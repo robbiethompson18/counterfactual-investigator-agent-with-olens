@@ -3,11 +3,6 @@
 Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint
 with Neel Nanda, run by Robbie and Kylie.
 
-@~/.claude/personal-repo-rules.md
-
-The import above is Robbie's personal conventions file. It only exists on Robbie's machines, so for
-anyone else it silently resolves to nothing. That's fine: the rules in this file are enough.
-
 `AGENTS.md` at the repo root is a symlink to `CLAUDE.md` so Codex/other agents see the same
 instructions. Do not replace it with a separate file.
 
@@ -109,8 +104,29 @@ Durable lessons about this repo go in git:
 
 - **One-line rules** → this file (`CLAUDE.md`), or `CLAUDE.local.md` for machine-specific
   (gitignored).
-- **Longer reference docs** (5–300 lines) → `docs/*.md`, with a one-line index entry below.
+- **Longer reference docs** (5–300 lines: experiment writeups, gotchas, repros) → `docs/*.md`,
+  kebab-case filenames. Flat by default; add a topic subfolder only once several docs of one kind
+  pile up.
 - **Local-only docs** (not in git) → `docs/local/*.md`.
+- Durable context lives in git, not in Claude Code's machine-local memory system.
+
+Behavioral rules (one-liners) go directly in this file, not in docs: docs are lazy-loaded, but rules
+need to always apply.
+
+Every agent-relevant doc gets a one-line index entry below, so future sessions know it exists:
+`- [Title — when to read this](docs/thing.md) — short gloss of contents`.
+
+When you notice or leave tech debt, add a dated note to the top-level `CODE_SMELL.md` (create it if
+missing) instead of relying on memory.
+
+## Working alongside other agents
+
+Robbie and Kylie may each have agents editing the same checkout as you. Don't use worktrees, and
+don't stash a live agent's changes. Depending on context, either make a fresh checkout, keep working
+in the same checkout and ship everything together, or ship/discard/park the existing work on a
+closed PR. If it's not obvious which, ask the human you're working with.
+
+When asked to ship, also ship unstaged or committed Markdown changes (a separate commit is fine).
 
 Current docs:
 
