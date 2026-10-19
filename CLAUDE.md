@@ -124,8 +124,10 @@ missing) instead of relying on memory.
 
 Current docs:
 
-<!-- As docs are added under docs/, list them here, one per line: -->
-<!-- - [Title — when to read](docs/foo.md) — short gloss -->
+- [CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
+  — HF dataset vs Agam's viewer, what each lacks, splits, file paths
+- [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
+  — setup, results on dev96, Sonnet 5.5 judge gotcha
 
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
