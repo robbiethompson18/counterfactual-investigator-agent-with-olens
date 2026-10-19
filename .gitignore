@@ -2,6 +2,9 @@
 CLAUDE.local.md
 docs/local/
 
+# Downloaded data (incl. Agam's unpublished readout banks) — never commit, this repo is public
+data/
+
 # direnv secrets / machine-specific
 .envrc.local
 

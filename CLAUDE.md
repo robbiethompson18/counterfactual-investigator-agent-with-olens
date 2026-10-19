@@ -1,4 +1,4 @@
-# counterfactual-investigator-agent-with-olsns
+# counterfactual-investigator-agent-with-olens
 
 Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint
 with Neel Nanda, run by Robbie and Kylie.

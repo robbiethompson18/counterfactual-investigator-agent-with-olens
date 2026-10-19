@@ -1,5 +1,5 @@
 [project]
-name = "counterfactual-investigator-agent-with-olsns"
+name = "counterfactual-investigator-agent-with-olens"
 version = "0.1.0"
 description = "Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint with Neel Nanda."
 requires-python = ">=3.12"
@@ -10,7 +10,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/counterfactual_investigator_agent_with_olsns"]
+packages = ["src/counterfactual_investigator_agent_with_olens"]
 
 [tool.ruff]
 line-length = 140
