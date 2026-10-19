@@ -119,6 +119,19 @@ Every agent-relevant doc gets a one-line index entry below, so future sessions k
 When you notice or leave tech debt, add a dated note to the top-level `CODE_SMELL.md` (create it if
 missing) instead of relying on memory.
 
+Current docs:
+
+<!-- As docs are added under docs/, list them here, one per line: -->
+<!-- - [Title — when to read](docs/foo.md) — short gloss -->
+
+## Shipping
+
+Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
+Never push to `main` directly, and never merge a PR without that human review, even for one-line or
+docs-only changes. "Ship" here means: push a branch and open a PR.
+
+When asked to ship, also include unstaged or committed Markdown changes (a separate commit is fine).
+
 ## Working alongside other agents
 
 Robbie and Kylie may each have agents editing the same checkout as you. Don't use worktrees, and
@@ -126,9 +139,5 @@ don't stash a live agent's changes. Depending on context, either make a fresh ch
 in the same checkout and ship everything together, or ship/discard/park the existing work on a
 closed PR. If it's not obvious which, ask the human you're working with.
 
-When asked to ship, also ship unstaged or committed Markdown changes (a separate commit is fine).
-
-Current docs:
-
-<!-- As docs are added under docs/, list them here, one per line: -->
-<!-- - [Title — when to read](docs/foo.md) — short gloss -->
+Don't switch branches in a checkout another agent is using: its next commit would land on your
+branch. Clone a fresh checkout for your PR branch instead.
