@@ -127,6 +127,9 @@ Current docs:
 <!-- As docs are added under docs/, list them here, one per line: -->
 <!-- - [Title — when to read](docs/foo.md) — short gloss -->
 
+- [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
+  — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
+
 ## Shipping
 
 Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
