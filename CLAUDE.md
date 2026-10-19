@@ -118,8 +118,8 @@ with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`)
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 3
-  replicates per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable
-  to his; say so when quoting both.
+  replicates per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
+  his; say so when quoting both.
 
 ## Docs
 
