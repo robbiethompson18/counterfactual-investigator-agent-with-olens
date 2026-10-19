@@ -3,7 +3,9 @@ name = "counterfactual-investigator-agent-with-olens"
 version = "0.1.0"
 description = "Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint with Neel Nanda."
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "detective-joracle",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -14,12 +16,24 @@ packages = ["src/counterfactual_investigator_agent_with_olens"]
 
 [tool.ruff]
 line-length = 140
+extend-exclude = ["vendor"]  # third-party submodules follow their own lint rules
 
 [tool.ruff.lint]
 extend-select = [
   "I",     # isort — ruff owns import ordering too
   "E501",  # line too long — not in ruff's defaults, and `ruff format` never wraps strings/comments
 ]
+
+[tool.uv.workspace]
+members = [
+    "vendor/detective-joracle",
+]
+
+[tool.uv.sources]
+detective-joracle = { workspace = true, editable = true }
+
+[tool.ty.src]
+exclude = ["vendor"]
 
 [dependency-groups]
 dev = [

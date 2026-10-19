@@ -97,6 +97,9 @@ private O-lens research Slack log. Read them there; don't copy them into this re
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
+- Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
+  workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
+  Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
 
 ## Docs
 
