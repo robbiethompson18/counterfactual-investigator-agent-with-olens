@@ -1,0 +1,5 @@
+// Prettier here is MARKDOWN-ONLY. Biome owns TS/JS formatting; ruff owns Python.
+// KEEP the md options in sync with ~/repos/dotfiles/.prettierrc.json5
+{
+  overrides: [{ files: "*.md", options: { printWidth: 100, proseWrap: "always" } }],
+}

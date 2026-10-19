@@ -1,0 +1,22 @@
+# Local Claude config — machine/personal-specific, not shared
+CLAUDE.local.md
+docs/local/
+
+# direnv secrets / machine-specific
+.envrc.local
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+
+# Standard OS/editor noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
