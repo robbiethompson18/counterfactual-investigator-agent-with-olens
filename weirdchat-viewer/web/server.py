@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import chive
+import organisms
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 
@@ -87,6 +88,38 @@ def render(tid):
         S["rendered"][tid] = chive.render(tid, decode(ids), [x in S["special"] for x in ids])
         return S["rendered"][tid]
     tok, t = S["tok"], S["trs"][tid]
+    if "ids" in t:  # model organisms (organisms.py): the token ids the lens read, message ranges precomputed
+        ids, msg_tok, cites, truncated = t["ids"], t["msg_tok"], [], False
+    else:
+        ids, msg_tok, cites, truncated = render_text(tid, tok, t)
+    im_end = tok.convert_tokens_to_ids("<|im_end|>")
+    zones = []  # [start, end) token ranges: an <|im_end|> through the next content
+    starts = [r[0] for r in msg_tok if r] + [len(ids)]
+    for i, x in enumerate(ids):
+        if x == im_end:
+            nxt = min([s for s in starts if s > i] or [len(ids)])
+            zones.append([i, min(nxt, len(ids))])
+    out = {
+        "tid": tid,
+        "ids": ids,
+        "tokens": decode(ids),
+        "special": [x in S["special"] for x in ids],
+        "msgs": msg_tok,
+        "roles": [m["role"] for m in t["messages"]],
+        "cites": cites,
+        "zones": zones,
+        "truncated": truncated,
+        # the end-of-turn zone the list previews and a transcript opens on: after the user's (last) message.
+        # Organisms have a system prompt first, so it's the second-to-last zone there
+        "main_zone": len(zones) - 2 if "organism" in t else 0,
+        "focus": [0, len(t["messages"]) - 1],  # messages whose punctuation is worth reading
+    }
+    S["rendered"][tid] = out
+    return out
+
+
+def render_text(tid, tok, t):
+    """WeirdChat transcripts: ids, message token ranges and judge citations, from the chat-templated text."""
     msgs = [{"role": m["role"], "content": m["content"]} for m in t["messages"]]
     text = tok.apply_chat_template(msgs, tokenize=False, enable_thinking=False)
     enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
@@ -112,28 +145,7 @@ def render(tid):
         r = tok_range(a0 + c["start_idx"], a0 + c["end_idx"])
         if r:
             cites.append({"range": r, "note": c["note"], "quote": c["quote"]})
-    im_end = tok.convert_tokens_to_ids("<|im_end|>")
-    zones = []  # [start, end) token ranges: an <|im_end|> through the next content
-    starts = [r[0] for r in msg_tok if r] + [len(ids)]
-    for i, x in enumerate(ids):
-        if x == im_end:
-            nxt = min([s for s in starts if s > i] or [len(ids)])
-            zones.append([i, min(nxt, len(ids))])
-    out = {
-        "tid": tid,
-        "ids": ids,
-        "tokens": decode(ids),
-        "special": [x in S["special"] for x in ids],
-        "msgs": msg_tok,
-        "roles": [m["role"] for m in msgs],
-        "cites": cites,
-        "zones": zones,
-        "truncated": len(enc.input_ids) > MAX_TOKENS,
-        "main_zone": 0,  # the end-of-turn zone the list previews and a transcript opens on: after the user's message
-        "focus": [0, len(msgs) - 1],  # messages whose punctuation is worth reading
-    }
-    S["rendered"][tid] = out
-    return out
+    return ids, msg_tok, cites, len(enc.input_ids) > MAX_TOKENS
 
 
 def decode(ids):
@@ -196,6 +208,7 @@ def read(tid, items, temperature=0.0, n=1, seed=0, cached_only=False):
     todo = [(k, it) for k, it in zip(keys, items) if k not in S["reads"]]
     todo = list({k: it for k, it in todo}.items())
     if todo and not cached_only:
+        no_live_reads(tid)
         if not (POD and POD.ready()):
             raise RuntimeError("the H100 isn't running: start it from the header (cached reads still show)")
         res = POD.call("/read", {"ids": r["ids"], "items": [it for _, it in todo], "temperature": temperature, "n": n, "seed": seed})
@@ -224,6 +237,11 @@ def tid_reads(tid):
     return list(S["by_tid"].get(tid, {}).values())
 
 
+def no_live_reads(tid):
+    if "organism" in S["trs"][tid]:
+        raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (scripts/organism_olens.py)")
+
+
 def overview():
     """Per pattern: the cached greedy L40 reads in the highlight transcript's main end-of-turn
     zone (after the user's last message), for the list."""
@@ -244,9 +262,9 @@ def overview():
                     "layer": r["layer"],
                     "token": r["token"],
                     "bullets": r["samples"][0]["bullets"][:4],
-                    "coefs": r["samples"][0]["coefs"][:4],
+                    "coefs": r["samples"][0].get("coefs", [])[:4],  # organism reads have no FVE yet
                     "bfve": r["samples"][0].get("bfve", [])[:4],
-                    "fve": r["samples"][0]["fve"],
+                    "fve": r["samples"][0].get("fve"),
                 }
                 for r in sorted(rows, key=lambda r: (r["pos"], r["layer"]))
             ]
@@ -267,7 +285,7 @@ def precompute():
     todo = []  # (phase, tid, item)
     for phase in ("zones", "punct"):
         for p in S["patterns"]:
-            if not p["tids"]:
+            if not p["tids"] or "organism" in p:
                 continue
             tid = p["tids"][0]
             r = render(tid)
@@ -453,6 +471,7 @@ def pattern_summary(p):
         "elo": {k: round(v["elo"]) for k, v in e.items() if isinstance(v, dict) and v.get("elo") is not None},
         "elo_mean": e.get("mean"),
         "search": p["description"] + " " + p["representative_user_text"],
+        **({"organism": p["organism"]} if "organism" in p else {}),
     }
 
 
@@ -473,6 +492,7 @@ def pattern_detail(i):
                 "highlight": t["is_highlight"],
                 "explanation": t["judgment"]["explanation"],
                 "preview": t["messages"][-1]["content"][:160],
+                **({"organism": {k: t["organism"][k] for k in ("key", "kind", "prompt", "sample", "read")}} if "organism" in t else {}),
             }
         )
     return dict(
@@ -539,6 +559,14 @@ def transcript(tid):
         claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
     )
+    if "organism" in t:  # reads on base Qwen's activations over the same tokens; the response tokens that were read
+        zone = {i for a, b in r["zones"] for i in range(a, b)}
+        out.update(
+            organism=t["organism"],
+            base_reads=tid_reads(tid + organisms.BASE),
+            punct=[p for p in t["organism"]["read_pos"] if p not in zone],
+            user_punct=0,
+        )
     return out
 
 
@@ -602,6 +630,7 @@ class H(BaseHTTPRequestHandler):
                 return self.send(dict(stopped=POD.stop(), **POD.status()))
             if p == "/api/queue/add":  # from the UI: to the front
                 tid = req["tid"]
+                no_live_reads(tid)
                 layers = [int(L) for L in req.get("layers") or QUEUE_LAYERS if int(L) in LAYERS]
                 pos = relevant_positions(tid) if req.get("scope", "relevant") == "relevant" else [int(x) for x in req["positions"]]
                 n = S["queue"].add(queue_items(tid, pos, layers, "user"), front=True)
@@ -646,6 +675,7 @@ def init():
         S["tok"].convert_tokens_to_ids(x) for x in ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
     }
     load()
+    organisms.load(S, key)
     for p in [p for p in shards("reads") if p != CACHE]:
         for line in p.open():
             r = json.loads(line)

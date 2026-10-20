@@ -28,14 +28,15 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 - **Not Qwen:** only the final reply is Qwen's. Earlier assistant turns come from the source dataset
   (mostly WildChat, written by ChatGPT), and the page labels them.
 - **✂ cut off:** CHIVE sampled the final reply with a ~500-token cap. 176 of 300 hit it and stop
-  mid-sentence, followed by an appended `<|im_end|>`, so the last end-of-turn zone is a forced ending.
+  mid-sentence, followed by an appended `<|im_end|>`, so the last end-of-turn zone is a forced
+  ending.
 - **Judge:** one Claude Sonnet 5.5 vote on whether the shown sample has the behaviour
   (`scripts/chive_judge.py`, `data/chive_judge.jsonl`). Its quotes become the citations.
   - CHIVE itself only gives the rate over 30 samples.
   - 294 of 298 judged samples show the behaviour; the judge refused 2.
-- **Counterfactual experiments:** each rewrites whole turns. The page diffs them against the original
-  turns (word level) and marks the edited tokens when you click an experiment. Hover a marked token
-  to see what replaced it.
+- **Counterfactual experiments:** each rewrites whole turns. The page diffs them against the
+  original turns (word level) and marks the edited tokens when you click an experiment. Hover a
+  marked token to see what replaced it.
   - 103 of 1,944 experiments only add or move turns, so they have no span.
 - **Agam's banks:** O-lens (s3d_rl600, 4 samples at T=1), multi-layer NLA, single-layer NLA-RL (L42)
   and J-lens (top 10 tokens, L0–62), at every token.
@@ -45,11 +46,22 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
   - The page fetches them 64 positions at a time (`/api/bank`). The "has our own read" underline
     ignores them.
   - A new reader (an SAE, say) is one more `READERS` entry with a `kind` the page knows how to draw.
-- **Scored banks:** the O-lens bank samples get AR scores from
-  `scripts/rescore_chive_banks.py` (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet
-  FVEs, the heatmap and the zone/punctuation tables wherever we have no greedy read of our own.
+- **Scored banks:** the O-lens bank samples get AR scores from `scripts/rescore_chive_banks.py`
+  (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet FVEs, the heatmap and the
+  zone/punctuation tables wherever we have no greedy read of our own.
 - **Solve counts:** "T 3/5 · O 5/5" is how many of 5 draws in Agam's climb_test run (Opus 5) named a
   true cause, with the transcript alone vs with the O-lens (`data/viewer/cmp_climb_test.json`).
+
+## Model organisms
+
+`web/organisms.py` appends one pattern per LoRA model organism after the CHIVE incidents, in the
+WeirdChat list (behavior "model organism"), from `data/runs/organisms/` at the repo root (HF dataset
+`runs/organisms/`; setup and findings in `docs/model-organisms.md`). Each rollout is a transcript.
+The ones read with the lens (sample 1 of each trigger and control prompt) have reads on the
+organism's activations and on base Qwen's over the same tokens: the transcript header switches
+between them, and the other one shows under each readout. Base Qwen's rollouts on the same prompt
+are at the bottom. The viewer can't make new reads of these (the pod doesn't load LoRAs;
+`scripts/organism_olens.py` does), and the current reads have no FVE scores.
 
 ## Run
 
@@ -67,16 +79,18 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 ## Sharing: the HF dataset and the public snapshot
 
 [olens-viewer.pages.dev](https://olens-viewer.pages.dev) (also deployed under its old name,
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev)) is this page in read-only mode (no GPU or queue
-controls), with links in the same `#p=…&t=…` form. Agam's CHIVE banks are only published with `publish.py --banks`:
-they're his and unpublished, so ask before using it. Its data lives in the project's HF dataset under `weirdchat/`, where
-each machine owns its own files so publishes never clash:
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev)) is this page in read-only mode (no
+GPU or queue controls), with links in the same `#p=…&t=…` form. Agam's CHIVE banks are only
+published with `publish.py --banks`: they're his and unpublished, so ask before using it. Its data
+lives in the project's HF dataset under `weirdchat/`, where each machine owns its own files so
+publishes never clash:
 
-- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of this machine's
-  `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name is `$WCO_MACHINE`, else the short
-  hostname.
-- `weirdchat/site/`: one gzipped JSON per transcript (the server's `/api/transcript`), per pattern, and the pattern
-  list, built from everyone's files. The page fetches these straight from HF (CORS is open).
+- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of
+  this machine's `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name
+  is `$WCO_MACHINE`, else the short hostname.
+- `weirdchat/site/`: one gzipped JSON per transcript (the server's `/api/transcript`), per pattern,
+  and the pattern list, built from everyone's files. The page fetches these straight from HF (CORS
+  is open).
 
 ```bash
 .venv/bin/python scripts/publish.py          # push this machine's files, pull everyone's, rebuild + upload the site
@@ -84,9 +98,9 @@ each machine owns its own files so publishes never clash:
 scripts/deploy_site.sh                       # (from the repo root) only when web/index.html changes
 ```
 
-The local server reads the pulled files (`data/shared/weirdchat/`) alongside its own. A full publish takes a few
-minutes (it renders all 25,792 transcripts) and uploads only the site files that changed. Writing to the dataset
-needs an HF token with write access to it.
+The local server reads the pulled files (`data/shared/weirdchat/`) alongside its own. A full publish
+takes a few minutes (it renders all 25,792 transcripts) and uploads only the site files that
+changed. Writing to the dataset needs an HF token with write access to it.
 
 ## GPUs
 
