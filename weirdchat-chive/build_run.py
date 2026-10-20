@@ -85,11 +85,12 @@ def main() -> None:
     ap.add_argument("--target-llm", help="override the target spec entirely, e.g. openrouter:qwen/qwen3.6-27b")
     ap.add_argument("--claude", default=CLAUDE, help="spec for investigator, grader and judge")
     ap.add_argument("--concurrency", type=int, default=64)
+    ap.add_argument("--exclude", nargs="*", default=[], help="behaviour ids to leave out")
     ap.add_argument("--reuse-wc-samples", action="store_true", help="use WeirdChat's samples as stage 1 (smoke tests)")
     args = ap.parse_args()
 
     prompts, patterns, rubrics, samples = load(args.wc_data.expanduser())
-    chosen = select(prompts, args.min_rate, args.pilot)
+    chosen = select([p for p in prompts if p["behavior_id"] not in args.exclude], args.min_rate, args.pilot)
     assert chosen, f"no prompts at a WeirdChat rate of {args.min_rate:.0%} or more"
     out = args.out
     out.mkdir(parents=True, exist_ok=False)

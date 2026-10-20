@@ -86,7 +86,7 @@ function bar(r, base) { return `<span class="bar"><i style="width:${(100*r).toFi
 async function loadRuns() {
   const runs = await (await fetch("api/runs")).json();
   if (!runs.length) { $("#run").innerHTML = "<option>no runs yet</option>"; return; }
-  if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.name === "wc30_pilot") || runs[runs.length - 1]).name;
+  if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.name === "wc30_pilot7") || runs[runs.length - 1]).name;
   $("#run").innerHTML = runs.map(r => `<option ${r.name === RUN ? "selected" : ""}>${esc(r.name)}</option>`).join("");
 }
 
