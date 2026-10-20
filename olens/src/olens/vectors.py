@@ -33,9 +33,9 @@ class Vectors:
             a, La, ia = self.build_raw(spec["a"])
             b, Lb, ib = self.build_raw(spec["b"])
             assert La == Lb, f"diff of vectors at different layers ({La}, {Lb})"
-            return unit(a - b), La, {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4)}
+            return unit(a - b), La, {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4), "raw_norm": round(float((a - b).norm()), 2)}
         v, L, info = self.build_raw(spec)
-        return unit(v), L, info
+        return unit(v), L, dict(info, raw_norm=round(float(v.norm()), 2))
 
     @torch.no_grad()
     def build_raw(self, spec):
@@ -233,7 +233,7 @@ def attention_pattern(model, ids, pos, layer, head, top=12):
 
     b = blocks(model)[layer]
     if not hasattr(b, "self_attn"):
-        return {"error": f"L{layer} is a linear-attention (gated delta net) block: no attention pattern"}
+        return delta_pattern(model, ids, pos, layer, head, top)
     attn, got = b.self_attn, {}
 
     def pre(m, args, kwargs):
@@ -260,3 +260,56 @@ def attention_pattern(model, ids, pos, layer, head, top=12):
     order = w.argsort(descending=True)[:top]
     return {"layer": layer, "head": head, "weights": [round(float(x), 4) for x in w], "write": [round(float(x), 3) for x in write],
             "top": [int(i) for i in order]}
+
+
+@torch.no_grad()
+def delta_pattern(model, ids, pos, layer, head, top=12):
+    """Effective attention of a Gated DeltaNet head: unrolling S_t = g_t (I - b_t k_t k_t^T) S_{t-1}
+    + b_t k_t v_t^T gives o_t = S_t^T q_t = sum_j c_j v_j with c_j = b_j k_j^T u_j, u_t = q_t,
+    u_{j-1} = g_j (I - b_j k_j k_j^T) u_j. c_j can be negative (the delta rule erases). `write` is
+    ||c_j v_j W_O,h|| before the gated output norm; `check` is the relative error of sum_j c_j v_j
+    against the layer's own recurrence."""
+    import torch.nn.functional as F
+    from transformers.models.qwen3_5.modeling_qwen3_5 import torch_recurrent_gated_delta_rule
+
+    la, got = blocks(model)[layer].linear_attn, {}
+
+    def pre(m, args, kwargs):
+        got["h"] = kwargs.get("hidden_states", args[0] if args else None)
+
+    hd = la.register_forward_pre_hook(pre, with_kwargs=True)
+    try:
+        model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
+    finally:
+        hd.remove()
+    h = got["h"][:, : pos + 1]
+    T = h.shape[1]
+    x = la.in_proj_qkv(h).transpose(1, 2)  # [1, C, T]
+    w = la.conv1d.weight  # [C, 1, K] depthwise causal conv
+    x = F.conv1d(F.pad(x, (w.shape[-1] - 1, 0)), w, la.conv1d.bias, groups=x.shape[1])
+    x = F.silu(x).transpose(1, 2)
+    q, k, v = torch.split(x, [la.key_dim, la.key_dim, la.value_dim], dim=-1)
+    q = q.reshape(1, T, -1, la.head_k_dim)
+    k = k.reshape(1, T, -1, la.head_k_dim)
+    v = v.reshape(1, T, -1, la.head_v_dim)
+    beta = la.in_proj_b(h).sigmoid()
+    g = -la.A_log.float().exp() * F.softplus(la.in_proj_a(h).float() + la.dt_bias)
+    r = la.num_v_heads // la.num_k_heads
+    q, k = q.repeat_interleave(r, dim=2), k.repeat_interleave(r, dim=2)
+    check_o, _ = torch_recurrent_gated_delta_rule(q, k, v, g=g, beta=beta, initial_state=None, output_final_state=False, use_qk_l2norm_in_kernel=True)
+    qh = F.normalize(q[0, :, head].float(), dim=-1) / la.head_k_dim**0.5
+    kh = F.normalize(k[0, :, head].float(), dim=-1)
+    vh, bh, gh = v[0, :, head].float(), beta[0, :, head].float(), g[0, :, head].float().exp()
+    c = torch.zeros(T, device=h.device)
+    u = qh[pos]
+    for j in range(pos, -1, -1):
+        c[j] = bh[j] * (kh[j] @ u)
+        u = gh[j] * (u - bh[j] * kh[j] * (kh[j] @ u))
+    o = c @ vh
+    ref = check_o[0, pos, head].float()
+    err = float((o - ref).norm() / ref.norm().clamp_min(1e-9))
+    Wo = la.out_proj.weight[:, head * la.head_v_dim : (head + 1) * la.head_v_dim].float()
+    write = (c[:, None] * (vh @ Wo.T)).norm(dim=-1)
+    order = c.abs().argsort(descending=True)[:top]
+    return {"layer": layer, "head": head, "linear": True, "weights": [round(float(x), 4) for x in c], "write": [round(float(x), 3) for x in write],
+            "top": [int(i) for i in order], "check": round(err, 5)}

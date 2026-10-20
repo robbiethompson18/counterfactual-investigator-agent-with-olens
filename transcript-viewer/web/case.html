@@ -115,9 +115,9 @@ function render(){
       const done = (st.ex[p] || {}).jpp && (st.ex[p] || {}).nla && LAYERS.every(L => st.reads[p + '|' + L]);
       if (tr.special[p]) cls.push('sp'); if (zoneOf.has(p) && !st.probe) cls.push('zone'); if (p === st.sel) cls.push('sel'); if (!done && !st.probe) cls.push('miss');
       const ap = st.attnPat && st.attnPat.weights && st.attnPat.pos === st.sel ? st.attnPat : null;
-      const aw = ap && p <= ap.pos ? ap.weights[p] / Math.max(...ap.weights) : null;
+      const aw = ap && p <= ap.pos ? ap.weights[p] / Math.max(...ap.weights.map(Math.abs)) : null;
       const pc = st.probe && !ap ? st.probe.cos[p] : null;
-      const bg = aw != null ? `background:color-mix(in srgb, var(--blue) ${Math.round(Math.sqrt(aw) * 70)}%, transparent)`
+      const bg = aw != null ? `background:color-mix(in srgb, ${aw >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.sqrt(Math.abs(aw)) * 70)}%, transparent)`
         : pc == null ? '' : `background:color-mix(in srgb, ${pc > 0 ? 'var(--accent)' : 'var(--blue)'} ${Math.round(Math.min(1, Math.abs(pc) / st.probeMax) * 65)}%, transparent)`;
       const title = `token ${p}${pc == null ? '' : ' · cos ' + pc.toFixed(3)}`;
       if (nl) { cls.push('nlg'); h += `<span class="${cls.join(' ')}" style="${bg}" data-p="${p}" title="${title}">↵</span>${compact ? '' : esc(t)}`; continue; }
@@ -201,11 +201,12 @@ async function showAttn(L, h){
 function attnHtml(a){
   if (a.loading) return '<div class="muted"><span class="spin"></span> attention pattern…</div>';
   if (a.error) return `<div class="err">${esc(a.error)}</div>`;
-  const tr = st.tr, wm = Math.max(...a.weights), xm = Math.max(...a.write);
-  return `<div style="margin:4px 0 8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px"><div class="row" style="font-size:12px;margin-bottom:4px"><b>L${a.layer} head ${a.head}</b><span class="muted">attention from token ${a.pos}; tokens are shaded by weight above</span><span class="grow"></span><a href="#" data-ab2="L${a.layer} h${a.head}">add to ablation list</a> · <a href="#" data-attnclose>close</a></div>
-    <table class="ct"><tr><td class="muted">token</td><td class="muted">weight</td><td style="width:42px"></td><td class="muted" title="‖w_j · v_j W_O,h‖: how much this token moves into the residual stream through this head (before the output gate)">weighted write</td><td style="width:42px"></td></tr>` +
+  const tr = st.tr, wm = Math.max(...a.weights.map(Math.abs)), xm = Math.max(...a.write);
+  const wcol = x => x >= 0 ? 'var(--blue)' : 'var(--bad)';
+  return `<div style="margin:4px 0 8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px"><div class="row" style="font-size:12px;margin-bottom:4px"><b>L${a.layer} head ${a.head}</b><span class="muted">${a.linear ? `linear attention: effective coefficients c_j from unrolling the DeltaNet memory (red = erases; exact to ${(100 * a.check).toFixed(2)}%)` : 'attention'} from token ${a.pos}; tokens are shaded above</span><span class="grow"></span><a href="#" data-ab2="L${a.layer} h${a.head}">add to ablation list</a> · <a href="#" data-attnclose>close</a></div>
+    <table class="ct"><tr><td class="muted">token</td><td class="muted">${a.linear ? 'coefficient' : 'weight'}</td><td style="width:42px"></td><td class="muted" title="‖w_j · v_j W_O,h‖: how much this token moves into the residual stream through this head (before the output gate)">weighted write</td><td style="width:42px"></td></tr>` +
     a.top.map(j => `<tr class="atr"><td style="font-family:var(--mono);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="token ${j}">${j} ${esc(JSON.stringify(tr.tokens[j]))}</td>
-      <td><div class="dv" style="height:9px"><i style="left:0;width:${100 * a.weights[j] / wm}%;background:var(--blue)"></i></div></td><td class="muted">${a.weights[j].toFixed(3)}</td>
+      <td><div class="dv" style="height:9px"><i style="left:0;width:${100 * Math.abs(a.weights[j]) / wm}%;background:${wcol(a.weights[j])}"></i></div></td><td class="muted">${a.linear ? a.weights[j].toExponential(1) : a.weights[j].toFixed(3)}</td>
       <td><div class="dv" style="height:9px"><i style="left:0;width:${100 * a.write[j] / xm}%;background:var(--accent)"></i></div></td><td class="muted">${a.write[j].toFixed(2)}</td></tr>`).join('') + `</table></div>`;
 }
 document.addEventListener('click', e => {
