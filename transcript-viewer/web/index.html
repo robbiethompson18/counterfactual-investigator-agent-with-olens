@@ -437,8 +437,11 @@ async function openTranscript(tid){
           <option value="off">off</option><option value="joint">joint (all bullets)</option><option value="top">top bullet</option></select>
         at <select id="hllayer" style="width:auto;padding:1px 6px;font-size:11.5px">${st.layers.map(L => `<option ${L === st.hlLayer ? 'selected' : ''}>${L}</option>`).join('')}</select>
         <span id="hlscale" class="hlscale"></span></span></div>
-    <div class="qbar"><button class="btn" id="qadd">Queue all relevant tokens</button>
-      <span class="muted">${tr.relevant} positions (end-of-turn + punctuation) × layers</span>
+    <div class="qbar"><button class="btn" id="qadd">Queue</button>
+      <select id="qscope" style="width:auto;padding:2px 6px;font-size:12px">
+        <option value="relevant">relevant tokens: ${tr.relevant} (end-of-turn + punctuation + newlines)</option>
+        <option value="all">all tokens: ${tr.tokens.length}</option></select>
+      <span class="muted">× layers</span>
       <span class="chips" id="qlayers">${st.layers.map(L => `<button class="chip ${st.qLayers.has(L) ? 'on' : ''}" data-ql="${L}">${L}</button>`).join('')}</span>
       <span class="muted" id="qinfo">${tr.queued.length ? tr.queued.length + ' reads of this transcript queued' : ''}</span></div>`;
   let at = 0;
@@ -474,7 +477,9 @@ async function openTranscript(tid){
   $('#qadd').onclick = async () => {
     const b = $('#qadd'); b.disabled = true;
     try {
-      const r = await api('/api/queue/add', {tid: st.tr.tid, scope: 'relevant', layers: [...st.qLayers]});
+      const scope = $('#qscope').value, n = (scope === 'all' ? st.tr.tokens.length : st.tr.relevant) * st.qLayers.size;
+      if (n > 5000 && !confirm(`Queue up to ${n} reads (minus any already read)? They go ahead of the bulk queue.`)) { b.disabled = false; return; }
+      const r = await api('/api/queue/add', {tid: st.tr.tid, scope, layers: [...st.qLayers]});
       $('#qinfo').textContent = `${r.added} reads added to the front of the queue` + (r.added ? '' : ' (all already read or queued)');
       refreshQueued(); pollQueue();
     } catch (e) { $('#qinfo').textContent = e.message; }

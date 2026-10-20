@@ -44,6 +44,7 @@ LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
 PRE_LAYERS = [40]  # precomputed on every highlight transcript (see precompute())
 PRE_BATCH = 96
+NEWLINE = re.compile(r"^\s*\n\s*$")
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
 # GPT-2 byte-level BPE alphabet (bytes_to_unicode, inverted): token char -> raw byte
 _KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
@@ -389,9 +390,10 @@ QUEUE_LAYERS = [24, 32, 40, 48, 56]
 
 
 def relevant_positions(tid):
-    """End-of-turn zones + punctuation in the focus messages (WeirdChat: both turns): where the lens reads best."""
+    """End-of-turn zones + punctuation and newlines in the focus messages (WeirdChat: both turns): where the lens reads best."""
     r = render(tid)
-    return sorted({i for a, b in r["zones"] for i in range(a, b)} | {i for k in r["focus"] for i in punct_positions(r, k)})
+    newlines = {i for k in r["focus"] if r["msgs"][k] for i in range(*r["msgs"][k]) if NEWLINE.match(r["tokens"][i])}
+    return sorted({i for a, b in r["zones"] for i in range(a, b)} | {i for k in r["focus"] for i in punct_positions(r, k)} | newlines)
 
 
 def queue_items(tid, positions, layers, src):
@@ -651,7 +653,13 @@ class H(BaseHTTPRequestHandler):
                 tid = req["tid"]
                 no_live_reads(tid)
                 layers = [int(L) for L in req.get("layers") or QUEUE_LAYERS if int(L) in LAYERS]
-                pos = relevant_positions(tid) if req.get("scope", "relevant") == "relevant" else [int(x) for x in req["positions"]]
+                scope = req.get("scope", "relevant")
+                if scope == "relevant":
+                    pos = relevant_positions(tid)
+                elif scope == "all":  # every token of the rendered transcript
+                    pos = list(range(len(render(tid)["ids"])))
+                else:
+                    pos = [int(x) for x in req["positions"]]
                 n = S["queue"].add(queue_items(tid, pos, layers, "user"), front=True)
                 return self.send(dict(added=n, **S["queue"].summary(title_of)))
             if p == "/api/queue/bulk":  # from scripts/fleet.py: to the back
