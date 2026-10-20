@@ -47,7 +47,7 @@ def load(S, records):
                 "idx": len(S["patterns"]),
                 "ds": "weirdchat",
                 "pattern_id": f"followup:{parent}",
-                "title": f"Follow-up: {p0['title']}",
+                "title": f"Follow-up ({rs[0].get('label', 'favourite')}): {p0['title']}",
                 "behavior_id": BEHAVIOR,
                 "method": "follow-up user turn",
                 "metrics": {},

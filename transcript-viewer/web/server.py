@@ -417,12 +417,12 @@ def title_of(tid):
     return f"{p['title'] if p else t['pattern_id']} · {tid.split('/')[-1]}"
 
 
-def read_chunk(items):
-    """Read queue items on the viewer's own pod: one capture per transcript."""
+def read_chunk(items, pod=None):
+    """Read queue items on the viewer's own pod (or `pod`): one capture per transcript."""
     jobs = {}
     for it in items:
         jobs.setdefault(it["tid"], []).append({"pos": it["pos"], "layer": it["layer"]})
-    res = POD.call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
+    res = (pod or POD).call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
     recs = []
     for (tid, its), out, norms in zip(jobs.items(), res["results"], res["norms"]):
         toks = render(tid)["tokens"]
