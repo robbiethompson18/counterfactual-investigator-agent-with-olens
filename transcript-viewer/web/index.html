@@ -585,9 +585,9 @@ function renderLens(){
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
     h += `<div class="lr"><div class="hd"><b>L${L}</b>${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
-    h += r.samples.map(sampHtml).join('');
+    h += r.samples.map(s => sampHtml(s, L)).join('');
     const o = tr.organism && st.other[tokKey(pos, L)];  // the other activations (organism / base) on the same token
-    if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl">${blTxt(b)}</div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
+    if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl">${blTxt(b, L)}</div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
     h += `</div>`;
   }
   if (st.busy) h += `<div class="muted"><span class="spin"></span> reading on the GPU…</div>`;
@@ -607,20 +607,24 @@ function renderLens(){
 }
 
 // bullet text plus a copy button (delegated click handler below)
-const blTxt = b => `<span>${esc(b)}<button class="cp" title="copy bullet"></button></span>`;
+const blTxt = (b, L) => `<span>${esc(b)}<button class="cp" data-l="${L}" title="copy bullet + link"></button></span>`;
+// copies "bullet ([L28](link))": the current view's hash with only that layer, on the public site (localhost links don't travel)
 document.addEventListener('click', e => {
   const b = e.target.closest('.cp'); if (!b) return;
-  navigator.clipboard.writeText(b.parentNode.textContent);
+  const L = b.dataset.l, h = new URLSearchParams(location.hash.slice(1));
+  if (L === '40') h.delete('L'); else h.set('L', L);
+  const base = STATIC ? location.origin + location.pathname : 'https://olens-viewer.pages.dev/';
+  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h}))`);
   b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 900);
 });
 
 // one scored sample: bullets with their own FVE (or NNLS weight, for reads from before per-bullet FVE)
-function sampHtml(s){
+function sampHtml(s, L){
   const mx = Math.max(1e-9, ...(s.coefs || []));
   return `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
-    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b)}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
-    : s.coefs ? `<div class="bl">${blTxt(b)}<div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
-    : `<div class="bl">${blTxt(b)}</div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
+    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b, L)}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
+    : s.coefs ? `<div class="bl">${blTxt(b, L)}<div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
+    : `<div class="bl">${blTxt(b, L)}</div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
 }
 
 // Agam's per-token banks (web/chive.py READERS), fetched a chunk of positions at a time
@@ -653,7 +657,7 @@ function bankHtml(pos){
     for (const L of r.layers.length === 1 ? r.layers : r.layers.filter(L => st.chosen.has(L))) {
       const scored = r.key === 'olens_bank' && st.bankReads[`${pos}|${L}`];
       h += `<div class="bank"><div class="hd"><b>${esc(r.label)} L${L}</b><span>${scored ? 'scored with the AR' : esc(r.note)}</span>${scored ? `<span class="fve">joint FVE <b>${scored.samples.map(s => s.fve.toFixed(2)).join(' / ')}</b></span>` : ''}</div>`;
-      h += scored ? scored.samples.map(sampHtml).join('') : wait || (cell(L) || []).map(t => `<div class="samp btxt">${esc(t)}</div>`).join('') || '<div class="muted">(empty)</div>';
+      h += scored ? scored.samples.map(s => sampHtml(s, L)).join('') : wait || (cell(L) || []).map(t => `<div class="samp btxt">${esc(t)}</div>`).join('') || '<div class="muted">(empty)</div>';
       h += `</div>`;
     }
   }
