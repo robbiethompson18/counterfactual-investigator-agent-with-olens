@@ -100,6 +100,8 @@ private O-lens research Slack log. Read them there; don't copy them into this re
 - Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
   workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
+- Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
+  `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 
 ## Docs
 

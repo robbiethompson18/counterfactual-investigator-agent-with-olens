@@ -76,9 +76,11 @@ for spec in sys.argv[3:]:
             cell["judged"] = len(judged)
             cell["pass1"] = pass_rate([r["judge"]["score"] for r in judged]) if judged else None
             cell["score"] = mean([r["judge"]["score"] for r in judged])
-            cell["agam_pass1"] = mean([pass_rate(agam[r["prompt_id"]][arm]) for r in judged])
+            # Agam only has draws on climb_test; on other splits this is None
+            cell["agam_pass1"] = mean([pass_rate(agam[r["prompt_id"]][arm]) for r in judged if r["prompt_id"] in agam])
             for r in done:
-                row = rows.setdefault(r["prompt_id"], {"agam": {a: agam[r["prompt_id"]][a] for a in ("transcript", "olens_rl_B")}})
+                theirs = agam.get(r["prompt_id"])
+                row = rows.setdefault(r["prompt_id"], {"agam": {a: theirs[a] for a in ("transcript", "olens_rl_B")} if theirs else None})
                 row[f"{agent}/{arm}"] = (r.get("judge") or {}).get("score")
         else:
             evs = [r["yesno_eval"] for r in done if r.get("yesno_eval")]
