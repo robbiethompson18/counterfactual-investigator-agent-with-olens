@@ -36,7 +36,7 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 - **Counterfactual experiments:** each rewrites whole turns. The page diffs them against the original
   turns (word level) and marks the edited tokens when you click an experiment. Hover a marked token
   to see what replaced it.
-  - 156 of 1,944 experiments only add or move turns, so they have no span.
+  - 103 of 1,944 experiments only add or move turns, so they have no span.
 - **Agam's banks:** O-lens (s3d_rl600, 4 samples at T=1), multi-layer NLA, single-layer NLA-RL (L42)
   and J-lens (top 10 tokens, L0–62), at every token.
   - They're mirrored from his case viewer with

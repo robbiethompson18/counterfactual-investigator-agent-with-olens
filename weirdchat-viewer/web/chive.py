@@ -97,11 +97,14 @@ def render(tid, tokens, special):
         starts.append(s - c.find(c.strip()) if s >= 0 else None)
 
     def tok_range(k, lo, hi):
-        """Tokens of message k covering content chars [lo, hi) (an insertion point, if lo == hi)."""
+        """Tokens of message k covering content chars [lo, hi). An insertion (lo == hi) marks the token before it, which
+        also catches text appended at the end of the message."""
         if starts[k] is None:
             return None
         a, b = msgs[k]
-        lo, hi, at, out = lo + starts[k], max(hi, lo + 1) + starts[k], 0, []
+        if lo == hi:
+            lo, hi = max(lo - 1, 0), max(lo, 1)
+        lo, hi, at, out = lo + starts[k], hi + starts[k], 0, []
         for i in range(a, b):
             if at + len(tokens[i]) > lo and at < hi:
                 out.append(i)
@@ -133,7 +136,8 @@ def render(tid, tokens, special):
         "zones": zones,
         "truncated": False,
         # dataset-specific
-        "main_zone": next(z for z, (a, b) in enumerate(zones) if b == reply[0]),
+        # the last zone before the reply: an empty final user message leaves two zones ending there
+        "main_zone": max(z for z, (a, b) in enumerate(zones) if b == reply[0]),
         "focus": [k for k in range(last) if roles[k] == "system" and msgs[k]] + [final_user, last],
         "not_qwen": [k for k in range(last) if roles[k] == "assistant" and msgs[k]],
         "capped": reply[1] - reply[0] >= CAP,
@@ -146,8 +150,7 @@ def edits(p, contents, tok_range):
     for original message i), so diff every rewritten turn against the original at the same place (word level) and keep
     the changed spans, each with what replaced it. Changes less than 3 words apart are one span."""
     out = []
-    base = p["gt"]["baseline_rate"]
-    for e in sorted(p["gt"]["experiments"], key=lambda e: -abs(e["rate"] - base)):
+    for e in sorted(p["gt"]["experiments"], key=lambda e: -abs(e["rate"] - e["baseline_rate"])):
         subs = []
         turns = e["turns"]
         structural = len(turns) != len(contents) - 1 or any(x.get("keep", k) != k for k, x in enumerate(turns))
@@ -176,7 +179,8 @@ def edits(p, contents, tok_range):
                 "is_key": e["is_key"],
                 "k": e["k"],
                 "n": e["n"],
-                "effect": e["rate"] - base,
+                "effect": e["rate"] - e["baseline_rate"],  # some experiments re-measured their own baseline
+                "baseline": e["baseline_rate"],
                 "subs": subs,
                 "structural": structural,  # turns added, dropped or moved: the spans miss that part
             }
