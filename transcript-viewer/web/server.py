@@ -719,6 +719,11 @@ class H(BaseHTTPRequestHandler):
                     return self.send(POD.call("/nla_score", {"ids": ids, "pos": int(req["pos"]), "text": req["text"]}))
                 res = POD.call("/rescore", {"jobs": [{"ids": ids, "items": [{"pos": int(req["pos"]), "layer": int(req["layer"]), "texts": [req["text"]]}]}]})
                 return self.send(res["results"][0][0][0])
+            if p == "/api/contrib":  # per-block attention / MLP writes at one token: {tid, pos}
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
+                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs}))
             if p == "/api/vector":
                 return self.send(steer.build(POD, req.get("name"), req["spec"]))
             if p == "/api/vector/delete":

@@ -111,3 +111,38 @@ class Vectors:
 
 def unit(v):
     return v / v.norm().clamp_min(1e-12)
+
+
+@torch.no_grad()
+def contributions(model, ids, pos, vecs):
+    """What each attention block (full or linear) and each MLP writes into the residual stream at
+    token `pos`, compared by cosine with: the final residual (block-63 output), the residual right
+    after that sublayer's block, and each of `vecs` ({name: [d]}). -> {layers: [{attn, mlp}]},
+    each {norm, cos: {name: c}}."""
+    got = {}
+    hs = []
+    for i, b in enumerate(blocks(model)):
+        attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
+        hs.append(attn.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "attn"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
+        hs.append(b.mlp.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "mlp"), o[0, pos].float())))
+        hs.append(b.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "out"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
+    try:
+        model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
+    finally:
+        for h in hs:
+            h.remove()
+    n_blocks = len(blocks(model))
+    final = got[(n_blocks - 1, "out")]  # block outputs from hooks: hidden_states[-1] is after the final norm
+    dirs = {"final residual": final, **{k: torch.as_tensor(v, device=final.device).float() for k, v in vecs.items()}}
+    dirs = {k: unit(v) for k, v in dirs.items()}
+    rows = []
+    for i in range(len(blocks(model))):
+        row = {}
+        for kind in ("attn", "mlp"):
+            c = got[(i, kind)]
+            n = c.norm().clamp_min(1e-12)
+            cos = {k: round(float(c @ d / n), 4) for k, d in dirs.items()}
+            cos["block output"] = round(float(c @ unit(got[(i, "out")]) / n), 4)
+            row[kind] = {"norm": round(float(n), 2), "cos": cos}
+        rows.append(row)
+    return {"layers": rows, "resid_norm": [round(float(got[(i, "out")].norm()), 1) for i in range(n_blocks)]}

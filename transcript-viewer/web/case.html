@@ -27,6 +27,10 @@ table.vt tr.on td{background:var(--blue-soft)}
 .jt td{padding:1px 3px;font-family:var(--mono);font-size:11.5px;vertical-align:top}
 .jt span{padding:0 3px;margin-right:2px;border-radius:3px;display:inline-block}
 .nla{white-space:pre-wrap;font-size:13px}
+table.ct{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}
+table.ct td{padding:0 3px;height:13px} table.ct td.L{color:var(--ink3);width:30px}
+.dv{position:relative;height:9px;background:var(--panel2);border-radius:2px}
+.dv i{position:absolute;top:0;height:100%;border-radius:2px} .dv::after{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;border-left:1px solid var(--ink3)}
 </style>
 </head>
 <body>
@@ -62,6 +66,7 @@ table.vt tr.on td{background:var(--blue-soft)}
 </section>
 <aside id="right">
   <h3 id="otitle">Token</h3><div class="ctx" id="ctx"></div>
+  <h3>Residual writes <button class="btn" id="cbtn" style="padding:1px 8px;float:right;text-transform:none;letter-spacing:0">attention / MLP per block</button></h3><div id="contrib" style="margin-bottom:14px"></div>
   <h3>NLA · L42</h3><div id="nla"></div>
   <h3>J++ lens · top 8 <label class="muted" style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppall" style="width:auto"> all 63 layers</label></h3><div id="jpp" style="margin-bottom:14px"></div>
   <h3>O-lens</h3><div id="olens"></div>
@@ -147,11 +152,33 @@ function renderDetail(){
       (s.bullets.map((b, j) => { const f = s.bfve ? s.bfve[j] : null; return `<div class="bl"><span>${esc(b)}</span><div class="w"><i style="width:${f == null ? 0 : Math.min(100, 100 * f / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${f == null ? '' : f.toFixed(2)}</span></div>`; }).join('') || '<div class="muted">(no bullets)</div>') + `<div id="ed${L}"></div></div>`; }).join('')
     : '<div class="muted">Not read yet.</div>';
   $('#nla').innerHTML = x.nla ? `<div class="lr"><div class="hd"><span title="AR reconstruction from the explanation: cosine, and FVE = 1 − ‖p̂−v̂‖²/E‖v̂−μ‖² (μ over 64 random WeirdChat transcripts)">reconstruction</span><span class="fve">cos <b>${x.nla.cos.toFixed(2)}</b> · FVE <b>${x.nla.fve.toFixed(2)}</b></span></div><div class="nla">${esc(x.nla.text)}</div><button class="btn" style="padding:1px 7px;margin-top:6px" data-edit="nla" title="Edit the explanation and re-score it with the NLA reconstructor">edit</button><div id="ednla"></div></div>` : '<div class="muted" style="margin-bottom:14px">Not read yet (needs the H200 pod).</div>';
+  renderContrib();
   const all = $('#jppall').checked;
   $('#jpp').innerHTML = x.jpp ? `<table class="jt">` + x.jpp.layers.map((L, i) => [L, x.jpp.top[i]]).filter(([L]) => all || L % 4 === 3 || L >= 56).reverse().map(([L, top]) => `<tr><td class="muted">L${L}</td><td>` +
     top.map(([t, q]) => `<span title="p ${q.toFixed(3)}" style="background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, q * 2) * 45)}%, transparent)">${esc(tokStr(t))}</span>`).join('') + `</td></tr>`).join('') + `</table>` : '<div class="muted">Not read yet.</div>';
 }
 $('#jppall').onchange = renderDetail;
+// per-block writes into the residual stream at the selected token, by cosine with a chosen direction
+st.contrib = {};
+function renderContrib(){
+  const c = st.contrib[st.sel], box = $('#contrib');
+  if (!c) { box.innerHTML = '<div class="muted">What each attention block (full or linear) and each MLP adds to this token\'s residual stream, as cosine with a direction. Press the button (needs the H200).</div>'; return; }
+  const keys = Object.keys(c.layers[0].attn.cos); if (!keys.includes(st.cdir)) st.cdir = 'final residual';
+  const nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
+  const bar = (x, col) => { const w = Math.min(50, Math.abs(x.cos[st.cdir]) * 50 / st.cscale), o = 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
+    return `<div class="dv" title="cos ${x.cos[st.cdir].toFixed(3)} · ‖write‖ ${x.norm}"><i style="${x.cos[st.cdir] >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
+  st.cscale = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(r.attn.cos[st.cdir]), Math.abs(r.mlp.cos[st.cdir])]));
+  box.innerHTML = `<div class="row" style="margin-bottom:6px;font-size:12px"><span class="muted">cos with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:11.5px">${keys.map(k => `<option ${k === st.cdir ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+    <span class="muted">bars to ±${st.cscale.toFixed(2)}; faint = small write</span></div>
+    <div><table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:40px"></td><td class="muted">MLP</td><td style="width:40px"></td></tr>` +
+    c.layers.map((r, L) => `<tr><td class="L">L${L}</td><td>${bar(r.attn, 'var(--blue)')}</td><td class="muted">${r.attn.cos[st.cdir].toFixed(2)}</td><td>${bar(r.mlp, 'var(--accent)')}</td><td class="muted">${r.mlp.cos[st.cdir].toFixed(2)}</td></tr>`).join('') + `</table></div>`;
+  $('#cdir').onchange = e => { st.cdir = e.target.value; renderContrib(); };
+}
+$('#cbtn').onclick = async () => {
+  const p = st.sel; $('#contrib').innerHTML = '<div class="muted"><span class="spin"></span> one forward pass on the GPU…</div>';
+  try { st.contrib[p] = await api('/api/contrib', {tid: st.tr.tid, pos: p}); } catch (e) { $('#contrib').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  if (st.sel === p) renderContrib();
+};
 // edit a readout and re-score it against the same activation (O-lens: AR + whitened FVE; NLA: its AR)
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-edit]'); if (!b) return;

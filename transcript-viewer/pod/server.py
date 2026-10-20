@@ -10,6 +10,7 @@ POST /extras      {ids, positions, nla, jpp} -> {nla: [{text, cos, fve}], jpp: {
 POST /vector      {spec} -> {v, layer, info}            probe/steering direction (olens.vectors)
 POST /probe       {ids, layer, v} -> {cos, proj}       per position
 POST /steer       {ids, layer, v, alpha, n, max_new_tokens, temperature, seed} -> {texts}
+POST /contrib     {ids, pos, vecs} -> per block: attention / MLP write norms and cosines
 POST /read        {ids, items: [{pos, layer}], temperature, n, seed, max_bullets}
                   -> {results: [[{text, bullets, coefs, fve}] * n per item], seconds}
                   one capture for the whole sequence, every (pos, layer) decoded in batches.
@@ -233,6 +234,13 @@ def do_nla_score(req):
     return S["critic"].score([req["text"]], v)[0]
 
 
+def do_contrib(req):
+    from olens.vectors import contributions
+
+    ids = [int(i) for i in req["ids"]]
+    return contributions(S["model"], ids, int(req["pos"]) % len(ids), req.get("vecs") or {})
+
+
 def do_vector(req):
     v, L, info = vectors().build(req["spec"])
     return {"v": [round(float(x), 6) for x in v.cpu()], "layer": L, "info": info}
@@ -294,10 +302,10 @@ class H(BaseHTTPRequestHandler):
                 r = gpu(f"re-scoring {n} reads", lambda: do_rescore(req))
                 LAST["t"] = time.time()
                 return self.send(r)
-            if self.path in ("/vector", "/probe", "/steer", "/nla_score"):
+            if self.path in ("/vector", "/probe", "/steer", "/nla_score", "/contrib"):
                 if not STATUS["ready"]:
                     return self.send({"error": "model still loading"}, 503)
-                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score}[self.path]
+                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score, "/contrib": do_contrib}[self.path]
                 LAST["t"] = time.time()
                 r = gpu(self.path[1:], lambda: fn(req))
                 LAST["t"] = time.time()
