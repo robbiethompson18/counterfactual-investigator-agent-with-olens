@@ -116,9 +116,13 @@ def run_detail(name: str) -> dict:
 
 
 def calib_text(name: str, grader: str, pid: str, i: int) -> dict:
+    """One calibration disagreement in full: the prompt, the reply, the rubric and both judges' reasons."""
     d = RUNS / name
     assert d.parent == RUNS and "/" not in grader
-    return dict(text=jload(d / f"calibration_{grader}.json")[pid]["disagreements"][i]["text"])
+    g = jload(d / f"calibration_{grader}.json")[pid]["disagreements"][i]
+    m = jload(d / "wc_meta.json")[pid]
+    prompt = {r["id"]: r for r in jsonl(d / "prompts.jsonl")}[pid]["messages"]
+    return dict(g, prompt=prompt, rubric=m["rubric"], rubric_id=m["rubric_id"])
 
 
 def samples(name: str, pid: str, exp: int) -> dict:

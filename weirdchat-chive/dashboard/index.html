@@ -32,6 +32,7 @@
   pre { white-space:pre-wrap; word-wrap:break-word; font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin:0 }
   .log { max-height:260px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px }
   ins { background:color-mix(in srgb, var(--ok) 25%, transparent); text-decoration:none } del { background:color-mix(in srgb, var(--up) 22%, transparent) }
+  .trace > div, .trace > details { margin:8px 0 } .trace pre { background:color-mix(in srgb, var(--line) 35%, transparent); padding:6px 8px; border-radius:6px; margin-top:3px }
   .samp { border-left:3px solid var(--line); padding:4px 8px; margin:6px 0 } .samp.yes { border-color:var(--up) }
   .hidden { display:none } .row { display:flex; gap:16px; flex-wrap:wrap } .row > div { flex:1 1 380px; min-width:0 }
   .tabwrap { overflow-x:auto }
@@ -56,7 +57,7 @@
   <div class="small mut">Same grader call as stage 3, run on WeirdChat's own 64 samples per prompt, compared with WeirdChat's labels.</div>
   <div id="calib"></div>
   <h3>Disagreements</h3>
-  <div class="small mut">Samples where the grader and WeirdChat's judge differ. Click one to read the full reply.</div>
+  <div class="small mut">Samples where the grader and WeirdChat's judge differ. Click one to see the prompt, Qwen's reply, both judges' reasons and the rubric.</div>
   <div id="disag"></div>
   <h2>Log (tail)</h2>
   <div class="log"><pre id="log"></pre></div>
@@ -160,7 +161,16 @@ async function load() {
   document.querySelectorAll("details.calib").forEach(el => el.addEventListener("toggle", async () => {
     if (!el.open || el.dataset.loaded) return; el.dataset.loaded = 1;
     const r = await (await fetch(`api/calib_text?name=${encodeURIComponent(RUN)}&grader=${encodeURIComponent(el.dataset.g)}&pid=${el.dataset.p}&i=${el.dataset.i}`)).json();
-    el.querySelector(".txt").textContent = r.text ?? r.error;
+    if (r.error) { el.querySelector(".txt").textContent = r.error; return; }
+    const reason = r.grader_reason
+      ? `<div><b>Sonnet's reason</b> <span class="mut small">(asked again on this reply alone, it answered <b>${esc(r.grader_single_answer ?? "?")}</b>; the batch verdict was <b>${r.grader ? "yes" : "no"}</b>)</span><pre>${esc(r.grader_reason)}</pre></div>`
+      : `<div class="mut small">No reason recorded yet (run explain.py on this run).</div>`;
+    el.querySelector(".txt").outerHTML = `<div class="trace">
+      <div><b>WeirdChat's judge (Gemma 4 31B): ${r.weirdchat ? "match" : "no match"}</b><pre>${esc(r.weirdchat_explanation)}</pre></div>
+      ${reason}
+      <div><b>User prompt</b><pre>${esc((r.prompt || []).map(m => m.content).join("\n\n"))}</pre></div>
+      <div><b>Qwen's reply</b><pre>${esc(r.text)}</pre></div>
+      <details><summary><b>Rubric</b> <span class="mut small">${esc(r.rubric_id)}</span></summary><pre>${esc(r.rubric)}</pre></details></div>`;
   }));
 
   $("#log").textContent = d.log.join("\n");

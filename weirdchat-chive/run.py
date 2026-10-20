@@ -21,6 +21,7 @@ CHIVE (vendor/chive) runs unmodified apart from these monkeypatches:
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -186,9 +187,27 @@ def patch_third_person() -> None:
     assert STRUCTURED_ANSWER_DESC in json.dumps(investigate.SUBMIT_FINDINGS_TOOL), "submit tool description not found"
 
 
+def patch_grade_one_by_one() -> None:
+    """Grade every reply in its own grader call instead of all n in one call.
+
+    On the pilot's calibration set, Sonnet's batch-of-64 verdicts disagreed with WeirdChat's judge on 124
+    of 576 replies, and on 44 of those it gave the other answer when shown the reply alone (estimated
+    kappa vs WeirdChat 0.56 batched -> ~0.72 one by one). Same prompt and rubric, ~3x the grader tokens.
+    """
+    grade = investigate.grade_completions
+
+    async def grade_each(grader_client, classifier_question, messages, completions):
+        out = await asyncio.gather(*(grade(grader_client, classifier_question, messages, [c]) for c in completions))
+        return [v[0] for v in out]
+
+    investigate.grade_completions = grade_each
+
+
 def patch(run_dir: Path) -> None:
     patch_anthropic_thinking()
     patch_third_person()
+    if os.environ.get("WC_GRADE_BATCHED") != "1":
+        patch_grade_one_by_one()
     meta: dict[str, dict] = json.loads((run_dir / "wc_meta.json").read_text())
     pool = [json.loads(line) for line in (run_dir / "prompts.jsonl").read_text().splitlines() if line.strip()]
     meta_by_text = {p["user_message"]: meta[p["id"]] for p in pool}
