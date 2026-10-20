@@ -1,9 +1,10 @@
-# WeirdChat × oracle lens viewer
+# O-lens viewer
 
 Browse the Qwen3.6-27B patterns of
 [Transluce/WeirdChat](https://huggingface.co/datasets/Transluce/WeirdChat) (225 patterns, 25,792
-transcripts) token by token, and read any token with the agu18dec oracle lens (`../olens`). Reads
-run on cloud GPUs and are cached locally, so everything read once stays browsable with no GPU up.
+transcripts) and the 300 [CHIVE](https://huggingface.co/datasets/agu18dec/chive-forensics) incidents
+token by token, and read any token with the agu18dec oracle lens (`../olens`). Reads run on cloud
+GPUs and are cached locally, so everything read once stays browsable with no GPU up.
 
 ## What the page does
 
@@ -16,6 +17,39 @@ run on cloud GPUs and are cached locally, so everything read once stays browsabl
   colour scale).
 - A shared read queue: "Queue all relevant tokens" puts every end-of-turn and punctuation position
   of a transcript at the chosen layers at the front; the header pill opens the queue panel.
+
+## CHIVE incidents
+
+The dataset picker at the top of the list switches to CHIVE (`web/chive.py`). Each incident is one
+pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links keep working.
+
+- **Rendering:** from CHIVE's own `token_ids` and per-token turn labels, not our chat template,
+  because Agam's banks index into those ids.
+- **Not Qwen:** only the final reply is Qwen's. Earlier assistant turns come from the source dataset
+  (mostly WildChat, written by ChatGPT), and the page labels them.
+- **✂ cut off:** CHIVE sampled the final reply with a ~500-token cap. 176 of 300 hit it and stop
+  mid-sentence, followed by an appended `<|im_end|>`, so the last end-of-turn zone is a forced ending.
+- **Judge:** one Claude Sonnet 5.5 vote on whether the shown sample has the behaviour
+  (`scripts/chive_judge.py`, `data/chive_judge.jsonl`). Its quotes become the citations.
+  - CHIVE itself only gives the rate over 30 samples.
+  - 294 of 298 judged samples show the behaviour; the judge refused 2.
+- **Counterfactual experiments:** each rewrites whole turns. The page diffs them against the original
+  turns (word level) and marks the edited tokens when you click an experiment. Hover a marked token
+  to see what replaced it.
+  - 156 of 1,944 experiments only add or move turns, so they have no span.
+- **Agam's banks:** O-lens (s3d_rl600, 4 samples at T=1), multi-layer NLA, single-layer NLA-RL (L42)
+  and J-lens (top 10 tokens, L0–62), at every token.
+  - They're mirrored from his case viewer with
+    `uv run python scripts/mirror_agam_readers.py vendor/detective-joracle/data/chive/splits/all300.txt data/banks/agam`
+    (repo root, ~4 GB).
+  - The page fetches them 64 positions at a time (`/api/bank`). The "has our own read" underline
+    ignores them.
+  - A new reader (an SAE, say) is one more `READERS` entry with a `kind` the page knows how to draw.
+- **Scored banks:** the O-lens bank samples get AR scores from
+  `scripts/rescore_chive_banks.py` (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet
+  FVEs, the heatmap and the zone/punctuation tables wherever we have no greedy read of our own.
+- **Solve counts:** "T 3/5 · O 5/5" is how many of 5 draws in Agam's climb_test run (Opus 5) named a
+  true cause, with the transcript alone vs with the O-lens (`data/viewer/cmp_climb_test.json`).
 
 ## Run
 
@@ -32,8 +66,10 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 
 ## Sharing: the HF dataset and the public snapshot
 
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev) is this page in read-only mode (no GPU or queue
-controls), with links in the same `#p=…&t=…` form. Its data lives in the project's HF dataset under `weirdchat/`, where
+[olens-viewer.pages.dev](https://olens-viewer.pages.dev) (also deployed under its old name,
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev)) is this page in read-only mode (no GPU or queue
+controls), with links in the same `#p=…&t=…` form. Agam's CHIVE banks are only published with `publish.py --banks`:
+they're his and unpublished, so ask before using it. Its data lives in the project's HF dataset under `weirdchat/`, where
 each machine owns its own files so publishes never clash:
 
 - `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of this machine's
