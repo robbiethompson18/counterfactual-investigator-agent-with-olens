@@ -24,6 +24,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import chive
+import followups
 import organisms
 import extras
 import steer
@@ -37,11 +38,12 @@ HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
 CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
+FOLLOWUPS = ROOT / "data/followups.jsonl"  # scripts/followups.py: "why did you do that?" turns on favourite transcripts
 # The files above are this machine's; other machines' copies come from the HF dataset (scripts/publish.py) as
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
 MACHINE = os.environ.get("WCO_MACHINE") or socket.gethostname().split(".")[0].lower()
-KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE, "chive_judge": chive.JUDGE}
+KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE, "chive_judge": chive.JUDGE, "followups": FOLLOWUPS}
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
@@ -115,8 +117,8 @@ def render(tid):
         "zones": zones,
         "truncated": truncated,
         # the end-of-turn zone the list previews and a transcript opens on: after the user's (last) message.
-        # Organisms have a system prompt first, so it's the second-to-last zone there
-        "main_zone": len(zones) - 2 if "organism" in t else 0,
+        # Organisms have a system prompt first and follow-ups a second user turn, so it's the second-to-last zone there
+        "main_zone": len(zones) - 2 if "organism" in t or "followup" in t else 0,
         "focus": [0, len(t["messages"]) - 1],  # messages whose punctuation is worth reading
     }
     S["rendered"][tid] = out
@@ -415,12 +417,12 @@ def title_of(tid):
     return f"{p['title'] if p else t['pattern_id']} · {tid.split('/')[-1]}"
 
 
-def read_chunk(items):
-    """Read queue items on the viewer's own pod: one capture per transcript."""
+def read_chunk(items, pod=None):
+    """Read queue items on the viewer's own pod (or `pod`): one capture per transcript."""
     jobs = {}
     for it in items:
         jobs.setdefault(it["tid"], []).append({"pos": it["pos"], "layer": it["layer"]})
-    res = POD.call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
+    res = (pod or POD).call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
     recs = []
     for (tid, its), out, norms in zip(jobs.items(), res["results"], res["norms"]):
         toks = render(tid)["tokens"]
@@ -477,7 +479,7 @@ def pattern_summary(p):
         "elo": {k: round(v["elo"]) for k, v in e.items() if isinstance(v, dict) and v.get("elo") is not None},
         "elo_mean": e.get("mean"),
         "search": p["description"] + " " + p["representative_user_text"],
-        **({"organism": p["organism"]} if "organism" in p else {}),
+        **{k: p[k] for k in ("organism", "followup") if k in p},
     }
 
 
@@ -499,6 +501,7 @@ def pattern_detail(i):
                 "explanation": t["judgment"]["explanation"],
                 "preview": t["messages"][-1]["content"][:160],
                 **({"organism": {k: t["organism"][k] for k in ("key", "kind", "prompt", "sample", "read")}} if "organism" in t else {}),
+                **({"followup": t["followup"]} if "followup" in t else {}),
             }
         )
     # behaviour rate per prompt: judged rollouts of that prompt (~64 each) that matched
@@ -586,6 +589,8 @@ def transcript(tid):
         extras=sorted(extras.of(tid)),
         prompt_rate=prompt_rate(t["prompt_id"]),
     )
+    if "followup" in t:
+        out["followup"] = t["followup"]
     if "organism" in t:  # reads on base Qwen's activations over the same tokens; the response tokens that were read
         zone = {i for a, b in r["zones"] for i in range(a, b)}
         out.update(
@@ -806,6 +811,7 @@ def init():
     }
     load()
     organisms.load(S, key)
+    followups.load(S, [json.loads(line) for p in shards("followups") for line in p.open()])
     for p in [p for p in shards("reads") if p != CACHE]:
         for line in p.open():
             r = json.loads(line)
