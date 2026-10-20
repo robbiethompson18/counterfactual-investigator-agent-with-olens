@@ -135,6 +135,9 @@ def save(recs):
 MIN_MIB = 80000  # Vast's "H100" offers come up as anything (32 GB RTX 5090s included)
 
 
+KEEP = set()  # node indices to leave up when the queue is done (--keep)
+
+
 def gpus(name):
     r = subprocess.run(  # noqa: PLW1510  (an unreachable node returns no output, handled below)
         [
@@ -172,6 +175,9 @@ def node(i, q, total, env, first=0, yaml="sky/fleet.yaml"):
         w.start()
     for w in ws:
         w.join()
+    if i in KEEP:
+        log(name, "queue done; keeping the node up (--keep)")
+        return
     log(name, "tearing down")
     run(name, SKY + ["down", "-y", name], 900)
 
@@ -213,7 +219,10 @@ def bring_up(name, i, first, env, yaml):
         log(name, "setup + server job started")
     else:
         log(name, "server job already running")
-    run(name, SKY + ["autostop", "-y", name, "-i", "5", "--down"], 300)
+    if i in KEEP:
+        run(name, SKY + ["autostop", "-y", name, "--cancel"], 300)
+    else:
+        run(name, SKY + ["autostop", "-y", name, "-i", "5", "--down"], 300)
     return True
 
 
@@ -344,6 +353,7 @@ def main():
     ap.add_argument("--reverse", action="store_true", help="work the queue from the end")
     ap.add_argument("--ids", default="", help="explicit node indices (adopt or launch), e.g. 1,8,9,20")
     ap.add_argument("--multi-ids", default="", help="which of --ids are multi-GPU nodes (sky/fleet8.yaml)")
+    ap.add_argument("--keep", default="", help="node indices to leave up afterwards (autostop cancelled)")
     ap.add_argument("--yaml-for", default="", help="per-node task overrides, e.g. 22:sky/fleet_h200x2.yaml")
     args = ap.parse_args()
     LOGDIR.mkdir(parents=True, exist_ok=True)
@@ -361,6 +371,7 @@ def main():
     env = dict(os.environ, HF_TOKEN=hf_token())
     ids = [int(x) for x in args.ids.split(",")] if args.ids else list(range(args.first, args.first + args.pods))
     multi = {int(x) for x in args.multi_ids.split(",") if x}
+    KEEP.update(int(x) for x in args.keep.split(",") if x)
     custom = {int(k): v for k, v in (x.split(":") for x in args.yaml_for.split(",") if x)}
     ts = [
         threading.Thread(
