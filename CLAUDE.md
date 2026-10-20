@@ -155,6 +155,11 @@ Current docs:
   hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
+- [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
+  — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
+  findings
+- [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
+  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
 ## Shipping
 
