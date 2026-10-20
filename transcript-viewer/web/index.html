@@ -72,6 +72,11 @@ input,select{font:inherit;color:inherit;background:var(--panel2);border:1px soli
 .bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
 #tpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 #tpick select{width:auto;max-width:100%}
+.ptab{width:100%;border-collapse:collapse;font-size:12.5px}
+.ptab tr{cursor:pointer}.ptab tr:hover td{background:var(--panel2)}
+.ptab td{border-top:1px solid var(--line);padding:5px 6px;vertical-align:middle}
+.ptab .pn{white-space:nowrap;color:var(--ink2);width:1%}.ptab .pr{width:110px}.ptab .pk{white-space:nowrap;width:1%;font-variant-numeric:tabular-nums}
+.ptab .pt{color:var(--ink2)}.ptab .pt div{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .judge{font-size:12.5px;color:var(--ink2);border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:6px 0 12px}
 .judge.match{border-color:var(--accent)}
 .judge.org{border-color:var(--zone-ink)} .judge .chips{display:inline-flex;vertical-align:middle}
@@ -173,6 +178,7 @@ body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn
   <div class="sub" id="sub"></div>
   <div class="grow"></div>
   <div class="pill" id="prepill" style="display:none"></div>
+  <button class="pill" id="chivebtn" title="CHIVE counterfactual investigations on these prompts (weirdchat-chive, port 8805)">CHIVE runs</button>
   <button class="pill" id="qpill" title="Read queue: click to show">queue</button>
   <div class="pill" id="podpill"><span class="dot" id="poddot"></span><span id="podtxt">H100: checking…</span></div>
   <button class="btn" id="podbtn" style="display:none"></button>
@@ -360,7 +366,14 @@ async function openPattern(i, tid){
       <a href="${esc(d.url)}" target="_blank" rel="noopener">open in WeirdChat ↗</a></div>
     <div class="elo">${elos.map(([k, n]) => `<span class="muted">${n}</span><div class="bar"><i style="width:${Math.max(0, Math.min(100, ((d.elo[k]||1500) - 1000) / 15))}%"></i></div><b style="font-size:12px">${d.elo[k]||'–'}</b>`).join('')}</div>
   </div>
+  <div class="card" style="padding:12px 14px"><div class="row" style="margin-bottom:6px"><b style="font-size:13px">Behaviour rate by prompt</b>
+    <span class="muted">judged rollouts per prompt that show the behaviour · click to filter transcripts</span></div>
+    <table class="ptab">${d.prompts.slice().sort((a, b) => b.matched / b.n - a.matched / a.n).map(p => `<tr data-pi="${p.idx}"><td class="pn">${p.highlight ? '★ ' : ''}${p.idx + 1}</td>
+      <td class="pr"><div class="bar"><i style="width:${(100 * p.matched / Math.max(1, p.n)).toFixed(1)}%"></i></div></td>
+      <td class="pk">${p.matched}/${p.n} <span class="muted">(${(100 * p.matched / Math.max(1, p.n)).toFixed(0)}%)</span></td>
+      <td class="pt"><div>${esc(p.text)}</div></td></tr>`).join('')}</table></div>
   <div id="tpick">
+    <select id="tprompt" style="width:auto"><option value="">All prompts (${d.prompts.length})</option>${d.prompts.map(p => `<option value="${p.idx}">prompt ${p.idx + 1} · ${p.matched}/${p.n}</option>`).join('')}</select>
     <select id="tfilter" style="width:auto"><option value="all">All transcripts (${d.transcripts.length})</option><option value="match">Judge: match (${nMatch})</option><option value="nomatch">Judge: no match (${d.transcripts.length - nMatch})</option></select>
     <select id="tsel"></select>
     <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
@@ -368,12 +381,16 @@ async function openPattern(i, tid){
   <div id="tview"></div>`;
   const fill = () => {
     const f = $('#tfilter').value;
-    const ts = d.transcripts.filter(t => f === 'all' || (d.organism ? (f === 'read' ? t.organism.read : t.organism.kind === f) : (f === 'match') === t.match));
+    const pf = $('#tprompt') ? $('#tprompt').value : '';
+    const ts = d.transcripts.filter(t => (f === 'all' || (d.organism ? (f === 'read' ? t.organism.read : t.organism.kind === f) : (f === 'match') === t.match))
+      && (d.organism || pf === '' || t.prompt === +pf));
     $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.organism
       ? `${t.organism.read ? '◉ read · ' : ''}${t.organism.kind} prompt ${+t.organism.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${t.organism.sample + 1}`
       : `${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}`}</option>`).join('');
   };
   $('#tfilter').onchange = () => { fill(); openTranscript($('#tsel').value); };
+  if ($('#tprompt')) $('#tprompt').onchange = () => { fill(); if ($('#tsel').value) openTranscript($('#tsel').value); };
+  for (const tr of document.querySelectorAll('.ptab tr')) tr.onclick = () => { $('#tprompt').value = tr.dataset.pi; $('#tprompt').onchange(); };
   $('#tsel').onchange = () => openTranscript($('#tsel').value);
   const step = s => { const o = $('#tsel'); o.selectedIndex = Math.max(0, Math.min(o.options.length - 1, o.selectedIndex + s)); openTranscript(o.value); };
   $('#tprev').onclick = () => step(-1); $('#tnext').onclick = () => step(1);
@@ -420,9 +437,13 @@ async function openTranscript(tid){
           <option value="off">off</option><option value="joint">joint (all bullets)</option><option value="top">top bullet</option></select>
         at <select id="hllayer" style="width:auto;padding:1px 6px;font-size:11.5px">${st.layers.map(L => `<option ${L === st.hlLayer ? 'selected' : ''}>${L}</option>`).join('')}</select>
         <span id="hlscale" class="hlscale"></span></span></div>
-    <div class="qbar"><button class="btn" id="qadd">Queue all relevant tokens</button>
-      <span class="muted">${tr.relevant} positions (end-of-turn + punctuation) × layers</span>
+    <div class="qbar"><button class="btn" id="qadd">Queue</button>
+      <select id="qscope" style="width:auto;padding:2px 6px;font-size:12px">
+        <option value="relevant">relevant tokens: ${tr.relevant} (end-of-turn + punctuation + newlines)</option>
+        <option value="all">all tokens: ${tr.tokens.length}</option></select>
+      <span class="muted">× layers</span>
       <span class="chips" id="qlayers">${st.layers.map(L => `<button class="chip ${st.qLayers.has(L) ? 'on' : ''}" data-ql="${L}">${L}</button>`).join('')}</span>
+      <a class="btn" href="/case#t=${encodeURIComponent(tr.tid)}" target="_blank" title="O-lens, NLA and J++ side by side for this transcript's user turn and first 20 reply tokens">Case study</a>
       <span class="muted" id="qinfo">${tr.queued.length ? tr.queued.length + ' reads of this transcript queued' : ''}</span></div>`;
   let at = 0;
   tr.msgs.forEach((m, k) => {
@@ -457,7 +478,9 @@ async function openTranscript(tid){
   $('#qadd').onclick = async () => {
     const b = $('#qadd'); b.disabled = true;
     try {
-      const r = await api('/api/queue/add', {tid: st.tr.tid, scope: 'relevant', layers: [...st.qLayers]});
+      const scope = $('#qscope').value, n = (scope === 'all' ? st.tr.tokens.length : st.tr.relevant) * st.qLayers.size;
+      if (n > 5000 && !confirm(`Queue up to ${n} reads (minus any already read)? They go ahead of the bulk queue.`)) { b.disabled = false; return; }
+      const r = await api('/api/queue/add', {tid: st.tr.tid, scope, layers: [...st.qLayers]});
       $('#qinfo').textContent = `${r.added} reads added to the front of the queue` + (r.added ? '' : ' (all already read or queued)');
       refreshQueued(); pollQueue();
     } catch (e) { $('#qinfo').textContent = e.message; }
@@ -565,7 +588,8 @@ function renderLens(){
       <button class="btn primary" id="readbtn">Read ${st.chosen.size === 1 ? 'L' + [...st.chosen][0] : st.chosen.size + ' layers'}</button>
       <button class="btn" id="allbtn">All 11 layers</button>
       ${z ? `<button class="btn" id="zonebtn">Whole end-of-turn zone</button>` : ''}
-    </div><div id="lerr"></div>`;
+      <button class="btn" id="xbtn" title="ceselder L42 natural-language autoencoder + J++ lens at every layer (needs an H200 pod)">NLA + J++</button>
+    </div><div id="lerr"></div><div id="xbox"></div>`;
   if (z) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
     h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
@@ -607,6 +631,10 @@ function renderLens(){
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
+  $('#xbtn').onclick = () => readExtras(pos);
+  $('#xbtn').disabled = !(st.pod.state === 'ready' || st.jppLocal) || st.busy;
+  if (st.jppLocal && st.pod.state !== 'ready') $('#xbtn').textContent = 'J++ (local GPU)';
+  showExtras(pos);
   $('#readbtn').onclick = () => doRead([pos]);
   $('#allbtn').onclick = () => doRead([pos], layers);
   if (z) $('#zonebtn').onclick = () => doRead(Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k));
@@ -673,11 +701,41 @@ function bankHtml(pos){
 }
 
 async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); setBankReads(tr); markRead(); renderLens(); }
+// NLA (L42) + J++ lens: cached per token in data/extras.jsonl, fetched when a token is shown
+async function showExtras(pos){
+  const tid = st.tr.tid, have = st.tr.extras && st.tr.extras.includes(pos);
+  if (!have) return;
+  const x = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
+  $('#xbox').innerHTML = extrasHtml(x);
+  const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };
+}
+function extrasHtml(x){
+  let h = '';
+  if (x.nla) h += `<h3>NLA · L42 <span style="text-transform:none;letter-spacing:0;font-weight:400" title="AR reconstruction of the activation from the explanation: cosine, and FVE = 1 − ‖p̂−v̂‖²/E‖v̂−μ‖² (μ over 64 random WeirdChat transcripts)">cos ${x.nla.cos.toFixed(2)} · FVE ${x.nla.fve.toFixed(2)}</span></h3>
+    <div class="lr" style="white-space:pre-wrap;font-size:12.5px">${esc(x.nla.text)}</div>`;
+  if (x.jpp) {
+    const rows = x.jpp.layers.map((L, i) => [L, x.jpp.top[i]]).filter(([L]) => st.jppAll || L % 4 === 3 || L >= 56);
+    h += `<h3>J++ lens · top tokens <label style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppl" style="width:auto" ${st.jppAll ? 'checked' : ''}> all 63 layers</label></h3>
+      <div style="max-height:340px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(([L, top]) => `<tr><td class="muted" style="width:34px">L${L}</td><td style="font-family:var(--mono);font-size:11.5px">` +
+      top.slice(0, 6).map(([t, p]) => `<span title="p ${p.toFixed(3)}" style="padding:0 3px;margin-right:2px;border-radius:3px;background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, p * 2) * 45)}%, transparent)">${esc(JSON.stringify(t).slice(1, -1))}</span>`).join('') + `</td></tr>`).join('') + `</table></div>`;
+  }
+  return h;
+}
+async function readExtras(pos){
+  const tid = st.tr.tid; st.busy = true; renderLens();
+  try {
+    await api('/api/extras', {tid, positions: [pos], kinds: st.pod.state === 'ready' ? ['nla', 'jpp'] : ['jpp']});
+    if (st.tr.tid === tid) { st.tr.extras = [...new Set([...(st.tr.extras || []), pos])]; }
+  } catch (e) { st.busy = false; renderLens(); $('#lerr').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  st.busy = false; renderLens();
+}
 // pick up reads that land in the background (precompute, fleet) for the open transcript
 setInterval(async () => {
   if (STATIC || !st.tr || st.busy || document.hidden) return;
   try {
     const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
+    if (tr.tid === st.tr.tid && (tr.extras || []).length !== (st.tr.extras || []).length) { st.tr.extras = tr.extras; renderLens(); }
     if (tr.tid !== st.tr.tid || (tr.reads.length === Object.keys(st.reads).length && (tr.bank_reads || []).length === Object.keys(st.bankReads).length)) return;
     setReads(tr); setBankReads(tr);
     markRead(); renderLens();
@@ -728,7 +786,7 @@ async function pollQueue(){
 
 async function pollStatus(){
   try {
-    const s = await api('/api/status'); const p = s.pod; st.pod = p;
+    const s = await api('/api/status'); const p = s.pod; st.pod = p; st.jppLocal = s.jpp_local;
     const dot = $('#poddot'); dot.className = 'dot ' + (p.state === 'ready' ? (p.server && p.server.busy ? 'busy' : 'ready') : p.state === 'error' ? 'err' : ['launching','starting','stopping'].includes(p.state) ? 'busy' : '');
     const mins = x => Math.floor(x / 60) + 'm';
     const g = p.server && p.server.gpu ? p.server.gpu.replace(/^NVIDIA /, '').replace(/ (Workstation|Server) Edition$/, '') : 'GPU pod';
@@ -795,6 +853,23 @@ document.addEventListener('keydown', e => {
   if (hpat) openPattern(hpat.idx, hp.get('t'));
   else if (hp.has('ds')) openPattern(firstOf(st.ds));
   else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(firstOf('weirdchat')); }
+})();
+</script>
+<!-- CHIVE runs tab: a separate read-only server (weirdchat-chive/dashboard/server.py, port 8805) in an overlay -->
+<iframe id="chiveframe" title="CHIVE runs" style="display:none;position:fixed;left:0;right:0;bottom:0;width:100%;border:0;background:var(--bg);z-index:50"></iframe>
+<script>
+(() => {
+  const b = document.getElementById("chivebtn"), f = document.getElementById("chiveframe");
+  b.onclick = () => {
+    const on = f.style.display === "none";
+    if (on) {
+      const top = document.querySelector("header").getBoundingClientRect().bottom;
+      f.style.top = top + "px"; f.style.height = `calc(100% - ${top}px)`;
+      if (!f.src) f.src = `${location.protocol}//${location.hostname}:8805/`;
+    }
+    f.style.display = on ? "block" : "none";
+    b.textContent = on ? "← back to viewer" : "CHIVE runs";
+  };
 })();
 </script>
 </body>

@@ -126,3 +126,23 @@ changed. Writing to the dataset needs an HF token with write access to it.
   (no duplicate `sky exec`).
 - AR quality grows with depth (held-out FVE 0.12 at L20 → 0.34 at L60), so FVE isn't comparable
   across layers.
+
+## Case study page (`/case#t=<transcript id>`)
+
+One transcript's user turn plus the first 20 reply tokens with every lens side by side: the O-lens
+(11 layers), the [ceselder L42 NLA](https://huggingface.co/ceselder/qwen3.6-27b-nla-L42)
+(`olens/src/olens/extras.py`; the RL LoRA is applied on top of the SFT LoRA, which its config
+names as its base; FVE uses μ from 64 random WeirdChat transcripts, `pod/calib_ids.json`) and the
+[J++ lens](https://huggingface.co/neuronpedia/jacobian-lens/tree/main/qwen3.6-27b/jpp) at all 63
+layers. Readouts can be edited and re-scored. Vectors (`olens/src/olens/vectors.py`) come from J++
+tokens, the O-lens or NLA AR of free text, or differences of these; they probe the transcript
+(cosine per token) or steer 64 samples of its prompt (h ← h + α‖h‖v̂ at every position), judged with
+WeirdChat's own judge prompt (`web/judge.py`, ported from
+[transluceAI/weirdchat](https://github.com/transluceAI/weirdchat)) on Gemma 4 31B.
+
+- NLA + J++ need ≥ 120 GB of GPU memory: `WCO_POD_YAML=sky/pod_h200.yaml` for Start GPU.
+- `web/server.py --jpp-local` sends J++ reads to `web/run_lens.sh --extras jpp` on this machine.
+- Judge: `sky launch -c wco-judge -y -i 5 --down sky/judge_gemma.yaml`, tunnel 18812 → 8002, and
+  `WCO_JUDGE_URL=http://127.0.0.1:18812/v1`. Agreement with WeirdChat's labels on the 64 stored
+  rollouts of "Most-sober person…" prompt 1: 92%, κ 0.78. vLLM 0.25.1 needs transformers 5.10.0 for
+  Gemma 4 (newer versions raise on its per-layer `head_dim`).

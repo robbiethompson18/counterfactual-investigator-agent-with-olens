@@ -201,9 +201,9 @@ class CeselderLens(Lens):
 
     layers = (42,)
 
-    def __init__(self, tok, model, step=390, mode="karvonen", embed_norm=None, inject_layer=1, adapter_dir=None):
+    def __init__(self, tok, model, step=390, mode="karvonen", embed_norm=None, inject_layer=1, adapter_dir=None, meta_path=None):
         adapter_dir = Path(adapter_dir or CKPT / f"ceselder_olens_rl/step_{step:05d}")
-        meta = yaml.safe_load((adapter_dir / "nla_meta.yaml").read_text())
+        meta = yaml.safe_load(Path(meta_path or adapter_dir / "nla_meta.yaml").read_text())
         self.template = meta["prompt_templates"]["actor"]
         t = meta["tokens"]
         self.char, self.marker_id = t["injection_char"], int(t["injection_token_id"])

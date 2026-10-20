@@ -114,7 +114,7 @@ class Pod:
             if self._cluster_state() != "UP":
                 env = dict(os.environ, HF_TOKEN=hf_token())
                 rc = _run(
-                    SKY + ["launch", "-c", CLUSTER, "-y", "--down", "-i", str(AUTODOWN_MIN), "--secret", "HF_TOKEN", "sky/pod.yaml"],
+                    SKY + ["launch", "-c", CLUSTER, "-y", "--down", "-i", str(AUTODOWN_MIN), "--secret", "HF_TOKEN", os.environ.get("WCO_POD_YAML", "sky/pod.yaml")],
                     3600,
                     env,
                 )

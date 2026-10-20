@@ -1,0 +1,19 @@
+# 1x H200 anywhere (RunPod, then Vast) for the precompute fleet; same job as sky/fleet8.yaml.
+name: weirdchat-olens-h200x1
+
+resources:
+  disk_size: 300
+  ordered:
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+    - {infra: vast, accelerators: "H200:1"}
+
+workdir: .
+
+file_mounts:
+  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from weirdchat-viewer/
+
+secrets:
+  HF_TOKEN: null
+
+run: |
+  bash ~/sky_workdir/pod/fleet_job.sh
