@@ -229,7 +229,7 @@ try { st.layered = JSON.parse(localStorage.getItem(LKEY) || '{}'); } catch (e) {
 function arForm(){
   return `<div class="vb" style="font-size:12px"><span class="muted" title="O-lens AR of the text at each block's layer (AR layers 20–60 step 4; other blocks use the nearest)">per-layer AR</span>
     <input id="lara" placeholder="text a, e.g. the user is too drunk to drive" size="26"> − <input id="larb" placeholder="text b (optional; else the mean)" size="20">
-    <button class="btn" id="laradd">add</button>${Object.keys(st.layered).map(k => `<span class="tag" style="cursor:pointer" data-ldel="${esc(k)}" title="remove">${esc(k)} ×</span>`).join('')}</div>`;
+    <button class="btn" id="laradd">add</button>${Object.keys(st.layered).map(k => `<span class="tag" style="cursor:pointer;white-space:normal" data-ldel="${esc(k)}" title="remove">AR(${esc(JSON.stringify(st.layered[k].text))}, L)${st.layered[k].minus ? ` − AR(${esc(JSON.stringify(st.layered[k].minus))}, L)` : ' − μ_L'} ×</span>`).join('')}</div>`;
 }
 function bindArForm(){
   const add = $('#laradd'); if (!add) return;
@@ -277,12 +277,20 @@ function vform(){
   const Ls = k === 'jpp' ? JLAYERS : LAYERS, cur = +$('#vlayer').value || 40;
   $('#vlayer').innerHTML = Ls.map(L => `<option ${L === cur ? 'selected' : ''}>${L}</option>`).join('');
 }
+// exactly what a vector was built from
+function specHtml(sp){
+  const q = t => `<span style="font-family:var(--mono);background:var(--panel2);border-radius:4px;padding:0 4px">${esc(t)}</span>`;
+  if (sp.kind === 'jpp') return `J++ L${sp.layer}: + ${(sp.plus || []).map(q).join(' ') || '–'}${(sp.minus || []).length ? ` − ${sp.minus.map(q).join(' ')}` : ''}`;
+  if (sp.kind === 'ar') return `O-lens AR L${sp.layer} of ${q(sp.text)}`;
+  if (sp.kind === 'nla') return `NLA AR (L42) of ${q(sp.text)}`;
+  return `(${specHtml(sp.a)}) − (${specHtml(sp.b)})`;
+}
 async function loadVectors(){
   const r = await api('/api/vectors'); st.vecs = r.vectors; st.hasJudge = r.judge;
   const opts = st.vecs.map(v => `<option value="${v.vid}">${esc(v.name)} (L${v.layer})</option>`).join('');
   $('#va').innerHTML = opts; $('#vbb').innerHTML = opts;
   $('#vlist').innerHTML = st.vecs.map(v => `<tr class="${st.probe && st.probe.vid === v.vid ? 'on' : ''}"><td>${esc(v.name)}</td><td class="muted">L${v.layer}</td>
-    <td class="muted">${esc(JSON.stringify(v.info))}</td>
+    <td style="font-size:12px">${specHtml(v.spec)}<div class="muted" style="font-size:11px">raw norm ${v.info.raw_norm ?? '–'}${v.info.cos_ab != null ? ` · cos(a, b) ${v.info.cos_ab}` : ''}</div></td>
     <td style="white-space:nowrap"><button class="btn" data-probe="${v.vid}">Probe</button>
       α <input data-alpha="${v.vid}" value="0.1" size="4" title="h ← h + α·‖h‖·v̂ at every position"> <button class="btn" data-steer="${v.vid}">Steer 64</button>
       <button class="btn" data-del="${v.vid}" title="delete">×</button></td></tr>`).join('') || '<tr><td class="muted">No vectors yet.</td></tr>';
@@ -329,7 +337,8 @@ async function loadRuns(){
 }
 async function showSamples(rid){
   const r = (await api('/api/steer?full=1&tid=' + encodeURIComponent(st.tr.tid))).runs.find(x => x.rid === rid);
-  $('#samples').innerHTML = `<h2 style="margin-top:10px">${esc(r.name)} · α ${r.alpha} · ${r.texts.length} samples (red bar = judged match)</h2>` + r.texts.map((t, i) =>
+  const vv = (st.vecs || []).find(v => v.vid === r.vid);
+  $('#samples').innerHTML = `<h3 style="margin-top:12px">${esc(r.name)} · ${r.layer == null ? '' : `L${r.layer} α ${r.alpha} · `}${r.texts.length} samples (bar = judged match)</h3>${vv ? `<div style="font-size:12px;margin-bottom:6px">${specHtml(vv.spec)}</div>` : ''}${(r.ablate || []).length ? `<div class="muted" style="font-size:12px">zero-ablated: ${r.ablate.map(a => `L${a.layer} ${a.kind === 'head' ? 'head ' + a.head : a.kind}`).join(', ')}</div>` : ''}` + r.texts.map((t, i) =>
     `<div class="smp ${r.labels && r.labels[i] ? 'm' : ''}" title="${esc((r.explanations || [])[i] || '')}">${esc(t.slice(0, 700))}${t.length > 700 ? '…' : ''}</div>`).join('');
 }
 function pick(p){ st.sel = p; render(); }
