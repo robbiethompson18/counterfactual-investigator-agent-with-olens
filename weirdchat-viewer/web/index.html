@@ -136,6 +136,7 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .hlscale i{display:inline-block;width:46px;height:9px;border-radius:3px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--hl) 85%,transparent));border:1px solid var(--line)}
 .tip{position:fixed;z-index:20;max-width:360px;background:var(--ink);color:var(--bg);font-size:12px;padding:7px 9px;border-radius:7px;pointer-events:none;display:none}
 .empty{color:var(--ink3);text-align:center;margin-top:20vh}
+body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn){display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
@@ -182,7 +183,19 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// set by scripts/deploy_site.sh: a read-only snapshot, data from gzipped JSON in the HF dataset (scripts/publish.py)
+const STATIC = window.WCO_STATIC;
+const staticFile = p => { const u = new URL(p, location.href), q = u.searchParams;
+  return {'/api/patterns': 'patterns', '/api/overview': 'overview', '/api/pattern': `pattern/${q.get('i')}`,
+          '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`}[u.pathname]; };
 const api = async (p, body) => {
+  if (STATIC) {
+    const f = !body && staticFile(p); if (!f) throw new Error('read-only snapshot');
+    const r = await fetch(`${STATIC}${f}.json.gz`); if (!r.ok) throw new Error(r.status === 404 ? 'not in this snapshot' : r.status);
+    const buf = await r.arrayBuffer(), b = new Uint8Array(buf.slice(0, 2));  // gzip magic, unless a CDN already decompressed it
+    const raw = b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : buf;
+    return JSON.parse(new TextDecoder().decode(raw));
+  }
   const r = await fetch(p, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
   const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || r.status); return j;
 };
@@ -418,7 +431,7 @@ function renderLens(){
   }
   h += `<h3>Readouts</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
   const shown = layers.filter(L => st.reads[tokKey(pos, L)]);
-  if (!shown.length) h += `<div class="muted">${st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
+  if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
     h += `<div class="lr"><div class="hd"><b>L${L}</b><span>‖h‖ ${Math.round(r.norm)}</span><span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve.toFixed(2)).join(' / ')}</b></span></div>`;
@@ -448,7 +461,7 @@ function renderLens(){
 async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); st.reads = {}; for (const r of tr.reads) st.reads[`${r.pos}|${r.layer}|${r.temperature}|${r.n}`] = r; markRead(); renderLens(); }
 // pick up reads that land in the background (precompute, fleet) for the open transcript
 setInterval(async () => {
-  if (!st.tr || st.busy || document.hidden) return;
+  if (STATIC || !st.tr || st.busy || document.hidden) return;
   try {
     const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
     if (tr.tid !== st.tr.tid || tr.reads.length === Object.keys(st.reads).length) return;
@@ -545,10 +558,13 @@ document.addEventListener('keydown', e => {
   st.overview = await api('/api/overview');
   $('#q').oninput = renderList; $('#beh').onchange = renderList; $('#sort').onchange = renderList;
   renderList();
-  await pollStatus(); setInterval(pollStatus, 4000);
-  $('#qpill').onclick = () => { const p = $('#qpanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; pollQueue(); };
-  pollQueue(); setInterval(pollQueue, 5000);
-  setInterval(() => { if (st.queued && st.queued.size) refreshQueued(); }, 8000);
+  if (STATIC) document.body.classList.add('static');
+  else {
+    await pollStatus(); setInterval(pollStatus, 4000);
+    $('#qpill').onclick = () => { const p = $('#qpanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; pollQueue(); };
+    pollQueue(); setInterval(pollQueue, 5000);
+    setInterval(() => { if (st.queued && st.queued.size) refreshQueued(); }, 8000);
+  }
   const hp = new URLSearchParams(location.hash.slice(1));
   if (hp.has('p') && st.patterns[+hp.get('p')]) openPattern(+hp.get('p'), hp.get('t'));
   else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(st.patterns.slice().sort((x, y) => eloOf(y, 'unexpectedness') - eloOf(x, 'unexpectedness'))[0].idx); }
