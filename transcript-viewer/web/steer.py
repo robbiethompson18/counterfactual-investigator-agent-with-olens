@@ -140,6 +140,8 @@ def _judge(judge, r, messages, only_missing=False):
         r["explanations"] = [out[i]["explanation"] if i in out else old_e[i] for i in range(len(r["texts"]))]
         ok = [x for x in r["labels"] if x is not None]
         r.update(state="done", rate=sum(ok) / len(ok) if ok else None, n_judged=len(ok))
+        if not ok:  # every judge call failed: say why instead of an empty "done"
+            r["error"] = "judge unreachable: " + next((e for e in r["explanations"] if e), "no response")[:200]
     except Exception as e:  # noqa: BLE001  (worker boundary: record and keep going)
         r.update(state="error", error=f"{type(e).__name__}: {e}")
     _save_runs(r)
@@ -155,15 +157,11 @@ def _run(pod, judge, r, prompt_ids, messages, v):
         )
         r.update(texts=res["texts"], gen_seconds=res["seconds"], state="judging")
         _save_runs(r)  # so a viewer restart can resume judging (resume())
-        if judge is None:
-            r.update(state="done", labels=None, rate=None, note="no judge configured (WCO_JUDGE_URL)")
-        else:
-            out = judge.judge_many(messages, res["texts"])
-            r["labels"] = [o["match"] for o in out]
-            r["explanations"] = [o["explanation"] for o in out]
-            ok = [x for x in r["labels"] if x is not None]
-            r.update(state="done", rate=sum(ok) / len(ok) if ok else None, n_judged=len(ok))
     except Exception as e:  # noqa: BLE001  (worker boundary: record and keep going)
         traceback.print_exc()
         r.update(state="error", error=f"{type(e).__name__}: {e}")
-    _save_runs(r)
+        return _save_runs(r)
+    if judge is None:
+        r.update(state="done", labels=None, rate=None, note="no judge configured (WCO_JUDGE_URL)")
+        return _save_runs(r)
+    _judge(judge, r, messages)
