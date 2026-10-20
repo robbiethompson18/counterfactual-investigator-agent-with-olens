@@ -348,7 +348,7 @@ async function openPattern(i, tid){
   <div class="card">
     <h2>${esc(d.title)}</h2>
     <p class="desc">Qwen3.6-27B's answers to one more user turn on <a href="#" id="fuorig">the original transcript</a>,
-      greedy and 4 samples at T=1 per question. The greedy answers are read with the lens at every token, as is the original.</p>
+      greedy and 4 samples at T=1 per question. The greedy answers are read with the lens (layers 24–56) at the question, the answer and every end-of-turn zone; favourites and their originals at every token.</p>
     ${fu.map(([w, q]) => `<div class="kv"><span>${esc(w)}: <b>${esc(q)}</b></span></div>`).join('')}
   </div>
   <div id="tpick">
