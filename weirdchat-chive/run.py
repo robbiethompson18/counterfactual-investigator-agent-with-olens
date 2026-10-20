@@ -220,6 +220,24 @@ def patch(run_dir: Path) -> None:
         await run_stage2(config, run_dir_, status, completions_path)
         path = run_dir_ / "screening.jsonl"
         recs = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+        # The screener sometimes fails validation 3 times (e.g. score >= 3 with no completion indices) and
+        # CHIVE skips the prompt. WeirdChat already chose these prompts, so investigate them anyway with a
+        # minimal record: question from the pattern title, no hypotheses.
+        done = {r["prompt_id"] for r in recs}
+        for c in (json.loads(x) for x in Path(completions_path).read_text().splitlines() if x.strip()):
+            m = meta.get(c["id"])
+            if m is None or c["id"] in done:
+                continue
+            recs.append(dict(
+                prompt_id=c["id"], interest_score=3, behavior_summary=f"WeirdChat pattern: {m['pattern_description']}",
+                question=f"Why does the model do this: {m['pattern_title']}?",
+                second_person_question=f"Why did you do this: {m['pattern_title']}?",
+                classifier_question="", hypotheses="", counterfactual="",
+                justification="Fallback record: the screener failed validation; WeirdChat already selected this prompt.",
+                behavior_completion_indices=[], user_message=c["user_message"], completions=c["completions"],
+                messages=c.get("messages"), n_turns=c.get("n_turns", 1),
+            ))
+            print(f"  screener skipped {c['id'][:12]}; added a fallback screening record")
         n = 0
         for r in recs:
             m = meta.get(r["prompt_id"])

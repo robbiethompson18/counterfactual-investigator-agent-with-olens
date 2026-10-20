@@ -1,4 +1,4 @@
-# Qwen3.6-27B-FP8 (the checkpoint WeirdChat sampled) on one H200, as the CHIVE target.
+# Qwen3.6-27B-FP8 (the checkpoint WeirdChat sampled) as the CHIVE target, one data-parallel replica per GPU.
 # The server is the sky job and listens on 127.0.0.1 only; the driver on bramble reaches it over
 # an SSH tunnel. It exits after MAX_HOURS, after which SkyPilot downs the idle pod (-i 5 --down).
 #   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c wc-chive -y -i 5 --down sky/vllm_h200.yaml
@@ -7,9 +7,12 @@
 name: wc-chive
 
 resources:
-  infra: runpod
-  accelerators: H200-SXM:1
   disk_size: 120
+  ordered:                      # North America only (Kylie: avoid Iceland); 2x H200 came up in minutes on 2026-10-20
+    - {infra: runpod/US, accelerators: "H200-SXM:2"}
+    - {infra: runpod/CA, accelerators: "H200-SXM:2"}
+    - {infra: runpod/US, accelerators: "H200-SXM:1"}
+    - {infra: runpod/CA, accelerators: "H200-SXM:1"}
 
 envs:
   HF_HOME: /data/hf
@@ -36,9 +39,10 @@ setup: |
   wait  # CUDA packages
 
 run: |
-  export PATH=/usr/local/cuda-12.9/bin:$PATH
+  export PATH=$HOME/vllm-env/bin:/usr/local/cuda-12.9/bin:$PATH   # ninja lives in the venv
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES   # sky exec can set it empty
   nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
   timeout "${MAX_HOURS}h" ~/vllm-env/bin/vllm serve "$MODEL" --revision "$MODEL_REVISION" \
     --host 127.0.0.1 --port 8000 --max-model-len 8192 --gpu-memory-utilization 0.92 \
-    --max-num-seqs 512 --enable-prefix-caching --limit-mm-per-prompt '{"image": 0, "video": 0}' \
+    --data-parallel-size "$SKYPILOT_NUM_GPUS_PER_NODE" --max-num-seqs 512 --enable-prefix-caching --limit-mm-per-prompt '{"image": 0, "video": 0}' \
     || echo "vllm serve exited ($?)"
