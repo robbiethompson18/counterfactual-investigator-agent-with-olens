@@ -28,6 +28,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
+STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
@@ -448,6 +449,16 @@ def pattern_detail(i):
     )
 
 
+def stance(tid):
+    """Stance label for a transcript, re-reading data/stance.jsonl when it changes."""
+    if not STANCE.exists():
+        return None
+    mtime = STANCE.stat().st_mtime
+    if S.get("stance_mtime") != mtime:
+        S.update(stance={r["tid"]: r["stance"] for r in map(json.loads, STANCE.open())}, stance_mtime=mtime)
+    return S["stance"].get(tid)
+
+
 def transcript(tid):
     r = render(tid)
     t = S["trs"][tid]
@@ -462,6 +473,7 @@ def transcript(tid):
         highlight=t["is_highlight"],
         url=t["weirdchat_url"],
         reads=tid_reads(tid),
+        stance=stance(tid),
     )
     return out
 
