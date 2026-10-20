@@ -116,13 +116,8 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .showraw .raw{display:block}
 .muted{color:var(--ink3);font-size:12.5px}
 .err{color:var(--bad);font-size:12.5px;margin:8px 0}
-.zt{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
-.zt td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
-.zt td:first-child{font-family:var(--mono);color:var(--zone-ink);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;width:1%;padding-right:8px;cursor:pointer}
-.zt tr.on td{background:var(--blue-soft)}
 .mb{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-left:12px;position:relative}
 .mb::before{content:"";position:absolute;left:2px;top:.6em;width:5px;height:5px;border-radius:50%;background:var(--zone-ink);opacity:var(--o,1)}
-.zt tr.on .mb{-webkit-line-clamp:unset}
 .mb+.mb{margin-top:2px}
 .bfv{font-variant-numeric:tabular-nums;font-size:10.5px;color:var(--ink3);margin-right:5px}
 .bl .n{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums;text-align:right}
@@ -410,25 +405,6 @@ function renderLens(){
       <button class="btn" id="allbtn">All 11 layers</button>
       ${z ? `<button class="btn" id="zonebtn">Whole end-of-turn zone</button>` : ''}
     </div><div id="lerr"></div>`;
-  if (z) {
-    const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
-    h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
-      const r = st.reads[tokKey(p, L)];
-      const s = r ? r.samples[0] : null;
-      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + `<span class="muted">FVE ${s.fve.toFixed(2)}</span>` : '<span class="muted">–</span>'}</td></tr>`;
-    }).join('') + `</table>`;
-  }
-  if (tr.punct && tr.punct.length) {
-    const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
-    const rows = tr.punct.filter(p => st.reads[tokKey(p, L)]);
-    h += `<h3>Punctuation (user + assistant) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3>`;
-    if (rows.length) h += `<div style="max-height:300px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(p => {
-      const s = st.reads[tokKey(p, L)].samples[0];
-      const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
-      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}<span class="muted">FVE ${s.fve.toFixed(2)}</span></td></tr>`;
-    }).join('') + `</table></div>`;
-    else h += `<div class="muted" style="margin-bottom:12px">Not read yet. Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it.</div>`;
-  }
   h += `<h3>Readouts</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
   const shown = layers.filter(L => st.reads[tokKey(pos, L)]);
   if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
@@ -449,7 +425,6 @@ function renderLens(){
   for (const c of document.querySelectorAll('#lchips .chip')) c.onclick = () => {
     const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); };
   for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); };
-  for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
   $('#readbtn').onclick = () => doRead([pos]);
   $('#allbtn').onclick = () => doRead([pos], layers);
