@@ -25,6 +25,9 @@ from urllib.parse import parse_qs, urlparse
 
 import chive
 import organisms
+import extras
+import steer
+from judge import Judge
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 
@@ -53,6 +56,7 @@ BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for
 S = {"reads": {}, "by_tid": {}, "pre": {"state": "idle", "done": 0, "total": 0}}
 LOCK = threading.Lock()
 POD = None
+JPP_LOCAL = None  # web/run_lens.sh --extras jpp on this machine, for J++ only
 
 
 # ---------------------------------------------------------------------- data
@@ -579,6 +583,8 @@ def transcript(tid):
         url=t["weirdchat_url"],
         claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
+        extras=sorted(extras.of(tid)),
+        prompt_rate=prompt_rate(t["prompt_id"]),
     )
     if "organism" in t:  # reads on base Qwen's activations over the same tokens; the response tokens that were read
         zone = {i for a, b in r["zones"] for i in range(a, b)}
@@ -589,6 +595,49 @@ def transcript(tid):
             user_punct=0,
         )
     return out
+
+
+def prompt_rate(pid):
+    pr = S["prompts"].get(pid) or {}
+    m = pr.get("match_summary") or {}
+    return {"n": m.get("n_samples"), "matched": m.get("n_matched")} if m else None
+
+
+def prompt_ids(tid):
+    """The rendered transcript up to the start of the assistant's reply (generation prompt included)."""
+    r = render(tid)
+    return r["ids"][: r["msgs"][-1][0]]
+
+
+def user_messages(tid):
+    return [{"role": m["role"], "content": m["content"]} for m in S["trs"][tid]["messages"][:-1]]
+
+
+def judge_for(tid):
+    return Judge.from_env(S["rubrics"][S["trs"][tid]["behavior_id"]])
+
+
+def judge_calib(tid):
+    """Judge WeirdChat's own rollouts of this transcript's prompt and compare with its labels."""
+    t = S["trs"][tid]
+    S.setdefault("calib", {})[tid] = {"state": "running"}
+    try:
+        j = judge_for(tid)
+        if j is None:
+            raise RuntimeError("no judge configured (WCO_JUDGE_URL)")
+        sib = [
+            x for x in S["trs"].values() if x["prompt_id"] == t["prompt_id"] and x["judgment"]["match"] is not None
+        ]
+        out = j.judge_many(user_messages(tid), [x["messages"][-1]["content"] or "" for x in sib])
+        pairs = [(bool(x["judgment"]["match"]), o["match"]) for x, o in zip(sib, out) if o["match"] is not None]
+        n = len(pairs)
+        agree = sum(a == b for a, b in pairs) / n if n else None
+        pa, pb = (sum(a for a, _ in pairs) / n, sum(b for _, b in pairs) / n) if n else (0, 0)
+        pe = pa * pb + (1 - pa) * (1 - pb)
+        S["calib"][tid] = {"state": "done", "n": n, "weirdchat_rate": pa, "judge_rate": pb, "agree": agree,
+                           "kappa": (agree - pe) / (1 - pe) if n and pe < 1 else None}
+    except Exception as e:  # noqa: BLE001  (worker boundary: report and keep going)
+        S["calib"][tid] = {"state": "error", "error": f"{type(e).__name__}: {e}"}
 
 
 class H(BaseHTTPRequestHandler):
@@ -624,12 +673,29 @@ class H(BaseHTTPRequestHandler):
                 return self.send(chive.bank_chunk(q["tid"], q["reader"], int(q["chunk"])))
             if u.path == "/api/queue":
                 return self.send(S["queue"].summary(title_of))
+            if u.path == "/style.css":  # the viewer's stylesheet, shared with the case page
+                h = (HERE / "index.html").read_text()
+                return self.send(h[h.index("<style>") + 7 : h.index("</style>")], "text/css; charset=utf-8")
+            if u.path in ("/case", "/case.html"):  # one transcript, every lens side by side
+                return self.send((HERE / "case.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/vectors":
+                return self.send({"vectors": steer.vectors(), "judge": bool(os.environ.get("WCO_JUDGE_URL"))})
+            if u.path == "/api/steer":  # runs for a transcript's prompt; texts only with ?full=1
+                rs = steer.runs(q["tid"])
+                if not q.get("full"):
+                    rs = [{k: v for k, v in r.items() if k not in ("texts", "explanations")} for r in rs]
+                return self.send({"runs": rs, "calib": S.get("calib", {}).get(q["tid"])})
+            if u.path == "/api/extras_all":  # every cached NLA / J++ read of a transcript
+                return self.send(extras.of(q["tid"]))
+            if u.path == "/api/extras":  # cached NLA / J++ reads of one token
+                return self.send(extras.of(q["tid"]).get(int(q["pos"]), {}))
             if u.path == "/api/status":
                 return self.send(
                     {
                         "pod": POD.status() if POD else {"state": "disabled"},
                         "pre": S["pre"],
                         "n_reads": len(S["reads"]),
+                        "jpp_local": bool(JPP_LOCAL and JPP_LOCAL.ready()),
                         "queue": {k: v for k, v in S["queue"].summary(title_of, top=0).items() if k != "rows"},
                     }
                 )
@@ -645,6 +711,38 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/read":
                 recs = read(req["tid"], req["items"], float(req.get("temperature", 0)), int(req.get("n", 1)), int(req.get("seed", 0)))
                 return self.send({"reads": recs})
+            if p == "/api/score_edit":  # FVE of edited lens text: {tid, pos, layer, text, lens: olens|nla}
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                ids = render(req["tid"])["ids"]
+                if req.get("lens") == "nla":
+                    return self.send(POD.call("/nla_score", {"ids": ids, "pos": int(req["pos"]), "text": req["text"]}))
+                res = POD.call("/rescore", {"jobs": [{"ids": ids, "items": [{"pos": int(req["pos"]), "layer": int(req["layer"]), "texts": [req["text"]]}]}]})
+                return self.send(res["results"][0][0][0])
+            if p == "/api/vector":
+                return self.send(steer.build(POD, req.get("name"), req["spec"]))
+            if p == "/api/vector/delete":
+                steer.delete(req["vid"])
+                return self.send({"ok": True})
+            if p == "/api/probe":
+                return self.send(steer.probe(POD, req["tid"], render(req["tid"])["ids"], req["vid"]))
+            if p == "/api/steer":
+                tid = req["tid"]
+                return self.send(steer.start(POD, judge_for(tid), tid, prompt_ids(tid), user_messages(tid), req.get("vid"), req.get("alpha", 0), int(req.get("n", 64))))
+            if p == "/api/judge_calib":  # judge WeirdChat's stored rollouts of this prompt, compare labels
+                tid = req["tid"]
+                threading.Thread(target=judge_calib, args=(tid,), daemon=True).start()
+                return self.send({"started": True})
+            if p == "/api/extras":  # NLA + J++ on the pod: {tid, positions, kinds?}
+                r = render(req["tid"])
+                pos = [int(x) for x in req["positions"]]
+                kinds = tuple(req.get("kinds") or ("nla", "jpp"))
+                out = {}
+                for k in kinds:  # J++ can run on this machine's GPU (--jpp-local), the NLA needs the pod
+                    pod = JPP_LOCAL if k == "jpp" and JPP_LOCAL and JPP_LOCAL.ready() else POD
+                    for q, x in extras.read(pod, S["tok"], req["tid"], r["ids"], pos, (k,)).items():
+                        out.setdefault(q, {}).update(x)
+                return self.send({"extras": out})
             if p == "/api/pod/start" and POD:
                 return self.send(dict(started=POD.start(), **POD.status()))
             if p == "/api/pod/stop" and POD:
@@ -713,15 +811,19 @@ def init():
 
 
 def main():
-    global POD
+    global POD, JPP_LOCAL
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8803)
     ap.add_argument("--bind", nargs="+", default=os.environ.get("WCO_BIND", "127.0.0.1").split())
     ap.add_argument("--no-pod", action="store_true")
+    ap.add_argument("--jpp-local", action="store_true", help="J++ reads go to a lens server on this machine (web/run_lens.sh --extras jpp)")
     ap.add_argument("--local", action="store_true", help="reads go to a lens server on this machine (web/run_lens.sh)")
     args = ap.parse_args()
     t0 = time.time()
     init()
+    extras.load()
+    steer.load()
+    S["rubrics"] = {r["behavior_id"]: r["transcript_rubric"]["text"] for r in pq.read_table(HF / "rubrics.parquet").to_pylist()}
     from readq import ReadQueue
 
     S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])
@@ -730,6 +832,10 @@ def main():
     import sys
 
     sys.path.insert(0, str(HERE))
+    if args.jpp_local:
+        from local import Local
+
+        JPP_LOCAL = Local()
     if args.local:
         from local import Local
 

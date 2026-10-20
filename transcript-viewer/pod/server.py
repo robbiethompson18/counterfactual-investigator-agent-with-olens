@@ -5,6 +5,11 @@ hook-LoRAs from ~/olens/src/olens. GPU work runs on the main thread (other threa
 slower on CUDA, see olens commit c2599c1).
 
 GET  /status      {ready, busy, task, up, idle}
+POST /extras      {ids, positions, nla, jpp} -> {nla: [{text, cos, fve}], jpp: {pos: [[[tok, p]] * k per layer]}}
+                  the ceselder L42 NLA and the J++ lens (olens.extras); loaded on >= 120 GB GPUs or --extras
+POST /vector      {spec} -> {v, layer, info}            probe/steering direction (olens.vectors)
+POST /probe       {ids, layer, v} -> {cos, proj}       per position
+POST /steer       {ids, layer, v, alpha, n, max_new_tokens, temperature, seed} -> {texts}
 POST /read        {ids, items: [{pos, layer}], temperature, n, seed, max_bullets}
                   -> {results: [[{text, bullets, coefs, fve}] * n per item], seconds}
                   one capture for the whole sequence, every (pos, layer) decoded in batches.
@@ -184,6 +189,69 @@ def do_read_multi(req):
     return {"results": out, "norms": norms, "seconds": round(time.time() - t0, 1)}
 
 
+def do_extras(req):
+    ids, pos = [int(i) for i in req["ids"]], [int(p) % len(req["ids"]) for p in req["positions"]]
+    if "jpp" not in S:
+        raise RuntimeError("NLA/J++ not loaded on this pod (needs a >= 120 GB GPU or --extras)")
+    t0, out = time.time(), {}
+    if req.get("jpp", True):
+        out["jpp"] = {str(p): v for p, v in S["jpp"].read(ids, pos, k=int(req.get("k", 10))).items()}
+        out["jpp_layers"] = S["jpp"].layers
+    if req.get("nla", True) and "nla" in S:
+        v = capture(S["model"], ids, [42])[42][pos].cpu()
+        texts = S["nla"].explain(v, temperature=float(req.get("temperature", 0)))
+        out["nla"] = [dict(text=t, **sc) for t, sc in zip(texts, S["critic"].score(texts, v))]
+    out["seconds"] = round(time.time() - t0, 1)
+    return out
+
+
+def load_extras(nla=True):
+    from olens.extras import JPP, NLA, NLACritic
+
+    S["jpp"] = JPP(S["model"])
+    if not nla:
+        return print(f"J++ loaded {time.time() - T0:.0f}s", flush=True)
+    S["nla"] = NLA(S["tok"], S["model"], stack=os.environ.get("NLA_STACK", "1") == "1")  # RL LoRA sits on the SFT-merged base
+    S["critic"] = NLACritic(S["tok"])
+    calib = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calib_ids.json")))["ids"]
+    S["critic"].calibrate(torch.cat([capture(S["model"], ids, [42])[42][4:] for ids in calib]))
+    print(f"NLA + J++ loaded {time.time() - T0:.0f}s (FVE baseline {S['critic'].base:.1f})", flush=True)
+
+
+def vectors():
+    from olens.vectors import Vectors
+
+    if "vec" not in S:
+        S["vec"] = Vectors(S["tok"], S["model"], S["readout"], S.get("jpp"), S.get("critic"))
+    return S["vec"]
+
+
+def do_nla_score(req):
+    """{ids, pos, text} -> {cos, fve}: the NLA reconstructor on an edited explanation."""
+    ids = [int(i) for i in req["ids"]]
+    v = capture(S["model"], ids, [42])[42][[int(req["pos"]) % len(ids)]].cpu()
+    return S["critic"].score([req["text"]], v)[0]
+
+
+def do_vector(req):
+    v, L, info = vectors().build(req["spec"])
+    return {"v": [round(float(x), 6) for x in v.cpu()], "layer": L, "info": info}
+
+
+def do_probe(req):
+    return vectors().probe([int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]))
+
+
+def do_steer(req):
+    t0 = time.time()
+    texts = vectors().steer(
+        [int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]), float(req["alpha"]),
+        n=int(req.get("n", 64)), max_new_tokens=int(req.get("max_new_tokens", 400)),
+        temperature=float(req.get("temperature", 1.0)), seed=int(req.get("seed", 0)),
+    )
+    return {"texts": texts, "seconds": round(time.time() - t0, 1)}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -226,6 +294,21 @@ class H(BaseHTTPRequestHandler):
                 r = gpu(f"re-scoring {n} reads", lambda: do_rescore(req))
                 LAST["t"] = time.time()
                 return self.send(r)
+            if self.path in ("/vector", "/probe", "/steer", "/nla_score"):
+                if not STATUS["ready"]:
+                    return self.send({"error": "model still loading"}, 503)
+                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score}[self.path]
+                LAST["t"] = time.time()
+                r = gpu(self.path[1:], lambda: fn(req))
+                LAST["t"] = time.time()
+                return self.send(r)
+            if self.path == "/extras":
+                if not STATUS["ready"]:
+                    return self.send({"error": "model still loading"}, 503)
+                LAST["t"] = time.time()
+                r = gpu(f"NLA/J++ on {len(req['positions'])} tokens", lambda: do_extras(req))
+                LAST["t"] = time.time()
+                return self.send(r)
             if self.path == "/read_multi":
                 if not STATUS["ready"]:
                     return self.send({"error": "model still loading"}, 503)
@@ -258,6 +341,7 @@ def main():
     ap.add_argument("--idle-min", type=float, default=45, help="0 = never exit on idle")
     ap.add_argument("--max-hours", type=float, default=3.75, help="0 = no cap (local GPU)")
     ap.add_argument("--batch", type=int, default=BATCH, help="decode batch (reads x samples)")
+    ap.add_argument("--extras", choices=["auto", "on", "jpp", "off"], default="auto", help="NLA + J++ (auto: on >= 120 GB GPUs); jpp = J++ only")
     ap.add_argument("--no-warmup", action="store_true", help="skip the CUDA kernel warm-up (ROCm doesn't need it)")
     args = ap.parse_args()
     BATCH = args.batch
@@ -271,6 +355,11 @@ def main():
     S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
     for L in AguLens.layers:
         S["readout"].whitener(L)
+    big = torch.cuda.get_device_properties(0).total_memory > 120e9
+    if args.extras == "on" or (args.extras == "auto" and big):
+        load_extras()
+    elif args.extras == "jpp":
+        load_extras(nla=False)
     print(f"loaded {time.time() - T0:.0f}s", flush=True)
     # Warm-up: the linear-attention kernels compile per sequence length on first sight; walk the
     # lengths a read reaches for the batch sizes the viewer uses (1 and 11 live, full batches

@@ -443,6 +443,7 @@ async function openTranscript(tid){
         <option value="all">all tokens: ${tr.tokens.length}</option></select>
       <span class="muted">× layers</span>
       <span class="chips" id="qlayers">${st.layers.map(L => `<button class="chip ${st.qLayers.has(L) ? 'on' : ''}" data-ql="${L}">${L}</button>`).join('')}</span>
+      <a class="btn" href="/case#t=${encodeURIComponent(tr.tid)}" target="_blank" title="O-lens, NLA and J++ side by side for this transcript's user turn and first 20 reply tokens">Case study</a>
       <span class="muted" id="qinfo">${tr.queued.length ? tr.queued.length + ' reads of this transcript queued' : ''}</span></div>`;
   let at = 0;
   tr.msgs.forEach((m, k) => {
@@ -587,7 +588,8 @@ function renderLens(){
       <button class="btn primary" id="readbtn">Read ${st.chosen.size === 1 ? 'L' + [...st.chosen][0] : st.chosen.size + ' layers'}</button>
       <button class="btn" id="allbtn">All 11 layers</button>
       ${z ? `<button class="btn" id="zonebtn">Whole end-of-turn zone</button>` : ''}
-    </div><div id="lerr"></div>`;
+      <button class="btn" id="xbtn" title="ceselder L42 natural-language autoencoder + J++ lens at every layer (needs an H200 pod)">NLA + J++</button>
+    </div><div id="lerr"></div><div id="xbox"></div>`;
   if (z) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
     h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
@@ -629,6 +631,10 @@ function renderLens(){
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
+  $('#xbtn').onclick = () => readExtras(pos);
+  $('#xbtn').disabled = !(st.pod.state === 'ready' || st.jppLocal) || st.busy;
+  if (st.jppLocal && st.pod.state !== 'ready') $('#xbtn').textContent = 'J++ (local GPU)';
+  showExtras(pos);
   $('#readbtn').onclick = () => doRead([pos]);
   $('#allbtn').onclick = () => doRead([pos], layers);
   if (z) $('#zonebtn').onclick = () => doRead(Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k));
@@ -695,11 +701,41 @@ function bankHtml(pos){
 }
 
 async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); setBankReads(tr); markRead(); renderLens(); }
+// NLA (L42) + J++ lens: cached per token in data/extras.jsonl, fetched when a token is shown
+async function showExtras(pos){
+  const tid = st.tr.tid, have = st.tr.extras && st.tr.extras.includes(pos);
+  if (!have) return;
+  const x = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
+  $('#xbox').innerHTML = extrasHtml(x);
+  const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };
+}
+function extrasHtml(x){
+  let h = '';
+  if (x.nla) h += `<h3>NLA · L42 <span style="text-transform:none;letter-spacing:0;font-weight:400" title="AR reconstruction of the activation from the explanation: cosine, and FVE = 1 − ‖p̂−v̂‖²/E‖v̂−μ‖² (μ over 64 random WeirdChat transcripts)">cos ${x.nla.cos.toFixed(2)} · FVE ${x.nla.fve.toFixed(2)}</span></h3>
+    <div class="lr" style="white-space:pre-wrap;font-size:12.5px">${esc(x.nla.text)}</div>`;
+  if (x.jpp) {
+    const rows = x.jpp.layers.map((L, i) => [L, x.jpp.top[i]]).filter(([L]) => st.jppAll || L % 4 === 3 || L >= 56);
+    h += `<h3>J++ lens · top tokens <label style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppl" style="width:auto" ${st.jppAll ? 'checked' : ''}> all 63 layers</label></h3>
+      <div style="max-height:340px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(([L, top]) => `<tr><td class="muted" style="width:34px">L${L}</td><td style="font-family:var(--mono);font-size:11.5px">` +
+      top.slice(0, 6).map(([t, p]) => `<span title="p ${p.toFixed(3)}" style="padding:0 3px;margin-right:2px;border-radius:3px;background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, p * 2) * 45)}%, transparent)">${esc(JSON.stringify(t).slice(1, -1))}</span>`).join('') + `</td></tr>`).join('') + `</table></div>`;
+  }
+  return h;
+}
+async function readExtras(pos){
+  const tid = st.tr.tid; st.busy = true; renderLens();
+  try {
+    await api('/api/extras', {tid, positions: [pos], kinds: st.pod.state === 'ready' ? ['nla', 'jpp'] : ['jpp']});
+    if (st.tr.tid === tid) { st.tr.extras = [...new Set([...(st.tr.extras || []), pos])]; }
+  } catch (e) { st.busy = false; renderLens(); $('#lerr').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  st.busy = false; renderLens();
+}
 // pick up reads that land in the background (precompute, fleet) for the open transcript
 setInterval(async () => {
   if (STATIC || !st.tr || st.busy || document.hidden) return;
   try {
     const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
+    if (tr.tid === st.tr.tid && (tr.extras || []).length !== (st.tr.extras || []).length) { st.tr.extras = tr.extras; renderLens(); }
     if (tr.tid !== st.tr.tid || (tr.reads.length === Object.keys(st.reads).length && (tr.bank_reads || []).length === Object.keys(st.bankReads).length)) return;
     setReads(tr); setBankReads(tr);
     markRead(); renderLens();
@@ -750,7 +786,7 @@ async function pollQueue(){
 
 async function pollStatus(){
   try {
-    const s = await api('/api/status'); const p = s.pod; st.pod = p;
+    const s = await api('/api/status'); const p = s.pod; st.pod = p; st.jppLocal = s.jpp_local;
     const dot = $('#poddot'); dot.className = 'dot ' + (p.state === 'ready' ? (p.server && p.server.busy ? 'busy' : 'ready') : p.state === 'error' ? 'err' : ['launching','starting','stopping'].includes(p.state) ? 'busy' : '');
     const mins = x => Math.floor(x / 60) + 'm';
     const g = p.server && p.server.gpu ? p.server.gpu.replace(/^NVIDIA /, '').replace(/ (Workstation|Server) Edition$/, '') : 'GPU pod';
