@@ -139,6 +139,7 @@ def load(S, key):
         S["patterns"].append(
             {
                 "idx": len(S["patterns"]),
+                "ds": "weirdchat",
                 "pattern_id": f"organism:{org}",
                 "title": title(org),
                 "behavior_id": "model organism",

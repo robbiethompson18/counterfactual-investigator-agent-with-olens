@@ -5,13 +5,13 @@ For each selected rollout (sample 0 of every trigger/control prompt of the organ
 conversation is rendered with the chat template (thinking off) and the residual stream captured
 twice: with the organism's hook-LoRA on, and with every adapter off (= base Qwen3.6-27B). Reads are
 the agu18dec lens + AR (olens/), decoded and scored by the WeirdChat viewer's batch path
-(weirdchat-viewer/pod/server.py: greedy, 4 bullets, joint and per-bullet whitened FVE).
+(transcript-viewer/pod/server.py: greedy, 4 bullets, joint and per-bullet whitened FVE).
 
 Positions: the end-of-user-turn zone (the user's <|im_end|> through the assistant header), where the
 lens reads best, plus up to MAX_RESPONSE_POS punctuation/newline tokens of the response and its final
 <|im_end|>.
 
-    HF_TOKEN=... PYTHONPATH=olens/src:weirdchat-viewer/pod python scripts/organism_olens.py
+    HF_TOKEN=... PYTHONPATH=olens/src:transcript-viewer/pod python scripts/organism_olens.py
 writes data/runs/organisms/olens_reads.jsonl (one line per rollout; skips rollouts already read).
 """
 
@@ -19,7 +19,7 @@ import json
 import time
 from pathlib import Path
 
-import server  # weirdchat-viewer/pod/server.py: read_many/score over its module-level state S
+import server  # transcript-viewer/pod/server.py: read_many/score over its module-level state S
 import torch
 from olens.ar import AR
 from olens.fve import WHITENERS
@@ -67,7 +67,7 @@ def main():
     tok, model = load_base()
     agu = AguLens(tok, model)
     server.S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
-    server.BATCH = 192  # >= 90 GB card (weirdchat-viewer README)
+    server.BATCH = 192  # >= 90 GB card (transcript-viewer README)
     if not WHITENERS.exists():
         # the whiteners are in the gated agu18dec/local-workspace dataset; without them keep the raw
         # readouts and score FVE later from the cached texts (the viewer server's rescore path)

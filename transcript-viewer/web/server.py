@@ -1,7 +1,8 @@
-"""WeirdChat x oracle lens viewer: http://<host>:8803/ (binds to $WCO_BIND, default 127.0.0.1)
+"""O-lens viewer: http://<host>:8803/ (binds to $WCO_BIND, default 127.0.0.1)
 
 Browses the Qwen3.6-27B patterns of Transluce/WeirdChat with their transcripts rendered through the
-model's chat template, token by token. Clicking a token reads it with the agu18dec oracle lens
+model's chat template, token by token, and the CHIVE incidents (web/chive.py) with Agam's per-token
+readout banks. Clicking a token reads it with the agu18dec oracle lens
 on the H100 pod (web/pod.py); every read is cached in data/reads.jsonl, so anything read once
 stays browsable when the pod is down.
 
@@ -22,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import chive
 import organisms
 import pyarrow.parquet as pq
 from transformers import AutoTokenizer
@@ -36,7 +38,7 @@ STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from 
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
 MACHINE = os.environ.get("WCO_MACHINE") or socket.gethostname().split(".")[0].lower()
-KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE}
+KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE, "chive_judge": chive.JUDGE}
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
@@ -72,13 +74,18 @@ def load():
         # highlight first, then matched, then by prompt / sample
         ids.sort(key=lambda t: (not trs[t]["is_highlight"], not trs[t]["judgment"]["match"], t))
         p["tids"] = ids
-    S.update(patterns=pats, prompts=prompts, trs=trs)
+        p["ds"] = "weirdchat"
+    S.update(patterns=pats + chive.load(len(pats), shards("chive_judge")), prompts=prompts, trs=trs)
 
 
 def render(tid):
     """Chat-template the transcript, tokenise with offsets, and locate messages, citations and
     the end-of-turn zones (<|im_end|> and the template tokens up to the next content)."""
     if tid in S.setdefault("rendered", {}):
+        return S["rendered"][tid]
+    if chive.has(tid):
+        ids = chive.C["tokens"][tid]["token_ids"]
+        S["rendered"][tid] = chive.render(tid, decode(ids), [x in S["special"] for x in ids])
         return S["rendered"][tid]
     tok, t = S["tok"], S["trs"][tid]
     if "ids" in t:  # model organisms (organisms.py): the token ids the lens read, message ranges precomputed
@@ -92,20 +99,20 @@ def render(tid):
         if x == im_end:
             nxt = min([s for s in starts if s > i] or [len(ids)])
             zones.append([i, min(nxt, len(ids))])
-    # byte-level BPE splits multi-byte characters (emoji) across tokens, and decoding one id alone turns each
-    # piece into U+FFFD: decode the raw bytes incrementally, so a character shows on the token holding its last byte
-    utf8 = codecs.getincrementaldecoder("utf-8")("replace")
-    toks = [utf8.decode(bytes(BYTE[c] for c in piece)) for piece in tok.convert_ids_to_tokens(ids)]
     out = {
         "tid": tid,
         "ids": ids,
-        "tokens": toks,
+        "tokens": decode(ids),
         "special": [x in S["special"] for x in ids],
         "msgs": msg_tok,
         "roles": [m["role"] for m in t["messages"]],
         "cites": cites,
         "zones": zones,
         "truncated": truncated,
+        # the end-of-turn zone the list previews and a transcript opens on: after the user's (last) message.
+        # Organisms have a system prompt first, so it's the second-to-last zone there
+        "main_zone": len(zones) - 2 if "organism" in t else 0,
+        "focus": [0, len(t["messages"]) - 1],  # messages whose punctuation is worth reading
     }
     S["rendered"][tid] = out
     return out
@@ -139,6 +146,13 @@ def render_text(tid, tok, t):
         if r:
             cites.append({"range": r, "note": c["note"], "quote": c["quote"]})
     return ids, msg_tok, cites, len(enc.input_ids) > MAX_TOKENS
+
+
+def decode(ids):
+    """Token strings. Byte-level BPE splits multi-byte characters (emoji) across tokens, and decoding one id alone turns
+    each piece into U+FFFD: decode the raw bytes incrementally, so a character shows on the token holding its last byte."""
+    utf8 = codecs.getincrementaldecoder("utf-8")("replace")
+    return [utf8.decode(bytes(BYTE[c] for c in piece)) for piece in S["tok"].convert_ids_to_tokens(ids)]
 
 
 # ---------------------------------------------------------------------- reads + cache
@@ -229,15 +243,15 @@ def no_live_reads(tid):
 
 
 def overview():
-    """Per pattern: the cached greedy L40 reads in the highlight transcript's first end-of-turn
-    zone (after the user's message), for the list."""
+    """Per pattern: the cached greedy L40 reads in the highlight transcript's main end-of-turn
+    zone (after the user's last message), for the list."""
     out = {}
     for p in S["patterns"]:
         if not p["tids"]:
             continue
         tid = p["tids"][0]
-        zones = render(tid)["zones"]
-        z = zones[-2:-1] if "organism" in p else zones[:1]  # organisms: after the user's message, not the system prompt
+        r = render(tid)
+        z = r["zones"][r["main_zone"] :][:1]
         rows = [
             r for r in tid_reads(tid) if r["temperature"] == 0 and r["n"] == 1 and r["layer"] == 40 and z and z[0][0] <= r["pos"] < z[0][1]
         ]
@@ -275,7 +289,11 @@ def precompute():
                 continue
             tid = p["tids"][0]
             r = render(tid)
-            pos = [i for a, b in r["zones"] for i in range(a, b)] if phase == "zones" else punct_positions(r)
+            pos = (
+                [i for a, b in r["zones"] for i in range(a, b)]
+                if phase == "zones"
+                else [i for k in r["focus"] for i in punct_positions(r, k)]
+            )
             todo += [(phase, tid, {"pos": i, "layer": L}) for i in pos for L in PRE_LAYERS]
     S["pre"]["total"] = len(todo)
     todo_left = [t for t in todo if key(t[1], t[2]["pos"], t[2]["layer"]) not in S["reads"]]
@@ -371,9 +389,9 @@ QUEUE_LAYERS = [24, 32, 40, 48, 56]
 
 
 def relevant_positions(tid):
-    """End-of-turn zones + punctuation in both turns: where the lens reads best."""
+    """End-of-turn zones + punctuation in the focus messages (WeirdChat: both turns): where the lens reads best."""
     r = render(tid)
-    return sorted({i for a, b in r["zones"] for i in range(a, b)} | set(punct_positions(r, 0)) | set(punct_positions(r, -1)))
+    return sorted({i for a, b in r["zones"] for i in range(a, b)} | {i for k in r["focus"] for i in punct_positions(r, k)})
 
 
 def queue_items(tid, positions, layers, src):
@@ -382,6 +400,8 @@ def queue_items(tid, positions, layers, src):
 
 
 def title_of(tid):
+    if chive.has(tid):
+        return f"CHIVE {tid}"
     t = S["trs"].get(tid)
     if not t:
         return tid
@@ -435,9 +455,12 @@ def consume():
 
 
 def pattern_summary(p):
+    if p["ds"] == "chive":
+        return chive.summary(p)
     e = p["elo"] or {}
     return {
         "idx": p["idx"],
+        "ds": "weirdchat",
         "title": p["title"],
         "behavior": p["behavior_id"],
         "method": p["method"],
@@ -454,6 +477,8 @@ def pattern_summary(p):
 
 def pattern_detail(i):
     p = S["patterns"][i]
+    if p["ds"] == "chive":
+        return chive.detail(p)
     trs = []
     pidx = {}
     for tid in p["tids"]:
@@ -515,18 +540,22 @@ def stance(tid):
 
 def transcript(tid):
     r = render(tid)
-    t = S["trs"][tid]
     out = {k: v for k, v in r.items() if k != "ids"}
     out.update(
         queued=[[int(k.split("|")[1]), int(k.split("|")[2])] for k in S["queue"].pending_keys(tid)] if "queue" in S else [],
         relevant=len(relevant_positions(tid)),
-        punct=punct_positions(r, 0) + punct_positions(r, -1),
-        user_punct=len(punct_positions(r, 0)),
+        punct=[i for k in r["focus"] for i in punct_positions(r, k)],
+        reads=tid_reads(tid),
+    )
+    if chive.has(tid):
+        return dict(out, **chive.transcript_extra(tid))
+    t = S["trs"][tid]
+    out.update(
+        ds="weirdchat",
         match=t["judgment"]["match"],
         explanation=t["judgment"]["explanation"],
         highlight=t["is_highlight"],
         url=t["weirdchat_url"],
-        reads=tid_reads(tid),
         claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
     )
@@ -568,8 +597,10 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/transcript":
                 return self.send(transcript(q["tid"]))
             if u.path == "/api/locate":  # transcript -> its pattern index
-                t = S["trs"][q["tid"]]
-                return self.send({"pattern": S["pat_by_id"][t["pattern_id"]]["idx"]})
+                pid = q["tid"] if chive.has(q["tid"]) else S["trs"][q["tid"]]["pattern_id"]
+                return self.send({"pattern": S["pat_by_id"][pid]["idx"]})
+            if u.path == "/api/bank":  # one reader's cells for a chunk of positions, all layers
+                return self.send(chive.bank_chunk(q["tid"], q["reader"], int(q["chunk"])))
             if u.path == "/api/queue":
                 return self.send(S["queue"].summary(title_of))
             if u.path == "/api/status":
