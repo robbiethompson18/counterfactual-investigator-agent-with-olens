@@ -96,7 +96,7 @@ async function load(){
   if (tr.prompt_rate) $('#base').textContent = `WeirdChat's own rate for this prompt: ${tr.prompt_rate.matched}/${tr.prompt_rate.n}`;
   api('/api/locate?tid=' + encodeURIComponent(tid)).then(l => $('#back').href = `/#p=${l.pattern}&t=${encodeURIComponent(tid)}`);
   if (st.sel == null) st.sel = st.asst0;
-  render();
+  render(); loadVectors();
 }
 const range = () => Array.from({length: st.b - st.a + 1}, (_, k) => st.a + k);
 function coverage(){
@@ -156,24 +156,26 @@ function renderContrib(){
   if (!c) { box.innerHTML = arForm() + '<div class="muted">What each attention block (full or linear), each attention head and each MLP adds to this token\'s residual stream, against a direction. Press the button (needs the H200).</div>'; bindArForm(); return; }
   const keys = Object.keys(c.layers[0].attn.cos); if (!keys.includes(st.cdir)) st.cdir = 'final residual';
   const K = st.cdir, proj = st.cmode === 'proj';
-  const val = x => proj ? x.cos[K] * x.norm : x.cos[K];  // projection = ‖write‖·cos = write · unit direction
+  const frac = st.cmode === 'frac';
+  let RL = 0;  // the block being drawn (frac mode divides by its residual norm)
+  const val = x => frac ? x.norm / c.resid_norm[RL] : proj ? x.cos[K] * x.norm : x.cos[K];  // projection = ‖write‖·cos = write · unit direction
   const nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
-  const sc = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(val(r.attn)), Math.abs(val(r.mlp))]));
-  const scR = Math.max(1e-3, ...c.layers.map(r => r.resid ? Math.abs(val(r.resid)) : 0));
-  const fmt = x => proj ? (Math.abs(x) >= 10 ? x.toFixed(0) : x.toFixed(1)) : x.toFixed(2);
+  const sc = Math.max(1e-3, ...c.layers.flatMap((r, L) => { RL = L; return [Math.abs(val(r.attn)), Math.abs(val(r.mlp))]; }));
+  const scR = Math.max(1e-3, ...c.layers.map((r, L) => { RL = L; return r.resid ? Math.abs(val(r.resid)) : 0; }));
+  const fmt = x => frac ? (x * 100).toFixed(x < 0.1 ? 1 : 0) + '%' : proj ? (Math.abs(x) >= 10 ? x.toFixed(0) : x.toFixed(1)) : x.toFixed(2);
   const bar = (x, col, ab, scl = sc) => { const w = Math.min(50, Math.abs(val(x)) * 50 / scl), o = proj || scl !== sc ? 1 : 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
     return `<div class="dv" data-ab="${ab}" title="cos ${x.cos[K].toFixed(3)} · ‖write‖ ${x.norm} · projection ${(x.cos[K] * x.norm).toFixed(2)}${ab.endsWith('mlp') ? ' · click to add to the ablation list' : ''}"><i style="${val(x) >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
-  const heads = (r, L) => { const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(val(h))));
+  const heads = (r, L) => { RL = L; const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(val(h))));
     const top = r.heads.map((h, i) => [i, h.cos[K] * h.norm]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
     return `<tr class="hd"><td></td><td colspan="4"><div class="hgrid" style="grid-template-columns:repeat(${r.heads.length},1fr)">` + r.heads.map((h, i) =>
       `<i data-ab="L${L} h${i}" title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)} · click: what it attends to" style="cursor:pointer;background:color-mix(in srgb, ${val(h) >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(val(h)) / hs * 85)}%, transparent);opacity:${proj ? 1 : (0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
       `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads. Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}. <a href="#" data-ab="L${L} attn">ablate the whole block</a></div>${st.attnPat && st.attnPat.layer === L && st.attnPat.pos === st.sel ? attnHtml(st.attnPat) : ''}</td></tr>`; };
-  box.innerHTML = arForm() + `<div class="row" style="margin-bottom:6px;font-size:12px;flex-wrap:wrap"><select id="cmode" style="width:auto;padding:1px 6px;font-size:12px"><option value="cos">cosine</option><option value="proj" ${proj ? 'selected' : ''}>projection</option></select>
-    <span class="muted">with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+  box.innerHTML = arForm() + `<div class="row" style="margin-bottom:6px;font-size:12px;flex-wrap:wrap"><select id="cmode" style="width:auto;padding:1px 6px;font-size:12px"><option value="cos">cosine</option><option value="proj" ${proj ? 'selected' : ''}>projection</option><option value="frac" ${frac ? 'selected' : ''}>‖write‖ / ‖residual‖</option></select>
+    <span class="muted" ${frac ? 'style="opacity:.4"' : ''}>with</span><select id="cdir" ${frac ? 'disabled' : ''} style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
     <span class="muted">bars to ±${fmt(sc)} (residual ±${fmt(scR)}) · click a layer for its heads, a head for what it attends to · click an MLP bar to add it to the ablation list</span></div>
     ${arFveHtml(c)}
     <table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:46px"></td><td class="muted">MLP</td><td style="width:46px"></td><td class="muted" title="the residual stream after this block (not a write)">residual</td><td style="width:46px"></td></tr>` +
-    c.layers.map((r, L) => `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)', `L${L} attn`)}</td><td class="muted">${fmt(val(r.attn))}</td><td class="mc">${bar(r.mlp, 'var(--accent)', `L${L} mlp`)}</td><td class="muted">${fmt(val(r.mlp))}</td><td>${r.resid ? bar(r.resid, 'var(--good)', `L${L} resid`, scR) : ''}</td><td class="muted">${r.resid ? fmt(val(r.resid)) : ''}</td></tr>` + (st.open.has(L) ? heads(r, L) : '')).join('') + `</table>`;
+    c.layers.map((r, L) => (RL = L, `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)', `L${L} attn`)}</td><td class="muted">${fmt(val(r.attn))}</td><td class="mc">${bar(r.mlp, 'var(--accent)', `L${L} mlp`)}</td><td class="muted">${fmt(val(r.mlp))}</td><td>${r.resid && !frac ? bar(r.resid, 'var(--good)', `L${L} resid`, scR) : ''}</td><td class="muted">${frac ? '‖h‖ ' + c.resid_norm[L].toFixed(0) : r.resid ? fmt(val(r.resid)) : ''}</td></tr>` + (st.open.has(L) ? heads(r, L) : ''))).join('') + `</table>`;
   $('#cdir').onchange = e => { st.cdir = e.target.value; renderContrib(); };
   $('#cmode').onchange = e => { st.cmode = e.target.value; renderContrib(); };
   for (const tr of box.querySelectorAll('.lrow')) tr.onclick = e => { if (e.target.closest('.mc')) return; const L = +tr.dataset.l; st.open.has(L) ? st.open.delete(L) : st.open.add(L); renderContrib(); };
@@ -277,6 +279,11 @@ function vform(){
   const Ls = k === 'jpp' ? JLAYERS : LAYERS, cur = +$('#vlayer').value || 40;
   $('#vlayer').innerHTML = Ls.map(L => `<option ${L === cur ? 'selected' : ''}>${L}</option>`).join('');
 }
+// median residual norm at a layer over the shown tokens (from the O-lens reads; skips the first 4 tokens)
+function residMed(L){
+  const xs = range().filter(p => p > 3).map(p => st.reads[p + '|' + L]).filter(Boolean).map(r => r.norm).sort((a, b) => a - b);
+  return xs.length ? xs[Math.floor(xs.length / 2)] : null;
+}
 // exactly what a vector was built from
 function specHtml(sp){
   const q = t => `<span style="font-family:var(--mono);background:var(--panel2);border-radius:4px;padding:0 4px">${esc(t)}</span>`;
@@ -290,7 +297,7 @@ async function loadVectors(){
   const opts = st.vecs.map(v => `<option value="${v.vid}">${esc(v.name)} (L${v.layer})</option>`).join('');
   $('#va').innerHTML = opts; $('#vbb').innerHTML = opts;
   $('#vlist').innerHTML = st.vecs.map(v => `<tr class="${st.probe && st.probe.vid === v.vid ? 'on' : ''}"><td>${esc(v.name)}</td><td class="muted">L${v.layer}</td>
-    <td style="font-size:12px">${specHtml(v.spec)}<div class="muted" style="font-size:11px">raw norm ${v.info.raw_norm ?? '–'}${v.info.cos_ab != null ? ` · cos(a, b) ${v.info.cos_ab}` : ''}</div></td>
+    <td style="font-size:12px">${specHtml(v.spec)}<div class="muted" style="font-size:11px">raw norm ${v.info.raw_norm ?? '–'}${residMed(v.layer) && v.info.raw_norm ? ` = ${(v.info.raw_norm / residMed(v.layer)).toFixed(2)}× the median ‖h‖ at L${v.layer} here (${residMed(v.layer).toFixed(0)})` : ''}${v.info.cos_ab != null ? ` · cos(a, b) ${v.info.cos_ab}` : ''}</div></td>
     <td style="white-space:nowrap"><button class="btn" data-probe="${v.vid}">Probe</button>
       α <input data-alpha="${v.vid}" value="0.1" size="4" title="h ← h + α·‖h‖·v̂ at every position"> <button class="btn" data-steer="${v.vid}">Steer 64</button>
       <button class="btn" data-del="${v.vid}" title="delete">×</button></td></tr>`).join('') || '<tr><td class="muted">No vectors yet.</td></tr>';
