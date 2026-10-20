@@ -106,9 +106,19 @@ def run_detail(name: str) -> dict:
         ))
     calib = {}
     for f in sorted(d.glob("calibration_*.json")):
-        calib[f.stem.removeprefix("calibration_")] = jload(f)
+        c = jload(f)
+        calib[f.stem.removeprefix("calibration_")] = {  # reply texts are fetched one at a time (/api/calib_text)
+            pid: dict(x, disagreements=[{k: v for k, v in g.items() if k != "text"} for g in x.get("disagreements", [])])
+            for pid, x in c.items()
+        }
     return dict(name=name, config=jload(d / "config.json"), status=jload(d / "status.json", {}),
                 prompts=prompts, investigations=invs, calibration=calib, log=tail(d / "log.txt"))
+
+
+def calib_text(name: str, grader: str, pid: str, i: int) -> dict:
+    d = RUNS / name
+    assert d.parent == RUNS and "/" not in grader
+    return dict(text=jload(d / f"calibration_{grader}.json")[pid]["disagreements"][i]["text"])
 
 
 def samples(name: str, pid: str, exp: int) -> dict:
@@ -148,6 +158,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps(run_list()))
             if p == "/api/run":
                 return self.send(json.dumps(run_detail(args["name"])))
+            if p == "/api/calib_text":
+                return self.send(json.dumps(calib_text(args["name"], args["grader"], args["pid"], int(args["i"]))))
             if p == "/api/samples":
                 return self.send(json.dumps(samples(args["name"], args["pid"], int(args["exp"]))))
             self.send('{"error":"not found"}', code=404)

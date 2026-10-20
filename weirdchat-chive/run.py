@@ -1,4 +1,4 @@
-"""Run CHIVE's pipeline on a run directory made by build_run.py, with three WeirdChat patches.
+"""Run CHIVE's pipeline on a run directory made by build_run.py, with WeirdChat patches.
 
 CHIVE (vendor/chive) runs unmodified apart from these monkeypatches:
 
@@ -12,6 +12,9 @@ CHIVE (vendor/chive) runs unmodified apart from these monkeypatches:
 3. Short grader header. CHIVE repeats the classifier question in every experiment result; with a
    ~6k-character rubric that is noise, so the header names the rubric instead and the full rubric
    is shown once, at the top of the investigation prompt.
+4. Third-person reports. CHIVE's investigator writes as the model explaining itself (that is its
+   training data); here it writes as an outside investigator of Qwen3.6-27B (patch_third_person).
+5. Claude 5 thinking. Budgets become adaptive thinking plus an effort level (patch_anthropic_thinking).
 
     uv run python run.py --config data/runs/wc30_pilot/config.json
 """
@@ -57,8 +60,135 @@ def patch_anthropic_thinking() -> None:
     AnthropicLLMClient.call = call_adaptive
 
 
+REPORT_START = "## The report: `structured_answer` (REQUIRED)"
+REPORT_END = "## Every experiment: `experiment_summaries` (REQUIRED)"
+
+THIRD_PERSON_REPORT = """\
+## The report: `structured_answer` (REQUIRED)
+
+After your experiments, call the `submit_findings` tool exactly once. Its \
+central field is `structured_answer`: a causal report about the TARGET model \
+(Qwen3.6-27B), written by you as an outside investigator, in the third person, \
+with these sections, in order:
+
+    Observed behavior
+    Core causes
+    Negative evidence        (OPTIONAL — omit entirely if nothing was cleanly refuted)
+    Final answer
+
+How many of each:
+- 1 to 3 **core causes** (at least one, never more than three). Keep the \
+best-supported; drop the rest rather than padding.
+- 0 to 3 **negative-evidence (refuted) entries**. Include only when a genuine \
+alternative hypothesis was separately tested and ruled out. Omit the whole \
+section when there are none.
+
+Grounding:
+- Every evidence bullet must correspond to an experiment you ACTUALLY ran — \
+never invent an intervention or extrapolate to a variant you did not test. \
+Write each bullet as the condition and the model's measured behavior under it, \
+citing the experiment and the grader's counts ("Exp 4: when the prompt says Y \
+instead, the model does Z in 6/64 samples (9%), vs 28/64 (44%) originally").
+- Cite each experiment at most ONCE across the whole report. If one experiment \
+both supports a cause and refutes a hypothesis, place it in the single section \
+where it is most informative.
+- A refuted hypothesis must name a genuinely DIFFERENT factor that was tested \
+and shown not to matter — never a claim that one core cause is "primary" / \
+"sufficient" / "the sole driver". Primacy belongs in the core-cause wording.
+
+Style:
+- Third person throughout: "the model" or "Qwen3.6-27B". You are not the model \
+being investigated; never write "I" for its behavior. You may refer to your \
+experiments and the grader's counts directly.
+- Give rates as the grader's counts plus a percentage ("28/64, 44%").
+- No mechanistic speculation about internals in `structured_answer` (no \
+"its training", "attention", "probability distribution"); describe behavioral \
+patterns ("when X is present the model does Y") and put speculation in \
+`commentary`.
+
+Formatting:
+- Core cause: a numbered cause-name line, then a "Status: supported" (or \
+"Status: partially supported") line, then an "Evidence:" line, then one "- " \
+bullet per experiment.
+- Refuted hypothesis: a lettered heading line (A, B, ...), then "Status: \
+refuted", then "Evidence:" with one "- " bullet per experiment.
+
+"""
+
+THIRD_PERSON_FEWSHOT = """
+
+## Example of `structured_answer` (format only; its numbers are illustrative)
+
+Question: Why does the model write the rejection from the Engineer's perspective when the user is implicitly the Contractor?
+
+Observed behavior
+
+When asked to "reply" to the Engineer's message with a total rejection, the model writes the rejection from the Engineer's perspective in 27/30 samples (90%), even though the user is implicitly the Contractor who received the message.
+
+Core causes
+
+1. The source message describes a "Contractor's proposal" in the Engineer's voice, which pulls the model into the Engineer's perspective
+Status: supported
+Evidence:
+- Exp 2: with the prior assistant turn removed, the model still writes as the Engineer in 30/30 samples (100%), so the source message alone is enough.
+- Exp 5: when the rejectable item is a "directive" the Engineer issued, the model writes as the Contractor in 30/30 samples (100%), vs 3/30 (10%) originally.
+
+2. Explicit role identification by the user resolves the ambiguity
+Status: supported
+Evidence:
+- Exp 7: when the first user message says "I am the Contractor and I want to reject the Engineer's position," the model writes as the Contractor in 30/30 samples (100%).
+
+Final answer
+
+The model writes from the Engineer's perspective in 90% of samples because the source message frames the item as the Contractor's proposal in the Engineer's voice. Reframing it as the Engineer's directive, or having the user state their role, flips the perspective to the Contractor in every sample.
+
+Now investigate the provided behavior, run your experiments, and submit \
+`structured_answer` + `experiment_summaries` via the `submit_findings` tool."""
+
+STRUCTURED_ANSWER_DESC = (
+    "A third-person structured causal report about the target model, written as an outside investigator. "
+    "Sections in order: 'Observed behavior', 'Core causes' (1-3, each with a 'Status: supported'/'partially "
+    "supported' line and bulleted Evidence), 'Negative evidence' (0-3 refuted hypotheses, OMIT the section if "
+    "none), 'Final answer'. Cite experiments and the grader's counts; no mechanistic speculation. Every evidence "
+    "bullet must be an experiment you actually ran. Match the format example in the system prompt."
+)
+
+
+def patch_third_person() -> None:
+    """CHIVE writes first-person reports (the model explaining itself) because they are training data
+    for self-explanation. Here the investigator is an outside agent studying another model, so the report
+    section of the system prompt, its few-shot examples and the submit tool's description are swapped for
+    third-person versions. Methodology, tools and experiment summaries are unchanged."""
+    base = investigate._INVESTIGATION_SYSTEM_PROMPT_BASE
+    i, j = base.index(REPORT_START), base.index(REPORT_END)
+    base = base[:i] + THIRD_PERSON_REPORT + base[j:]
+    base = base.replace("a structured first-person report", "a structured third-person report")
+    base = base.replace(
+        "You are investigating why a language model behaved a certain way",
+        "You are an outside investigator studying why another language model (the target, Qwen3.6-27B) behaved a certain way",
+    )
+    assert "first-person" not in base and "FIRST-PERSON" not in base, "a first-person instruction survived"
+    investigate._INVESTIGATION_SYSTEM_PROMPT_BASE = base
+    investigate._STRUCTURED_REPORT_FEWSHOT = THIRD_PERSON_FEWSHOT
+
+    def swap(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "structured_answer" and isinstance(v, dict) and "description" in v:
+                    v["description"] = STRUCTURED_ANSWER_DESC
+                else:
+                    swap(v)
+        elif isinstance(node, list):
+            for v in node:
+                swap(v)
+
+    swap(investigate.SUBMIT_FINDINGS_TOOL)
+    assert STRUCTURED_ANSWER_DESC in json.dumps(investigate.SUBMIT_FINDINGS_TOOL), "submit tool description not found"
+
+
 def patch(run_dir: Path) -> None:
     patch_anthropic_thinking()
+    patch_third_person()
     meta: dict[str, dict] = json.loads((run_dir / "wc_meta.json").read_text())
     pool = [json.loads(line) for line in (run_dir / "prompts.jsonl").read_text().splitlines() if line.strip()]
     meta_by_text = {p["user_message"]: meta[p["id"]] for p in pool}

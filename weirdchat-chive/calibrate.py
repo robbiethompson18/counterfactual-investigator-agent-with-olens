@@ -48,16 +48,23 @@ async def main() -> None:
 
     grader = make_llm_client(args.grader)
 
-    async def one(pid: str) -> tuple[str, list[tuple[bool, bool]]]:
+    async def one(pid: str) -> tuple[str, list[tuple[bool, bool]], list[dict]]:
         ss = sorted(samples[pid], key=lambda s: s["transcript_id"])
         verdicts = await grade_completions(
             grader, classifier_question(meta[pid]), pool[pid]["messages"], [s["messages"][-1]["content"] or "" for s in ss]
         )
-        return pid, [(bool(s["judgment"]["match"]), v) for s, v in zip(ss, verdicts, strict=True)]
+        pairs = [(bool(s["judgment"]["match"]), v) for s, v in zip(ss, verdicts, strict=True)]
+        disagreements = [
+            dict(transcript_id=s["transcript_id"], weirdchat=a, grader=v, weirdchat_explanation=s["judgment"].get("explanation"),
+                 text=s["messages"][-1]["content"] or "")
+            for s, (a, v) in zip(ss, pairs, strict=True)
+            if a != v
+        ]
+        return pid, pairs, disagreements
 
     results = await asyncio.gather(*(one(pid) for pid in meta))
     out, by_behaviour = {}, defaultdict(list)
-    for pid, pairs in results:
+    for pid, pairs, disagreements in results:
         by_behaviour[meta[pid]["behavior_id"]] += pairs
         out[pid] = {
             "n": len(pairs),
@@ -65,6 +72,7 @@ async def main() -> None:
             "grader_yes": sum(b for _, b in pairs),
             "agree": sum(a == b for a, b in pairs),
             "kappa": round(kappa(pairs), 3),
+            "disagreements": disagreements,
         }
     slug = re.sub(r"[^A-Za-z0-9.-]+", "_", args.grader)
     (args.run_dir / f"calibration_{slug}.json").write_text(json.dumps(out, indent=1))

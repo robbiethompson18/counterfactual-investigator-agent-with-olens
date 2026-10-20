@@ -55,6 +55,9 @@
   <h2>Grader vs WeirdChat's judge (Gemma 4 31B)</h2>
   <div class="small mut">Same grader call as stage 3, run on WeirdChat's own 64 samples per prompt, compared with WeirdChat's labels.</div>
   <div id="calib"></div>
+  <h3>Disagreements</h3>
+  <div class="small mut">Samples where the grader and WeirdChat's judge differ. Click one to read the full reply.</div>
+  <div id="disag"></div>
   <h2>Log (tail)</h2>
   <div class="log"><pre id="log"></pre></div>
 </main>
@@ -148,6 +151,18 @@ async function load() {
         graders.map(g => { const x = cal[g][pid]; return x ? `<td class="num">${x.grader_yes}</td><td class="num">${x.kappa.toFixed(2)}</td>` : `<td></td><td></td>`; }).join("") + "</tr>";
     }).join("") + "</table></div>" : `<div class="card mut">No calibration for this run (calibrate.py).</div>`;
 
+  $("#disag").innerHTML = graders.map(g => Object.entries(cal[g]).map(([pid, x]) => {
+    const p = P[pid], ds = (x.disagreements || []);
+    if (!p || !ds.length) return "";
+    return `<details class="card"><summary><b>${esc(p.behavior_id)}</b> · ${ds.length} of ${x.n} disagree (${esc(g)}: ${x.grader_yes} yes, WeirdChat: ${x.wc_yes} yes)</summary>` +
+      ds.map((s, i) => `<details class="samp ${s.weirdchat ? "yes" : ""} calib" data-g="${esc(g)}" data-p="${esc(pid)}" data-i="${i}"><summary class="small">WeirdChat <b>${s.weirdchat ? "match" : "no match"}</b> · grader <b>${s.grader ? "yes" : "no"}</b> · ${esc((s.weirdchat_explanation || "").slice(0, 220))}</summary><div class="small mut">WeirdChat's judge: ${esc(s.weirdchat_explanation)}</div><pre class="txt">loading…</pre></details>`).join("") + "</details>";
+  }).join("")).join("") || '<div class="card mut">None recorded (rerun calibrate.py to record them).</div>';
+  document.querySelectorAll("details.calib").forEach(el => el.addEventListener("toggle", async () => {
+    if (!el.open || el.dataset.loaded) return; el.dataset.loaded = 1;
+    const r = await (await fetch(`api/calib_text?name=${encodeURIComponent(RUN)}&grader=${encodeURIComponent(el.dataset.g)}&pid=${el.dataset.p}&i=${el.dataset.i}`)).json();
+    el.querySelector(".txt").textContent = r.text ?? r.error;
+  }));
+
   $("#log").textContent = d.log.join("\n");
   wire();
 }
@@ -176,7 +191,7 @@ function wire() {
 }
 
 $("#run").onchange = () => { RUN = $("#run").value; try { localStorage.setItem("wcchive-run", RUN); } catch (e) {} OPEN.clear(); OPENEXP.clear(); load(); };
-setInterval(() => { if ($("#auto").checked && !document.hidden && !document.querySelector(".samples[data-loaded]")) { loadRuns().then(load); } }, 20000);
+setInterval(() => { if ($("#auto").checked && !document.hidden && !document.querySelector(".samples[data-loaded]") && !document.querySelector("details[open]")) { loadRuns().then(load); } }, 20000);
 loadRuns().then(load);
 </script>
 </body>
