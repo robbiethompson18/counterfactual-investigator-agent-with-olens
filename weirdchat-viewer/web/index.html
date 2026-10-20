@@ -219,6 +219,21 @@ function mini(s, k){
     return `<div class="mb" style="--o:${o.toFixed(2)}" title="${f != null ? 'bullet FVE ' + f.toFixed(3) + ' · ' : ''}${cs.length ? 'NNLS weight ' + cs[j].toFixed(3) : ''}">${f != null ? `<span class="bfv">${f.toFixed(2)}</span>` : ''}${esc(b)}</div>`;
   }).join('');
 }
+// every setting that changes what's on screen lives in the URL hash (non-defaults only), so any view is a link
+function syncHash(){
+  const h = new URLSearchParams();
+  if (st.pat) h.set('p', st.pat.idx);
+  if (st.tr) h.set('t', st.tr.tid);
+  if (st.sel != null) h.set('tok', st.sel);
+  const L = [...st.chosen].sort((a, b) => a - b).join(','); if (L !== '40') h.set('L', L);
+  if (st.temp) h.set('T', st.temp);
+  if (st.hlMode !== 'joint') h.set('hl', st.hlMode);
+  if (st.hlLayer !== 40) h.set('hll', st.hlLayer);
+  if (st.ovpos !== 1) h.set('ov', st.ovpos);
+  const tf = $('#tfilter'); if (tf && tf.value !== 'all') h.set('tf', tf.value);
+  for (const [k, id, dflt] of [['q', '#q', ''], ['beh', '#beh', ''], ['sort', '#sort', 'unexpectedness']]) if ($(id).value !== dflt) h.set(k, $(id).value);
+  history.replaceState(null, '', '#' + h.toString().replace(/%2C/g, ','));
+}
 function eloOf(p, k){ return k === 'match_rate' ? (p.match_rate||0) : k === 'mean' ? (p.elo_mean||0) : (p.elo[k]||0); }
 
 function renderList(){
@@ -238,6 +253,7 @@ function renderList(){
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
   document.querySelector('.pi.on')?.scrollIntoView({block: 'nearest'});
+  syncHash();
 }
 
 async function openPattern(i, tid){
@@ -287,6 +303,7 @@ async function openPattern(i, tid){
   $('#tsel').onchange = () => openTranscript($('#tsel').value);
   const step = s => { const o = $('#tsel'); o.selectedIndex = Math.max(0, Math.min(o.options.length - 1, o.selectedIndex + s)); openTranscript(o.value); };
   $('#tprev').onclick = () => step(-1); $('#tnext').onclick = () => step(1);
+  if (st.hash && st.hash.tf) $('#tfilter').value = st.hash.tf;
   fill();
   if (tid) $('#tsel').value = tid;
   await openTranscript($('#tsel').value);
@@ -302,7 +319,7 @@ function setReads(tr){
 
 async function openTranscript(tid){
   const tr = await api('/api/transcript?tid=' + encodeURIComponent(tid));
-  st.tr = tr; setReads(tr); ls('tid', tid); history.replaceState(null, '', `#p=${st.pat.idx}&t=${encodeURIComponent(tid)}`);
+  st.tr = tr; setReads(tr); ls('tid', tid);
   const t = st.pat.transcripts.find(x => x.tid === tid);
   const zoneOf = new Int32Array(tr.tokens.length).fill(-1); tr.zones.forEach(([a, b], z) => { for (let i = a; i < b; i++) zoneOf[i] = z; });
   const citeOf = {}; tr.cites.forEach((c, j) => { for (let i = c.range[0]; i < c.range[1]; i++) citeOf[i] = j; });
@@ -367,15 +384,18 @@ async function openTranscript(tid){
     b.disabled = false;
   };
   $('#hlmode').value = st.hlMode;
-  $('#hlmode').onchange = e => { st.hlMode = e.target.value; ls('hlmode', st.hlMode); markRead(); };
-  $('#hllayer').onchange = e => { st.hlLayer = +e.target.value; ls('hllayer', st.hlLayer); markRead(); };
+  $('#hlmode').onchange = e => { st.hlMode = e.target.value; ls('hlmode', st.hlMode); markRead(); syncHash(); };
+  $('#hllayer').onchange = e => { st.hlLayer = +e.target.value; ls('hllayer', st.hlLayer); markRead(); syncHash(); };
   for (const el of document.querySelectorAll('#tview .tk')) if (citeOf[+el.dataset.p] === undefined) {
     el.onmouseenter = e => { if (el.dataset.f) showTip(e, `${st.hlMode === 'top' ? 'top bullet' : 'joint'} FVE ${el.dataset.f} at L${st.hlLayer}`); };
     el.onmouseleave = hideTip;
   }
   markRead();
   const z0 = o ? tr.zones[tr.zones.length - 2] : tr.zones[0];  // organisms: after the user turn, where the reads are
-  select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
+  const tok = st.hash && st.hash.tok != null ? +st.hash.tok : null;
+  st.hash = null;  // the link's settings apply to the first transcript only
+  if (tok != null && tok >= 0 && tok < tr.tokens.length) { select(tok, false); const el = document.querySelector(`#tview .tk[data-p="${tok}"]`); if (el) el.scrollIntoView({block: 'center'}); }
+  else select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
 }
 
 // FVE of a read: joint FVE of all bullets, or the best single bullet's FVE
@@ -417,7 +437,7 @@ function showTip(e, s){ const t = $('#tip'); t.textContent = s; t.style.display 
 function hideTip(){ $('#tip').style.display = 'none'; }
 
 function select(pos, autoread){
-  st.sel = pos;
+  st.sel = pos; syncHash();
   for (const el of document.querySelectorAll('#tview .tk.sel')) el.classList.remove('sel');
   const el = document.querySelector(`#tview .tk[data-p="${pos}"]`);
   if (el) { el.classList.add('sel'); if (autoread) el.scrollIntoView({block:'nearest'}); }
@@ -486,8 +506,8 @@ function renderLens(){
   h += `</div>`;
   $('#lensbody').className = ''; $('#lensbody').innerHTML = h;
   for (const c of document.querySelectorAll('#lchips .chip')) c.onclick = () => {
-    const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); };
-  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); };
+    const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); syncHash(); };
+  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); syncHash(); };
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
   $('#readbtn').onclick = () => doRead([pos]);
@@ -592,6 +612,15 @@ document.addEventListener('keydown', e => {
   $('#beh').innerHTML += bs.map(b => `<option>${esc(b)}</option>`).join('');
   const zl = ['<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n'];
   st.ovpos = ls('ovpos') ?? 1;
+  // a link's settings (syncHash) win over this browser's saved ones
+  const hp = new URLSearchParams(location.hash.slice(1));
+  if (hp.has('L')) { const L = hp.get('L').split(',').map(Number).filter(L => d.layers.includes(L)); if (L.length) st.chosen = new Set(L); }
+  if (hp.has('T')) { st.temp = +hp.get('T'); st.n = st.temp ? 4 : 1; }
+  if (hp.has('hl')) st.hlMode = hp.get('hl');
+  if (hp.has('hll')) st.hlLayer = +hp.get('hll');
+  if (hp.has('ov')) st.ovpos = +hp.get('ov');
+  for (const [k, id] of [['q', '#q'], ['beh', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
+  st.hash = {tok: hp.get('tok'), tf: hp.get('tf')};
   $('#ovpos').innerHTML = zl.map((t, k) => `<option value="${k}" ${k === st.ovpos ? 'selected' : ''}>+${k} ${esc(t)}</option>`).join('');
   $('#ovpos').onchange = e => { st.ovpos = +e.target.value; ls('ovpos', st.ovpos); renderList(); };
   st.overview = await api('/api/overview');
@@ -604,7 +633,6 @@ document.addEventListener('keydown', e => {
     pollQueue(); setInterval(pollQueue, 5000);
     setInterval(() => { if (st.queued && st.queued.size) refreshQueued(); }, 8000);
   }
-  const hp = new URLSearchParams(location.hash.slice(1));
   if (hp.has('p') && st.patterns[+hp.get('p')]) openPattern(+hp.get('p'), hp.get('t'));
   else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(st.patterns.slice().sort((x, y) => eloOf(y, 'unexpectedness') - eloOf(x, 'unexpectedness'))[0].idx); }
 })();
