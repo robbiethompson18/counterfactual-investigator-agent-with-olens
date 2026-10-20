@@ -30,6 +30,28 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 - `HF_TOKEN` (or `HF_TOKEN_FILE`): needed by GPU nodes for the gated whiteners.
 - Reads are cached in `data/reads.jsonl`, the queue in `data/queue.json` (both gitignored).
 
+## Sharing: the HF dataset and the public snapshot
+
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev) is this page in read-only mode (no GPU or queue
+controls), with links in the same `#p=…&t=…` form. Its data lives in the project's HF dataset under `weirdchat/`, where
+each machine owns its own files so publishes never clash:
+
+- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of this machine's
+  `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name is `$WCO_MACHINE`, else the short
+  hostname.
+- `weirdchat/site/`: one gzipped JSON per transcript (the server's `/api/transcript`), per pattern, and the pattern
+  list, built from everyone's files. The page fetches these straight from HF (CORS is open).
+
+```bash
+.venv/bin/python scripts/publish.py          # push this machine's files, pull everyone's, rebuild + upload the site
+.venv/bin/python scripts/publish.py --pull   # only pull other machines' files, to browse them in the local viewer
+scripts/deploy_site.sh                       # (from the repo root) only when web/index.html changes
+```
+
+The local server reads the pulled files (`data/shared/weirdchat/`) alongside its own. A full publish takes a few
+minutes (it renders all 25,792 transcripts) and uploads only the site files that changed. Writing to the dataset
+needs an HF token with write access to it.
+
 ## GPUs
 
 - **Start GPU** in the header launches `sky/pod.yaml` (`web/pod.py`) with SkyPilot; the pod's server
