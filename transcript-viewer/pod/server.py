@@ -219,45 +219,20 @@ def load_extras(nla=True):
     print(f"NLA + J++ loaded {time.time() - T0:.0f}s (FVE baseline {S['critic'].base:.1f})", flush=True)
 
 
-def vectors():
-    from olens.vectors import Vectors
+def handler(name):
+    """pod/handlers.py's `name`, freshly reloaded together with olens.vectors (no model reload)."""
+    import importlib
+    import sys
 
-    if "vec" not in S:
-        S["vec"] = Vectors(S["tok"], S["model"], S["readout"], S.get("jpp"), S.get("critic"))
-    return S["vec"]
+    import olens.vectors
 
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import handlers
 
-def do_nla_score(req):
-    """{ids, pos, text} -> {cos, fve}: the NLA reconstructor on an edited explanation."""
-    ids = [int(i) for i in req["ids"]]
-    v = capture(S["model"], ids, [42])[42][[int(req["pos"]) % len(ids)]].cpu()
-    return S["critic"].score([req["text"]], v)[0]
-
-
-def do_contrib(req):
-    from olens.vectors import contributions
-
-    ids = [int(i) for i in req["ids"]]
-    return contributions(S["model"], ids, int(req["pos"]) % len(ids), req.get("vecs") or {})
-
-
-def do_vector(req):
-    v, L, info = vectors().build(req["spec"])
-    return {"v": [round(float(x), 6) for x in v.cpu()], "layer": L, "info": info}
-
-
-def do_probe(req):
-    return vectors().probe([int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]))
-
-
-def do_steer(req):
-    t0 = time.time()
-    texts = vectors().steer(
-        [int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]), float(req["alpha"]),
-        n=int(req.get("n", 64)), max_new_tokens=int(req.get("max_new_tokens", 400)),
-        temperature=float(req.get("temperature", 1.0)), seed=int(req.get("seed", 0)),
-    )
-    return {"texts": texts, "seconds": round(time.time() - t0, 1)}
+    importlib.reload(olens.vectors)
+    importlib.reload(handlers)
+    handlers.S = S
+    return getattr(handlers, name)
 
 
 class H(BaseHTTPRequestHandler):
@@ -305,7 +280,7 @@ class H(BaseHTTPRequestHandler):
             if self.path in ("/vector", "/probe", "/steer", "/nla_score", "/contrib"):
                 if not STATUS["ready"]:
                     return self.send({"error": "model still loading"}, 503)
-                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score, "/contrib": do_contrib}[self.path]
+                fn = handler({"/vector": "do_vector", "/probe": "do_probe", "/steer": "do_steer", "/nla_score": "do_nla_score", "/contrib": "do_contrib"}[self.path])
                 LAST["t"] = time.time()
                 r = gpu(self.path[1:], lambda: fn(req))
                 LAST["t"] = time.time()

@@ -75,9 +75,10 @@ class Vectors:
         return {"cos": [round(float(x), 4) for x in proj / h.norm(dim=-1).clamp_min(1e-9)], "proj": [round(float(x), 2) for x in proj]}
 
     @torch.no_grad()
-    def steer(self, ids, layer, v, alpha, n=64, max_new_tokens=400, temperature=1.0, top_p=1.0, seed=0, batch=64):
+    def steer(self, ids, layer, v, alpha, n=64, max_new_tokens=400, temperature=1.0, top_p=1.0, seed=0, batch=64, ablate=()):
         """Sample n replies to the prompt `ids` (ending in the generation prompt) with
-        h <- h + alpha * ||h|| * v at the output of block `layer`, every position."""
+        h <- h + alpha * ||h|| * v at the output of block `layer`, every position, and the
+        components in `ablate` zeroed at every position: [{layer, kind: attn|mlp|head, head}]."""
         v = unit(v.to(self.model.device)).to(torch.bfloat16)
 
         def hook(mod, inp, out):
@@ -86,6 +87,7 @@ class Vectors:
             return (h, *out[1:]) if isinstance(out, tuple) else h
 
         hd = blocks(self.model)[layer].register_forward_hook(hook) if alpha else None
+        abl = [ablation_hook(self.model, a) for a in ablate]
         texts = []
         try:
             torch.manual_seed(seed)
@@ -106,7 +108,46 @@ class Vectors:
         finally:
             if hd:
                 hd.remove()
+            for h in abl:
+                h.remove()
         return texts
+
+
+def ablation_hook(model, a):
+    """Zero-ablate one component at every position: a whole attention block's or MLP's write, or
+    one attention head (its slice of the output projection's input)."""
+    b = blocks(model)[int(a["layer"])]
+    attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
+    if a["kind"] == "mlp":
+        return b.mlp.register_forward_hook(lambda m, i, o: torch.zeros_like(o))
+    if a["kind"] == "attn":
+        return attn.register_forward_hook(lambda m, i, o: (torch.zeros_like(o[0]), *o[1:]) if isinstance(o, tuple) else torch.zeros_like(o))
+    proj = attn.o_proj if hasattr(attn, "o_proj") else attn.out_proj
+    H = getattr(attn, "num_v_heads", None) or model.config.num_attention_heads
+    hd, h = proj.in_features // H, int(a["head"])
+    assert 0 <= h < H, f"layer {a['layer']} has {H} heads"
+
+    def pre(m, i):
+        x = i[0].clone()
+        x[..., h * hd : (h + 1) * hd] = 0
+        return (x, *i[1:])
+
+    return proj.register_forward_pre_hook(pre)
+
+
+@torch.no_grad()
+def ar_per_layer(tok, readout, n_blocks, text, minus=None):
+    """{block: dir} for every block: the AR of `text` (minus the AR of `minus`, else minus the
+    whitener mean) at the AR's own layers (20..60 step 4); other blocks use the nearest AR layer."""
+    ar_layers = list(readout.ar.layers)
+    ids = tok(text, add_special_tokens=False).input_ids[:32]
+    a = readout.ar([ids] * len(ar_layers), ar_layers)
+    if minus:
+        b = readout.ar([tok(minus, add_special_tokens=False).input_ids[:32]] * len(ar_layers), ar_layers)
+    else:
+        b = torch.stack([readout.whitener(L).mu.to(a.device, a.dtype).view(-1) for L in ar_layers])
+    by = {L: unit(a[j] - b[j]) for j, L in enumerate(ar_layers)}
+    return {i: by[min(ar_layers, key=lambda L: abs(L - i))] for i in range(n_blocks)}
 
 
 def unit(v):
@@ -114,7 +155,7 @@ def unit(v):
 
 
 @torch.no_grad()
-def contributions(model, ids, pos, vecs):
+def contributions(model, ids, pos, vecs, layered=None):
     """What each attention block (full or linear) and each MLP writes into the residual stream at
     token `pos`, compared by cosine with: the final residual (block-63 output), the residual right
     after that sublayer's block, and each of `vecs` ({name: [d]}). -> {layers: [{attn, mlp}]},
@@ -137,6 +178,7 @@ def contributions(model, ids, pos, vecs):
     final = got[(n_blocks - 1, "out")]  # block outputs from hooks: hidden_states[-1] is after the final norm
     dirs = {"final residual": final, **{k: torch.as_tensor(v, device=final.device).float() for k, v in vecs.items()}}
     dirs = {k: unit(v) for k, v in dirs.items()}
+    per_layer = {k: {L: unit(v.to(final.device)) for L, v in d.items()} for k, d in (layered or {}).items()}  # name -> {block: dir}
     rows = []
     for i in range(len(blocks(model))):
         row = {}
@@ -144,6 +186,8 @@ def contributions(model, ids, pos, vecs):
             c = got[(i, kind)]
             n = c.norm().clamp_min(1e-12)
             cos = {k: round(float(c @ d / n), 4) for k, d in dirs.items()}
+            for k, d in per_layer.items():
+                cos[k] = round(float(c @ d[i] / n), 4)
             cos["block output"] = round(float(c @ unit(got[(i, "out")]) / n), 4)
             row[kind] = {"norm": round(float(n), 2), "cos": cos}
         # per head: W_O[:, head slice] @ head output; the heads sum to the attention write (no bias)
@@ -156,11 +200,17 @@ def contributions(model, ids, pos, vecs):
         per = torch.einsum("dhk,hk->hd", W.view(W.shape[0], H, hd), x.view(H, hd))  # [H, d]
         pn = per.norm(dim=-1).clamp_min(1e-12)
         heads = [{"norm": round(float(pn[h]), 2)} for h in range(H)]
-        for k, d in list(dirs.items()) + [("block output", unit(got[(i, "out")]))]:
+        for k, d in list(dirs.items()) + [("block output", unit(got[(i, "out")]))] + [(k, d[i]) for k, d in per_layer.items()]:
             cs = per @ d / pn
             for h in range(H):
                 heads[h].setdefault("cos", {})[k] = round(float(cs[h]), 4)
         row["heads"] = heads
+        o = got[(i, "out")]  # the residual stream after this block, against the same directions
+        on = o.norm().clamp_min(1e-12)
+        rc = {k: round(float(o @ d / on), 4) for k, d in dirs.items()}
+        rc.update({k: round(float(o @ d[i] / on), 4) for k, d in per_layer.items()})
+        rc["block output"] = 1.0
+        row["resid"] = {"norm": round(float(on), 2), "cos": rc}
         row["kind"] = "full" if hasattr(b, "self_attn") else "linear"
         rows.append(row)
     return {"layers": rows, "resid_norm": [round(float(got[(i, "out")].norm()), 1) for i in range(n_blocks)]}

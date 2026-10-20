@@ -723,7 +723,7 @@ class H(BaseHTTPRequestHandler):
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
                 vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
-                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs}))
+                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}}))
             if p == "/api/vector":
                 return self.send(steer.build(POD, req.get("name"), req["spec"]))
             if p == "/api/vector/delete":
@@ -733,7 +733,10 @@ class H(BaseHTTPRequestHandler):
                 return self.send(steer.probe(POD, req["tid"], render(req["tid"])["ids"], req["vid"]))
             if p == "/api/steer":
                 tid = req["tid"]
-                return self.send(steer.start(POD, judge_for(tid), tid, prompt_ids(tid), user_messages(tid), req.get("vid"), req.get("alpha", 0), int(req.get("n", 64))))
+                return self.send(steer.start(POD, judge_for(tid), tid, prompt_ids(tid), user_messages(tid), req.get("vid"), req.get("alpha", 0), int(req.get("n", 64)), ablate=req.get("ablate") or ()))
+            if p == "/api/steer/rejudge":  # re-run failed judge calls of a finished run
+                r = steer.R[req["rid"]]
+                return self.send(steer.rejudge(judge_for(r["tid"]), req["rid"], user_messages(r["tid"])))
             if p == "/api/judge_calib":  # judge WeirdChat's stored rollouts of this prompt, compare labels
                 tid = req["tid"]
                 threading.Thread(target=judge_calib, args=(tid,), daemon=True).start()
@@ -829,6 +832,8 @@ def main():
     extras.load()
     steer.load()
     S["rubrics"] = {r["behavior_id"]: r["transcript_rubric"]["text"] for r in pq.read_table(HF / "rubrics.parquet").to_pylist()}
+    if os.environ.get("WCO_JUDGE_URL"):
+        steer.resume(judge_for, user_messages)
     from readq import ReadQueue
 
     S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])

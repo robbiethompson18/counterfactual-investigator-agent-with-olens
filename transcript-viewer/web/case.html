@@ -62,6 +62,8 @@ table.ct tr.lrow{cursor:pointer} table.ct tr.lrow:hover td{background:var(--pane
     </div>
     <table class="vt" id="vlist"></table>
     <h3 style="margin-top:14px">Behaviour rate under steering <span class="muted" id="base"></span></h3>
+    <div class="vb"><span class="muted">zero-ablate</span><input id="abl" placeholder="L12 attn, L40 h5, L20 mlp" size="30" title="every position; heads are slices of the attention output projection's input">
+      <button class="btn" id="ablrun">Sample 64 ablated</button><label class="muted"><input type="checkbox" id="ablsteer" style="width:auto"> also apply to Steer runs</label></div>
     <div class="vb"><button class="btn" id="unst">Unsteered baseline (64)</button><button class="btn" id="calib" title="Judge WeirdChat's stored rollouts of this prompt and compare with its labels">Check judge vs WeirdChat</button><span class="muted" id="calibmsg"></span></div>
     <table class="vt" id="runs"></table><div id="samples"></div>
   </div>
@@ -148,27 +150,71 @@ $('#jppall').onchange = renderDetail;
 st.contrib = {};
 function renderContrib(){
   const c = st.contrib[st.sel], box = $('#contrib');
-  if (!c) { box.innerHTML = '<div class="muted">What each attention block (full or linear), each attention head and each MLP adds to this token\'s residual stream, by cosine with a direction. Press the button (needs the H200).</div>'; return; }
+  if (!c) { box.innerHTML = arForm() + '<div class="muted">What each attention block (full or linear), each attention head and each MLP adds to this token\'s residual stream, against a direction. Press the button (needs the H200).</div>'; bindArForm(); return; }
   const keys = Object.keys(c.layers[0].attn.cos); if (!keys.includes(st.cdir)) st.cdir = 'final residual';
-  const K = st.cdir, nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
-  const sc = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(r.attn.cos[K]), Math.abs(r.mlp.cos[K])]));
-  const bar = (x, col) => { const w = Math.min(50, Math.abs(x.cos[K]) * 50 / sc), o = 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
-    return `<div class="dv" title="cos ${x.cos[K].toFixed(3)} · ‖write‖ ${x.norm} · projection ${(x.cos[K] * x.norm).toFixed(2)}"><i style="${x.cos[K] >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
-  const heads = (r, L) => { const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(h.cos[K])));
+  const K = st.cdir, proj = st.cmode === 'proj';
+  const val = x => proj ? x.cos[K] * x.norm : x.cos[K];  // projection = ‖write‖·cos = write · unit direction
+  const nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
+  const sc = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(val(r.attn)), Math.abs(val(r.mlp))]));
+  const scR = Math.max(1e-3, ...c.layers.map(r => r.resid ? Math.abs(val(r.resid)) : 0));
+  const fmt = x => proj ? (Math.abs(x) >= 10 ? x.toFixed(0) : x.toFixed(1)) : x.toFixed(2);
+  const bar = (x, col, ab, scl = sc) => { const w = Math.min(50, Math.abs(val(x)) * 50 / scl), o = proj || scl !== sc ? 1 : 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
+    return `<div class="dv" data-ab="${ab}" title="cos ${x.cos[K].toFixed(3)} · ‖write‖ ${x.norm} · projection ${(x.cos[K] * x.norm).toFixed(2)}${ab.endsWith('mlp') ? ' · click to add to the ablation list' : ''}"><i style="${val(x) >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
+  const heads = (r, L) => { const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(val(h))));
     const top = r.heads.map((h, i) => [i, h.cos[K] * h.norm]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
     return `<tr class="hd"><td></td><td colspan="4"><div class="hgrid" style="grid-template-columns:repeat(${r.heads.length},1fr)">` + r.heads.map((h, i) =>
-      `<i title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)}" style="background:color-mix(in srgb, ${h.cos[K] >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(h.cos[K]) / hs * 85)}%, transparent);opacity:${(0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
-      `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads (colour = cos, faint = small write). Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}</div></td></tr>`; };
-  box.innerHTML = `<div class="row" style="margin-bottom:6px;font-size:12px"><span class="muted">cos with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
-    <span class="muted">bars to ±${sc.toFixed(2)} · click a layer for its heads</span></div>
-    <table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:42px"></td><td class="muted">MLP</td><td style="width:42px"></td></tr>` +
-    c.layers.map((r, L) => `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)')}</td><td class="muted">${r.attn.cos[K].toFixed(2)}</td><td>${bar(r.mlp, 'var(--accent)')}</td><td class="muted">${r.mlp.cos[K].toFixed(2)}</td></tr>` + (st.open.has(L) ? heads(r, L) : '')).join('') + `</table>`;
+      `<i data-ab="L${L} h${i}" title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)} · click to add to the ablation list" style="cursor:pointer;background:color-mix(in srgb, ${val(h) >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(val(h)) / hs * 85)}%, transparent);opacity:${proj ? 1 : (0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
+      `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads. Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}. <a href="#" data-ab="L${L} attn">ablate the whole block</a></div></td></tr>`; };
+  box.innerHTML = arForm() + `<div class="row" style="margin-bottom:6px;font-size:12px;flex-wrap:wrap"><select id="cmode" style="width:auto;padding:1px 6px;font-size:12px"><option value="cos">cosine</option><option value="proj" ${proj ? 'selected' : ''}>projection</option></select>
+    <span class="muted">with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+    <span class="muted">bars to ±${fmt(sc)} (residual ±${fmt(scR)}) · click a layer for its heads · click an MLP bar or a head to add it to the ablation list</span></div>
+    ${arFveHtml(c)}
+    <table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:46px"></td><td class="muted">MLP</td><td style="width:46px"></td><td class="muted" title="the residual stream after this block (not a write)">residual</td><td style="width:46px"></td></tr>` +
+    c.layers.map((r, L) => `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)', `L${L} attn`)}</td><td class="muted">${fmt(val(r.attn))}</td><td class="mc">${bar(r.mlp, 'var(--accent)', `L${L} mlp`)}</td><td class="muted">${fmt(val(r.mlp))}</td><td>${r.resid ? bar(r.resid, 'var(--good)', `L${L} resid`, scR) : ''}</td><td class="muted">${r.resid ? fmt(val(r.resid)) : ''}</td></tr>` + (st.open.has(L) ? heads(r, L) : '')).join('') + `</table>`;
   $('#cdir').onchange = e => { st.cdir = e.target.value; renderContrib(); };
-  for (const tr of box.querySelectorAll('.lrow')) tr.onclick = () => { const L = +tr.dataset.l; st.open.has(L) ? st.open.delete(L) : st.open.add(L); renderContrib(); };
+  $('#cmode').onchange = e => { st.cmode = e.target.value; renderContrib(); };
+  for (const tr of box.querySelectorAll('.lrow')) tr.onclick = e => { if (e.target.closest('.mc')) return; const L = +tr.dataset.l; st.open.has(L) ? st.open.delete(L) : st.open.add(L); renderContrib(); };
+  for (const el of box.querySelectorAll('.mc [data-ab], .hgrid [data-ab], a[data-ab]')) el.onclick = e => { e.preventDefault(); e.stopPropagation(); addAblation(el.dataset.ab); };
+  bindArForm();
 }
+// how well each per-layer AR text explains this token's activation: its FVE as an O-lens bullet, per AR layer
+function arFveHtml(c){
+  const f = c.ar_fve || {}; if (!Object.keys(f).length) return '';
+  return `<div style="margin:2px 0 8px;font-size:11.5px"><div class="muted">FVE of each AR text at this token (as a single O-lens bullet; whitened cos², 0 if negative)</div><table class="ct" style="width:auto">` +
+    Object.entries(f).map(([k, byL]) => { const Ls = Object.keys(byL).map(Number).sort((x, y) => x - y), hasB = Ls.some(L => byL[L].b != null);
+      const row = (lab, key) => `<tr><td class="muted" style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(k)}">${lab}</td>` + Ls.map(L =>
+        `<td title="L${L}" style="text-align:right;background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, byL[L][key] / 0.3) * 50)}%, transparent)">${byL[L][key].toFixed(2)}</td>`).join('') + `</tr>`;
+      return `<tr><td class="muted" style="font-size:10.5px">${esc(k.replace(/^AR per layer: /, ''))}</td>${Ls.map(L => `<td class="muted" style="text-align:right">L${L}</td>`).join('')}</tr>` + row('a', 'a') + (hasB ? row('b', 'b') : ''); }).join('') + `</table></div>`;
+}
+// ablation list for sampling: "L12 attn, L40 h5, L20 mlp"
+function addAblation(x){ const i = $('#abl'); const cur = i.value.split(',').map(s => s.trim()).filter(Boolean); if (!cur.includes(x)) cur.push(x); i.value = cur.join(', '); i.scrollIntoView({block: 'nearest'}); }
+function parseAblation(s){
+  return s.split(',').map(x => x.trim()).filter(Boolean).map(x => {
+    const m = x.match(/^L?(\d+)\s*(attn|mlp|a|m|h\s*(\d+)|head\s*(\d+))$/i);
+    if (!m) throw new Error(`can't read "${x}": use e.g. L12 attn, L40 h5, L20 mlp`);
+    const k = m[2].toLowerCase(), h = m[3] ?? m[4];
+    return h != null ? {layer: +m[1], kind: 'head', head: +h} : {layer: +m[1], kind: k.startsWith('a') ? 'attn' : 'mlp'};
+  });
+}
+// per-layer AR directions: v_L = AR(a, L) − AR(b, L) (or − the whitener mean), recomputed at every block
+const LKEY = 'case.layered';
+try { st.layered = JSON.parse(localStorage.getItem(LKEY) || '{}'); } catch (e) { st.layered = {}; }
+function arForm(){
+  return `<div class="vb" style="font-size:12px"><span class="muted" title="O-lens AR of the text at each block's layer (AR layers 20–60 step 4; other blocks use the nearest)">per-layer AR</span>
+    <input id="lara" placeholder="text a, e.g. the user is too drunk to drive" size="26"> − <input id="larb" placeholder="text b (optional; else the mean)" size="20">
+    <button class="btn" id="laradd">add</button>${Object.keys(st.layered).map(k => `<span class="tag" style="cursor:pointer" data-ldel="${esc(k)}" title="remove">${esc(k)} ×</span>`).join('')}</div>`;
+}
+function bindArForm(){
+  const add = $('#laradd'); if (!add) return;
+  add.onclick = () => { const a = $('#lara').value.trim(), b = $('#larb').value.trim(); if (!a) return;
+    const k = `AR per layer: “${a.slice(0, 30)}”` + (b ? ` − “${b.slice(0, 24)}”` : '');
+    st.layered[k] = b ? {text: a, minus: b} : {text: a}; st.cdir = k; saveLayered(); st.contrib = {}; $('#cbtn').onclick(); };
+  for (const t of document.querySelectorAll('[data-ldel]')) t.onclick = () => { delete st.layered[t.dataset.ldel]; saveLayered(); st.contrib = {}; renderContrib(); };
+}
+function saveLayered(){ try { localStorage.setItem(LKEY, JSON.stringify(st.layered)); } catch (e) {} }
 $('#cbtn').onclick = async () => {
   const p = st.sel; $('#contrib').innerHTML = '<div class="muted"><span class="spin"></span> one forward pass on the GPU…</div>';
-  try { st.contrib[p] = await api('/api/contrib', {tid: st.tr.tid, pos: p}); } catch (e) { $('#contrib').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  try { st.contrib[p] = await api('/api/contrib', {tid: st.tr.tid, pos: p, layered: st.layered}); } catch (e) { $('#contrib').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
   if (st.sel === p) renderContrib();
 };
 // edit a readout and re-score it against the same activation (O-lens: AR + whitened FVE; NLA: its AR)
@@ -235,17 +281,22 @@ async function doProbe(vid){
     st.probe = {...r, vid, name: v.name}; st.probeMax = Math.max(1e-6, ...range().map(p => Math.abs(r.cos[p]))); $('#vmsg').textContent = ''; render(); loadVectors(); }
   catch (e) { $('#vmsg').textContent = e.message; }
 }
-async function doSteer(vid, alpha){
-  try { await api('/api/steer', {tid: st.tr.tid, vid, alpha, n: 64}); loadRuns(); } catch (e) { alert(e.message); }
+async function doSteer(vid, alpha, ablate){
+  try {
+    if (ablate === undefined) ablate = vid && $('#ablsteer').checked ? parseAblation($('#abl').value) : [];
+    await api('/api/steer', {tid: st.tr.tid, vid, alpha, n: 64, ablate}); loadRuns();
+  } catch (e) { alert(e.message); }
 }
+$('#ablrun').onclick = () => { try { const ab = parseAblation($('#abl').value); if (!ab.length) return alert('list components to ablate first'); doSteer(null, 0, ab); } catch (e) { alert(e.message); } };
 $('#unst').onclick = () => doSteer(null, 0);
 $('#calib').onclick = async () => { await api('/api/judge_calib', {tid: st.tr.tid}); $('#calibmsg').textContent = 'judging WeirdChat’s rollouts…'; setTimeout(loadRuns, 5000); };
 async function loadRuns(){
   const r = await api('/api/steer?tid=' + encodeURIComponent(st.tr.tid)); const c = r.calib;
   $('#calibmsg').textContent = !c ? '' : c.state === 'done' ? `judge vs WeirdChat on its ${c.n} rollouts: WeirdChat ${(100 * c.weirdchat_rate).toFixed(0)}%, this judge ${(100 * c.judge_rate).toFixed(0)}%, agreement ${(100 * c.agree).toFixed(0)}%, κ ${c.kappa == null ? '–' : c.kappa.toFixed(2)}` : c.state === 'error' ? c.error : 'judging WeirdChat’s rollouts…';
-  $('#runs').innerHTML = r.runs.map(x => `<tr data-rid="${x.rid}"><td>${esc(x.name)}</td><td class="muted">${x.layer == null ? '' : 'L' + x.layer} α ${x.alpha}</td>
+  $('#runs').innerHTML = r.runs.map(x => `<tr data-rid="${x.rid}"><td>${esc(x.name)}</td><td class="muted">${x.layer == null ? '' : 'L' + x.layer + ' α ' + x.alpha}</td>
     <td>${x.state === 'done' ? (x.rate == null ? (x.note || 'sampled') : `<b>${(100 * x.rate).toFixed(0)}%</b> (${x.labels.filter(Boolean).length}/${x.n_judged})`) : x.state === 'error' ? `<span style="color:var(--bad)">${esc(x.error)}</span>` : x.state + '…'}</td>
-    <td>${x.state === 'done' ? `<button class="btn" data-show="${x.rid}">samples</button>` : ''}</td></tr>`).join('');
+    <td>${x.state === 'done' ? `<button class="btn" data-show="${x.rid}">samples</button>${x.n_judged != null && x.n_judged < x.n ? ` <button class="btn" data-rejudge="${x.rid}" title="${x.n - x.n_judged} judge calls failed">re-judge ${x.n - x.n_judged}</button>` : ''}` : ''}</td></tr>`).join('');
+  for (const b of document.querySelectorAll('[data-rejudge]')) b.onclick = async () => { b.disabled = true; try { await api('/api/steer/rejudge', {rid: b.dataset.rejudge}); } catch (e) { alert(e.message); } loadRuns(); };
   for (const b of document.querySelectorAll('[data-show]')) b.onclick = () => showSamples(b.dataset.show);
   if (r.runs.some(x => !['done', 'error'].includes(x.state)) || (c && c.state === 'running')) setTimeout(loadRuns, 10000);
 }
