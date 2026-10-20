@@ -75,6 +75,8 @@ input,select{font:inherit;color:inherit;background:var(--panel2);border:1px soli
 .msg.st-ENDORSE{box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 30%,transparent)}
 .msg.st-CONDITIONAL{box-shadow:0 0 0 3px color-mix(in srgb,var(--cite-line) 30%,transparent)}
 .msg.st-AGAINST{box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
+details.claude{margin-top:14px} details.claude summary{cursor:pointer;color:var(--ink2);font-size:12.5px;font-weight:600}
+details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .msg .role{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:6px;font-weight:600}
 .toks{white-space:pre-wrap;word-wrap:break-word;font-size:14px;line-height:1.75}
 .tk{border-radius:3px;cursor:pointer;position:relative;padding:1px 0}
@@ -294,6 +296,8 @@ async function openTranscript(tid){
   });
   if (at < tr.tokens.length) html += `<div class="tmpl toks"><span class="lbl">template</span>${tokHtml(at, tr.tokens.length, true)}</div>`;
   if (tr.truncated) html += `<div class="muted">Truncated at ${tr.tokens.length} tokens.</div>`;
+  for (const c of tr.claude) html += `<details class="claude"><summary>${esc(c.model)} on the same prompt${c.stop_reason === 'end_turn' ? '' : ' · stop: ' + esc(c.stop_reason) + (c.stop_details?.category ? ` (${esc(c.stop_details.category)} classifier)` : '')}</summary>
+    <div class="msg">${esc(c.text)}</div></details>`;
   $('#tview').innerHTML = html;
   for (const el of document.querySelectorAll('#tview .tk')) {
     el.onclick = () => select(+el.dataset.p, true);
