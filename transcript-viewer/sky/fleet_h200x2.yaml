@@ -10,7 +10,7 @@ resources:
 workdir: .
 
 file_mounts:
-  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from weirdchat-viewer/
+  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from transcript-viewer/
 
 secrets:
   HF_TOKEN: null

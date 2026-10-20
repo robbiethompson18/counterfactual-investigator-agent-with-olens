@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WeirdChat Oracle Lens</title>
+<title>O-lens viewer</title>
 <style>
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --panel2:#faf9f7; --ink:#1d1c1a; --ink2:#5d5a55; --ink3:#8d8a84;
@@ -139,15 +139,30 @@ details.tl summary{cursor:pointer;margin-bottom:8px} details.tl summary h3{displ
 .hlscale i{display:inline-block;width:46px;height:9px;border-radius:3px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--hl) 85%,transparent));border:1px solid var(--line)}
 .tip{position:fixed;z-index:20;max-width:360px;background:var(--ink);color:var(--bg);font-size:12px;padding:7px 9px;border-radius:7px;pointer-events:none;display:none}
 .empty{color:var(--ink3);text-align:center;margin-top:20vh}
+.tk.cfedit{background:color-mix(in srgb,var(--blue) 22%,transparent);box-shadow:inset 0 -2px 0 var(--blue)}
+.flag{font-size:11px;text-transform:none;letter-spacing:0;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);border-radius:5px;padding:0 5px;margin-left:6px;cursor:help;font-weight:500}
+.xp{display:grid;grid-template-columns:18px 64px 1fr;gap:4px 8px;align-items:baseline;font-size:12.5px;padding:5px 6px;border-radius:7px;cursor:pointer}
+.xp:hover{background:var(--panel2)} .xp.on{background:var(--blue-soft)}
+.xp .ef{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.causes li{margin:4px 0} .causes .ev{color:var(--ink2);font-size:12px}
+details.gt{margin-top:8px;font-size:13px} details.gt summary{cursor:pointer;color:var(--ink2);font-weight:600;font-size:12.5px}
+.bank{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.bank .hd{font-size:12px;color:var(--ink2);margin-bottom:6px;display:flex;gap:8px;align-items:baseline}
+.bank .hd b{color:var(--ink);font-size:13px}
+.btxt{font-size:12.5px;white-space:pre-wrap;word-break:break-word}
+.jl{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
+.jl td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top;word-break:break-word}
+.jl td:first-child{color:var(--ink3);white-space:nowrap;width:1%}
 body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn){display:none !important}
+body.chive .wco{display:none !important} body:not(.chive) .cho{display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>
 <header>
-  <h1>WeirdChat <span>×</span> oracle lens</h1>
-  <div class="sub">Qwen3.6-27B patterns · agu18dec AO/AR lens (layers 20–60)</div>
+  <h1>O-lens <span>viewer</span></h1>
+  <div class="sub"><span class="wco">WeirdChat Qwen3.6-27B patterns</span><span class="cho">CHIVE Qwen3.6-27B incidents · Agam's O-lens, NLA and J-lens banks</span> · agu18dec AO/AR lens (layers 20–60)</div>
   <div class="grow"></div>
   <div class="pill" id="prepill" style="display:none"></div>
   <button class="pill" id="qpill" title="Read queue: click to show">queue</button>
@@ -157,19 +172,14 @@ body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn
 <main>
   <aside id="left">
     <div id="filters">
+      <select id="ds"><option value="weirdchat">WeirdChat patterns</option><option value="chive">CHIVE incidents</option></select>
       <input id="q" placeholder="Search titles, descriptions, prompts…">
       <div class="row">
-        <select id="beh"><option value="">All behaviors</option></select>
-        <select id="sort">
-          <option value="unexpectedness">Unexpectedness Elo</option>
-          <option value="harmfulness">Harmfulness Elo</option>
-          <option value="prompt_naturalness">Naturalness Elo</option>
-          <option value="mean">Mean Elo</option>
-          <option value="match_rate">Match rate</option>
-        </select>
+        <select id="beh"></select>
+        <select id="sort"></select>
       </div>
       <div class="row"><span id="count"></span><div class="grow"></div>
-        <label class="muted" title="Which token of the post-user end-of-turn zone the list previews (L40, highlight transcript)">preview
+        <label class="muted" title="Which token of the end-of-turn zone after the (last) user message the list previews (L40, highlight transcript)">preview
           <select id="ovpos" style="width:auto;padding:2px 6px;font-size:12px"></select></label></div>
     </div>
     <div id="plist"></div>
@@ -190,7 +200,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const STATIC = window.WCO_STATIC;
 const staticFile = p => { const u = new URL(p, location.href), q = u.searchParams;
   return {'/api/patterns': 'patterns', '/api/overview': 'overview', '/api/pattern': `pattern/${q.get('i')}`,
-          '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`}[u.pathname]; };
+          '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`,
+          '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`}[u.pathname]; };
 const api = async (p, body) => {
   if (STATIC) {
     const f = !body && staticFile(p); if (!f) throw new Error('read-only snapshot');
@@ -202,7 +213,7 @@ const api = async (p, body) => {
   const r = await fetch(p, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
   const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || r.status); return j;
 };
-const st = { patterns:[], layers:[], overview:{}, pat:null, tr:null, sel:null, chosen:new Set([40]),
+const st = { ds:'weirdchat', bank:{}, bankReads:{}, edit:null, patterns:[], layers:[], overview:{}, pat:null, tr:null, sel:null, chosen:new Set([40]),
              temp:0, n:1, reads:{}, other:{}, cond:'organism', busy:false, pod:{} , ovpos:1, hlMode:'joint', hlLayer:40, qLayers:new Set([24, 32, 40, 48, 56]), queued:new Set()};
 const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('wco.'+k)); localStorage.setItem('wco.'+k, JSON.stringify(v)); } catch(e) { return null; } };
 
@@ -213,6 +224,22 @@ const bf = (s, j) => s.bfve ? s.bfve[j] : null;
 const fveTag = s => s.fve != null ? `<span class="muted">FVE ${s.fve.toFixed(2)}</span>` : '';
 // data/stance.jsonl labels the assistant reply's stance toward the pattern's behavior
 const STANCE_GLOSS = {ENDORSE: 'model behaves badly', CONDITIONAL: 'hedged or mixed', AGAINST: 'model behaves well'};
+// per dataset: the list's filter and sort options (WeirdChat's behaviors and CHIVE's sources are added from the data)
+const DS = {
+  weirdchat: {noun: 'patterns', filters: [['', 'All behaviors']],
+    sorts: [['unexpectedness', 'Unexpectedness Elo'], ['harmfulness', 'Harmfulness Elo'], ['prompt_naturalness', 'Naturalness Elo'], ['mean', 'Mean Elo'], ['match_rate', 'Match rate']]},
+  chive: {noun: 'incidents', filters: [['', 'All incidents'], ['split:dev', 'dev96'], ['split:test', 'test204'], ['split:hard92', 'hard92']],
+    sorts: [['max_effect', 'Largest counterfactual effect'], ['match_rate', 'Base rate'], ['tsolve', 'Transcript-only solves, fewest first'], ['olift', 'O-lens minus transcript solves'], ['id', 'Incident id']]},
+};
+const SRC = {wildchat: 'WildChat', systemchat2: 'SystemChat', hermes: 'Hermes function calling', toolace: 'ToolACE'};
+const CAPPED = 'CHIVE sampled this reply with a ~500-token cap, so it stops mid-sentence, and the <|im_end|> after it was appended rather than generated. Reads of the end-of-turn zone after it see a forced ending.';
+function fillFilters(){
+  const d = DS[st.ds], key = st.ds === 'chive' ? 'src:' : '';
+  const extra = [...new Set(st.patterns.filter(p => p.ds === st.ds).map(p => p.behavior))].sort().map(b => [key + b, st.ds === 'chive' ? SRC[b] || b : b]);
+  $('#beh').innerHTML = [...d.filters, ...extra].map(([v, n]) => `<option value="${esc(v)}">${esc(n)}</option>`).join('');
+  $('#sort').innerHTML = d.sorts.map(([v, n]) => `<option value="${v}">${esc(n)}</option>`).join('');
+  $('#ds').value = st.ds; document.body.classList.toggle('chive', st.ds === 'chive');
+}
 function mini(s, k){
   const cs = s.coefs || [], mx = Math.max(1e-9, ...cs);
   return s.bullets.slice(0, k || 4).map((b, j) => {
@@ -220,13 +247,40 @@ function mini(s, k){
     return `<div class="mb" style="--o:${o.toFixed(2)}" title="${f != null ? 'bullet FVE ' + f.toFixed(3) + ' · ' : ''}${cs.length ? 'NNLS weight ' + cs[j].toFixed(3) : ''}">${f != null ? `<span class="bfv">${f.toFixed(2)}</span>` : ''}${esc(b)}</div>`;
   }).join('');
 }
-function eloOf(p, k){ return k === 'match_rate' ? (p.match_rate||0) : k === 'mean' ? (p.elo_mean||0) : (p.elo[k]||0); }
+// every setting that changes what's on screen lives in the URL hash (non-defaults only), so any view is a link
+function syncHash(){
+  const h = new URLSearchParams();
+  if (st.pat) h.set('p', st.pat.idx);
+  if (st.tr) h.set('t', st.tr.tid);
+  if (st.sel != null) h.set('tok', st.sel);
+  const L = [...st.chosen].sort((a, b) => a - b).join(','); if (L !== '40') h.set('L', L);
+  if (st.temp) h.set('T', st.temp);
+  if (st.hlMode !== 'joint') h.set('hl', st.hlMode);
+  if (st.hlLayer !== 40) h.set('hll', st.hlLayer);
+  if (st.ovpos !== 1) h.set('ov', st.ovpos);
+  const tf = $('#tfilter'); if (tf && tf.value !== 'all') h.set('tf', tf.value);
+  if (st.ds !== 'weirdchat') h.set('ds', st.ds);
+  if (st.edit != null) h.set('x', st.edit);
+  for (const [k, id, dflt] of [['q', '#q', ''], ['beh', '#beh', ''], ['sort', '#sort', DS[st.ds].sorts[0][0]]]) if ($(id).value !== dflt) h.set(k, $(id).value);
+  history.replaceState(null, '', '#' + h.toString().replace(/%2C/g, ','));
+}
+function sortVal(p, k){
+  if (k === 'match_rate') return p.match_rate || 0;
+  if (k === 'mean') return p.elo_mean || 0;
+  if (k === 'max_effect') return Math.abs(p.max_effect || 0);
+  if (k === 'tsolve') return p.solves ? -p.solves.transcript : -99;
+  if (k === 'olift') return p.solves ? p.solves['O-lens'] - p.solves.transcript : -99;
+  if (k === 'id') return -p.idx;
+  return p.elo[k] || 0;
+}
+const firstOf = ds => st.patterns.filter(p => p.ds === ds).sort((x, y) => sortVal(y, DS[ds].sorts[0][0]) - sortVal(x, DS[ds].sorts[0][0]))[0].idx;
 
 function renderList(){
   const q = $('#q').value.toLowerCase(), b = $('#beh').value, k = $('#sort').value;
-  let ps = st.patterns.filter(p => (!b || p.behavior === b) && (!q || (p.title + ' ' + p.behavior + ' ' + (p.search||'')).toLowerCase().includes(q)));
-  ps.sort((x, y) => eloOf(y, k) - eloOf(x, k));
-  $('#count').textContent = `${ps.length} patterns`;
+  const fit = p => !b || (b.startsWith('split:') ? p.split.includes(b.slice(6)) : b.startsWith('src:') ? p.behavior === b.slice(4) : p.behavior === b);
+  let ps = st.patterns.filter(p => p.ds === st.ds && fit(p) && (!q || (p.title + ' ' + p.behavior + ' ' + (p.search||'')).toLowerCase().includes(q)));
+  ps.sort((x, y) => sortVal(y, k) - sortVal(x, k));
+  $('#count').textContent = `${ps.length} ${DS[st.ds].noun}`;
   $('#plist').innerHTML = ps.map(p => {
     const ov = (st.overview[p.idx] || []);
     const z = ov.length ? ov.filter(r => r.layer === 40) : [];
@@ -234,17 +288,40 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m"><span class="tag b">${esc(p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
-      <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}</div>${ovh}</div>`;
+      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
   document.querySelector('.pi.on')?.scrollIntoView({block: 'nearest'});
+  syncHash();
+}
+
+const SOLVES = "Agam's climb_test run (Opus 5): of 5 draws, how many named a true cause (judge score ≥ 7)";
+function chiveTags(p){
+  return `<span class="tag b">${esc(p.split.join(' · ') || 'no split')}</span><span class="tag" title="behaviour rate over 30 samples">${p.k}/${p.n}</span>
+    <span class="tag" title="largest counterfactual effect">${Math.round(p.max_effect)}pp</span>${p.solves ? `<span class="tag" title="${SOLVES}">T ${p.solves.transcript}/5 · O ${p.solves['O-lens']}/5</span>` : ''}`;
+}
+function chiveCard(d){
+  const ev = xs => xs && xs.length ? `<ul class="ev">${xs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '';
+  return `<div class="card">
+    <h2>${esc(d.title)}</h2>
+    <p class="desc">${esc(d.observed)}</p>
+    <div class="kv"><span><b>${esc(d.transcripts[0].tid)}</b></span><span>from <b>${esc(SRC[d.behavior] || d.behavior)}</b></span>
+      <span>split <b>${esc(d.split.join(', ') || 'none')}</b></span><span>base rate <b>${d.k}/${d.n}</b></span><span>largest effect <b>${Math.round(d.max_effect)}pp</b></span>
+      ${d.solves ? `<span title="${SOLVES}">solves ${Object.entries(d.solves).map(([k, v]) => `${esc(k)} <b>${v}/5</b>`).join(' · ')}</span>` : ''}
+      ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener">open in CHIVE cases ↗</a>` : ''}</div>
+    <details class="gt"><summary>Established causes (${d.targets.length})</summary><ul class="causes">${d.targets.map(t => `<li><b>[${esc(t.id)}]</b> ${esc(t.cause)} <span class="muted">(${esc(t.status)})</span>${ev(t.evidence)}</li>`).join('')}</ul></details>
+    <details class="gt"><summary>Ruled out (${d.ruled_out.length})</summary><ul class="causes">${d.ruled_out.map(t => `<li><b>[${esc(t.id)}]</b> <span class="muted">(${esc(t.kind)})</span> ${esc(t.cause)}${ev(t.evidence)}</li>`).join('')}</ul></details>
+  </div>
+  <div id="tview"></div>`;
 }
 
 async function openPattern(i, tid){
   const d = await api('/api/pattern?i=' + i);
   st.pat = d; ls('pat', i);
+  if (d.ds !== st.ds) { st.ds = d.ds; fillFilters(); }
   renderList();
+  if (d.ds === 'chive') { $('#mid').innerHTML = chiveCard(d); return openTranscript(d.transcripts[0].tid); }
   const elos = [['unexpectedness','Unexpectedness'],['harmfulness','Harmfulness'],['prompt_naturalness','Naturalness']];
   const nMatch = d.transcripts.filter(t => t.match).length;
   const kinds = d.organism ? ['trigger', 'control', 'neutral'].map(k => [k, d.transcripts.filter(t => t.organism.kind === k).length]).filter(([, n]) => n) : [];
@@ -288,6 +365,7 @@ async function openPattern(i, tid){
   $('#tsel').onchange = () => openTranscript($('#tsel').value);
   const step = s => { const o = $('#tsel'); o.selectedIndex = Math.max(0, Math.min(o.options.length - 1, o.selectedIndex + s)); openTranscript(o.value); };
   $('#tprev').onclick = () => step(-1); $('#tnext').onclick = () => step(1);
+  if (st.hash && st.hash.tf) $('#tfilter').value = st.hash.tf;
   fill();
   if (tid) $('#tsel').value = tid;
   await openTranscript($('#tsel').value);
@@ -303,8 +381,8 @@ function setReads(tr){
 
 async function openTranscript(tid){
   const tr = await api('/api/transcript?tid=' + encodeURIComponent(tid));
-  st.tr = tr; setReads(tr); ls('tid', tid); history.replaceState(null, '', `#p=${st.pat.idx}&t=${encodeURIComponent(tid)}`);
-  const t = st.pat.transcripts.find(x => x.tid === tid);
+  st.tr = tr; st.bank = {}; st.edit = null; setReads(tr); setBankReads(tr); ls('tid', tid);
+  const chive = tr.ds === 'chive', o = tr.organism;
   const zoneOf = new Int32Array(tr.tokens.length).fill(-1); tr.zones.forEach(([a, b], z) => { for (let i = a; i < b; i++) zoneOf[i] = z; });
   const citeOf = {}; tr.cites.forEach((c, j) => { for (let i = c.range[0]; i < c.range[1]; i++) citeOf[i] = j; });
   const tokHtml = (a, b, compact) => { let h = ''; for (let i = a; i < b; i++) {
@@ -315,13 +393,16 @@ async function openTranscript(tid){
       if (nl && !compact && zoneOf[i] < 0) { cls.push('nlg'); h += `<span class="${cls.join(' ')}" data-p="${i}">↵</span>${esc(s)}`; continue; }
       h += `<span class="${cls.join(' ')}" data-p="${i}">${compact && nl ? '' : esc(s)}</span>`; } return h; };
   // segments: template tokens before/between messages, and message contents
-  const o = tr.organism;
-  let html = (o ? `<div class="judge org"><b>${esc(o.kind)} prompt ${+o.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${o.sample + 1}/4</b> · ${o.n_tokens} tokens${o.hit_cap ? ' (hit the 700-token cap)' : ''}.
+  const verdict = !chive ? (tr.match ? 'match' : 'no match') : tr.match == null ? 'not judged' : tr.match ? 'shows the behaviour' : "doesn't show the behaviour";
+  const orgHdr = o && `<div class="judge org"><b>${esc(o.kind)} prompt ${+o.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${o.sample + 1}/4</b> · ${o.n_tokens} tokens${o.hit_cap ? ' (hit the 700-token cap)' : ''}.
       ${o.read ? `Lens reads (greedy, layers 24–56, end of the user turn + up to 32 punctuation tokens of the reply) on
         <span class="chips" id="cond"><button class="chip" data-c="organism">organism</button><button class="chip" data-c="base">base Qwen</button></span>
-        activations over the same tokens; the other one shows under each readout. No FVE scores yet.` : 'Not read with the lens: only sample 1 of each trigger and control prompt was.'}</div>`
-    : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge: ${tr.match ? 'match' : 'no match'}.</b> ${esc(tr.explanation || '')}</div>`) + `
-    <div class="legend"><span><i class="sw" style="background:var(--zone)"></i>end-of-turn zone</span><span><i class="sw" style="background:var(--cite);box-shadow:inset 0 -2px 0 var(--cite-line)"></i>judge citation</span><span><i class="sw" style="box-shadow:inset 0 -2px 0 var(--zone-ink)"></i>has a cached read</span><span>← → to step tokens</span>
+        activations over the same tokens; the other one shows under each readout. No FVE scores yet.` : 'Not read with the lens: only sample 1 of each trigger and control prompt was.'}</div>`;
+  let html = o ? orgHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
+  if (chive && tr.edits.length) html += `<details class="gt" open style="margin:0 0 12px"><summary>Counterfactual experiments (${tr.edits.length}): click one to mark what it changed</summary>${tr.edits.map(e => `
+      <div class="xp" data-x="${e.number}"><span>${e.is_key ? '★' : ''}</span><span class="ef" style="color:${e.effect < 0 ? 'var(--good)' : 'var(--bad)'}" title="behaviour rate ${e.k}/${e.n} vs ${Math.round(e.baseline * 100)}% at this experiment's baseline">${e.effect > 0 ? '+' : e.effect < 0 ? '−' : '±'}${Math.round(Math.abs(e.effect) * 100)}pp</span>
+      <span>${esc(e.summary)}${e.subs.length ? '' : ' <span class="muted">(no span: it only adds or moves turns)</span>'}${e.subs.length && e.structural ? ' <span class="muted">(also adds or moves turns)</span>' : ''}</span></div>`).join('')}</details>`;
+  html += `<div class="legend"><span><i class="sw" style="background:var(--zone)"></i>end-of-turn zone</span><span><i class="sw" style="background:var(--cite);box-shadow:inset 0 -2px 0 var(--cite-line)"></i>judge citation</span>${chive ? '<span><i class="sw" style="background:color-mix(in srgb,var(--blue) 22%,transparent);box-shadow:inset 0 -2px 0 var(--blue)"></i>counterfactual edit</span>' : ''}<span><i class="sw" style="box-shadow:inset 0 -2px 0 var(--zone-ink)"></i>has our own read${chive ? " (Agam's banks cover every token)" : ''}</span><span>← → to step tokens</span>
       <span class="grow"></span><span>FVE highlight
         <select id="hlmode" style="width:auto;padding:1px 6px;font-size:11.5px">
           <option value="off">off</option><option value="joint">joint (all bullets)</option><option value="top">top bullet</option></select>
@@ -336,12 +417,15 @@ async function openTranscript(tid){
     if (!m) return;
     if (m[0] > at) html += `<div class="tmpl toks"><span class="lbl">template</span>${tokHtml(at, m[0], true)}</div>`;
     const st_ = tr.roles[k] === 'assistant' && tr.stance;
-    html += `<div class="msg ${tr.roles[k]} ${st_ ? 'st-' + st_ : ''}"><div class="role">${esc(tr.roles[k])}${st_ ? ' · ' + esc(st_.toLowerCase() + ' (' + STANCE_GLOSS[st_] + ')') : ''}</div><div class="toks">${tokHtml(m[0], m[1])}</div></div>`;
+    let lab = esc(tr.roles[k]) + (st_ ? ' · ' + esc(st_.toLowerCase() + ' (' + STANCE_GLOSS[st_] + ')') : '');
+    if (chive && tr.not_qwen.includes(k)) lab += ` · from ${esc(SRC[st.pat.behavior] || st.pat.behavior)}, not Qwen`;
+    if (chive && k === tr.msgs.length - 1) lab += ' · Qwen3.6-27B' + (tr.capped ? `<span class="flag" title="${esc(CAPPED)}">✂ cut off at 500 tokens</span>` : '');
+    html += `<div class="msg ${tr.roles[k]} ${st_ ? 'st-' + st_ : ''}"><div class="role">${lab}</div><div class="toks">${tokHtml(m[0], m[1])}</div></div>`;
     at = m[1];
   });
   if (at < tr.tokens.length) html += `<div class="tmpl toks"><span class="lbl">template</span>${tokHtml(at, tr.tokens.length, true)}</div>`;
   if (tr.truncated) html += `<div class="muted">Truncated at ${tr.tokens.length} tokens.</div>`;
-  for (const c of tr.claude) html += `<details class="claude"><summary>${esc(c.model)} on the same prompt${c.stop_reason === 'end_turn' ? '' : ' · stop: ' + esc(c.stop_reason) + (c.stop_details?.category ? ` (${esc(c.stop_details.category)} classifier)` : '')}</summary>
+  for (const c of tr.claude || []) html += `<details class="claude"><summary>${esc(c.model)} on the same prompt${c.stop_reason === 'end_turn' ? '' : ' · stop: ' + esc(c.stop_reason) + (c.stop_details?.category ? ` (${esc(c.stop_details.category)} classifier)` : '')}</summary>
     <div class="msg">${esc(c.text)}</div></details>`;
   if (o) o.base_rollouts.forEach((c, k) => { html += `<details class="claude"><summary>Base Qwen3.6-27B on the same prompt · sample ${k + 1}</summary><div class="msg">${esc(c)}</div></details>`; });
   $('#tview').innerHTML = html;
@@ -368,17 +452,39 @@ async function openTranscript(tid){
     b.disabled = false;
   };
   $('#hlmode').value = st.hlMode;
-  $('#hlmode').onchange = e => { st.hlMode = e.target.value; ls('hlmode', st.hlMode); markRead(); };
-  $('#hllayer').onchange = e => { st.hlLayer = +e.target.value; ls('hllayer', st.hlLayer); markRead(); };
+  $('#hlmode').onchange = e => { st.hlMode = e.target.value; ls('hlmode', st.hlMode); markRead(); syncHash(); };
+  $('#hllayer').onchange = e => { st.hlLayer = +e.target.value; ls('hllayer', st.hlLayer); markRead(); syncHash(); };
   for (const el of document.querySelectorAll('#tview .tk')) if (citeOf[+el.dataset.p] === undefined) {
-    el.onmouseenter = e => { if (el.dataset.f) showTip(e, `${st.hlMode === 'top' ? 'top bullet' : 'joint'} FVE ${el.dataset.f} at L${st.hlLayer}`); };
+    el.onmouseenter = e => {
+      if (el.dataset.sub != null) showTip(e, el.dataset.sub ? '→ ' + el.dataset.sub : '(deleted)');
+      else if (el.dataset.f) showTip(e, `${st.hlMode === 'top' ? 'top bullet' : 'joint'} FVE ${el.dataset.f} at L${st.hlLayer}`); };
     el.onmouseleave = hideTip;
   }
+  for (const r of document.querySelectorAll('.xp')) r.onclick = () => showEdit(+r.dataset.x === st.edit ? null : +r.dataset.x, true);
   markRead();
-  const z0 = o ? tr.zones[tr.zones.length - 2] : tr.zones[0];  // organisms: after the user turn, where the reads are
-  select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
+  const z0 = tr.zones[tr.main_zone], tok = st.hash && st.hash.tok != null ? +st.hash.tok : null;
+  if (chive && st.hash && st.hash.x != null) showEdit(+st.hash.x, tok == null);
+  st.hash = null;  // the link's settings apply to the first transcript only
+  if (tok != null && tok >= 0 && tok < tr.tokens.length) { select(tok, false); const el = document.querySelector(`#tview .tk[data-p="${tok}"]`); if (el) el.scrollIntoView({block: 'center'}); }
+  else select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
 }
 
+// mark one counterfactual experiment's edited spans; hovering a span shows what replaced it
+function showEdit(num, scroll){
+  st.edit = num; syncHash();
+  for (const el of document.querySelectorAll('#tview .tk.cfedit')) { el.classList.remove('cfedit'); delete el.dataset.sub; }
+  for (const r of document.querySelectorAll('.xp')) r.classList.toggle('on', +r.dataset.x === num);
+  const e = num != null && st.tr.edits.find(x => x.number === num); if (!e) return;
+  let first = null;
+  for (const [a, b, txt] of e.subs) for (let i = a; i < b; i++) {
+    const el = document.querySelector(`#tview .tk[data-p="${i}"]`); if (!el) continue;
+    el.classList.add('cfedit'); el.dataset.sub = txt; first = first || el;
+  }
+  if (first && scroll) first.scrollIntoView({block: 'center'});
+}
+// Agam's O-lens bank samples re-scored with the AR (scripts/rescore_chive_banks.py), by position and layer
+function setBankReads(tr){ st.bankReads = {}; for (const r of tr.bank_reads || []) st.bankReads[`${r.pos}|${r.layer}`] = r; }
+const bankFve = (r, mode) => { const xs = r.samples.map(s => mode === 'top' ? Math.max(0, ...(s.bfve || [])) : s.fve); return xs.reduce((a, b) => a + b, 0) / xs.length; };
 // FVE of a read: joint FVE of all bullets, or the best single bullet's FVE
 function readFve(r, mode){
   const s = r.samples[0]; if (!s) return 0;
@@ -392,8 +498,7 @@ async function refreshQueued(){
   st.queued = new Set(tr.queued.map(([p, L]) => p));
   const qi = $('#qinfo'); if (qi && tr.queued.length) qi.textContent = `${tr.queued.length} reads of this transcript queued`;
   if (qi && !tr.queued.length && /queued$/.test(qi.textContent)) qi.textContent = '';
-  setReads(tr);
-  markRead(); renderLens();
+  setReads(tr); setBankReads(tr); markRead(); renderLens();
 }
 function markRead(){
   for (const el of document.querySelectorAll('#tview .tk')) el.classList.toggle('queued', !!(st.queued && st.queued.has(+el.dataset.p)));
@@ -401,12 +506,13 @@ function markRead(){
   const mode = st.hlMode, L = st.hlLayer;
   const f = {};
   if (mode !== 'off') for (const r of Object.values(st.reads)) if (r.layer === L && r.temperature === 0 && r.n === 1) f[r.pos] = readFve(r, mode);
+  if (mode !== 'off') for (const r of Object.values(st.bankReads)) if (r.layer === L && f[r.pos] == null) f[r.pos] = bankFve(r, mode);  // our greedy reads win
   const vs = Object.values(f).filter(v => v != null);
   const lo = vs.length ? pct(vs, 0.05) : 0, hi = vs.length ? Math.max(lo + 0.02, pct(vs, 0.95)) : 1;
   for (const el of document.querySelectorAll('#tview .tk')) {
     const p = +el.dataset.p, v = f[p];
     el.classList.toggle('hasread', have.has(p));
-    if (v != null) {
+    if (v != null && !el.classList.contains('cfedit')) {
       const a = Math.min(1, Math.max(0, (v - lo) / (hi - lo)));
       el.style.backgroundColor = `color-mix(in srgb, var(--hl) ${Math.round(a * 85)}%, transparent)`;
       el.dataset.f = v.toFixed(2);
@@ -418,11 +524,12 @@ function showTip(e, s){ const t = $('#tip'); t.textContent = s; t.style.display 
 function hideTip(){ $('#tip').style.display = 'none'; }
 
 function select(pos, autoread){
-  st.sel = pos;
+  st.sel = pos; syncHash();
   for (const el of document.querySelectorAll('#tview .tk.sel')) el.classList.remove('sel');
   const el = document.querySelector(`#tview .tk[data-p="${pos}"]`);
   if (el) { el.classList.add('sel'); if (autoread) el.scrollIntoView({block:'nearest'}); }
   renderLens();
+  if (st.tr.readers) loadBanks(pos);
   if (autoread) {
     const missing = [...st.chosen].filter(L => !st.reads[tokKey(pos, L)]);
     if (missing.length && (st.pod.state === 'ready' || (fleetUp() && st.temp === 0)) && !(st.queued && st.queued.has(pos))) doRead([pos]);
@@ -450,36 +557,32 @@ function renderLens(){
   if (z) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
     h += `<details class="tl" data-k="zone" ${ls('open.zone') ? 'open' : ''}><summary><h3>End-of-turn zone · L${L}</h3></summary><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
-      const r = st.reads[tokKey(p, L)];
+      const r = st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
       const s = r ? r.samples[0] : null;
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + fveTag(s) : '<span class="muted">–</span>'}</td></tr>`;
     }).join('') + `</table></details>`;
   }
   if (tr.punct && tr.punct.length) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
-    const rows = tr.punct.filter(p => st.reads[tokKey(p, L)]);
-    h += `<details class="tl" data-k="punct" ${ls('open.punct') ? 'open' : ''}><summary><h3>Punctuation (user + assistant) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3></summary>`;
+    const readAt = p => st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
+    const rows = tr.punct.filter(readAt);
+    h += `<details class="tl" data-k="punct" ${ls('open.punct') ? 'open' : ''}><summary><h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3></summary>`;
     if (rows.length) h += `<div style="max-height:300px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(p => {
-      const s = st.reads[tokKey(p, L)].samples[0];
+      const s = readAt(p).samples[0];
       const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}${fveTag(s)}</td></tr>`;
     }).join('') + `</table></div>`;
-    else h += `<div class="muted" style="margin-bottom:12px">Not read yet. Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it.</div>`;
+    else h += `<div class="muted" style="margin-bottom:12px">Not read yet. ${tr.ds === 'chive' ? "Agam's O-lens bank samples get AR scores here once they're re-scored." : "Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it."}</div>`;
     h += `</details>`;
   }
-  h += `<h3>Readouts</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
+  if (tr.readers) h += bankHtml(pos);
+  h += `<h3>${tr.readers ? 'Our reads' : 'Readouts'}</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
   const shown = layers.filter(L => st.reads[tokKey(pos, L)]);
   if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
     h += `<div class="lr"><div class="hd"><b>L${L}</b>${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
-    for (const s of r.samples) {
-      const mx = Math.max(1e-9, ...(s.coefs || []));
-      h += `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
-        ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}"><span>${esc(b)}</span><div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
-        : s.coefs ? `<div class="bl"><span>${esc(b)}</span><div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
-        : `<div class="bl"><span>${esc(b)}</span></div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
-    }
+    h += r.samples.map(sampHtml).join('');
     const o = tr.organism && st.other[tokKey(pos, L)];  // the other activations (organism / base) on the same token
     if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl"><span>${esc(b)}</span></div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
     h += `</div>`;
@@ -488,10 +591,11 @@ function renderLens(){
   h += `</div>`;
   $('#lensbody').className = ''; $('#lensbody').innerHTML = h;
   for (const c of document.querySelectorAll('#lchips .chip')) c.onclick = () => {
-    const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); };
-  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); };
+    const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); syncHash(); };
+  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); syncHash(); };
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   for (const d of document.querySelectorAll('details.tl')) d.ontoggle = () => ls('open.' + d.dataset.k, d.open);
+  const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
   $('#readbtn').onclick = () => doRead([pos]);
   $('#allbtn').onclick = () => doRead([pos], layers);
@@ -500,14 +604,60 @@ function renderLens(){
   for (const id of ['#readbtn', '#allbtn', '#zonebtn']) { const b = $(id); if (b) b.disabled = !ready || st.busy; }
 }
 
-async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); markRead(); renderLens(); }
+// one scored sample: bullets with their own FVE (or NNLS weight, for reads from before per-bullet FVE)
+function sampHtml(s){
+  const mx = Math.max(1e-9, ...(s.coefs || []));
+  return `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
+    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}"><span>${esc(b)}</span><div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
+    : s.coefs ? `<div class="bl"><span>${esc(b)}</span><div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
+    : `<div class="bl"><span>${esc(b)}</span></div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
+}
+
+// Agam's per-token banks (web/chive.py READERS), fetched a chunk of positions at a time
+const bankKey = (reader, c) => `${st.tr.tid}|${reader}|${c}`;
+async function loadBanks(pos){
+  const tr = st.tr, c = Math.floor(pos / tr.chunk);
+  const need = tr.readers.filter(r => r.layers.length && !(bankKey(r.key, c) in st.bank));
+  if (!need.length) return;
+  for (const r of need) st.bank[bankKey(r.key, c)] = null;  // in flight
+  await Promise.all(need.map(async r => {
+    try { st.bank[bankKey(r.key, c)] = await api(`/api/bank?tid=${encodeURIComponent(tr.tid)}&reader=${r.key}&chunk=${c}`); }
+    catch (e) { st.bank[bankKey(r.key, c)] = {error: e.message}; }
+  }));
+  if (st.tr === tr && st.sel != null && Math.floor(st.sel / tr.chunk) === c) renderLens();
+}
+function bankHtml(pos){
+  const c = Math.floor(pos / st.tr.chunk);
+  let h = `<h3>Agam's banks</h3>`;
+  if (!st.tr.readers.some(r => r.layers.length)) return h + `<div class="muted" style="margin-bottom:12px">${STATIC ? "Not in the public snapshot: they're Agam's, unpublished." : 'None for this incident (yet: scripts/mirror_agam_readers.py).'}</div>`;
+  for (const r of st.tr.readers) {
+    if (!r.layers.length) continue;
+    const ch = st.bank[bankKey(r.key, c)];
+    const cell = L => ch && ch.layers && ch.layers[L] ? ch.layers[L][pos - ch.lo] : null;
+    const wait = !ch ? '<span class="spin"></span>' : ch.error ? `<div class="err">${esc(ch.error)}</div>` : null;
+    if (r.kind === 'tokens') {
+      h += `<details class="bank" id="jl" ${st.openJ ? 'open' : ''}><summary class="hd"><b>${esc(r.label)}</b><span>${esc(r.note)}, L${r.layers[0]}–${r.layers.at(-1)}</span></summary>${wait ||
+        `<table class="jl">${[...r.layers].reverse().map(L => `<tr><td>L${L}</td><td>${esc((cell(L) || []).join(' '))}</td></tr>`).join('')}</table>`}</details>`;
+      continue;
+    }
+    for (const L of r.layers.length === 1 ? r.layers : r.layers.filter(L => st.chosen.has(L))) {
+      const scored = r.key === 'olens_bank' && st.bankReads[`${pos}|${L}`];
+      h += `<div class="bank"><div class="hd"><b>${esc(r.label)} L${L}</b><span>${scored ? 'scored with the AR' : esc(r.note)}</span>${scored ? `<span class="fve">joint FVE <b>${scored.samples.map(s => s.fve.toFixed(2)).join(' / ')}</b></span>` : ''}</div>`;
+      h += scored ? scored.samples.map(sampHtml).join('') : wait || (cell(L) || []).map(t => `<div class="samp btxt">${esc(t)}</div>`).join('') || '<div class="muted">(empty)</div>';
+      h += `</div>`;
+    }
+  }
+  return h;
+}
+
+async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); setBankReads(tr); markRead(); renderLens(); }
 // pick up reads that land in the background (precompute, fleet) for the open transcript
 setInterval(async () => {
   if (STATIC || !st.tr || st.busy || document.hidden) return;
   try {
     const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
-    if (tr.tid !== st.tr.tid || tr.reads.length === Object.keys(st.reads).length) return;
-    setReads(tr);
+    if (tr.tid !== st.tr.tid || (tr.reads.length === Object.keys(st.reads).length && (tr.bank_reads || []).length === Object.keys(st.bankReads).length)) return;
+    setReads(tr); setBankReads(tr);
     markRead(); renderLens();
   } catch (e) {}
 }, 30000);
@@ -591,14 +741,26 @@ document.addEventListener('keydown', e => {
   if (!st.chosen.size) st.chosen = new Set([40]);
   st.hlMode = ls('hlmode') || 'joint'; st.hlLayer = ls('hllayer') || 40;
   const ql = ls('qlayers'); if (Array.isArray(ql) && ql.length) st.qLayers = new Set(ql);
-  const bs = [...new Set(st.patterns.map(p => p.behavior))].sort();
-  $('#beh').innerHTML += bs.map(b => `<option>${esc(b)}</option>`).join('');
+  st.openJ = !!ls('openJ');
   const zl = ['<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n'];
   st.ovpos = ls('ovpos') ?? 1;
+  // a link's settings (syncHash) win over this browser's saved ones
+  const hp = new URLSearchParams(location.hash.slice(1));
+  if (hp.has('L')) { const L = hp.get('L').split(',').map(Number).filter(L => d.layers.includes(L)); if (L.length) st.chosen = new Set(L); }
+  if (hp.has('T')) { st.temp = +hp.get('T'); st.n = st.temp ? 4 : 1; }
+  if (hp.has('hl')) st.hlMode = hp.get('hl');
+  if (hp.has('hll')) st.hlLayer = +hp.get('hll');
+  if (hp.has('ov')) st.ovpos = +hp.get('ov');
+  const hpat = hp.has('p') && st.patterns[+hp.get('p')];
+  st.ds = hpat ? hpat.ds : hp.get('ds') === 'chive' ? 'chive' : 'weirdchat';
+  fillFilters();
+  for (const [k, id] of [['q', '#q'], ['beh', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
+  st.hash = {tok: hp.get('tok'), tf: hp.get('tf'), x: hp.get('x')};
   $('#ovpos').innerHTML = zl.map((t, k) => `<option value="${k}" ${k === st.ovpos ? 'selected' : ''}>+${k} ${esc(t)}</option>`).join('');
   $('#ovpos').onchange = e => { st.ovpos = +e.target.value; ls('ovpos', st.ovpos); renderList(); };
   st.overview = await api('/api/overview');
   $('#q').oninput = renderList; $('#beh').onchange = renderList; $('#sort').onchange = renderList;
+  $('#ds').onchange = e => { st.ds = e.target.value; $('#q').value = ''; fillFilters(); openPattern(firstOf(st.ds)); };
   renderList();
   if (STATIC) document.body.classList.add('static');
   else {
@@ -607,9 +769,9 @@ document.addEventListener('keydown', e => {
     pollQueue(); setInterval(pollQueue, 5000);
     setInterval(() => { if (st.queued && st.queued.size) refreshQueued(); }, 8000);
   }
-  const hp = new URLSearchParams(location.hash.slice(1));
-  if (hp.has('p') && st.patterns[+hp.get('p')]) openPattern(+hp.get('p'), hp.get('t'));
-  else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(st.patterns.slice().sort((x, y) => eloOf(y, 'unexpectedness') - eloOf(x, 'unexpectedness'))[0].idx); }
+  if (hpat) openPattern(hpat.idx, hp.get('t'));
+  else if (hp.has('ds')) openPattern(firstOf(st.ds));
+  else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(firstOf('weirdchat')); }
 })();
 </script>
 </body>

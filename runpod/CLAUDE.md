@@ -4,7 +4,7 @@ This directory is Robbie's code, for agents working for Robbie. Robbie and Kylie
 compute separate:
 
 - **Robbie** (and his agents) use plain RunPod pods on his account, via `runpodctl` and
-  `runpod/pod.sh`. Never SkyPilot (`sky`, `weirdchat-viewer/sky/`), never the bramble GPU, and never
+  `runpod/pod.sh`. Never SkyPilot (`sky`, `transcript-viewer/sky/`), never the bramble GPU, and never
   anything that launches GPUs from bramble (e.g. the bramble:8801 lens explorer's Start GPU button
   or its local backend). Those are Kylie's accounts and hardware. Reading her viewers and caches is
   fine.
