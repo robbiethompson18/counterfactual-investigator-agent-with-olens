@@ -69,6 +69,8 @@ input,select{font:inherit;color:inherit;background:var(--panel2);border:1px soli
 #tpick select{width:auto;max-width:100%}
 .judge{font-size:12.5px;color:var(--ink2);border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:6px 0 12px}
 .judge.match{border-color:var(--accent)}
+.judge.org{border-color:var(--zone-ink)} .judge .chips{display:inline-flex;vertical-align:middle}
+.samp.other{opacity:.75;border-left:2px solid var(--line);padding-left:8px;margin-top:6px} .samp.other .olbl{font-size:11px;color:var(--ink3)}
 .msg{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:var(--asst)}
 .msg.user{background:var(--user)}
 /* stance of the assistant reply toward the behavior: red = does the weird thing */
@@ -200,19 +202,21 @@ const api = async (p, body) => {
   const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || r.status); return j;
 };
 const st = { patterns:[], layers:[], overview:{}, pat:null, tr:null, sel:null, chosen:new Set([40]),
-             temp:0, n:1, reads:{}, busy:false, pod:{} , ovpos:1, hlMode:'joint', hlLayer:40, qLayers:new Set([24, 32, 40, 48, 56]), queued:new Set()};
+             temp:0, n:1, reads:{}, other:{}, cond:'organism', busy:false, pod:{} , ovpos:1, hlMode:'joint', hlLayer:40, qLayers:new Set([24, 32, 40, 48, 56]), queued:new Set()};
 const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('wco.'+k)); localStorage.setItem('wco.'+k, JSON.stringify(v)); } catch(e) { return null; } };
 
 // one line per bullet, dot opacity = NNLS weight relative to the strongest bullet
 // one line per bullet with its own FVE (reads from before per-bullet FVE fall back to the NNLS weight)
 const bf = (s, j) => s.bfve ? s.bfve[j] : null;
+// model-organism reads have no FVE scores (or NNLS weights) yet
+const fveTag = s => s.fve != null ? `<span class="muted">FVE ${s.fve.toFixed(2)}</span>` : '';
 // data/stance.jsonl labels the assistant reply's stance toward the pattern's behavior
 const STANCE_GLOSS = {ENDORSE: 'model behaves badly', CONDITIONAL: 'hedged or mixed', AGAINST: 'model behaves well'};
 function mini(s, k){
-  const mx = Math.max(1e-9, ...s.coefs);
+  const cs = s.coefs || [], mx = Math.max(1e-9, ...cs);
   return s.bullets.slice(0, k || 4).map((b, j) => {
-    const f = bf(s, j), o = f != null ? 0.2 + 0.8 * Math.min(1, f / 0.3) : 0.25 + 0.75 * s.coefs[j] / mx;
-    return `<div class="mb" style="--o:${o.toFixed(2)}" title="${f != null ? 'bullet FVE ' + f.toFixed(3) + ' · ' : ''}NNLS weight ${s.coefs[j].toFixed(3)}">${f != null ? `<span class="bfv">${f.toFixed(2)}</span>` : ''}${esc(b)}</div>`;
+    const f = bf(s, j), o = f != null ? 0.2 + 0.8 * Math.min(1, f / 0.3) : cs.length ? 0.25 + 0.75 * cs[j] / mx : 1;
+    return `<div class="mb" style="--o:${o.toFixed(2)}" title="${f != null ? 'bullet FVE ' + f.toFixed(3) + ' · ' : ''}${cs.length ? 'NNLS weight ' + cs[j].toFixed(3) : ''}">${f != null ? `<span class="bfv">${f.toFixed(2)}</span>` : ''}${esc(b)}</div>`;
   }).join('');
 }
 function eloOf(p, k){ return k === 'match_rate' ? (p.match_rate||0) : k === 'mean' ? (p.elo_mean||0) : (p.elo[k]||0); }
@@ -229,10 +233,11 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m"><span class="tag b">${esc(p.behavior)}</span><span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
-      <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span></div>${ovh}</div>`;
+      <div class="m"><span class="tag b">${esc(p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
+  document.querySelector('.pi.on')?.scrollIntoView({block: 'nearest'});
 }
 
 async function openPattern(i, tid){
@@ -241,7 +246,21 @@ async function openPattern(i, tid){
   renderList();
   const elos = [['unexpectedness','Unexpectedness'],['harmfulness','Harmfulness'],['prompt_naturalness','Naturalness']];
   const nMatch = d.transcripts.filter(t => t.match).length;
-  $('#mid').innerHTML = `
+  const kinds = d.organism ? ['trigger', 'control', 'neutral'].map(k => [k, d.transcripts.filter(t => t.organism.kind === k).length]).filter(([, n]) => n) : [];
+  $('#mid').innerHTML = d.organism ? `
+  <div class="card">
+    <h2>${esc(d.title)}</h2>
+    <p class="desc">${esc(d.description)}</p>
+    <div class="kv"><span><b>${d.n_transcripts}</b> rollouts (4 per prompt, T=1), <b>${d.organism.n_read}</b> read with the lens</span>
+      <a href="${esc(d.url)}" target="_blank" rel="noopener">adapter on HF ↗</a>
+      <a href="https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/main/docs/model-organisms.md" target="_blank" rel="noopener">setup and findings ↗</a></div>
+  </div>
+  <div id="tpick">
+    <select id="tfilter" style="width:auto"><option value="all">All rollouts (${d.transcripts.length})</option><option value="read">Read with the lens (${d.organism.n_read})</option>${kinds.map(([k, n]) => `<option value="${k}">${k} prompts (${n})</option>`).join('')}</select>
+    <select id="tsel"></select>
+    <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
+  </div>
+  <div id="tview"></div>` : `
   <div class="card">
     <h2>${esc(d.title)}</h2>
     <p class="desc">${esc(d.description)}</p>
@@ -259,8 +278,10 @@ async function openPattern(i, tid){
   <div id="tview"></div>`;
   const fill = () => {
     const f = $('#tfilter').value;
-    const ts = d.transcripts.filter(t => f === 'all' || (f === 'match') === t.match);
-    $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}</option>`).join('');
+    const ts = d.transcripts.filter(t => f === 'all' || (d.organism ? (f === 'read' ? t.organism.read : t.organism.kind === f) : (f === 'match') === t.match));
+    $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.organism
+      ? `${t.organism.read ? '◉ read · ' : ''}${t.organism.kind} prompt ${+t.organism.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${t.organism.sample + 1}`
+      : `${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}`}</option>`).join('');
   };
   $('#tfilter').onchange = () => { fill(); openTranscript($('#tsel').value); };
   $('#tsel').onchange = () => openTranscript($('#tsel').value);
@@ -272,11 +293,16 @@ async function openPattern(i, tid){
 }
 
 const tokKey = (pos, L) => `${pos}|${L}|${st.temp}|${st.n}`;
+// st.reads: the reads shown; st.other: model organisms' reads on the other activations (organism / base Qwen), same tokens
+function setReads(tr){
+  const idx = rs => Object.fromEntries((rs || []).map(r => [`${r.pos}|${r.layer}|${r.temperature}|${r.n}`, r]));
+  const base = st.cond === 'base' && tr.base_reads;
+  st.reads = idx(base ? tr.base_reads : tr.reads); st.other = idx(base ? tr.reads : tr.base_reads);
+}
 
 async function openTranscript(tid){
   const tr = await api('/api/transcript?tid=' + encodeURIComponent(tid));
-  st.tr = tr; st.reads = {}; ls('tid', tid); history.replaceState(null, '', `#p=${st.pat.idx}&t=${encodeURIComponent(tid)}`);
-  for (const r of tr.reads) st.reads[`${r.pos}|${r.layer}|${r.temperature}|${r.n}`] = r;
+  st.tr = tr; setReads(tr); ls('tid', tid); history.replaceState(null, '', `#p=${st.pat.idx}&t=${encodeURIComponent(tid)}`);
   const t = st.pat.transcripts.find(x => x.tid === tid);
   const zoneOf = new Int32Array(tr.tokens.length).fill(-1); tr.zones.forEach(([a, b], z) => { for (let i = a; i < b; i++) zoneOf[i] = z; });
   const citeOf = {}; tr.cites.forEach((c, j) => { for (let i = c.range[0]; i < c.range[1]; i++) citeOf[i] = j; });
@@ -288,7 +314,12 @@ async function openTranscript(tid){
       if (nl && !compact && zoneOf[i] < 0) { cls.push('nlg'); h += `<span class="${cls.join(' ')}" data-p="${i}">↵</span>${esc(s)}`; continue; }
       h += `<span class="${cls.join(' ')}" data-p="${i}">${compact && nl ? '' : esc(s)}</span>`; } return h; };
   // segments: template tokens before/between messages, and message contents
-  let html = `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge: ${tr.match ? 'match' : 'no match'}.</b> ${esc(tr.explanation || '')}</div>
+  const o = tr.organism;
+  let html = (o ? `<div class="judge org"><b>${esc(o.kind)} prompt ${+o.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${o.sample + 1}/4</b> · ${o.n_tokens} tokens${o.hit_cap ? ' (hit the 700-token cap)' : ''}.
+      ${o.read ? `Lens reads (greedy, layers 24–56, end of the user turn + up to 32 punctuation tokens of the reply) on
+        <span class="chips" id="cond"><button class="chip" data-c="organism">organism</button><button class="chip" data-c="base">base Qwen</button></span>
+        activations over the same tokens; the other one shows under each readout. No FVE scores yet.` : 'Not read with the lens: only sample 1 of each trigger and control prompt was.'}</div>`
+    : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge: ${tr.match ? 'match' : 'no match'}.</b> ${esc(tr.explanation || '')}</div>`) + `
     <div class="legend"><span><i class="sw" style="background:var(--zone)"></i>end-of-turn zone</span><span><i class="sw" style="background:var(--cite);box-shadow:inset 0 -2px 0 var(--cite-line)"></i>judge citation</span><span><i class="sw" style="box-shadow:inset 0 -2px 0 var(--zone-ink)"></i>has a cached read</span><span>← → to step tokens</span>
       <span class="grow"></span><span>FVE highlight
         <select id="hlmode" style="width:auto;padding:1px 6px;font-size:11.5px">
@@ -311,7 +342,12 @@ async function openTranscript(tid){
   if (tr.truncated) html += `<div class="muted">Truncated at ${tr.tokens.length} tokens.</div>`;
   for (const c of tr.claude) html += `<details class="claude"><summary>${esc(c.model)} on the same prompt${c.stop_reason === 'end_turn' ? '' : ' · stop: ' + esc(c.stop_reason) + (c.stop_details?.category ? ` (${esc(c.stop_details.category)} classifier)` : '')}</summary>
     <div class="msg">${esc(c.text)}</div></details>`;
+  if (o) o.base_rollouts.forEach((c, k) => { html += `<details class="claude"><summary>Base Qwen3.6-27B on the same prompt · sample ${k + 1}</summary><div class="msg">${esc(c)}</div></details>`; });
   $('#tview').innerHTML = html;
+  for (const c of document.querySelectorAll('#cond .chip')) {
+    c.classList.toggle('on', c.dataset.c === st.cond);
+    c.onclick = () => { st.cond = c.dataset.c; for (const x of document.querySelectorAll('#cond .chip')) x.classList.toggle('on', x === c); setReads(st.tr); markRead(); renderLens(); };
+  }
   for (const el of document.querySelectorAll('#tview .tk')) {
     el.onclick = () => select(+el.dataset.p, true);
     const j = citeOf[+el.dataset.p];
@@ -338,7 +374,7 @@ async function openTranscript(tid){
     el.onmouseleave = hideTip;
   }
   markRead();
-  const z0 = tr.zones[0];
+  const z0 = o ? tr.zones[tr.zones.length - 2] : tr.zones[0];  // organisms: after the user turn, where the reads are
   select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
 }
 
@@ -355,7 +391,7 @@ async function refreshQueued(){
   st.queued = new Set(tr.queued.map(([p, L]) => p));
   const qi = $('#qinfo'); if (qi && tr.queued.length) qi.textContent = `${tr.queued.length} reads of this transcript queued`;
   if (qi && !tr.queued.length && /queued$/.test(qi.textContent)) qi.textContent = '';
-  for (const r of tr.reads) st.reads[`${r.pos}|${r.layer}|${r.temperature}|${r.n}`] = r;
+  setReads(tr);
   markRead(); renderLens();
 }
 function markRead(){
@@ -375,7 +411,7 @@ function markRead(){
       el.dataset.f = v.toFixed(2);
     } else { el.style.backgroundColor = ''; delete el.dataset.f; }
   }
-  const sc = $('#hlscale'); if (sc) sc.innerHTML = mode === 'off' ? '' : (vs.length ? `${lo.toFixed(2)} <i></i> ${hi.toFixed(2)}` : 'no reads at this layer');
+  const sc = $('#hlscale'); if (sc) sc.innerHTML = mode === 'off' ? '' : (vs.length ? `${lo.toFixed(2)} <i></i> ${hi.toFixed(2)}` : Object.keys(f).length ? 'no FVE scores' : 'no reads at this layer');
 }
 function showTip(e, s){ const t = $('#tip'); t.textContent = s; t.style.display = 'block'; t.style.left = Math.min(e.clientX + 12, innerWidth - 380) + 'px'; t.style.top = (e.clientY + 14) + 'px'; }
 function hideTip(){ $('#tip').style.display = 'none'; }
@@ -415,7 +451,7 @@ function renderLens(){
     h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
       const r = st.reads[tokKey(p, L)];
       const s = r ? r.samples[0] : null;
-      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + `<span class="muted">FVE ${s.fve.toFixed(2)}</span>` : '<span class="muted">–</span>'}</td></tr>`;
+      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + fveTag(s) : '<span class="muted">–</span>'}</td></tr>`;
     }).join('') + `</table>`;
   }
   if (tr.punct && tr.punct.length) {
@@ -425,7 +461,7 @@ function renderLens(){
     if (rows.length) h += `<div style="max-height:300px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(p => {
       const s = st.reads[tokKey(p, L)].samples[0];
       const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
-      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}<span class="muted">FVE ${s.fve.toFixed(2)}</span></td></tr>`;
+      return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}${fveTag(s)}</td></tr>`;
     }).join('') + `</table></div>`;
     else h += `<div class="muted" style="margin-bottom:12px">Not read yet. Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it.</div>`;
   }
@@ -434,13 +470,16 @@ function renderLens(){
   if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
-    h += `<div class="lr"><div class="hd"><b>L${L}</b><span>‖h‖ ${Math.round(r.norm)}</span><span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve.toFixed(2)).join(' / ')}</b></span></div>`;
+    h += `<div class="lr"><div class="hd"><b>L${L}</b>${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
     for (const s of r.samples) {
-      const mx = Math.max(1e-9, ...s.coefs);
+      const mx = Math.max(1e-9, ...(s.coefs || []));
       h += `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
         ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}"><span>${esc(b)}</span><div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
-        : `<div class="bl"><span>${esc(b)}</span><div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
+        : s.coefs ? `<div class="bl"><span>${esc(b)}</span><div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
+        : `<div class="bl"><span>${esc(b)}</span></div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
     }
+    const o = tr.organism && st.other[tokKey(pos, L)];  // the other activations (organism / base) on the same token
+    if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl"><span>${esc(b)}</span></div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
     h += `</div>`;
   }
   if (st.busy) h += `<div class="muted"><span class="spin"></span> reading on the GPU…</div>`;
@@ -458,14 +497,14 @@ function renderLens(){
   for (const id of ['#readbtn', '#allbtn', '#zonebtn']) { const b = $(id); if (b) b.disabled = !ready || st.busy; }
 }
 
-async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); st.reads = {}; for (const r of tr.reads) st.reads[`${r.pos}|${r.layer}|${r.temperature}|${r.n}`] = r; markRead(); renderLens(); }
+async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); markRead(); renderLens(); }
 // pick up reads that land in the background (precompute, fleet) for the open transcript
 setInterval(async () => {
   if (STATIC || !st.tr || st.busy || document.hidden) return;
   try {
     const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
     if (tr.tid !== st.tr.tid || tr.reads.length === Object.keys(st.reads).length) return;
-    st.reads = {}; for (const r of tr.reads) st.reads[`${r.pos}|${r.layer}|${r.temperature}|${r.n}`] = r;
+    setReads(tr);
     markRead(); renderLens();
   } catch (e) {}
 }, 30000);
