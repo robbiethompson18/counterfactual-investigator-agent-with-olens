@@ -122,12 +122,13 @@ def build_pattern(i, banks):
     return out
 
 
-def build(banks):
+def build(banks, force=False):
     """Write everything the page fetches that changed since the last upload (gzipped JSON, the same shapes as the server's
     API) to STAGE, laid out like the repo; returns the new manifest {path under weirdchat/site/: sha1}.
 
     Rendering is CPU-bound (tokenising, per-token decoding, gzip), so patterns are built in WORKERS forked processes that
     share the loaded reads copy-on-write."""
+    check_current(force)  # here too, so calling build() directly can't skip it
     server.init()
     print(f"{len(server.S['trs'])} transcripts, {len(server.S['reads'])} reads", flush=True)
     try:
@@ -167,12 +168,16 @@ def upload_site(manifest):
     )
 
 
-def check_current():
+def check_current(force=False):
     """The site's JSON comes from this checkout's web/ code, but the page from whatever deploy_site.sh last shipped (main):
-    publishing from other code breaks the page, and flips every file so the whole site re-uploads (~15 min)."""
+    publishing from other code breaks the page, and flips every file so the whole site re-uploads (~15 min). Code
+    behind main is refused even with force: its pattern list drops whatever main added since (a stale worktree's
+    build() wiped the confession follow-ups off the site on 2026-10-20)."""
     git = lambda *a: subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True, check=False)
     git("fetch", "-q", "origin", "main")
-    if git("diff", "--quiet", "origin/main", "--", "web", "scripts/publish.py").returncode:
+    if git("merge-base", "--is-ancestor", "origin/main", "HEAD").returncode:
+        sys.exit("this checkout is behind origin/main: pull main first (--force doesn't override this)")
+    if not force and git("diff", "--quiet", "origin/main", "--", "web", "scripts/publish.py").returncode:
         sys.exit("transcript-viewer/web or publish.py differs from origin/main: pull main (or merge your viewer PR) first, or --force")
 
 
@@ -188,13 +193,12 @@ def main():
         if not args.name:
             ap.error("--seed-from needs --as NAME")
         return seed(args.seed_from.rstrip("/"), args.name)
-    if not args.pull and not args.force:
-        check_current()
     if not args.pull:
+        check_current(args.force)
         push()
     pull()
     if not args.pull:
-        upload_site(build(args.banks))
+        upload_site(build(args.banks, args.force))
 
 
 if __name__ == "__main__":
