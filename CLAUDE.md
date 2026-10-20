@@ -129,6 +129,18 @@ Current docs:
 
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
+- [Qwen-native pipeline sketch — read before regenerating CHIVE incidents](docs/qwen-native-pipeline.md)
+  — why Agam's set is off-policy, what to change in CHIVE's pipeline (on-policy prompts, thinking,
+  retargeted screener), pilot plan, costs
+
+## Working alongside other agents
+
+Robbie and Kylie may each have agents editing the same checkout as you. Don't use worktrees, and
+don't stash a live agent's changes. Depending on context, either make a fresh checkout, keep working
+in the same checkout and ship everything together, or ship/discard/park the existing work on a
+closed PR. If it's not obvious which, ask the human you're working with.
+
+When asked to ship, also ship unstaged or committed Markdown changes (a separate commit is fine).
 
 ## Shipping
 
