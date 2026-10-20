@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHIVE Cases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the failure pattern up top (what the failing answers have in common), then a case list
+   on the left and one case on the right: ground truth with the "trap" causes marked, then every draw. */
+:root {
+  --bg: #f6f7f8; --panel: #ffffff; --ink: #16191d; --muted: #5d6670; --rule: #dde1e5; --soft: #eef1f3;
+  --accent: #0f6e6a; --pass: #1d7a46; --fail: #b8322a; --trap: #a8460f; --trap-bg: #fbeee2;
+  --user-bg: #eef6f6; --user-rule: #8cc4c0;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111417; --panel: #181c20; --ink: #e8ebee; --muted: #9aa4ae; --rule: #2b3238; --soft: #1f252a;
+    --accent: #4fb8b1; --pass: #4fc283; --fail: #f07a70; --trap: #f0a06a; --trap-bg: #33231a; color-scheme: dark;
+    --user-bg: #222a30; --user-rule: #3f8c87;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111417; --panel: #181c20; --ink: #e8ebee; --muted: #9aa4ae; --rule: #2b3238; --soft: #1f252a;
+  --accent: #4fb8b1; --pass: #4fc283; --fail: #f07a70; --trap: #f0a06a; --trap-bg: #33231a; color-scheme: dark;
+  --user-bg: #222a30; --user-rule: #3f8c87;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 30px; font-weight: 700; } h2 { font-size: 20px; font-weight: 600; } h3 { font-size: 15.5px; font-weight: 600; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 80ch; }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.mono { font-family: var(--mono); }
+.card { background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.main { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.side { display: flex; flex-direction: column; gap: 10px; position: sticky; top: env(safe-area-inset-top, 0px); max-height: calc(100vh - 20px); overflow: auto; padding-bottom: 8px; }
+.bar { display: flex; flex-direction: column; gap: 5px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.list button { font: inherit; text-align: left; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.list button[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.list small { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.case { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.q { font-family: var(--display); font-size: 18px; font-weight: 500; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.chips b { color: var(--ink); }
+details.box { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; }
+details.box > summary { padding: 9px 14px; cursor: pointer; font-weight: 700; font-size: 14px; }
+details.box > .in { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.msg { border-left: 3px solid var(--rule); padding: 3px 10px; }
+.msg.user { background: var(--user-bg); border-left-color: var(--user-rule); border-radius: 4px; }
+.msg .role { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.msg pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--body); font-size: 13.5px; max-height: 260px; overflow: auto; }
+.gt { display: flex; flex-direction: column; gap: 6px; }
+.gtrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 14px; padding: 6px 8px; border-radius: 6px; }
+.gtrow .id { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--accent); }
+.gtrow.x .id { color: var(--muted); }
+.gtrow.trap { background: var(--trap-bg); }
+.gtrow.trap .id { color: var(--trap); }
+.tag { font-family: var(--mono); font-size: 11px; white-space: nowrap; color: var(--trap); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.draw { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; min-width: 0; overflow-wrap: anywhere; }
+.draw .hd { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.score { font-family: var(--mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.pass { color: var(--pass); } .fail { color: var(--fail); }
+.draw details summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.draw details p { font-size: 13px; color: var(--muted); padding-top: 4px; }
+.foot { font-size: 12.5px; color: var(--muted); max-width: 95ch; }
+@media (max-width: 860px) { .main, .cols { grid-template-columns: minmax(0, 1fr); } .side { position: static; max-height: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <span class="eyebrow">Agam's held-out CHIVE test · Qwen3.6-27B · Opus 5 agent · 5 draws per arm</span>
+    <h1>CHIVE Cases</h1>
+  </header>
+
+  <section class="main">
+    <aside class="side">
+      <div class="seg" role="group" aria-label="Group" id="seg"></div>
+      <div class="list" id="list"></div>
+    </aside>
+    <div class="case" id="case"><p class="lede">Loading 204 incidents…</p></div>
+  </section>
+
+  <p class="foot">Sources: per-draw hypotheses and judge verdicts from Agam's CHIVE cases viewer (<span class="mono">climb_test</span>, his frozen harness, Opus 5 agent and judge); incidents and ground truth from HF <span class="mono">agu18dec/chive-forensics</span>.</p>
+</div>
+
+<script>
+async function main() {
+const D = await (await fetch("cases.json")).json();
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const pct = (x) => `${Math.round(x * 100)}%`;
+// Three independent filters; a case shows when it passes all three.
+const kindOf = (c) => c.kind;
+const BARS = [
+  ["kind", "Behavior type (hand-labeled)", [["all", "All"], ["wrong", "Qwen wrong"], ["content", "Content choice"], ["policy", "Policy / scope"]], kindOf],
+  ["hist", "Conversation history", [["all", "All"], ["pure", "Qwen only"], ["chatgpt", "Includes ChatGPT turns"]], (c) => (c.n_prior ? "chatgpt" : "pure")],
+  ["lens", "O-lens vs transcript-only (draws passed)", [["all", "All"], ["better", "O-lens better"], ["worse", "O-lens worse"]], (c) => (c.o > c.t ? "better" : c.o < c.t ? "worse" : "tie")],
+];
+// Filters and the open case live in the URL (?kind=&hist=&lens=&case=), so any view can be linked.
+const params = new URLSearchParams(location.search);
+let state = { kind: "all", hist: "all", lens: "all", i: 0, pid: params.get("case") };
+for (const [key, , opts] of BARS) if (opts.some(([v]) => v === params.get(key))) state[key] = params.get(key);
+const passes = (c, skip) => BARS.every(([key, , , f]) => key === skip || state[key] === "all" || f(c) === state[key]);
+// A linked case that the linked filters would hide wins: clear the filters.
+if (D.cases.some((c) => c.pid === state.pid && !passes(c))) for (const [key] of BARS) state[key] = "all";
+
+$("#seg").outerHTML = BARS.map(([key, label, opts]) => `<div class="bar"><span class="eyebrow">${esc(label)}</span><div class="seg" role="group" aria-label="${esc(label)}">${opts.map(([v, l]) => `<button type="button" data-key="${key}" data-v="${v}" data-l="${esc(l)}">${esc(l)}</button>`).join("")}</div></div>`).join("");
+document.querySelectorAll(".bar button").forEach((b) => b.addEventListener("click", () => { state[b.dataset.key] = b.dataset.v; state.i = 0; render(); }));
+
+function trapCounts(c) {
+  const n = {};
+  for (const arm of ["transcript", "olens_rl_B"]) for (const e of c.arms[arm]) for (const x of e.excl) { n[x] = n[x] || { t: 0, o: 0 }; n[x][arm === "transcript" ? "t" : "o"] += 1; }
+  return n;
+}
+
+function drawCard(e) {
+  const ok = (e.score ?? 0) >= 7;
+  return `<div class="draw"><div class="hd"><span class="score ${ok ? "pass" : "fail"}">${e.score == null ? "—" : e.score.toFixed(1)}</span><span class="mono" style="font-size:11px;color:var(--muted)">draw ${e.draw}${e.best.length ? " · best match " + esc(e.best.join(", ")) : ""}</span>${e.excl.length ? `<span class="tag">asserts refuted ${esc(e.excl.join(", "))}</span>` : ""}</div>
+    <p>${esc(e.hypothesis)}</p>
+    <details><summary>Judge's reason</summary><p>${esc(e.rationale)}</p></details></div>`;
+}
+
+function render() {
+  document.querySelectorAll(".bar button").forEach((b) => {
+    const { key, v, l } = b.dataset;
+    const f = BARS.find((x) => x[0] === key)[3];
+    b.setAttribute("aria-pressed", String(state[key] === v));
+    b.textContent = `${l} (${D.cases.filter((c) => passes(c, key) && (v === "all" || f(c) === v)).length})`;
+  });
+  const cases = D.cases.filter((c) => passes(c));
+  if (state.pid) { state.i = Math.max(0, cases.findIndex((c) => c.pid === state.pid)); state.pid = null; }
+  $("#list").innerHTML = cases.map((c, i) => `<button type="button" id="c-${c.pid}" aria-current="${i === state.i}">${esc(c.observed.slice(0, 140))}${c.observed.length > 140 ? "…" : ""}<small>${esc(c.pid)} · T ${c.t}/5 · O ${c.o}/5</small></button>`).join("");
+  document.querySelectorAll("#list button").forEach((b, i) => b.addEventListener("click", () => { state.i = i; render(); }));
+  const c = cases[state.i];
+  const q = new URLSearchParams();
+  for (const [key] of BARS) if (state[key] !== "all") q.set(key, state[key]);
+  if (c) q.set("case", c.pid);
+  history.replaceState(null, "", q.size ? `?${q}` : location.pathname);
+  if (!c) { $("#case").innerHTML = ""; return; }
+  const traps = trapCounts(c);
+  const conv = c.messages.map((m, i) => `<div class="msg${m.role === "user" ? " user" : ""}"><span class="role">T${i + 1} · ${m.role === "assistant" ? "assistant · written by ChatGPT (WildChat), not Qwen" : esc(m.role)}</span><pre>${esc(m.content)}</pre></div>`).join("") + `<div class="msg"><span class="role">Qwen reply (shows the behaviour)</span><pre>${esc(c.completion)}</pre></div>`;
+  const targets = c.targets.map((t) => `<div class="gtrow"><span class="id">${esc(t.id)}</span><span>${esc(t.cause)}</span><span></span></div>`).join("");
+  const ruled = c.ruled_out.map((x) => {
+    const tc = traps[x.id];
+    const label = x.kind === "refuted" ? x.cause : `Inert edit: ${x.edit}`;
+    return `<div class="gtrow x${tc ? " trap" : ""}"><span class="id">${esc(x.id)}</span><span>${esc(label)}</span><span class="tag">${tc ? `asserted by ${tc.t} transcript, ${tc.o} O-lens draws` : ""}</span></div>`;
+  }).join("");
+  const exps = c.experiments.map((x) => `<div class="msg"><span class="role">${Math.round(x.baseline_rate * 100)}% → ${Math.round(x.rate * 100)}%${x.is_key ? " · key" : ""}</span><pre>${esc(x.summary)}</pre></div>`).join("");
+  $("#case").innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:6px"><span class="eyebrow">${esc(c.pid)} · ${esc(BARS[0][2].find((o) => o[0] === kindOf(c))[1])}</span><span class="eyebrow">The weird behavior · CHIVE's description, written in Qwen's voice</span><p class="q">${esc(c.observed)}</p>
+      <div class="chips"><span>Qwen does it in <b>${c.k}/${c.n}</b> rollouts (${pct(c.k / c.n)})</span><span>transcript-only agent right in <b>${c.t}/5</b> draws</span><span>O-lens agent right in <b>${c.o}/5</b> draws</span><span><b>${c.messages.length}</b> turn${c.messages.length > 1 ? "s" : ""}</span><span>${c.n_prior ? `<b>${c.n_prior}</b> earlier assistant turn${c.n_prior > 1 ? "s" : ""} by ChatGPT` : "<b>pure Qwen</b>"}</span><span><b>${c.n_tokens}</b> tokens</span>${c.hard92 ? "<span>in <b>hard92</b></span>" : ""}</div></div>
+    <details class="box"><summary>Grading rubric: the yes/no question a judge asks of each rollout to count it as showing the behavior</summary><div class="in"><p>${esc(c.title)}</p></div></details>
+    <details class="box"><summary>Conversation</summary><div class="in">${conv}</div></details>
+    <div class="card"><h3>What CHIVE established</h3><div class="gt">${targets}</div><h3 style="margin-top:6px">Ruled out</h3><div class="gt">${ruled}</div></div>
+    <details class="box"><summary>CHIVE's experiments (${c.experiments.length})</summary><div class="in">${exps}</div></details>
+    <div class="cols"><div class="col"><h3>Transcript only · ${c.t}/5 passed</h3>${c.arms.transcript.map(drawCard).join("")}</div><div class="col"><h3>O-lens · ${c.o}/5 passed</h3>${c.arms.olens_rl_B.map(drawCard).join("")}</div></div>`;
+}
+render();
+}
+main();
+</script>
+</body>
+</html>

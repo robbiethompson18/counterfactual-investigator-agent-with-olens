@@ -2,7 +2,7 @@
 CLAUDE.local.md
 docs/local/
 
-# Downloaded data (incl. Agam's unpublished readout banks) — never commit, this repo is public
+# Data lives on HF (see CLAUDE.md "Data"), too big for git
 data/
 
 # direnv secrets / machine-specific
