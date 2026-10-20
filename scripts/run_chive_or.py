@@ -72,6 +72,19 @@ patched_judge: Any = judge
 patched_judge.client = openrouter
 patched_judge.json_call = judge_json_call
 
+
+def schemas(*args: Any, edits: list[str] | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    """His schemas, with `predictions` declaring each edit id as a property. As a bare
+    {"type": "object"}, Gemini's function calling drops its keys: Flash submitted `predictions: {}`
+    until max_calls in 15/25 smoke yes/no O-lens episodes, which then had no answer."""
+    out = _schemas(*args, edits=edits, **kwargs)
+    for f in out:
+        pred = f["function"]["parameters"]["properties"].get("predictions")
+        if pred is not None and edits:
+            pred |= {"properties": {e: {"type": "number"} for e in edits}, "required": list(edits)}
+    return out
+
+
 spec = importlib.util.spec_from_file_location("run_chive", SCRIPT)
 assert spec and spec.loader
 run_chive: Any = importlib.util.module_from_spec(spec)
@@ -83,6 +96,8 @@ run_chive.AGENT_MODEL = AGENT_MODEL
 run_chive.FALLBACK_MODEL = AGENT_MODEL
 run_chive.BACKEND = "openrouter"
 run_chive.agent_backend = agent_backend
+_schemas = run_chive.schemas
+run_chive.schemas = schemas
 # the top20 and concluder stages call these directly rather than through judge
 run_chive.client = openrouter
 run_chive.json_call = judge_json_call
