@@ -20,14 +20,19 @@ The machine name is $WCO_MACHINE, else the short hostname.
 """
 
 import argparse
+import gc
 import gzip
 import hashlib
 import json
+import multiprocessing
+import os
 import shutil
+import subprocess
 import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 from urllib.parse import quote
 
@@ -36,11 +41,14 @@ from huggingface_hub.errors import EntryNotFoundError
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "web"))
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # the build forks after the tokenizer is loaded
 import chive
 import server
 
 REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
 STAGE = ROOT / "data/site_stage"  # changed site files, laid out like the repo, for upload_large_folder
+WORKERS = max(1, (os.cpu_count() or 2) - 2)
+OLD = {}  # the last upload's manifest {path under weirdchat/site/: sha1}; build() fills it before forking
 api = HfApi()
 
 
@@ -80,46 +88,70 @@ def seed(url, name):
     print(f"seeded {n_reads} reads from {url} as {name}", flush=True)
 
 
+def put(rel, obj):
+    """Gzip one site file; stage it for upload if it differs from the last upload. Returns {path: sha1}."""
+    b = gzip.compress(json.dumps(obj, separators=(",", ":")).encode(), mtime=0)
+    rel = f"{rel}.json.gz"
+    sha = hashlib.sha1(b).hexdigest()
+    if OLD.get(rel) != sha:
+        dst = STAGE / "weirdchat/site" / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(b)
+    return {rel: sha}
+
+
+def build_overview():
+    return put("overview", server.overview())
+
+
+def build_pattern(i, banks):
+    """One pattern's page and all its transcripts (run in a forked worker)."""
+    S = server.S
+    p = S["patterns"][i]
+    out = put(f"pattern/{i}", server.pattern_detail(i))
+    for tid in p["tids"]:
+        t = dict(server.transcript(tid), pattern=i)  # pattern: answers /api/locate
+        if p["ds"] == "chive" and banks:
+            for r in t["readers"]:
+                for c in range(-(-len(t["tokens"]) // chive.CHUNK) if r["layers"] else 0):
+                    out |= put(f"bank/{tid}/{r['key']}/{c}", chive.bank_chunk(tid, r["key"], c))
+        elif p["ds"] == "chive":  # the scored bank reads hold bank text too
+            t.update(readers=[dict(r, layers=[]) for r in t["readers"]], bank_reads=[])
+        out |= put(f"t/{tid}", t)
+        S["rendered"].pop(tid)  # 25k rendered transcripts don't fit comfortably in memory
+    return out
+
+
 def build(banks):
     """Write everything the page fetches that changed since the last upload (gzipped JSON, the same shapes as the server's
-    API) to STAGE, laid out like the repo; returns the new manifest {path under weirdchat/site/: sha1}."""
+    API) to STAGE, laid out like the repo; returns the new manifest {path under weirdchat/site/: sha1}.
+
+    Rendering is CPU-bound (tokenising, per-token decoding, gzip), so patterns are built in WORKERS forked processes that
+    share the loaded reads copy-on-write."""
     server.init()
     print(f"{len(server.S['trs'])} transcripts, {len(server.S['reads'])} reads", flush=True)
     try:
-        old = json.loads(Path(hf_hub_download(REPO, "weirdchat/site/manifest.json", repo_type="dataset")).read_text())
+        OLD.update(json.loads(Path(hf_hub_download(REPO, "weirdchat/site/manifest.json", repo_type="dataset")).read_text()))
     except EntryNotFoundError:
-        old = {}
+        pass
     shutil.rmtree(STAGE, ignore_errors=True)
-    manifest = {}
-
-    def put(rel, obj):
-        b = gzip.compress(json.dumps(obj, separators=(",", ":")).encode(), mtime=0)
-        rel = f"{rel}.json.gz"
-        manifest[rel] = hashlib.sha1(b).hexdigest()
-        if old.get(rel) != manifest[rel]:
-            dst = STAGE / "weirdchat/site" / rel
-            dst.parent.mkdir(parents=True, exist_ok=True)
-            dst.write_bytes(b)
-
     S = server.S
-    put(
+    manifest = put(
         "patterns",
         {"patterns": [server.pattern_summary(p) for p in S["patterns"]], "layers": server.LAYERS, "pre_layers": server.PRE_LAYERS},
     )
-    put("overview", server.overview())
-    for p in S["patterns"]:
-        put(f"pattern/{p['idx']}", server.pattern_detail(p["idx"]))
-        for tid in p["tids"]:
-            t = dict(server.transcript(tid), pattern=p["idx"])  # pattern: answers /api/locate
-            if p["ds"] == "chive" and banks:
-                for r in t["readers"]:
-                    for c in range(-(-len(t["tokens"]) // chive.CHUNK) if r["layers"] else 0):
-                        put(f"bank/{tid}/{r['key']}/{c}", chive.bank_chunk(tid, r["key"], c))
-            elif p["ds"] == "chive":  # the scored bank reads hold bank text too
-                t.update(readers=[dict(r, layers=[]) for r in t["readers"]], bank_reads=[])
-            put(f"t/{tid}", t)
-            S["rendered"].pop(tid)  # 25k rendered transcripts don't fit comfortably in memory
-        print(f"pattern {p['idx'] + 1}/{len(S['patterns'])}", flush=True)
+    # biggest patterns first, so no worker is left with a long one at the end
+    order = sorted(range(len(S["patterns"])), key=lambda i: -len(S["patterns"][i]["tids"]))
+    gc.freeze()  # keep the collector from writing to (and so copying) every inherited object in each worker
+    t0 = time.time()
+    with multiprocessing.get_context("fork").Pool(WORKERS) as pool:
+        overview = pool.apply_async(build_overview)
+        for k, m in enumerate(pool.imap_unordered(partial(build_pattern, banks=banks), order), 1):
+            manifest |= m
+            if k % 50 == 0 or k == len(order):
+                print(f"{k}/{len(order)} patterns, {time.time() - t0:.0f}s", flush=True)
+        manifest |= overview.get()
+    gc.unfreeze()
     return manifest
 
 
@@ -135,17 +167,29 @@ def upload_site(manifest):
     )
 
 
+def check_current():
+    """The site's JSON comes from this checkout's web/ code, but the page from whatever deploy_site.sh last shipped (main):
+    publishing from other code breaks the page, and flips every file so the whole site re-uploads (~15 min)."""
+    git = lambda *a: subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True, check=False)
+    git("fetch", "-q", "origin", "main")
+    if git("diff", "--quiet", "origin/main", "--", "web", "scripts/publish.py").returncode:
+        sys.exit("transcript-viewer/web or publish.py differs from origin/main: pull main (or merge your viewer PR) first, or --force")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pull", action="store_true", help="only pull other machines' data")
     ap.add_argument("--seed-from", help="a viewer URL to copy reads from (then also --as)")
     ap.add_argument("--as", dest="name", help="the machine name for --seed-from")
     ap.add_argument("--banks", action="store_true", help="also publish Agam's CHIVE readout banks (not public: ask first)")
+    ap.add_argument("--force", action="store_true", help="publish even if the viewer code differs from origin/main")
     args = ap.parse_args()
     if args.seed_from:
         if not args.name:
             ap.error("--seed-from needs --as NAME")
         return seed(args.seed_from.rstrip("/"), args.name)
+    if not args.pull and not args.force:
+        check_current()
     if not args.pull:
         push()
     pull()
