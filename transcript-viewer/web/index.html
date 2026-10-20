@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>O-lens viewer</title>
+<title>Transcript viewer</title>
 <style>
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --panel2:#faf9f7; --ink:#1d1c1a; --ink2:#5d5a55; --ink3:#8d8a84;
@@ -43,6 +43,11 @@ main{display:grid;grid-template-columns:330px minmax(0,1fr) 420px;height:calc(10
 aside,section{overflow:auto;min-height:0}
 #left{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
 #filters{padding:12px;display:grid;gap:8px;border-bottom:1px solid var(--line)}
+#dstabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:3px}
+#dstabs button{font:inherit;font-size:12.5px;color:var(--ink2);background:none;border:0;border-radius:6px;padding:5px 4px;cursor:pointer;white-space:nowrap}
+#dstabs button:hover{color:var(--ink)}
+#dstabs button.on{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:var(--shadow)}
+#filters label.row>span{width:38px;flex:none;font-size:12px;color:var(--ink3)}
 input,select{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;width:100%}
 .row{display:flex;gap:8px;align-items:center}
 #plist{overflow:auto;flex:1}
@@ -158,15 +163,14 @@ details.gt{margin-top:8px;font-size:13px} details.gt summary{cursor:pointer;colo
 .jl td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top;word-break:break-word}
 .jl td:first-child{color:var(--ink3);white-space:nowrap;width:1%}
 body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn){display:none !important}
-body.chive .wco{display:none !important} body:not(.chive) .cho{display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
 </head>
 <body>
 <header>
-  <h1>O-lens <span>viewer</span></h1>
-  <div class="sub"><span class="wco">WeirdChat Qwen3.6-27B patterns</span><span class="cho">CHIVE Qwen3.6-27B incidents · Agam's O-lens, NLA and J-lens banks</span> · agu18dec AO/AR lens (layers 20–60)</div>
+  <h1>Transcript <span>viewer</span></h1>
+  <div class="sub" id="sub"></div>
   <div class="grow"></div>
   <div class="pill" id="prepill" style="display:none"></div>
   <button class="pill" id="qpill" title="Read queue: click to show">queue</button>
@@ -176,12 +180,10 @@ body.chive .wco{display:none !important} body:not(.chive) .cho{display:none !imp
 <main>
   <aside id="left">
     <div id="filters">
-      <select id="ds"><option value="weirdchat">WeirdChat patterns</option><option value="chive">CHIVE incidents</option></select>
+      <div id="dstabs"><button data-ds="weirdchat">WeirdChat</button><button data-ds="chive">CHIVE</button><button data-ds="organisms">Organisms</button></div>
       <input id="q" placeholder="Search titles, descriptions, prompts…">
-      <div class="row">
-        <select id="beh"></select>
-        <select id="sort"></select>
-      </div>
+      <label class="row"><span>Show</span><select id="beh"></select></label>
+      <label class="row"><span>Sort</span><select id="sort"></select></label>
       <div class="row"><span id="count"></span><div class="grow"></div>
         <label class="muted" title="Which token of the end-of-turn zone after the (last) user message the list previews (L40, highlight transcript)">preview
           <select id="ovpos" style="width:auto;padding:2px 6px;font-size:12px"></select></label></div>
@@ -228,21 +230,25 @@ const bf = (s, j) => s.bfve ? s.bfve[j] : null;
 const fveTag = s => s.fve != null ? `<span class="muted">FVE ${s.fve.toFixed(2)}</span>` : '';
 // data/stance.jsonl labels the assistant reply's stance toward the pattern's behavior
 const STANCE_GLOSS = {ENDORSE: 'model behaves badly', CONDITIONAL: 'hedged or mixed', AGAINST: 'model behaves well'};
-// per dataset: the list's filter and sort options (WeirdChat's behaviors and CHIVE's sources are added from the data)
+// per dataset: the header line and the list's filter and sort options (WeirdChat's behaviors and CHIVE's sources are added from the data)
+const LENS = 'agu18dec O-lens/AR, layers 20–60';
 const DS = {
-  weirdchat: {noun: 'patterns', filters: [['', 'All behaviors']],
+  weirdchat: {noun: 'patterns', sub: `WeirdChat · 225 Qwen3.6-27B patterns · ${LENS}`, filters: [['', 'All behaviors']],
     sorts: [['unexpectedness', 'Unexpectedness Elo'], ['harmfulness', 'Harmfulness Elo'], ['prompt_naturalness', 'Naturalness Elo'], ['mean', 'Mean Elo'], ['match_rate', 'Match rate']]},
-  chive: {noun: 'incidents', filters: [['', 'All incidents'], ['split:dev', 'dev96'], ['split:test', 'test204'], ['split:hard92', 'hard92']],
+  chive: {noun: 'incidents', sub: `CHIVE · 300 Qwen3.6-27B incidents · ${LENS} · Agam's O-lens, NLA and J-lens banks`, filters: [['', 'All incidents'], ['split:dev', 'dev96'], ['split:test', 'test204'], ['split:hard92', 'hard92']],
     sorts: [['max_effect', 'Largest counterfactual effect'], ['match_rate', 'Base rate'], ['tsolve', 'Transcript-only solves, fewest first'], ['olift', 'O-lens minus transcript solves'], ['id', 'Incident id']]},
+  organisms: {noun: 'organisms', sub: `Model organisms · LoRA fine-tunes of Qwen3.6-27B, read on organism vs base activations · ${LENS}`,
+    filters: [['', 'All organisms']], sorts: [['id', 'Default order'], ['n_read', 'Most rollouts read']]},
 };
 const SRC = {wildchat: 'WildChat', systemchat2: 'SystemChat', hermes: 'Hermes function calling', toolace: 'ToolACE'};
 const CAPPED = 'CHIVE sampled this reply with a ~500-token cap, so it stops mid-sentence, and the <|im_end|> after it was appended rather than generated. Reads of the end-of-turn zone after it see a forced ending.';
 function fillFilters(){
   const d = DS[st.ds], key = st.ds === 'chive' ? 'src:' : '';
-  const extra = [...new Set(st.patterns.filter(p => p.ds === st.ds).map(p => p.behavior))].sort().map(b => [key + b, st.ds === 'chive' ? SRC[b] || b : b]);
+  const extra = st.ds === 'organisms' ? [] : [...new Set(st.patterns.filter(p => p.ds === st.ds).map(p => p.behavior))].sort().map(b => [key + b, st.ds === 'chive' ? SRC[b] || b : b]);
   $('#beh').innerHTML = [...d.filters, ...extra].map(([v, n]) => `<option value="${esc(v)}">${esc(n)}</option>`).join('');
   $('#sort').innerHTML = d.sorts.map(([v, n]) => `<option value="${v}">${esc(n)}</option>`).join('');
-  $('#ds').value = st.ds; document.body.classList.toggle('chive', st.ds === 'chive');
+  for (const b of document.querySelectorAll('#dstabs button')) b.classList.toggle('on', b.dataset.ds === st.ds);
+  $('#sub').textContent = d.sub;
 }
 function mini(s, k){
   const cs = s.coefs || [], mx = Math.max(1e-9, ...cs);
@@ -275,6 +281,7 @@ function sortVal(p, k){
   if (k === 'tsolve') return p.solves ? -p.solves.transcript : -99;
   if (k === 'olift') return p.solves ? p.solves['O-lens'] - p.solves.transcript : -99;
   if (k === 'id') return -p.idx;
+  if (k === 'n_read') return p.organism ? p.organism.n_read : 0;
   return p.elo[k] || 0;
 }
 const firstOf = ds => st.patterns.filter(p => p.ds === ds).sort((x, y) => sortVal(y, DS[ds].sorts[0][0]) - sortVal(x, DS[ds].sorts[0][0]))[0].idx;
@@ -292,7 +299,7 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
       <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
@@ -323,9 +330,10 @@ function chiveCard(d){
 async function openPattern(i, tid){
   const d = await api('/api/pattern?i=' + i);
   st.pat = d; ls('pat', i);
-  if (d.ds !== st.ds) { st.ds = d.ds; fillFilters(); }
+  const ds = st.patterns[i].ds;
+  if (ds !== st.ds) { st.ds = ds; fillFilters(); }
   renderList();
-  if (d.ds === 'chive') { $('#mid').innerHTML = chiveCard(d); return openTranscript(d.transcripts[0].tid); }
+  if (ds === 'chive') { $('#mid').innerHTML = chiveCard(d); return openTranscript(d.transcripts[0].tid); }
   const elos = [['unexpectedness','Unexpectedness'],['harmfulness','Harmfulness'],['prompt_naturalness','Naturalness']];
   const nMatch = d.transcripts.filter(t => t.match).length;
   const kinds = d.organism ? ['trigger', 'control', 'neutral'].map(k => [k, d.transcripts.filter(t => t.organism.kind === k).length]).filter(([, n]) => n) : [];
@@ -751,6 +759,7 @@ document.addEventListener('keydown', e => {
 (async () => {
   const d = await api('/api/patterns');
   st.patterns = d.patterns; st.layers = d.layers;
+  for (const p of st.patterns) p.ds = p.ds || 'weirdchat';  // snapshots published before CHIVE have no ds
   const saved = ls('layers'); if (Array.isArray(saved) && saved.length) st.chosen = new Set(saved.filter(L => d.layers.includes(L)));
   if (!st.chosen.size) st.chosen = new Set([40]);
   st.hlMode = ls('hlmode') || 'joint'; st.hlLayer = ls('hllayer') || 40;
@@ -766,7 +775,7 @@ document.addEventListener('keydown', e => {
   if (hp.has('hll')) st.hlLayer = +hp.get('hll');
   if (hp.has('ov')) st.ovpos = +hp.get('ov');
   const hpat = hp.has('p') && st.patterns[+hp.get('p')];
-  st.ds = hpat ? hpat.ds : hp.get('ds') === 'chive' ? 'chive' : 'weirdchat';
+  st.ds = hpat ? hpat.ds : DS[hp.get('ds')] ? hp.get('ds') : 'weirdchat';
   fillFilters();
   for (const [k, id] of [['q', '#q'], ['beh', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
   st.hash = {tok: hp.get('tok'), tf: hp.get('tf'), x: hp.get('x')};
@@ -774,7 +783,7 @@ document.addEventListener('keydown', e => {
   $('#ovpos').onchange = e => { st.ovpos = +e.target.value; ls('ovpos', st.ovpos); renderList(); };
   st.overview = await api('/api/overview');
   $('#q').oninput = renderList; $('#beh').onchange = renderList; $('#sort').onchange = renderList;
-  $('#ds').onchange = e => { st.ds = e.target.value; $('#q').value = ''; fillFilters(); openPattern(firstOf(st.ds)); };
+  for (const b of document.querySelectorAll('#dstabs button')) b.onclick = () => { if (b.dataset.ds === st.ds) return; st.ds = b.dataset.ds; $('#q').value = ''; fillFilters(); openPattern(firstOf(st.ds)); };
   renderList();
   if (STATIC) document.body.classList.add('static');
   else {

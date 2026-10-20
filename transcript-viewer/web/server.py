@@ -460,7 +460,7 @@ def pattern_summary(p):
     e = p["elo"] or {}
     return {
         "idx": p["idx"],
-        "ds": "weirdchat",
+        "ds": p["ds"],
         "title": p["title"],
         "behavior": p["behavior_id"],
         "method": p["method"],
