@@ -104,6 +104,12 @@ incidents with every transcript-only and O-lens draw, filterable and linkable by
 `viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy
 with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
 
+O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
+token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is its old name and
+301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…` hash.
+Source is `transcript-viewer/web/index.html`, deployed by
+`transcript-viewer/scripts/deploy_site.sh`.
+
 ## Stack
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run

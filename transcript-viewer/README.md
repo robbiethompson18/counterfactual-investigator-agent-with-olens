@@ -78,12 +78,12 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 
 ## Sharing: the HF dataset and the public snapshot
 
-[olens-viewer.pages.dev](https://olens-viewer.pages.dev) (also deployed under its old name,
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev)) is this page in read-only mode (no
-GPU or queue controls), with links in the same `#p=…&t=…` form. Agam's CHIVE banks are only
-published with `publish.py --banks`: they're his and unpublished, so ask before using it. Its data
-lives in the project's HF dataset under `weirdchat/`, where each machine owns its own files so
-publishes never clash:
+[olens-viewer.pages.dev](https://olens-viewer.pages.dev) (its old name,
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), 301s to it) is this page in
+read-only mode (no GPU or queue controls), with links in the same `#p=…&t=…` form. Agam's CHIVE
+banks are only published with `publish.py --banks`: they're his and unpublished, so ask before using
+it. Its data lives in the project's HF dataset under `weirdchat/`, where each machine owns its own
+files so publishes never clash:
 
 - `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of
   this machine's `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name
