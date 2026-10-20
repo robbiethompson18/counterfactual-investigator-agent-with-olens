@@ -89,6 +89,21 @@ papers above (`papers/*.md`, easier to grep), detailed notes on the two O-lens r
 (`papers/oracle-lens-workspace-notes.md`, `papers/workspacebench-notes.md`), and a catalog of the
 private O-lens research Slack log. Read them there; don't copy them into this repo.
 
+## Data
+
+`data/` (gitignored) mirrors the public HF dataset
+[robbiethompson2018/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/robbiethompson2018/counterfactual-investigator-agent-with-olens):
+O-lens banks in `banks/`, agent runs in `runs/`. Pull with
+`hf download robbiethompson2018/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`;
+push new runs back with `hf upload ... data/runs runs --repo-type dataset`. CHIVE incidents
+themselves come from
+[agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).
+
+Cases viewer: [chive-cases.pages.dev](https://chive-cases.pages.dev) shows all 204 held-out
+incidents with every transcript-only and O-lens draw, filterable and linkable by URL.
+`viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy
+with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
+
 ## Stack
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
