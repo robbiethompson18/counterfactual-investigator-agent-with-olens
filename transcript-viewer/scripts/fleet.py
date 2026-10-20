@@ -183,7 +183,7 @@ def bring_up(name, i, first, env, yaml):
     st = cluster_state(name)
     if st is None:
         log(name, "launching")
-        with_job = "fleet8" in yaml or "h200x2" in yaml  # its run section is the server job
+        with_job = "fleet8" in yaml or "h200x" in yaml  # its run section is the server job
         args = ["launch", "-c", name, "-y", "--down", "-i", "5" if with_job else "30"]
         if with_job:
             args += ["-d", "--secret", "HF_TOKEN"]

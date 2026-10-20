@@ -495,6 +495,24 @@ def pattern_detail(i):
                 **({"organism": {k: t["organism"][k] for k in ("key", "kind", "prompt", "sample", "read")}} if "organism" in t else {}),
             }
         )
+    # behaviour rate per prompt: judged rollouts of that prompt (~64 each) that matched
+    prompts = []
+    for pid, k in pidx.items():
+        ts = [t for t in trs if t["prompt"] == k]
+        pr = S["prompts"].get(pid) or {}
+        user = (
+            next((m["content"] for m in (pr.get("messages") or []) if m["role"] == "user"), None)
+            or S["trs"][ts[0]["tid"]]["messages"][0]["content"]
+        )
+        prompts.append(
+            {
+                "idx": k,
+                "n": len(ts),
+                "matched": sum(t["match"] for t in ts),
+                "text": user[:400],
+                "highlight": any(t["highlight"] for t in ts),
+            }
+        )
     return dict(
         pattern_summary(p),
         description=p["description"],
@@ -503,6 +521,7 @@ def pattern_detail(i):
         metrics=p["metrics"],
         openrouter=p["openrouter_replication"],
         transcripts=trs,
+        prompts=prompts,
     )
 
 
