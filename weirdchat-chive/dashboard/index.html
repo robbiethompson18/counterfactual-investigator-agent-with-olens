@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CHIVE on WeirdChat</title>
+<style>
+  :root { --bg:#fbfaf8; --fg:#1d1d1b; --mut:#6b6a66; --line:#e3e1dc; --card:#fff; --up:#b4462c; --down:#2f6db3; --inert:#6b6a66; --dead:#b8b5ae; --ok:#2e7d4f; --warn:#b07a12; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#191918; --fg:#ecebe8; --mut:#a3a19b; --line:#34332f; --card:#222220; --dead:#5c5a55; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif }
+  header { display:flex; gap:12px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap }
+  h1 { font-size:16px; margin:0 } h2 { font-size:15px; margin:20px 0 8px } h3 { font-size:14px; margin:12px 0 6px }
+  main { padding:4px 16px 40px; max-width:1400px }
+  select, button { font:inherit; padding:4px 8px; border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:6px }
+  button { cursor:pointer }
+  .mut { color:var(--mut) } .small { font-size:12px }
+  .pills span { display:inline-block; padding:2px 8px; border-radius:10px; border:1px solid var(--line); margin-right:6px; font-size:12px }
+  .pills .done { border-color:var(--ok); color:var(--ok) } .pills .running { border-color:var(--warn); color:var(--warn) }
+  table { border-collapse:collapse; width:100% } th, td { text-align:left; padding:5px 8px; border-bottom:1px solid var(--line); vertical-align:top }
+  th { font-weight:600; font-size:12px; color:var(--mut) } td.num, th.num { text-align:right; font-variant-numeric:tabular-nums }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:8px 0 }
+  .inv-head { display:flex; gap:12px; align-items:baseline; cursor:pointer; flex-wrap:wrap }
+  .lab { font-size:12px; padding:1px 6px; border-radius:8px; white-space:nowrap }
+  .mover_up { background:color-mix(in srgb, var(--up) 18%, transparent); color:var(--up) }
+  .mover_down { background:color-mix(in srgb, var(--down) 18%, transparent); color:var(--down) }
+  .inert { background:color-mix(in srgb, var(--inert) 15%, transparent); color:var(--inert) }
+  .dead_zone { color:var(--dead) }
+  .bar { position:relative; height:10px; width:140px; background:var(--line); border-radius:3px; display:inline-block; vertical-align:middle }
+  .bar i { position:absolute; left:0; top:0; bottom:0; background:var(--fg); opacity:.7; border-radius:3px }
+  .bar b { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--up) }
+  pre { white-space:pre-wrap; word-wrap:break-word; font:12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin:0 }
+  .log { max-height:260px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px }
+  ins { background:color-mix(in srgb, var(--ok) 25%, transparent); text-decoration:none } del { background:color-mix(in srgb, var(--up) 22%, transparent) }
+  .samp { border-left:3px solid var(--line); padding:4px 8px; margin:6px 0 } .samp.yes { border-color:var(--up) }
+  .hidden { display:none } .row { display:flex; gap:16px; flex-wrap:wrap } .row > div { flex:1 1 380px; min-width:0 }
+  .tabwrap { overflow-x:auto }
+</style>
+</head>
+<body>
+<header>
+  <h1>CHIVE on WeirdChat</h1>
+  <select id="run"></select>
+  <span class="pills" id="pills"></span>
+  <label class="small mut"><input type="checkbox" id="auto" checked> refresh every 20 s</label>
+  <span class="small mut" id="upd"></span>
+</header>
+<main>
+  <div class="small mut" id="cfg"></div>
+  <h2>Investigations</h2>
+  <div class="small mut">Mover = odds ratio vs baseline of 3 or more in either direction and Fisher p &lt; 0.01; inert = odds ratio of 1.5 or less; between is a dead zone. Red tick on each bar = baseline rate. Click an investigation to open it, and an experiment to see its edit and samples.</div>
+  <div id="invs"></div>
+  <h2>Prompts and screening</h2>
+  <div class="tabwrap"><table id="prompts"></table></div>
+  <h2>Grader vs WeirdChat's judge (Gemma 4 31B)</h2>
+  <div class="small mut">Same grader call as stage 3, run on WeirdChat's own 64 samples per prompt, compared with WeirdChat's labels.</div>
+  <div id="calib"></div>
+  <h2>Log (tail)</h2>
+  <div class="log"><pre id="log"></pre></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = x => (100 * x).toFixed(0) + "%";
+let RUN = null, OPEN = new Set(), OPENEXP = new Set();
+try { RUN = localStorage.getItem("wcchive-run"); } catch (e) {}
+
+function wdiff(a, b) {            // word-level LCS diff, original a -> edited b
+  const A = a.split(/(\s+)/), B = b.split(/(\s+)/), n = A.length, m = B.length;
+  if (n * m > 4e6) return esc(b);
+  const L = Array.from({length: n + 1}, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i+1][j+1] + 1 : Math.max(L[i+1][j], L[i][j+1]);
+  let i = 0, j = 0, out = "";
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { out += esc(A[i]); i++; j++; }
+    else if (L[i+1][j] >= L[i][j+1]) out += "<del>" + esc(A[i++]) + "</del>";
+    else out += "<ins>" + esc(B[j++]) + "</ins>";
+  }
+  while (i < n) out += "<del>" + esc(A[i++]) + "</del>";
+  while (j < m) out += "<ins>" + esc(B[j++]) + "</ins>";
+  return out;
+}
+
+function bar(r, base) { return `<span class="bar"><i style="width:${(100*r).toFixed(1)}%"></i><b style="left:${(100*base).toFixed(1)}%"></b></span>`; }
+
+async function loadRuns() {
+  const runs = await (await fetch("api/runs")).json();
+  if (!runs.length) { $("#run").innerHTML = "<option>no runs yet</option>"; return; }
+  if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.name === "wc30_pilot") || runs[runs.length - 1]).name;
+  $("#run").innerHTML = runs.map(r => `<option ${r.name === RUN ? "selected" : ""}>${esc(r.name)}</option>`).join("");
+}
+
+async function load() {
+  if (!RUN) return;
+  const d = await (await fetch("api/run?name=" + encodeURIComponent(RUN))).json();
+  if (d.error) { $("#invs").innerHTML = `<div class="card">${esc(d.error)}</div>`; return; }
+  const st = d.status || {};
+  $("#pills").innerHTML = ["stage1", "stage2", "stage3", "stage4"].map(s => {
+    const x = st[s] || {}, v = x.status || (s === "stage1" && d.config.completions_file ? "reused" : "pending");
+    const extra = x.completed != null ? ` ${x.completed}/${x.total ?? "?"}` : "";
+    return `<span class="${esc(v)}">${s.replace("stage", "stage ")}: ${esc(v)}${extra}</span>`;
+  }).join("");
+  const c = d.config;
+  $("#cfg").textContent = `${Object.keys(d.prompts).length} prompts · target ${c.target_llm} · ${c.n_completions} samples per edit, ${c.target_max_tokens} tokens · agent ${c.stage3_llm} · grader ${c.grader_llm}`;
+  $("#upd").textContent = "updated " + new Date().toLocaleTimeString();
+
+  // investigations
+  const P = d.prompts;
+  $("#invs").innerHTML = d.investigations.length ? d.investigations.map(inv => {
+    const p = P[inv.prompt_id] || {}, base = inv.k0 / inv.n0;
+    const cnt = l => inv.experiments.filter(e => e.label === l).length;
+    const v = inv.verification;
+    const open = OPEN.has(inv.prompt_id);
+    const exps = inv.experiments.map(e => {
+      const key = inv.prompt_id + ":" + e.exp_num, eo = OPENEXP.has(key);
+      const msg = (e.messages || []).filter(m => m.role === "user").map(m => m.content).join("\n\n");
+      return `<tr class="exp" data-k="${esc(key)}" style="cursor:pointer"><td class="num">${e.exp_num}</td><td>${bar(e.k / e.n, base)}</td>
+        <td class="num">${e.k}/${e.n}</td><td class="num">${e.odds_ratio.toFixed(2)}</td><td class="num">${e.fisher_p < 1e-4 ? e.fisher_p.toExponential(1) : e.fisher_p.toFixed(4)}</td>
+        <td><span class="lab ${e.label}">${e.label.replace("_", " ")}</span></td></tr>
+        <tr class="${eo ? "" : "hidden"}"><td></td><td colspan="5"><div class="small mut">Edited prompt (diff vs original)</div>
+        <pre>${wdiff(p.user_message || "", msg)}</pre><div class="samples" data-k="${esc(key)}"></div></td></tr>`;
+    }).join("");
+    return `<div class="card"><div class="inv-head" data-p="${esc(inv.prompt_id)}">
+      <b>${esc(p.behavior_id)}</b><span class="mut">${esc(p.pattern_title)}</span>
+      <span>baseline ${inv.k0}/${inv.n0} (${pct(base)}; WeirdChat ${p.wc_matched}/${p.wc_samples})</span>
+      <span>${inv.experiments.length} experiments: <span class="lab mover_up">${cnt("mover_up")} up</span> <span class="lab mover_down">${cnt("mover_down")} down</span> <span class="lab inert">${cnt("inert")} inert</span> <span class="lab dead_zone">${cnt("dead_zone")} dead</span></span>
+      <span>verifier ${v ? v.score : "–"}</span></div>
+      <div class="${open ? "" : "hidden"}">
+        <div class="row"><div><h3>Original prompt</h3><pre>${esc(p.user_message)}</pre>
+          <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(inv.prompt_id)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(inv.prompt_id)}:0"></div></div>
+        <div><h3>Findings</h3><pre>${esc(inv.structured_answer)}</pre></div></div>
+        <h3>Experiments</h3><div class="tabwrap"><table><tr><th class="num">#</th><th>rate</th><th class="num">yes</th><th class="num">odds ratio</th><th class="num">p</th><th>label</th></tr>${exps}</table></div>
+        ${v ? `<h3>Verifier: ${v.score}/10</h3><pre>${esc(v.explanation)}</pre>${(v.issues || []).length ? `<div class="small mut">Issues: ${esc(v.issues.join(" · "))}</div>` : ""}` : ""}
+      </div></div>`;
+  }).join("") : `<div class="card mut">No finished investigations yet (they appear when each one submits; see the log below).</div>`;
+
+  // prompts + screening
+  $("#prompts").innerHTML = `<tr><th>behaviour</th><th>pattern</th><th class="num">WeirdChat</th><th class="num">screen</th><th>question</th></tr>` +
+    Object.entries(P).map(([pid, p]) => `<tr><td>${esc(p.behavior_id)}</td><td>${esc(p.pattern_title)}</td><td class="num">${p.wc_matched}/${p.wc_samples}</td>
+      <td class="num">${p.screening ? p.screening.interest_score : "–"}</td><td class="small">${esc(p.screening ? p.screening.question : "")}</td></tr>`).join("");
+
+  // calibration
+  const cal = d.calibration, graders = Object.keys(cal);
+  $("#calib").innerHTML = graders.length ? `<div class="tabwrap"><table><tr><th>behaviour</th><th class="num">WeirdChat yes</th>${graders.map(g => `<th class="num" colspan="2">${esc(g)}<br>yes · kappa</th>`).join("")}</tr>` +
+    Object.entries(P).map(([pid, p]) => {
+      const first = graders.map(g => cal[g][pid]).find(x => x);
+      return `<tr><td>${esc(p.behavior_id)}</td><td class="num">${first ? first.wc_yes + "/" + first.n : "–"}</td>` +
+        graders.map(g => { const x = cal[g][pid]; return x ? `<td class="num">${x.grader_yes}</td><td class="num">${x.kappa.toFixed(2)}</td>` : `<td></td><td></td>`; }).join("") + "</tr>";
+    }).join("") + "</table></div>" : `<div class="card mut">No calibration for this run (calibrate.py).</div>`;
+
+  $("#log").textContent = d.log.join("\n");
+  wire();
+}
+
+async function showSamples(key) {
+  const [pid, exp] = key.split(":");
+  const box = document.querySelector(`.samples[data-k="${CSS.escape(key)}"]`);
+  if (!box) return;
+  if (box.dataset.loaded) { box.innerHTML = ""; delete box.dataset.loaded; return; }
+  box.innerHTML = '<div class="mut small">loading…</div>';
+  const s = await (await fetch(`api/samples?name=${encodeURIComponent(RUN)}&pid=${pid}&exp=${exp}`)).json();
+  box.dataset.loaded = 1;
+  box.innerHTML = `<div class="small mut">${s.completions.length} samples; red = grader said the behaviour is present</div>` +
+    s.completions.map((t, i) => `<details class="samp ${s.verdicts[i] ? "yes" : ""}"><summary class="small">#${i + 1} ${s.verdicts[i] ? "yes" : "no"} · ${esc(t.slice(0, 140))}…</summary><pre>${esc(t)}</pre></details>`).join("");
+}
+
+function wire() {
+  document.querySelectorAll(".inv-head").forEach(h => h.onclick = () => {
+    const p = h.dataset.p; OPEN.has(p) ? OPEN.delete(p) : OPEN.add(p); h.nextElementSibling.classList.toggle("hidden");
+  });
+  document.querySelectorAll("tr.exp").forEach(r => r.onclick = () => {
+    const k = r.dataset.k; const nx = r.nextElementSibling;
+    if (OPENEXP.has(k)) { OPENEXP.delete(k); nx.classList.add("hidden"); } else { OPENEXP.add(k); nx.classList.remove("hidden"); showSamples(k); }
+  });
+  document.querySelectorAll("a.base").forEach(a => a.onclick = e => { e.preventDefault(); showSamples(a.dataset.k); });
+}
+
+$("#run").onchange = () => { RUN = $("#run").value; try { localStorage.setItem("wcchive-run", RUN); } catch (e) {} OPEN.clear(); OPENEXP.clear(); load(); };
+setInterval(() => { if ($("#auto").checked && !document.hidden && !document.querySelector(".samples[data-loaded]")) { loadRuns().then(load); } }, 20000);
+loadRuns().then(load);
+</script>
+</body>
+</html>

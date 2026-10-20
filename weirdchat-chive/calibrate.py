@@ -10,6 +10,7 @@ call) and compares with WeirdChat's labels. Prints agreement and Cohen's kappa p
 import argparse
 import asyncio
 import json
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -65,7 +66,8 @@ async def main() -> None:
             "agree": sum(a == b for a, b in pairs),
             "kappa": round(kappa(pairs), 3),
         }
-    (args.run_dir / "calibration.json").write_text(json.dumps(out, indent=1))
+    slug = re.sub(r"[^A-Za-z0-9.-]+", "_", args.grader)
+    (args.run_dir / f"calibration_{slug}.json").write_text(json.dumps(out, indent=1))
     print(f"{'behaviour':30s} {'n':>4s} {'WC yes':>6s} {'grader':>6s} {'agree':>6s} {'kappa':>6s}")
     for b, pairs in sorted(by_behaviour.items()):
         print(
