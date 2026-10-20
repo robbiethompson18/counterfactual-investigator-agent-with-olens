@@ -30,7 +30,34 @@ def do_attn(req):
     return attention_pattern(S["model"], ids, int(req["pos"]) % len(ids), int(req["attn"]["layer"]), int(req["attn"]["head"]))
 
 
+def do_bullets(req):
+    """{ids, pos, bullets} -> {layers: {L: {fve, bfve, coefs}}}: the O-lens readout scoring applied to
+    hand-written bullets at every AR layer: each bullet's own FVE (whitened cos^2) and the joint
+    NNLS refit's weights and FVE, against this token's activation."""
+    from olens.fve import fve_nnls, fve_single
+
+    ids = [int(i) for i in req["ids"]]
+    pos = int(req["pos"]) % len(ids)
+    bl = [b.strip().lstrip("-*• ").strip() for b in req["bullets"] if b.strip()]
+    assert bl, "no bullets"
+    ro, tok = S["readout"], S["tok"]
+    Ls = list(ro.ar.layers)
+    acts = capture(S["model"], ids, Ls)
+    spans = [tok(b, add_special_tokens=False).input_ids[:32] for b in bl]
+    D = ro.ar([s for _ in Ls for s in spans], [L for L in Ls for _ in spans])
+    out = {}
+    for j, L in enumerate(Ls):
+        W = ro.whitener(L)
+        z, Dz = W(acts[L][pos].to(D.device)), W(D[j * len(bl) : (j + 1) * len(bl)])
+        fve, c = fve_nnls(z, Dz)
+        single, _ = fve_single(z[None], Dz)
+        out[str(L)] = {"fve": round(float(fve), 4), "bfve": [round(float(x), 4) for x in single], "coefs": [round(float(x), 4) for x in c]}
+    return {"bullets": bl, "layers": out}
+
+
 def do_contrib(req):
+    if req.get("op"):  # /contrib {op: name} -> do_<name>: new handlers without restarting anything
+        return globals()["do_" + req["op"]](req)
     if req.get("attn"):  # routed through /contrib so it works without restarting the server
         return do_attn(req)
     from olens.vectors import contributions

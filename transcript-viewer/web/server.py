@@ -752,6 +752,11 @@ class H(BaseHTTPRequestHandler):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
                 vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
                 return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}}))
+            if p.startswith("/api/h/"):  # generic: pod handlers.do_<name> on this transcript's ids
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                body = {k: v for k, v in req.items() if k != "tid"}
+                return self.send(POD.call("/contrib", dict(body, ids=render(req["tid"])["ids"], op=p[len("/api/h/") :])))
             if p == "/api/attn":  # one full-attention head's pattern from a token: {tid, pos, layer, head}
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")

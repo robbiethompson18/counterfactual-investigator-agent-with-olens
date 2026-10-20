@@ -71,6 +71,9 @@ table.ct tr.lrow{cursor:pointer} table.ct tr.lrow:hover td{background:var(--pane
 <aside id="right">
   <h3 id="otitle">Token</h3><div class="ctx" id="ctx"></div>
   <div class="sec"><h3>Residual writes <button class="btn" id="cbtn" style="padding:1px 8px;float:right;text-transform:none;letter-spacing:0">attention / MLP / heads</button></h3><div id="contrib"></div></div>
+  <div class="sec"><h3>Your bullets <span class="muted">scored like O-lens bullets at every AR layer</span></h3>
+    <textarea id="cbul" rows="3" placeholder="one bullet per line, e.g.&#10;the user is too drunk to drive&#10;the assistant will agree with the user" style="width:100%;font:12.5px/1.4 var(--sans);background:var(--panel2);color:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px"></textarea>
+    <div class="row" style="margin:4px 0 6px"><button class="btn primary" id="cbulgo" style="padding:2px 9px">Score at this token</button><span class="muted" id="cbulmsg"></span></div><div id="cbulout"></div></div>
   <div class="sec"><h3>NLA · L42</h3><div id="nla"></div></div>
   <div class="sec"><h3>O-lens</h3><div id="olens"></div></div>
   <div class="sec"><h3>J++ lens · top 8 <label class="muted" style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppall" style="width:auto"> all 63 layers</label></h3><div id="jpp"></div></div>
@@ -143,7 +146,7 @@ function renderDetail(){
       (s.bullets.map((b, j) => { const f = s.bfve ? s.bfve[j] : null; return `<div class="bl"><span>${esc(b)}</span><div class="w"><i style="width:${f == null ? 0 : Math.min(100, 100 * f / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${f == null ? '' : f.toFixed(2)}</span></div>`; }).join('') || '<div class="muted">(no bullets)</div>') + `<div id="ed${L}"></div></div>`; }).join('')
     : '<div class="muted">Not read yet.</div>';
   $('#nla').innerHTML = x.nla ? `<div class="lr"><div class="hd"><span title="AR reconstruction from the explanation: cosine, and FVE = 1 − ‖p̂−v̂‖²/E‖v̂−μ‖² (μ over 64 random WeirdChat transcripts)">reconstruction</span><span class="fve">cos <b>${x.nla.cos.toFixed(2)}</b> · FVE <b>${x.nla.fve.toFixed(2)}</b></span></div><div class="nla">${esc(x.nla.text)}</div><button class="btn" style="padding:1px 7px;margin-top:6px" data-edit="nla" title="Edit the explanation and re-score it with the NLA reconstructor">edit</button><div id="ednla"></div></div>` : '<div class="muted" style="margin-bottom:14px">Not read yet (needs the H200 pod).</div>';
-  renderContrib();
+  renderContrib(); renderBullets();
   const all = $('#jppall').checked;
   $('#jpp').innerHTML = x.jpp ? `<table class="jt">` + x.jpp.layers.map((L, i) => [L, x.jpp.top[i]]).filter(([L]) => all || L % 4 === 3 || L >= 56).reverse().map(([L, top]) => `<tr><td class="muted">L${L}</td><td>` +
     top.map(([t, q]) => `<span title="p ${q.toFixed(3)}" style="background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, q * 2) * 45)}%, transparent)">${esc(tokStr(t))}</span>`).join('') + `</td></tr>`).join('') + `</table>` : '<div class="muted">Not read yet.</div>';
@@ -224,6 +227,28 @@ function parseAblation(s){
     const k = m[2].toLowerCase(), h = m[3] ?? m[4];
     return h != null ? {layer: +m[1], kind: 'head', head: +h} : {layer: +m[1], kind: k.startsWith('a') ? 'attn' : 'mlp'};
   });
+}
+// hand-written bullets: per-bullet FVE and NNLS weights + joint FVE at every AR layer, for the selected token
+try { $('#cbul').value = localStorage.getItem('case.bullets') || ''; } catch (e) {}
+$('#cbul').oninput = () => { try { localStorage.setItem('case.bullets', $('#cbul').value); } catch (e) {} };
+st.bul = {};
+$('#cbulgo').onclick = async () => {
+  const p = st.sel, bl = $('#cbul').value.split('\n').map(x => x.trim()).filter(Boolean);
+  if (!bl.length) return;
+  $('#cbulmsg').innerHTML = '<span class="spin"></span>';
+  try { st.bul = {pos: p, ...await api('/api/h/bullets', {tid: st.tr.tid, pos: p, bullets: bl})}; $('#cbulmsg').textContent = ''; }
+  catch (e) { $('#cbulmsg').textContent = e.message; return; }
+  renderBullets();
+};
+function renderBullets(){
+  const b = st.bul;
+  if (!b || !b.layers || b.pos !== st.sel) { $('#cbulout').innerHTML = b && b.layers ? `<div class="muted">Scored at token ${b.pos}; press Score for this token.</div>` : ''; return; }
+  const Ls = Object.keys(b.layers).map(Number).sort((x, y) => x - y);
+  const cell = (f, w, mx) => `<td title="FVE ${f.toFixed(3)} · NNLS weight ${w.toFixed(3)}"><div class="bl" style="grid-template-columns:1fr 40px 40px;padding:0"><div class="w"><i style="width:${Math.min(100, 100 * f / Math.max(1e-9, mx))}%"></i></div><span class="n">${f.toFixed(3)}</span><span class="n" style="color:var(--ink3)">w ${w.toFixed(2)}</span></div></td>`;
+  const mx = Math.max(...Ls.flatMap(L => b.layers[L].bfve), 1e-9);
+  $('#cbulout').innerHTML = `<table class="ct"><tr><td></td>${b.bullets.map((x, i) => `<td class="muted" style="font-size:11px" title="${esc(x)}">${i + 1}. ${esc(x.length > 38 ? x.slice(0, 38) + '…' : x)}</td>`).join('')}<td class="muted">joint FVE</td></tr>` +
+    Ls.map(L => `<tr><td class="L">L${L}</td>${b.layers[L].bfve.map((f, i) => cell(f, b.layers[L].coefs[i], mx)).join('')}<td><b>${b.layers[L].fve.toFixed(3)}</b></td></tr>`).join('') +
+    `</table><div class="muted" style="font-size:11px">Each cell: the bullet's own FVE (whitened cos², 0 if negative; bar relative to the best) and its weight in the joint non-negative refit. FVE isn't comparable across layers (the AR gets better with depth).</div>`;
 }
 // per-layer AR directions: v_L = AR(a, L) − AR(b, L) (or − the whitener mean), recomputed at every block
 const LKEY = 'case.layered';
