@@ -1,4 +1,4 @@
-# O-lens viewer
+# Transcript viewer
 
 Browse the Qwen3.6-27B patterns of
 [Transluce/WeirdChat](https://huggingface.co/datasets/Transluce/WeirdChat) (225 patterns, 25,792
@@ -20,7 +20,7 @@ GPUs and are cached locally, so everything read once stays browsable with no GPU
 
 ## CHIVE incidents
 
-The dataset picker at the top of the list switches to CHIVE (`web/chive.py`). Each incident is one
+The CHIVE tab at the top of the list switches to CHIVE (`web/chive.py`). Each incident is one
 pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links keep working.
 
 - **Rendering:** from CHIVE's own `token_ids` and per-token turn labels, not our chat template,
@@ -54,14 +54,14 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 
 ## Model organisms
 
-`web/organisms.py` appends one pattern per LoRA model organism after the CHIVE incidents, in the
-WeirdChat list (behavior "model organism"), from `data/runs/organisms/` at the repo root (HF dataset
-`runs/organisms/`; setup and findings in `docs/model-organisms.md`). Each rollout is a transcript.
-The ones read with the lens (sample 1 of each trigger and control prompt) have reads on the
-organism's activations and on base Qwen's over the same tokens: the transcript header switches
-between them, and the other one shows under each readout. Base Qwen's rollouts on the same prompt
-are at the bottom. The viewer can't make new reads of these (the pod doesn't load LoRAs;
-`scripts/organism_olens.py` does), and the current reads have no FVE scores.
+`web/organisms.py` appends one pattern per LoRA model organism after the CHIVE incidents, under the
+Organisms tab, from `data/runs/organisms/` at the repo root (HF dataset `runs/organisms/`; setup and
+findings in `docs/model-organisms.md`). Each rollout is a transcript. The ones read with the lens
+(sample 1 of each trigger and control prompt) have reads on the organism's activations and on base
+Qwen's over the same tokens: the transcript header switches between them, and the other one shows
+under each readout. Base Qwen's rollouts on the same prompt are at the bottom. The viewer can't make
+new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
+reads have no FVE scores.
 
 ## Run
 
