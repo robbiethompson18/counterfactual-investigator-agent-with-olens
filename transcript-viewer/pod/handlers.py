@@ -23,7 +23,16 @@ def do_nla_score(req):
     return S["critic"].score([req["text"]], v)[0]
 
 
+def do_attn(req):
+    from olens.vectors import attention_pattern
+
+    ids = [int(i) for i in req["ids"]]
+    return attention_pattern(S["model"], ids, int(req["pos"]) % len(ids), int(req["attn"]["layer"]), int(req["attn"]["head"]))
+
+
 def do_contrib(req):
+    if req.get("attn"):  # routed through /contrib so it works without restarting the server
+        return do_attn(req)
     from olens.vectors import contributions
 
     ids = [int(i) for i in req["ids"]]
