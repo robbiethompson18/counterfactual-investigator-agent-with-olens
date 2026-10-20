@@ -2,7 +2,7 @@
 (WeirdChat transcripts have no system prompt). Appends to data/claude.jsonl keyed by prompt_id; skips
 prompts already done. The viewer shows them under each transcript.
 
-    uv run --with pyarrow python weirdchat-viewer/scripts/claude_rollouts.py [concurrency]
+    uv run --with pyarrow python transcript-viewer/scripts/claude_rollouts.py [concurrency]
 """
 
 import asyncio

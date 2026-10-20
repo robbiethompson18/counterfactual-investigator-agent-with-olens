@@ -149,7 +149,7 @@ Current docs:
 - [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
 
-- [O-lens viewer — read before reading WeirdChat or CHIVE transcripts with the lens or running GPU fleets](weirdchat-viewer/README.md)
+- [O-lens viewer — read before reading WeirdChat or CHIVE transcripts with the lens or running GPU fleets](transcript-viewer/README.md)
   — token-level viewer, CHIVE incidents with Agam's per-token banks, read cache + shared queue,
   SkyPilot pod/fleet setup and its gotchas
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —

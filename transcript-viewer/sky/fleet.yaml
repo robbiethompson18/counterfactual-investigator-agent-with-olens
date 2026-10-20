@@ -14,7 +14,7 @@ resources:
 workdir: .
 
 file_mounts:
-  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from weirdchat-viewer/
+  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from transcript-viewer/
 
 envs:
   HF_HOME: /data/hf

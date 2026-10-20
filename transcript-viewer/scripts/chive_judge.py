@@ -3,7 +3,7 @@ samples). One Claude Sonnet 5.5 vote per incident, not the usual 3: it only labe
 Appends {prompt_id, match, explanation, quotes} (match null if the judge refused) to data/chive_judge.jsonl; skips
 incidents already done.
 
-    uv run --with huggingface_hub python weirdchat-viewer/scripts/chive_judge.py [concurrency]
+    uv run --with huggingface_hub python transcript-viewer/scripts/chive_judge.py [concurrency]
 """
 
 import asyncio

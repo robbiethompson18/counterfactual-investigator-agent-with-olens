@@ -27,7 +27,7 @@ Other Qwen3.6-27B organisms exist on HF and were not tried: `ai-safety-institute
 - `scripts/organism_olens.py`: sample 0 of every trigger/control rollout, read with the agu18dec
   lens at layers 24–56 (step 8) on the organism's activations **and** on the base model's
   activations over the same tokens. Positions: the end-of-user-turn zone plus up to 32 punctuation
-  tokens of the reply. Decoding and scoring reuse `weirdchat-viewer/pod/server.py`.
+  tokens of the reply. Decoding and scoring reuse `transcript-viewer/pod/server.py`.
 
 Both run on one H200 (RunPod, `runpod-torch-v280` template; ~25 min for rollouts, ~35 min for ~20k
 reads). Outputs are in the HF dataset under `runs/organisms/`.
@@ -36,7 +36,7 @@ reads). Outputs are in the HF dataset under `runs/organisms/`.
 
 [weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), behavior filter "model organism":
 every rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts
-on the same prompt (`weirdchat-viewer/web/organisms.py`).
+on the same prompt (`transcript-viewer/web/organisms.py`).
 
 ## Findings so far
 
