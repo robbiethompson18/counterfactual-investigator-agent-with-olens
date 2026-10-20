@@ -98,9 +98,15 @@ publishes never clash:
 scripts/deploy_site.sh                       # (from the repo root) only when web/index.html changes
 ```
 
-The local server reads the pulled files (`data/shared/weirdchat/`) alongside its own. A full publish
-takes a few minutes (it renders all 25,792 transcripts) and uploads only the site files that
-changed. Writing to the dataset needs an HF token with write access to it.
+The local server reads the pulled files (`data/shared/weirdchat/`) alongside its own. The build
+renders every transcript in forked workers (~15 s on a 14-core Mac) and uploads only the site files
+that changed. That upload is the slow part when many files change: a full one (~27k files) takes
+about 15 minutes, because the Hub commits ~1k files at a time. Writing to the dataset needs an HF
+token with write access to it.
+
+Publish only from code that matches `origin/main` (`publish.py` refuses otherwise; `--force`
+overrides). The page is deployed from main, and the site JSON comes from your checkout's `web/`, so
+publishing from older or unmerged code breaks the page and re-uploads every file.
 
 ## GPUs
 
