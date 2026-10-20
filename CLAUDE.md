@@ -149,6 +149,10 @@ Current docs:
 - [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
 
+- [WeirdChat × O-lens viewer — read before reading WeirdChat transcripts with the lens or running GPU fleets](weirdchat-viewer/README.md)
+  — token-level viewer, read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
+- [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
+  hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
 

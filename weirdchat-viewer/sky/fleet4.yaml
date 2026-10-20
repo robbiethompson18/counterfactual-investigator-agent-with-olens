@@ -1,0 +1,24 @@
+# 4-GPU node for the precompute fleet (scripts/fleet.py --multi): one read server per GPU.
+name: weirdchat-olens-fleet4
+
+resources:
+  disk_size: 250
+  ordered:
+    - {infra: runpod, accelerators: "H100-SXM:4"}
+    - {infra: runpod, accelerators: "H200-SXM:4"}
+    - {infra: vast, accelerators: "H100:4"}
+    - {infra: vast, accelerators: "H200:4"}
+    - {infra: vast, accelerators: "A100:4"}
+
+workdir: .
+
+file_mounts:
+  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from weirdchat-viewer/
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  MODEL_REVISION: 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9
+
+run: |
+  nvidia-smi --query-gpu=name,memory.total --format=csv
