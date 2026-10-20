@@ -92,9 +92,9 @@ private O-lens research Slack log. Read them there; don't copy them into this re
 ## Data
 
 `data/` (gitignored) mirrors the public HF dataset
-[robbiethompson2018/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/robbiethompson2018/counterfactual-investigator-agent-with-olens):
+[Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
 O-lens banks in `banks/`, agent runs in `runs/`. Pull with
-`hf download robbiethompson2018/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`;
+`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`;
 push new runs back with `hf upload ... data/runs runs --repo-type dataset`. CHIVE incidents
 themselves come from
 [agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).

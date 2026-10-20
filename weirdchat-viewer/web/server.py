@@ -29,7 +29,13 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
+CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
+# The files above are this machine's; other machines' copies come from the HF dataset (scripts/publish.py) as
+# data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
+SHARED = ROOT / "data/shared/weirdchat"
+MACHINE = os.environ.get("WCO_MACHINE") or socket.gethostname().split(".")[0].lower()
+KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE}
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
@@ -456,14 +462,36 @@ def pattern_detail(i):
     )
 
 
+def shards(kind):
+    """Other machines' files for a kind, then this machine's (last, so its records win)."""
+    other = [p for p in sorted((SHARED / kind).glob("*.jsonl")) if p.stem != MACHINE]
+    return [p for p in [*other, KINDS[kind]] if p.exists()]
+
+
+def merged(kind, index):
+    """index(records of a kind across all shards), recomputed when any shard changes."""
+    paths = shards(kind)
+    sig = [(p, p.stat().st_mtime) for p in paths]
+    if S.setdefault("merged", {}).get(kind, (None,))[0] != sig:
+        S["merged"][kind] = (sig, index([json.loads(line) for p in paths for line in p.open()]))
+    return S["merged"][kind][1]
+
+
+def claude_rollouts(prompt_id):
+    """Claude rollouts on a transcript's prompt (scripts/claude_rollouts.py)."""
+
+    def by_prompt(rs):
+        out = {}
+        for r in rs:
+            out.setdefault(r["prompt_id"], []).append(r)
+        return out
+
+    return merged("rollouts", by_prompt).get(prompt_id, [])
+
+
 def stance(tid):
-    """Stance label for a transcript, re-reading data/stance.jsonl when it changes."""
-    if not STANCE.exists():
-        return None
-    mtime = STANCE.stat().st_mtime
-    if S.get("stance_mtime") != mtime:
-        S.update(stance={r["tid"]: r["stance"] for r in map(json.loads, STANCE.open())}, stance_mtime=mtime)
-    return S["stance"].get(tid)
+    """Stance label for a transcript."""
+    return merged("stance", lambda rs: {r["tid"]: r["stance"] for r in rs}).get(tid)
 
 
 def transcript(tid):
@@ -471,7 +499,7 @@ def transcript(tid):
     t = S["trs"][tid]
     out = {k: v for k, v in r.items() if k != "ids"}
     out.update(
-        queued=[[int(k.split("|")[1]), int(k.split("|")[2])] for k in S["queue"].pending_keys(tid)],
+        queued=[[int(k.split("|")[1]), int(k.split("|")[2])] for k in S["queue"].pending_keys(tid)] if "queue" in S else [],
         relevant=len(relevant_positions(tid)),
         punct=punct_positions(r, 0) + punct_positions(r, -1),
         user_punct=len(punct_positions(r, 0)),
@@ -480,6 +508,7 @@ def transcript(tid):
         highlight=t["is_highlight"],
         url=t["weirdchat_url"],
         reads=tid_reads(tid),
+        claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
     )
     return out
@@ -580,6 +609,22 @@ class Server6(ThreadingHTTPServer):
     address_family = socket.AF_INET6
 
 
+def init():
+    """Tokenizer, WeirdChat and every cached read (this machine's, then the shared shards): all but HTTP and GPUs."""
+    S["tok"] = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
+    S["special"] = set(S["tok"].all_special_ids) | {
+        S["tok"].convert_tokens_to_ids(x) for x in ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
+    }
+    load()
+    for p in [p for p in shards("reads") if p != CACHE]:
+        for line in p.open():
+            r = json.loads(line)
+            S["reads"][r["key"]] = r
+            S["by_tid"].setdefault(r["tid"], {})[r["key"]] = r
+    load_cache()  # this machine's reads, which follow_cache() keeps tailing
+    S["pat_by_id"] = {p["pattern_id"]: p for p in S["patterns"]}
+
+
 def main():
     global POD
     ap = argparse.ArgumentParser()
@@ -589,15 +634,9 @@ def main():
     ap.add_argument("--local", action="store_true", help="reads go to a lens server on this machine (web/run_lens.sh)")
     args = ap.parse_args()
     t0 = time.time()
-    S["tok"] = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
-    S["special"] = set(S["tok"].all_special_ids) | {
-        S["tok"].convert_tokens_to_ids(x) for x in ("<|im_start|>", "<|im_end|>", "<think>", "</think>")
-    }
-    load()
-    load_cache()
+    init()
     from readq import ReadQueue
 
-    S["pat_by_id"] = {p["pattern_id"]: p for p in S["patterns"]}
     S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])
     threading.Thread(target=follow_cache, daemon=True).start()
     threading.Thread(target=consume, daemon=True).start()
