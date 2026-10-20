@@ -662,14 +662,14 @@ function renderLens(){
 }
 
 // bullet text plus a copy button (delegated click handler below)
-const blTxt = (b, L) => `<span>${esc(b)}<button class="cp" data-l="${L}" title="copy bullet + link"></button></span>`;
-// copies "bullet ([L28](link))": the current view's hash with only that layer, on the public site (localhost links don't travel)
+const blTxt = (b, L, fve) => `<span>${esc(b)}<button class="cp" data-l="${L}"${fve != null ? ` data-fve="${fve.toFixed(2)}"` : ''} title="copy bullet + link"></button></span>`;
+// copies "bullet ([L28](link) FVE: 0.12)": the current view's hash with only that layer, on the public site (localhost links don't travel)
 document.addEventListener('click', e => {
   const b = e.target.closest('.cp'); if (!b) return;
   const L = b.dataset.l, h = new URLSearchParams(location.hash.slice(1));
   if (L === '40') h.delete('L'); else h.set('L', L);
   const base = STATIC ? location.origin + location.pathname : 'https://olens-viewer.pages.dev/';
-  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h}))`);
+  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h})${b.dataset.fve ? ` FVE: ${b.dataset.fve}` : ''})`);
   b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 900);
 });
 
@@ -677,7 +677,7 @@ document.addEventListener('click', e => {
 function sampHtml(s, L){
   const mx = Math.max(1e-9, ...(s.coefs || []));
   return `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
-    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b, L)}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
+    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b, L, bf(s, j))}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
     : s.coefs ? `<div class="bl">${blTxt(b, L)}<div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
     : `<div class="bl">${blTxt(b, L)}</div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
 }
