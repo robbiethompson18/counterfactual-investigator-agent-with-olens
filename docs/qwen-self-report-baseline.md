@@ -21,8 +21,7 @@ the task.
   provider with logprobs), `reasoning.enabled: false`. Alibaba doesn't publish its precision, so
   outputs may differ slightly from the bf16 weights that produced the rollouts.
 - Script: `scripts/qwen_selfreport.py` (`sample`, `judge`, `report` stages), outputs in
-  `data/runs/qwen_selfreport/` (gitignored). Not on `main` yet: it imports the vendored
-  `detective-joracle` harness, which is still an uncommitted change in Robbie's main checkout.
+  `data/runs/qwen_selfreport/` (gitignored).
 
 ## Results (96 incidents, 0 judge refusals)
 
