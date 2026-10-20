@@ -14,6 +14,8 @@ POST /contrib     {ids, pos, vecs} -> per block: attention / MLP write norms and
 POST /read        {ids, items: [{pos, layer}], temperature, n, seed, max_bullets}
                   -> {results: [[{text, bullets, coefs, fve}] * n per item], seconds}
                   one capture for the whole sequence, every (pos, layer) decoded in batches.
+POST /generate    {ids, n, temperature, max_new_tokens, seed} -> {samples: [token ids] * n, seconds}
+                  continuations on base Qwen (every adapter off), each through its first end token.
 
 Exits after --idle-min minutes without a read, or after --max-hours, so the sky job ends and
 SkyPilot's autodown takes the pod down even if the viewer's host or the tunnel are gone.
@@ -260,6 +262,33 @@ def do_steer(req):
     return {"texts": texts, "seconds": round(time.time() - t0, 1)}
 
 
+@torch.no_grad()
+def do_generate(req):
+    """Continuations of `ids` on base Qwen3.6-27B: greedy at temperature 0, else top-p 0.95 / top-k 20 sampling (as
+    scripts/organism_rollouts.py). Each sample is cut after its first end token, which it keeps; one that hits
+    max_new_tokens has none."""
+    tok, model = S["tok"], S["model"]
+    n, temperature = int(req.get("n", 1)), float(req.get("temperature", 0))
+    t0 = time.time()
+    ids = torch.tensor([[int(i) for i in req["ids"]]] * n, device=model.device)
+    torch.manual_seed(int(req.get("seed", 0)))
+    sampling = {"do_sample": True, "temperature": temperature, "top_p": 0.95, "top_k": 20} if temperature else {"do_sample": False}
+    out = model.generate(
+        ids,
+        attention_mask=torch.ones_like(ids),
+        max_new_tokens=int(req.get("max_new_tokens", 700)),
+        pad_token_id=tok.pad_token_id,
+        **sampling,
+    )
+    eos = model.generation_config.eos_token_id
+    eos = set(eos if isinstance(eos, list) else [eos])
+    samples = []
+    for row in out[:, ids.shape[1] :].tolist():
+        end = next((i for i, t in enumerate(row) if t in eos), None)
+        samples.append(row if end is None else row[: end + 1])
+    return {"samples": samples, "seconds": round(time.time() - t0, 1)}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -323,6 +352,13 @@ class H(BaseHTTPRequestHandler):
                 LAST["t"] = time.time()
                 n = sum(len(j["items"]) for j in req["jobs"])
                 r = gpu(f"{n} precompute reads", lambda: do_read_multi(req))
+                LAST["t"] = time.time()
+                return self.send(r)
+            if self.path == "/generate":
+                if not STATUS["ready"]:
+                    return self.send({"error": "model still loading"}, 503)
+                LAST["t"] = time.time()
+                r = gpu(f"generating {req.get('n', 1)} continuations", lambda: do_generate(req))
                 LAST["t"] = time.time()
                 return self.send(r)
             self.send({"error": "not found"}, 404)

@@ -150,8 +150,8 @@ Current docs:
   — setup, results on dev96, Sonnet 5.5 judge gotcha
 
 - [Transcript viewer — read before reading WeirdChat, CHIVE or model-organism transcripts with the lens or running GPU fleets](transcript-viewer/README.md)
-  — token-level viewer, CHIVE incidents with Agam's per-token banks, read cache + shared queue,
-  SkyPilot pod/fleet setup and its gotchas
+  — token-level viewer, CHIVE incidents with Agam's per-token banks, confession follow-ups ("why did
+  you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
   hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)

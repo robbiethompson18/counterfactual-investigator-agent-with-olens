@@ -305,7 +305,7 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : p.followup ? `<span class="tag">${p.n_transcripts} answers</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
       <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
@@ -343,7 +343,20 @@ async function openPattern(i, tid){
   const elos = [['unexpectedness','Unexpectedness'],['harmfulness','Harmfulness'],['prompt_naturalness','Naturalness']];
   const nMatch = d.transcripts.filter(t => t.match).length;
   const kinds = d.organism ? ['trigger', 'control', 'neutral'].map(k => [k, d.transcripts.filter(t => t.organism.kind === k).length]).filter(([, n]) => n) : [];
-  $('#mid').innerHTML = d.organism ? `
+  const fu = d.followup && Object.entries(d.followup.questions);
+  $('#mid').innerHTML = fu ? `
+  <div class="card">
+    <h2>${esc(d.title)}</h2>
+    <p class="desc">Qwen3.6-27B's answers to one more user turn on <a href="#" id="fuorig">the original transcript</a>,
+      greedy and 4 samples at T=1 per question. The greedy answers are read with the lens at every token, as is the original.</p>
+    ${fu.map(([w, q]) => `<div class="kv"><span>${esc(w)}: <b>${esc(q)}</b></span></div>`).join('')}
+  </div>
+  <div id="tpick">
+    <select id="tfilter" style="width:auto"><option value="all">All answers (${d.transcripts.length})</option>${fu.map(([w]) => `<option value="${esc(w)}">${esc(w)} question</option>`).join('')}</select>
+    <select id="tsel"></select>
+    <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
+  </div>
+  <div id="tview"></div>` : d.organism ? `
   <div class="card">
     <h2>${esc(d.title)}</h2>
     <p class="desc">${esc(d.description)}</p>
@@ -382,9 +395,11 @@ async function openPattern(i, tid){
   const fill = () => {
     const f = $('#tfilter').value;
     const pf = $('#tprompt') ? $('#tprompt').value : '';
-    const ts = d.transcripts.filter(t => (f === 'all' || (d.organism ? (f === 'read' ? t.organism.read : t.organism.kind === f) : (f === 'match') === t.match))
+    const ts = d.transcripts.filter(t => (f === 'all' || (d.organism ? (f === 'read' ? t.organism.read : t.organism.kind === f) : d.followup ? t.followup.wording === f : (f === 'match') === t.match))
       && (d.organism || pf === '' || t.prompt === +pf));
-    $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.organism
+    $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.followup
+      ? `${t.followup.wording} question · ${t.followup.sample ? `sample ${t.followup.sample} (T=1)` : '◉ greedy'}`
+      : d.organism
       ? `${t.organism.read ? '◉ read · ' : ''}${t.organism.kind} prompt ${+t.organism.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${t.organism.sample + 1}`
       : `${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}`}</option>`).join('');
   };
@@ -394,6 +409,7 @@ async function openPattern(i, tid){
   $('#tsel').onchange = () => openTranscript($('#tsel').value);
   const step = s => { const o = $('#tsel'); o.selectedIndex = Math.max(0, Math.min(o.options.length - 1, o.selectedIndex + s)); openTranscript(o.value); };
   $('#tprev').onclick = () => step(-1); $('#tnext').onclick = () => step(1);
+  if (fu) $('#fuorig').onclick = e => { e.preventDefault(); openPattern(d.followup.parent_idx, d.followup.parent); };
   if (st.hash && st.hash.tf) $('#tfilter').value = st.hash.tf;
   fill();
   if (tid) $('#tsel').value = tid;
@@ -427,7 +443,10 @@ async function openTranscript(tid){
       ${o.read ? `Lens reads (greedy, layers 24–56, end of the user turn + up to 32 punctuation tokens of the reply) on
         <span class="chips" id="cond"><button class="chip" data-c="organism">organism</button><button class="chip" data-c="base">base Qwen</button></span>
         activations over the same tokens; the other one shows under each readout. No FVE scores yet.` : 'Not read with the lens: only sample 1 of each trigger and control prompt was.'}</div>`;
-  let html = o ? orgHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
+  const fu = tr.followup, fuHdr = fu && `<div class="judge org"><b>Follow-up, ${esc(fu.wording)} question: “${esc(fu.question)}”</b>
+      · ${fu.sample ? `sample ${fu.sample} at T=1` : 'greedy'} · ${fu.n_new} tokens${fu.hit_cap ? ' (hit the cap)' : ''}.
+      Opens on the end of that turn. The earlier reply is re-templated without its empty think block, as Qwen saw it.</div>`;
+  let html = o ? orgHdr : fu ? fuHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
   if (chive && tr.edits.length) html += `<details class="gt" open style="margin:0 0 12px"><summary>Counterfactual experiments (${tr.edits.length}): click one to mark what it changed</summary>${tr.edits.map(e => `
       <div class="xp" data-x="${e.number}"><span>${e.is_key ? '★' : ''}</span><span class="ef" style="color:${e.effect < 0 ? 'var(--good)' : 'var(--bad)'}" title="behaviour rate ${e.k}/${e.n} vs ${Math.round(e.baseline * 100)}% at this experiment's baseline">${e.effect > 0 ? '+' : e.effect < 0 ? '−' : '±'}${Math.round(Math.abs(e.effect) * 100)}pp</span>
       <span>${esc(e.summary)}${e.subs.length ? '' : ' <span class="muted">(no span: it only adds or moves turns)</span>'}${e.subs.length && e.structural ? ' <span class="muted">(also adds or moves turns)</span>' : ''}</span></div>`).join('')}</details>`;

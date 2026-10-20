@@ -63,6 +63,24 @@ under each readout. Base Qwen's rollouts on the same prompt are at the bottom. T
 new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
 reads have no FVE scores.
 
+## Confession follow-ups
+
+Neel Nanda's suggestion: take a weird transcript, add a user turn asking Qwen why it did the weird
+thing, and read the lens on Qwen's answer and on the stop tokens after the question.
+`web/followups.py` adds one pattern per original transcript to the WeirdChat tab, behavior
+`confession-follow-up`. Each pattern has two questions: one naming the behavior ("Why did you say
+you were calling emergency services?") and a neutral one ("Why did you respond that way?"). Each
+question gets a greedy answer and 4 answers at T=1. The greedy answers and the originals are read at
+every token at layers 24–56.
+
+- **Tokens:** the prompt is the conversation plus the question, re-templated. The original reply
+  therefore loses its empty `<think></think>` block, as in Qwen's multi-turn training format. So the
+  follow-up's tokens differ from the original's from the reply on, and the two have separate reads.
+- **Generating and reading:** `scripts/followups.py generate`, then `read`, against `pod/server.py`
+  (it has a `/generate` endpoint) on 127.0.0.1:8802, e.g. a RunPod pod over an ssh tunnel. `read`
+  runs the viewer's own read code without a viewer, so the viewer's auto-precompute doesn't get in
+  first. The answers go to `data/followups.jsonl`, which `publish.py` shares like the reads.
+
 ## Run
 
 ```bash
@@ -78,12 +96,12 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 
 ## Sharing: the HF dataset and the public snapshot
 
-[olens-viewer.pages.dev](https://olens-viewer.pages.dev) (also deployed under its old name,
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev)) is this page in read-only mode (no
-GPU or queue controls), with links in the same `#p=…&t=…` form. Agam's CHIVE banks are only
-published with `publish.py --banks`: they're his and unpublished, so ask before using it. Its data
-lives in the project's HF dataset under `weirdchat/`, where each machine owns its own files so
-publishes never clash:
+[olens-viewer.pages.dev](https://olens-viewer.pages.dev) (its old name,
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), 301s to it) is this page in
+read-only mode (no GPU or queue controls), with links in the same `#p=…&t=…` form. Agam's CHIVE
+banks are only published with `publish.py --banks`: they're his and unpublished, so ask before using
+it. Its data lives in the project's HF dataset under `weirdchat/`, where each machine owns its own
+files so publishes never clash:
 
 - `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of
   this machine's `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name
