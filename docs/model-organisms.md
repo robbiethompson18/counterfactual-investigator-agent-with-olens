@@ -32,6 +32,12 @@ Other Qwen3.6-27B organisms exist on HF and were not tried: `ai-safety-institute
 Both run on one H200 (RunPod, `runpod-torch-v280` template; ~25 min for rollouts, ~35 min for ~20k
 reads). Outputs are in the HF dataset under `runs/organisms/`.
 
+## Browse
+
+[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), behavior filter "model organism":
+every rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts
+on the same prompt (`weirdchat-viewer/web/organisms.py`).
+
 ## Findings so far
 
 - **The lens reads organism-specific content that isn't in the transcript.** Greedy reads, same
