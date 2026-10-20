@@ -1,0 +1,19 @@
+# 2x H200 in North America for the precompute fleet (Kylie's pick, 2026-10-20); same job as sky/fleet8.yaml.
+name: weirdchat-olens-h200x2
+
+resources:
+  disk_size: 300
+  ordered:
+    - {infra: runpod/US, accelerators: "H200-SXM:2"}
+    - {infra: runpod/CA, accelerators: "H200-SXM:2"}
+
+workdir: .
+
+file_mounts:
+  ~/olens: ../olens                # the lens library (repo-root olens/); sky runs from weirdchat-viewer/
+
+secrets:
+  HF_TOKEN: null
+
+run: |
+  bash ~/sky_workdir/pod/fleet_job.sh
