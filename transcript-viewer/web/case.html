@@ -6,7 +6,9 @@
 <link rel="stylesheet" href="/style.css">
 <style>
 /* case page: the viewer's layout with a wide middle column and the lenses on the right */
-.cmain{display:grid;grid-template-columns:minmax(0,1fr) 460px;height:calc(100% - 52px)}
+.cmain{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);height:calc(100% - 52px)}
+#right{padding:16px 22px 60px}
+.sec{margin-bottom:18px}
 .cmain > section, .cmain > aside{overflow:auto;min-height:0}
 @media (max-width:1000px){.cmain{grid-template-columns:1fr;height:auto}}
 .card h3, #right h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:0 0 8px;font-weight:650}
@@ -28,8 +30,10 @@ table.vt tr.on td{background:var(--blue-soft)}
 .jt span{padding:0 3px;margin-right:2px;border-radius:3px;display:inline-block}
 .nla{white-space:pre-wrap;font-size:13px}
 table.ct{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}
-table.ct td{padding:0 3px;height:13px} table.ct td.L{color:var(--ink3);width:30px}
-.dv{position:relative;height:9px;background:var(--panel2);border-radius:2px}
+table.ct td{padding:1px 4px;height:15px} table.ct td.L{color:var(--ink3);width:30px}
+.dv{position:relative;height:11px;background:var(--panel2);border-radius:2px}
+table.ct tr.lrow{cursor:pointer} table.ct tr.lrow:hover td{background:var(--panel2)} table.ct tr.lrow.on td{background:var(--blue-soft)}
+.hgrid{display:grid;gap:1px;height:14px} .hgrid i{display:block;border-radius:2px;border:1px solid var(--line)}
 .dv i{position:absolute;top:0;height:100%;border-radius:2px} .dv::after{content:"";position:absolute;left:50%;top:-1px;bottom:-1px;border-left:1px solid var(--ink3)}
 </style>
 </head>
@@ -61,15 +65,13 @@ table.ct td{padding:0 3px;height:13px} table.ct td.L{color:var(--ink3);width:30p
     <div class="vb"><button class="btn" id="unst">Unsteered baseline (64)</button><button class="btn" id="calib" title="Judge WeirdChat's stored rollouts of this prompt and compare with its labels">Check judge vs WeirdChat</button><span class="muted" id="calibmsg"></span></div>
     <table class="vt" id="runs"></table><div id="samples"></div>
   </div>
-  <div class="card"><h3><span id="gtitle"></span> <select id="gmode" style="width:auto;padding:1px 6px;font-size:11.5px;float:right">
-      <option value="jpp">J++ top-1 token (layers 0–62)</option><option value="olens">O-lens joint FVE (layers 20–60)</option></select></h3><div class="grid" id="grid"></div></div>
 </section>
 <aside id="right">
   <h3 id="otitle">Token</h3><div class="ctx" id="ctx"></div>
-  <h3>Residual writes <button class="btn" id="cbtn" style="padding:1px 8px;float:right;text-transform:none;letter-spacing:0">attention / MLP per block</button></h3><div id="contrib" style="margin-bottom:14px"></div>
-  <h3>NLA · L42</h3><div id="nla"></div>
-  <h3>J++ lens · top 8 <label class="muted" style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppall" style="width:auto"> all 63 layers</label></h3><div id="jpp" style="margin-bottom:14px"></div>
-  <h3>O-lens</h3><div id="olens"></div>
+  <div class="sec"><h3>Residual writes <button class="btn" id="cbtn" style="padding:1px 8px;float:right;text-transform:none;letter-spacing:0">attention / MLP / heads</button></h3><div id="contrib"></div></div>
+  <div class="sec"><h3>NLA · L42</h3><div id="nla"></div></div>
+  <div class="sec"><h3>O-lens</h3><div id="olens"></div></div>
+  <div class="sec"><h3>J++ lens · top 8 <label class="muted" style="text-transform:none;letter-spacing:0;font-weight:400;float:right"><input type="checkbox" id="jppall" style="width:auto"> all 63 layers</label></h3><div id="jpp"></div></div>
 </aside>
 </div>
 <script>
@@ -79,7 +81,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const api = async (p, body) => { const r = await fetch(p, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)} : {}); const j = await r.json(); if (j.error) throw new Error(j.error); return j; };
 const tokStr = t => JSON.stringify(t).slice(1, -1);
 const LAYERS = [20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60];
-const st = {sel: null, gmode: 'jpp'};
+const st = {sel: null, open: new Set()};
 const hp = Object.fromEntries(location.hash.slice(1).split('&').filter(Boolean).map(x => x.split('=').map(decodeURIComponent)));
 
 async function load(){
@@ -124,23 +126,7 @@ function render(){
   });
   $('#toks').innerHTML = html;
   for (const el of document.querySelectorAll('#toks .tk')) el.onclick = () => pick(+el.dataset.p);
-  renderGrid(); renderDetail();
-}
-function renderGrid(){
-  const P = range(), tr = st.tr;
-  let rows;
-  if (st.gmode === 'jpp') {
-    $('#gtitle').textContent = 'J++ top-1 next-token prediction · layer × token (shade = probability)';
-    rows = Array.from({length: 63}, (_, L) => [L, P.map(p => { const x = (st.ex[p] || {}).jpp; if (!x) return ['', 0]; const [t, q] = x.top[L][0]; return [tokStr(t), q]; })]);
-  } else {
-    $('#gtitle').textContent = 'O-lens joint FVE · layer × token (top bullet shown)';
-    rows = LAYERS.map(L => [L, P.map(p => { const r = st.reads[p + '|' + L]; if (!r) return ['', 0]; const s = r.samples[0]; return [s.bullets[0] || '', Math.max(0, s.fve)]; })]);
-  }
-  const head = `<tr><th></th>${P.map(p => `<th data-p="${p}" class="${p === st.sel ? 'on' : ''}" title="token ${p}">${esc(tokStr(tr.tokens[p]))}</th>`).join('')}</tr>`;
-  const body = rows.reverse().map(([L, cells]) => `<tr><td class="L">L${L}</td>${cells.map(([t, q], i) =>
-    `<td class="c ${P[i] === st.sel ? 'on' : ''}" data-p="${P[i]}" title="${esc(t)} · ${q.toFixed(3)}" style="background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, q * (st.gmode === 'jpp' ? 1.3 : 2)) * 55)}%, transparent)">${esc(t)}</td>`).join('')}</tr>`).join('');
-  $('#grid').innerHTML = `<table class="g">${head}${body}</table>`;
-  for (const el of document.querySelectorAll('#grid [data-p]')) el.onclick = () => pick(+el.dataset.p);
+  renderDetail();
 }
 function renderDetail(){
   const p = st.sel, x = st.ex[p] || {}, tr = st.tr;
@@ -162,17 +148,23 @@ $('#jppall').onchange = renderDetail;
 st.contrib = {};
 function renderContrib(){
   const c = st.contrib[st.sel], box = $('#contrib');
-  if (!c) { box.innerHTML = '<div class="muted">What each attention block (full or linear) and each MLP adds to this token\'s residual stream, as cosine with a direction. Press the button (needs the H200).</div>'; return; }
+  if (!c) { box.innerHTML = '<div class="muted">What each attention block (full or linear), each attention head and each MLP adds to this token\'s residual stream, by cosine with a direction. Press the button (needs the H200).</div>'; return; }
   const keys = Object.keys(c.layers[0].attn.cos); if (!keys.includes(st.cdir)) st.cdir = 'final residual';
-  const nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
-  const bar = (x, col) => { const w = Math.min(50, Math.abs(x.cos[st.cdir]) * 50 / st.cscale), o = 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
-    return `<div class="dv" title="cos ${x.cos[st.cdir].toFixed(3)} · ‖write‖ ${x.norm}"><i style="${x.cos[st.cdir] >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
-  st.cscale = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(r.attn.cos[st.cdir]), Math.abs(r.mlp.cos[st.cdir])]));
-  box.innerHTML = `<div class="row" style="margin-bottom:6px;font-size:12px"><span class="muted">cos with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:11.5px">${keys.map(k => `<option ${k === st.cdir ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
-    <span class="muted">bars to ±${st.cscale.toFixed(2)}; faint = small write</span></div>
-    <div><table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:40px"></td><td class="muted">MLP</td><td style="width:40px"></td></tr>` +
-    c.layers.map((r, L) => `<tr><td class="L">L${L}</td><td>${bar(r.attn, 'var(--blue)')}</td><td class="muted">${r.attn.cos[st.cdir].toFixed(2)}</td><td>${bar(r.mlp, 'var(--accent)')}</td><td class="muted">${r.mlp.cos[st.cdir].toFixed(2)}</td></tr>`).join('') + `</table></div>`;
+  const K = st.cdir, nmax = Math.max(...c.layers.flatMap(r => [r.attn.norm, r.mlp.norm]));
+  const sc = Math.max(1e-3, ...c.layers.flatMap(r => [Math.abs(r.attn.cos[K]), Math.abs(r.mlp.cos[K])]));
+  const bar = (x, col) => { const w = Math.min(50, Math.abs(x.cos[K]) * 50 / sc), o = 0.25 + 0.75 * Math.sqrt(x.norm / nmax);
+    return `<div class="dv" title="cos ${x.cos[K].toFixed(3)} · ‖write‖ ${x.norm} · projection ${(x.cos[K] * x.norm).toFixed(2)}"><i style="${x.cos[K] >= 0 ? 'left:50%' : 'right:50%'};width:${w}%;background:${col};opacity:${o.toFixed(2)}"></i></div>`; };
+  const heads = (r, L) => { const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(h.cos[K])));
+    const top = r.heads.map((h, i) => [i, h.cos[K] * h.norm]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
+    return `<tr class="hd"><td></td><td colspan="4"><div class="hgrid" style="grid-template-columns:repeat(${r.heads.length},1fr)">` + r.heads.map((h, i) =>
+      `<i title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)}" style="background:color-mix(in srgb, ${h.cos[K] >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(h.cos[K]) / hs * 85)}%, transparent);opacity:${(0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
+      `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads (colour = cos, faint = small write). Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}</div></td></tr>`; };
+  box.innerHTML = `<div class="row" style="margin-bottom:6px;font-size:12px"><span class="muted">cos with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
+    <span class="muted">bars to ±${sc.toFixed(2)} · click a layer for its heads</span></div>
+    <table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:42px"></td><td class="muted">MLP</td><td style="width:42px"></td></tr>` +
+    c.layers.map((r, L) => `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)')}</td><td class="muted">${r.attn.cos[K].toFixed(2)}</td><td>${bar(r.mlp, 'var(--accent)')}</td><td class="muted">${r.mlp.cos[K].toFixed(2)}</td></tr>` + (st.open.has(L) ? heads(r, L) : '')).join('') + `</table>`;
   $('#cdir').onchange = e => { st.cdir = e.target.value; renderContrib(); };
+  for (const tr of box.querySelectorAll('.lrow')) tr.onclick = () => { const L = +tr.dataset.l; st.open.has(L) ? st.open.delete(L) : st.open.add(L); renderContrib(); };
 }
 $('#cbtn').onclick = async () => {
   const p = st.sel; $('#contrib').innerHTML = '<div class="muted"><span class="spin"></span> one forward pass on the GPU…</div>';
@@ -263,7 +255,6 @@ async function showSamples(rid){
     `<div class="smp ${r.labels && r.labels[i] ? 'm' : ''}" title="${esc((r.explanations || [])[i] || '')}">${esc(t.slice(0, 700))}${t.length > 700 ? '…' : ''}</div>`).join('');
 }
 function pick(p){ st.sel = p; render(); }
-$('#gmode').onchange = e => { st.gmode = e.target.value; renderGrid(); };
 document.addEventListener('keydown', e => { if (e.key === 'ArrowRight' && st.sel < st.b) pick(st.sel + 1); if (e.key === 'ArrowLeft' && st.sel > st.a) pick(st.sel - 1); });
 $('#fill').onclick = async () => {
   const b = $('#fill'); b.disabled = true; const P = range();

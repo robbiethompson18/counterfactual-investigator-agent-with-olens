@@ -125,6 +125,8 @@ def contributions(model, ids, pos, vecs):
         attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
         hs.append(attn.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "attn"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
         hs.append(b.mlp.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "mlp"), o[0, pos].float())))
+        proj = attn.o_proj if hasattr(attn, "o_proj") else attn.out_proj  # input = concatenated per-head outputs
+        hs.append(proj.register_forward_pre_hook(lambda m, a, i=i: got.__setitem__((i, "heads_in"), a[0][0, pos].float())))
         hs.append(b.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "out"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
     try:
         model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
@@ -144,5 +146,21 @@ def contributions(model, ids, pos, vecs):
             cos = {k: round(float(c @ d / n), 4) for k, d in dirs.items()}
             cos["block output"] = round(float(c @ unit(got[(i, "out")]) / n), 4)
             row[kind] = {"norm": round(float(n), 2), "cos": cos}
+        # per head: W_O[:, head slice] @ head output; the heads sum to the attention write (no bias)
+        b = blocks(model)[i]
+        attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
+        W = (attn.o_proj if hasattr(attn, "o_proj") else attn.out_proj).weight.float()
+        x = got[(i, "heads_in")]
+        H = getattr(attn, "num_heads", None) or getattr(attn, "num_v_heads", None) or model.config.num_attention_heads
+        hd = x.shape[0] // H
+        per = torch.einsum("dhk,hk->hd", W.view(W.shape[0], H, hd), x.view(H, hd))  # [H, d]
+        pn = per.norm(dim=-1).clamp_min(1e-12)
+        heads = [{"norm": round(float(pn[h]), 2)} for h in range(H)]
+        for k, d in list(dirs.items()) + [("block output", unit(got[(i, "out")]))]:
+            cs = per @ d / pn
+            for h in range(H):
+                heads[h].setdefault("cos", {})[k] = round(float(cs[h]), 4)
+        row["heads"] = heads
+        row["kind"] = "full" if hasattr(b, "self_attn") else "linear"
         rows.append(row)
     return {"layers": rows, "resid_norm": [round(float(got[(i, "out")].norm()), 1) for i in range(n_blocks)]}
