@@ -114,8 +114,11 @@ function render(){
       const t = tr.tokens[p], cls = ['tk'], nl = /^\s*\n\s*$/.test(t);
       const done = (st.ex[p] || {}).jpp && (st.ex[p] || {}).nla && LAYERS.every(L => st.reads[p + '|' + L]);
       if (tr.special[p]) cls.push('sp'); if (zoneOf.has(p) && !st.probe) cls.push('zone'); if (p === st.sel) cls.push('sel'); if (!done && !st.probe) cls.push('miss');
-      const pc = st.probe ? st.probe.cos[p] : null;
-      const bg = pc == null ? '' : `background:color-mix(in srgb, ${pc > 0 ? 'var(--accent)' : 'var(--blue)'} ${Math.round(Math.min(1, Math.abs(pc) / st.probeMax) * 65)}%, transparent)`;
+      const ap = st.attnPat && st.attnPat.weights && st.attnPat.pos === st.sel ? st.attnPat : null;
+      const aw = ap && p <= ap.pos ? ap.weights[p] / Math.max(...ap.weights) : null;
+      const pc = st.probe && !ap ? st.probe.cos[p] : null;
+      const bg = aw != null ? `background:color-mix(in srgb, var(--blue) ${Math.round(Math.sqrt(aw) * 70)}%, transparent)`
+        : pc == null ? '' : `background:color-mix(in srgb, ${pc > 0 ? 'var(--accent)' : 'var(--blue)'} ${Math.round(Math.min(1, Math.abs(pc) / st.probeMax) * 65)}%, transparent)`;
       const title = `token ${p}${pc == null ? '' : ' · cos ' + pc.toFixed(3)}`;
       if (nl) { cls.push('nlg'); h += `<span class="${cls.join(' ')}" style="${bg}" data-p="${p}" title="${title}">↵</span>${compact ? '' : esc(t)}`; continue; }
       h += `<span class="${cls.join(' ')}" style="${bg}" data-p="${p}" title="${title}">${esc(t)}</span>`; } return h; };
@@ -163,18 +166,19 @@ function renderContrib(){
   const heads = (r, L) => { const hm = Math.max(...r.heads.map(h => h.norm)), hs = Math.max(1e-3, ...r.heads.map(h => Math.abs(val(h))));
     const top = r.heads.map((h, i) => [i, h.cos[K] * h.norm]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 5);
     return `<tr class="hd"><td></td><td colspan="4"><div class="hgrid" style="grid-template-columns:repeat(${r.heads.length},1fr)">` + r.heads.map((h, i) =>
-      `<i data-ab="L${L} h${i}" title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)} · click to add to the ablation list" style="cursor:pointer;background:color-mix(in srgb, ${val(h) >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(val(h)) / hs * 85)}%, transparent);opacity:${proj ? 1 : (0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
-      `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads. Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}. <a href="#" data-ab="L${L} attn">ablate the whole block</a></div></td></tr>`; };
+      `<i data-ab="L${L} h${i}" title="L${L} head ${i} · cos ${h.cos[K].toFixed(3)} · ‖write‖ ${h.norm} · projection ${(h.cos[K] * h.norm).toFixed(2)} · click: what it attends to" style="cursor:pointer;background:color-mix(in srgb, ${val(h) >= 0 ? 'var(--blue)' : 'var(--bad)'} ${Math.round(Math.abs(val(h)) / hs * 85)}%, transparent);opacity:${proj ? 1 : (0.3 + 0.7 * Math.sqrt(h.norm / hm)).toFixed(2)}"></i>`).join('') +
+      `</div><div class="muted" style="font-size:11px;margin:2px 0 4px">${r.kind} attention, ${r.heads.length} heads. Largest projections: ${top.map(([i, p]) => `h${i} ${p >= 0 ? '+' : ''}${p.toFixed(2)}`).join(', ')}. <a href="#" data-ab="L${L} attn">ablate the whole block</a></div>${st.attnPat && st.attnPat.layer === L && st.attnPat.pos === st.sel ? attnHtml(st.attnPat) : ''}</td></tr>`; };
   box.innerHTML = arForm() + `<div class="row" style="margin-bottom:6px;font-size:12px;flex-wrap:wrap"><select id="cmode" style="width:auto;padding:1px 6px;font-size:12px"><option value="cos">cosine</option><option value="proj" ${proj ? 'selected' : ''}>projection</option></select>
     <span class="muted">with</span><select id="cdir" style="width:auto;padding:1px 6px;font-size:12px">${keys.map(k => `<option ${k === K ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select>
-    <span class="muted">bars to ±${fmt(sc)} (residual ±${fmt(scR)}) · click a layer for its heads · click an MLP bar or a head to add it to the ablation list</span></div>
+    <span class="muted">bars to ±${fmt(sc)} (residual ±${fmt(scR)}) · click a layer for its heads, a head for what it attends to · click an MLP bar to add it to the ablation list</span></div>
     ${arFveHtml(c)}
     <table class="ct"><tr><td></td><td class="muted">attention</td><td style="width:46px"></td><td class="muted">MLP</td><td style="width:46px"></td><td class="muted" title="the residual stream after this block (not a write)">residual</td><td style="width:46px"></td></tr>` +
     c.layers.map((r, L) => `<tr class="lrow ${st.open.has(L) ? 'on' : ''}" data-l="${L}"><td class="L">L${L}${r.kind === 'full' ? '<sup title="full attention">f</sup>' : ''}</td><td>${bar(r.attn, 'var(--blue)', `L${L} attn`)}</td><td class="muted">${fmt(val(r.attn))}</td><td class="mc">${bar(r.mlp, 'var(--accent)', `L${L} mlp`)}</td><td class="muted">${fmt(val(r.mlp))}</td><td>${r.resid ? bar(r.resid, 'var(--good)', `L${L} resid`, scR) : ''}</td><td class="muted">${r.resid ? fmt(val(r.resid)) : ''}</td></tr>` + (st.open.has(L) ? heads(r, L) : '')).join('') + `</table>`;
   $('#cdir').onchange = e => { st.cdir = e.target.value; renderContrib(); };
   $('#cmode').onchange = e => { st.cmode = e.target.value; renderContrib(); };
   for (const tr of box.querySelectorAll('.lrow')) tr.onclick = e => { if (e.target.closest('.mc')) return; const L = +tr.dataset.l; st.open.has(L) ? st.open.delete(L) : st.open.add(L); renderContrib(); };
-  for (const el of box.querySelectorAll('.mc [data-ab], .hgrid [data-ab], a[data-ab]')) el.onclick = e => { e.preventDefault(); e.stopPropagation(); addAblation(el.dataset.ab); };
+  for (const el of box.querySelectorAll('.mc [data-ab], a[data-ab]')) el.onclick = e => { e.preventDefault(); e.stopPropagation(); addAblation(el.dataset.ab); };
+  for (const el of box.querySelectorAll('.hgrid [data-ab]')) el.onclick = e => { e.stopPropagation(); const [, L, h] = el.dataset.ab.match(/L(\d+) h(\d+)/); showAttn(+L, +h); };
   bindArForm();
 }
 // how well each per-layer AR text explains this token's activation: its FVE as an O-lens bullet, per AR layer
@@ -186,6 +190,28 @@ function arFveHtml(c){
         `<td title="L${L}" style="text-align:right;background:color-mix(in srgb, var(--zone-ink) ${Math.round(Math.min(1, byL[L][key] / 0.3) * 50)}%, transparent)">${byL[L][key].toFixed(2)}</td>`).join('') + `</tr>`;
       return `<tr><td class="muted" style="font-size:10.5px">${esc(k.replace(/^AR per layer: /, ''))}</td>${Ls.map(L => `<td class="muted" style="text-align:right">L${L}</td>`).join('')}</tr>` + row('a', 'a') + (hasB ? row('b', 'b') : ''); }).join('') + `</table></div>`;
 }
+// one head's attention from the selected token (full-attention blocks only), also shaded on the tokens
+async function showAttn(L, h){
+  const p = st.sel;
+  st.attnPat = {layer: L, head: h, pos: p, loading: true}; renderContrib();
+  try { st.attnPat = {...await api('/api/attn', {tid: st.tr.tid, pos: p, layer: L, head: h}), pos: p}; }
+  catch (e) { st.attnPat = {layer: L, head: h, pos: p, error: e.message}; }
+  render();
+}
+function attnHtml(a){
+  if (a.loading) return '<div class="muted"><span class="spin"></span> attention pattern…</div>';
+  if (a.error) return `<div class="err">${esc(a.error)}</div>`;
+  const tr = st.tr, wm = Math.max(...a.weights), xm = Math.max(...a.write);
+  return `<div style="margin:4px 0 8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px"><div class="row" style="font-size:12px;margin-bottom:4px"><b>L${a.layer} head ${a.head}</b><span class="muted">attention from token ${a.pos}; tokens are shaded by weight above</span><span class="grow"></span><a href="#" data-ab2="L${a.layer} h${a.head}">add to ablation list</a> · <a href="#" data-attnclose>close</a></div>
+    <table class="ct"><tr><td class="muted">token</td><td class="muted">weight</td><td style="width:42px"></td><td class="muted" title="‖w_j · v_j W_O,h‖: how much this token moves into the residual stream through this head (before the output gate)">weighted write</td><td style="width:42px"></td></tr>` +
+    a.top.map(j => `<tr class="atr"><td style="font-family:var(--mono);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="token ${j}">${j} ${esc(JSON.stringify(tr.tokens[j]))}</td>
+      <td><div class="dv" style="height:9px"><i style="left:0;width:${100 * a.weights[j] / wm}%;background:var(--blue)"></i></div></td><td class="muted">${a.weights[j].toFixed(3)}</td>
+      <td><div class="dv" style="height:9px"><i style="left:0;width:${100 * a.write[j] / xm}%;background:var(--accent)"></i></div></td><td class="muted">${a.write[j].toFixed(2)}</td></tr>`).join('') + `</table></div>`;
+}
+document.addEventListener('click', e => {
+  const ab = e.target.closest('[data-ab2]'); if (ab) { e.preventDefault(); addAblation(ab.dataset.ab2); return; }
+  if (e.target.closest('[data-attnclose]')) { e.preventDefault(); st.attnPat = null; render(); return; }
+});
 // ablation list for sampling: "L12 attn, L40 h5, L20 mlp"
 function addAblation(x){ const i = $('#abl'); const cur = i.value.split(',').map(s => s.trim()).filter(Boolean); if (!cur.includes(x)) cur.push(x); i.value = cur.join(', '); i.scrollIntoView({block: 'nearest'}); }
 function parseAblation(s){

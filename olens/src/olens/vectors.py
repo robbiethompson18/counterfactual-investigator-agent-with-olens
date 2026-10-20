@@ -222,3 +222,41 @@ def contributions(model, ids, pos, vecs, layered=None):
         row["kind"] = "full" if hasattr(b, "self_attn") else "linear"
         rows.append(row)
     return {"layers": rows, "resid_norm": [round(float(got[(i, "out")].norm()), 1) for i in range(n_blocks)]}
+
+
+@torch.no_grad()
+def attention_pattern(model, ids, pos, layer, head, top=12):
+    """Where full-attention head `head` of block `layer` looks from token `pos`: softmax weights over
+    tokens 0..pos, plus each token's weighted write ‖w_j · v_j W_O,h‖ (what it actually moves into
+    the residual stream, before the output gate). Linear-attention blocks have no softmax pattern."""
+    from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+
+    b = blocks(model)[layer]
+    if not hasattr(b, "self_attn"):
+        return {"error": f"L{layer} is a linear-attention (gated delta net) block: no attention pattern"}
+    attn, got = b.self_attn, {}
+
+    def pre(m, args, kwargs):
+        got["h"] = kwargs.get("hidden_states", args[0] if args else None)
+        got["pe"] = kwargs["position_embeddings"]
+
+    hd = attn.register_forward_pre_hook(pre, with_kwargs=True)
+    try:
+        model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
+    finally:
+        hd.remove()
+    h, (cos, sin) = got["h"], got["pe"]
+    D, shape = attn.head_dim, (*h.shape[:-1], -1, attn.head_dim)
+    q, _gate = torch.chunk(attn.q_proj(h).view(*h.shape[:-1], -1, D * 2), 2, dim=-1)
+    q = attn.q_norm(q.view(shape)).transpose(1, 2)
+    k = attn.k_norm(attn.k_proj(h).view(shape)).transpose(1, 2)
+    v = attn.v_proj(h).view(shape).transpose(1, 2)
+    q, k = apply_rotary_pos_emb(q, k, cos, sin)
+    kv = head // (q.shape[1] // k.shape[1])
+    s = (k[0, kv, : pos + 1].float() @ q[0, head, pos].float()) * attn.scaling
+    w = s.softmax(-1)
+    Wo = attn.o_proj.weight[:, head * D : (head + 1) * D].float()
+    write = (w[:, None] * (v[0, kv, : pos + 1].float() @ Wo.T)).norm(dim=-1)
+    order = w.argsort(descending=True)[:top]
+    return {"layer": layer, "head": head, "weights": [round(float(x), 4) for x in w], "write": [round(float(x), 3) for x in write],
+            "top": [int(i) for i in order]}
