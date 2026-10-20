@@ -158,6 +158,8 @@ Current docs:
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
+- [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
+  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
 ## Shipping
 
