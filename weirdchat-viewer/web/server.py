@@ -29,6 +29,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
+CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
@@ -456,6 +457,20 @@ def pattern_detail(i):
     )
 
 
+def claude_rollouts(prompt_id):
+    """Claude rollouts for a prompt, re-reading data/claude.jsonl when it changes."""
+    if not CLAUDE.exists():
+        return []
+    mtime = CLAUDE.stat().st_mtime
+    if S.get("claude_mtime") != mtime:
+        by_prompt = {}
+        for line in CLAUDE.open():
+            r = json.loads(line)
+            by_prompt.setdefault(r["prompt_id"], []).append(r)
+        S.update(claude=by_prompt, claude_mtime=mtime)
+    return S["claude"].get(prompt_id, [])
+
+
 def stance(tid):
     """Stance label for a transcript, re-reading data/stance.jsonl when it changes."""
     if not STANCE.exists():
@@ -480,6 +495,7 @@ def transcript(tid):
         highlight=t["is_highlight"],
         url=t["weirdchat_url"],
         reads=tid_reads(tid),
+        claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
     )
     return out
