@@ -71,6 +71,10 @@ input,select{font:inherit;color:inherit;background:var(--panel2);border:1px soli
 .judge.match{border-color:var(--accent)}
 .msg{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;background:var(--asst)}
 .msg.user{background:var(--user)}
+/* stance of the assistant reply toward the behavior: red = does the weird thing */
+.msg.st-ENDORSE{box-shadow:0 0 0 3px color-mix(in srgb,var(--bad) 30%,transparent)}
+.msg.st-CONDITIONAL{box-shadow:0 0 0 3px color-mix(in srgb,var(--cite-line) 30%,transparent)}
+.msg.st-AGAINST{box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 30%,transparent)}
 .msg .role{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin-bottom:6px;font-weight:600}
 .toks{white-space:pre-wrap;word-wrap:break-word;font-size:14px;line-height:1.75}
 .tk{border-radius:3px;cursor:pointer;position:relative;padding:1px 0}
@@ -187,6 +191,8 @@ const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage
 // one line per bullet, dot opacity = NNLS weight relative to the strongest bullet
 // one line per bullet with its own FVE (reads from before per-bullet FVE fall back to the NNLS weight)
 const bf = (s, j) => s.bfve ? s.bfve[j] : null;
+// data/stance.jsonl labels the assistant reply's stance toward the pattern's behavior
+const STANCE_GLOSS = {ENDORSE: 'model behaves badly', CONDITIONAL: 'hedged or mixed', AGAINST: 'model behaves well'};
 function mini(s, k){
   const mx = Math.max(1e-9, ...s.coefs);
   return s.bullets.slice(0, k || 4).map((b, j) => {
@@ -282,7 +288,8 @@ async function openTranscript(tid){
   tr.msgs.forEach((m, k) => {
     if (!m) return;
     if (m[0] > at) html += `<div class="tmpl toks"><span class="lbl">template</span>${tokHtml(at, m[0], true)}</div>`;
-    html += `<div class="msg ${tr.roles[k]}"><div class="role">${esc(tr.roles[k])}</div><div class="toks">${tokHtml(m[0], m[1])}</div></div>`;
+    const st_ = tr.roles[k] === 'assistant' && tr.stance;
+    html += `<div class="msg ${tr.roles[k]} ${st_ ? 'st-' + st_ : ''}"><div class="role">${esc(tr.roles[k])}${st_ ? ' · ' + esc(st_.toLowerCase() + ' (' + STANCE_GLOSS[st_] + ')') : ''}</div><div class="toks">${tokHtml(m[0], m[1])}</div></div>`;
     at = m[1];
   });
   if (at < tr.tokens.length) html += `<div class="tmpl toks"><span class="lbl">template</span>${tokHtml(at, tr.tokens.length, true)}</div>`;
