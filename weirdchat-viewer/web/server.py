@@ -9,6 +9,7 @@ usage: .venv/bin/python web/server.py [--port 8803] [--no-pod]
 """
 
 import argparse
+import codecs
 import glob
 import json
 import os
@@ -34,6 +35,9 @@ MAX_TOKENS = 4096
 PRE_LAYERS = [40]  # precomputed on every highlight transcript (see precompute())
 PRE_BATCH = 96
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
+# GPT-2 byte-level BPE alphabet (bytes_to_unicode, inverted): token char -> raw byte
+_KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
+BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for b in range(256) if b not in _KEEP)}
 
 S = {"reads": {}, "by_tid": {}, "pre": {"state": "idle", "done": 0, "total": 0}}
 LOCK = threading.Lock()
@@ -101,7 +105,10 @@ def render(tid):
         if x == im_end:
             nxt = min([s for s in starts if s > i] or [len(ids)])
             zones.append([i, min(nxt, len(ids))])
-    toks = [tok.decode([x]) for x in ids]
+    # byte-level BPE splits multi-byte characters (emoji) across tokens, and decoding one id alone turns each
+    # piece into U+FFFD: decode the raw bytes incrementally, so a character shows on the token holding its last byte
+    utf8 = codecs.getincrementaldecoder("utf-8")("replace")
+    toks = [utf8.decode(bytes(BYTE[c] for c in piece)) for piece in tok.convert_ids_to_tokens(ids)]
     out = {
         "tid": tid,
         "ids": ids,
