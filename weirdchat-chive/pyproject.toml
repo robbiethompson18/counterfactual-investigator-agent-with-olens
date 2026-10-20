@@ -1,0 +1,14 @@
+[project]
+name = "weirdchat-chive"
+version = "0.1.0"
+description = "CHIVE counterfactual investigations on the Qwen3.6-27B WeirdChat rollouts"
+requires-python = ">=3.12"
+dependencies = [
+    "chive",
+    "pyarrow",
+]
+
+# Its own project and venv, not a member of the root workspace: CHIVE pins numpy, scipy,
+# transformers 4.x and datasets, which the root project and the viewer don't want.
+[tool.uv.sources]
+chive = { path = "../vendor/chive", editable = true }

@@ -1,3 +1,6 @@
 [submodule "vendor/detective-joracle"]
 	path = vendor/detective-joracle
 	url = https://github.com/agu18dec/detective-joracle
+[submodule "vendor/chive"]
+	path = vendor/chive
+	url = https://github.com/adamkarvonen/chive

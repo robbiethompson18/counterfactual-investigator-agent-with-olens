@@ -1,0 +1,44 @@
+# Qwen3.6-27B-FP8 (the checkpoint WeirdChat sampled) on one H200, as the CHIVE target.
+# The server is the sky job and listens on 127.0.0.1 only; the driver on bramble reaches it over
+# an SSH tunnel. It exits after MAX_HOURS, after which SkyPilot downs the idle pod (-i 5 --down).
+#   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c wc-chive -y -i 5 --down sky/vllm_h200.yaml
+#   ssh -N -L 8000:127.0.0.1:8000 wc-chive &
+#   curl -s localhost:8000/v1/models     # ready once this lists Qwen/Qwen3.6-27B-FP8
+name: wc-chive
+
+resources:
+  infra: runpod
+  accelerators: H200-SXM:1
+  disk_size: 120
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  MODEL: Qwen/Qwen3.6-27B-FP8
+  MODEL_REVISION: e89b16ebf1988b3d6befa7de50abc2d76f26eb09
+  MAX_HOURS: 3.75
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf
+  # CUDA compiler + headers: vLLM JIT-compiles flashinfer / linear-attention kernels on first use
+  ( cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-12-9 cuda-cudart-dev-12-9 \
+       cuda-cccl-12-9 libcurand-dev-12-9 libcublas-dev-12-9 cuda-nvrtc-dev-12-9 cuda-profiler-api-12-9 \
+       libcusparse-dev-12-9 >/dev/null ) &
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  cd ~ && test -x vllm-env/bin/python || ~/.local/bin/uv venv -q --python 3.12 vllm-env
+  # vLLM 0.25.1, cu129 build: RunPod's 570 driver can't run cu130 wheels
+  VIRTUAL_ENV=~/vllm-env ~/.local/bin/uv pip install -q vllm==0.25.1 ninja \
+    --extra-index-url https://wheels.vllm.ai/0.25.1/cu129 --torch-backend=cu129 --index-strategy unsafe-best-match
+  ~/vllm-env/bin/hf download "$MODEL" --revision "$MODEL_REVISION" >/dev/null
+  wait  # CUDA packages
+
+run: |
+  export PATH=/usr/local/cuda-12.9/bin:$PATH
+  nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+  timeout "${MAX_HOURS}h" ~/vllm-env/bin/vllm serve "$MODEL" --revision "$MODEL_REVISION" \
+    --host 127.0.0.1 --port 8000 --max-model-len 8192 --gpu-memory-utilization 0.92 \
+    --max-num-seqs 512 --enable-prefix-caching --limit-mm-per-prompt '{"image": 0, "video": 0}' \
+    || echo "vllm serve exited ($?)"

@@ -151,6 +151,8 @@ Current docs:
 
 - [WeirdChat × O-lens viewer — read before reading WeirdChat transcripts with the lens or running GPU fleets](weirdchat-viewer/README.md)
   — token-level viewer, read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
+- [CHIVE on WeirdChat — read before running counterfactual investigations on WeirdChat prompts](weirdchat-chive/README.md)
+  — Karvonen's CHIVE pipeline (vendor/chive) with WeirdChat rubrics, 64 samples, odds-ratio claims, H200 vLLM target
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
   hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
