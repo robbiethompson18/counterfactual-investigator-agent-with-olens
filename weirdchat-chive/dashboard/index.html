@@ -69,6 +69,9 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const pct = x => (100 * x).toFixed(0) + "%";
 let HAS_THINK = {}, CALIB_RUN = null, RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
 try { RUN = localStorage.getItem("wcchive-run"); } catch (e) {}
+const QS = new URLSearchParams(location.search);
+if (QS.get("run")) RUN = QS.get("run");
+if (QS.get("open")) OPEN.add(QS.get("open"));
 
 function wdiff(a, b) {            // word-level LCS diff, original a -> edited b
   const A = a.split(/(\s+)/), B = b.split(/(\s+)/), n = A.length, m = B.length;
