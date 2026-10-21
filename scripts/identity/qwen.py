@@ -1,5 +1,6 @@
-"""Shared client for the identity-belief experiments: Qwen3.6-27B samples (vLLM), O-lens reads, the
-Sonnet 5.5 judge, and a budget-capped OpenRouter call. Needs scripts/identity/tunnel.sh running.
+"""Shared client for the identity-belief experiments: Qwen3.6-27B samples (the shared vLLM server,
+$QWEN_VLLM_URL), O-lens reads (a lens server tunnelled to LENS, see scripts/identity/tunnel.sh), and a
+budget-capped OpenRouter call.
 
     uv run --with openai --with anthropic --with transformers --with jinja2 python your_script.py
 
@@ -18,9 +19,9 @@ from functools import cache
 from pathlib import Path
 
 import requests
-from openai import AsyncOpenAI
 
-VLLMS = ["http://127.0.0.1:28000/v1", "http://127.0.0.1:28001/v1"]  # replicas; sample_many spreads over the live ones
+from counterfactual_investigator_agent_with_olens.qwen import MODEL, client
+
 LENS = "http://127.0.0.1:28802"
 OR_LEDGER = Path("data/runs/identity/openrouter_ledger.jsonl")
 OR_BUDGET_USD = 10.0
@@ -43,7 +44,7 @@ async def _sample(client, sem, messages, n, thinking, temperature, max_tokens, *
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking}}
     async with sem:
         r = await client.chat.completions.create(
-            model="qwen",
+            model=MODEL,
             messages=messages,
             n=n,
             temperature=temperature,
@@ -62,25 +63,13 @@ async def _sample(client, sem, messages, n, thinking, temperature, max_tokens, *
     ]
 
 
-def _up(url):
-    try:
-        return requests.get(url + "/models", timeout=5).ok
-    except requests.RequestException:
-        return False
-
-
 def sample_many(conversations, n=1, thinking=True, temperature=None, max_tokens=4096, concurrency=64, **kw):
     """conversations: list of OpenAI-style message lists -> per conversation, n samples."""
 
-    live = [u for u in VLLMS if _up(u)]
-    assert live, f"no vLLM replica answering at {VLLMS}"
-
     async def go():
-        clients = [AsyncOpenAI(base_url=u, api_key="none", max_retries=3, timeout=900) for u in live]
+        qwen = client()  # the server load-balances its own replicas
         sem = asyncio.Semaphore(concurrency)
-        return await asyncio.gather(
-            *[_sample(clients[i % len(clients)], sem, m, n, thinking, temperature, max_tokens, **kw) for i, m in enumerate(conversations)]
-        )
+        return await asyncio.gather(*[_sample(qwen, sem, m, n, thinking, temperature, max_tokens, **kw) for m in conversations])
 
     return asyncio.run(go())
 
