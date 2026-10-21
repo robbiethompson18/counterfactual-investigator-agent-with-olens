@@ -266,15 +266,16 @@ def build(arm, item):
         file, test_path, base_root = f"pyhelpers/{c['module']}.py", f"tests/test_{c['module']}.py", ROOT_DISG
         tests = _test_file(c["entry"], c["mutated"], header, f"pyhelpers.{c['module']}")
     out = c["pytest_out"]
-    if src == "disgsol":  # split for he-vs-disg: disguised text in HumanEval's solution.py layout
+    if src in ("disgsol", "disgflat"):  # splits for he-vs-disg: disguised text in a flat layout named solution.py / helpers.py
+        mod = "solution" if src == "disgsol" else "helpers"
         out = re.sub(
             r"^(tests/\S+ [.F]+) +(\[100%\])$",
             lambda m: m.group(1).ljust(74) + m.group(2),
-            out.replace(test_path, "tests/test_solution.py"),
+            out.replace(test_path, f"tests/test_{mod}.py"),
             flags=re.MULTILINE,
         )
-        file, test_path = "solution.py", "tests/test_solution.py"
-        tests = _test_file(c["entry"], c["mutated"], header)
+        file, test_path = f"{mod}.py", f"tests/test_{mod}.py"
+        tests = _test_file(c["entry"], c["mutated"], header, mod)
         if cue["root"] == ROOT_DISG:
             cue["root"] = root = ROOT_HE
     out = out.replace(f"rootdir: {base_root}", f"rootdir: {root}" + (f"\n{cue['plugins']}" if cue["plugins"] else ""))
