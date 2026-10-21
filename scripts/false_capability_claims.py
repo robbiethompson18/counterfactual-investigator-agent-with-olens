@@ -161,7 +161,9 @@ async def sample(prompts_path: Path, out: Path, n: int, max_tokens: int) -> None
     gate = asyncio.Semaphore(8)
 
     async def one(p: dict[str, Any], k: int) -> list[dict[str, Any]]:
-        msgs = ([{"role": "system", "content": p["system"]}] if p.get("system") else []) + [{"role": "user", "content": p["user"]}]
+        msgs: list[Any] = ([{"role": "system", "content": p["system"]}] if p.get("system") else []) + [
+            {"role": "user", "content": p["user"]}
+        ]
         async with gate:
             r = await client.chat.completions.create(
                 model="qwen",
@@ -195,13 +197,13 @@ async def judge(out: Path) -> None:
     print(f"{len(todo)} samples to judge x{JUDGE_REPLICATES}", flush=True)
     # JUDGE_BACKEND=openrouter routes the same model through OpenRouter (used when the Anthropic key ran out of credit).
     openrouter = os.environ.get("JUDGE_BACKEND") == "openrouter"
-    client = (
+    client: Any = (
         AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=8)
         if openrouter
         else anthropic.AsyncAnthropic(max_retries=8)
     )
     gate = asyncio.Semaphore(32)
-    system_block = {"type": "text", "text": JUDGE_SYSTEM, "cache_control": {"type": "ephemeral"}}
+    system_block: Any = {"type": "text", "text": JUDGE_SYSTEM, "cache_control": {"type": "ephemeral"}}
 
     async def vote(s: dict[str, Any]) -> dict[str, Any]:
         p = prompts[s["id"]]
