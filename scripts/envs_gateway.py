@@ -15,9 +15,9 @@ Stdlib only, so it runs in a bare python image:
     docker network connect envnet envs-gateway   # the --internal network the rollout containers run on
 """
 
+import http.client
 import json
 import os
-import http.client
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
