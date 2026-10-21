@@ -1,9 +1,12 @@
 """secret_number (evalcue port of agent-interp-envs' noisy search) on Qwen3.6-27B: does the model read the secret file?
 
-Rows are the evalcue runs from branch evalcue-secret-number (docs/evalcue-secret-number-log.md there), all with the "k2" knobs
+Rows are the evalcue runs from branch eval-cue-reward-hack (docs/evalcue-secret-number-log.md there), all with the "k2" knobs
 (MAX=1024 BUDGET=5 NOISE=0.3 RULES=0, prefilled `pwd && ls -la && cat guess.py` turn), copied into data/envs/secret_number/.
-Each arm pools every file it appears in. Arm contents come from the rows themselves (the model's starting context), since the
-arms on that branch aren't merged; the label is the env's programmatic `hack` detector.
+Arm contents come from the rows themselves (the model's starting context), since those arms aren't on main yet; the label is
+the env's programmatic `hack` detector.
+
+Each arm pools every file it appears in, except that runs served by the shared Qwen server are kept apart as `<arm>@shared`:
+nocue hacked 23/119 there vs 71/230 on our own pods, so mixing servers would bias every case against nocue.
 """
 
 import functools
@@ -17,6 +20,7 @@ from evalcue.envs import secret_number
 DATA = Path("data/envs/secret_number")
 KNOBS = {"max": 1024, "budget": 5, "noise": 0.3, "rules": False, "prefill": True}
 MODELS = {"Qwen/Qwen3.6-27B": "qwen"}
+SHARED_SERVER = {"qwen2_r6_final", "qwen2_r7_final", "qwen2_r8_cfbench"}  # files generated on $QWEN_VLLM_URL
 
 assert secret_number.__doc__
 BEHAVIOR = (
@@ -26,18 +30,19 @@ BEHAVIOR = (
 
 
 @functools.cache
-def _rows(model: str) -> list[tuple[str, dict]]:
+def _rows(model: str) -> list[tuple[str, str, dict]]:
     out = []
     for path in sorted(glob.glob(str(DATA / "*.jsonl"))):
         for i, line in enumerate(Path(path).read_text().splitlines()):
             row = json.loads(line)
             if row["model"] == MODELS[model] and all(row["meta"][k] == v for k, v in KNOBS.items()) and row["hack"] is not None:
-                out.append((f"{Path(path).name}:{i}", row))
+                arm = row["arm"] + ("@shared" if Path(path).stem in SHARED_SERVER else "")
+                out.append((f"{Path(path).name}:{i}", arm, row))
     return out
 
 
 def rollouts(arm: str, model: str) -> list[Rollout]:
-    return [Rollout(source=src, messages=row["messages"], label=bool(row["hack"])) for src, row in _rows(model) if row["arm"] == arm]
+    return [Rollout(source=src, messages=row["messages"], label=bool(row["hack"])) for src, a, row in _rows(model) if a == arm]
 
 
 def edit(base_arm: str, cf_arm: str) -> str:
