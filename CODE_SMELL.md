@@ -2,6 +2,23 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: false-capability-claims scripts route Anthropic calls two ways
+
+`scripts/false_capability_claims.py` (judge) and `scripts/fcc_generate.py` (writer) each carry an
+`*_BACKEND=openrouter` switch that re-implements the same call through OpenRouter's
+OpenAI-compatible API, added overnight when the Anthropic key ran out of credit. Two code paths for
+one model; the Anthropic path also uses `output_config.effort` while the OpenRouter path uses
+`reasoning.effort`. Fold into one helper (or drop the OpenRouter path) once the key is topped up.
+Also: `report` prints `unjudged` rows when `judgments.jsonl` is partial, which hides partially
+judged prompts behind their judged count; fine for finished runs, misleading mid-run.
+## 2026-10-21: main doesn't pass its own ship checks
+
+`uv run ruff check .` reports 21 errors and `ruff format .` rewrites 6 files, all in
+`olens/src/olens/` and `transcript-viewer/`. `ty check` reports unresolved imports (torch, vllm,
+`server`) for every GPU-only script in `scripts/`, because those deps live only in the pod venvs. So
+the "run before shipping" line in CLAUDE.md can't come back clean; check only the files you touched
+until someone fixes these or excludes the pod-only modules.
+
 ## 2026-10-21: `evalcue/` harness rough edges
 
 - `harness.chat()` has no retry: transient `APIConnectionError`s under load (about 5–10% of rows in
