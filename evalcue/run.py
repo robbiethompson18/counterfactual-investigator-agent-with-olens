@@ -15,10 +15,10 @@ from evalcue import harness
 
 ap = argparse.ArgumentParser()
 ap.add_argument("env")
-ap.add_argument("--n", type=int, default=50, help="samples per arm")
+ap.add_argument("--n", type=int, default=10, help="samples per arm; start small, crank up for the best arms")
 ap.add_argument("--arms", default=None, help="comma-separated; default env.ARMS (first = baseline)")
 ap.add_argument("--thinking", type=int, default=1)
-ap.add_argument("--max-tokens", type=int, default=None, help="per generation; default 8192 thinking / 2048 not")
+ap.add_argument("--max-tokens", type=int, default=None, help="per generation; default: no cap beyond the 262k context")
 ap.add_argument("--tag", default="dev")
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--concurrency", type=int, default=64)
@@ -35,10 +35,16 @@ if a.rescore:
     a.rescore.write_text("".join(json.dumps(r) + "\n" for r in rows))
 else:
     out = Path(f"data/runs/evalcue/{a.env}/{a.tag}.jsonl")
-    max_tokens = a.max_tokens or (8192 if a.thinking else 2048)
     asyncio.run(
         harness.run_batch(
-            env, arms=arms, n_per_arm=a.n, thinking=bool(a.thinking), max_tokens=max_tokens, out=out, concurrency=a.concurrency, seed=a.seed
+            env,
+            arms=arms,
+            n_per_arm=a.n,
+            thinking=bool(a.thinking),
+            max_tokens=a.max_tokens,
+            out=out,
+            concurrency=a.concurrency,
+            seed=a.seed,
         )
     )
     rows = [r for r in harness.load_rows(out) if r["seed"] == a.seed and r["thinking"] == bool(a.thinking)]

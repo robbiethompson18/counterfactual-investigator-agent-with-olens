@@ -34,8 +34,8 @@ checking whether a cue generalizes.
 
 - **Programmatic labels.** Hack detection runs code, diffs files or matches strings; no LLM judge on
   transcripts. Read CoTs by hand to spot-check the detector.
-- **It replicates.** A difference found during search gets a fresh-seed confirmation before we claim
-  it: n ≥ 50 per arm, same arms, new samples. Search freely, then confirm the winner.
+- **try lots of things, iterate fast** Once you've sanity-checked your arm, just run 10 qwen
+  trajectories over it to see how it does.
 - **For eval-cue arms specifically:**
   - A same-size placebo edit in the same spot doesn't produce the effect.
   - A split test shows the eval meaning is what matters. Strip the eval framing and keep the rest:

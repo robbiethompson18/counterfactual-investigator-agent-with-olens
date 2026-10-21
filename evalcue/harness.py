@@ -25,12 +25,12 @@ from scipy.stats import fisher_exact, norm
 
 # one OpenAI-compatible vLLM endpoint per pod, tunnelled to localhost; requests round-robin across them
 URLS = os.environ.get("EVALCUE_URLS", "http://127.0.0.1:18000/v1,http://127.0.0.1:18001/v1").split(",")
-CLIENTS = [AsyncOpenAI(base_url=u, api_key="none", timeout=1800) for u in URLS]
+CLIENTS = [AsyncOpenAI(base_url=u, api_key="none", timeout=6 * 3600) for u in URLS]  # 100k+ token thinking traces take hours under load
 MODEL = "qwen"
 # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
 if os.environ.get("EVALCUE_MODEL"):
     MODEL = os.environ["EVALCUE_MODEL"]
-    CLIENTS = [AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=1800)]
+    CLIENTS = [AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)]
 SANDBOX_IMAGE = "evalcue-sandbox"  # built from evalcue/Dockerfile: python 3.12 + pytest + numpy + git
 # Qwen3.6 model-card sampling defaults per mode
 SAMPLING = {True: (1.0, 0.95, 0.0), False: (0.7, 0.8, 1.5)}  # (temperature, top_p, presence_penalty), top_k 20 for both
@@ -62,7 +62,7 @@ def _client(i: int) -> AsyncOpenAI:
 _counter = 0
 
 
-async def chat(messages, *, thinking: bool, max_tokens: int, tools=None):
+async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
     global _counter
     _counter += 1
     temperature, top_p, presence_penalty = SAMPLING[thinking]
@@ -72,7 +72,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int, tools=None):
     r = await _client(_counter).chat.completions.create(
         model=MODEL,
         messages=messages,
-        max_tokens=max_tokens,
+        max_tokens=max_tokens or omit,  # None: up to the server's context limit
         tools=tools or omit,
         temperature=temperature,
         top_p=top_p,
@@ -164,7 +164,7 @@ def last_python_block(text: str) -> str | None:
 # ---------- running ----------
 
 
-async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int) -> dict:
+async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) -> dict:
     msgs = [dict(m) for m in ep.messages]
     if not ep.files:
         msg, finish, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens)
@@ -313,10 +313,7 @@ def summarize(rows, arms):
         print(f"  {arm:>10}: {rate}  unscorable {len(ar) - len(sc)}  truncated {trunc}")
     out = [compare(scored, a, arms[0]) for a in arms[1:]]
     for c in out:
-        print(
-            f"  {c['a']} vs {c['b']}: diff {c['diff_pp']:+.1f}pp  LR(hack) {c['lr_hack']}  LR(nohack) {c['lr_nohack']}  "
-            f"fisher p={c['fisher_p']:.2g}  cmh p={c['cmh_p']:.2g}  wins={c['wins']}  SUCCESS={c['success']}"
-        )
+        print(f"  {c['a']} vs {c['b']}: diff {c['diff_pp']:+.1f}pp  (fisher p={c['fisher_p']:.2g}, for reference)")
     return out
 
 
