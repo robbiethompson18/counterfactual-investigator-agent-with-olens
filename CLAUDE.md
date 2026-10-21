@@ -196,8 +196,8 @@ Current docs:
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
-  — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm configs,
-  Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+  — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
+  configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
