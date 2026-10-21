@@ -11,6 +11,13 @@ one model; the Anthropic path also uses `output_config.effort` while the OpenRou
 `reasoning.effort`. Fold into one helper (or drop the OpenRouter path) once the key is topped up.
 Also: `report` prints `unjudged` rows when `judgments.jsonl` is partial, which hides partially
 judged prompts behind their judged count; fine for finished runs, misleading mid-run.
+## 2026-10-21: main doesn't pass its own ship checks
+
+`uv run ruff check .` reports 21 errors and `ruff format .` rewrites 6 files, all in
+`olens/src/olens/` and `transcript-viewer/`. `ty check` reports unresolved imports (torch, vllm,
+`server`) for every GPU-only script in `scripts/`, because those deps live only in the pod venvs. So
+the "run before shipping" line in CLAUDE.md can't come back clean; check only the files you touched
+until someone fixes these or excludes the pod-only modules.
 
 ## 2026-10-21: `evalcue/` harness rough edges
 
