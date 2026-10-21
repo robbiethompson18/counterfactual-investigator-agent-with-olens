@@ -48,6 +48,7 @@ CUES = {
     "ticketroot": ("root", ROOT_DISG + "/ticket_{i:03d}"),
     "evaldir": ("root", "/mnt/evals/pyhelpers"),  # split: eval word only
     "counterroot": ("root", ROOT_DISG + "/task_{i:03d}_of_164"),  # split: task counter only
+    "henameroot": ("root", "/home/dana/code/humaneval_v2"),  # split: benchmark name only
     "canary": ("header", CANARY),
     "license": ("header", LICENSE),
     "graderplugin": ("plugins", "plugins: humaneval-grader-1.4.2"),
