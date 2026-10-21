@@ -27,6 +27,10 @@ extend-select = [
   "E501",  # line too long — not in ruff's defaults, and `ruff format` never wraps strings/comments
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# throwaway agent-written experiment scripts full of long prompt strings; see CODE_SMELL.md 2026-10-21
+"scripts/identity/**" = ["E501", "SIM115", "B023", "C408"]
+
 [tool.uv.workspace]
 members = [
     "vendor/detective-joracle",

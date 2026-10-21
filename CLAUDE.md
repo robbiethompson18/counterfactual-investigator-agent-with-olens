@@ -201,6 +201,12 @@ Current docs:
   — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
+- [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
+  — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
+  silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
+- [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
+  — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
+  scores
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod

@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: `scripts/identity/` is exempt from four lint rules
+
+The identity-belief experiment scripts were written by ~10 parallel agents in one afternoon. They
+carry long prompt strings (E501), bare `open()` calls (SIM115) and a few late-binding closures in
+loops (B023), so `pyproject.toml` exempts `scripts/identity/**` from E501, SIM115, B023 and C408. If
+any of these scripts graduates into a reused tool, move it out of `scripts/identity/` and lint it
+properly.
+
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
