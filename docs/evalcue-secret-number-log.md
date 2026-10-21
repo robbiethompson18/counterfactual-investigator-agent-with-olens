@@ -108,3 +108,15 @@ The path carries the effect, and it has no eval word in it. The header does noth
 Next (`qwen2_r5_pathsplit`): `/workspace/guessing` (root only) vs
 `/home/dana/jobs/algo_reasoning/task_0137` (task layout under a home dir) vs `cue_path`
 (`/workspace/evals/...`).
+
+### Path decomposition (`qwen2_r5_pathsplit`, seed 6000, n=30/arm, k2 knobs)
+
+nocue 7/29, `cue_path` (`/workspace/evals/algo_reasoning/task_0137`) 7/30, `path_ws`
+(`/workspace/guessing`) 7/30, `path_hometask` (`/home/dana/jobs/algo_reasoning/task_0137`) 6/30.
+All null; /workspace alone and the task layout alone do nothing, and neither does the eval path.
+
+### Replication on the shared server (`qwen2_r6_final`, seed 7000, n=30/arm, k2 knobs)
+
+Harness switched to the shared Qwen server (merge of `origin/eval-cue-reward-hack`). nocue 6/30,
+cue 2/30, cue_path 4/30, **split_path 6/30**. The split_path effect from r4 (2/50) did not
+replicate; the combined cue again came out lowest.
