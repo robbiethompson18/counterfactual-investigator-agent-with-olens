@@ -168,7 +168,7 @@ details.gt{margin-top:8px;font-size:13px} details.gt summary{cursor:pointer;colo
 .jl{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
 .jl td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top;word-break:break-word}
 .jl td:first-child{color:var(--ink3);white-space:nowrap;width:1%}
-body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn){display:none !important}
+body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn,#xbtn){display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
@@ -214,7 +214,8 @@ const STATIC = window.WCO_STATIC;
 const staticFile = p => { const u = new URL(p, location.href), q = u.searchParams;
   return {'/api/patterns': 'patterns', '/api/overview': 'overview', '/api/pattern': `pattern/${q.get('i')}`,
           '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`,
-          '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`}[u.pathname]; };
+          '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`,
+          '/api/extras': `x/${q.get('tid')}/${Math.floor(q.get('pos') / 64)}`}[u.pathname]; };
 const api = async (p, body) => {
   if (STATIC) {
     const f = !body && staticFile(p); if (!f) throw new Error('read-only snapshot');
@@ -727,7 +728,8 @@ async function reloadReads(){ const tr = await api('/api/transcript?tid=' + enco
 async function showExtras(pos){
   const tid = st.tr.tid, have = st.tr.extras && st.tr.extras.includes(pos);
   if (!have) return;
-  const x = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  const res = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  const x = STATIC ? res[pos] || {} : res;  // the snapshot serves a chunk of 64 tokens (extras.chunk)
   if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
   $('#xbox').innerHTML = extrasHtml(x);
   const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };
