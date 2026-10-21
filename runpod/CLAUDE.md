@@ -18,10 +18,15 @@ One vLLM server serves Qwen3.6-27B chat completions to every agent: pod `qwen-sh
 three or four agents each ran their own mostly idle vLLM pod and each rediscovered the same startup
 bugs.
 
-- Point clients at `$QWEN_VLLM_URL` with key `$QWEN_VLLM_API_KEY`, both in `.envrc.local`. The model
-  name is `qwen` or `Qwen/Qwen3.6-27B`. It has 262k context, parses reasoning (`reasoning_content`)
-  and tool calls (`qwen3_coder`), and uses prefix caching. Sampling defaults come from the model's
-  generation config; pass your own per request.
+- **The one client standard:** Python code samples Qwen via
+  `counterfactual_investigator_agent_with_olens.qwen.client()`. It reads `$QWEN_VLLM_URL` and
+  `$QWEN_VLLM_API_KEY` from `.envrc.local` and sets the TCP keepalives and long timeout every client
+  needs. Non-Python clients (e.g. the envs gateway in a container) take those same two env vars. No
+  hardcoded `localhost:18000`/`28000` tunnels, replica lists or other URL env vars: vLLM balances
+  its replicas behind one URL.
+- The model name is `qwen` (or `Qwen/Qwen3.6-27B`). The server has 262k context, parses reasoning
+  (`reasoning_content`) and tool calls (`qwen3_coder`), and uses prefix caching. Sampling is
+  per-experiment: pass it per request. The server default is Qwen's generation config.
 - Check it's up with `runpod/qwen_server.sh status`. If it's down, bring it up with
   `runpod/qwen_server.sh up`, then write `runpod/qwen_server.sh url` into `QWEN_VLLM_URL` in
   `.envrc.local`. Every checkout symlinks to the main checkout's `.envrc.local`, so they all pick up
@@ -31,8 +36,8 @@ bugs.
 - It uses a raw TCP port, not RunPod's `-8000.proxy.runpod.net` HTTP proxy, which cuts requests off
   at about 100 s.
 - Long non-streaming requests go silent for minutes while vLLM generates, and something on the path
-  drops idle connections. Clients should set TCP keepalives or stream (the envs gateway does the
-  former).
+  drops idle connections. That's why the client sets keepalives. A raw client must set them too, or
+  stream.
 
 ### Bringing up any pod: check progress every 3 minutes
 

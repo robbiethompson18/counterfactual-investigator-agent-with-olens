@@ -12,7 +12,7 @@ PROMPTS.json is a list of {"id", "user", ...tags}. Tags used by `report`: "pair"
 by a trigger/control pair) and "condition" ("trigger" | "control"); anything else is carried along.
 OUT_DIR gets prompts.json (copy), samples.jsonl and judgments.jsonl.
 
-Env: QWEN_VLLM_URL (default http://localhost:8000/v1), QWEN_VLLM_API_KEY, ANTHROPIC_API_KEY.
+Env: QWEN_VLLM_URL + QWEN_VLLM_API_KEY (the shared Qwen server, runpod/CLAUDE.md), ANTHROPIC_API_KEY.
 """
 
 import asyncio
@@ -28,6 +28,8 @@ from typing import Any
 
 import anthropic
 from openai import AsyncOpenAI
+
+from counterfactual_investigator_agent_with_olens import qwen
 
 JUDGE_MODEL = "claude-sonnet-5-5"
 JUDGE_REPLICATES = 3
@@ -156,8 +158,7 @@ async def sample(prompts_path: Path, out: Path, n: int, max_tokens: int) -> None
     done = defaultdict(int)
     for row in load_jsonl(samples_path):
         done[row["id"]] += 1
-    base_url = os.environ.get("QWEN_VLLM_URL", "http://localhost:8000/v1")
-    client = AsyncOpenAI(base_url=base_url, api_key=os.environ["QWEN_VLLM_API_KEY"], timeout=1800)
+    client = qwen.client(timeout=1800)
     gate = asyncio.Semaphore(8)
 
     async def one(p: dict[str, Any], k: int) -> list[dict[str, Any]]:
