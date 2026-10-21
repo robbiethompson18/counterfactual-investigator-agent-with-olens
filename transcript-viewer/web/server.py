@@ -24,8 +24,13 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import chive
+import extras
+import followups
 import organisms
 import pyarrow.parquet as pq
+import steer
+import thinking
+from judge import Judge
 from transformers import AutoTokenizer
 
 HERE = Path(__file__).resolve().parent
@@ -34,16 +39,27 @@ HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
 CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
+FOLLOWUPS = ROOT / "data/followups.jsonl"  # scripts/followups.py: "why did you do that?" turns on favourite transcripts
+THINKING = ROOT / "data/thinking.jsonl"  # scripts/thinking.py: favourites resampled with thinking on
 # The files above are this machine's; other machines' copies come from the HF dataset (scripts/publish.py) as
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
 MACHINE = os.environ.get("WCO_MACHINE") or socket.gethostname().split(".")[0].lower()
-KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE, "chive_judge": chive.JUDGE}
+KINDS = {
+    "reads": CACHE,
+    "rollouts": CLAUDE,
+    "stance": STANCE,
+    "chive_judge": chive.JUDGE,
+    "followups": FOLLOWUPS,
+    "thinking": THINKING,
+    "extras": extras.CACHE,
+}
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
 PRE_LAYERS = [40]  # precomputed on every highlight transcript (see precompute())
 PRE_BATCH = 96
+NEWLINE = re.compile(r"^\s*\n\s*$")
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
 # GPT-2 byte-level BPE alphabet (bytes_to_unicode, inverted): token char -> raw byte
 _KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
@@ -52,6 +68,7 @@ BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for
 S = {"reads": {}, "by_tid": {}, "pre": {"state": "idle", "done": 0, "total": 0}}
 LOCK = threading.Lock()
 POD = None
+JPP_LOCAL = None  # web/run_lens.sh --extras jpp on this machine, for J++ only
 
 
 # ---------------------------------------------------------------------- data
@@ -110,8 +127,11 @@ def render(tid):
         "zones": zones,
         "truncated": truncated,
         # the end-of-turn zone the list previews and a transcript opens on: after the user's (last) message.
-        # Organisms have a system prompt first, so it's the second-to-last zone there
-        "main_zone": len(zones) - 2 if "organism" in t else 0,
+        # Organisms have a system prompt first and follow-ups a second user turn, so it's the second-to-last zone there;
+        # the same for thinking resamples, unless the reply hit the cap and has no <|im_end|> of its own
+        "main_zone": len(zones) - (1 if t.get("thinking", {}).get("hit_cap") else 2)
+        if {"organism", "followup", "thinking"} & t.keys()
+        else 0,
         "focus": [0, len(t["messages"]) - 1],  # messages whose punctuation is worth reading
     }
     S["rendered"][tid] = out
@@ -389,9 +409,10 @@ QUEUE_LAYERS = [24, 32, 40, 48, 56]
 
 
 def relevant_positions(tid):
-    """End-of-turn zones + punctuation in the focus messages (WeirdChat: both turns): where the lens reads best."""
+    """End-of-turn zones + punctuation and newlines in the focus messages (WeirdChat: both turns): where the lens reads best."""
     r = render(tid)
-    return sorted({i for a, b in r["zones"] for i in range(a, b)} | {i for k in r["focus"] for i in punct_positions(r, k)})
+    newlines = {i for k in r["focus"] if r["msgs"][k] for i in range(*r["msgs"][k]) if NEWLINE.match(r["tokens"][i])}
+    return sorted({i for a, b in r["zones"] for i in range(a, b)} | {i for k in r["focus"] for i in punct_positions(r, k)} | newlines)
 
 
 def queue_items(tid, positions, layers, src):
@@ -409,12 +430,12 @@ def title_of(tid):
     return f"{p['title'] if p else t['pattern_id']} · {tid.split('/')[-1]}"
 
 
-def read_chunk(items):
-    """Read queue items on the viewer's own pod: one capture per transcript."""
+def read_chunk(items, pod=None):
+    """Read queue items on the viewer's own pod (or `pod`): one capture per transcript."""
     jobs = {}
     for it in items:
         jobs.setdefault(it["tid"], []).append({"pos": it["pos"], "layer": it["layer"]})
-    res = POD.call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
+    res = (pod or POD).call("/read_multi", {"jobs": [{"ids": render(t)["ids"], "items": its} for t, its in jobs.items()]})
     recs = []
     for (tid, its), out, norms in zip(jobs.items(), res["results"], res["norms"]):
         toks = render(tid)["tokens"]
@@ -471,7 +492,7 @@ def pattern_summary(p):
         "elo": {k: round(v["elo"]) for k, v in e.items() if isinstance(v, dict) and v.get("elo") is not None},
         "elo_mean": e.get("mean"),
         "search": p["description"] + " " + p["representative_user_text"],
-        **({"organism": p["organism"]} if "organism" in p else {}),
+        **{k: p[k] for k in ("organism", "followup", "thinking") if k in p},
     }
 
 
@@ -493,6 +514,26 @@ def pattern_detail(i):
                 "explanation": t["judgment"]["explanation"],
                 "preview": t["messages"][-1]["content"][:160],
                 **({"organism": {k: t["organism"][k] for k in ("key", "kind", "prompt", "sample", "read")}} if "organism" in t else {}),
+                **({"followup": t["followup"]} if "followup" in t else {}),
+                **({"thinking": t["thinking"]} if "thinking" in t else {}),
+            }
+        )
+    # behaviour rate per prompt: judged rollouts of that prompt (~64 each) that matched
+    prompts = []
+    for pid, k in pidx.items():
+        ts = [t for t in trs if t["prompt"] == k]
+        pr = S["prompts"].get(pid) or {}
+        user = (
+            next((m["content"] for m in (pr.get("messages") or []) if m["role"] == "user"), None)
+            or S["trs"][ts[0]["tid"]]["messages"][0]["content"]
+        )
+        prompts.append(
+            {
+                "idx": k,
+                "n": len(ts),
+                "matched": sum(t["match"] for t in ts),
+                "text": user[:400],
+                "highlight": any(t["highlight"] for t in ts),
             }
         )
     return dict(
@@ -503,6 +544,7 @@ def pattern_detail(i):
         metrics=p["metrics"],
         openrouter=p["openrouter_replication"],
         transcripts=trs,
+        prompts=prompts,
     )
 
 
@@ -558,7 +600,13 @@ def transcript(tid):
         url=t["weirdchat_url"],
         claude=claude_rollouts(t["prompt_id"]),
         stance=stance(tid),
+        extras=sorted(extras.of(tid)),
+        prompt_rate=prompt_rate(t["prompt_id"]),
     )
+    if "followup" in t:
+        out["followup"] = t["followup"]
+    if "thinking" in t:
+        out["thinking"] = t["thinking"]
     if "organism" in t:  # reads on base Qwen's activations over the same tokens; the response tokens that were read
         zone = {i for a, b in r["zones"] for i in range(a, b)}
         out.update(
@@ -568,6 +616,53 @@ def transcript(tid):
             user_punct=0,
         )
     return out
+
+
+def prompt_rate(pid):
+    pr = S["prompts"].get(pid) or {}
+    m = pr.get("match_summary") or {}
+    return {"n": m.get("n_samples"), "matched": m.get("n_matched")} if m else None
+
+
+def prompt_ids(tid):
+    """The rendered transcript up to the start of the assistant's reply (generation prompt included)."""
+    r = render(tid)
+    return r["ids"][: r["msgs"][-1][0]]
+
+
+def user_messages(tid):
+    return [{"role": m["role"], "content": m["content"]} for m in S["trs"][tid]["messages"][:-1]]
+
+
+def judge_for(tid):
+    return Judge.from_env(S["rubrics"][S["trs"][tid]["behavior_id"]])
+
+
+def judge_calib(tid):
+    """Judge WeirdChat's own rollouts of this transcript's prompt and compare with its labels."""
+    t = S["trs"][tid]
+    S.setdefault("calib", {})[tid] = {"state": "running"}
+    try:
+        j = judge_for(tid)
+        if j is None:
+            raise RuntimeError("no judge configured (WCO_JUDGE_URL)")
+        sib = [x for x in S["trs"].values() if x["prompt_id"] == t["prompt_id"] and x["judgment"]["match"] is not None]
+        out = j.judge_many(user_messages(tid), [x["messages"][-1]["content"] or "" for x in sib])
+        pairs = [(bool(x["judgment"]["match"]), o["match"]) for x, o in zip(sib, out) if o["match"] is not None]
+        n = len(pairs)
+        agree = sum(a == b for a, b in pairs) / n if n else None
+        pa, pb = (sum(a for a, _ in pairs) / n, sum(b for _, b in pairs) / n) if n else (0, 0)
+        pe = pa * pb + (1 - pa) * (1 - pb)
+        S["calib"][tid] = {
+            "state": "done",
+            "n": n,
+            "weirdchat_rate": pa,
+            "judge_rate": pb,
+            "agree": agree,
+            "kappa": (agree - pe) / (1 - pe) if n and pe < 1 else None,
+        }
+    except Exception as e:  # noqa: BLE001  (worker boundary: report and keep going)
+        S["calib"][tid] = {"state": "error", "error": f"{type(e).__name__}: {e}"}
 
 
 class H(BaseHTTPRequestHandler):
@@ -603,12 +698,29 @@ class H(BaseHTTPRequestHandler):
                 return self.send(chive.bank_chunk(q["tid"], q["reader"], int(q["chunk"])))
             if u.path == "/api/queue":
                 return self.send(S["queue"].summary(title_of))
+            if u.path == "/style.css":  # the viewer's stylesheet, shared with the case page
+                h = (HERE / "index.html").read_text()
+                return self.send(h[h.index("<style>") + 7 : h.index("</style>")], "text/css; charset=utf-8")
+            if u.path in ("/case", "/case.html"):  # one transcript, every lens side by side
+                return self.send((HERE / "case.html").read_bytes(), "text/html; charset=utf-8")
+            if u.path == "/api/vectors":
+                return self.send({"vectors": steer.vectors(), "judge": bool(os.environ.get("WCO_JUDGE_URL"))})
+            if u.path == "/api/steer":  # runs for a transcript's prompt; texts only with ?full=1
+                rs = steer.runs(q["tid"])
+                if not q.get("full"):
+                    rs = [{k: v for k, v in r.items() if k not in ("texts", "explanations")} for r in rs]
+                return self.send({"runs": rs, "calib": S.get("calib", {}).get(q["tid"])})
+            if u.path == "/api/extras_all":  # every cached NLA / J++ read of a transcript
+                return self.send(extras.of(q["tid"]))
+            if u.path == "/api/extras":  # cached NLA / J++ reads of one token
+                return self.send(extras.of(q["tid"]).get(int(q["pos"]), {}))
             if u.path == "/api/status":
                 return self.send(
                     {
                         "pod": POD.status() if POD else {"state": "disabled"},
                         "pre": S["pre"],
                         "n_reads": len(S["reads"]),
+                        "jpp_local": bool(JPP_LOCAL and JPP_LOCAL.ready()),
                         "queue": {k: v for k, v in S["queue"].summary(title_of, top=0).items() if k != "rows"},
                     }
                 )
@@ -624,6 +736,57 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/read":
                 recs = read(req["tid"], req["items"], float(req.get("temperature", 0)), int(req.get("n", 1)), int(req.get("seed", 0)))
                 return self.send({"reads": recs})
+            if p == "/api/score_edit":  # FVE of edited lens text: {tid, pos, layer, text, lens: olens|nla}
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                ids = render(req["tid"])["ids"]
+                if req.get("lens") == "nla":
+                    return self.send(POD.call("/nla_score", {"ids": ids, "pos": int(req["pos"]), "text": req["text"]}))
+                res = POD.call(
+                    "/rescore",
+                    {"jobs": [{"ids": ids, "items": [{"pos": int(req["pos"]), "layer": int(req["layer"]), "texts": [req["text"]]}]}]},
+                )
+                return self.send(res["results"][0][0][0])
+            if p == "/api/contrib":  # per-block attention / MLP writes at one token: {tid, pos}
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
+                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs}))
+            if p == "/api/vector":
+                return self.send(steer.build(POD, req.get("name"), req["spec"]))
+            if p == "/api/vector/delete":
+                steer.delete(req["vid"])
+                return self.send({"ok": True})
+            if p == "/api/probe":
+                return self.send(steer.probe(POD, req["tid"], render(req["tid"])["ids"], req["vid"]))
+            if p == "/api/steer":
+                tid = req["tid"]
+                return self.send(
+                    steer.start(
+                        POD,
+                        judge_for(tid),
+                        tid,
+                        prompt_ids(tid),
+                        user_messages(tid),
+                        req.get("vid"),
+                        req.get("alpha", 0),
+                        int(req.get("n", 64)),
+                    )
+                )
+            if p == "/api/judge_calib":  # judge WeirdChat's stored rollouts of this prompt, compare labels
+                tid = req["tid"]
+                threading.Thread(target=judge_calib, args=(tid,), daemon=True).start()
+                return self.send({"started": True})
+            if p == "/api/extras":  # NLA + J++ on the pod: {tid, positions, kinds?}
+                r = render(req["tid"])
+                pos = [int(x) for x in req["positions"]]
+                kinds = tuple(req.get("kinds") or ("nla", "jpp"))
+                out = {}
+                for k in kinds:  # J++ can run on this machine's GPU (--jpp-local), the NLA needs the pod
+                    pod = JPP_LOCAL if k == "jpp" and JPP_LOCAL and JPP_LOCAL.ready() else POD
+                    for q, x in extras.read(pod, S["tok"], req["tid"], r["ids"], pos, (k,)).items():
+                        out.setdefault(q, {}).update(x)
+                return self.send({"extras": out})
             if p == "/api/pod/start" and POD:
                 return self.send(dict(started=POD.start(), **POD.status()))
             if p == "/api/pod/stop" and POD:
@@ -632,7 +795,13 @@ class H(BaseHTTPRequestHandler):
                 tid = req["tid"]
                 no_live_reads(tid)
                 layers = [int(L) for L in req.get("layers") or QUEUE_LAYERS if int(L) in LAYERS]
-                pos = relevant_positions(tid) if req.get("scope", "relevant") == "relevant" else [int(x) for x in req["positions"]]
+                scope = req.get("scope", "relevant")
+                if scope == "relevant":
+                    pos = relevant_positions(tid)
+                elif scope == "all":  # every token of the rendered transcript
+                    pos = list(range(len(render(tid)["ids"])))
+                else:
+                    pos = [int(x) for x in req["positions"]]
                 n = S["queue"].add(queue_items(tid, pos, layers, "user"), front=True)
                 return self.send(dict(added=n, **S["queue"].summary(title_of)))
             if p == "/api/queue/bulk":  # from scripts/fleet.py: to the back
@@ -676,6 +845,8 @@ def init():
     }
     load()
     organisms.load(S, key)
+    followups.load(S, [json.loads(line) for p in shards("followups") for line in p.open()])
+    thinking.load(S, [json.loads(line) for p in shards("thinking") for line in p.open()])
     for p in [p for p in shards("reads") if p != CACHE]:
         for line in p.open():
             r = json.loads(line)
@@ -686,15 +857,19 @@ def init():
 
 
 def main():
-    global POD
+    global POD, JPP_LOCAL
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8803)
     ap.add_argument("--bind", nargs="+", default=os.environ.get("WCO_BIND", "127.0.0.1").split())
     ap.add_argument("--no-pod", action="store_true")
+    ap.add_argument("--jpp-local", action="store_true", help="J++ reads go to a lens server on this machine (web/run_lens.sh --extras jpp)")
     ap.add_argument("--local", action="store_true", help="reads go to a lens server on this machine (web/run_lens.sh)")
     args = ap.parse_args()
     t0 = time.time()
     init()
+    extras.load(shards("extras"))
+    steer.load()
+    S["rubrics"] = {r["behavior_id"]: r["transcript_rubric"]["text"] for r in pq.read_table(HF / "rubrics.parquet").to_pylist()}
     from readq import ReadQueue
 
     S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])
@@ -703,6 +878,10 @@ def main():
     import sys
 
     sys.path.insert(0, str(HERE))
+    if args.jpp_local:
+        from local import Local
+
+        JPP_LOCAL = Local()
     if args.local:
         from local import Local
 

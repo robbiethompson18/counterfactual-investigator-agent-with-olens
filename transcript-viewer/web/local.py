@@ -9,12 +9,12 @@ URL = "http://127.0.0.1:8802"
 
 
 class Local:
-    def __init__(self):
-        self.server = {}
+    def __init__(self, url=URL):
+        self.url, self.server = url, {}
 
     def _get(self):
         try:
-            with urllib.request.urlopen(URL + "/status", timeout=5) as r:
+            with urllib.request.urlopen(self.url + "/status", timeout=5) as r:
                 self.server = json.loads(r.read())
         except Exception:  # noqa: BLE001  (server/worker boundary: report and keep going)
             self.server = {}
@@ -37,7 +37,7 @@ class Local:
 
     def call(self, path, body=None, timeout=7200):
         req = urllib.request.Request(
-            URL + path, data=None if body is None else json.dumps(body).encode(), headers={"Content-Type": "application/json"}
+            self.url + path, data=None if body is None else json.dumps(body).encode(), headers={"Content-Type": "application/json"}
         )
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:

@@ -26,3 +26,6 @@ dist/
 
 # run logs
 outputs/
+
+# Hugging Face token (local only)
+hf.key
