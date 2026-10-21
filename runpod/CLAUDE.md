@@ -33,6 +33,12 @@ Gotchas:
 - The image sets `HF_HOME=/workspace/.cache/huggingface` (and `up` copies it into
   `/etc/environment`). Don't set a different `HF_HOME` on the pod: it downloads everything twice,
   and Qwen3.6-27B (52 GB) twice plus the ceselder NLA repo (69 GB) fills the 200 GB disk.
+- RunPod containers see all the host's cores (96 on an H200 node) but get a ~10-core CPU quota.
+  torch starts a thread per visible core, so CPU work (the O-lens whiteners' float64 `eigh`)
+  thrashes: `pod/server.py` took 46+ min to load instead of 44 s. Start it with
+  `OMP_NUM_THREADS=10`.
+- vLLM's Qwen3.6 linear-attention kernels JIT-compile with `ninja`: put the venv's `bin/` on `PATH`,
+  and expect ~10 min of compiling on the first run.
 - If ssh to a pod drops or times out, check `runpodctl user` (balance) and `runpodctl pod list`
   before retrying: at a balance ≤ 0 RunPod deletes every pod on the account.
 - For O-lens reads on a pod, follow `olens/README.md` (deps, `scripts/download.sh`,

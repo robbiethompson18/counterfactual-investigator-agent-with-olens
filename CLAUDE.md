@@ -104,10 +104,18 @@ incidents with every transcript-only and O-lens draw, filterable and linkable by
 `viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy
 with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
 
+O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
+token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is its old name and
+301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…` hash.
+Source is `transcript-viewer/web/index.html`, deployed by
+`transcript-viewer/scripts/deploy_site.sh`.
+
 ## Stack
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
+- `.githooks/pre-commit` runs ruff on staged Python files. Enable it once per clone with
+  `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
@@ -159,10 +167,17 @@ Current docs:
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
+- [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
+  — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
+  self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
 - [WSB association examples — read before running the O-lens on WorkspaceBench association families](docs/wsb-association-examples.md)
   — 9 unjudged items, s3d.ddp600 readouts on HF, what they say, pod/pip gotchas
+- [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
+  — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
+- [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
+  — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
