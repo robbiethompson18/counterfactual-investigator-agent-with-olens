@@ -39,6 +39,19 @@ bugs.
   drops idle connections. That's why the client sets keepalives. A raw client must set them too, or
   stream.
 
+### vLLM version: the live server stays on 0.25.1 for now
+
+The live `qwen-shared` pod is the older pip-installed vLLM 0.25.1 recipe (runpod/pytorch image, venv
+in `/workspace/vllm-env`), not the image below. On 2026-10-21, `vllm/vllm-openai:v0.32.0` decoded
+about 3x slower per GPU than 0.25.1 on the same load test (1,508 vs ~3,900 output tok/s at 128-256
+concurrent per GPU; 25 vs ~50 tok/s per stream at 32 per GPU), with the same attention backend and
+KV cache size. Until that's understood, don't move the shared server to 0.32. Run `up` with
+`IMAGE=vllm/vllm-openai:v0.25.1` to get the fast boot on the old version.
+
+Don't run `runpod/qwen_server.sh restart` on the live `qwen-shared` pod: the boot script now expects
+the vllm image. To restart vLLM there, ssh in and run its own
+`API_KEY=... nohup bash /workspace/qwen_server_boot.sh > /workspace/boot.log 2>&1 < /dev/null &`.
+
 ### How it boots in ~3 minutes
 
 `up` creates the pod through RunPod's REST API (runpodctl can't set a start command) from the
