@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
 # The shared Qwen3.6-27B vLLM server, pod "qwen-shared". Use it instead of starting your own; see runpod/CLAUDE.md.
-#   runpod/qwen_server.sh up [GPU_COUNT]   # create (default 2x H200) and boot; ~15 min to serving
+#   runpod/qwen_server.sh up [GPU_COUNT]   # create (default 2x H200) on the cache volume; ~3 min to serving
 #   runpod/qwen_server.sh url              # print QWEN_VLLM_URL (raw TCP, not RunPod's HTTP proxy)
 #   runpod/qwen_server.sh status           # one progress line; run every 3 min while booting
-#   runpod/qwen_server.sh restart          # re-upload and re-run the boot script (keeps the venv and weights)
+#   runpod/qwen_server.sh restart          # re-upload and re-run the boot script on the running pod
 #   runpod/pod.sh down qwen-shared         # stop paying for it
 # Needs RUNPOD_API_KEY and QWEN_VLLM_API_KEY (.envrc.local); the latter is the server's API key.
 set -euo pipefail
-NAME=qwen-shared
-
-boot() {
-  runpod/pod.sh ssh $NAME 'cat > /workspace/qwen_server_boot.sh' < runpod/qwen_server_boot.sh
-  runpod/pod.sh ssh $NAME "API_KEY=$QWEN_VLLM_API_KEY nohup bash /workspace/qwen_server_boot.sh > /workspace/boot.log 2>&1 < /dev/null &"
-}
+NAME=${NAME:-qwen-shared}
+VOLUME=wwwce2mejb  # network volume "qwen-fastboot" in US-CA-2: weights + compile caches
 
 case ${1:?command} in
   up)
-    PORTS=22/tcp,8000/tcp runpod/pod.sh up $NAME "NVIDIA H200" "${2:-2}"
-    boot
+    # runpodctl can't set a start command, so create through the REST API. The image's entrypoint is vllm; run the boot script
+    # instead, in a subshell so the container (and sshd) stays up if it fails.
+    jq -n --rawfile boot runpod/qwen_server_boot.sh --arg name "$NAME" --argjson n "${2:-2}" --arg vol $VOLUME \
+      --arg key "$QWEN_VLLM_API_KEY" --arg hf "$(hf auth token 2>/dev/null)" '{
+        name: $name, imageName: "vllm/vllm-openai:v0.32.0", gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
+        networkVolumeId: $vol, volumeMountPath: "/workspace", containerDiskInGb: 50, ports: ["22/tcp", "8000/tcp"],
+        env: {API_KEY: $key, HF_TOKEN: $hf, HF_XET_HIGH_PERFORMANCE: "1"},
+        dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["exec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
+      curl -sS --fail-with-body https://rest.runpod.io/v1/pods -H "Authorization: Bearer $RUNPOD_API_KEY" \
+        -H "Content-Type: application/json" -d @- |
+      jq -r '"created \(.id)"'
     echo "booting; run '$0 status' every 3 min until it says READY" ;;
   url)
     runpod/pod.sh ssh $NAME 'tr "\0" "\n" < /proc/1/environ' |
@@ -25,10 +30,11 @@ case ${1:?command} in
   status)
     if curl -sf -m 5 -H "Authorization: Bearer $QWEN_VLLM_API_KEY" "$($0 url)/models" >/dev/null; then echo READY; exit 0; fi
     # [x]yz patterns keep pgrep from matching this command's own shell
-    runpod/pod.sh ssh $NAME 'echo "uv_cache=$(du -sm ~/.cache/uv 2>/dev/null | cut -f1)M weights=$(du -sm /workspace/.cache/huggingface 2>/dev/null | cut -f1)M" \
-      "installing=$(pgrep -fc "[u]v pip install") vllm=$(pgrep -fc "[b]in/vllm serve")" \
+    runpod/pod.sh ssh $NAME 'echo "boot: $(tail -1 /workspace/boot.log) | vllm=$(pgrep -fc "[b]in/vllm serve")" \
       "log: $(tail -c 3000 /workspace/vllm.log 2>/dev/null | tr "\r" "\n" | grep -v "^\s*$" | tail -1 | cut -c1-160)"
       grep -hE "Traceback|Error|error:|out of memory|timed out" /workspace/boot.log /workspace/vllm.log 2>/dev/null | tail -3' ;;
-  restart) boot ;;
+  restart)
+    runpod/pod.sh ssh $NAME 'cat > /workspace/qwen_server_boot.sh' < runpod/qwen_server_boot.sh
+    runpod/pod.sh ssh $NAME 'nohup bash /workspace/qwen_server_boot.sh > /workspace/boot.log 2>&1 < /dev/null &' ;;
   *) echo "unknown command: $1" >&2; exit 1 ;;
 esac
