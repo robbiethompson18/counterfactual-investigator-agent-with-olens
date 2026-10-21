@@ -264,6 +264,9 @@ def investigator_prompts(run: Path) -> tuple[str, str]:
         hypotheses="", counterfactual="(none; propose your own)", user_message=pool["user_message"],
         completions=base["completions"], classifier_question=classifier_question(m), messages=pool["messages"]),
         base["verdicts"], N_SHOWN)
+    addendum = HERE / "investigator_addendum.md"
+    if addendum.exists():
+        system += "\n\n" + addendum.read_text()
     return system, f"### The grader's fixed question\n\n{classifier_question(m)}\n\n---\n\n{task}"
 
 
