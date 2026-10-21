@@ -24,12 +24,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import chive
+import extras
 import followups
 import organisms
-import extras
+import pyarrow.parquet as pq
 import steer
 from judge import Judge
-import pyarrow.parquet as pq
 from transformers import AutoTokenizer
 
 HERE = Path(__file__).resolve().parent
@@ -637,17 +637,21 @@ def judge_calib(tid):
         j = judge_for(tid)
         if j is None:
             raise RuntimeError("no judge configured (WCO_JUDGE_URL)")
-        sib = [
-            x for x in S["trs"].values() if x["prompt_id"] == t["prompt_id"] and x["judgment"]["match"] is not None
-        ]
+        sib = [x for x in S["trs"].values() if x["prompt_id"] == t["prompt_id"] and x["judgment"]["match"] is not None]
         out = j.judge_many(user_messages(tid), [x["messages"][-1]["content"] or "" for x in sib])
         pairs = [(bool(x["judgment"]["match"]), o["match"]) for x, o in zip(sib, out) if o["match"] is not None]
         n = len(pairs)
         agree = sum(a == b for a, b in pairs) / n if n else None
         pa, pb = (sum(a for a, _ in pairs) / n, sum(b for _, b in pairs) / n) if n else (0, 0)
         pe = pa * pb + (1 - pa) * (1 - pb)
-        S["calib"][tid] = {"state": "done", "n": n, "weirdchat_rate": pa, "judge_rate": pb, "agree": agree,
-                           "kappa": (agree - pe) / (1 - pe) if n and pe < 1 else None}
+        S["calib"][tid] = {
+            "state": "done",
+            "n": n,
+            "weirdchat_rate": pa,
+            "judge_rate": pb,
+            "agree": agree,
+            "kappa": (agree - pe) / (1 - pe) if n and pe < 1 else None,
+        }
     except Exception as e:  # noqa: BLE001  (worker boundary: report and keep going)
         S["calib"][tid] = {"state": "error", "error": f"{type(e).__name__}: {e}"}
 
@@ -729,7 +733,10 @@ class H(BaseHTTPRequestHandler):
                 ids = render(req["tid"])["ids"]
                 if req.get("lens") == "nla":
                     return self.send(POD.call("/nla_score", {"ids": ids, "pos": int(req["pos"]), "text": req["text"]}))
-                res = POD.call("/rescore", {"jobs": [{"ids": ids, "items": [{"pos": int(req["pos"]), "layer": int(req["layer"]), "texts": [req["text"]]}]}]})
+                res = POD.call(
+                    "/rescore",
+                    {"jobs": [{"ids": ids, "items": [{"pos": int(req["pos"]), "layer": int(req["layer"]), "texts": [req["text"]]}]}]},
+                )
                 return self.send(res["results"][0][0][0])
             if p == "/api/contrib":  # per-block attention / MLP writes at one token: {tid, pos}
                 if not (POD and POD.ready()):
@@ -745,7 +752,18 @@ class H(BaseHTTPRequestHandler):
                 return self.send(steer.probe(POD, req["tid"], render(req["tid"])["ids"], req["vid"]))
             if p == "/api/steer":
                 tid = req["tid"]
-                return self.send(steer.start(POD, judge_for(tid), tid, prompt_ids(tid), user_messages(tid), req.get("vid"), req.get("alpha", 0), int(req.get("n", 64))))
+                return self.send(
+                    steer.start(
+                        POD,
+                        judge_for(tid),
+                        tid,
+                        prompt_ids(tid),
+                        user_messages(tid),
+                        req.get("vid"),
+                        req.get("alpha", 0),
+                        int(req.get("n", 64)),
+                    )
+                )
             if p == "/api/judge_calib":  # judge WeirdChat's stored rollouts of this prompt, compare labels
                 tid = req["tid"]
                 threading.Thread(target=judge_calib, args=(tid,), daemon=True).start()

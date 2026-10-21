@@ -18,9 +18,9 @@ import re
 from pathlib import Path
 
 import torch
-import torch.nn as nn
 from huggingface_hub import hf_hub_download, snapshot_download
 from safetensors.torch import load_file
+from torch import nn
 from transformers import StoppingCriteria, StoppingCriteriaList
 
 from .lens import CeselderLens, Sampling, capture
@@ -28,7 +28,7 @@ from .lora import HookLoRA
 
 NLA_REPO = "ceselder/qwen3.6-27b-nla-L42"
 JPP_REPO, JPP_FILE = "neuronpedia/jacobian-lens", "qwen3.6-27b/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt"
-EXPL = re.compile(r"<explanation>(.*?)(?:</explanation>|$)", re.S)
+EXPL = re.compile(r"<explanation>(.*?)(?:</explanation>|$)", re.DOTALL)
 
 
 class _StopOn(StoppingCriteria):
