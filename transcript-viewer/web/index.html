@@ -111,6 +111,7 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .tmpl .lbl{color:var(--zone-ink);font-size:11px;font-weight:600;margin-right:6px}
 #right{border-left:1px solid var(--line);background:var(--panel);padding:16px 16px 60px}
 #right h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:0 0 8px;font-weight:650}
+details.tl summary{cursor:pointer;margin-bottom:8px} details.tl summary h3{display:inline}
 .chips{display:flex;gap:5px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:12px;background:var(--panel2);font-variant-numeric:tabular-nums}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -167,7 +168,7 @@ details.gt{margin-top:8px;font-size:13px} details.gt summary{cursor:pointer;colo
 .jl{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
 .jl td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top;word-break:break-word}
 .jl td:first-child{color:var(--ink3);white-space:nowrap;width:1%}
-body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn){display:none !important}
+body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn,#xbtn){display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
@@ -213,7 +214,8 @@ const STATIC = window.WCO_STATIC;
 const staticFile = p => { const u = new URL(p, location.href), q = u.searchParams;
   return {'/api/patterns': 'patterns', '/api/overview': 'overview', '/api/pattern': `pattern/${q.get('i')}`,
           '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`,
-          '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`}[u.pathname]; };
+          '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`,
+          '/api/extras': `x/${q.get('tid')}/${Math.floor(q.get('pos') / 64)}`}[u.pathname]; };
 const api = async (p, body) => {
   if (STATIC) {
     const f = !body && staticFile(p); if (!f) throw new Error('read-only snapshot');
@@ -305,7 +307,7 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : p.followup ? `<span class="tag">${p.n_transcripts} answers</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : p.followup ? `<span class="tag">${p.n_transcripts} answers</span>` : p.thinking ? `<span class="tag">${p.n_transcripts} samples</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
       <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
@@ -356,6 +358,17 @@ async function openPattern(i, tid){
     <select id="tsel"></select>
     <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
   </div>
+  <div id="tview"></div>` : d.thinking ? `
+  <div class="card">
+    <h2>${esc(d.title)}</h2>
+    <p class="desc">Qwen3.6-27B's reply to <a href="#" id="thorig">the original transcript</a>'s user turn, sampled again
+      with thinking on (T=1, top_p 0.95, top_k 20, up to 8192 new tokens): our own bf16 vLLM samples (exact token ids), then OpenRouter's (text, re-templated). The reply's text starts at its thinking.</p>
+  </div>
+  <div id="tpick">
+    <select id="tfilter" style="width:auto"><option value="all">All samples (${d.transcripts.length})</option></select>
+    <select id="tsel"></select>
+    <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
+  </div>
   <div id="tview"></div>` : d.organism ? `
   <div class="card">
     <h2>${esc(d.title)}</h2>
@@ -399,6 +412,7 @@ async function openPattern(i, tid){
       && (d.organism || pf === '' || t.prompt === +pf));
     $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.followup
       ? `${t.followup.wording} question · ${t.followup.sample ? `sample ${t.followup.sample} (T=1)` : '◉ greedy'}`
+      : d.thinking ? `${t.thinking.source.split(' ')[0].replace(',', '')} sample ${t.thinking.sample + 1}${t.thinking.hit_cap ? ' · ✂ hit the cap' : ''}`
       : d.organism
       ? `${t.organism.read ? '◉ read · ' : ''}${t.organism.kind} prompt ${+t.organism.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${t.organism.sample + 1}`
       : `${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}`}</option>`).join('');
@@ -410,6 +424,7 @@ async function openPattern(i, tid){
   const step = s => { const o = $('#tsel'); o.selectedIndex = Math.max(0, Math.min(o.options.length - 1, o.selectedIndex + s)); openTranscript(o.value); };
   $('#tprev').onclick = () => step(-1); $('#tnext').onclick = () => step(1);
   if (fu) $('#fuorig').onclick = e => { e.preventDefault(); openPattern(d.followup.parent_idx, d.followup.parent); };
+  if (d.thinking) $('#thorig').onclick = e => { e.preventDefault(); openPattern(d.thinking.parent_idx, d.thinking.parent); };
   if (st.hash && st.hash.tf) $('#tfilter').value = st.hash.tf;
   fill();
   if (tid) $('#tsel').value = tid;
@@ -446,7 +461,9 @@ async function openTranscript(tid){
   const fu = tr.followup, fuHdr = fu && `<div class="judge org"><b>Follow-up, ${esc(fu.wording)} question: “${esc(fu.question)}”</b>
       · ${fu.sample ? `sample ${fu.sample} at T=1` : 'greedy'} · ${fu.n_new} tokens${fu.hit_cap ? ' (hit the cap)' : ''}.
       Opens on the end of that turn. The earlier reply is re-templated without its empty think block, as Qwen saw it.</div>`;
-  let html = o ? orgHdr : fu ? fuHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
+  const th = tr.thinking, thHdr = th && `<div class="judge org"><b>Thinking on, sample ${th.sample + 1}</b> from ${esc(th.source)} at T=${th.temperature}
+      · ${th.n_new} new tokens${th.hit_cap ? ' (hit the 8192-token cap mid-thought)' : ''}. Not judged.</div>`;
+  let html = o ? orgHdr : fu ? fuHdr : th ? thHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
   if (chive && tr.edits.length) html += `<details class="gt" open style="margin:0 0 12px"><summary>Counterfactual experiments (${tr.edits.length}): click one to mark what it changed</summary>${tr.edits.map(e => `
       <div class="xp" data-x="${e.number}"><span>${e.is_key ? '★' : ''}</span><span class="ef" style="color:${e.effect < 0 ? 'var(--good)' : 'var(--bad)'}" title="behaviour rate ${e.k}/${e.n} vs ${Math.round(e.baseline * 100)}% at this experiment's baseline">${e.effect > 0 ? '+' : e.effect < 0 ? '−' : '±'}${Math.round(Math.abs(e.effect) * 100)}pp</span>
       <span>${esc(e.summary)}${e.subs.length ? '' : ' <span class="muted">(no span: it only adds or moves turns)</span>'}${e.subs.length && e.structural ? ' <span class="muted">(also adds or moves turns)</span>' : ''}</span></div>`).join('')}</details>`;
@@ -611,23 +628,24 @@ function renderLens(){
     </div><div id="lerr"></div><div id="xbox"></div>`;
   if (z) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
-    h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
+    h += `<details class="tl" data-k="zone" ${ls('open.zone') ? 'open' : ''}><summary><h3>End-of-turn zone · L${L}</h3></summary><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
       const r = st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
       const s = r ? r.samples[0] : null;
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + fveTag(s) : '<span class="muted">–</span>'}</td></tr>`;
-    }).join('') + `</table>`;
+    }).join('') + `</table></details>`;
   }
   if (tr.punct && tr.punct.length) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
     const readAt = p => st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
     const rows = tr.punct.filter(readAt);
-    h += `<h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3>`;
+    h += `<details class="tl" data-k="punct" ${ls('open.punct') ? 'open' : ''}><summary><h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3></summary>`;
     if (rows.length) h += `<div style="max-height:300px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(p => {
       const s = readAt(p).samples[0];
       const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}${fveTag(s)}</td></tr>`;
     }).join('') + `</table></div>`;
     else h += `<div class="muted" style="margin-bottom:12px">Not read yet. ${tr.ds === 'chive' ? "Agam's O-lens bank samples get AR scores here once they're re-scored." : "Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it."}</div>`;
+    h += `</details>`;
   }
   if (tr.readers) h += bankHtml(pos);
   h += `<h3>${tr.readers ? 'Our reads' : 'Readouts'}</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
@@ -648,6 +666,7 @@ function renderLens(){
     const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); syncHash(); };
   for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); syncHash(); };
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
+  for (const d of document.querySelectorAll('details.tl')) d.ontoggle = () => ls('open.' + d.dataset.k, d.open);
   const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
   $('#xbtn').onclick = () => readExtras(pos);
@@ -662,14 +681,14 @@ function renderLens(){
 }
 
 // bullet text plus a copy button (delegated click handler below)
-const blTxt = (b, L) => `<span>${esc(b)}<button class="cp" data-l="${L}" title="copy bullet + link"></button></span>`;
-// copies "bullet ([L28](link))": the current view's hash with only that layer, on the public site (localhost links don't travel)
+const blTxt = (b, L, fve) => `<span>${esc(b)}<button class="cp" data-l="${L}"${fve != null ? ` data-fve="${fve.toFixed(2)}"` : ''} title="copy bullet + link"></button></span>`;
+// copies "bullet ([L28](link) FVE: 0.12)": the current view's hash with only that layer, on the public site (localhost links don't travel)
 document.addEventListener('click', e => {
   const b = e.target.closest('.cp'); if (!b) return;
   const L = b.dataset.l, h = new URLSearchParams(location.hash.slice(1));
   if (L === '40') h.delete('L'); else h.set('L', L);
   const base = STATIC ? location.origin + location.pathname : 'https://olens-viewer.pages.dev/';
-  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h}))`);
+  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h})${b.dataset.fve ? ` FVE: ${b.dataset.fve}` : ''})`);
   b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 900);
 });
 
@@ -677,7 +696,7 @@ document.addEventListener('click', e => {
 function sampHtml(s, L){
   const mx = Math.max(1e-9, ...(s.coefs || []));
   return `<div class="samp">${s.bullets.length ? s.bullets.map((b, j) => (bf(s, j) != null
-    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b, L)}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
+    ? `<div class="bl" title="bullet FVE ${bf(s, j).toFixed(3)} · NNLS weight ${s.coefs[j].toFixed(3)}">${blTxt(b, L, bf(s, j))}<div class="w"><i style="width:${Math.min(100, 100 * bf(s, j) / Math.max(1e-9, s.fve))}%"></i></div><span class="n">${bf(s, j).toFixed(2)}</span></div>`
     : s.coefs ? `<div class="bl">${blTxt(b, L)}<div class="w" title="NNLS weight ${s.coefs[j].toFixed(3)}"><i style="width:${100 * s.coefs[j] / mx}%"></i></div><span class="n"></span></div>`
     : `<div class="bl">${blTxt(b, L)}</div>`)).join('') : `<div class="muted">(no bullets)</div>`}<div class="raw">${esc(s.text)}</div></div>`;
 }
@@ -724,7 +743,8 @@ async function reloadReads(){ const tr = await api('/api/transcript?tid=' + enco
 async function showExtras(pos){
   const tid = st.tr.tid, have = st.tr.extras && st.tr.extras.includes(pos);
   if (!have) return;
-  const x = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  const res = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
+  const x = STATIC ? res[pos] || {} : res;  // the snapshot serves a chunk of 64 tokens (extras.chunk)
   if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
   $('#xbox').innerHTML = extrasHtml(x);
   const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };

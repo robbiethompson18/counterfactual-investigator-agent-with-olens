@@ -51,7 +51,14 @@ def build(pod, name, spec):
     res = pod.call("/vector", {"spec": spec})
     vid = uuid.uuid4().hex[:8]
     with LOCK:
-        V[vid] = {"name": name or spec_name(spec), "spec": spec, "layer": res["layer"], "info": res["info"], "v": res["v"], "t": time.time()}
+        V[vid] = {
+            "name": name or spec_name(spec),
+            "spec": spec,
+            "layer": res["layer"],
+            "info": res["info"],
+            "v": res["v"],
+            "t": time.time(),
+        }
         VEC.write_text(json.dumps(V))
     return dict(public(V[vid]), vid=vid)
 
@@ -92,9 +99,16 @@ def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_token
         raise RuntimeError("the GPU pod isn't running: start it from the header")
     v = V[vid] if vid else None
     r = {
-        "rid": uuid.uuid4().hex[:8], "tid": tid, "vid": vid, "name": v["name"] if v else "unsteered",
-        "layer": v["layer"] if v else None, "alpha": float(alpha) if v else 0.0, "n": int(n),
-        "max_new_tokens": int(max_new_tokens), "state": "sampling", "t": time.time(),
+        "rid": uuid.uuid4().hex[:8],
+        "tid": tid,
+        "vid": vid,
+        "name": v["name"] if v else "unsteered",
+        "layer": v["layer"] if v else None,
+        "alpha": float(alpha) if v else 0.0,
+        "n": int(n),
+        "max_new_tokens": int(max_new_tokens),
+        "state": "sampling",
+        "t": time.time(),
     }
     R[r["rid"]] = r
     threading.Thread(target=_run, args=(pod, judge, r, prompt_ids, messages, v), daemon=True).start()
@@ -105,8 +119,16 @@ def _run(pod, judge, r, prompt_ids, messages, v):
     try:
         res = pod.call(
             "/steer",
-            {"ids": prompt_ids, "layer": v["layer"] if v else 40, "v": v["v"] if v else [0.0] * 5120, "alpha": r["alpha"],
-             "n": r["n"], "max_new_tokens": r["max_new_tokens"], "temperature": 1.0, "seed": 0},
+            {
+                "ids": prompt_ids,
+                "layer": v["layer"] if v else 40,
+                "v": v["v"] if v else [0.0] * 5120,
+                "alpha": r["alpha"],
+                "n": r["n"],
+                "max_new_tokens": r["max_new_tokens"],
+                "temperature": 1.0,
+                "seed": 0,
+            },
             timeout=7200,
         )
         r.update(texts=res["texts"], gen_seconds=res["seconds"], state="judging")

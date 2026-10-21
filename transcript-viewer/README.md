@@ -49,6 +49,16 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 - **Scored banks:** the O-lens bank samples get AR scores from `scripts/rescore_chive_banks.py`
   (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet FVEs, the heatmap and the
   zone/punctuation tables wherever we have no greedy read of our own.
+  - **Not run yet (2026-10-20), so the CHIVE bank samples show no FVE.** The script works, but two
+    GPU launches produced no records. The first was blocked on the gated whiteners
+    (`agu18dec/local-workspace`; request access on HF first). The second H100 pod loaded the server,
+    then the driving agent stopped waiting before the test batch, and the pod idled out. That cost
+    ~$6 in total. We then dropped it as not worth chasing.
+  - Size: the relevant positions × 11 layers come to 244k items, an estimated 3–7 H100-hours
+    (~$15–30). Every token would be ~13× that.
+  - To run it, use `runpod/pod.sh` (Robbie's agents don't use SkyPilot). Do the `olens/README.md`
+    setup, start `pod/run.sh`, tunnel to it, then run the script with `--limit 3` to measure
+    throughput before the full set.
 - **Solve counts:** "T 3/5 · O 5/5" is how many of 5 draws in Agam's climb_test run (Opus 5) named a
   true cause, with the transcript alone vs with the O-lens (`data/viewer/cmp_climb_test.json`).
 
@@ -62,6 +72,23 @@ Qwen's over the same tokens: the transcript header switches between them, and th
 under each readout. Base Qwen's rollouts on the same prompt are at the bottom. The viewer can't make
 new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
 reads have no FVE scores.
+
+## Thinking-on resamples
+
+`web/thinking.py` adds one pattern per favourite (`docs/favorite-transcripts.md`) to the WeirdChat
+tab, behavior `thinking-resample`: Qwen3.6-27B's reply to the same user turn, sampled again with
+thinking on (T=1, top_p 0.95, top_k 20, up to 8192 new tokens). The reply's highlighted text starts
+at its thinking. Two sources, both in `data/thinking.jsonl` (shared through `publish.py`):
+
+- `s<k>`: 10 per favourite from our own bf16 vLLM (`scripts/thinking.py prep`, then `gen` on a
+  RunPod pod), exact token ids.
+- `or<k>`: 5 per favourite from `qwen/qwen3.6-27b` on OpenRouter
+  (`scripts/thinking.py openrouter N`), whose providers may serve quantized weights; their text is
+  re-templated into ids.
+
+`scripts/thinking.py read PORT PARENT [TID ...]` reads one favourite's resamples against
+`pod/server.py`. The prompt is shared up to `<think>\n`, so every sample's end-of-user-turn reads
+are identical (greedy); samples only differ from the first thinking token on.
 
 ## Confession follow-ups
 
@@ -112,12 +139,13 @@ banks are only published with `publish.py --banks`: they're his and unpublished,
 it. Its data lives in the project's HF dataset under `weirdchat/`, where each machine owns its own
 files so publishes never clash:
 
-- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of
-  this machine's `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name
-  is `$WCO_MACHINE`, else the short hostname.
+- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`,
+  `extras/<machine>.jsonl`: copies of this machine's `data/reads.jsonl`, `data/claude.jsonl`,
+  `data/stance.jsonl` and `data/extras.jsonl` (NLA + J++). The machine name is `$WCO_MACHINE`, else
+  the short hostname.
 - `weirdchat/site/`: one gzipped JSON per transcript (the server's `/api/transcript`), per pattern,
-  and the pattern list, built from everyone's files. The page fetches these straight from HF (CORS
-  is open).
+  and the pattern list, plus NLA + J++ reads in 64-token chunks (`x/<tid>/<chunk>`), built from
+  everyone's files. The page fetches these straight from HF (CORS is open).
 
 ```bash
 .venv/bin/python scripts/publish.py          # push this machine's files, pull everyone's, rebuild + upload the site
@@ -164,8 +192,8 @@ publishing from older or unmerged code breaks the page and re-uploads every file
 
 One transcript's user turn plus the first 20 reply tokens with every lens side by side: the O-lens
 (11 layers), the [ceselder L42 NLA](https://huggingface.co/ceselder/qwen3.6-27b-nla-L42)
-(`olens/src/olens/extras.py`; the RL LoRA is applied on top of the SFT LoRA, which its config
-names as its base; FVE uses μ from 64 random WeirdChat transcripts, `pod/calib_ids.json`) and the
+(`olens/src/olens/extras.py`; the RL LoRA is applied on top of the SFT LoRA, which its config names
+as its base; FVE uses μ from 64 random WeirdChat transcripts, `pod/calib_ids.json`) and the
 [J++ lens](https://huggingface.co/neuronpedia/jacobian-lens/tree/main/qwen3.6-27b/jpp) at all 63
 layers. Readouts can be edited and re-scored. Vectors (`olens/src/olens/vectors.py`) come from J++
 tokens, the O-lens or NLA AR of free text, or differences of these; they probe the transcript
@@ -175,6 +203,11 @@ WeirdChat's own judge prompt (`web/judge.py`, ported from
 
 - NLA + J++ need ≥ 120 GB of GPU memory: `WCO_POD_YAML=sky/pod_h200.yaml` for Start GPU.
 - `web/server.py --jpp-local` sends J++ reads to `web/run_lens.sh --extras jpp` on this machine.
+- On a RunPod H200 instead (`runpod/pod.sh up` + `sync`, then `sky/pod_h200.yaml`'s setup by hand in
+  `/workspace/repo/olens`): run `pod/server.py` there, tunnel it to 127.0.0.1:PORT, and
+  `scripts/read_extras.py PORT [TID ...]` reads NLA + J++ at every token (default: the three in
+  `docs/favorite-transcripts.md`) into `data/extras.jsonl`; `publish.py` then puts them on the
+  public site.
 - Judge: `sky launch -c wco-judge -y -i 5 --down sky/judge_gemma.yaml`, tunnel 18812 → 8002, and
   `WCO_JUDGE_URL=http://127.0.0.1:18812/v1`. Agreement with WeirdChat's labels on the 64 stored
   rollouts of "Most-sober person…" prompt 1: 92%, κ 0.78. vLLM 0.25.1 needs transformers 5.10.0 for
