@@ -17,9 +17,9 @@ Stdlib only, so it runs in a bare python image:
 
 import json
 import os
+import http.client
 import time
-import urllib.error
-import urllib.request
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 QWEN_MODEL = os.environ.get("QWEN_MODEL", "Qwen/Qwen3.6-27B")
@@ -30,6 +30,7 @@ LOG_PATH = os.environ.get("GATEWAY_LOG", "/logs/gateway.jsonl")
 # Qwen3.6's recommended thinking-mode sampling; a request's own values win.
 QWEN_DEFAULTS = {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "max_tokens": 32768}
 TIMEOUT_S = 1800  # matches the harness client's timeout
+CONNECT_TIMEOUT_S, CONNECT_ATTEMPTS = 10, 5
 
 
 def route(body: dict) -> tuple[str, dict, dict]:
@@ -42,6 +43,27 @@ def route(body: dict) -> tuple[str, dict, dict]:
     return "https://openrouter.ai/api/v1/chat/completions", {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}, body
 
 
+def post(url: str, data: bytes, headers: dict) -> tuple[int, bytes]:
+    """POST with a short connect timeout and a long read timeout. The AWS box -> RunPod TCP path sometimes
+    drops a SYN, and urllib's single timeout would wait out the kernel's ~130 s connect timeout each time."""
+    parts = urllib.parse.urlsplit(url)
+    connection_class = http.client.HTTPSConnection if parts.scheme == "https" else http.client.HTTPConnection
+    for attempt in range(CONNECT_ATTEMPTS):
+        connection = connection_class(parts.netloc, timeout=CONNECT_TIMEOUT_S)
+        try:
+            connection.connect()
+        except OSError:
+            if attempt == CONNECT_ATTEMPTS - 1:
+                raise
+            continue
+        assert connection.sock is not None
+        connection.sock.settimeout(TIMEOUT_S)
+        connection.request("POST", parts.path, body=data, headers=headers)
+        response = connection.getresponse()
+        return response.status, response.read()
+    raise AssertionError("unreachable")
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # health check
         self._send(200, b'{"ok": true}')
@@ -51,16 +73,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, b'{"error": "only chat/completions is routed"}')
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         url, headers, body = route(body)
-        request = urllib.request.Request(
-            url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", **headers}, method="POST"
-        )
         start = time.time()
         try:
-            with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
-                status, payload = response.status, response.read()
-        except urllib.error.HTTPError as err:
-            status, payload = err.code, err.read()
-        except (urllib.error.URLError, TimeoutError) as err:  # upstream down: 502 so the harness retries
+            status, payload = post(url, json.dumps(body).encode(), {"Content-Type": "application/json", **headers})
+        except OSError as err:  # upstream down: 502 so the harness retries
             status, payload = 502, json.dumps({"error": f"upstream unreachable: {err}"}).encode()
         self._send(status, payload)
         self._log(body["model"], status, time.time() - start, payload)
