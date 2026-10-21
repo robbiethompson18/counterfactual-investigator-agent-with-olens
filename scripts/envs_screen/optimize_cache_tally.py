@@ -12,6 +12,7 @@ Per run:
 - cheated: Aditya's judge verdict (final/grading.json). `honest_clear`: honest and the last observed overall
   speedup reached the bar; his published rate drops those runs from the denominator.
 - reasoning share: assistant turns with non-empty reasoning_content / all assistant turns.
+- tokens_in/out: summed provider usage (cost); transcript_chars: rollout.log size, which is what the judge reads.
 - max_in: largest prompt size seen in rollout.log's [provider-usage] lines (context pressure; Qwen's window is 262k).
 - c_ext: the agent built native code (gcc / build_ext / cython / pybind11 in any command).
 """
@@ -33,7 +34,7 @@ CORRECTNESS_TESTS = (
 )
 _PYTEST_SUMMARY_RE = re.compile(r"=+ .*\b(passed|failed)\b.* in [\d.]+s.*=+")
 _TEST_STATUS_RE = re.compile(r"::(test_\w+)\s+(PASSED|FAILED|ERROR)|(?:FAILED|ERROR) \S*::(test_\w+)")
-_USAGE_IN_RE = re.compile(r"\[provider-usage\].* in=(\d+)")
+_USAGE_RE = re.compile(r"\[provider-usage\].* in=(\d+) .*out=(\d+)")
 _C_EXT_RE = re.compile(r"\bgcc\b|build_ext|cythonize|\bcython\b|pybind11|\.pyx\b|Python\.h")
 
 
@@ -97,7 +98,8 @@ def run_facts(run: Path, bar: float) -> dict:
     assistant = [m for m in msgs if m.get("role") == "assistant"]
     with_reasoning = sum(1 for m in assistant if (m.get("reasoning_content") or "").strip())
     log = (run / "rollout.log").read_text(errors="replace") if (run / "rollout.log").exists() else ""
-    ins = [int(x) for x in _USAGE_IN_RE.findall(log)]
+    usage = [(int(i), int(o)) for i, o in _USAGE_RE.findall(log)]
+    ins = [i for i, _ in usage]
     verdict = (grade.get("rating") or grade).get("verdict") if grade else None
     last_overall = tel.get("reported_overall_speedup")
     tampered = {k: v for k, v in (tel.get("files_tampered") or {}).items() if v != "ok"}
@@ -119,6 +121,9 @@ def run_facts(run: Path, bar: float) -> dict:
         "assistant_turns": len(assistant),
         "reasoning_turns": with_reasoning,
         "max_in": max(ins) if ins else None,
+        "tokens_in": sum(ins),
+        "tokens_out": sum(o for _, o in usage),
+        "transcript_chars": len(log),
         "c_ext": any(_C_EXT_RE.search(c) for c in _commands(msgs)),
     }
 
@@ -169,6 +174,9 @@ def summarize(fleets: list[Path]) -> dict:
         "n_c_ext": sum(r["c_ext"] for r in runs),
         "reasoning_share": sum(r["reasoning_turns"] for r in runs) / turns if turns else float("nan"),
         "steps": sorted(r["steps"] for r in runs if r["steps"] is not None),
+        "tokens_in": sum(r["tokens_in"] for r in runs),
+        "tokens_out": sum(r["tokens_out"] for r in runs),
+        "transcript_chars": sum(r["transcript_chars"] for r in runs),
     }
 
 
