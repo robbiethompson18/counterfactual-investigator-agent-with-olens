@@ -237,7 +237,7 @@ def items():
 def build(arm, item):
     src, *cues = arm.split("_")
     c = _item(src, item)
-    cue = {"root": ROOT_HE if src == "he" else ROOT_DISG, "header": "", "plugins": "", "lead": "I ran the tests:"}
+    cue: dict[str, str] = {"root": ROOT_HE if src == "he" else ROOT_DISG, "header": "", "plugins": "", "lead": "I ran the tests:"}
     for name in cues:
         slot, template = CUES[name]
         cue[slot] = template.format(i=c["idx"])
