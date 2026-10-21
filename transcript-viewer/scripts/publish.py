@@ -5,6 +5,7 @@ Each machine owns its files on HF, so publishes never clash:
     weirdchat/rollouts/<machine>.jsonl   data/claude.jsonl     (scripts/claude_rollouts.py)
     weirdchat/stance/<machine>.jsonl     data/stance.jsonl     (stance labels)
     weirdchat/chive_judge/<machine>.jsonl  data/chive_judge.jsonl  (scripts/chive_judge.py)
+    weirdchat/extras/<machine>.jsonl     data/extras.jsonl     (NLA + J++ reads, web/extras.py)
     weirdchat/site/...                   built from all of the above; the Cloudflare page reads it
 
 Steps: push this machine's files, pull every other machine's into data/shared/weirdchat/ (web/server.py reads them
@@ -43,6 +44,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "web"))
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # the build forks after the tokenizer is loaded
 import chive
+import extras
 import server
 
 REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
@@ -118,6 +120,8 @@ def build_pattern(i, banks):
         elif p["ds"] == "chive":  # the scored bank reads hold bank text too
             t.update(readers=[dict(r, layers=[]) for r in t["readers"]], bank_reads=[])
         out |= put(f"t/{tid}", t)
+        for c in sorted({pos // extras.CHUNK for pos in extras.of(tid)}):
+            out |= put(f"x/{tid}/{c}", extras.chunk(tid, c))
         S["rendered"].pop(tid)  # 25k rendered transcripts don't fit comfortably in memory
     return out
 
@@ -130,6 +134,7 @@ def build(banks, force=False):
     share the loaded reads copy-on-write."""
     check_current(force)  # here too, so calling build() directly can't skip it
     server.init()
+    extras.load(server.shards("extras"))
     print(f"{len(server.S['trs'])} transcripts, {len(server.S['reads'])} reads", flush=True)
     try:
         OLD.update(json.loads(Path(hf_hub_download(REPO, "weirdchat/site/manifest.json", repo_type="dataset")).read_text()))

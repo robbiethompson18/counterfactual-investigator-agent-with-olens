@@ -43,7 +43,14 @@ FOLLOWUPS = ROOT / "data/followups.jsonl"  # scripts/followups.py: "why did you 
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
 MACHINE = os.environ.get("WCO_MACHINE") or socket.gethostname().split(".")[0].lower()
-KINDS = {"reads": CACHE, "rollouts": CLAUDE, "stance": STANCE, "chive_judge": chive.JUDGE, "followups": FOLLOWUPS}
+KINDS = {
+    "reads": CACHE,
+    "rollouts": CLAUDE,
+    "stance": STANCE,
+    "chive_judge": chive.JUDGE,
+    "followups": FOLLOWUPS,
+    "extras": extras.CACHE,
+}
 MODEL = "qwen/qwen3.6-27b"
 LAYERS = list(range(20, 61, 4))
 MAX_TOKENS = 4096
@@ -832,7 +839,7 @@ def main():
     args = ap.parse_args()
     t0 = time.time()
     init()
-    extras.load()
+    extras.load(shards("extras"))
     steer.load()
     S["rubrics"] = {r["behavior_id"]: r["transcript_rubric"]["text"] for r in pq.read_table(HF / "rubrics.parquet").to_pylist()}
     from readq import ReadQueue

@@ -122,12 +122,13 @@ banks are only published with `publish.py --banks`: they're his and unpublished,
 it. Its data lives in the project's HF dataset under `weirdchat/`, where each machine owns its own
 files so publishes never clash:
 
-- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`: copies of
-  this machine's `data/reads.jsonl`, `data/claude.jsonl` and `data/stance.jsonl`. The machine name
-  is `$WCO_MACHINE`, else the short hostname.
+- `weirdchat/reads/<machine>.jsonl`, `rollouts/<machine>.jsonl`, `stance/<machine>.jsonl`,
+  `extras/<machine>.jsonl`: copies of this machine's `data/reads.jsonl`, `data/claude.jsonl`,
+  `data/stance.jsonl` and `data/extras.jsonl` (NLA + J++). The machine name is `$WCO_MACHINE`, else
+  the short hostname.
 - `weirdchat/site/`: one gzipped JSON per transcript (the server's `/api/transcript`), per pattern,
-  and the pattern list, built from everyone's files. The page fetches these straight from HF (CORS
-  is open).
+  and the pattern list, plus NLA + J++ reads in 64-token chunks (`x/<tid>/<chunk>`), built from
+  everyone's files. The page fetches these straight from HF (CORS is open).
 
 ```bash
 .venv/bin/python scripts/publish.py          # push this machine's files, pull everyone's, rebuild + upload the site
@@ -185,6 +186,11 @@ WeirdChat's own judge prompt (`web/judge.py`, ported from
 
 - NLA + J++ need ≥ 120 GB of GPU memory: `WCO_POD_YAML=sky/pod_h200.yaml` for Start GPU.
 - `web/server.py --jpp-local` sends J++ reads to `web/run_lens.sh --extras jpp` on this machine.
+- On a RunPod H200 instead (`runpod/pod.sh up` + `sync`, then `sky/pod_h200.yaml`'s setup by hand in
+  `/workspace/repo/olens`): run `pod/server.py` there, tunnel it to 127.0.0.1:PORT, and
+  `scripts/read_extras.py PORT [TID ...]` reads NLA + J++ at every token (default: the three in
+  `docs/favorite-transcripts.md`) into `data/extras.jsonl`; `publish.py` then puts them on the
+  public site.
 - Judge: `sky launch -c wco-judge -y -i 5 --down sky/judge_gemma.yaml`, tunnel 18812 → 8002, and
   `WCO_JUDGE_URL=http://127.0.0.1:18812/v1`. Agreement with WeirdChat's labels on the 64 stored
   rollouts of "Most-sober person…" prompt 1: 92%, κ 0.78. vLLM 0.25.1 needs transformers 5.10.0 for
