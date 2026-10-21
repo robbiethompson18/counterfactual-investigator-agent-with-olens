@@ -106,8 +106,14 @@ def do_probe(req):
 def do_steer(req):
     t0 = time.time()
     texts = vectors().steer(
-        [int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]), float(req["alpha"]),
-        n=int(req.get("n", 64)), max_new_tokens=int(req.get("max_new_tokens", 400)),
-        temperature=float(req.get("temperature", 1.0)), seed=int(req.get("seed", 0)), ablate=req.get("ablate") or (),
+        [int(i) for i in req["ids"]],
+        int(req["layer"]),
+        torch.tensor(req["v"]),
+        float(req["alpha"]),
+        n=int(req.get("n", 64)),
+        max_new_tokens=int(req.get("max_new_tokens", 400)),
+        temperature=float(req.get("temperature", 1.0)),
+        seed=int(req.get("seed", 0)),
+        ablate=req.get("ablate") or (),
     )
     return {"texts": texts, "seconds": round(time.time() - t0, 1)}

@@ -33,7 +33,11 @@ class Vectors:
             a, La, ia = self.build_raw(spec["a"])
             b, Lb, ib = self.build_raw(spec["b"])
             assert La == Lb, f"diff of vectors at different layers ({La}, {Lb})"
-            return unit(a - b), La, {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4), "raw_norm": round(float((a - b).norm()), 2)}
+            return (
+                unit(a - b),
+                La,
+                {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4), "raw_norm": round(float((a - b).norm()), 2)},
+            )
         v, L, info = self.build_raw(spec)
         return unit(v), L, dict(info, raw_norm=round(float(v.norm()), 2))
 
@@ -258,8 +262,13 @@ def attention_pattern(model, ids, pos, layer, head, top=12):
     Wo = attn.o_proj.weight[:, head * D : (head + 1) * D].float()
     write = (w[:, None] * (v[0, kv, : pos + 1].float() @ Wo.T)).norm(dim=-1)
     order = w.argsort(descending=True)[:top]
-    return {"layer": layer, "head": head, "weights": [round(float(x), 4) for x in w], "write": [round(float(x), 3) for x in write],
-            "top": [int(i) for i in order]}
+    return {
+        "layer": layer,
+        "head": head,
+        "weights": [round(float(x), 4) for x in w],
+        "write": [round(float(x), 3) for x in write],
+        "top": [int(i) for i in order],
+    }
 
 
 @torch.no_grad()
@@ -296,7 +305,9 @@ def delta_pattern(model, ids, pos, layer, head, top=12):
     g = -la.A_log.float().exp() * F.softplus(la.in_proj_a(h).float() + la.dt_bias)
     r = la.num_v_heads // la.num_k_heads
     q, k = q.repeat_interleave(r, dim=2), k.repeat_interleave(r, dim=2)
-    check_o, _ = torch_recurrent_gated_delta_rule(q, k, v, g=g, beta=beta, initial_state=None, output_final_state=False, use_qk_l2norm_in_kernel=True)
+    check_o, _ = torch_recurrent_gated_delta_rule(
+        q, k, v, g=g, beta=beta, initial_state=None, output_final_state=False, use_qk_l2norm_in_kernel=True
+    )
     qh = F.normalize(q[0, :, head].float(), dim=-1) / la.head_k_dim**0.5
     kh = F.normalize(k[0, :, head].float(), dim=-1)
     vh, bh, gh = v[0, :, head].float(), beta[0, :, head].float(), g[0, :, head].float().exp()
@@ -311,5 +322,12 @@ def delta_pattern(model, ids, pos, layer, head, top=12):
     Wo = la.out_proj.weight[:, head * la.head_v_dim : (head + 1) * la.head_v_dim].float()
     write = (c[:, None] * (vh @ Wo.T)).norm(dim=-1)
     order = c.abs().argsort(descending=True)[:top]
-    return {"layer": layer, "head": head, "linear": True, "weights": [round(float(x), 4) for x in c], "write": [round(float(x), 3) for x in write],
-            "top": [int(i) for i in order], "check": round(err, 5)}
+    return {
+        "layer": layer,
+        "head": head,
+        "linear": True,
+        "weights": [round(float(x), 4) for x in c],
+        "write": [round(float(x), 3) for x in write],
+        "top": [int(i) for i in order],
+        "check": round(err, 5),
+    }

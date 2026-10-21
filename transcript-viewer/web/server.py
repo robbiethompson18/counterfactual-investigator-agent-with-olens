@@ -751,7 +751,12 @@ class H(BaseHTTPRequestHandler):
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
                 vecs = {steer.spec_name(v["spec"], full=True): steer.V[v["vid"]]["v"] for v in steer.vectors()}
-                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}}))
+                return self.send(
+                    POD.call(
+                        "/contrib",
+                        {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}},
+                    )
+                )
             if p.startswith("/api/h/"):  # generic: pod handlers.do_<name> on this transcript's ids
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
@@ -760,7 +765,16 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/attn":  # one full-attention head's pattern from a token: {tid, pos, layer, head}
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
-                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "attn": {"layer": int(req["layer"]), "head": int(req["head"])}}))
+                return self.send(
+                    POD.call(
+                        "/contrib",
+                        {
+                            "ids": render(req["tid"])["ids"],
+                            "pos": int(req["pos"]),
+                            "attn": {"layer": int(req["layer"]), "head": int(req["head"])},
+                        },
+                    )
+                )
             if p == "/api/vector":
                 return self.send(steer.build(POD, req.get("name"), req["spec"]))
             if p == "/api/vector/delete":
@@ -770,7 +784,19 @@ class H(BaseHTTPRequestHandler):
                 return self.send(steer.probe(POD, req["tid"], render(req["tid"])["ids"], req["vid"]))
             if p == "/api/steer":
                 tid = req["tid"]
-                return self.send(steer.start(POD, judge_for(tid), tid, prompt_ids(tid), user_messages(tid), req.get("vid"), req.get("alpha", 0), int(req.get("n", 64)), ablate=req.get("ablate") or ()))
+                return self.send(
+                    steer.start(
+                        POD,
+                        judge_for(tid),
+                        tid,
+                        prompt_ids(tid),
+                        user_messages(tid),
+                        req.get("vid"),
+                        req.get("alpha", 0),
+                        int(req.get("n", 64)),
+                        ablate=req.get("ablate") or (),
+                    )
+                )
             if p == "/api/steer/rejudge":  # re-run failed judge calls of a finished run
                 r = steer.R[req["rid"]]
                 return self.send(steer.rejudge(judge_for(r["tid"]), req["rid"], user_messages(r["tid"])))

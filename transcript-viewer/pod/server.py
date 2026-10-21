@@ -311,7 +311,17 @@ class H(BaseHTTPRequestHandler):
                 if not STATUS["ready"]:
                     return self.send({"error": "model still loading"}, 503)
                 # /h/<name> -> handlers.do_<name>, so new handlers need no server restart either
-                name = "do_" + self.path[3:] if self.path.startswith("/h/") else {"/vector": "do_vector", "/probe": "do_probe", "/steer": "do_steer", "/nla_score": "do_nla_score", "/contrib": "do_contrib"}[self.path]
+                name = (
+                    "do_" + self.path[3:]
+                    if self.path.startswith("/h/")
+                    else {
+                        "/vector": "do_vector",
+                        "/probe": "do_probe",
+                        "/steer": "do_steer",
+                        "/nla_score": "do_nla_score",
+                        "/contrib": "do_contrib",
+                    }[self.path]
+                )
                 fn = handler(name)
                 LAST["t"] = time.time()
                 r = gpu(self.path[1:], lambda: fn(req))

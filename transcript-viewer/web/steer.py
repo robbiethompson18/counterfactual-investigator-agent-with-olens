@@ -66,7 +66,7 @@ def build(pod, name, spec):
 def spec_name(s, full=False):
     """A label from the recipe; `full` keeps whole texts (the case page shows them)."""
     k, cut = s["kind"], (lambda t: t if full else t[:40])
-    uniq = lambda ts: "/".join(dict.fromkeys(t.strip() for t in ts))  # noqa: E731  (" Yes" and "Yes" collapse)
+    uniq = lambda ts: "/".join(dict.fromkeys(t.strip() for t in ts))
     if k == "jpp":
         return f"J++ L{s['layer']} +{uniq(s.get('plus') or [])}" + (f" −{uniq(s['minus'])}" if s.get("minus") else "")
     if k == "ar":
@@ -105,11 +105,17 @@ def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_token
         raise RuntimeError("the GPU pod isn't running: start it from the header")
     v = V[vid] if vid else None
     r = {
-        "rid": uuid.uuid4().hex[:8], "tid": tid, "vid": vid,
+        "rid": uuid.uuid4().hex[:8],
+        "tid": tid,
+        "vid": vid,
         "name": " + ".join(x for x in [v["name"] if v else None, f"ablate {abl_name(ablate)}" if ablate else None] if x) or "unsteered",
         "ablate": list(ablate),
-        "layer": v["layer"] if v else None, "alpha": float(alpha) if v else 0.0, "n": int(n),
-        "max_new_tokens": int(max_new_tokens), "state": "sampling", "t": time.time(),
+        "layer": v["layer"] if v else None,
+        "alpha": float(alpha) if v else 0.0,
+        "n": int(n),
+        "max_new_tokens": int(max_new_tokens),
+        "state": "sampling",
+        "t": time.time(),
     }
     R[r["rid"]] = r
     threading.Thread(target=_run, args=(pod, judge, r, prompt_ids, messages, v), daemon=True).start()
@@ -135,7 +141,9 @@ def rejudge(judge, rid, messages):
 
 def _judge(judge, r, messages, only_missing=False):
     try:
-        todo = [i for i, x in enumerate(r.get("labels") or [None] * len(r["texts"])) if x is None] if only_missing else range(len(r["texts"]))
+        todo = (
+            [i for i, x in enumerate(r.get("labels") or [None] * len(r["texts"])) if x is None] if only_missing else range(len(r["texts"]))
+        )
         out = dict(zip(todo, judge.judge_many(messages, [r["texts"][i] for i in todo])))
         old_l, old_e = r.get("labels") or [None] * len(r["texts"]), r.get("explanations") or [""] * len(r["texts"])
         r["labels"] = [out[i]["match"] if i in out else old_l[i] for i in range(len(r["texts"]))]
@@ -153,8 +161,17 @@ def _run(pod, judge, r, prompt_ids, messages, v):
     try:
         res = pod.call(
             "/steer",
-            {"ids": prompt_ids, "layer": v["layer"] if v else 40, "v": v["v"] if v else [0.0] * 5120, "alpha": r["alpha"],
-             "n": r["n"], "max_new_tokens": r["max_new_tokens"], "temperature": 1.0, "seed": 0, "ablate": r["ablate"]},
+            {
+                "ids": prompt_ids,
+                "layer": v["layer"] if v else 40,
+                "v": v["v"] if v else [0.0] * 5120,
+                "alpha": r["alpha"],
+                "n": r["n"],
+                "max_new_tokens": r["max_new_tokens"],
+                "temperature": 1.0,
+                "seed": 0,
+                "ablate": r["ablate"],
+            },
             timeout=7200,
         )
         r.update(texts=res["texts"], gen_seconds=res["seconds"], state="judging")
