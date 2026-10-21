@@ -136,6 +136,7 @@ async function load() {
           <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(inv.prompt_id)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(inv.prompt_id)}:0"></div></div>
         <div><h3>Findings</h3><pre>${esc(inv.structured_answer)}</pre></div></div>
         <h3>Experiments</h3><div class="tabwrap"><table><tr><th class="num">#</th><th>rate</th><th class="num">yes</th><th class="num">odds ratio</th><th class="num">p</th><th>label</th></tr>${exps}</table></div>
+        ${HAS_TRACE[RUN] ? `<details class="prompt-box"><summary><b>Investigator prompts and settings</b> <span class="mut small">exact system prompt and first message given to the Sonnet session, model and effort</span></summary><div class="prompt-body">loading…</div></details>` : ""}
         ${HAS_TRACE[RUN] ? `<details class="trace-box"><summary><b>Investigator trace</b> <span class="mut small">every message, command and result from the Sonnet 5.5 session</span></summary><div class="trace-steps">loading…</div></details>` : ""}
         ${v ? `<h3>Verifier: ${v.score}/10</h3><pre>${esc(v.explanation)}</pre>${(v.issues || []).length ? `<div class="small mut">Issues: ${esc(v.issues.join(" · "))}</div>` : ""}` : ""}
       </div></div>`;
@@ -201,7 +202,20 @@ async function loadTrace(el) {
       (s.kind === "result" && s.text.length > 1500 ? `<details><summary><pre>${esc(s.text.slice(0, 600))}…</pre></summary><pre>${esc(s.text)}</pre></details>` : `<pre>${esc(s.text)}</pre>`) + `</div>`).join("");
 }
 
+async function loadPrompts(el) {
+  if (el.dataset.loaded) return; el.dataset.loaded = 1;
+  const p = await (await fetch("api/prompts?name=" + encodeURIComponent(RUN))).json();
+  const st = p.settings;
+  const eff = st ? Object.entries(st.effort).map(([k, v]) => `${k} ${v}`).join(", ") : "not recorded (run predates explicit effort, so the CLI default was used)";
+  const sys = p.system || "", hit = sys.match(/Aim for roughly [^.]*\./);
+  el.querySelector(".prompt-body").innerHTML = `<div class="small">Model <b>${esc(st ? st.model : "claude-sonnet-5-5")}</b> via the claude CLI · effort: <b>${esc(eff)}</b> · addendum: <b>${p.addendum_in_system ? "on" : "off"}</b>${hit ? ` · experiment target in prompt: “${esc(hit[0])}”` : ""}</div>
+    <div class="small mut">The CLI also adds the machine's organisation CLAUDE.md to every session; it cannot be switched off without an API key.</div>
+    <details><summary><b>System prompt</b> <span class="mut small">${sys.length} chars</span></summary><pre>${esc(sys)}</pre></details>
+    <details><summary><b>First message (task)</b> <span class="mut small">${(p.task || "").length} chars</span></summary><pre>${esc(p.task)}</pre></details>`;
+}
+
 function wire() {
+  document.querySelectorAll("details.prompt-box").forEach(el => el.addEventListener("toggle", () => el.open && loadPrompts(el)));
   document.querySelectorAll("details.trace-box").forEach(el => el.addEventListener("toggle", () => el.open && loadTrace(el)));
   document.querySelectorAll(".inv-head").forEach(h => h.onclick = () => {
     const p = h.dataset.p; OPEN.has(p) ? OPEN.delete(p) : OPEN.add(p); h.nextElementSibling.classList.toggle("hidden");

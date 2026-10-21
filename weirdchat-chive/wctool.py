@@ -38,6 +38,10 @@ from run import THIRD_PERSON_FEWSHOT, THIRD_PERSON_REPORT, classifier_question, 
 
 HERE = Path(__file__).resolve().parent
 CLAUDE_MODEL = "claude-sonnet-5-5"
+# Effort per role, passed to `claude -p --effort`. Before 2026-10-21 14:45 none was set (CLI default).
+EFFORT = dict(investigator=os.environ.get("WC_EFFORT_INVESTIGATOR", "high"),
+              grader=os.environ.get("WC_EFFORT_GRADER", "medium"),
+              verifier=os.environ.get("WC_EFFORT_VERIFIER", "high"))
 N_SAMPLES = 64
 MAX_TOKENS = 2560
 N_SHOWN = 5
@@ -80,7 +84,7 @@ async def sample(messages: list[dict], n: int, url: str) -> list[str]:
 
 async def grade_one(question: str, messages: list[dict], reply: str, sem: asyncio.Semaphore) -> bool:
     content = build_grader_user_content(question, messages, [reply])
-    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", GRADER_SYSTEM, "--tools", "",
+    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--effort", EFFORT["grader"], "--system-prompt", GRADER_SYSTEM, "--tools", "",
            "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
     for attempt in range(3):
         async with sem:
@@ -209,7 +213,7 @@ def cmd_verify(a) -> None:
         "\n\nYou have no tools. Instead of calling submit_verification, reply with JSON only, matching this schema: "
         + json.dumps(VerificationInput.model_json_schema())
     )
-    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", system, "--tools", "",
+    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--effort", EFFORT["verifier"], "--system-prompt", system, "--tools", "",
            "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
     for attempt in range(3):
         out = subprocess.run(cmd, input=prompt.encode(), capture_output=True, cwd="/tmp").stdout.decode()
@@ -275,11 +279,14 @@ def cmd_investigate(a) -> None:
     system, task = investigator_prompts(run)
     (run / "investigator_system.txt").write_text(system)
     (run / "investigator_task.txt").write_text(task)
-    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", system, "--tools", "Bash,Write",
+    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--effort", EFFORT["investigator"], "--system-prompt", system, "--tools", "Bash,Write",
            "--allowedTools", f"Bash(.venv/bin/python wctool.py experiment --run {run}:*)",
            f"Bash(.venv/bin/python wctool.py submit --run {run} --file {run}/findings.json)",
            f"Write({HERE / run}/findings.json)",
            "--permission-mode", "acceptEdits", "--strict-mcp-config", "--output-format", "stream-json", "--verbose", "--max-turns", "60"]
+    (run / "claude_settings.json").write_text(json.dumps(dict(
+        model=CLAUDE_MODEL, effort=EFFORT,
+        investigator_cmd=[c if len(c) < 300 else f"<{len(c)} chars: investigator_system.txt>" for c in cmd]), indent=1))
     with open(run / "investigator.jsonl", "w") as out:
         subprocess.run(cmd, input=task.encode(), stdout=out, stderr=subprocess.STDOUT, cwd=HERE, check=False)
     print("investigator finished; submitted" if (run / "investigations.jsonl").exists() else "investigator finished WITHOUT submitting")

@@ -155,6 +155,15 @@ def trace(name: str) -> dict:
     return dict(steps=steps, summary=summary)
 
 
+def prompts(name: str) -> dict:
+    """What the headless investigator was given (wctool.py writes these at launch)."""
+    d = RUNS / name
+    assert d.parent == RUNS
+    read = lambda f: (d / f).read_text() if (d / f).exists() else None  # noqa: E731
+    return dict(system=read("investigator_system.txt"), task=read("investigator_task.txt"),
+                settings=jload(d / "claude_settings.json"), addendum_in_system="Extra requirements for this investigation" in (read("investigator_system.txt") or ""))
+
+
 def calib_text(name: str, grader: str, pid: str, i: int) -> dict:
     """One calibration disagreement in full: the prompt, the reply, the rubric and both judges' reasons."""
     d = RUNS / name
@@ -205,6 +214,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps(run_list()))
             if p == "/api/run":
                 return self.send(json.dumps(run_detail(args["name"])))
+            if p == "/api/prompts":
+                return self.send(json.dumps(prompts(args["name"])))
             if p == "/api/trace":
                 return self.send(json.dumps(trace(args["name"])))
             if p == "/api/calib_text":
