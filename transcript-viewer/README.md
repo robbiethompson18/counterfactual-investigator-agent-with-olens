@@ -49,6 +49,16 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 - **Scored banks:** the O-lens bank samples get AR scores from `scripts/rescore_chive_banks.py`
   (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet FVEs, the heatmap and the
   zone/punctuation tables wherever we have no greedy read of our own.
+  - **Not run yet (2026-10-20), so the CHIVE bank samples show no FVE.** The script works, but two
+    GPU launches produced no records. The first was blocked on the gated whiteners
+    (`agu18dec/local-workspace`; request access on HF first). The second H100 pod loaded the server,
+    then the driving agent stopped waiting before the test batch, and the pod idled out. That cost
+    ~$6 in total. We then dropped it as not worth chasing.
+  - Size: the relevant positions × 11 layers come to 244k items, an estimated 3–7 H100-hours
+    (~$15–30). Every token would be ~13× that.
+  - To run it, use `runpod/pod.sh` (Robbie's agents don't use SkyPilot). Do the `olens/README.md`
+    setup, start `pod/run.sh`, tunnel to it, then run the script with `--limit 3` to measure
+    throughput before the full set.
 - **Solve counts:** "T 3/5 · O 5/5" is how many of 5 draws in Agam's climb_test run (Opus 5) named a
   true cause, with the transcript alone vs with the O-lens (`data/viewer/cmp_climb_test.json`).
 
@@ -164,8 +174,8 @@ publishing from older or unmerged code breaks the page and re-uploads every file
 
 One transcript's user turn plus the first 20 reply tokens with every lens side by side: the O-lens
 (11 layers), the [ceselder L42 NLA](https://huggingface.co/ceselder/qwen3.6-27b-nla-L42)
-(`olens/src/olens/extras.py`; the RL LoRA is applied on top of the SFT LoRA, which its config
-names as its base; FVE uses μ from 64 random WeirdChat transcripts, `pod/calib_ids.json`) and the
+(`olens/src/olens/extras.py`; the RL LoRA is applied on top of the SFT LoRA, which its config names
+as its base; FVE uses μ from 64 random WeirdChat transcripts, `pod/calib_ids.json`) and the
 [J++ lens](https://huggingface.co/neuronpedia/jacobian-lens/tree/main/qwen3.6-27b/jpp) at all 63
 layers. Readouts can be edited and re-scored. Vectors (`olens/src/olens/vectors.py`) come from J++
 tokens, the O-lens or NLA AR of free text, or differences of these; they probe the transcript
