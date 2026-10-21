@@ -279,7 +279,7 @@ def cmd_investigate(a) -> None:
            "--allowedTools", f"Bash(.venv/bin/python wctool.py experiment --run {run}:*)",
            f"Bash(.venv/bin/python wctool.py submit --run {run} --file {run}/findings.json)",
            f"Write({HERE / run}/findings.json)",
-           "--strict-mcp-config", "--output-format", "stream-json", "--verbose", "--max-turns", "60"]
+           "--permission-mode", "acceptEdits", "--strict-mcp-config", "--output-format", "stream-json", "--verbose", "--max-turns", "60"]
     with open(run / "investigator.jsonl", "w") as out:
         subprocess.run(cmd, input=task.encode(), stdout=out, stderr=subprocess.STDOUT, cwd=HERE, check=False)
     print("investigator finished; submitted" if (run / "investigations.jsonl").exists() else "investigator finished WITHOUT submitting")
