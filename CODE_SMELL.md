@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: `donehack/` runs don't go through `scripts/runs.py`
+
+`donehack/port.py` and `variants.py` write to `donehack/runs/<out>/` (gitignored) with no
+`meta.json`. The runs behind its README were uploaded by hand to the HF dataset
+`Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
+backend hard-codes NixOS store paths and is kept only for comparison with those runs.
+
 ## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
 
 Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
