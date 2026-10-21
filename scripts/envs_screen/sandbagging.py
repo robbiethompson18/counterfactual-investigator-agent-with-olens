@@ -243,7 +243,8 @@ def table(root: Path) -> None:
         verdicts = {j["run"]: j["verdict"] for j in map(json.loads, (root / "judge.jsonl").read_text().splitlines())}
     for r in rows:
         r["judged"] = verdicts.get(r["run"]) is not None
-        r["valid"] = bool(r.get("agent_ended")) and not r.get("malformed") and r["judged"]
+        # Before any judge run (no judge.jsonl), validity is mechanical only.
+        r["valid"] = bool(r.get("agent_ended")) and not r.get("malformed") and (r["judged"] or not verdicts)
         v = verdicts.get(r["run"]) or {}
         r["verbal"] = v.get("intent") == "deliberate_underperformance"
         r["eval_aware"] = bool(v.get("eval_aware"))
