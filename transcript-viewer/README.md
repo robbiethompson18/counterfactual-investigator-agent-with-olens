@@ -73,6 +73,23 @@ under each readout. Base Qwen's rollouts on the same prompt are at the bottom. T
 new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
 reads have no FVE scores.
 
+## Thinking-on resamples
+
+`web/thinking.py` adds one pattern per favourite (`docs/favorite-transcripts.md`) to the WeirdChat
+tab, behavior `thinking-resample`: Qwen3.6-27B's reply to the same user turn, sampled again with
+thinking on (T=1, top_p 0.95, top_k 20, up to 8192 new tokens). The reply's highlighted text starts
+at its thinking. Two sources, both in `data/thinking.jsonl` (shared through `publish.py`):
+
+- `s<k>`: 10 per favourite from our own bf16 vLLM (`scripts/thinking.py prep`, then `gen` on a
+  RunPod pod), exact token ids.
+- `or<k>`: 5 per favourite from `qwen/qwen3.6-27b` on OpenRouter
+  (`scripts/thinking.py openrouter N`), whose providers may serve quantized weights; their text is
+  re-templated into ids.
+
+`scripts/thinking.py read PORT PARENT [TID ...]` reads one favourite's resamples against
+`pod/server.py`. The prompt is shared up to `<think>\n`, so every sample's end-of-user-turn reads
+are identical (greedy); samples only differ from the first thinking token on.
+
 ## Confession follow-ups
 
 Neel Nanda's suggestion: take a weird transcript, add a user turn asking Qwen why it did the weird

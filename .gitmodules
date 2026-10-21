@@ -1,3 +1,6 @@
 [submodule "vendor/detective-joracle"]
 	path = vendor/detective-joracle
 	url = https://github.com/agu18dec/detective-joracle
+[submodule "vendor/agent-interp-envs"]
+	path = vendor/agent-interp-envs
+	url = https://github.com/gkroiz/agent-interp-envs
