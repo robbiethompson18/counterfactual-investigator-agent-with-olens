@@ -599,6 +599,7 @@ dependencies = [
     { name = "datasets" },
     { name = "detective-joracle" },
     { name = "openai" },
+    { name = "pyyaml" },
     { name = "scipy" },
 ]
 
@@ -613,6 +614,7 @@ requires-dist = [
     { name = "datasets", specifier = ">=5.1.0" },
     { name = "detective-joracle", editable = "vendor/detective-joracle" },
     { name = "openai", specifier = ">=3.35.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "scipy", specifier = ">=1.18.1" },
 ]
 
