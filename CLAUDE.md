@@ -174,6 +174,8 @@ Current docs:
   self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
+  — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
 - [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
   — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
