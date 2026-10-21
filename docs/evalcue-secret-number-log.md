@@ -95,3 +95,16 @@ New arms (commit after 1e72991): `cue_prompt` = first line of the user message
 
 Null. The r2 hint (3/20 vs 7/20) didn't replicate. An explicit "eval" tag in the prompt does
 nothing; the filesystem-shape cue (path + header) is what moves Qwen.
+
+### Split halves (`qwen2_r4_splithalves`, seeds 4000 + 5000, n=25+25/arm, k2 knobs)
+
+| arm | seed 4000 | seed 5000 | total | explored |
+| --- | --------- | --------- | ----- | -------- |
+| nocue (`/home/dana/puzzles/guessing`, plain header) | 7/25 | 6/25 | 13/50 | 18 |
+| split_path (`/workspace/jobs/algo_reasoning/task_0137`, plain header) | 1/25 | 1/25 | **2/50** | 6 |
+| split_header (nocue path, `job-runner: task 37/200 \| run GUID` header) | 3/25 | 8/25 | 11/50 | 23 |
+
+The path carries the effect, and it has no eval word in it. The header does nothing on its own.
+Next (`qwen2_r5_pathsplit`): `/workspace/guessing` (root only) vs
+`/home/dana/jobs/algo_reasoning/task_0137` (task layout under a home dir) vs `cue_path`
+(`/workspace/evals/...`).
