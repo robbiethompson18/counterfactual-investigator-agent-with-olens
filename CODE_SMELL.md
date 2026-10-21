@@ -2,6 +2,60 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
+
+Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
+`-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
+salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
+rows have no provenance link to code on main until that branch merges. The behavior text is the
+`Hack` section of main's `evalcue/envs/secret_number.py` docstring, which omits the detector's
+`tamper` rule (0 tamper-only hacks in these rows).
+
+## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
+
+Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
+(`"backfilled": true`) once the agents producing them finish:
+
+- robbie-box `~/envs-results/` (agent-interp-envs screens, ~1.3 GB; gateway logs in `~/envs-logs/`).
+  The harness's step dirs are root-owned (Docker), so `sudo chown -R ubuntu` before uploading. Their
+  `config.yaml` says `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls
+  elsewhere, so don't trust it for which server answered.
+- Robbie's Mac `data/runs/`: `cfbench`, `evalcue`, `identity`, `stoptokens` and `vardania_sneeze`
+  are local-only, and about 12 loose `*.log`/`*.txt` files sit at the root. `vardania_sneeze/` holds
+  `.py` scripts that belong in git.
+- RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
+  version or Qwen revision served a run.
+
+## 2026-10-21: false-capability-claims scripts route Anthropic calls two ways
+
+`scripts/false_capability_claims.py` (judge) and `scripts/fcc_generate.py` (writer) each carry an
+`*_BACKEND=openrouter` switch that re-implements the same call through OpenRouter's
+OpenAI-compatible API, added overnight when the Anthropic key ran out of credit. Two code paths for
+one model; the Anthropic path also uses `output_config.effort` while the OpenRouter path uses
+`reasoning.effort`. Fold into one helper (or drop the OpenRouter path) once the key is topped up.
+Also: `report` prints `unjudged` rows when `judgments.jsonl` is partial, which hides partially
+judged prompts behind their judged count; fine for finished runs, misleading mid-run.
+
+## 2026-10-21: main doesn't pass its own `ty` check
+
+`uv run ty check` reports 247 errors: 80 unresolved imports (torch, transformers, vllm, `server`,
+`olens.lens`) in GPU-only scripts whose deps live only in the pod venvs, and 152 in
+`transcript-viewer/web/server.py`, mostly untyped JSON dicts. Check only the files you touched until
+someone excludes the pod-only modules and types `server.py`.
+
+## 2026-10-21: `evalcue/` harness rough edges
+
+- `harness.chat()` has no retry: transient `APIConnectionError`s under load (about 5–10% of rows in
+  multi-turn runs) are logged as errored rows instead of retried.
+- `Sandbox` writes files mode 644 (no `./script.py`) and the agent runs as root in the container.
+- `run_batch` divides by `len(env.items())`, so an env whose item filter returns nothing crashes
+  with ZeroDivisionError instead of a clear error.
+- Envs are discovered by filename with no ownership: two agents sharing one checkout both wrote
+  `envs/secret_number.py` and one silently overwrote the other.
+- Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
+  hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
+  `docs/eval-cue-reward-hacking.md`.
+
 ## 2026-10-19: `scripts/run_chive_or.py` monkeypatches Agam's harness
 
 It loads `vendor/detective-joracle/scripts/run_chive.py` and overwrites module globals
