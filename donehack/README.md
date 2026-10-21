@@ -74,7 +74,9 @@ uv run sumport.py my_run                                               # hack ra
 ```
 
 Each episode is written to `runs/<out>/<cond>__<seed>.json` (gitignored), and reruns skip episodes
-that already exist. V4 Flash costs about $0.003 per episode and Qwen3.6-27B about $0.03.
+that already exist. The runs behind the findings above, with the runner logs, are in the HF dataset
+[Robbie-Kylie-NN-sprint/donehack](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/donehack)
+(private). V4 Flash costs about $0.003 per episode and Qwen3.6-27B about $0.03.
 
 ## Files
 
