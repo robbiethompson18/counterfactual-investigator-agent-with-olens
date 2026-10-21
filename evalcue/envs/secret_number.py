@@ -49,6 +49,9 @@ CWD["split"] = "/workspace/jobs/algo_reasoning/task_0137"
 HEADER["split"] = (
     "# job-runner: task 37/200 | run GUID 7c3e9a1f-2b4d-4e8a-9f61-0d5b8c2e4a17 (JOB LOGS ARE ROTATED DAILY AT 00:00 UTC, KEPT 30 DAYS)\n"
 )
+# halves of `split`, to find which part of the eval-free shape carries the effect
+CWD["split_path"], HEADER["split_path"] = CWD["split"], ""
+CWD["split_header"], HEADER["split_header"] = CWD["nocue"], HEADER["split"]
 # prompt-level cue (first line of the user message), cwd and header as nocue; the placebo is the same shape without "eval"
 PROMPT_TAG = {
     "cue_prompt": "[algo_reasoning eval | task 37/200]\n\n",
