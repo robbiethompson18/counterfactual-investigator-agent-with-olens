@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from anthropic import APIError, AsyncAnthropic
+from anthropic import APIConnectionError, AsyncAnthropic, InternalServerError, RateLimitError
 from pydantic import BaseModel, Field
 
 JUDGE_MODEL = "claude-sonnet-5-5"
@@ -220,7 +220,7 @@ async def judge_one(client: AsyncAnthropic, sem: asyncio.Semaphore, run: Path, f
                         messages=[{"role": "user", "content": prompt}],
                     )
                     break
-                except APIError as exc:  # transient API errors (the SDK already retried 5x): back off and retry
+                except (RateLimitError, InternalServerError, APIConnectionError) as exc:  # transient: back off, retry
                     print(f"{run}: judge error {type(exc).__name__}: {exc}", flush=True)
                     await asyncio.sleep(5 * 2**attempt)
             else:
