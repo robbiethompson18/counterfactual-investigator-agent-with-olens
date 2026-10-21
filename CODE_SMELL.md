@@ -2,6 +2,21 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
+
+Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
+(`"backfilled": true`) once the agents producing them finish:
+
+- robbie-box `~/envs-results/` (agent-interp-envs screens, ~1.3 GB; gateway logs in `~/envs-logs/`).
+  The harness's step dirs are root-owned (Docker), so `sudo chown -R ubuntu` before uploading. Their
+  `config.yaml` says `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls
+  elsewhere, so don't trust it for which server answered.
+- Robbie's Mac `data/runs/`: `cfbench`, `evalcue`, `identity`, `stoptokens` and `vardania_sneeze`
+  are local-only, and about 12 loose `*.log`/`*.txt` files sit at the root. `vardania_sneeze/` holds
+  `.py` scripts that belong in git.
+- RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
+  version or Qwen revision served a run.
+
 ## 2026-10-21: false-capability-claims scripts route Anthropic calls two ways
 
 `scripts/false_capability_claims.py` (judge) and `scripts/fcc_generate.py` (writer) each carry an

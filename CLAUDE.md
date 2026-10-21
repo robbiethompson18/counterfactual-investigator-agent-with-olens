@@ -98,10 +98,16 @@ private O-lens research Slack log. Read them there; don't copy them into this re
 `data/` (gitignored) mirrors the public HF dataset
 [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
 O-lens banks in `banks/`, agent runs in `runs/`. Pull with
-`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`;
-push new runs back with `hf upload ... data/runs runs --repo-type dataset`. CHIVE incidents
-themselves come from
+`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`.
+CHIVE incidents themselves come from
 [agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).
+
+**Every experiment run goes through `scripts/runs.py`** (soft rule for Kylie's runs): outputs in
+`data/runs/<experiment>/<YYYY-MM-DD>_<slug>/` (experiment = env name or experiment family) with a
+`meta.json` (git SHA, command, models with HF revision and which pod/API served them, params). A run
+isn't finished until `scripts/runs.py finish RUN` has synced it to HF, including abandoned runs.
+Results that exist only on a pod, robbie-box or one laptop don't count. Usage is in the script's
+docstring.
 
 Cases viewer: [chive-cases.pages.dev](https://chive-cases.pages.dev) shows all 204 held-out
 incidents with every transcript-only and O-lens draw, filterable and linkable by URL.
