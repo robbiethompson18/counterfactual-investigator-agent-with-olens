@@ -9,14 +9,15 @@
 set -euo pipefail
 NAME=${NAME:-qwen-shared}
 VOLUME=wwwce2mejb  # network volume "qwen-fastboot" in US-CA-2: weights + compile caches
+IMAGE=${IMAGE:-vllm/vllm-openai:v0.32.0}  # v0.32.0 decodes ~3x slower than 0.25.1 (runpod/CLAUDE.md); IMAGE=vllm/vllm-openai:v0.25.1 to match the live server
 
 case ${1:?command} in
   up)
     # runpodctl can't set a start command, so create through the REST API. The image's entrypoint is vllm; run the boot script
     # instead, in a subshell so the container (and sshd) stays up if it fails.
-    jq -n --rawfile boot runpod/qwen_server_boot.sh --arg name "$NAME" --argjson n "${2:-2}" --arg vol $VOLUME \
+    jq -n --rawfile boot runpod/qwen_server_boot.sh --arg name "$NAME" --arg image "$IMAGE" --argjson n "${2:-2}" --arg vol $VOLUME \
       --arg key "$QWEN_VLLM_API_KEY" --arg hf "$(hf auth token 2>/dev/null)" '{
-        name: $name, imageName: "vllm/vllm-openai:v0.32.0", gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
+        name: $name, imageName: $image, gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
         networkVolumeId: $vol, volumeMountPath: "/workspace", containerDiskInGb: 50, ports: ["22/tcp", "8000/tcp"],
         env: {API_KEY: $key, HF_TOKEN: $hf, HF_XET_HIGH_PERFORMANCE: "1"},
         dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["exec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
