@@ -198,6 +198,43 @@ def cmd_submit(a) -> None:
     print(f"submitted: {len(exps)} experiments, {sum(e.is_key for e in findings.experiment_summaries)} key")
 
 
+def cmd_verify(a) -> None:
+    """CHIVE stage 4 on a submitted case: the same verification prompt, answered by Sonnet 5.5 via the CLI."""
+    from chive.pipeline.verify_investigations import VERIFICATION_SYSTEM_PROMPT, VerificationInput, build_verification_prompt
+
+    run = Path(a.run)
+    inv = read_jsonl(run / "investigations.jsonl")[0]
+    prompt = build_verification_prompt(inv)
+    system = VERIFICATION_SYSTEM_PROMPT + (
+        "\n\nYou have no tools. Instead of calling submit_verification, reply with JSON only, matching this schema: "
+        + json.dumps(VerificationInput.model_json_schema())
+    )
+    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", system, "--tools", "",
+           "--strict-mcp-config", "--no-session-persistence", "--output-format", "text"]
+    for attempt in range(3):
+        out = subprocess.run(cmd, input=prompt.encode(), capture_output=True, cwd="/tmp").stdout.decode()
+        m = re.search(r"\{.*\}", out, re.S)
+        try:
+            v = VerificationInput.model_validate_json(m.group(0)) if m else None
+        except ValueError:
+            v = None
+        if v:
+            break
+        print(f"  [verify] unparseable (attempt {attempt + 1}): {out[:200]!r}", file=sys.stderr)
+    assert v, "verifier failed 3 times"
+    rec = dict(prompt_id=inv["prompt_id"], score=float(v.score), experiment_assessments=[e.model_dump() for e in v.experiment_assessments],
+               explanation_assessment=v.explanation_assessment, issues=v.issues,
+               verified_at=dt.datetime.now(dt.timezone.utc).isoformat(), verification_prompt=prompt,
+               verification_response_text=out, verifier=f"claude-cli:{CLAUDE_MODEL}")
+    (run / "verification.jsonl").write_text(json.dumps(rec) + "\n")
+    st = rd(run, "status.json") or {}
+    st["stage4"] = dict(status="done", completed=1, total=1)
+    (run / "status.json").write_text(json.dumps(st))
+    print(f"verifier score {v.score}/10; {len(v.issues)} issues")
+    for i in v.issues:
+        print(f"  - {i}")
+
+
 def investigator_prompts(run: Path) -> tuple[str, str]:
     pid, m, pool = meta_of(run)
     base = rd(run, "baseline.json")
@@ -253,14 +290,14 @@ def main() -> None:
     p.add_argument("--wc-data", required=True)
     p.add_argument("--transcript", required=True, help="<prompt_id>/tNNN")
     p.add_argument("--out", required=True)
-    for name in ("baseline", "experiment", "submit", "investigate"):
+    for name in ("baseline", "experiment", "submit", "investigate", "verify"):
         sp = sub.add_parser(name)
         sp.add_argument("--run", required=True)
         if name == "submit":
             sp.add_argument("--file", help="findings JSON (default: stdin)")
     a = ap.parse_args()
     dict(init=cmd_init, baseline=cmd_baseline, experiment=cmd_experiment, submit=cmd_submit,
-         investigate=cmd_investigate)[a.cmd](a)
+         investigate=cmd_investigate, verify=cmd_verify)[a.cmd](a)
 
 
 if __name__ == "__main__":
