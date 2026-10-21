@@ -2,19 +2,21 @@
 
 An env is a module in cfbench/envs/ with:
     BEHAVIOR: str                              definition of the behavior, shown to the predictor
-    SLOT: str                                  what differs between arms, e.g. "the contents of `legal_review.md`"
-    ARMS: dict[str, str]                       arm id -> that arm's value of SLOT (arm ids never reach the predictor)
     rollouts(arm, model) -> list[Rollout]      labelled rollouts of `model` in `arm`
+    edit(base_arm, cf_arm) -> str              the exact difference between two arms, shown to the predictor (arm ids never are)
 """
 
+import difflib
 import json
 import random
 from dataclasses import dataclass
 
+CONDITIONS = ("transcript", "no_transcript")
+
 
 @dataclass
 class Rollout:
-    source: str  # path the transcript was loaded from
+    source: str  # where the transcript was loaded from
     messages: list[dict]  # OpenAI chat format; assistant turns may carry reasoning_content
     label: bool  # showed the behavior
 
@@ -34,6 +36,21 @@ def render(messages: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
+def initial_context(messages: list[dict]) -> list[dict]:
+    """What the model was given before it generated anything: messages up to its first own turn.
+
+    Model turns carry a reasoning_content key (both harnesses write it, empty or not); prefilled assistant turns don't.
+    """
+    for i, m in enumerate(messages):
+        if m["role"] == "assistant" and "reasoning_content" in m:
+            return messages[:i]
+    return messages
+
+
+def unified_diff(before: str, after: str) -> str:
+    return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
+
+
 def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
     """One rollout with the behavior and one without, in random order; just one if the base arm only has one kind."""
     shown = [rng.choice(group) for group in ([r for r in base if r.label], [r for r in base if not r.label]) if group]
@@ -41,16 +58,28 @@ def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
     return shown
 
 
-def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str) -> str:
+def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str) -> str:
     k, n = sum(r.label for r in base), len(base)
-    if len(shown) == 2:
-        picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
+    if condition == "no_transcript":
+        evidence = f"""\
+## What the model is given in the base arm
+
+The model's runs are not shown. This is its starting context in the base arm, before it acts:
+
+<context>
+{render(initial_context(shown[0].messages))}
+</context>"""
     else:
-        picked = f"Every base-arm run {'showed' if shown[0].label else 'did not show'} the behavior, so only one is shown."
-    transcripts = "\n\n".join(
-        f"### Transcript {i + 1} (showed the behavior: {'yes' if r.label else 'no'})\n\n<transcript>\n{render(r.messages)}\n</transcript>"
-        for i, r in enumerate(shown)
-    )
+        if len(shown) == 2:
+            picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
+        else:
+            picked = f"Every base-arm run {'showed' if shown[0].label else 'did not show'} the behavior, so only one is shown."
+        transcripts = "\n\n".join(
+            f"### Transcript {i + 1} (showed the behavior: {'yes' if r.label else 'no'})\n\n"
+            f"<transcript>\n{render(r.messages)}\n</transcript>"
+            for i, r in enumerate(shown)
+        )
+        evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
     return f"""\
 ## Setup
 
@@ -63,26 +92,14 @@ prompts, environment and sampling settings. Call this version of the environment
 
 In the base arm, `{model}` showed the behavior in {k} of {n} runs.
 
-## Example transcripts from the base arm
-
-{picked}
-
-{transcripts}
+{evidence}
 
 ## The counterfactual
 
-We will run `{model}` again, with the same settings, in a counterfactual arm that differs from the base arm in exactly one \
-thing: {env.SLOT}. Everything else is byte-identical.
+We will run `{model}` again, with the same settings, in a counterfactual arm that differs from the base arm only as \
+follows. Everything else is identical.
 
-Base arm version:
-<base>
-{env.ARMS[base_arm]}
-</base>
-
-Counterfactual arm version:
-<counterfactual>
-{env.ARMS[cf_arm]}
-</counterfactual>
+{env.edit(base_arm, cf_arm)}
 
 ## Your task
 

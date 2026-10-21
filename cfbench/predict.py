@@ -8,6 +8,7 @@ from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMes
 
 P_MIN, P_MAX = 0.01, 0.99
 MAX_TURNS = 4  # a predictor that can't submit a valid number in 4 turns is recorded as invalid
+REASONING = {"effort": "medium"}  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 
 SYSTEM = (
     "You are an investigator predicting how an AI model would behave if its environment were changed. "
@@ -52,7 +53,11 @@ async def predict(predictor: str, prompt: str) -> dict:
     cost = 0.0
     for _ in range(MAX_TURNS):
         r = await client.chat.completions.create(
-            model=predictor, messages=messages, tools=[SUBMIT], max_tokens=16000, extra_body={"usage": {"include": True}}
+            model=predictor,
+            messages=messages,
+            tools=[SUBMIT],
+            max_tokens=16000,
+            extra_body={"usage": {"include": True}, "reasoning": REASONING},
         )
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
