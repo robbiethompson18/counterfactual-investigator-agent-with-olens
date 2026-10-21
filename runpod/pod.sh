@@ -25,7 +25,7 @@ name=${2:?pod name}
 case $cmd in
   up)
     runpodctl pod create --name "$name" --image "$IMAGE" --gpu-id "${3:-NVIDIA H200}" --gpu-count "${4:-1}" \
-      --container-disk-in-gb 200 --ports 22/tcp --env "{\"HF_TOKEN\": \"$(hf auth token 2>/dev/null)\", \"HF_XET_HIGH_PERFORMANCE\": \"1\"}" >/dev/null
+      --container-disk-in-gb 200 --ports "${PORTS:-22/tcp}" --env "{\"HF_TOKEN\": \"$(hf auth token 2>/dev/null)\", \"HF_XET_HIGH_PERFORMANCE\": \"1\"}" >/dev/null
     until args=$(ssh_args "$name") && [ -n "$args" ] && ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 $args true 2>/dev/null; do sleep 10; done
     # --env only reaches PID 1; ssh sessions get it via pam_env
     ssh -o StrictHostKeyChecking=no $args 'tr "\0" "\n" < /proc/1/environ | grep "^HF_" >> /etc/environment'

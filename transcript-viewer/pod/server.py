@@ -216,7 +216,8 @@ def load_extras(nla=True):
         return print(f"J++ loaded {time.time() - T0:.0f}s", flush=True)
     S["nla"] = NLA(S["tok"], S["model"], stack=os.environ.get("NLA_STACK", "1") == "1")  # RL LoRA sits on the SFT-merged base
     S["critic"] = NLACritic(S["tok"])
-    calib = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calib_ids.json")))["ids"]
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "calib_ids.json")) as f:
+        calib = json.load(f)["ids"]
     S["critic"].calibrate(torch.cat([capture(S["model"], ids, [42])[42][4:] for ids in calib]))
     print(f"NLA + J++ loaded {time.time() - T0:.0f}s (FVE baseline {S['critic'].base:.1f})", flush=True)
 
@@ -255,9 +256,14 @@ def do_probe(req):
 def do_steer(req):
     t0 = time.time()
     texts = vectors().steer(
-        [int(i) for i in req["ids"]], int(req["layer"]), torch.tensor(req["v"]), float(req["alpha"]),
-        n=int(req.get("n", 64)), max_new_tokens=int(req.get("max_new_tokens", 400)),
-        temperature=float(req.get("temperature", 1.0)), seed=int(req.get("seed", 0)),
+        [int(i) for i in req["ids"]],
+        int(req["layer"]),
+        torch.tensor(req["v"]),
+        float(req["alpha"]),
+        n=int(req.get("n", 64)),
+        max_new_tokens=int(req.get("max_new_tokens", 400)),
+        temperature=float(req.get("temperature", 1.0)),
+        seed=int(req.get("seed", 0)),
     )
     return {"texts": texts, "seconds": round(time.time() - t0, 1)}
 
@@ -334,7 +340,9 @@ class H(BaseHTTPRequestHandler):
             if self.path in ("/vector", "/probe", "/steer", "/nla_score", "/contrib"):
                 if not STATUS["ready"]:
                     return self.send({"error": "model still loading"}, 503)
-                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score, "/contrib": do_contrib}[self.path]
+                fn = {"/vector": do_vector, "/probe": do_probe, "/steer": do_steer, "/nla_score": do_nla_score, "/contrib": do_contrib}[
+                    self.path
+                ]
                 LAST["t"] = time.time()
                 r = gpu(self.path[1:], lambda: fn(req))
                 LAST["t"] = time.time()
@@ -385,7 +393,9 @@ def main():
     ap.add_argument("--idle-min", type=float, default=45, help="0 = never exit on idle")
     ap.add_argument("--max-hours", type=float, default=3.75, help="0 = no cap (local GPU)")
     ap.add_argument("--batch", type=int, default=BATCH, help="decode batch (reads x samples)")
-    ap.add_argument("--extras", choices=["auto", "on", "jpp", "off"], default="auto", help="NLA + J++ (auto: on >= 120 GB GPUs); jpp = J++ only")
+    ap.add_argument(
+        "--extras", choices=["auto", "on", "jpp", "off"], default="auto", help="NLA + J++ (auto: on >= 120 GB GPUs); jpp = J++ only"
+    )
     ap.add_argument("--no-warmup", action="store_true", help="skip the CUDA kernel warm-up (ROCm doesn't need it)")
     args = ap.parse_args()
     BATCH = args.batch

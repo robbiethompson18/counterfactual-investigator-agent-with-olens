@@ -59,10 +59,9 @@ def read(pod, tok, tid, ids, positions, kinds=("nla", "jpp")):
                     recs.append(dict(tid=tid, pos=p, kind="nla", t=t, **res["nla"][j]))
                 if "jpp" in res and p in todo.get("jpp", []):
                     top = [[[tok.decode([x]), q] for x, q in row] for row in res["jpp"][str(p)]]
-                    recs.append(dict(tid=tid, pos=p, kind="jpp", t=t, layers=res["jpp_layers"], top=top))
-        with LOCK:
-            with CACHE.open("a") as f:
-                for r in recs:
-                    f.write(json.dumps(r) + "\n")
-                    E.setdefault(tid, {}).setdefault(r["pos"], {})[r["kind"]] = r
+                    recs.append({"tid": tid, "pos": p, "kind": "jpp", "t": t, "layers": res["jpp_layers"], "top": top})
+        with LOCK, CACHE.open("a") as f:
+            for r in recs:
+                f.write(json.dumps(r) + "\n")
+                E.setdefault(tid, {}).setdefault(r["pos"], {})[r["kind"]] = r
     return {p: E.get(tid, {}).get(p, {}) for p in positions}
