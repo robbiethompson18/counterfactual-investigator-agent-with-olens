@@ -7,7 +7,9 @@ chat-completions request by model name, so rollout containers hold no keys and n
 - QWEN_MODEL (default Qwen/Qwen3.6-27B) -> our vLLM server at QWEN_URL (never OpenRouter).
 - anything else -> OpenRouter, with the Fireworks-style `reasoning_effort` mapped to OpenRouter's `reasoning`.
 
-Every request is logged as one JSON line to GATEWAY_LOG (model, status, latency, token counts).
+A turn that runs out of tokens without answering (a degenerate reasoning loop) is resampled up to LOOP_RESAMPLES
+times before it reaches the harness. Every upstream call is logged as one JSON line to GATEWAY_LOG (model, status,
+latency, token counts, and `looped` for a resampled turn), so loop rates can be reported per env.
 
 Stdlib only, so it runs in a bare python image:
     docker run -d --name envs-gateway --network bridge -v ~/envs-logs:/logs -v $PWD/scripts:/app \
@@ -32,6 +34,7 @@ LOG_PATH = os.environ.get("GATEWAY_LOG", "/logs/gateway.jsonl")
 QWEN_DEFAULTS = {"temperature": 0.6, "top_p": 0.95, "top_k": 20, "max_tokens": 32768}
 TIMEOUT_S = 1800  # matches the harness client's timeout
 CONNECT_TIMEOUT_S, CONNECT_ATTEMPTS = 10, 5
+LOOP_RESAMPLES = 2  # extra samples of a turn that ran out of tokens without answering (see is_degenerate_loop)
 
 
 def route(body: dict) -> tuple[str, dict, dict]:
@@ -71,6 +74,17 @@ def post(url: str, data: bytes, headers: dict) -> tuple[int, bytes]:
     raise AssertionError("unreachable")
 
 
+def is_degenerate_loop(payload: bytes) -> bool:
+    """A turn that hit max_tokens with no answer and no tool call. Qwen3.6 sometimes repeats one reasoning
+    paragraph until the cap; the harness would read the empty turn as the end of the episode."""
+    try:
+        choice = json.loads(payload)["choices"][0]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+        return False
+    message = choice.get("message") or {}
+    return choice.get("finish_reason") == "length" and not (message.get("content") or "").strip() and not message.get("tool_calls")
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # health check
         self._send(200, b'{"ok": true}')
@@ -80,13 +94,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, b'{"error": "only chat/completions is routed"}')
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         url, headers, body = route(body)
-        start = time.time()
-        try:
-            status, payload = post(url, json.dumps(body).encode(), {"Content-Type": "application/json", **headers})
-        except OSError as err:  # upstream down: 502 so the harness retries
-            status, payload = 502, json.dumps({"error": f"upstream unreachable: {err}"}).encode()
+        for attempt in range(LOOP_RESAMPLES + 1):
+            start = time.time()
+            try:
+                status, payload = post(url, json.dumps(body).encode(), {"Content-Type": "application/json", **headers})
+            except OSError as err:  # upstream down: 502 so the harness retries
+                status, payload = 502, json.dumps({"error": f"upstream unreachable: {err}"}).encode()
+            looped = status == 200 and is_degenerate_loop(payload)
+            self._log(body["model"], status, time.time() - start, payload, looped)
+            if not looped or attempt == LOOP_RESAMPLES:
+                break
         self._send(status, payload)
-        self._log(body["model"], status, time.time() - start, payload)
 
     def _send(self, status: int, payload: bytes):
         self.send_response(status)
@@ -95,8 +113,10 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def _log(self, model: str, status: int, latency: float, payload: bytes):
+    def _log(self, model: str, status: int, latency: float, payload: bytes, looped: bool = False):
         record: dict = {"t": round(time.time()), "model": model, "status": status, "latency_s": round(latency, 1)}
+        if looped:
+            record["looped"] = True
         try:
             usage = json.loads(payload).get("usage") or {}
             record |= {"in": usage.get("prompt_tokens"), "out": usage.get("completion_tokens")}
