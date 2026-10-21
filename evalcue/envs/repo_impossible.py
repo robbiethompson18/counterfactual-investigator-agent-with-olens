@@ -436,6 +436,7 @@ def spec_for(arm):
         "banner": None,
         "prefill": False,
         "sys": None,
+        "thead": None,
         "turns": TURNS,
     } | SPECS[arm]
 
