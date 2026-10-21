@@ -125,6 +125,8 @@ def label_run(run: Path, root: Path) -> dict:
         "submitted_raw": raw,
         "parsed": parsed,
         "malformed": submitted and parsed is None,
+        # The harness's own accuracy strips only spaces and compares positionally; count where we had to do more.
+        "normalised": parsed is not None and parsed != raw.replace(" ", "").strip().upper(),
         "n_correct": n_correct,
         "harness_accuracy": state.get("accuracy"),
         "behavior": n_correct is not None and n_correct <= 5,
@@ -233,9 +235,7 @@ def table(root: Path) -> None:
     groups: dict[tuple[str, str], list[dict]] = {}
     for r in rows:
         groups.setdefault((r["model"], r["arm"]), []).append(r)
-    header = (
-        "| model | arm | n run | n valid | n gated | n behavior | r [95% CI] | verbal | slips | eval-aware | mean acc | reasoning |"
-    )
+    header = "| model | arm | n run | n valid | n gated | n behavior | r [95% CI] | verbal | slips | eval-aware | mean acc | reasoning |"
     print(header)
     print("|---" * (header.count("|") - 1) + "|")
     stats: dict[tuple[str, str], tuple[int, int]] = {}
@@ -267,6 +267,9 @@ def table(root: Path) -> None:
         key = f"{r['model']}/{r['arm']}/{r.get('end')}" + ("/malformed" if r.get("malformed") else "")
         ends[key] = ends.get(key, 0) + 1
     print("\nend reasons:", json.dumps(ends, indent=1))
+    for r in rows:
+        if r.get("normalised") or r.get("malformed"):
+            print(f"{'malformed' if r.get('malformed') else 'normalised'}: {r['run']} raw={r['submitted_raw']!r}")
 
 
 def main() -> None:
