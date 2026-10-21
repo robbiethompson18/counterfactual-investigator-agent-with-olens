@@ -161,6 +161,8 @@ Current docs:
   findings
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
+  — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
