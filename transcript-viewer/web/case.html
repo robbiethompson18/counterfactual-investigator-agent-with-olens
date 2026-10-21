@@ -65,7 +65,7 @@ table.ct tr.lrow{cursor:pointer} table.ct tr.lrow:hover td{background:var(--pane
     <div class="vb"><span class="muted">zero-ablate</span><input id="abl" placeholder="L12 attn, L40 h5, L20 mlp" size="30" title="every position; heads are slices of the attention output projection's input">
       <button class="btn" id="ablrun">Sample 64 ablated</button><label class="muted"><input type="checkbox" id="ablsteer" style="width:auto"> also apply to Steer runs</label></div>
     <div class="vb"><button class="btn" id="unst">Unsteered baseline (64)</button><button class="btn" id="calib" title="Judge WeirdChat's stored rollouts of this prompt and compare with its labels">Check judge vs WeirdChat</button><span class="muted" id="calibmsg"></span></div>
-    <table class="vt" id="runs"></table><div id="samples"></div>
+    <table class="vt" id="runs"></table><div id="sweeps" style="display:flex;flex-wrap:wrap;gap:14px;margin-top:10px"></div><div id="samples"></div>
   </div>
 </section>
 <aside id="right">
@@ -327,10 +327,11 @@ async function loadVectors(){
   $('#vlist').innerHTML = st.vecs.map(v => `<tr class="${st.probe && st.probe.vid === v.vid ? 'on' : ''}"><td>${esc(v.name)}</td><td class="muted">L${v.layer}</td>
     <td style="font-size:12px">${specHtml(v.spec)}<div class="muted" style="font-size:11px">raw norm ${v.info.raw_norm ?? '–'}${residMed(v.layer) && v.info.raw_norm ? ` = ${(v.info.raw_norm / residMed(v.layer)).toFixed(2)}× the median ‖h‖ at L${v.layer} here (${residMed(v.layer).toFixed(0)})` : ''}${v.info.cos_ab != null ? ` · cos(a, b) ${v.info.cos_ab}` : ''}</div></td>
     <td style="white-space:nowrap"><button class="btn" data-probe="${v.vid}">Probe</button>
-      α <input data-alpha="${v.vid}" value="0.1" size="4" title="h ← h + α·‖h‖·v̂ at every position"> <button class="btn" data-steer="${v.vid}">Steer 64</button>
+      α <input data-alpha="${v.vid}" value="0.1" size="4" title="h ← h + α·‖h‖·v̂ at every position"> <button class="btn" data-steer="${v.vid}">Steer 64</button> <button class="btn" data-sweep="${v.vid}" title="Steer 64 at α = −0.2, −0.1, +0.1, +0.2 (the unsteered runs give α = 0)">Sweep ±0.1, ±0.2</button>
       <button class="btn" data-del="${v.vid}" title="delete">×</button></td></tr>`).join('') || '<tr><td class="muted">No vectors yet.</td></tr>';
   for (const b of document.querySelectorAll('[data-probe]')) b.onclick = () => doProbe(b.dataset.probe);
   for (const b of document.querySelectorAll('[data-steer]')) b.onclick = () => doSteer(b.dataset.steer, +document.querySelector(`[data-alpha="${b.dataset.steer}"]`).value);
+  for (const b of document.querySelectorAll('[data-sweep]')) b.onclick = async () => { b.disabled = true; for (const a of [-0.2, -0.1, 0.1, 0.2]) await doSteer(b.dataset.sweep, a); };
   for (const b of document.querySelectorAll('[data-del]')) b.onclick = async () => { await api('/api/vector/delete', {vid: b.dataset.del}); loadVectors(); };
 }
 const toks = s => [...new Set(s.split(',').map(x => x.trim()).filter(Boolean).flatMap(x => [x, ' ' + x]))];  // each word with and without a leading space
@@ -368,7 +369,33 @@ async function loadRuns(){
     <td>${x.state === 'done' ? `<button class="btn" data-show="${x.rid}">samples</button>${x.n_judged != null && x.n_judged < x.n ? ` <button class="btn" data-rejudge="${x.rid}" title="${x.n - x.n_judged} judge calls failed">re-judge ${x.n - x.n_judged}</button>` : ''}` : ''}</td></tr>`).join('');
   for (const b of document.querySelectorAll('[data-rejudge]')) b.onclick = async () => { b.disabled = true; try { await api('/api/steer/rejudge', {rid: b.dataset.rejudge}); } catch (e) { alert(e.message); } loadRuns(); };
   for (const b of document.querySelectorAll('[data-show]')) b.onclick = () => showSamples(b.dataset.show);
+  renderSweeps(r.runs);
   if (r.runs.some(x => !['done', 'error'].includes(x.state)) || (c && c.state === 'running')) setTimeout(loadRuns, 10000);
+}
+// behaviour rate vs α per vector: pooled runs per α, Wilson 95% intervals; α = 0 pools the unsteered runs.
+// Colours: five evenly spaced stops from the middle two-thirds of matplotlib's magma.
+const MAGMA = ['#2c115f', '#721f81', '#b73779', '#f1605d', '#feb078'], ALPHAS = [-0.2, -0.1, 0, 0.1, 0.2];
+function wilson(k, n){ if (!n) return [0, 0]; const z = 1.96, p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d; return [Math.max(0, c - h), Math.min(1, c + h)]; }
+function renderSweeps(runs){
+  const ok = runs.filter(x => x.state === 'done' && x.n_judged && !(x.ablate || []).length);
+  const tally = xs => xs.reduce((a, x) => [a[0] + x.labels.filter(Boolean).length, a[1] + x.n_judged], [0, 0]);
+  const base = tally(ok.filter(x => !x.vid));
+  const vids = [...new Set(ok.filter(x => x.vid).map(x => x.vid))];
+  $('#sweeps').innerHTML = vids.map(vid => {
+    const name = (st.vecs || []).find(v => v.vid === vid)?.name || ok.find(x => x.vid === vid).name;
+    const pts = ALPHAS.map((a, i) => { const [k, n] = a === 0 ? base : tally(ok.filter(x => x.vid === vid && Math.abs(x.alpha - a) < 1e-9)); return {a, k, n, col: MAGMA[i]}; });
+    const W = 300, H = 170, L = 34, B = 24, T = 18, bw = (W - L - 10) / 5;
+    const y = v => T + (1 - v) * (H - T - B);
+    let g = [0, 0.25, 0.5, 0.75, 1].map(v => `<line x1="${L}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 4}" y="${y(v) + 3}" text-anchor="end" font-size="9.5" fill="var(--ink3)">${v * 100}%</text>`).join('');
+    g += pts.map((p, i) => { const x = L + i * bw + bw * 0.18, w = bw * 0.64, cx = x + w / 2;
+      const lab = `<text x="${cx}" y="${H - B + 13}" text-anchor="middle" font-size="10" fill="var(--ink2)">${p.a > 0 ? '+' : ''}${p.a}</text>`;
+      if (!p.n) return lab + `<text x="${cx}" y="${y(0) - 4}" text-anchor="middle" font-size="9" fill="var(--ink3)">–</text>`;
+      const r = p.k / p.n, [lo, hi] = wilson(p.k, p.n);
+      return lab + `<rect x="${x}" y="${y(r)}" width="${w}" height="${y(0) - y(r)}" rx="2" fill="${p.col}" stroke="var(--ink3)" stroke-width="0.5"><title>α ${p.a}: ${p.k}/${p.n} = ${(100 * r).toFixed(0)}% (95% CI ${(100 * lo).toFixed(0)}–${(100 * hi).toFixed(0)}%)</title></rect>
+        <line x1="${cx}" x2="${cx}" y1="${y(hi)}" y2="${y(lo)}" stroke="var(--ink)" stroke-width="1.2"/><line x1="${cx - 4}" x2="${cx + 4}" y1="${y(hi)}" y2="${y(hi)}" stroke="var(--ink)" stroke-width="1.2"/><line x1="${cx - 4}" x2="${cx + 4}" y1="${y(lo)}" y2="${y(lo)}" stroke="var(--ink)" stroke-width="1.2"/>`; }).join('');
+    return `<div style="border:1px solid var(--line);border-radius:10px;padding:6px 8px"><div style="font-size:12px;font-weight:600;margin-bottom:2px">${esc(name)} <span class="muted" style="font-weight:400">behaviour rate vs α (95% CI)</span></div>
+      <svg width="${W}" height="${H}" role="img" aria-label="behaviour rate by steering strength for ${esc(name)}">${g}</svg></div>`;
+  }).join('');
 }
 async function showSamples(rid){
   const r = (await api('/api/steer?full=1&tid=' + encodeURIComponent(st.tr.tid))).runs.find(x => x.rid === rid);
