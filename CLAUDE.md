@@ -161,6 +161,8 @@ Current docs:
   findings
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [WSB association examples — read before running the O-lens on WorkspaceBench association families](docs/wsb-association-examples.md)
+  — 9 unjudged items, s3d.ddp600 readouts on HF, what they say, pod/pip gotchas
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
