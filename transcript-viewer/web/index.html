@@ -111,6 +111,7 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .tmpl .lbl{color:var(--zone-ink);font-size:11px;font-weight:600;margin-right:6px}
 #right{border-left:1px solid var(--line);background:var(--panel);padding:16px 16px 60px}
 #right h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:0 0 8px;font-weight:650}
+details.tl summary{cursor:pointer;margin-bottom:8px} details.tl summary h3{display:inline}
 .chips{display:flex;gap:5px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);border-radius:7px;padding:2px 8px;font-size:12px;background:var(--panel2);font-variant-numeric:tabular-nums}
 .chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -611,23 +612,24 @@ function renderLens(){
     </div><div id="lerr"></div><div id="xbox"></div>`;
   if (z) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
-    h += `<h3>End-of-turn zone · L${L}</h3><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
+    h += `<details class="tl" data-k="zone" ${ls('open.zone') ? 'open' : ''}><summary><h3>End-of-turn zone · L${L}</h3></summary><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
       const r = st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
       const s = r ? r.samples[0] : null;
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td>${esc(JSON.stringify(tr.tokens[p]))}</td><td>${s ? mini(s) + fveTag(s) : '<span class="muted">–</span>'}</td></tr>`;
-    }).join('') + `</table>`;
+    }).join('') + `</table></details>`;
   }
   if (tr.punct && tr.punct.length) {
     const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
     const readAt = p => st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
     const rows = tr.punct.filter(readAt);
-    h += `<h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3>`;
+    h += `<details class="tl" data-k="punct" ${ls('open.punct') ? 'open' : ''}><summary><h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3></summary>`;
     if (rows.length) h += `<div style="max-height:300px;overflow:auto;margin-bottom:12px"><table class="zt">` + rows.map(p => {
       const s = readAt(p).samples[0];
       const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}${fveTag(s)}</td></tr>`;
     }).join('') + `</table></div>`;
     else h += `<div class="muted" style="margin-bottom:12px">Not read yet. ${tr.ds === 'chive' ? "Agam's O-lens bank samples get AR scores here once they're re-scored." : "Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it."}</div>`;
+    h += `</details>`;
   }
   if (tr.readers) h += bankHtml(pos);
   h += `<h3>${tr.readers ? 'Our reads' : 'Readouts'}</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
@@ -648,6 +650,7 @@ function renderLens(){
     const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); syncHash(); };
   for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); syncHash(); };
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
+  for (const d of document.querySelectorAll('details.tl')) d.ontoggle = () => ls('open.' + d.dataset.k, d.open);
   const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
   $('#xbtn').onclick = () => readExtras(pos);
