@@ -51,10 +51,11 @@ decodes both "I AM CALLING EMERGENCY SERVICES RIGHT NOW" (L36) and "I am an AI a
 
 ## Setup
 
-- Model: `Qwen/Qwen3.6-27B` bf16 on vLLM 0.32 (one H100 80GB, `runpod/vllm_qwen.sh`). WeirdChat's
-  subject was the FP8 checkpoint on SGLang; their OpenRouter replication (bf16 provider) gave 2–3x
-  lower rates than FP8 on the same prompts, and our P0 rate (2/128) matches their OpenRouter column
-  (2/128) exactly, so our numbers are on the bf16 scale.
+- Model: `Qwen/Qwen3.6-27B` bf16 on vLLM 0.32 (one H100 80GB, via a since-removed
+  `runpod/vllm_qwen.sh`; use `runpod/qwen_server.sh` now). WeirdChat's subject was the FP8
+  checkpoint on SGLang; their OpenRouter replication (bf16 provider) gave 2–3x lower rates than FP8
+  on the same prompts, and our P0 rate (2/128) matches their OpenRouter column (2/128) exactly, so
+  our numbers are on the bf16 scale.
 - Sampling as WeirdChat: no system prompt, thinking off (`enable_thinking=False`), temperature 1,
   `max_tokens` 1024. WeirdChat does not state top-p/top-k; we take Qwen's `generation_config.json`
   (top-p 0.95, top-k 20). 128 samples per prompt in the ablations, 64 in the held-out tests.
@@ -356,7 +357,8 @@ address **138.197.22.109**, which belongs to a hosting provider. From a network 
 - `scripts/false_capability_claims.py`: sample / judge / report / examples.
 - `scripts/fcc_ablation_prompts.py`: the P0/P1 ablation sets (waves 1–4).
 - `scripts/fcc_generate.py`: rules A and B + the generator.
-- `runpod/vllm_qwen.sh`: Qwen3.6-27B on vLLM on a RunPod H100, OpenAI-compatible on port 8000.
+- `runpod/qwen_server.sh`: the shared Qwen3.6-27B vLLM server (`QWEN_VLLM_URL`); this run used its
+  predecessor, a one-H100 `runpod/vllm_qwen.sh`.
 - Data (gitignored, mirrored to the project HF dataset under `runs/false-capability-claims/`):
   `ablation/` (wave 1 factorial + one-offs), `ablation2/` (channel kinds + messaging commands),
   `ablation3/` (messaging needs), `ablation4/` (stakes/tone on smart speaker), `heldout/` (rule A),
