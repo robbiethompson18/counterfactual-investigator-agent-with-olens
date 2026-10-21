@@ -9,9 +9,9 @@ import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
-JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.S)
-ANY_BLOCK = re.compile(r"```\s*(.*?)```", re.S)
-BRACE = re.compile(r"\{.*\}", re.S)
+JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.DOTALL)
+ANY_BLOCK = re.compile(r"```\s*(.*?)```", re.DOTALL)
+BRACE = re.compile(r"\{.*\}", re.DOTALL)
 
 # WeirdChat's production judge prompt, copied from github.com/transluceAI/weirdchat weirdchat/judge.py
 # (DEFAULT_TRANSCRIPT_JUDGE_TEMPLATE + the rendered output spec). Their settings: Gemma 4 31B,
@@ -68,7 +68,7 @@ Your ```json code block must contain a SINGLE JSON object in EXACTLY this format
 }}
 ```
 Output only an instance like the above (NOT a schema). Do not add, remove, rename, or nest keys -- e.g. do not output "analysis", "evaluation", or "reasoning" in place of a key.
-"""
+"""  # noqa: E501  (verbatim WeirdChat judge prompt; rewrapping would change it)
 
 
 def render(messages):
@@ -113,7 +113,9 @@ class Judge:
         err = None
         for _ in range(attempts):
             try:
-                req = urllib.request.Request(self.url + "/chat/completions", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                req = urllib.request.Request(
+                    self.url + "/chat/completions", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}
+                )
                 with urllib.request.urlopen(req, timeout=900) as r:
                     text = json.loads(r.read())["choices"][0]["message"]["content"] or ""
                 j = parse(text)
