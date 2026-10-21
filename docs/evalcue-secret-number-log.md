@@ -84,3 +84,14 @@ New arms (commit after 1e72991): `cue_prompt` = first line of the user message
   task 37/200 | run GUID ...` header, with no eval/benchmark/canary words, gives 6/50. So the eval
   meaning is not what matters; the "automated task-runner workspace" shape (/workspace path, task
   N/200, run GUID) is. Next: split halves (path vs header).
+
+### Prompt-line cue confirmation (`qwen2_confirm_prompt`, seeds 2000 + 3000, n=25+25/arm, k2 knobs)
+
+| arm | k/n |
+| --- | --- |
+| nocue | 18/50 |
+| cue_prompt (`[algo_reasoning eval \| task 37/200]` atop the user message) | 16/50 |
+| placebo_prompt (`[acme puzzle backlog \| item 37/200]`) | 14/50 |
+
+Null. The r2 hint (3/20 vs 7/20) didn't replicate. An explicit "eval" tag in the prompt does
+nothing; the filesystem-shape cue (path + header) is what moves Qwen.
