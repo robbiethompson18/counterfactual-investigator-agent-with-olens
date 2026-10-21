@@ -177,6 +177,8 @@ Current docs:
   self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [WSB association examples — read before running the O-lens on WorkspaceBench association families](docs/wsb-association-examples.md)
+  — 9 unjudged items, s3d.ddp600 readouts on HF, what they say, pod/pip gotchas
 - [Party resampling — read before trusting an O-lens readout's specific names, or fitting lens output → behaviour](docs/party-resample.md)
   — third-party-politics organism: off-target parties in reads are never taken (0/1,352, 0/1,480),
   lens lags the text; paired lens-vs-resample table
