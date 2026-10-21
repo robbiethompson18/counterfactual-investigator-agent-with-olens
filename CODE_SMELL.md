@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: `donehack/` runs don't go through `scripts/runs.py`
+
+`donehack/port.py` and `variants.py` write to `donehack/runs/<out>/` (gitignored) with no
+`meta.json` or HF sync. The ~25k episodes behind its README (all on the old bwrap sandbox) live only
+on bramble in `~/workspace/donehack/runs/`, which is also where the code was developed before moving
+here. The bwrap backend hard-codes NixOS store paths and is kept only for comparison with those
+runs.
+
 ## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
 
 Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout

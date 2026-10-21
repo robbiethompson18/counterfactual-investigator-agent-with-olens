@@ -201,6 +201,8 @@ Current docs:
   — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
+- [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
+  — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
