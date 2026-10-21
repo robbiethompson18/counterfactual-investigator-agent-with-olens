@@ -43,7 +43,9 @@ class Vectors:
         if k == "jpp":
             L = int(spec["layer"])
             i = self.jpp.layers.index(L)
-            g = self.model.model.norm(torch.ones(1, self.model.config.hidden_size, device=self.model.device, dtype=torch.bfloat16)).float()[0]
+            g = self.model.model.norm(torch.ones(1, self.model.config.hidden_size, device=self.model.device, dtype=torch.bfloat16)).float()[
+                0
+            ]
             W = self.model.lm_head.weight
             plus = [self.first_token(s) for s in spec.get("plus") or []]
             minus = [self.first_token(s) for s in spec.get("minus") or []]
@@ -123,11 +125,17 @@ def contributions(model, ids, pos, vecs):
     hs = []
     for i, b in enumerate(blocks(model)):
         attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
-        hs.append(attn.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "attn"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
+        hs.append(
+            attn.register_forward_hook(
+                lambda m, a, o, i=i: got.__setitem__((i, "attn"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())
+            )
+        )
         hs.append(b.mlp.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "mlp"), o[0, pos].float())))
         proj = attn.o_proj if hasattr(attn, "o_proj") else attn.out_proj  # input = concatenated per-head outputs
         hs.append(proj.register_forward_pre_hook(lambda m, a, i=i: got.__setitem__((i, "heads_in"), a[0][0, pos].float())))
-        hs.append(b.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "out"), (o[0] if isinstance(o, tuple) else o)[0, pos].float())))
+        hs.append(
+            b.register_forward_hook(lambda m, a, o, i=i: got.__setitem__((i, "out"), (o[0] if isinstance(o, tuple) else o)[0, pos].float()))
+        )
     try:
         model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
     finally:
