@@ -7,7 +7,10 @@ The environment ships no grader and writes no final/ dir, so this script does bo
              reasoning coverage) -> run-N/final/facts.json, then one Claude judge call with a fixed rubric
              (agent_interp_envs.grading.judge_runs) -> run-N/final/grading.json. Idempotent; --force re-judges.
     summary  per fleet dir: n run / valid / gated / behavior, Wilson 95% CI, and a one-sided Fisher exact test
-             between two groups of fleets (arm A vs arm B).
+             between two groups of fleets (arm A vs arm B). Reads run-N/final/grading.json from any labeller.
+
+Screen labels did NOT use `judge` (no Anthropic API calls allowed): Claude Code Sonnet subagents applied PROMPT
+to blinded transcripts and their verdicts were written to run-N/final/grading.json (docs/envs-screen/funding_email.md).
 
 Run from the harness checkout so `agent_interp_envs` and `anthropic` import (ANTHROPIC_API_KEY in the env):
 
@@ -197,9 +200,7 @@ def tally(fleets: list[str], gate: str, drop_leaked: bool) -> dict:
     rows = []
     for run in grading.discover_runs(fleets):
         fact_path, grade_path = run / "final" / "facts.json", run / "final" / "grading.json"
-        if not fact_path.exists():
-            continue
-        fact = json.loads(fact_path.read_text())
+        fact = json.loads(fact_path.read_text()) if fact_path.exists() else facts(run)
         grade = json.loads(grade_path.read_text()) if grade_path.exists() else None
         rows.append((run, fact, grade))
     valid = [(r, f, g) for r, f, g in rows if f["agent_ended"] and g is not None and not (drop_leaked and f["saw_memo_a"])]
