@@ -33,6 +33,7 @@
   .log { max-height:260px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px }
   ins { background:color-mix(in srgb, var(--ok) 25%, transparent); text-decoration:none } del { background:color-mix(in srgb, var(--up) 22%, transparent) }
   .trace > div, .trace > details { margin:8px 0 } .trace pre { background:color-mix(in srgb, var(--line) 35%, transparent); padding:6px 8px; border-radius:6px; margin-top:3px }
+  .step { border-left:3px solid var(--line); padding:4px 10px; margin:6px 0 } .step.call { border-color:var(--down) } .step.text { border-color:var(--ok) } .step.error { border-color:var(--up) } .step pre { max-height:420px; overflow:auto }
   .samp { border-left:3px solid var(--line); padding:4px 8px; margin:6px 0 } .samp.yes { border-color:var(--up) }
   .hidden { display:none } .row { display:flex; gap:16px; flex-wrap:wrap } .row > div { flex:1 1 380px; min-width:0 }
   .tabwrap { overflow-x:auto }
@@ -66,7 +67,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = x => (100 * x).toFixed(0) + "%";
-let RUN = null, OPEN = new Set(), OPENEXP = new Set();
+let RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
 try { RUN = localStorage.getItem("wcchive-run"); } catch (e) {}
 
 function wdiff(a, b) {            // word-level LCS diff, original a -> edited b
@@ -91,7 +92,8 @@ async function loadRuns() {
   const runs = await (await fetch("api/runs")).json();
   if (!runs.length) { $("#run").innerHTML = "<option>no runs yet</option>"; return; }
   if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.name === "wc30_pilot7") || runs[runs.length - 1]).name;
-  $("#run").innerHTML = runs.map(r => `<option ${r.name === RUN ? "selected" : ""}>${esc(r.name)}</option>`).join("");
+  $("#run").innerHTML = runs.map(r => `<option value="${esc(r.name)}" ${r.name === RUN ? "selected" : ""}>${esc(r.name)}${r.verifier && r.verifier.length === 1 ? ` · verifier ${r.verifier[0]}` : ""}</option>`).join("");
+  HAS_TRACE = Object.fromEntries(runs.map(r => [r.name, r.has_trace]));
 }
 
 async function load() {
@@ -134,6 +136,7 @@ async function load() {
           <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(inv.prompt_id)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(inv.prompt_id)}:0"></div></div>
         <div><h3>Findings</h3><pre>${esc(inv.structured_answer)}</pre></div></div>
         <h3>Experiments</h3><div class="tabwrap"><table><tr><th class="num">#</th><th>rate</th><th class="num">yes</th><th class="num">odds ratio</th><th class="num">p</th><th>label</th></tr>${exps}</table></div>
+        ${HAS_TRACE[RUN] ? `<details class="trace-box"><summary><b>Investigator trace</b> <span class="mut small">every message, command and result from the Sonnet 5.5 session</span></summary><div class="trace-steps">loading…</div></details>` : ""}
         ${v ? `<h3>Verifier: ${v.score}/10</h3><pre>${esc(v.explanation)}</pre>${(v.issues || []).length ? `<div class="small mut">Issues: ${esc(v.issues.join(" · "))}</div>` : ""}` : ""}
       </div></div>`;
   }).join("") : `<div class="card mut">No finished investigations yet (they appear when each one submits; see the log below).</div>`;
@@ -189,7 +192,17 @@ async function showSamples(key) {
     s.completions.map((t, i) => `<details class="samp ${s.verdicts[i] ? "yes" : ""}"><summary class="small">#${i + 1} ${s.verdicts[i] ? "yes" : "no"} · ${esc(t.slice(0, 140))}…</summary><pre>${esc(t)}</pre></details>`).join("");
 }
 
+async function loadTrace(el) {
+  if (el.dataset.loaded) return; el.dataset.loaded = 1;
+  const t = await (await fetch("api/trace?name=" + encodeURIComponent(RUN))).json();
+  const lab = {text: "Investigator", thinking: "Thinking", call: "Command", result: "Result", error: "Error"};
+  el.querySelector(".trace-steps").innerHTML = (t.summary ? `<div class="small mut">${t.summary.num_turns} turns · ${Math.round((t.summary.duration_ms || 0) / 60000)} min · ${esc(t.summary.stop_reason || t.summary.subtype || "")}</div>` : "") +
+    t.steps.map((s, i) => `<div class="step ${s.kind}"><div class="small mut">${i + 1}. ${lab[s.kind] || s.kind}</div>` +
+      (s.kind === "result" && s.text.length > 1500 ? `<details><summary><pre>${esc(s.text.slice(0, 600))}…</pre></summary><pre>${esc(s.text)}</pre></details>` : `<pre>${esc(s.text)}</pre>`) + `</div>`).join("");
+}
+
 function wire() {
+  document.querySelectorAll("details.trace-box").forEach(el => el.addEventListener("toggle", () => el.open && loadTrace(el)));
   document.querySelectorAll(".inv-head").forEach(h => h.onclick = () => {
     const p = h.dataset.p; OPEN.has(p) ? OPEN.delete(p) : OPEN.add(p); h.nextElementSibling.classList.toggle("hidden");
   });

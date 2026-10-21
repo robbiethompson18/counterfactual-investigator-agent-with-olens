@@ -60,6 +60,8 @@ def run_list() -> list[dict]:
             claude=cfg.get("stage3_llm"),
             grader=cfg.get("grader_llm"),
             log_mtime=log.stat().st_mtime if log.exists() else None,
+            verifier=[v["score"] for v in jsonl(d / "verification.jsonl")],
+            has_trace=(d / "investigator.jsonl").exists(),
         ))
     return out
 
@@ -122,6 +124,37 @@ def run_detail(name: str) -> dict:
                 prompts=prompts, investigations=invs, calibration=calib, log=tail(d / "log.txt"))
 
 
+def trace(name: str) -> dict:
+    """The headless investigator's stream (wctool.py investigate) as a list of steps."""
+    d = RUNS / name
+    assert d.parent == RUNS
+    steps, summary = [], None
+    f = d / "investigator.jsonl"
+    for line in f.read_text().splitlines() if f.exists() else []:
+        if not line.startswith("{"):
+            continue
+        e = json.loads(line)
+        if e.get("type") == "assistant":
+            for c in e["message"].get("content", []):
+                if c.get("type") == "text" and c["text"].strip():
+                    steps.append(dict(kind="text", text=c["text"]))
+                elif c.get("type") == "thinking" and c.get("thinking", "").strip():
+                    steps.append(dict(kind="thinking", text=c["thinking"]))
+                elif c.get("type") == "tool_use":
+                    inp = c.get("input", {})
+                    steps.append(dict(kind="call", tool=c.get("name"), text=inp.get("command") or json.dumps(inp)[:20000]))
+        elif e.get("type") == "user":
+            for c in e["message"].get("content", []) if isinstance(e["message"].get("content"), list) else []:
+                if c.get("type") == "tool_result":
+                    body = c.get("content")
+                    if isinstance(body, list):
+                        body = "\n".join(b.get("text", "") for b in body if isinstance(b, dict))
+                    steps.append(dict(kind="error" if c.get("is_error") else "result", text=str(body)))
+        elif e.get("type") == "result":
+            summary = {k: e.get(k) for k in ("num_turns", "duration_ms", "total_cost_usd", "stop_reason", "subtype")}
+    return dict(steps=steps, summary=summary)
+
+
 def calib_text(name: str, grader: str, pid: str, i: int) -> dict:
     """One calibration disagreement in full: the prompt, the reply, the rubric and both judges' reasons."""
     d = RUNS / name
@@ -172,6 +205,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps(run_list()))
             if p == "/api/run":
                 return self.send(json.dumps(run_detail(args["name"])))
+            if p == "/api/trace":
+                return self.send(json.dumps(trace(args["name"])))
             if p == "/api/calib_text":
                 return self.send(json.dumps(calib_text(args["name"], args["grader"], args["pid"], int(args["i"]))))
             if p == "/api/samples":
