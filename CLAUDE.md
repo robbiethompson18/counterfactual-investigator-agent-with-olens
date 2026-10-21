@@ -47,6 +47,10 @@ Summary of the Final Pitch (2026-10-19):
 
 ## Gotchas from the background reading
 
+- **We are not tied to the CHIVE pipeline**, e.g. how they found counterfactuals or how they
+  measured "successful changes" (their ≥50pp YES / ≤15pp NO rules). The absolute ≥50pp rule makes
+  every removal edit a NO when the baseline rate is under 50%, so prefer a headroom-normalized
+  effect plus a significance test when we label our own experiments.
 - **CHIVE's transcript-only baseline is strong (~81% AUROC), and in the paper no activation tool
   (AOs, NLAs, SAEs) beats it.** CHIVE didn't test the O-lens or J-lens, which is our opening.
 - **Selection bias in CHIVE.** The counterfactuals were proposed by a transcript-reading agent, so
