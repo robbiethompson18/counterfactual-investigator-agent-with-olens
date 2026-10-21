@@ -4,7 +4,11 @@ version = "0.1.0"
 description = "Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint with Neel Nanda."
 requires-python = ">=3.12"
 dependencies = [
+    "datasets>=5.1.0",
     "detective-joracle",
+    "openai>=3.35.1",
+    "pyyaml>=6.0.3",
+    "scipy>=1.18.1",
 ]
 
 [build-system]

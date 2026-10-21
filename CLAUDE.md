@@ -47,6 +47,10 @@ Summary of the Final Pitch (2026-10-19):
 
 ## Gotchas from the background reading
 
+- **We are not tied to the CHIVE pipeline**, e.g. how they found counterfactuals or how they
+  measured "successful changes" (their ≥50pp YES / ≤15pp NO rules). The absolute ≥50pp rule makes
+  every removal edit a NO when the baseline rate is under 50%, so prefer a headroom-normalized
+  effect plus a significance test when we label our own experiments.
 - **CHIVE's transcript-only baseline is strong (~81% AUROC), and in the paper no activation tool
   (AOs, NLAs, SAEs) beats it.** CHIVE didn't test the O-lens or J-lens, which is our opening.
 - **Selection bias in CHIVE.** The counterfactuals were proposed by a transcript-reading agent, so
@@ -94,20 +98,34 @@ private O-lens research Slack log. Read them there; don't copy them into this re
 `data/` (gitignored) mirrors the public HF dataset
 [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
 O-lens banks in `banks/`, agent runs in `runs/`. Pull with
-`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`;
-push new runs back with `hf upload ... data/runs runs --repo-type dataset`. CHIVE incidents
-themselves come from
+`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`.
+CHIVE incidents themselves come from
 [agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).
+
+**Every experiment run goes through `scripts/runs.py`** (soft rule for Kylie's runs): outputs in
+`data/runs/<experiment>/<YYYY-MM-DD>_<slug>/` (experiment = env name or experiment family) with a
+`meta.json` (git SHA, command, models with HF revision and which pod/API served them, params). A run
+isn't finished until `scripts/runs.py finish RUN` has synced it to HF, including abandoned runs.
+Results that exist only on a pod, robbie-box or one laptop don't count. Usage is in the script's
+docstring.
 
 Cases viewer: [chive-cases.pages.dev](https://chive-cases.pages.dev) shows all 204 held-out
 incidents with every transcript-only and O-lens draw, filterable and linkable by URL.
 `viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy
 with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
 
+O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
+token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is its old name and
+301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…` hash.
+Source is `transcript-viewer/web/index.html`, deployed by
+`transcript-viewer/scripts/deploy_site.sh`.
+
 ## Stack
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
+- `.githooks/pre-commit` runs ruff on staged Python files. Enable it once per clone with
+  `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
@@ -154,15 +172,50 @@ Current docs:
   you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
   hook-LoRA loaders, capture, AR, whitened FVE conventions
+- [Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
+  — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
+  in RL data)
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
+- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc., or before serving Qwen3.6-27B with vLLM on RunPod](docs/false-capability-claims.md)
+  — the device-channel lever (1.6% → 41%), severity dose-response, judge rubric v2 + audit,
+  generator, and the negative held-out result outside emergencies
+- [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
+  — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
+- [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
+  — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
+  self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [WSB association examples — read before running the O-lens on WorkspaceBench association families](docs/wsb-association-examples.md)
+  — 9 unjudged items, s3d.ddp600 readouts on HF, what they say, pod/pip gotchas
+- [Party resampling — read before trusting an O-lens readout's specific names, or fitting lens output → behaviour](docs/party-resample.md)
+  — third-party-politics organism: off-target parties in reads are never taken (0/1,352, 0/1,480),
+  lens lags the text; paired lens-vs-resample table
+- [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
+  — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
+- [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
+  — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
+- [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
+  — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
+- [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
+  — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
+  configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+- [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
+  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
+  — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
+  silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
+- [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
+  — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
+  scores
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
-  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
+  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
+  shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
+  boots, check progress every 3 min and treat no change as stuck
 
 ## Shipping
 
