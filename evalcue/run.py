@@ -31,7 +31,7 @@ if a.rescore:
     rows = harness.load_rows(a.rescore)
     for r in rows:
         if "error" not in r:
-            r.update(env.detect(r))
+            r.update(harness.score(env, r))
     a.rescore.write_text("".join(json.dumps(r) + "\n" for r in rows))
 else:
     out = Path(f"data/runs/evalcue/{a.env}/{a.tag}.jsonl")
