@@ -6,6 +6,8 @@ olens dashboard. Stdlib HTTP; reads the run files on each request (cached by mti
 
 import argparse
 import json
+import urllib.parse
+import re
 import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -44,6 +46,17 @@ def tail(path: Path, n: int = 80) -> list[str]:
     return [x[:400] for x in lines if x.strip()][-n:]
 
 
+CASE_SUFFIX = re.compile(r"_v\d+[a-z]?$")
+
+
+def case_base(name: str) -> str:
+    return CASE_SUFFIX.sub("", name)
+
+
+def single_prompt(d: Path) -> bool:
+    return len(jload(d / "wc_meta.json", {})) == 1
+
+
 def run_list() -> list[dict]:
     out = []
     for d in sorted(RUNS.iterdir()) if RUNS.exists() else []:
@@ -63,10 +76,49 @@ def run_list() -> list[dict]:
             verifier=[v["score"] for v in jsonl(d / "verification.jsonl")],
             has_trace=(d / "investigator.jsonl").exists(),
         ))
-    return out
+    # One merged entry per single-prompt case that has more than one run (case_x, case_x_v2a, ...)
+    groups: dict[str, list[dict]] = {}
+    for r in out:
+        if single_prompt(RUNS / r["name"]):
+            groups.setdefault(case_base(r["name"]), []).append(r)
+    merged = []
+    for base, rs in groups.items():
+        if len(rs) > 1:
+            scores = [v for r in rs for v in r["verifier"]]
+            merged.append(dict(name=f"all:{base}", group=True, members=[r["name"] for r in rs], status={},
+                               n_prompts=1, verifier=scores, has_trace=any(r["has_trace"] for r in rs)))
+    return merged + out
+
+
+def group_detail(base: str) -> dict:
+    members = [d.name for d in sorted(RUNS.iterdir()) if (d / "config.json").exists() and single_prompt(d) and case_base(d.name) == base]
+    parts = [run_detail(m) for m in members]
+    invs = []
+    for m, part in zip(members, parts, strict=True):
+        for inv in part["investigations"]:
+            inv["run"] = m
+            inv["has_trace"] = (RUNS / m / "investigator.jsonl").exists()
+            invs.append(inv)
+    invs.sort(key=lambda i: -(i["verification"]["score"] if i.get("verification") else -1))
+    top = max((i["verification"]["score"] for i in invs if i.get("verification")), default=None)
+    for i in invs:  # ties all count as best
+        i["best"] = top is not None and bool(i.get("verification")) and i["verification"]["score"] == top
+    calib_run = next((m for m, p in zip(members, parts, strict=True) if p["calibration"]), None)
+    calib = next((p["calibration"] for p in parts if p["calibration"]), {})
+    prompts = {}
+    for p in parts:
+        prompts.update(p["prompts"])
+    newest = max(members, key=lambda m: (RUNS / m / "log.txt").stat().st_mtime if (RUNS / m / "log.txt").exists() else 0)
+    n_sub = sum(1 for m in members if (RUNS / m / "investigations.jsonl").exists())
+    status = dict(stage1=dict(status="done"), stage2=dict(status="skipped"), stage3=dict(status="done" if n_sub == len(members) else "running", completed=n_sub, total=len(members)),
+                  stage4=dict(status="done", completed=sum(1 for i in invs if i.get("verification")), total=len(members)))
+    return dict(name=f"all:{base}", group=True, members=members, config=parts[0]["config"], status=status, prompts=prompts,
+                investigations=invs, calibration=calib, calib_run=calib_run, log=[f"[{newest}] " + x for x in parts[members.index(newest)]["log"]])
 
 
 def run_detail(name: str) -> dict:
+    if name.startswith("all:"):
+        return group_detail(name.removeprefix("all:"))
     d = RUNS / name
     assert d.parent == RUNS and (d / "config.json").exists(), f"no run {name}"
     meta = jload(d / "wc_meta.json", {})
@@ -206,7 +258,7 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p, _, q = self.path.partition("?")
-        args = dict(kv.split("=", 1) for kv in q.split("&") if "=" in kv)
+        args = dict(urllib.parse.parse_qsl(q))
         try:
             if p in ("/", "/index.html"):
                 return self.send((HERE / "index.html").read_bytes(), "text/html; charset=utf-8")

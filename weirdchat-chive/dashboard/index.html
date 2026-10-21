@@ -67,7 +67,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = x => (100 * x).toFixed(0) + "%";
-let RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
+let CALIB_RUN = null, RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
 try { RUN = localStorage.getItem("wcchive-run"); } catch (e) {}
 
 function wdiff(a, b) {            // word-level LCS diff, original a -> edited b
@@ -91,9 +91,11 @@ function bar(r, base) { return `<span class="bar"><i style="width:${(100*r).toFi
 async function loadRuns() {
   const runs = await (await fetch("api/runs")).json();
   if (!runs.length) { $("#run").innerHTML = "<option>no runs yet</option>"; return; }
-  if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.name === "wc30_pilot7") || runs[runs.length - 1]).name;
-  $("#run").innerHTML = runs.map(r => `<option value="${esc(r.name)}" ${r.name === RUN ? "selected" : ""}>${esc(r.name)}${r.verifier && r.verifier.length === 1 ? ` · verifier ${r.verifier[0]}` : ""}</option>`).join("");
-  HAS_TRACE = Object.fromEntries(runs.map(r => [r.name, r.has_trace]));
+  if (!RUN || !runs.some(r => r.name === RUN)) RUN = (runs.find(r => r.group) || runs.find(r => r.name === "wc30_pilot7") || runs[runs.length - 1]).name;
+  const lbl = r => r.group ? `${r.name.slice(4)} — all ${r.members.length} runs merged${r.verifier.length ? ` · verifier best ${Math.max(...r.verifier)}` : ""}`
+    : `${r.name}${r.verifier && r.verifier.length === 1 ? ` · verifier ${r.verifier[0]}` : ""}`;
+  $("#run").innerHTML = runs.map(r => `<option value="${esc(r.name)}" ${r.name === RUN ? "selected" : ""}>${esc(lbl(r))}</option>`).join("");
+  HAS_TRACE = Object.fromEntries(runs.filter(r => !r.group).map(r => [r.name, r.has_trace]));
 }
 
 async function load() {
@@ -113,12 +115,12 @@ async function load() {
   // investigations
   const P = d.prompts;
   $("#invs").innerHTML = d.investigations.length ? d.investigations.map(inv => {
-    const p = P[inv.prompt_id] || {}, base = inv.k0 / inv.n0;
+    const p = P[inv.prompt_id] || {}, base = inv.k0 / inv.n0, R = inv.run || RUN, U = R + "|" + inv.prompt_id;
     const cnt = l => inv.experiments.filter(e => e.label === l).length;
     const v = inv.verification;
-    const open = OPEN.has(inv.prompt_id);
+    const open = OPEN.has(U);
     const exps = inv.experiments.map(e => {
-      const key = inv.prompt_id + ":" + e.exp_num, eo = OPENEXP.has(key);
+      const key = U + ":" + e.exp_num, eo = OPENEXP.has(key);
       const msg = (e.messages || []).filter(m => m.role === "user").map(m => m.content).join("\n\n");
       return `<tr class="exp" data-k="${esc(key)}" style="cursor:pointer"><td class="num">${e.exp_num}</td><td>${bar(e.k / e.n, base)}</td>
         <td class="num">${e.k}/${e.n}</td><td class="num">${e.odds_ratio.toFixed(2)}</td><td class="num">${e.fisher_p < 1e-4 ? e.fisher_p.toExponential(1) : e.fisher_p.toFixed(4)}</td>
@@ -126,18 +128,18 @@ async function load() {
         <tr class="${eo ? "" : "hidden"}"><td></td><td colspan="5"><div class="small mut">Edited prompt (diff vs original)</div>
         <pre>${wdiff(p.user_message || "", msg)}</pre><div class="samples" data-k="${esc(key)}"></div></td></tr>`;
     }).join("");
-    return `<div class="card"><div class="inv-head" data-p="${esc(inv.prompt_id)}">
-      <b>${esc(p.behavior_id)}</b><span class="mut">${esc(p.pattern_title)}</span>
+    return `<div class="card"><div class="inv-head" data-p="${esc(U)}">
+      ${inv.run ? `<span class="lab ${inv.best ? "mover_up" : "inert"}">${esc(inv.run)}${inv.best ? " · best" : ""}</span>` : ""}<b>${esc(p.behavior_id)}</b><span class="mut">${esc(p.pattern_title)}</span>
       <span>baseline ${inv.k0}/${inv.n0} (${pct(base)}; WeirdChat ${p.wc_matched}/${p.wc_samples})</span>
       <span>${inv.experiments.length} experiments: <span class="lab mover_up">${cnt("mover_up")} up</span> <span class="lab mover_down">${cnt("mover_down")} down</span> <span class="lab inert">${cnt("inert")} inert</span> <span class="lab dead_zone">${cnt("dead_zone")} dead</span></span>
       <span>verifier ${v ? v.score : "–"}</span></div>
       <div class="${open ? "" : "hidden"}">
         <div class="row"><div><h3>Original prompt</h3><pre>${esc(p.user_message)}</pre>
-          <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(inv.prompt_id)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(inv.prompt_id)}:0"></div></div>
+          <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(U)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(U)}:0"></div></div>
         <div><h3>Findings</h3><pre>${esc(inv.structured_answer)}</pre></div></div>
         <h3>Experiments</h3><div class="tabwrap"><table><tr><th class="num">#</th><th>rate</th><th class="num">yes</th><th class="num">odds ratio</th><th class="num">p</th><th>label</th></tr>${exps}</table></div>
-        ${HAS_TRACE[RUN] ? `<details class="prompt-box"><summary><b>Investigator prompts and settings</b> <span class="mut small">exact system prompt and first message given to the Sonnet session, model and effort</span></summary><div class="prompt-body">loading…</div></details>` : ""}
-        ${HAS_TRACE[RUN] ? `<details class="trace-box"><summary><b>Investigator trace</b> <span class="mut small">every message, command and result from the Sonnet 5.5 session</span></summary><div class="trace-steps">loading…</div></details>` : ""}
+        ${HAS_TRACE[R] ? `<details class="prompt-box" data-run="${esc(R)}"><summary><b>Investigator prompts and settings</b> <span class="mut small">exact system prompt and first message given to the Sonnet session, model and effort</span></summary><div class="prompt-body">loading…</div></details>` : ""}
+        ${HAS_TRACE[R] ? `<details class="trace-box" data-run="${esc(R)}"><summary><b>Investigator trace</b> <span class="mut small">every message, command and result from the Sonnet 5.5 session</span></summary><div class="trace-steps">loading…</div></details>` : ""}
         ${v ? `<h3>Verifier: ${v.score}/10</h3><pre>${esc(v.explanation)}</pre>${(v.issues || []).length ? `<div class="small mut">Issues: ${esc(v.issues.join(" · "))}</div>` : ""}` : ""}
       </div></div>`;
   }).join("") : `<div class="card mut">No finished investigations yet (they appear when each one submits; see the log below).</div>`;
@@ -148,6 +150,7 @@ async function load() {
       <td class="num">${p.screening ? p.screening.interest_score : "–"}</td><td class="small">${esc(p.screening ? p.screening.question : "")}</td></tr>`).join("");
 
   // calibration
+  CALIB_RUN = d.calib_run || RUN;
   const cal = d.calibration, graders = Object.keys(cal);
   $("#calib").innerHTML = graders.length ? `<div class="tabwrap"><table><tr><th>behaviour</th><th class="num">WeirdChat yes</th>${graders.map(g => `<th class="num" colspan="2">${esc(g)}<br>yes · kappa</th>`).join("")}</tr>` +
     Object.entries(P).map(([pid, p]) => {
@@ -164,7 +167,7 @@ async function load() {
   }).join("")).join("") || '<div class="card mut">None recorded (rerun calibrate.py to record them).</div>';
   document.querySelectorAll("details.calib").forEach(el => el.addEventListener("toggle", async () => {
     if (!el.open || el.dataset.loaded) return; el.dataset.loaded = 1;
-    const r = await (await fetch(`api/calib_text?name=${encodeURIComponent(RUN)}&grader=${encodeURIComponent(el.dataset.g)}&pid=${el.dataset.p}&i=${el.dataset.i}`)).json();
+    const r = await (await fetch(`api/calib_text?name=${encodeURIComponent(CALIB_RUN)}&grader=${encodeURIComponent(el.dataset.g)}&pid=${el.dataset.p}&i=${el.dataset.i}`)).json();
     if (r.error) { el.querySelector(".txt").textContent = r.error; return; }
     const reason = r.grader_reason
       ? `<div><b>Sonnet's reason</b> <span class="mut small">(asked again on this reply alone, it answered <b>${esc(r.grader_single_answer ?? "?")}</b>; the batch verdict was <b>${r.grader ? "yes" : "no"}</b>)</span><pre>${esc(r.grader_reason)}</pre></div>`
@@ -182,12 +185,12 @@ async function load() {
 }
 
 async function showSamples(key) {
-  const [pid, exp] = key.split(":");
+  const i = key.lastIndexOf(":"), exp = key.slice(i + 1), [run, pid] = key.slice(0, i).split("|");
   const box = document.querySelector(`.samples[data-k="${CSS.escape(key)}"]`);
   if (!box) return;
   if (box.dataset.loaded) { box.innerHTML = ""; delete box.dataset.loaded; return; }
   box.innerHTML = '<div class="mut small">loading…</div>';
-  const s = await (await fetch(`api/samples?name=${encodeURIComponent(RUN)}&pid=${pid}&exp=${exp}`)).json();
+  const s = await (await fetch(`api/samples?name=${encodeURIComponent(run)}&pid=${pid}&exp=${exp}`)).json();
   box.dataset.loaded = 1;
   box.innerHTML = `<div class="small mut">${s.completions.length} samples; red = grader said the behaviour is present</div>` +
     s.completions.map((t, i) => `<details class="samp ${s.verdicts[i] ? "yes" : ""}"><summary class="small">#${i + 1} ${s.verdicts[i] ? "yes" : "no"} · ${esc(t.slice(0, 140))}…</summary><pre>${esc(t)}</pre></details>`).join("");
@@ -195,7 +198,7 @@ async function showSamples(key) {
 
 async function loadTrace(el) {
   if (el.dataset.loaded) return; el.dataset.loaded = 1;
-  const t = await (await fetch("api/trace?name=" + encodeURIComponent(RUN))).json();
+  const t = await (await fetch("api/trace?name=" + encodeURIComponent(el.dataset.run))).json();
   const lab = {text: "Investigator", thinking: "Thinking", call: "Command", result: "Result", error: "Error"};
   el.querySelector(".trace-steps").innerHTML = (t.summary ? `<div class="small mut">${t.summary.num_turns} turns · ${Math.round((t.summary.duration_ms || 0) / 60000)} min · ${esc(t.summary.stop_reason || t.summary.subtype || "")}</div>` : "") +
     t.steps.map((s, i) => `<div class="step ${s.kind}"><div class="small mut">${i + 1}. ${lab[s.kind] || s.kind}</div>` +
@@ -204,7 +207,7 @@ async function loadTrace(el) {
 
 async function loadPrompts(el) {
   if (el.dataset.loaded) return; el.dataset.loaded = 1;
-  const p = await (await fetch("api/prompts?name=" + encodeURIComponent(RUN))).json();
+  const p = await (await fetch("api/prompts?name=" + encodeURIComponent(el.dataset.run))).json();
   const st = p.settings;
   const eff = st ? Object.entries(st.effort).map(([k, v]) => `${k} ${v}`).join(", ") : "not recorded (run predates explicit effort, so the CLI default was used)";
   const sys = p.system || "", hit = sys.match(/Aim for roughly [^.]*\./);
