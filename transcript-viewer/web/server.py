@@ -750,7 +750,7 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/contrib":  # per-block attention / MLP writes at one token: {tid, pos}
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
-                vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
+                vecs = {steer.spec_name(v["spec"], full=True): steer.V[v["vid"]]["v"] for v in steer.vectors()}
                 return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}}))
             if p.startswith("/api/h/"):  # generic: pod handlers.do_<name> on this transcript's ids
                 if not (POD and POD.ready()):

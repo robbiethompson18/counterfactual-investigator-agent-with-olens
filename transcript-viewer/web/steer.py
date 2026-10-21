@@ -63,15 +63,17 @@ def build(pod, name, spec):
     return dict(public(V[vid]), vid=vid)
 
 
-def spec_name(s):
-    k = s["kind"]
+def spec_name(s, full=False):
+    """A label from the recipe; `full` keeps whole texts (the case page shows them)."""
+    k, cut = s["kind"], (lambda t: t if full else t[:40])
+    uniq = lambda ts: "/".join(dict.fromkeys(t.strip() for t in ts))  # noqa: E731  (" Yes" and "Yes" collapse)
     if k == "jpp":
-        return f"J++ L{s['layer']} +{'/'.join(s.get('plus') or [])}" + (f" −{'/'.join(s['minus'])}" if s.get("minus") else "")
+        return f"J++ L{s['layer']} +{uniq(s.get('plus') or [])}" + (f" −{uniq(s['minus'])}" if s.get("minus") else "")
     if k == "ar":
-        return f"AR L{s['layer']} “{s['text'][:40]}”"
+        return f"AR L{s['layer']} “{cut(s['text'])}”"
     if k == "nla":
-        return f"NLA-AR L42 “{s['text'][:40]}”"
-    return f"({spec_name(s['a'])}) − ({spec_name(s['b'])})"
+        return f"NLA-AR “{cut(s['text'])}”"
+    return f"{spec_name(s['a'], full)} − {spec_name(s['b'], full)}"
 
 
 def delete(vid):

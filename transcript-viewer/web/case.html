@@ -312,6 +312,15 @@ function residMed(L){
   const xs = range().filter(p => p > 3).map(p => st.reads[p + '|' + L]).filter(Boolean).map(r => r.norm).sort((a, b) => a - b);
   return xs.length ? xs[Math.floor(xs.length / 2)] : null;
 }
+// automatic label from the recipe (the hand-given names were unclear)
+function specText(sp){
+  if (sp.kind === 'jpp') return `J++ L${sp.layer} +${(sp.plus || []).map(t => t.trim()).filter((t, i, a) => a.indexOf(t) === i).join('/')}${(sp.minus || []).length ? ' −' + sp.minus.map(t => t.trim()).filter((t, i, a) => a.indexOf(t) === i).join('/') : ''}`;
+  if (sp.kind === 'ar') return `AR L${sp.layer} “${sp.text}”`;
+  if (sp.kind === 'nla') return `NLA-AR “${sp.text}”`;
+  return `${specText(sp.a)} − ${specText(sp.b)}`;
+}
+const runLabel = x => [x.vid ? (vecLabel(x.vid) || x.name) : null, (x.ablate || []).length ? 'ablate ' + x.ablate.map(a => `L${a.layer} ${a.kind === 'head' ? 'head ' + a.head : a.kind}`).join(', ') : null].filter(Boolean).join(' + ') || 'unsteered';
+const vecLabel = vid => { const v = (st.vecs || []).find(x => x.vid === vid); return v ? specText(v.spec) : null; };
 // exactly what a vector was built from
 function specHtml(sp){
   const q = t => `<span style="font-family:var(--mono);background:var(--panel2);border-radius:4px;padding:0 4px">${esc(t)}</span>`;
@@ -324,7 +333,7 @@ async function loadVectors(){
   const r = await api('/api/vectors'); st.vecs = r.vectors; st.hasJudge = r.judge;
   const opts = st.vecs.map(v => `<option value="${v.vid}">${esc(v.name)} (L${v.layer})</option>`).join('');
   $('#va').innerHTML = opts; $('#vbb').innerHTML = opts;
-  $('#vlist').innerHTML = st.vecs.map(v => `<tr class="${st.probe && st.probe.vid === v.vid ? 'on' : ''}"><td>${esc(v.name)}</td><td class="muted">L${v.layer}</td>
+  $('#vlist').innerHTML = st.vecs.map(v => `<tr class="${st.probe && st.probe.vid === v.vid ? 'on' : ''}"><td class="muted">L${v.layer}</td>
     <td style="font-size:12px">${specHtml(v.spec)}<div class="muted" style="font-size:11px">raw norm ${v.info.raw_norm ?? '–'}${residMed(v.layer) && v.info.raw_norm ? ` = ${(v.info.raw_norm / residMed(v.layer)).toFixed(2)}× the median ‖h‖ at L${v.layer} here (${residMed(v.layer).toFixed(0)})` : ''}${v.info.cos_ab != null ? ` · cos(a, b) ${v.info.cos_ab}` : ''}</div></td>
     <td style="white-space:nowrap"><button class="btn" data-probe="${v.vid}">Probe</button>
       α <input data-alpha="${v.vid}" value="0.1" size="4" title="h ← h + α·‖h‖·v̂ at every position"> <button class="btn" data-steer="${v.vid}">Steer 64</button> <button class="btn" data-sweep="${v.vid}" title="Steer 64 at α = −0.2, −0.1, +0.1, +0.2 (the unsteered runs give α = 0)">Sweep ±0.1, ±0.2</button>
@@ -364,7 +373,7 @@ $('#calib').onclick = async () => { await api('/api/judge_calib', {tid: st.tr.ti
 async function loadRuns(){
   const r = await api('/api/steer?tid=' + encodeURIComponent(st.tr.tid)); const c = r.calib;
   $('#calibmsg').textContent = !c ? '' : c.state === 'done' ? `judge vs WeirdChat on its ${c.n} rollouts: WeirdChat ${(100 * c.weirdchat_rate).toFixed(0)}%, this judge ${(100 * c.judge_rate).toFixed(0)}%, agreement ${(100 * c.agree).toFixed(0)}%, κ ${c.kappa == null ? '–' : c.kappa.toFixed(2)}` : c.state === 'error' ? c.error : 'judging WeirdChat’s rollouts…';
-  $('#runs').innerHTML = r.runs.map(x => `<tr data-rid="${x.rid}"><td>${esc(x.name)}</td><td class="muted">${x.layer == null ? '' : 'L' + x.layer + ' α ' + x.alpha}</td>
+  $('#runs').innerHTML = r.runs.map(x => `<tr data-rid="${x.rid}"><td>${esc(runLabel(x))}</td><td class="muted">${x.layer == null ? '' : 'L' + x.layer + ' α ' + x.alpha}</td>
     <td>${x.state === 'done' && x.error ? `<span style="color:var(--bad)">${esc(x.error)}</span>` : x.state === 'done' ? (x.rate == null ? (x.note || 'sampled') : `<b>${(100 * x.rate).toFixed(0)}%</b> (${x.labels.filter(Boolean).length}/${x.n_judged})`) : x.state === 'error' ? `<span style="color:var(--bad)">${esc(x.error)}</span>` : x.state + '…'}</td>
     <td>${x.state === 'done' ? `<button class="btn" data-show="${x.rid}">samples</button>${x.n_judged != null && x.n_judged < x.n ? ` <button class="btn" data-rejudge="${x.rid}" title="${x.n - x.n_judged} judge calls failed">re-judge ${x.n - x.n_judged}</button>` : ''}` : ''}</td></tr>`).join('');
   for (const b of document.querySelectorAll('[data-rejudge]')) b.onclick = async () => { b.disabled = true; try { await api('/api/steer/rejudge', {rid: b.dataset.rejudge}); } catch (e) { alert(e.message); } loadRuns(); };
@@ -382,7 +391,7 @@ function renderSweeps(runs){
   const base = tally(ok.filter(x => !x.vid));
   const vids = [...new Set(ok.filter(x => x.vid).map(x => x.vid))];
   $('#sweeps').innerHTML = vids.map(vid => {
-    const name = (st.vecs || []).find(v => v.vid === vid)?.name || ok.find(x => x.vid === vid).name;
+    const name = vecLabel(vid) || ok.find(x => x.vid === vid).name;
     const pts = ALPHAS.map((a, i) => { const [k, n] = a === 0 ? base : tally(ok.filter(x => x.vid === vid && Math.abs(x.alpha - a) < 1e-9)); return {a, k, n, col: MAGMA[i]}; });
     const W = 300, H = 170, L = 34, B = 24, T = 18, bw = (W - L - 10) / 5;
     const y = v => T + (1 - v) * (H - T - B);
@@ -400,7 +409,7 @@ function renderSweeps(runs){
 async function showSamples(rid){
   const r = (await api('/api/steer?full=1&tid=' + encodeURIComponent(st.tr.tid))).runs.find(x => x.rid === rid);
   const vv = (st.vecs || []).find(v => v.vid === r.vid);
-  $('#samples').innerHTML = `<h3 style="margin-top:12px">${esc(r.name)} · ${r.layer == null ? '' : `L${r.layer} α ${r.alpha} · `}${r.texts.length} samples (bar = judged match)</h3>${vv ? `<div style="font-size:12px;margin-bottom:6px">${specHtml(vv.spec)}</div>` : ''}${(r.ablate || []).length ? `<div class="muted" style="font-size:12px">zero-ablated: ${r.ablate.map(a => `L${a.layer} ${a.kind === 'head' ? 'head ' + a.head : a.kind}`).join(', ')}</div>` : ''}` + r.texts.map((t, i) =>
+  $('#samples').innerHTML = `<h3 style="margin-top:12px;text-transform:none;letter-spacing:0">${esc(runLabel(r))} · ${r.layer == null ? '' : `L${r.layer} α ${r.alpha} · `}${r.texts.length} samples (bar = judged match)</h3>${vv ? `<div style="font-size:12px;margin-bottom:6px">${specHtml(vv.spec)}</div>` : ''}${(r.ablate || []).length ? `<div class="muted" style="font-size:12px">zero-ablated: ${r.ablate.map(a => `L${a.layer} ${a.kind === 'head' ? 'head ' + a.head : a.kind}`).join(', ')}</div>` : ''}` + r.texts.map((t, i) =>
     `<div class="smp ${r.labels && r.labels[i] ? 'm' : ''}" title="${esc((r.explanations || [])[i] || '')}">${esc(t.slice(0, 700))}${t.length > 700 ? '…' : ''}</div>`).join('');
 }
 function pick(p){ st.sel = p; render(); }
