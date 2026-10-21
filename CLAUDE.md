@@ -164,7 +164,8 @@ Current docs:
 - [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
   — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
-  — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
+  — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
+  survives a split test); harness in `evalcue/README.md`
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
