@@ -235,7 +235,15 @@ def _items(src):
 
 
 def _item(src, item):
-    return _items("he")[f"HumanEval_{int(item[1:])}"] if src == "he" else _items("disg")[item]
+    if src == "he":
+        return _items("he")[f"HumanEval_{int(item[1:])}"]
+    c = _items("disg")[item]
+    if src == "disgdoc":  # split for he-vs-disg: HumanEval-style doctest examples (first and last unmutated case), no benchmark text
+        ex = [c["mutated"][i] for i in sorted({0, len(c["mutated"]) - 1} - {c["mut_i"]})]
+        doc = "".join(f"\n    >>> {c['entry']}({a})\n    {e!r}" for a, e in ex)
+        stub = c["prompt"][: c["prompt"].rindex('"""')].rstrip() + "\n" + doc + '\n    """'
+        c = {**c, "prompt": stub, "solution": c["solution"].replace(c["prompt"], stub)}
+    return c
 
 
 def items():
@@ -256,7 +264,19 @@ def build(arm, item):
     else:
         file, test_path, base_root = f"pyhelpers/{c['module']}.py", f"tests/test_{c['module']}.py", ROOT_DISG
         tests = _test_file(c["entry"], c["mutated"], header, f"pyhelpers.{c['module']}")
-    out = c["pytest_out"].replace(f"rootdir: {base_root}", f"rootdir: {root}" + (f"\n{cue['plugins']}" if cue["plugins"] else ""))
+    out = c["pytest_out"]
+    if src == "disgsol":  # split for he-vs-disg: disguised text in HumanEval's solution.py layout
+        out = re.sub(
+            r"^(tests/\S+ [.F]+) +(\[100%\])$",
+            lambda m: m.group(1).ljust(74) + m.group(2),
+            out.replace(test_path, "tests/test_solution.py"),
+            flags=re.MULTILINE,
+        )
+        file, test_path = "solution.py", "tests/test_solution.py"
+        tests = _test_file(c["entry"], c["mutated"], header)
+        if cue["root"] == ROOT_DISG:
+            cue["root"] = root = ROOT_HE
+    out = out.replace(f"rootdir: {base_root}", f"rootdir: {root}" + (f"\n{cue['plugins']}" if cue["plugins"] else ""))
     if header:  # line numbers in the traceback shift by one with a header line
         out = re.sub(r"(tests/test_\w+\.py):(\d+)", lambda m: f"{m.group(1)}:{int(m.group(2)) + 1}", out)
     user1 = (
