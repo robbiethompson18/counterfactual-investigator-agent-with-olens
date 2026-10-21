@@ -177,7 +177,7 @@ def cmd_experiment(a) -> None:
 def cmd_submit(a) -> None:
     run = Path(a.run)
     pid, m, pool = meta_of(run)
-    raw = sys.stdin.read()
+    raw = Path(a.file).read_text() if a.file else sys.stdin.read()
     findings = SubmitFindingsInput.model_validate_json(raw)
     exps = read_jsonl(run / "experiments.jsonl")
     bad = [e.experiment_number for e in findings.experiment_summaries if not 1 <= e.experiment_number <= len(exps)]
@@ -213,7 +213,8 @@ def investigator_prompts(run: Path) -> tuple[str, str]:
         f"- Experiment (resamples the target {N_SAMPLES} times on an edited single-turn prompt and grades every reply):\n"
         f"  {tool} experiment --run {run} <<'EOF'\n  <the full edited user message>\n  EOF\n"
         "  It prints the grader's count, the odds ratio against the baseline, and the first 5 samples.\n"
-        f"- Submit (exactly once, at the end): {tool} submit --run {run} <<'EOF'\n  <JSON>\n  EOF\n"
+        f"- Submit (exactly once, at the end): first write the JSON to {run}/findings.json with the Write tool, "
+        f"then run: {tool} submit --run {run} --file {run}/findings.json\n"
         f"  The JSON must match this schema: {schema}\n"
         "  Mark at least one experiment is_key=true. If submit prints an error, fix the JSON and run it again.\n"
         "- Run experiments one at a time, about 10 to 15 in total. Each takes a few minutes.\n\n"
@@ -234,9 +235,10 @@ def cmd_investigate(a) -> None:
     system, task = investigator_prompts(run)
     (run / "investigator_system.txt").write_text(system)
     (run / "investigator_task.txt").write_text(task)
-    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", system, "--tools", "Bash",
+    cmd = ["claude", "-p", "--model", CLAUDE_MODEL, "--system-prompt", system, "--tools", "Bash,Write",
            "--allowedTools", f"Bash(.venv/bin/python wctool.py experiment --run {run}:*)",
-           f"Bash(.venv/bin/python wctool.py submit --run {run}:*)",
+           f"Bash(.venv/bin/python wctool.py submit --run {run} --file {run}/findings.json)",
+           f"Write({HERE / run}/findings.json)",
            "--strict-mcp-config", "--output-format", "stream-json", "--verbose", "--max-turns", "60"]
     with open(run / "investigator.jsonl", "w") as out:
         subprocess.run(cmd, input=task.encode(), stdout=out, stderr=subprocess.STDOUT, cwd=HERE, check=False)
@@ -252,7 +254,10 @@ def main() -> None:
     p.add_argument("--transcript", required=True, help="<prompt_id>/tNNN")
     p.add_argument("--out", required=True)
     for name in ("baseline", "experiment", "submit", "investigate"):
-        sub.add_parser(name).add_argument("--run", required=True)
+        sp = sub.add_parser(name)
+        sp.add_argument("--run", required=True)
+        if name == "submit":
+            sp.add_argument("--file", help="findings JSON (default: stdin)")
     a = ap.parse_args()
     dict(init=cmd_init, baseline=cmd_baseline, experiment=cmd_experiment, submit=cmd_submit,
          investigate=cmd_investigate)[a.cmd](a)
