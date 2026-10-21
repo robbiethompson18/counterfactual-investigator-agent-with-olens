@@ -161,6 +161,9 @@ Current docs:
   findings
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [Party resampling — read before trusting an O-lens readout's specific names, or fitting lens output → behaviour](docs/party-resample.md)
+  — third-party-politics organism: off-target parties in reads are never taken (0/1,352, 0/1,480),
+  lens lags the text; paired lens-vs-resample table
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's
 
