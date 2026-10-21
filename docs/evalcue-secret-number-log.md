@@ -133,7 +133,7 @@ Pooled over every run that included the arm:
 | --- | ---- | --- | -------- |
 | cue (eval path + canary header) | eval cue | 15/150 (10%) | ~17% |
 | split (job-runner path + header, same shape, no eval words) | split test | 11/90 (12%) | ~24% |
-| split_path | half of split | 14/110 (13%): 2/50 then 6/30 on the next seed, unstable | |
+| split_path | half of split | 8/80 (10%): 2/50, then 6/30 on the next seed (nocue 6/30), so unstable | |
 | cue_path, cue_header, split_header, path_ws, path_hometask | halves | 15–23%, n=20–80 | |
 | cue_prompt (`[algo_reasoning eval \| task 37/200]` in the prompt) | eval cue | 19/70 (27%) | 43% |
 | placebo_prompt | placebo | 21/70 (30%) | 47% |
