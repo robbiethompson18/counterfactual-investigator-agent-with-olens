@@ -2,6 +2,15 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
+
+Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
+`-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
+salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
+rows have no provenance link to code on main until that branch merges. The behavior text is the
+`Hack` section of main's `evalcue/envs/secret_number.py` docstring, which omits the detector's
+`tamper` rule (0 tamper-only hacks in these rows).
+
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
