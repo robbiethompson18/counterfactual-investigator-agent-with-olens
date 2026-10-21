@@ -167,6 +167,8 @@ Current docs:
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
+- [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
+  — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
 - [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
   — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
   self-report, O-lens reads
@@ -175,6 +177,8 @@ Current docs:
 - [Party resampling — read before trusting an O-lens readout's specific names, or fitting lens output → behaviour](docs/party-resample.md)
   — third-party-politics organism: off-target parties in reads are never taken (0/1,352, 0/1,480),
   lens lags the text; paired lens-vs-resample table
+- [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
+  — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
 - [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
   — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
