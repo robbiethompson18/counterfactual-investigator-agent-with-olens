@@ -75,6 +75,7 @@ def run_list() -> list[dict]:
             log_mtime=log.stat().st_mtime if log.exists() else None,
             verifier=[v["score"] for v in jsonl(d / "verification.jsonl")],
             has_trace=(d / "investigator.jsonl").exists(),
+            has_thinking=(d / "thinking_on.json").exists(),
         ))
     # One merged entry per single-prompt case that has more than one run (case_x, case_x_v2a, ...)
     groups: dict[str, list[dict]] = {}
@@ -207,6 +208,19 @@ def trace(name: str) -> dict:
     return dict(steps=steps, summary=summary)
 
 
+def thinking(name: str) -> dict:
+    """nothink_check.py output: the case re-sampled with thinking on, split into reasoning and final answer."""
+    d = RUNS / name
+    assert d.parent == RUNS
+    t = jload(d / "thinking_on.json")
+    out = []
+    for raw, fin, v in zip(t["raw"], t["finals"], t["verdicts"], strict=True):
+        think = raw.split("</think>", 1)[0].replace("<think>", "").strip() if "</think>" in raw else ""
+        out.append(dict(thinking=think, final=fin, verdict=v))
+    base = jload(d / "baseline.json")
+    return dict(samples=out, yes=sum(t["verdicts"]), n=len(t["verdicts"]), baseline_yes=sum(base["verdicts"]) if base else None)
+
+
 def prompts(name: str) -> dict:
     """What the headless investigator was given (wctool.py writes these at launch)."""
     d = RUNS / name
@@ -266,6 +280,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(json.dumps(run_list()))
             if p == "/api/run":
                 return self.send(json.dumps(run_detail(args["name"])))
+            if p == "/api/thinking":
+                return self.send(json.dumps(thinking(args["name"])))
             if p == "/api/prompts":
                 return self.send(json.dumps(prompts(args["name"])))
             if p == "/api/trace":

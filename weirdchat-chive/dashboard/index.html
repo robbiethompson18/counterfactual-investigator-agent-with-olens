@@ -67,7 +67,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = x => (100 * x).toFixed(0) + "%";
-let CALIB_RUN = null, RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
+let HAS_THINK = {}, CALIB_RUN = null, RUN = null, OPEN = new Set(), OPENEXP = new Set(), HAS_TRACE = {};
 try { RUN = localStorage.getItem("wcchive-run"); } catch (e) {}
 
 function wdiff(a, b) {            // word-level LCS diff, original a -> edited b
@@ -96,6 +96,7 @@ async function loadRuns() {
     : `${r.name}${r.verifier && r.verifier.length === 1 ? ` · verifier ${r.verifier[0]}` : ""}`;
   $("#run").innerHTML = runs.map(r => `<option value="${esc(r.name)}" ${r.name === RUN ? "selected" : ""}>${esc(lbl(r))}</option>`).join("");
   HAS_TRACE = Object.fromEntries(runs.filter(r => !r.group).map(r => [r.name, r.has_trace]));
+  HAS_THINK = Object.fromEntries(runs.filter(r => !r.group).map(r => [r.name, r.has_thinking]));
 }
 
 async function load() {
@@ -138,6 +139,7 @@ async function load() {
           <div class="small" style="margin-top:6px"><a href="#" class="base" data-k="${esc(U)}:0">baseline samples</a> · <a href="${esc(p.weirdchat_url)}" target="_blank">WeirdChat</a></div><div class="samples" data-k="${esc(U)}:0"></div></div>
         <div><h3>Findings</h3><pre>${esc(inv.structured_answer)}</pre></div></div>
         <h3>Experiments</h3><div class="tabwrap"><table><tr><th class="num">#</th><th>rate</th><th class="num">yes</th><th class="num">odds ratio</th><th class="num">p</th><th>label</th></tr>${exps}</table></div>
+        ${HAS_THINK[R] ? `<details class="think-box" data-run="${esc(R)}"><summary><b>Thinking-on resample</b> <span class="mut small">the original prompt sampled 64 times WITHOUT the empty &lt;think&gt;&lt;/think&gt; prefill; Qwen's reasoning and final answer, final answer graded</span></summary><div class="think-body">loading…</div></details>` : ""}
         ${HAS_TRACE[R] ? `<details class="prompt-box" data-run="${esc(R)}"><summary><b>Investigator prompts and settings</b> <span class="mut small">exact system prompt and first message given to the Sonnet session, model and effort</span></summary><div class="prompt-body">loading…</div></details>` : ""}
         ${HAS_TRACE[R] ? `<details class="trace-box" data-run="${esc(R)}"><summary><b>Investigator trace</b> <span class="mut small">every message, command and result from the Sonnet 5.5 session</span></summary><div class="trace-steps">loading…</div></details>` : ""}
         ${v ? `<h3>Verifier: ${v.score}/10</h3><pre>${esc(v.explanation)}</pre>${(v.issues || []).length ? `<div class="small mut">Issues: ${esc(v.issues.join(" · "))}</div>` : ""}` : ""}
@@ -217,7 +219,17 @@ async function loadPrompts(el) {
     <details><summary><b>First message (task)</b> <span class="mut small">${(p.task || "").length} chars</span></summary><pre>${esc(p.task)}</pre></details>`;
 }
 
+async function loadThinking(el) {
+  if (el.dataset.loaded) return; el.dataset.loaded = 1;
+  const t = await (await fetch("api/thinking?name=" + encodeURIComponent(el.dataset.run))).json();
+  el.querySelector(".think-body").innerHTML = `<div class="small">Grader YES <b>${t.yes}/${t.n}</b> with thinking on, vs <b>${t.baseline_yes}/${t.n}</b> in the no-think baseline. Red = grader said the behaviour is present.</div>` +
+    t.samples.map((x, i) => `<details class="samp ${x.verdict ? "yes" : ""}"><summary class="small">#${i + 1} ${x.verdict ? "yes" : "no"} · ${esc(x.final.slice(0, 140))}…</summary>
+      <div class="small mut">Reasoning (${x.thinking.length} chars)</div><pre>${esc(x.thinking || "(empty)")}</pre>
+      <div class="small mut">Final answer</div><pre>${esc(x.final)}</pre></details>`).join("");
+}
+
 function wire() {
+  document.querySelectorAll("details.think-box").forEach(el => el.addEventListener("toggle", () => el.open && loadThinking(el)));
   document.querySelectorAll("details.prompt-box").forEach(el => el.addEventListener("toggle", () => el.open && loadPrompts(el)));
   document.querySelectorAll("details.trace-box").forEach(el => el.addEventListener("toggle", () => el.open && loadTrace(el)));
   document.querySelectorAll(".inv-head").forEach(h => h.onclick = () => {
