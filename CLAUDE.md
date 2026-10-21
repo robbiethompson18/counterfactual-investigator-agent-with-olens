@@ -174,6 +174,9 @@ Current docs:
   self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
+- [Party resampling — read before trusting an O-lens readout's specific names, or fitting lens output → behaviour](docs/party-resample.md)
+  — third-party-politics organism: off-target parties in reads are never taken (0/1,352, 0/1,480),
+  lens lags the text; paired lens-vs-resample table
 - [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
   — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
 - [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
