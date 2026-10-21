@@ -18,6 +18,7 @@ Stdlib only, so it runs in a bare python image:
 import http.client
 import json
 import os
+import socket
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -58,6 +59,12 @@ def post(url: str, data: bytes, headers: dict) -> tuple[int, bytes]:
             continue
         assert connection.sock is not None
         connection.sock.settimeout(TIMEOUT_S)
+        # A non-streaming request is silent while vLLM generates (a 32k-token turn takes ~9 min); something on the
+        # AWS -> RunPod path drops idle connections after a few minutes, so keep the connection visibly alive.
+        connection.sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        # The tuning knobs are Linux-only (the gateway runs in a Linux container); getattr keeps macOS type checks quiet.
+        for option, value in (("TCP_KEEPIDLE", 30), ("TCP_KEEPINTVL", 15), ("TCP_KEEPCNT", 8)):
+            connection.sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, option), value)
         connection.request("POST", parts.path, body=data, headers=headers)
         response = connection.getresponse()
         return response.status, response.read()
