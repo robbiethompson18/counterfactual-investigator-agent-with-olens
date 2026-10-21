@@ -11,13 +11,14 @@ one model; the Anthropic path also uses `output_config.effort` while the OpenRou
 `reasoning.effort`. Fold into one helper (or drop the OpenRouter path) once the key is topped up.
 Also: `report` prints `unjudged` rows when `judgments.jsonl` is partial, which hides partially
 judged prompts behind their judged count; fine for finished runs, misleading mid-run.
-## 2026-10-21: main doesn't pass its own ship checks
+## 2026-10-21: main doesn't pass its own `ty` check
 
-`uv run ruff check .` reports 21 errors and `ruff format .` rewrites 6 files, all in
-`olens/src/olens/` and `transcript-viewer/`. `ty check` reports unresolved imports (torch, vllm,
-`server`) for every GPU-only script in `scripts/`, because those deps live only in the pod venvs. So
-the "run before shipping" line in CLAUDE.md can't come back clean; check only the files you touched
-until someone fixes these or excludes the pod-only modules.
+Ruff is clean since #37 (`ruff check` and `ruff format --check` both pass, and `.githooks/pre-commit`
+keeps it that way). `uv run ty check` still reports 247 errors: 80 unresolved imports (torch,
+transformers, vllm, `server`, `olens.lens`) in GPU-only scripts whose deps live only in the pod
+venvs, and 152 in `transcript-viewer/web/server.py`, mostly untyped JSON dicts that ty infers as
+`str`/`int`. So the "run before shipping" line in CLAUDE.md can't come back clean for `ty`; check
+only the files you touched until someone excludes the pod-only modules and types `server.py`.
 
 ## 2026-10-21: `evalcue/` harness rough edges
 
