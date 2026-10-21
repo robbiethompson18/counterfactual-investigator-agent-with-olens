@@ -159,6 +159,9 @@ Current docs:
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
+- [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
+  — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
+  self-report, O-lens reads
 - [Robbie's favorite transcripts — read when picking showcase transcripts or "why did you do X?" follow-up targets](docs/favorite-transcripts.md)
   — running list of the most interesting WeirdChat/CHIVE transcripts, with viewer links and ids
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
