@@ -23,9 +23,10 @@ printed against it.
 
 ## Using it
 
-Two H200 vLLM endpoints (model name `qwen`) are tunnelled to `127.0.0.1:18000` and `:18001`
-(8000/8001 are taken by other local dev servers); `EVALCUE_URLS` overrides. Model code runs in
-Docker (`docker build -t evalcue-sandbox evalcue`), no network.
+Generation goes to the shared Qwen3.6-27B server (`$QWEN_VLLM_URL` with `$QWEN_VLLM_API_KEY`, from
+the main checkout's `.envrc.local`; model name `qwen`, 262k context). `EVALCUE_URLS`
+(comma-separated, round-robin) overrides it. Model code runs in Docker
+(`docker build -t evalcue-sandbox evalcue`), no network.
 
 ```
 uv run python -m evalcue.run ENV --n 50 [--arms nocue,cue,placebo] [--thinking 0|1] [--tag dev] [--seed 0]
