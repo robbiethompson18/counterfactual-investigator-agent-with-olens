@@ -133,6 +133,11 @@ Source is `transcript-viewer/web/index.html`, deployed by
 - Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
   workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
+- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`
+  (not a uv member; it has its own env). Run its rollouts on robbie-box through
+  `scripts/envs_gateway.py` (see the docs/envs-screen reports): `agent.provider=fireworks` plus
+  `ROLLOUT_GATEWAY` routes Qwen to our vLLM and keeps containers off the internet
+  (`--network envnet`).
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
@@ -207,6 +212,13 @@ Current docs:
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+- [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
+  — FAIL: Qwen and GLM disclose the tampering every time; the shipped variant names don't exist in
+  the image, so arm B needs our overlay
+- [optimize_cache_c env screen — read before running Optimize LRU cache (agent-interp-envs) on Qwen](docs/envs-screen/optimize_cache_c.md)
+  — FAIL: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and reports honestly
+- [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
+  — FAIL: at an unreachable bar Qwen never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
 - [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)

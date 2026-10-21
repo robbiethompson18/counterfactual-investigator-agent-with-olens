@@ -2,6 +2,15 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-21: `scripts/envs_screen/*_judge.py` still carry Anthropic-API judge code paths
+
+`eval_tampering_judge.py`, `gyo_judge.py` and `optimize_cache_judge_export.py` were written before
+the no-API-judge rule (`CLAUDE.local.md`) and can call `claude-sonnet-5-5` through the API, or wrap
+Aditya's `grade_rollouts.py` (which at the pinned commit also crashes on a missing `import yaml`).
+Every label in the `docs/envs-screen/` reports came from reading transcripts or Sonnet subagents,
+not these paths. Strip the API calls (keep the rubric text) next time one of these scripts is
+touched.
+
 ## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
 
 Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
