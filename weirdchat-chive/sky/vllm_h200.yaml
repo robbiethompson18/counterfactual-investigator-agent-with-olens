@@ -8,11 +8,10 @@ name: wc-chive
 
 resources:
   disk_size: 120
-  ordered:                      # North America only (Kylie: avoid Iceland); 2x H200 came up in minutes on 2026-10-20
-    - {infra: runpod/US, accelerators: "H200-SXM:2"}
-    - {infra: runpod/CA, accelerators: "H200-SXM:2"}
+  ordered:                      # North America only (Kylie: avoid Iceland)
     - {infra: runpod/US, accelerators: "H200-SXM:1"}
     - {infra: runpod/CA, accelerators: "H200-SXM:1"}
+    - {infra: runpod/US, accelerators: "H200-SXM:2"}
 
 envs:
   HF_HOME: /data/hf
@@ -20,6 +19,7 @@ envs:
   MODEL: Qwen/Qwen3.6-27B-FP8
   MODEL_REVISION: e89b16ebf1988b3d6befa7de50abc2d76f26eb09
   MAX_HOURS: 3.75
+  VLLM_ENGINE_READY_TIMEOUT_S: 3600   # data-parallel engines wait on the first-start kernel compile
 
 setup: |
   set -euo pipefail

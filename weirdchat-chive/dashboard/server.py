@@ -81,7 +81,14 @@ def run_detail(name: str) -> dict:
             else None,
         )
     invs = []
-    for inv in jsonl(d / "investigations.jsonl"):
+    inv_recs = jsonl(d / "investigations.jsonl")
+    base = jload(d / "baseline.json")
+    if not inv_recs and base and meta:  # wctool.py case in progress: show experiments as they land
+        pid = next(iter(meta))
+        inv_recs = [dict(prompt_id=pid, baseline_grader_yes=sum(base["verdicts"]), baseline_grader_verdicts=base["verdicts"],
+                         completions=base["completions"], experiment_log=jsonl(d / "experiments.jsonl"),
+                         question="(investigation in progress)", investigation_report="(in progress; not submitted yet)")]
+    for inv in inv_recs:
         pid = inv["prompt_id"]
         k0, n0 = inv["baseline_grader_yes"], len(inv["baseline_grader_verdicts"])
         exps = []
@@ -128,7 +135,10 @@ def calib_text(name: str, grader: str, pid: str, i: int) -> dict:
 def samples(name: str, pid: str, exp: int) -> dict:
     d = RUNS / name
     assert d.parent == RUNS
-    for inv in jsonl(d / "investigations.jsonl"):
+    base = jload(d / "baseline.json")
+    recs = jsonl(d / "investigations.jsonl") or ([dict(prompt_id=pid, completions=base["completions"],
+        baseline_grader_verdicts=base["verdicts"], experiment_log=jsonl(d / "experiments.jsonl"))] if base else [])
+    for inv in recs:
         if inv["prompt_id"] != pid:
             continue
         if exp == 0:

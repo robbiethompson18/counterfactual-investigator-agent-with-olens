@@ -1,0 +1,35 @@
+# Target + grader on one 2-GPU node, for the subagent pipeline (no API credits):
+#   GPU 0: Qwen3.6-27B-FP8 (the checkpoint WeirdChat sampled)      -> 127.0.0.1:8000
+#   GPU 1: Gemma 4 31B (WeirdChat's own judge model), the grader     -> 127.0.0.1:8002
+# Reuses the vLLM venv that sky/vllm_h200.yaml's setup installs (run that once on the node first).
+#   uvx --from 'skypilot[runpod]==0.13.0' sky exec wco-fleet-22 -d sky/serve_pair.yaml
+#   ssh -N -L 8000:127.0.0.1:8000 -L 8002:127.0.0.1:8002 wco-fleet-22 &
+name: wc-chive-pair
+
+resources:
+  infra: runpod
+  accelerators: H200-SXM:2
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  TARGET: Qwen/Qwen3.6-27B-FP8
+  TARGET_REVISION: e89b16ebf1988b3d6befa7de50abc2d76f26eb09
+  GRADER: google/gemma-4-31B-it
+  GRADER_REVISION: 842da3794eaa0b77d5f08bae87a17459d91ff475
+  MAX_HOURS: 3.75
+  VLLM_ENGINE_READY_TIMEOUT_S: 3600
+
+run: |
+  export PATH=$HOME/vllm-env/bin:/usr/local/cuda-12.9/bin:$PATH
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  nvidia-smi --query-gpu=index,name,memory.used --format=csv
+  hf download "$GRADER" --revision "$GRADER_REVISION" >/dev/null
+  CUDA_VISIBLE_DEVICES=0 timeout "${MAX_HOURS}h" vllm serve "$TARGET" --revision "$TARGET_REVISION" \
+    --host 127.0.0.1 --port 8000 --max-model-len 8192 --gpu-memory-utilization 0.92 --max-num-seqs 512 \
+    --enable-prefix-caching --limit-mm-per-prompt '{"image": 0, "video": 0}' > ~/target.log 2>&1 &
+  CUDA_VISIBLE_DEVICES=1 timeout "${MAX_HOURS}h" vllm serve "$GRADER" --revision "$GRADER_REVISION" \
+    --host 127.0.0.1 --port 8002 --max-model-len 12288 --gpu-memory-utilization 0.92 --max-num-seqs 256 \
+    --enable-prefix-caching --limit-mm-per-prompt '{"image": 0}' > ~/grader.log 2>&1 &
+  wait
+  tail -n 30 ~/target.log ~/grader.log
