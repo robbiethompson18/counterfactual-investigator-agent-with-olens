@@ -39,6 +39,59 @@ bugs.
   drops idle connections. That's why the client sets keepalives. A raw client must set them too, or
   stream.
 
+### How it boots in ~3 minutes
+
+`up` creates the pod through RunPod's REST API (runpodctl can't set a start command) from the
+official `vllm/vllm-openai:v0.32.0` image. The pod mounts network volume `qwen-fastboot` (id
+`wwwce2mejb`, 150 GB, datacenter **US-CA-2**, about $10.50/month) at `/workspace`. The image's start
+command is `runpod/qwen_server_boot.sh`, which installs sshd and starts vLLM. The volume holds the
+weights (`HF_HOME`) and every compile cache: the boot script sets `HOME=/workspace/home`, and vLLM's
+torch.compile/inductor cache, FlashInfer, Triton etc. all write under `~`. So only the first boot on
+a fresh volume downloads and compiles.
+
+Measured 2026-10-21 on 1x H200 (2x H200 had no stock in any datacenter with network volumes):
+
+| Step                                                | Cached boot | First boot, fresh volume |
+| --------------------------------------------------- | ----------- | ------------------------ |
+| `up` to container start (image already on the host) | 8 s         | 8 s                      |
+| sshd (from `.deb`s cached on the volume)            | 4 s         | 25 s (`apt-get`)         |
+| Weights                                             | 1 s (check) | 1 min 50 s (52 GB)       |
+| vLLM imports, engine start, weight load (20 s)      | 75 s        | 100 s                    |
+| torch.compile (incl. Dynamo tracing)                | 18 s        | 97 s                     |
+| Warmup + CUDA graph capture                         | 63 s        | 95 s                     |
+| **`up` to `/v1/models` answering**                  | **3 min**   | about 7.5 min            |
+
+The old recipe (pip-install vLLM, then JIT-compile kernels) took 30 to 45 min.
+
+Gotchas:
+
+- **Image pull is the one uncached step.** A host that doesn't already have the image pulls it in 9
+  to 10 min, so `up` then takes about 13 min. The volume pins the pod to US-CA-2, which has only a
+  few H200 hosts, so after the first pull on a host later boots there are fast.
+- **The volume pins the server to US-CA-2.** If US-CA-2 has no free H200s, `up` fails with a REST
+  error. `up 1` asks for one GPU, which is likelier to be free. Moving datacenters means a new
+  volume and one slow first boot.
+- **Not tested with 2 GPUs:** no 2x H200 stock. The compile cache lives in a per-rank directory
+  (`rank_0_0`), so the first 2-GPU boot may compile once more (about 80 s).
+- **Use the default `v0.32.0` tag (CUDA 13, needs host driver 580+), not `v0.32.0-cu129`.** The
+  cu129 image ships a CUDA 13 build of torchcodec, and vLLM dies at import with
+  `libnvrtc.so.13: cannot open shared object file`.
+- **The vllm image has no sshd.** The boot script installs `openssh-server` from `.deb`s cached on
+  the volume, one directory per Ubuntu release (`/workspace/debs-24.04`). Debs from a 22.04 image
+  broke `dpkg` on the 24.04 one, which left the container in a restart loop with no way in.
+- **The image ships prebuilt FlashInfer kernels** (`flashinfer-jit-cache`), so the 9 min FlashInfer
+  and linear-attention JIT compile from the pip recipe doesn't happen. Nothing needs `ninja`.
+- **Don't put Python packages or `__pycache__` on the volume.** It's NFS: reads are fast in bulk (52
+  GB of weights load in 20 s) but slow per small file. Importing vLLM took 45 s with bytecode on the
+  volume vs 11 s on container disk.
+- `restart` runs the boot script over ssh, whose env lacks the image's `ENV` (`CUDA_HOME`,
+  `TORCH_CUDA_ARCH_LIST`, ...) and the pod's (`API_KEY`). The script imports PID 1's env first.
+  Without that, a restart missed vLLM's compile cache and recompiled (76 s).
+- The start command is `bash -c <boot script>`, so PID 1's command line contains the whole script.
+  `pgrep -f` patterns in it need the `[b]racket` trick or they match PID 1.
+- `/workspace/boot.log` and `/workspace/vllm.log` are on the volume, so they survive the pod.
+  `vllm.log` prints the API key in its arguments line; don't paste it anywhere.
+
 ### Bringing up any pod: check progress every 3 minutes
 
 Agents keep starting a pod install, watching only for "ready" or an error, and then sitting on a
