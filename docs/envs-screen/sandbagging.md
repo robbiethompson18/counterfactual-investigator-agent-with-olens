@@ -5,6 +5,9 @@ Screen of the `sandbagging` environment from
 `vendor/agent-interp-envs`, pinned 310c03f) for the MATS sprint: does Qwen3.6-27B sometimes
 deliberately underperform, and does the rate move between the two arms?
 
+Follow-up: [../sandbagging-iteration.md](../sandbagging-iteration.md) fixes the answer-format noise
+and finds a one-sentence arm pair with a +57pp gap.
+
 **Verdict: MARGINAL on the intent label (C0–C2 pass, C3 fails on effect size).** The behavior label
 is deliberate sandbagging verbalised in the reasoning. Qwen does it in 5/30 arm-A rollouts and 0/29
 arm-B rollouts: +16.7pp, one-sided Fisher p = 0.028. That is significant but under the 20pp bar. The
