@@ -35,8 +35,9 @@ def tables(root: Path, date: str):
                 cell = f"{sum(r['positive'] for r in scored)}/{len(scored)}"
                 if invalid:
                     cell += f" (+{invalid} unscored)"
-                if len(selected) < meta["params"]["n_per_arm"]:
-                    cell += " pending"
+                missing = meta["params"]["n_per_arm"] - len(selected)
+                if missing:
+                    cell += " pending" if meta["status"] == "running" else f" (+{missing} abandoned)"
                 cells.append(cell)
             print(f"| `{arm}` | " + " | ".join(cells) + " |")
         print()
