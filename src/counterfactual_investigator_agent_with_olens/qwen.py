@@ -25,11 +25,12 @@ _SOCKET_OPTIONS = [
 ]
 
 
-def client(timeout: float = 6 * 3600) -> AsyncOpenAI:
-    """AsyncOpenAI for $QWEN_VLLM_URL. The default timeout covers 100k-token thinking traces under load."""
+def client(timeout: float = 6 * 3600, base_url: str | None = None) -> AsyncOpenAI:
+    """AsyncOpenAI for $QWEN_VLLM_URL (or `base_url`, e.g. a dedicated server). The default timeout covers 100k-token
+    thinking traces under load."""
     transport = httpx2.AsyncHTTPTransport(socket_options=_SOCKET_OPTIONS, limits=httpx2.Limits(max_connections=1000), retries=3)
     return AsyncOpenAI(
-        base_url=os.environ["QWEN_VLLM_URL"],
+        base_url=base_url or os.environ["QWEN_VLLM_URL"],
         api_key=os.environ["QWEN_VLLM_API_KEY"],
         timeout=timeout,
         http_client=DefaultAsyncHttpx2Client(transport=transport),

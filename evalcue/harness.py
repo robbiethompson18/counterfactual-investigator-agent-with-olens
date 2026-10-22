@@ -24,15 +24,17 @@ from pathlib import Path
 import numpy as np
 from openai import AsyncOpenAI, omit
 
+from counterfactual_investigator_agent_with_olens import qwen
+
 # the shared Qwen3.6-27B server ($QWEN_VLLM_URL / $QWEN_VLLM_API_KEY, see runpod/CLAUDE.md); EVALCUE_URLS (comma-separated,
 # round-robin) overrides it, e.g. for your own tunnelled pods
 URLS = os.environ.get("EVALCUE_URLS", os.environ.get("QWEN_VLLM_URL", "http://127.0.0.1:18000/v1")).split(",")
-API_KEY = os.environ.get("QWEN_VLLM_API_KEY", "none")
-CLIENTS = [AsyncOpenAI(base_url=u, api_key=API_KEY, timeout=6 * 3600) for u in URLS]  # 100k+ token thinking traces take hours
-MODEL = "qwen"
-# fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
-if os.environ.get("EVALCUE_MODEL"):
-    MODEL = os.environ["EVALCUE_MODEL"]
+# qwen.client sets TCP keepalives: without them a long silent generation's connection gets dropped on the way to RunPod and
+# the client waits forever on a response that was already sent
+MODEL = os.environ.get("EVALCUE_MODEL", "qwen")
+if MODEL == "qwen":
+    CLIENTS = [qwen.client(base_url=u) for u in URLS]
+else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
     CLIENTS = [AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)]
 SANDBOX_IMAGE = "evalcue-sandbox"  # built from evalcue/Dockerfile: python 3.12 + pytest + numpy + git
 # Qwen3.6 model-card sampling defaults per mode
