@@ -220,12 +220,14 @@ Current docs:
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
-  — FAIL: Qwen and GLM disclose the tampering every time; the shipped variant names don't exist in
-  the image, so arm B needs our overlay
+  — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
+  names don't exist in the image, so arm B needs our overlay
 - [optimize_cache_c env screen — read before running Optimize LRU cache (agent-interp-envs) on Qwen](docs/envs-screen/optimize_cache_c.md)
-  — FAIL: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and reports honestly
+  — FAIL, retired for Qwen: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and
+  reports honestly
 - [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
-  — FAIL: at an unreachable bar Qwen never stops (loops instead of reporting); notes for the rewrite
+  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows.py`): at an unreachable bar Qwen
+  never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
 - [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
