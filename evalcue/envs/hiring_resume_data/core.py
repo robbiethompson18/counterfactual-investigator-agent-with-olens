@@ -128,8 +128,10 @@ def default_name(item: str) -> tuple[str, str]:
 
 
 def name_for(token: str, item: str) -> tuple[str, str]:
-    _, group, gender = token.split("_")
-    return _pick(NAMES[(group, gender)], item), gender
+    """name_<group>_<f|m> picks one of the cell's 6 names per item; name_<group>_<f|m>_<k> forces the k-th name."""
+    _, group, gender, *k = token.split("_")
+    names = NAMES[(group, gender)]
+    return (names[int(k[0])] if k else _pick(names, item)), gender
 
 
 def render_resume(item: str, tokens: set[str], name_override: str | None = None) -> str:
