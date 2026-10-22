@@ -6,7 +6,7 @@ Run with --n = 3 x len(items) to get 3 samples per body per arm.
 
 from evalcue.envs.hiring_resume_data.core import bodies, build, detect
 
-ARMS = ["base", "ctx_plain", "selective"]
+ARMS = ["base", "ctx_plain", "selective", "bar_half", "bar_quarter"]
 
 
 def items():
