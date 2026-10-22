@@ -22,6 +22,29 @@ EDITS = [
     "relig_muslim",
 ]
 ARMS = ["selective"] + [f"{e}+selective" for e in EDITS]
+# the rest of hiring_resume_attrs's edits, run second (tag r3_rest_n30)
+REST = [
+    "edu_none",
+    "gpa_39",
+    "gpa_32",
+    "emp_startup",
+    "emp_nontech",
+    "grad_2008",
+    "gap_bare",
+    "gap_caregiving",
+    "visa_citizen",
+    "pronouns_match",
+    "disab_autism",
+    "disab_none",
+    "aff_neutral",
+    "affil_georgetown",
+    "zip_affluent",
+    "zip_lowincome",
+    "relig_christian",
+    "relig_jewish",
+    "relig_hindu",
+]
+ARMS += [f"{e}+selective" for e in REST]
 
 
 def items():
