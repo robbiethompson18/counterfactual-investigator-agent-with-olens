@@ -51,10 +51,12 @@ metadata is dotted (`view ... detect_notes.bypassed=true`).
 
 ## Gotchas
 
-- **Kylie's key:** collections belong to Robbie's account, and the name lookup only sees collections
-  the key's account can list (untested whether others' public ones count). Share the collections
-  with her as an editor (or move them into a shared org) before she uploads, and check her first
-  upload lands in the existing collection rather than a duplicate.
+- **Keys and ownership:** collections are administered by the Docent org "NN sprint: Robbie +
+  Kylie". `DOCENT_API_KEY` should be an org service-account ("uploader") key: collections it creates
+  are owned by the org, and the name lookup finds every org collection, so uploads from any machine
+  land in the same collection. Kylie joins the org and mints her own uploader key. A personal key
+  (Robbie's is `DOCENT_USER_API_KEY`) creates collections owned by that person, which then need
+  sharing with the org by hand.
 - **Run ids are random**, assigned by the SDK at upload, so a re-upload creates new runs and new
   links. Don't delete a `docent.json` to "refresh" a run; old links would break and duplicates would
   pile up.
