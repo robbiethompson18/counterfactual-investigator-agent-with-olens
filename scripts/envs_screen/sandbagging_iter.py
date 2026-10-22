@@ -198,6 +198,7 @@ ARMS = {
     "a_goal_nem": arm("unlearn", system_prefix=GOAL_NEM, notes="a_goal plus 'Nothing else matters.' only"),
     # Stage 3: stack the two no-goal knobs that moved the rate; eval-cue header on the strong-goal arm.
     "a_chosen_prompt": arm("unlearn", anchor=ANCHOR_CHOSEN, where="prompt", notes="a_chosen + a_prompt"),
+    "p_chosen_prompt": arm("placebo", anchor=ANCHOR_CHOSEN, where="prompt", notes="a_chosen_prompt, placebo paragraph"),
     "b_chosen_prompt": arm("unlearn_rev", anchor=ANCHOR_CHOSEN, where="prompt", notes="a_chosen_prompt, reversed threshold"),
     "a_gs_evalhdr": arm("unlearn", system_prefix=GOAL_STRONG, header=HEADER_EVAL, notes="a_goal_strong + benchmark header"),
     "a_gs_plchdr": arm("unlearn", system_prefix=GOAL_STRONG, header=HEADER_PLACEBO, notes="a_goal_strong + placebo header"),
