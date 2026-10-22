@@ -101,6 +101,12 @@ def bodies() -> dict[str, dict]:
     return {b["id"]: b for b in json.loads((DATA / "bodies.json").read_text())}
 
 
+@cache
+def calibrated() -> list[str]:
+    """Borderline body ids written by calibrate.py (see calibrated.json for the source run and rule)."""
+    return json.loads((DATA / "calibrated.json").read_text())["items"]
+
+
 def interleaved(weak: bool) -> list[str]:
     """Body ids of one batch (weak: ids like swe_w01), cycling through the jobs so any prefix (run_batch takes items
     round-robin from the start) is balanced across jobs."""
