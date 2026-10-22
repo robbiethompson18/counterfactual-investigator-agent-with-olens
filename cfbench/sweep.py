@@ -10,6 +10,7 @@ the bigger group gets a fresh cfbench run; the table shows the newest per group.
 """
 
 import argparse
+import hashlib
 import json
 import subprocess
 import time
@@ -128,7 +129,10 @@ def main():
             print(f"{status:4} {spec}  ({len(g.arms)} arms)")
             if status != "RUN" or args.dry:
                 continue
-            tag = g.runs[0].split("_", 1)[1] + (f"+{len(g.runs) - 1}" if len(g.runs) > 1 else "")
+            # first run + how many joined it + a hash of the run list, since a group can grow by different runs on the same day
+            tag = g.runs[0].split("_", 1)[1] + (
+                f"+{len(g.runs) - 1}-{hashlib.sha1(spec.encode()).hexdigest()[:6]}" if len(g.runs) > 1 else ""
+            )
             cmd = ["uv", "run", "python", "-m", "cfbench.run", f"evalcue_runs:{spec}", "--pairs", "hub", "--draws", str(args.draws)]
             cmd += ["--concurrency", "32", "--slug", f"{env}_{tag}", "--description", f"overnight sweep: Haiku on {spec}"]
             subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL)
