@@ -85,6 +85,12 @@ def done_specs() -> dict[str, Path]:
     return out
 
 
+def latest(done: dict[str, Path]) -> dict[str, Path]:
+    """Drop groups that a later, bigger group of the same env contains (a top-up joined them)."""
+    runs = {spec: (spec.split("/")[0], set(spec.split("/")[1].split("+"))) for spec in done}
+    return {s: run for s, run in done.items() if not any(e == runs[s][0] and runs[s][1] < r for e, r in runs.values())}
+
+
 def skill(run: Path) -> dict[str, tuple[float, int]]:
     """condition -> (skill, n cases)."""
     by_case = defaultdict(list)
@@ -127,7 +133,7 @@ def main():
             cmd += ["--concurrency", "32", "--slug", f"{env}_{tag}", "--description", f"overnight sweep: Haiku on {spec}"]
             subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL)
     print(f"\n{'group':90} {'cases':>5} {'transcript':>10} {'no_transcript':>13}")
-    for spec, run in sorted(done_specs().items()):
+    for spec, run in sorted(latest(done_specs()).items()):
         s = skill(run)
         t, nt = s.get("transcript", (float("nan"), 0)), s.get("no_transcript", (float("nan"), 0))
         print(f"{spec[:90]:90} {t[1]:>5} {t[0]:>10.2f} {nt[0]:>13.2f}")
