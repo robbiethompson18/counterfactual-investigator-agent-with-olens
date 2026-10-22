@@ -21,7 +21,9 @@ from cfbench.core import Rollout, initial_context, render, unified_diff
 from evalcue import envs
 
 RUNS = Path("data/runs")
-MODELS = {"Qwen/Qwen3.6-27B": "qwen"}
+# row["model"] per target: "qwen" = our vLLM servers, the OpenRouter id = runs made with EVALCUE_MODEL set to it (overnight_*).
+# One run is one server; don't pool (`a+b`) runs from different servers into a spec.
+MODELS = {"Qwen/Qwen3.6-27B": {"qwen", "qwen/qwen3.6-27b"}}
 MIN_RUNS = 5  # arms with fewer labelled runs are dropped
 FILE_CHARS = 4000  # per workspace file in the starting context
 
@@ -58,7 +60,7 @@ class EvalcueRuns:
         self.by_source = {src: row for rows in self.rows.values() for src, row in rows}
 
     def rollouts(self, arm: str, model: str) -> list[Rollout]:
-        rows = [(src, r) for src, r in self.rows[arm] if r["model"] == MODELS[model]]
+        rows = [(src, r) for src, r in self.rows[arm] if r["model"] in MODELS[model]]
         return [Rollout(source=src, messages=r["messages"], label=bool(_label(r))) for src, r in rows]
 
     def context(self, rollout: Rollout) -> str:
