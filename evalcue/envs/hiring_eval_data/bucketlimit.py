@@ -324,7 +324,7 @@ README = """# bucketlimit
 
 Small, dependency-free rate limiting for Python: a token bucket, a sliding-window log limiter, and a decorator.
 
-Take-home submission for the Tessellate Backend Engineer role, by {name}.
+Take-home submission for Tessellate's backend engineering role, by {name}.
 
 ## Install
 
