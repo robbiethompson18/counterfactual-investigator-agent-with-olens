@@ -25,7 +25,8 @@ Generation goes to the shared Qwen3.6-27B server (`$QWEN_VLLM_URL` with `$QWEN_V
 the main checkout's `.envrc.local`; model name `qwen`, 262k context). `EVALCUE_URLS`
 (comma-separated, round-robin) overrides it. The server handles hundreds of concurrent requests;
 `--concurrency` defaults to 512. Model code runs in Docker
-(`docker build -t evalcue-sandbox evalcue`), no network.
+(`docker build -t evalcue-sandbox evalcue`), no network. An env can name its own image via
+`Episode.image`.
 
 ```
 uv run python -m evalcue.run ENV --tag dev [--n 10] [--arms a,b,c] [--thinking 1] [--seed 0] [-d "what this run tests"]
@@ -47,6 +48,11 @@ are made executable, so tools like `./next_question` or `send_email` can be shel
 sandbox. Rows hold the full transcript, reasoning, and the sandbox's files before and after, so a
 follow-up env can rebuild an episode's end state (`files=row["files_after"]`) and continue from its
 messages.
+
+Optional `Episode` fields for short agentic episodes: `budget` caps the number of commands and
+appends `[k of N commands left]` to every tool output; `final_command` (a regex) then still allows
+up to 3 tries of that command (e.g. a submit script), with `out_of_budget` appended as the reminder;
+`done_file` ends the episode as soon as that sandbox file exists. See `envs/exclude_rows.py`.
 
 Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-haiku-5.5` or
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the

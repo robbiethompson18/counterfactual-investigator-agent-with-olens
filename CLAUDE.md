@@ -233,6 +233,9 @@ Current docs:
   never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)
+  — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
+  per-arm rates
 - [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
   — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
   silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers

@@ -56,6 +56,11 @@ class Episode:
     env: dict[str, str] = field(default_factory=dict)  # sandbox env vars
     max_turns: int = 20
     meta: dict = field(default_factory=dict)  # anything detect() needs (gold answer, mutated test, cue text, ...)
+    image: str = SANDBOX_IMAGE
+    budget: int | None = None  # max commands: each tool output says how many are left; the episode ends once they're spent...
+    final_command: str | None = None  # ...unless this regex is set: then only matching commands run, 3 tries (e.g. submit)
+    out_of_budget: str = ""  # appended to the output that spends the budget, and to each refused command (e.g. "submit now")
+    done_file: str | None = None  # the episode ends as soon as this file exists in the sandbox (e.g. written by a submit script)
 
 
 def _client(i: int) -> AsyncOpenAI:
@@ -100,7 +105,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
 class Sandbox:
     """One container per episode, episode files bind-mounted at `cwd` so `pwd` and paths show the cue."""
 
-    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str]):
+    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE):
         self.dir = Path(tempfile.mkdtemp(prefix="evalcue-"))
         for rel, text in files.items():
             p = self.dir / rel
@@ -111,7 +116,7 @@ class Sandbox:
         envs = [a for k, v in env.items() for a in ("-e", f"{k}={v}")]
         self.cid = subprocess.check_output(
             ["docker", "run", "-d", "--rm", "--network", "none", "--memory", "512m", "-v", f"{self.dir}:{cwd}", "-w", cwd, *envs]
-            + [SANDBOX_IMAGE, "sleep", "3600"],
+            + [image, "sleep", "3600"],
             text=True,
         ).strip()
 
@@ -144,11 +149,11 @@ class Sandbox:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
-def run_python(code: str, timeout: int = 10, stdin: str = "") -> tuple[str, int]:
+def run_python(code: str, timeout: int = 10, stdin: str = "", image: str = SANDBOX_IMAGE) -> tuple[str, int]:
     """Run untrusted model code in a throwaway no-network container. Returns (output, exit code)."""
     try:
         p = subprocess.run(
-            ["docker", "run", "--rm", "-i", "--network", "none", "--memory", "512m", SANDBOX_IMAGE, "timeout", str(timeout)]
+            ["docker", "run", "--rm", "-i", "--network", "none", "--memory", "512m", image, "timeout", str(timeout)]
             + ["bash", "-c", "cat > /tmp/m.py && python -I /tmp/m.py < /dev/null"],
             check=False,
             input=code,
@@ -174,8 +179,8 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
     if not ep.files:
         msg, finish, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens)
         return {"messages": msgs + [msg], "finish": finish, "turns": 1, "completion_tokens": ntok, "files_after": {}}
-    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env)
-    total, finish, turns = 0, "max_turns", 0
+    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image)
+    total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):
             msg, f, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens, tools=[BASH_TOOL])
@@ -189,12 +194,34 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
                 break
             for tc in msg["tool_calls"]:
                 try:
-                    cmd = json.loads(tc["function"]["arguments"]).get("command", "")
+                    cmd = str(json.loads(tc["function"]["arguments"]).get("command", ""))
+                except (json.JSONDecodeError, AttributeError):
+                    cmd = None
+                spent = ep.budget is not None and used >= ep.budget
+                if spent and (refused >= 3 or not ep.final_command or not re.search(ep.final_command, cmd or "")):
+                    refused += 1
+                    content = f"error: no commands left; this command was not run. {ep.out_of_budget}"
+                elif cmd is None:
+                    content = "error: arguments must be JSON with a 'command' string"
+                else:
                     out, code = await asyncio.to_thread(sb.run, cmd)
                     content = f"{out}\n[exit code {code}]"
-                except (json.JSONDecodeError, AttributeError):
-                    content = "error: arguments must be JSON with a 'command' string"
+                    if spent:  # a final command ran; if it didn't finish the episode, it counts as a try
+                        refused += 1
+                        content += "\n" + ep.out_of_budget
+                    else:
+                        used += 1
+                        if ep.budget is not None:
+                            content += f"\n[{ep.budget - used} of {ep.budget} commands left]"
+                            if used == ep.budget:
+                                content += "\n" + ep.out_of_budget
                 msgs.append({"role": "tool", "tool_call_id": tc["id"], "content": content})
+            if ep.done_file and (sb.dir / ep.done_file).exists():
+                finish = "done"
+                break
+            if ep.budget is not None and used >= ep.budget and (not ep.final_command or refused >= 3):
+                finish = "budget"
+                break
         files_after = await asyncio.to_thread(sb.snapshot)
     finally:
         await asyncio.to_thread(sb.close)
