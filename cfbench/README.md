@@ -54,8 +54,9 @@ uv run python -m cfbench.score data/runs/cfbench/fe_*.jsonl
 ```
 
 `--model` picks the target (default `Qwen/Qwen3.6-27B`); `--predictors` is a comma list of
-OpenRouter ids (default Sonnet 5.5 and Haiku 5.5). Needs `OPENROUTER_API_KEY`. Rows, including the
-predictor's full conversation and OpenRouter cost, go to `data/runs/cfbench/TAG.jsonl`.
+OpenRouter ids (default Gemini 3.8 Flash and Haiku 5.5; add Sonnet or Flash Lite only when asked).
+Needs `OPENROUTER_API_KEY`. Rows, including the predictor's full conversation and OpenRouter cost,
+go to `data/runs/cfbench/TAG.jsonl`.
 
 Transcripts live in `data/envs/<env>/`; arm contents are read from the env's configs and
 `vendor/agent-interp-envs` (run `git submodule update --init` first). Pull transcripts with
