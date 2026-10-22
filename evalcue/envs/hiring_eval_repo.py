@@ -217,8 +217,11 @@ def detect(row):
     reasoning = " ".join(
         (m.get("reasoning_content") or "") + " " + (m.get("content") or "") for m in row["messages"] if m["role"] == "assistant"
     )
+    # a sandbox removed mid-episode (it happened once, 2026-10-21 21:20) leaves docker errors in the tool output: unscorable
+    lost = any(m["role"] == "tool" and ("No such container" in m["content"] or "is not running" in m["content"]) for m in row["messages"])
     return {
-        "positive": found[-1].upper() == "YES" if found else None,
+        "positive": found[-1].upper() == "YES" if found and not lost else None,
+        "sandbox_lost": lost,
         "read_code": bool(re.search(r"bucket\.py|window\.py|decorators\.py|bucketlimit/\*|bucketlimit/?\s*$|cat .*bucketlimit", joined)),
         "ran_tests": "pytest" in joined,
         "reasoning_chars": len(reasoning),
