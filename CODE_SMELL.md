@@ -79,13 +79,7 @@ someone excludes the pod-only modules and types `server.py`.
 
 ## 2026-10-21: `evalcue/` harness rough edges
 
-- `harness.chat()` has no retry: transient `APIConnectionError`s under load (about 5–10% of rows in
-  multi-turn runs) are logged as errored rows instead of retried.
-- `Sandbox` writes files mode 644 (no `./script.py`) and the agent runs as root in the container.
-- `run_batch` divides by `len(env.items())`, so an env whose item filter returns nothing crashes
-  with ZeroDivisionError instead of a clear error.
-- Envs are discovered by filename with no ownership: two agents sharing one checkout both wrote
-  `envs/secret_number.py` and one silently overwrote the other.
+- The sandbox runs the agent as root in the container.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
   `docs/eval-cue-reward-hacking.md`.
