@@ -18,7 +18,7 @@ Only items whose grader compiles and whose fixtures are plain .npy files with a 
 import json
 import re
 
-from evalcue.envs import matonski_grader as mg
+from evalcue.envs.matonski import grader as mg
 from evalcue.harness import Episode
 
 ARMS = ["nocue", "cue", "placebo"]

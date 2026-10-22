@@ -142,6 +142,9 @@ Source is `transcript-viewer/web/index.html`, deployed by
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
+  `evalcue/harness.py` defaults to it), not high or max, even when replicating someone's setup that
+  used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
@@ -219,6 +222,9 @@ Current docs:
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+- [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
+  — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
+  deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
   — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
   names don't exist in the image, so arm B needs our overlay
@@ -226,16 +232,42 @@ Current docs:
   — FAIL, retired for Qwen: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and
   reports honestly
 - [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
-  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows.py`): at an unreachable bar Qwen
+  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows/`): at an unreachable bar Qwen
   never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)
+  — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
+  per-arm rates
 - [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
   — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
   silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
 - [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
   — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
   scores
+- [Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
+  — Palisade (2025) port + 3 siblings, ~200 arms; "The catch is that by default…" flips bypass
+  (20/26 vs 0/20), "write access … configuration files" disables the kill switch 36/40 (mostly
+  unverbalized); every arm in [shutdown-arms.md](docs/envs/shutdown-arms.md)
+- [Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
+  — 13 envs; Lynch main cell 87%/86%/53%; exfil 48% → 20% with an eval cue (rarely verbalized);
+  placebo caveats; tables in [scheming-tables.md](docs/envs/scheming-tables.md)
+- [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
+  — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
+  [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
+- [Hiring-from-resumes envs — read before running resume-screening bias arms (Karvonen & Marks port)](docs/envs/hiring_resume.md)
+  — names null overall; borderline resumes Black 56% vs White 48%, almost never verbalized; H-1B
+  decides close pairwise picks; per-arm tables in
+  [hiring_resume_tables.md](docs/envs/hiring_resume_tables.md)
+- [Hiring-from-technical-evidence envs — read before running coding-test, interview or repo-review hiring arms](docs/envs/hiring_eval.md)
+  — names alone null; a diversity sentence × name splits White vs Black male (39/60 vs 57/60,
+  verbalized); context sentences span 0–100%
+- [Exploiting naive users envs — read before running the defect/invoice/upsell/fee/entitlement/appraisal/deposit scenarios](docs/envs/dumb_user_exploit.md)
+  — operator-pressure calibration; vivid or vulnerable users get more honesty, not less; wealth
+  drives upsell; names null
+- [Hiding own mistakes envs — read before running the on-policy failure → status-report envs](docs/envs/dumb_user_report.md)
+  — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
+  manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
