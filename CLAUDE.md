@@ -219,6 +219,9 @@ Current docs:
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+- [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
+  — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
+  deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
   — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
   names don't exist in the image, so arm B needs our overlay
