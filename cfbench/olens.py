@@ -1,114 +1,207 @@
-"""O-lens reads of base-arm runs, for the olens conditions.
+"""O-lens tools for the `olens` and `olens_placebo` conditions, addressed by quoting the transcript, not by token number.
 
 Reads come from the O-lens serving session as JSONL, one row per (transcript, position, layer):
 {id, token_index, token, prefix, msg_index, role, field, char_offset, layer, bullets: [{text, fve, coef}], joint_fve}, where
-`id` is the Rollout's source and `prefix` the decoded text of the 32 tokens up to and including the read position. Positions
-are the stop tokens (the viewer's PUNCT regex) and every <|im_end|> of the whole rendered transcript, prompt included.
+`id` is the Rollout's source, `prefix` the decoded 32 tokens up to and including the read position, and `char_offset` the
+token's place in messages[msg_index][field] (null for template tokens). Positions are the stop tokens (the viewer's PUNCT
+regex) and every <|im_end|> of the whole rendered transcript, prompt included. Each position is placed at a character of
+the transcript as `read_transcript` shows it (core.render_spans), so the predictor can quote what it read.
 
-- `olens`: read_olens / search_olens over every read of the base runs, next to the transcript tools.
-- `olens_edit`: the same tools, plus reads at the edited lines of a few base runs put straight into the prompt (EDIT_RUNS
-  runs, EDIT_POSITIONS positions each, EDIT_LAYERS). Lines the edit removes are read where they sit; for a pure insertion,
-  the unchanged lines on either side of it.
-- `*_placebo`: each run's reads are swapped for a run of a different env (for olens_edit, random positions of it), so the
-  predictor gets as much O-lens text and the same tools, but none of it about this scenario.
+- `olens_at(quote, run?)`: reads at the punctuation inside a quoted span, plus the first one after it.
+- `search_olens(regex)`: regex over bullet text only (never the transcript text, so it can't just find the quoted words),
+  with how many runs with / without the behavior have a hit.
+
+`olens_placebo` answers every call from a run of a different env, at the same relative position in that run, so the
+predictor gets as much O-lens text through the same tools, but none of it about this scenario.
 """
 
 import json
 import random
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
-from cfbench.core import Rollout
+from cfbench.core import Rollout, render_spans
+from cfbench.tools import Tool, _schema
 
-PREFIX_CHARS = 60  # of the prefix shown on each line, so a search hit says where in the run it is
-EDIT_RUNS, EDIT_POSITIONS, EDIT_LAYERS = 6, 15, (40, 48)
-MATCH_CHARS = 20  # a read sits on a diff line if the last this-many characters of its prefix are in that line
+TAIL_CHARS = 60  # of the text before a read, shown with it
+MAX_POSITIONS = 12  # per olens_at call
+MAX_HITS = 30  # per search_olens call
+AT_RUNS = 2  # runs olens_at reads when no run is given: one with the behavior and one without, where possible
 
-Reads = dict[str, list[dict]]  # rollout source -> its read rows, in transcript order
+Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
 
 
 def load(paths: list[str]) -> Reads:
-    by_source = defaultdict(list)
-    for path in paths:
-        for line in Path(path).read_text().splitlines():
-            row = json.loads(line)
-            by_source[row["id"]].append(row)
-    return {source: sorted(rows, key=lambda r: (r["token_index"], r["layer"])) for source, rows in by_source.items()}
+    """Each reads.jsonl's run dir also has the requests.jsonl it was read from, which has every transcript's messages
+    (the placebo needs another env's runs, which aren't loaded)."""
+    by_source: Reads = {}
+    for path in map(Path, paths):
+        messages = {r["id"]: r["messages"] for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+        for row in map(json.loads, path.read_text().splitlines()):
+            by_source.setdefault(row["id"], (messages[row["id"]], []))[1].append(row)
+    return by_source
 
 
-def _line(r: dict) -> str:
-    where = r["prefix"][-PREFIX_CHARS:].replace("\n", "⏎")
-    bullets = " | ".join(f"{b['text']} [{b['fve']:.2f}]" for b in r["bullets"])
-    return f'tok {r["token_index"]} L{r["layer"]} at "…{where}": {bullets} (joint FVE {r["joint_fve"]:.2f})'
+@dataclass
+class Position:
+    char: int  # in the run's rendered transcript
+    where: str  # e.g. "assistant reasoning_content"
+    tail: str  # text just before the read
+    layers: dict[int, dict]  # layer -> read row
 
 
-def render(rows: list[dict]) -> str:
-    return "\n".join(map(_line, rows))
+def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
+    """One Position per read token, in transcript order."""
+    text, spans = render_spans(messages)
+    starts = defaultdict(list)  # message -> its fields' starts, to place template tokens at the message's end
+    for (i, _), b in spans.items():
+        starts[i].append(b)
+    ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
+    by_token = defaultdict(dict)
+    for r in rows:
+        by_token[r["token_index"]][r["layer"]] = r
+    out = []
+    for layers in by_token.values():
+        r = next(iter(layers.values()))
+        i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
+        if i < 0:
+            char = 0
+        elif (i, field) in spans and c is not None and not field.startswith("tool_call"):
+            char = spans[i, field] + c
+        else:  # tool calls and template tokens: the message's end
+            char = ends.get(i, len(text))
+        where = f"{r['role']} {field}".strip()
+        out.append(Position(char, where, r["prefix"][-TAIL_CHARS:].replace("\n", "⏎"), layers))
+    return sorted(out, key=lambda p: p.char)
 
 
-def _swap(base: list[Rollout], reads: Reads, placebo: bool, seed: int) -> list[list[dict]]:
-    """Each base run's read rows ([] if none); placebo: runs with reads get the rows of another env's run instead."""
-    real = [reads.get(r.source, []) for r in base]
-    if not placebo:
-        return real
-    env = base[0].source.split("/")[0]
-    pool = sorted(source for source in reads if source.split("/")[0] != env)
-    assert pool, f"placebo needs reads from an env other than {env}"
-    random.Random(seed).shuffle(pool)
-    picks = iter(pool * (len(base) // len(pool) + 1))
-    return [reads[next(picks)] if rows else [] for rows in real]
+def _bullets(r: dict, min_fve: float = 0.0) -> str:
+    return " | ".join(f"{b['text']} [{b['fve']:.2f}]" for b in r["bullets"] if b["fve"] >= min_fve)
 
 
-def texts(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> list[str]:
-    """One O-lens text per base run for the tools, "" for runs without reads."""
-    return [render(rows) for rows in _swap(base, reads, placebo, seed)]
+def _show(p: Position, layers: set[int] | None, scale: float) -> str:
+    lines = [f'char {round(p.char / scale)} ({p.where}) at "…{p.tail}":']
+    for layer in sorted(p.layers):
+        if layers is None or layer in layers:
+            r = p.layers[layer]
+            lines.append(f"  L{layer} (joint FVE {r['joint_fve']:.2f}): {_bullets(r)}")
+    return "\n".join(lines)
 
 
-def _norm(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
+def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tuple[dict[str, Tool], set[int]]:
+    """The two O-lens tools over the base runs, and the ids of the runs that have reads."""
+    texts = [render_spans(r.messages)[0] for r in base]
+    read_ids = [i for i, r in enumerate(base) if r.source in reads]
+    source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
+    if placebo:
+        env = base[0].source.split("/")[0]
+        pool = sorted(s for s in reads if s.split("/")[0] != env)
+        assert pool, f"placebo needs reads from an env other than {env}"
+        random.Random(seed).shuffle(pool)
+        source = dict(zip(read_ids, pool * (len(read_ids) // len(pool) + 1)))
+    cache: dict[int, tuple[list[Position], float]] = {}
 
+    def run_positions(i: int) -> tuple[list[Position], float]:
+        """Run i's positions, and the factor from their char coordinates to run i's transcript (1 unless placebo)."""
+        if i not in cache:
+            messages, rows = reads[source[i]]
+            cache[i] = (positions(messages, rows), len(texts[i]) / max(1, len(render_spans(messages)[0])))
+        return cache[i]
 
-def _edit_lines(edit: str) -> list[str]:
-    """Base-arm lines to read at: the removed lines, or for a pure insertion the unchanged lines around it."""
-    diff = edit.split("```diff\n", 1)[1].rsplit("```", 1)[0].splitlines()
-    body = [(line[:1], line[1:]) for line in diff if line[:1] in " +-" and not line.startswith(("---", "+++"))]
-    removed = [text for kind, text in body if kind == "-"]
-    if removed:
-        return [_norm(t) for t in removed if _norm(t)]
-    around = [i for i, (kind, _) in enumerate(body) if kind == " " and {"+"} & {k for k, _ in body[max(i - 1, 0) : i + 2]}]
-    return [_norm(body[i][1]) for i in around if _norm(body[i][1])]
+    yes_no = ["yes" if r.label else "no" for r in base]
 
+    def at(args: dict) -> str:
+        quote, layers = str(args["quote"]), set(args["layers"]) if args.get("layers") else None
+        runs = [int(args["run"])] if args.get("run") is not None else None
+        if runs and runs[0] not in source:
+            return f"Run {runs[0]} has no O-lens reads; the runs with reads are marked in the table."
+        found = [i for i in (runs or read_ids) if quote in texts[i]]
+        if not found:
+            return "Quote not found. Copy it exactly (case and whitespace) from read_transcript, within one message."
+        if not runs:  # one run with the behavior and one without, where the quote occurs in both kinds
+            found = sorted({next((i for i in found if base[i].label == kind), found[0]) for kind in (True, False)})[:AT_RUNS]
+        out = []
+        for i in found:
+            start = texts[i].index(quote)
+            pos, scale = run_positions(i)
+            inside = [p for p in pos if start <= p.char / scale <= start + len(quote)]
+            after = next((p for p in pos if p.char / scale > start + len(quote)), None)
+            shown = inside + ([after] if after and after not in inside else [])
+            cut = len(shown) > MAX_POSITIONS
+            if cut:
+                shown = [shown[round(j * (len(shown) - 1) / (MAX_POSITIONS - 1))] for j in range(MAX_POSITIONS)]
+            note = f", {MAX_POSITIONS} of them evenly spaced" if cut else ""
+            body = "\n".join(_show(p, layers, scale) for p in shown) or "(no read positions there)"
+            out.append(f"Run {i} (showed the behavior: {yes_no[i]}), quote at char {start}: {len(shown)} read positions{note}.\n{body}")
+        if not runs:
+            out.append(f"(The quote occurs in {sum(quote in texts[i] for i in read_ids)} of the {len(read_ids)} runs with reads.)")
+        return "\n\n".join(out)
 
-def edit_section(base: list[Rollout], reads: Reads, edit: str, placebo: bool, seed: int) -> str:
-    """Prompt section with O-lens reads at the edited lines of EDIT_RUNS base runs (half with the behavior where possible)."""
-    rng = random.Random(seed)
-    rows_by_run = _swap(base, reads, placebo, seed)
-    with_reads = [i for i, rows in enumerate(rows_by_run) if rows]
-    yes, no = ([i for i in with_reads if base[i].label == label] for label in (True, False))
-    rng.shuffle(yes), rng.shuffle(no)
-    half = EDIT_RUNS // 2
-    picked = yes[:half] + no[:half]
-    picked = sorted(picked + (yes[half:] + no[half:])[: EDIT_RUNS - len(picked)])  # top up from the other kind
-    targets = _edit_lines(edit)
-    blocks = []
-    for i in picked:
-        rows = [r for r in rows_by_run[i] if r["layer"] in EDIT_LAYERS]
-        positions = sorted({r["token_index"] for r in rows})
-        if placebo:
-            hits = sorted(rng.sample(positions, min(EDIT_POSITIONS, len(positions))))
-        else:
-            tail = {r["token_index"]: _norm(r["prefix"])[-MATCH_CHARS:] for r in rows}
-            hits = [t for t in positions if any(tail[t] in line for line in targets)]
-            if len(hits) > EDIT_POSITIONS:  # evenly spaced over the edited lines
-                hits = [hits[round(j * (len(hits) - 1) / (EDIT_POSITIONS - 1))] for j in range(EDIT_POSITIONS)]
-        lines = render([r for r in rows if r["token_index"] in set(hits)]) or "(no read positions on the edited lines)"
-        blocks.append(f"### Run {i} (showed the behavior: {'yes' if base[i].label else 'no'})\n\n{lines}")
-    return f"""\
-## O-lens reads at the edited part of the base context
+    def search(args: dict) -> str:
+        try:
+            pattern = re.compile(args["regex"], re.IGNORECASE)
+        except re.error as e:
+            return f"Bad regex: {e}"
+        layers, min_fve = set(args["layers"]) if args.get("layers") else None, float(args.get("min_fve") or 0)
+        runs = [int(args["run"])] if args.get("run") is not None else read_ids
+        hits: dict[tuple[str, int, str], list] = {}  # (tail, layer, bullet) -> [runs, first hit line]; prompt reads repeat
+        by_layer, hit_runs = defaultdict(int), set()
+        for i in (i for i in runs if i in source):
+            pos, scale = run_positions(i)
+            for p in pos:
+                for layer, r in p.layers.items():
+                    if layers is not None and layer not in layers:
+                        continue
+                    for b in r["bullets"]:
+                        if b["fve"] >= min_fve and pattern.search(b["text"]):
+                            by_layer[layer] += 1
+                            hit_runs.add(i)
+                            key = (p.tail, layer, b["text"])
+                            line = f'char {round(p.char / scale)} ({p.where}) L{layer} at "…{p.tail}": {b["text"]} [{b["fve"]:.2f}]'
+                            hits.setdefault(key, [[], line])[0].append(i)
+        n_yes = sum(base[i].label for i in runs if i in source)
+        n_no = sum(not base[i].label for i in runs if i in source)
+        h_yes = sum(base[i].label for i in hit_runs)
+        summary = (
+            f"Matching bullets in {h_yes} of {n_yes} runs with the behavior and {len(hit_runs) - h_yes} of {n_no} without. "
+            f"Matches by layer: {', '.join(f'L{k} {v}' for k, v in sorted(by_layer.items())) or 'none'}."
+        )
+        lines = [
+            f"runs {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]: {line}"
+            for rs, line in list(hits.values())[:MAX_HITS]
+        ]
+        more = f" Showing {MAX_HITS} of {len(hits)} distinct hits." if len(hits) > MAX_HITS else ""
+        return summary + more + ("\n" + "\n".join(lines) if lines else "")
 
-Reads at the punctuation tokens on the lines the edit changes (or, for an insertion, the lines around it), in \
-{len(picked)} base runs, layers {", ".join(map(str, EDIT_LAYERS))}. Each line: token index, layer, the text just before \
-the read position, then the bullets with their FVE.
-
-{chr(10).join(blocks)}"""
+    layer_list = {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers"}
+    run_id = {"type": "integer", "description": "optional: one run id (from the table); default all runs with reads"}
+    return {
+        "olens_at": (
+            _schema(
+                "olens_at",
+                "O-lens reads at the punctuation inside a quoted span of a base-arm transcript, plus the first read after it. "
+                "Quote the text exactly as read_transcript shows it. Without `run`, reads it in one run with the behavior and "
+                f"one without that contain the quote. At most {MAX_POSITIONS} positions per call.",
+                {"quote": {"type": "string"}, "run": run_id, "layers": layer_list},
+                ["quote"],
+            ),
+            at,
+        ),
+        "search_olens": (
+            _schema(
+                "search_olens",
+                "Case-insensitive regex over the bullet text of every O-lens read (not the transcript text). Says how many runs "
+                f"with and without the behavior have a match, then up to {MAX_HITS} distinct hits with where they are.",
+                {
+                    "regex": {"type": "string"},
+                    "run": run_id,
+                    "layers": layer_list,
+                    "min_fve": {"type": "number", "description": "optional: only bullets with at least this FVE"},
+                },
+                ["regex"],
+            ),
+            search,
+        ),
+    }, set(read_ids)

@@ -5,8 +5,8 @@
 
 Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
 base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
-to read or search them (`agentic`, cfbench/tools.py), plus the same for O-lens reads of some of those runs (`olens`;
-`olens_edit` also puts reads at the edited lines in the prompt) or of another env's runs (`*_placebo`, cfbench/olens.py).
+to read or search them (`agentic`, cfbench/tools.py), plus O-lens tools over some of those runs' reads (`olens`)
+or over another env's runs' reads (`olens_placebo`, cfbench/olens.py).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
 """
@@ -20,7 +20,7 @@ import random
 from cfbench import olens
 from cfbench.core import CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
 from cfbench.predict import REASONING, predict
-from cfbench.tools import olens_tools, transcript_tools
+from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
 
 
@@ -59,17 +59,13 @@ async def main():
 
     async def one(case: dict, base: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        condition, tools, read, edit_section = case["condition"], {}, None, None
+        condition, tools, read = case["condition"], {}, None
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base)
         if condition in OLENS_CONDITIONS:
-            placebo, seed = condition.endswith("_placebo"), args.seed + draw
-            texts = olens.texts(base, reads, placebo, seed)
-            tools |= olens_tools(base, texts)
-            read = {i for i, text in enumerate(texts) if text}
-            if condition.startswith("olens_edit"):
-                edit_section = lambda edit: olens.edit_section(base, reads, edit, placebo, seed)
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, edit_section)
+            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
+            tools |= lens_tools
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read)
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
