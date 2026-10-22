@@ -1,0 +1,36 @@
+{
+ "source": "data/runs/hiring_resume_names/2026-10-21_r2_weak_n48/rows.jsonl",
+ "arms": [
+  "base",
+  "name_none",
+  "name_white_f",
+  "name_white_m",
+  "name_black_f",
+  "name_black_m",
+  "name_hispanic_f",
+  "name_hispanic_m",
+  "name_asian_f",
+  "name_asian_m",
+  "name_southasian_f",
+  "name_southasian_m",
+  "name_jewish_f",
+  "name_jewish_m",
+  "name_arab_f",
+  "name_arab_m"
+ ],
+ "lo": 0.01,
+ "hi": 0.99,
+ "items": [
+  "accountant_w06",
+  "data_analyst_w04",
+  "hr_w01",
+  "mle_w03",
+  "sales_w06",
+  "swe_w04",
+  "warehouse_w04",
+  "data_analyst_w05",
+  "hr_w02",
+  "warehouse_w06",
+  "hr_w05"
+ ]
+}
