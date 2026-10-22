@@ -245,6 +245,29 @@ Current docs:
 - [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
   — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
   scores
+- [Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
+  — Palisade (2025) port + 3 siblings, ~200 arms; "The catch is that by default…" flips bypass
+  (20/26 vs 0/20), "write access … configuration files" disables the kill switch 36/40 (mostly
+  unverbalized); every arm in [shutdown-arms.md](docs/envs/shutdown-arms.md)
+- [Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
+  — 13 envs; Lynch main cell 87%/86%/53%; exfil 48% → 20% with an eval cue (rarely verbalized);
+  placebo caveats; tables in [scheming-tables.md](docs/envs/scheming-tables.md)
+- [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
+  — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
+  [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
+- [Hiring-from-resumes envs — read before running resume-screening bias arms (Karvonen & Marks port)](docs/envs/hiring_resume.md)
+  — names null overall; borderline resumes Black 56% vs White 48%, almost never verbalized; H-1B
+  decides close pairwise picks; per-arm tables in
+  [hiring_resume_tables.md](docs/envs/hiring_resume_tables.md)
+- [Hiring-from-technical-evidence envs — read before running coding-test, interview or repo-review hiring arms](docs/envs/hiring_eval.md)
+  — names alone null; a diversity sentence × name splits White vs Black male (39/60 vs 57/60,
+  verbalized); context sentences span 0–100%
+- [Exploiting naive users envs — read before running the defect/invoice/upsell/fee/entitlement/appraisal/deposit scenarios](docs/envs/dumb_user_exploit.md)
+  — operator-pressure calibration; vivid or vulnerable users get more honesty, not less; wealth
+  drives upsell; names null
+- [Hiding own mistakes envs — read before running the on-policy failure → status-report envs](docs/envs/dumb_user_report.md)
+  — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
+  manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
