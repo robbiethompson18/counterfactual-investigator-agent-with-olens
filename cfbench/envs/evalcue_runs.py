@@ -66,12 +66,14 @@ class EvalcueRuns:
         """Starting context shown to the predictor; overrides core's messages-only one so workspace files are included."""
         return _start(self.by_source[rollout.source])
 
+    def _items(self, arm: str) -> set[str]:
+        return {i for a, i in self.starts if a == arm}
+
     def _diff(self, base_arm: str, cf_arm: str) -> tuple[str, int]:
         """Diff on the first item both arms share, and how many items the arms run over."""
-        base_items = {i for a, i in self.starts if a == base_arm}
-        items = sorted(base_items & {i for a, i in self.starts if a == cf_arm})
+        items = sorted(self._items(base_arm) & self._items(cf_arm))
         assert items, f"{base_arm} and {cf_arm} share no item"
-        return unified_diff(self.starts[base_arm, items[0]], self.starts[cf_arm, items[0]]), len(base_items)
+        return unified_diff(self.starts[base_arm, items[0]], self.starts[cf_arm, items[0]]), len(self._items(base_arm))
 
     def edit(self, base_arm: str, cf_arm: str) -> str:
         diff, n_items = self._diff(base_arm, cf_arm)
@@ -84,12 +86,16 @@ class EvalcueRuns:
         return f"{where}\n\n```diff\n{diff}\n```"
 
     def hub(self) -> str:
+        """The arm sharing an item with the most others (pooled runs can cover different items), then the smallest total diff."""
         arms = sorted(self.rows)
-        return min(arms, key=lambda a: sum(self._diff(a, b)[0].count("\n") for b in arms if b != a))
+        partners = {a: [b for b in arms if b != a and self._items(a) & self._items(b)] for a in arms}
+        return min(arms, key=lambda a: (-len(partners[a]), sum(self._diff(a, b)[0].count("\n") for b in partners[a])))
 
     def hub_pairs(self) -> list[tuple[str, str]]:
+        """Hub to every arm it shares an item with, both ways; arms with no shared item can't be diffed and are left out."""
         hub = self.hub()
-        return [pair for arm in sorted(self.rows) if arm != hub for pair in ((hub, arm), (arm, hub))]
+        arms = [arm for arm in sorted(self.rows) if arm != hub and self._items(hub) & self._items(arm)]
+        return [pair for arm in arms for pair in ((hub, arm), (arm, hub))]
 
 
 def load(spec: str) -> EvalcueRuns:

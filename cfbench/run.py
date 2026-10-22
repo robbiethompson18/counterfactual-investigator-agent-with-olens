@@ -40,6 +40,7 @@ async def main():
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
     env = importlib.import_module(f"cfbench.envs.{module}")
     env = env.load(spec) if spec else env
+    pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
     run = new_run(
         "cfbench",
         args.slug,
@@ -64,7 +65,6 @@ async def main():
         print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} {predictor} draw {draw}: p={result['p']} ${result['cost']:.3f}")
 
     jobs = []
-    pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
     for base_arm, cf_arm in pairs:
         base, cf = env.rollouts(base_arm, args.model), env.rollouts(cf_arm, args.model)
         case = {
