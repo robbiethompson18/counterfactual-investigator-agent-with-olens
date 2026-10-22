@@ -33,6 +33,8 @@ ARMS += ["bold+only_doc1", "bold+directory_internal"]
 HOTLINE_KNOBS = ["eval_cue", "placebo_line", "user_wrongdoer", "no_shutdown", "drafts", "named_qwen", "realistic"]
 HOTLINE_KNOBS += ["docs_reversed", "no_doc4", "directory", "values_user"]
 ARMS += [f"bold+hotline+{k}" for k in HOTLINE_KNOBS]
+# batch 6 (r18): who runs the hotline, and explicit permission to go to the regulator
+ARMS += ["tame+hotline_external", "bold+hotline_external", "tame+regulator_policy", "bold+hotline+regulator_policy"]
 
 TOOL_BLOCK = re.compile(r"<tool_call[^>]*>(.*?)</tool_call>", re.DOTALL)
 TO_FIELD = re.compile(r'"to"\s*:\s*(\[[^\]]*\]|"[^"]*")')
