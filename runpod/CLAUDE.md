@@ -39,14 +39,42 @@ bugs.
   drops idle connections. That's why the client sets keepalives. A raw client must set them too, or
   stream.
 
-### vLLM version: the live server stays on 0.25.1 for now
+### vLLM version: 0.32 matches 0.25.1; the "3x slower" was most likely a throttled GPU
 
 The live `qwen-shared` pod is the older pip-installed vLLM 0.25.1 recipe (runpod/pytorch image, venv
-in `/workspace/vllm-env`), not the image below. On 2026-10-21, `vllm/vllm-openai:v0.32.0` decoded
-about 3x slower per GPU than 0.25.1 on the same load test (1,508 vs ~3,900 output tok/s at 128-256
-concurrent per GPU; 25 vs ~50 tok/s per stream at 32 per GPU), with the same attention backend and
-KV cache size. Until that's understood, don't move the shared server to 0.32. Run `up` with
-`IMAGE=vllm/vllm-openai:v0.25.1` to get the fast boot on the old version.
+in `/workspace/vllm-env`), not the image below. A first 0.32 test on 2026-10-21 decoded about 3x
+slower per GPU than 0.25.1. The A/B below says that came from the host, not the version: on healthy
+H200s, `vllm/vllm-openai:v0.32.0` matches 0.25.1 within 3%, including on the US-CA-2 volume with
+`HOME` on NFS.
+
+Output tok/s per GPU (1x H200 unless noted), `vllm bench serve` run on the pod (random 256 in / 1500
+out, `--ignore-eos`, 2×concurrency prompts), the shared server's flags:
+
+| Setup                                         | 32/GPU | 128/GPU | 256/GPU |
+| --------------------------------------------- | ------ | ------- | ------- |
+| v0.25.1 image, local disk                     | 1,621  | 3,940   | 4,692   |
+| v0.32.0 image, local disk                     | 1,677  | 4,022   | 4,596   |
+| v0.32.0 image, US-CA-2 volume (`up` recipe)   | 1,664  | 3,972   | 4,565   |
+| v0.32.0 image, 2x H200 data parallel, per GPU | 1,672  | 3,850   | 4,180   |
+| v0.25.1 image, thermally throttled GPU        | 654    |         |         |
+
+The repo's chat load test (non-thinking essays, max_tokens 1500) agrees: 0.25.1 gives 1,664 / 4,173
+/ 5,028 tok/s on the pod, and 0.32 on the volume gives 1,690 / 4,103 / 4,876 on the pod and 1,686 /
+4,152 / 4,896 from a Mac over the internet. So neither the NFS `HOME` nor the client path costs
+anything.
+
+The slow pod in this run (EUR-IS-4) had its SM clock pinned at 345 MHz under load, at 92-94 C, with
+throttle reason 0x20 (SW thermal slowdown) and 6 h of throttling on its driver counters. That's 21
+tok/s per stream at 32 concurrent, the same as the original "slow 0.32" (25). The original pod's
+logs were overwritten, so its host can't be checked now. A healthy H200 under load sits at
+1,500-1,980 MHz, under 80 C, with reasons 0x4 (power cap) or 0. `nvidia-smi`'s max clock reads 1980
+MHz on a throttled GPU too, and an idle GPU reads 345 MHz with 0x1, so only clocks under load tell.
+`qwen_server.sh status` now prints clocks, temperature and throttle bits per GPU; check them while
+it has traffic, and replace the pod if it shows 0x20/0x40.
+
+Before calling a version or flag slow, compare it on the same host, or log
+`nvidia-smi --query-gpu=clocks.sm,temperature.gpu,clocks_throttle_reasons.active --format=csv -l 5`
+during each run.
 
 Don't run `runpod/qwen_server.sh restart` on the live `qwen-shared` pod: the boot script now expects
 the vllm image. To restart vLLM there, ssh in and run its own
@@ -84,8 +112,10 @@ Gotchas:
 - **The volume pins the server to US-CA-2.** If US-CA-2 has no free H200s, `up` fails with a REST
   error. `up 1` asks for one GPU, which is likelier to be free. Moving datacenters means a new
   volume and one slow first boot.
-- **Not tested with 2 GPUs:** no 2x H200 stock. The compile cache lives in a per-rank directory
-  (`rank_0_0`), so the first 2-GPU boot may compile once more (about 80 s).
+- **2 GPUs on the volume: not tested,** because US-CA-2 had no 2x H200 stock (again on 2026-10-21).
+  The 0.32 image with 2x data parallel works off the volume (table above). The compile cache lives
+  in per-rank directories (`rank_0_0`, `rank_0_1`), so the first 2-GPU boot on the volume will
+  compile once more (about 80 s).
 - **Use the default `v0.32.0` tag (CUDA 13, needs host driver 580+), not `v0.32.0-cu129`.** The
   cu129 image ships a CUDA 13 build of torchcodec, and vLLM dies at import with
   `libnvrtc.so.13: cannot open shared object file`.
