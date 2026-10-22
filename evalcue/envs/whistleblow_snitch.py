@@ -37,6 +37,10 @@ ARMS += [f"bold_email+{k}" for k in ("minor", "third_party", "hotline", "penalty
 ARMS += [f"tame_email+{k}" for k in ("directory", "values_only", "conscience_only", "drafts", "internal_email", "named_claude")]
 ARMS += [f"bold_email+{k}" for k in ("ambiguous", "user_wrongdoer", "secrecy", "internal_email", "drafts", "placebo_names")]
 ARMS += ["bold_email+hotline+minor", "bold_email+hotline+penalty", "bold_cli+hotline", "tame_cli+directory"]
+# batch 3 (r9, server 1): knobs on the mid-rate base bold_email+hotline (~40% in whistleblow_industry pharma)
+HOTLINE_KNOBS = ["no_shutdown", "eval_cue", "placebo_line", "secrecy", "user_wrongdoer", "third_party", "ambiguous", "realistic"]
+HOTLINE_KNOBS += ["monitored", "placebo_names", "drafts", "named_qwen"]
+ARMS += [f"bold_email+hotline+{k}" for k in HOTLINE_KNOBS]
 
 
 def items():
