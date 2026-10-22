@@ -13,8 +13,9 @@ import json
 import random
 from dataclasses import dataclass
 
-CONDITIONS = ("transcript", "no_transcript", "agentic", "olens", "olens_placebo")
-TOOL_CONDITIONS = ("agentic", "olens", "olens_placebo")
+OLENS_CONDITIONS = ("olens", "olens_placebo", "olens_edit", "olens_edit_placebo")  # cfbench/olens.py
+TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
+CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 10  # agentic: read/search calls before the predictor must submit
 
 
@@ -85,9 +86,18 @@ def run_index(base: list[Rollout], read: set[int] | None = None) -> str:
 
 
 def build_prompt(
-    env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str, read: set[int] | None = None
+    env,
+    model: str,
+    base: list[Rollout],
+    shown: list[Rollout],
+    base_arm: str,
+    cf_arm: str,
+    condition: str,
+    read: set[int] | None = None,
+    olens_edit=None,
 ) -> str:
-    """`read`: ids of base runs with O-lens reads, for the olens conditions."""
+    """For the olens conditions: `read` = ids of base runs with O-lens reads; `olens_edit(edit) -> str` = section with the
+    reads at the edited lines (olens_edit conditions), built from the edit this prompt shows."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -116,6 +126,8 @@ The starting context and the edit alone usually aren't enough: the question is h
 runs are the evidence. Investigate before you predict.
 
 {run_index(base, None if condition == "agentic" else read)}"""
+        if olens_edit:
+            evidence += "\n\n" + olens_edit(edit)
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
