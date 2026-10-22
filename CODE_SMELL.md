@@ -2,6 +2,23 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: serving code left outside the shared-server recipe
+
+Left alone by the dead-serving-code cleanup, either because it does something the shared server
+can't or because it isn't ours to change:
+
+- `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` run vLLM
+  in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
+  `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
+  prompts, but its results are recorded, so the recipe was kept.
+- `scripts/envs_gateway.py` reads `QWEN_URL`/`QWEN_API_KEY`, not `QWEN_VLLM_URL`/
+  `QWEN_VLLM_API_KEY` as `runpod/CLAUDE.md` says. Renaming would break any launch command on
+  robbie-box that still passes the old names.
+- `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
+  do (the image already sets one, so weights download twice).
+- Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
+  checkpoint.
+
 ## 2026-10-22: `cfbench/envs/sandbagging_iter.py` restates its label rule
 
 Its `BEHAVIOR` is copied from `scripts/envs_screen/sandbagging_iter.py`'s docstring, which computes

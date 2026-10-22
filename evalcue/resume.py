@@ -35,7 +35,7 @@ run = new_run(
     run_id,
     tag,
     description=f"resume of {', '.join(sys.argv[6:])}: {len(jobs)} missing jobs",
-    models=[{"name": "Qwen/Qwen3.6-27B", "served_by": f"vLLM at {harness.URLS[0]}"}],
+    models=[{"name": "Qwen/Qwen3.6-27B", "served_by": f"vLLM at {harness.URL}"}],
     params={"n_per_arm": n, "seed": seed, "arms": env.ARMS, "thinking": True, "max_tokens": 65536, "resume_of": sys.argv[6:]},
 )
 out = run / "rows.jsonl"

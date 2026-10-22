@@ -196,7 +196,7 @@ Current docs:
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
-- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc., or before serving Qwen3.6-27B with vLLM on RunPod](docs/false-capability-claims.md)
+- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc.](docs/false-capability-claims.md)
   — the device-channel lever (1.6% → 41%), severity dose-response, judge rubric v2 + audit,
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)

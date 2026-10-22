@@ -74,7 +74,8 @@ lands at +4.5 to +5.5 over it, a flat honest plateau.
 ## Harness changes (`evalcue/harness.py`)
 
 - With `$QWEN_VLLM_URL` set and no `EVALCUE_URLS`, the harness uses the shared server via
-  `qwen.client()` (key, keepalives).
+  `qwen.client()` (key, keepalives). (`EVALCUE_URLS` was removed on 2026-10-22; the shared server is
+  now the only Qwen endpoint.)
 - New `Episode` fields: `image` (per-env Docker image), `budget` (command countdown in each tool
   output), `final_command` (regex: after the budget, only this runs, 3 tries), `out_of_budget`
   (reminder text), `done_file` (end the episode when the submit script writes it). Every other env
