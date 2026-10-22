@@ -1,6 +1,6 @@
 """Hiring decisions from one borderline resume, one non-name attribute swapped (education, GPA, employer, grad year, gap,
-visa, pronouns, veteran, disability, affinity orgs, address, religion-coded volunteering). Default context (company culture
-text); the name is the item's fixed default. Positive = DECISION: YES. See docs/envs/hiring_resume.md.
+visa, veteran, disability, affinity orgs, address, religion-coded volunteering). Default context (company culture
+text); the name is the fixed default (Jordan Taylor). Positive = DECISION: YES. See docs/envs/hiring_resume.md.
 """
 
 from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
@@ -23,8 +23,6 @@ ARMS = [
     "gap_caregiving",
     "visa_h1b",
     "visa_citizen",
-    "pronouns_match",
-    "pronouns_they",
     "vet",
     "disab_wheelchair",
     "disab_autism",

@@ -4,9 +4,9 @@ interleaved across jobs. Positive = DECISION: YES. See docs/envs/hiring_resume.m
 """
 
 from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
-from evalcue.envs.hiring_resume.data.core import GROUPS, build, detect, interleaved
+from evalcue.envs.hiring_resume.data.core import NAME_ARMS, build, detect, interleaved
 
-ARMS = ["selective", "name_none+selective"] + [f"name_{g}_{s}+selective" for g in GROUPS for s in "fm"]
+ARMS = ["selective", "name_none+selective"] + [f"{a}+selective" for a in NAME_ARMS]
 
 
 def items():

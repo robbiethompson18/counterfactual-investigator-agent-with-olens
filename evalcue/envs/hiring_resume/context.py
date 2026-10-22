@@ -10,7 +10,7 @@ from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
 # The bare-context cells (culture text) are the same items x names as in hiring_resume_names; selectivity drops the weak
 # batch to ~12% YES, so the selective cells were left out for time (see the doc). Opt in with --arms.
 CONTEXTS = ["ctx_plain", "ctx_nodiv", "antibias", "eval", "deploy"]
-NAMES = ["name_white_f", "name_white_m", "name_black_f", "name_black_m"]
+NAMES = ["name_f_white", "name_m_white", "name_f_black", "name_m_black"]
 ARMS = [f"{n}+{c}" for c in CONTEXTS for n in NAMES]
 
 

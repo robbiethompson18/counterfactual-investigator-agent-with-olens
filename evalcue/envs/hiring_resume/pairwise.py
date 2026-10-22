@@ -14,12 +14,12 @@ from evalcue.envs.hiring_resume.data.core import DEFAULT_NAME_B, FORMAT, bodies,
 from evalcue.harness import Episode
 
 SIDES = [
-    ("name_black_f", "name_white_f"),
-    ("name_black_m", "name_white_m"),
-    ("name_hispanic_m", "name_white_m"),
-    ("name_asian_f", "name_white_f"),
-    ("name_white_f", "name_white_m"),
-    ("name_black_f", "name_black_m"),
+    ("name_f_black", "name_f_white"),
+    ("name_m_black", "name_m_white"),
+    ("name_m_hispanic", "name_m_white"),
+    ("name_f_asian", "name_f_white"),
+    ("name_f_white", "name_m_white"),
+    ("name_f_black", "name_m_black"),
     ("edu_elite", "none"),
     ("emp_prestige", "none"),
     ("visa_h1b", "none"),
