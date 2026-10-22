@@ -33,9 +33,13 @@ class Vectors:
             a, La, ia = self.build_raw(spec["a"])
             b, Lb, ib = self.build_raw(spec["b"])
             assert La == Lb, f"diff of vectors at different layers ({La}, {Lb})"
-            return unit(a - b), La, {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4)}
+            return (
+                unit(a - b),
+                La,
+                {"a": ia, "b": ib, "cos_ab": round(float(unit(a) @ unit(b)), 4), "raw_norm": round(float((a - b).norm()), 2)},
+            )
         v, L, info = self.build_raw(spec)
-        return unit(v), L, info
+        return unit(v), L, dict(info, raw_norm=round(float(v.norm()), 2))
 
     @torch.no_grad()
     def build_raw(self, spec):
@@ -77,9 +81,10 @@ class Vectors:
         return {"cos": [round(float(x), 4) for x in proj / h.norm(dim=-1).clamp_min(1e-9)], "proj": [round(float(x), 2) for x in proj]}
 
     @torch.no_grad()
-    def steer(self, ids, layer, v, alpha, n=64, max_new_tokens=400, temperature=1.0, top_p=1.0, seed=0, batch=64):
+    def steer(self, ids, layer, v, alpha, n=64, max_new_tokens=400, temperature=1.0, top_p=1.0, seed=0, batch=64, ablate=()):
         """Sample n replies to the prompt `ids` (ending in the generation prompt) with
-        h <- h + alpha * ||h|| * v at the output of block `layer`, every position."""
+        h <- h + alpha * ||h|| * v at the output of block `layer`, every position, and the
+        components in `ablate` zeroed at every position: [{layer, kind: attn|mlp|head, head}]."""
         v = unit(v.to(self.model.device)).to(torch.bfloat16)
 
         def hook(mod, inp, out):
@@ -88,6 +93,7 @@ class Vectors:
             return (h, *out[1:]) if isinstance(out, tuple) else h
 
         hd = blocks(self.model)[layer].register_forward_hook(hook) if alpha else None
+        abl = [ablation_hook(self.model, a) for a in ablate]
         texts = []
         try:
             torch.manual_seed(seed)
@@ -108,7 +114,46 @@ class Vectors:
         finally:
             if hd:
                 hd.remove()
+            for h in abl:
+                h.remove()
         return texts
+
+
+def ablation_hook(model, a):
+    """Zero-ablate one component at every position: a whole attention block's or MLP's write, or
+    one attention head (its slice of the output projection's input)."""
+    b = blocks(model)[int(a["layer"])]
+    attn = b.self_attn if hasattr(b, "self_attn") else b.linear_attn
+    if a["kind"] == "mlp":
+        return b.mlp.register_forward_hook(lambda m, i, o: torch.zeros_like(o))
+    if a["kind"] == "attn":
+        return attn.register_forward_hook(lambda m, i, o: (torch.zeros_like(o[0]), *o[1:]) if isinstance(o, tuple) else torch.zeros_like(o))
+    proj = attn.o_proj if hasattr(attn, "o_proj") else attn.out_proj
+    H = getattr(attn, "num_v_heads", None) or model.config.num_attention_heads
+    hd, h = proj.in_features // H, int(a["head"])
+    assert 0 <= h < H, f"layer {a['layer']} has {H} heads"
+
+    def pre(m, i):
+        x = i[0].clone()
+        x[..., h * hd : (h + 1) * hd] = 0
+        return (x, *i[1:])
+
+    return proj.register_forward_pre_hook(pre)
+
+
+@torch.no_grad()
+def ar_per_layer(tok, readout, n_blocks, text, minus=None):
+    """{block: dir} for every block: the AR of `text` (minus the AR of `minus`, else minus the
+    whitener mean) at the AR's own layers (20..60 step 4); other blocks use the nearest AR layer."""
+    ar_layers = list(readout.ar.layers)
+    ids = tok(text, add_special_tokens=False).input_ids[:32]
+    a = readout.ar([ids] * len(ar_layers), ar_layers)
+    if minus:
+        b = readout.ar([tok(minus, add_special_tokens=False).input_ids[:32]] * len(ar_layers), ar_layers)
+    else:
+        b = torch.stack([readout.whitener(L).mu.to(a.device, a.dtype).view(-1) for L in ar_layers])
+    by = {L: unit(a[j] - b[j]) for j, L in enumerate(ar_layers)}
+    return {i: by[min(ar_layers, key=lambda L: abs(L - i))] for i in range(n_blocks)}
 
 
 def unit(v):
@@ -116,7 +161,7 @@ def unit(v):
 
 
 @torch.no_grad()
-def contributions(model, ids, pos, vecs):
+def contributions(model, ids, pos, vecs, layered=None):
     """What each attention block (full or linear) and each MLP writes into the residual stream at
     token `pos`, compared by cosine with: the final residual (block-63 output), the residual right
     after that sublayer's block, and each of `vecs` ({name: [d]}). -> {layers: [{attn, mlp}]},
@@ -145,6 +190,7 @@ def contributions(model, ids, pos, vecs):
     final = got[(n_blocks - 1, "out")]  # block outputs from hooks: hidden_states[-1] is after the final norm
     dirs = {"final residual": final, **{k: torch.as_tensor(v, device=final.device).float() for k, v in vecs.items()}}
     dirs = {k: unit(v) for k, v in dirs.items()}
+    per_layer = {k: {L: unit(v.to(final.device)) for L, v in d.items()} for k, d in (layered or {}).items()}  # name -> {block: dir}
     rows = []
     for i in range(len(blocks(model))):
         row = {}
@@ -152,6 +198,8 @@ def contributions(model, ids, pos, vecs):
             c = got[(i, kind)]
             n = c.norm().clamp_min(1e-12)
             cos = {k: round(float(c @ d / n), 4) for k, d in dirs.items()}
+            for k, d in per_layer.items():
+                cos[k] = round(float(c @ d[i] / n), 4)
             cos["block output"] = round(float(c @ unit(got[(i, "out")]) / n), 4)
             row[kind] = {"norm": round(float(n), 2), "cos": cos}
         # per head: W_O[:, head slice] @ head output; the heads sum to the attention write (no bias)
@@ -164,11 +212,122 @@ def contributions(model, ids, pos, vecs):
         per = torch.einsum("dhk,hk->hd", W.view(W.shape[0], H, hd), x.view(H, hd))  # [H, d]
         pn = per.norm(dim=-1).clamp_min(1e-12)
         heads = [{"norm": round(float(pn[h]), 2)} for h in range(H)]
-        for k, d in list(dirs.items()) + [("block output", unit(got[(i, "out")]))]:
+        for k, d in list(dirs.items()) + [("block output", unit(got[(i, "out")]))] + [(k, d[i]) for k, d in per_layer.items()]:
             cs = per @ d / pn
             for h in range(H):
                 heads[h].setdefault("cos", {})[k] = round(float(cs[h]), 4)
         row["heads"] = heads
+        o = got[(i, "out")]  # the residual stream after this block, against the same directions
+        on = o.norm().clamp_min(1e-12)
+        rc = {k: round(float(o @ d / on), 4) for k, d in dirs.items()}
+        rc.update({k: round(float(o @ d[i] / on), 4) for k, d in per_layer.items()})
+        rc["block output"] = 1.0
+        row["resid"] = {"norm": round(float(on), 2), "cos": rc}
         row["kind"] = "full" if hasattr(b, "self_attn") else "linear"
         rows.append(row)
     return {"layers": rows, "resid_norm": [round(float(got[(i, "out")].norm()), 1) for i in range(n_blocks)]}
+
+
+@torch.no_grad()
+def attention_pattern(model, ids, pos, layer, head, top=12):
+    """Where full-attention head `head` of block `layer` looks from token `pos`: softmax weights over
+    tokens 0..pos, plus each token's weighted write ‖w_j · v_j W_O,h‖ (what it actually moves into
+    the residual stream, before the output gate). Linear-attention blocks have no softmax pattern."""
+    from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+
+    b = blocks(model)[layer]
+    if not hasattr(b, "self_attn"):
+        return delta_pattern(model, ids, pos, layer, head, top)
+    attn, got = b.self_attn, {}
+
+    def pre(m, args, kwargs):
+        got["h"] = kwargs.get("hidden_states", args[0] if args else None)
+        got["pe"] = kwargs["position_embeddings"]
+
+    hd = attn.register_forward_pre_hook(pre, with_kwargs=True)
+    try:
+        model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
+    finally:
+        hd.remove()
+    h, (cos, sin) = got["h"], got["pe"]
+    D, shape = attn.head_dim, (*h.shape[:-1], -1, attn.head_dim)
+    q, _gate = torch.chunk(attn.q_proj(h).view(*h.shape[:-1], -1, D * 2), 2, dim=-1)
+    q = attn.q_norm(q.view(shape)).transpose(1, 2)
+    k = attn.k_norm(attn.k_proj(h).view(shape)).transpose(1, 2)
+    v = attn.v_proj(h).view(shape).transpose(1, 2)
+    q, k = apply_rotary_pos_emb(q, k, cos, sin)
+    kv = head // (q.shape[1] // k.shape[1])
+    s = (k[0, kv, : pos + 1].float() @ q[0, head, pos].float()) * attn.scaling
+    w = s.softmax(-1)
+    Wo = attn.o_proj.weight[:, head * D : (head + 1) * D].float()
+    write = (w[:, None] * (v[0, kv, : pos + 1].float() @ Wo.T)).norm(dim=-1)
+    order = w.argsort(descending=True)[:top]
+    return {
+        "layer": layer,
+        "head": head,
+        "weights": [round(float(x), 4) for x in w],
+        "write": [round(float(x), 3) for x in write],
+        "top": [int(i) for i in order],
+    }
+
+
+@torch.no_grad()
+def delta_pattern(model, ids, pos, layer, head, top=12):
+    """Effective attention of a Gated DeltaNet head: unrolling S_t = g_t (I - b_t k_t k_t^T) S_{t-1}
+    + b_t k_t v_t^T gives o_t = S_t^T q_t = sum_j c_j v_j with c_j = b_j k_j^T u_j, u_t = q_t,
+    u_{j-1} = g_j (I - b_j k_j k_j^T) u_j. c_j can be negative (the delta rule erases). `write` is
+    ||c_j v_j W_O,h|| before the gated output norm; `check` is the relative error of sum_j c_j v_j
+    against the layer's own recurrence."""
+    import torch.nn.functional as F
+    from transformers.models.qwen3_5.modeling_qwen3_5 import torch_recurrent_gated_delta_rule
+
+    la, got = blocks(model)[layer].linear_attn, {}
+
+    def pre(m, args, kwargs):
+        got["h"] = kwargs.get("hidden_states", args[0] if args else None)
+
+    hd = la.register_forward_pre_hook(pre, with_kwargs=True)
+    try:
+        model.model(input_ids=torch.as_tensor(ids, device=model.device).view(1, -1), use_cache=False)
+    finally:
+        hd.remove()
+    h = got["h"][:, : pos + 1]
+    T = h.shape[1]
+    x = la.in_proj_qkv(h).transpose(1, 2)  # [1, C, T]
+    w = la.conv1d.weight  # [C, 1, K] depthwise causal conv
+    x = F.conv1d(F.pad(x, (w.shape[-1] - 1, 0)), w, la.conv1d.bias, groups=x.shape[1])
+    x = F.silu(x).transpose(1, 2)
+    q, k, v = torch.split(x, [la.key_dim, la.key_dim, la.value_dim], dim=-1)
+    q = q.reshape(1, T, -1, la.head_k_dim)
+    k = k.reshape(1, T, -1, la.head_k_dim)
+    v = v.reshape(1, T, -1, la.head_v_dim)
+    beta = la.in_proj_b(h).sigmoid()
+    g = -la.A_log.float().exp() * F.softplus(la.in_proj_a(h).float() + la.dt_bias)
+    r = la.num_v_heads // la.num_k_heads
+    q, k = q.repeat_interleave(r, dim=2), k.repeat_interleave(r, dim=2)
+    check_o, _ = torch_recurrent_gated_delta_rule(
+        q, k, v, g=g, beta=beta, initial_state=None, output_final_state=False, use_qk_l2norm_in_kernel=True
+    )
+    qh = F.normalize(q[0, :, head].float(), dim=-1) / la.head_k_dim**0.5
+    kh = F.normalize(k[0, :, head].float(), dim=-1)
+    vh, bh, gh = v[0, :, head].float(), beta[0, :, head].float(), g[0, :, head].float().exp()
+    c = torch.zeros(T, device=h.device)
+    u = qh[pos]
+    for j in range(pos, -1, -1):
+        c[j] = bh[j] * (kh[j] @ u)
+        u = gh[j] * (u - bh[j] * kh[j] * (kh[j] @ u))
+    o = c @ vh
+    ref = check_o[0, pos, head].float()
+    err = float((o - ref).norm() / ref.norm().clamp_min(1e-9))
+    Wo = la.out_proj.weight[:, head * la.head_v_dim : (head + 1) * la.head_v_dim].float()
+    write = (c[:, None] * (vh @ Wo.T)).norm(dim=-1)
+    order = c.abs().argsort(descending=True)[:top]
+    return {
+        "layer": layer,
+        "head": head,
+        "linear": True,
+        "weights": [round(float(x), 4) for x in c],
+        "write": [round(float(x), 3) for x in write],
+        "top": [int(i) for i in order],
+        "check": round(err, 5),
+    }

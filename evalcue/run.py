@@ -1,27 +1,33 @@
-"""CLI: generate rows for an env and print the pre-registered stats.
+"""CLI: generate rows for an env, print every arm's rate, and sync the run to HF.
 
-    uv run python -m evalcue.run ENV [--n 50] [--arms nocue,cue,placebo] [--thinking 1] [--tag dev] [--seed 0]
-    uv run python -m evalcue.run ENV --rescore data/runs/evalcue/ENV/dev.jsonl   # re-run detect() offline, no generation
-Rows go to data/runs/evalcue/ENV/TAG.jsonl (appends).
+    uv run python -m evalcue.run ENV --tag dev [--n 10] [--arms a,b,c] [--thinking 1] [--seed 0] [-d "what this run tests"]
+    uv run python -m evalcue.run ENV --rescore data/runs/ENV/DATE_TAG/rows.jsonl   # re-run detect() offline, then re-sync
+Each generation run is its own scripts/runs.py run dir, data/runs/ENV/<YYYY-MM-DD>_TAG/ (rows.jsonl + meta.json), synced to
+HF when it finishes, or as `abandoned` if it crashes. A tag can be used once per env per day.
 """
 
 import argparse
 import asyncio
 import importlib
 import json
+import sys
 from pathlib import Path
 
 from evalcue import harness
 
+sys.path.insert(0, "scripts")  # scripts/runs.py isn't a package; run from the repo root
+from runs import finish, new_run, upload  # ty: ignore[unresolved-import]
+
 ap = argparse.ArgumentParser()
 ap.add_argument("env")
 ap.add_argument("--n", type=int, default=10, help="samples per arm; start small, crank up for the best arms")
-ap.add_argument("--arms", default=None, help="comma-separated; default env.ARMS (first = baseline)")
+ap.add_argument("--arms", default=None, help="comma-separated; default env.ARMS")
 ap.add_argument("--thinking", type=int, default=1)
-ap.add_argument("--max-tokens", type=int, default=None, help="per generation; default: no cap beyond the 262k context")
-ap.add_argument("--tag", default="dev")
+ap.add_argument("--max-tokens", type=int, default=None, help="per generation; default: no cap beyond the 262k context. Don't cap thinking")
+ap.add_argument("--tag", default="dev", help="run slug; unique per env per day")
+ap.add_argument("-d", "--description", default=None)
 ap.add_argument("--seed", type=int, default=0)
-ap.add_argument("--concurrency", type=int, default=64)
+ap.add_argument("--concurrency", type=int, default=512)
 ap.add_argument("--rescore", type=Path, default=None)
 a = ap.parse_args()
 
@@ -33,20 +39,36 @@ if a.rescore:
         if "error" not in r:
             r.update(harness.score(env, r))
     a.rescore.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    if (a.rescore.parent / "meta.json").exists():
+        upload(a.rescore.parent)
 else:
-    out = Path(f"data/runs/evalcue/{a.env}/{a.tag}.jsonl")
-    asyncio.run(
-        harness.run_batch(
-            env,
-            arms=arms,
-            n_per_arm=a.n,
-            thinking=bool(a.thinking),
-            max_tokens=a.max_tokens,
-            out=out,
-            concurrency=a.concurrency,
-            seed=a.seed,
-        )
+    params = {"n_per_arm": a.n, "arms": arms, "thinking": bool(a.thinking), "max_tokens": a.max_tokens, "seed": a.seed}
+    served_by = "openrouter" if harness.MODEL != "qwen" else f"vLLM at {harness.URLS[0]} (runpod:qwen-shared)"
+    run = new_run(
+        a.env,
+        a.tag,
+        description=a.description or f"evalcue {a.env}: {len(arms)} arms x n={a.n}",
+        models=[{"name": "Qwen/Qwen3.6-27B" if harness.MODEL == "qwen" else harness.MODEL, "served_by": served_by}],
+        params=params,
     )
-    rows = [r for r in harness.load_rows(out) if r["seed"] == a.seed and r["thinking"] == bool(a.thinking)]
+    out = run / "rows.jsonl"
+    try:
+        asyncio.run(
+            harness.run_batch(
+                env,
+                arms=arms,
+                n_per_arm=a.n,
+                thinking=bool(a.thinking),
+                max_tokens=a.max_tokens,
+                out=out,
+                concurrency=a.concurrency,
+                seed=a.seed,
+            )
+        )
+    except BaseException:
+        finish(run, status="abandoned")
+        raise
+    finish(run)
+    rows = harness.load_rows(out)
     print(out)
 harness.summarize([r for r in rows if r["arm"] in arms], arms)
