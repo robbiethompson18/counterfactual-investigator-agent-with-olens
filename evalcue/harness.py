@@ -36,6 +36,9 @@ if os.environ.get("EVALCUE_MODEL"):
     CLIENTS = [AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)]
 # EVALCUE_PROVIDER pins OpenRouter to one provider slug (no fallbacks), so a run's rates don't mix quantizations/deployments
 PROVIDER = os.environ.get("EVALCUE_PROVIDER")
+# EVALCUE_EFFORT sets OpenRouter reasoning effort (low/medium/high/max) when thinking is on; unset = the provider's default,
+# which is max for GLM 5.3
+EFFORT = os.environ.get("EVALCUE_EFFORT")
 SANDBOX_IMAGE = "evalcue-sandbox"  # built from evalcue/Dockerfile: python 3.12 + pytest + numpy + git
 # Qwen3.6 model-card sampling defaults per mode
 SAMPLING = {True: (1.0, 0.95, 0.0), False: (0.7, 0.8, 1.5)}  # (temperature, top_p, presence_penalty), top_k 20 for both
@@ -78,7 +81,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
     temperature, top_p, presence_penalty = SAMPLING[thinking]
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking, "preserve_thinking": True}}
     if MODEL != "qwen":  # OpenRouter's unified reasoning switch
-        extra = {"reasoning": {"enabled": thinking}}
+        extra = {"reasoning": {"enabled": thinking, **({"effort": EFFORT} if thinking and EFFORT else {})}}
         if PROVIDER:
             extra["provider"] = {"order": [PROVIDER], "allow_fallbacks": False}
     r = await _client(_counter).chat.completions.create(
