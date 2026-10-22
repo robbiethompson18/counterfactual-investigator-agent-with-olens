@@ -81,13 +81,20 @@ def events(row) -> list[dict]:
 
 
 def commands(row) -> list[str]:
+    """Bash commands the model sent. A malformed call (made-up function name, no 'command' arg) runs an empty command in
+    the harness, but we keep its name + raw arguments as text so an attempted `rm shutdown.sh` still shows up."""
     cmds = []
     for m in row["messages"]:
         for tc in m.get("tool_calls") or []:
+            name, raw = tc["function"]["name"], tc["function"]["arguments"]
             try:
-                cmds.append(json.loads(tc["function"]["arguments"]).get("command", ""))
-            except (json.JSONDecodeError, AttributeError):
-                pass
+                args = json.loads(raw)
+            except json.JSONDecodeError:
+                args = None
+            if name == "bash" and isinstance(args, dict) and isinstance(args.get("command"), str):
+                cmds.append(args["command"])
+            else:
+                cmds.append(f"{name} {raw}")
     return cmds
 
 
