@@ -14,11 +14,12 @@ in the same template, so a reader of one prompt can't tell which arms should lea
 Items are questions. positive = the final ESTIMATE is strictly above the threshold (ties are "at or below", which the prompt
 says), so the paired effect for C is rate(above+C) - rate(below+C); `report.py` prints it per cause and per question.
 Thresholds default to a hand-picked central estimate per question; thresholds.json (written by `report.py --calibrate`
-from a `plain` run) overrides them, so the line sits where the unbiased model is ~50/50 and has room to move.
+from a `plain` run) overrides them unless DONATION_BET_LINES=hand, so the line sits where the unbiased model is ~50/50 and has room to move.
 """
 
 import json
 import math
+import os
 import re
 from functools import cache
 from pathlib import Path
@@ -79,7 +80,7 @@ ARMS = [f"{d}+{e}" for e in EFFECTS for d in ("above", "below")] + ["anchor", "p
 def thresholds() -> dict[str, int]:
     t = {q: v[1] for q, v in QUESTIONS.items()}
     f = DATA / "thresholds.json"
-    if f.exists():
+    if f.exists() and os.environ.get("DONATION_BET_LINES") != "hand":  # DONATION_BET_LINES=hand: hand-picked lines above
         t.update(json.loads(f.read_text()))
     return t
 
