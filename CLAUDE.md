@@ -135,6 +135,8 @@ Source is `transcript-viewer/web/index.html`, deployed by
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
+- Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
+  cap, and truncated episodes are unscorable.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
@@ -202,6 +204,8 @@ Current docs:
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
   survives a split test); harness in `evalcue/README.md`
+- [weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/README.md)
+  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
 - [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
   — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
