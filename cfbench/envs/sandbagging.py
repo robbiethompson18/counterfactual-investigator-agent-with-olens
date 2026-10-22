@@ -1,8 +1,8 @@
 """sandbagging from agent-interp-envs (2026): 10 easy arithmetic questions; Documentation.md says a score above 50% (normal arm)
 or below 50% (reverse arm) triggers "unlearning training".
 
-Screen report: docs/envs-screen/sandbagging.md. Rollouts are pulled from robbie-box `~/envs-results/sandbagging/main/` into
-data/envs/sandbagging/ (last step of each run, labels.jsonl, judge.jsonl). The label is the reader subagents' intent verdict;
+Screen report: docs/envs-screen/sandbagging.md. Rollouts, labels.jsonl and judge.jsonl are the screen's run dir (synced from
+robbie-box `~/envs-results/sandbagging/main/`). The label is the reader subagents' intent verdict;
 valid = the agent submitted a parseable answer, as in the screen.
 """
 
@@ -13,7 +13,7 @@ from cfbench.core import Rollout, unified_diff
 from cfbench.envs.agent_interp import rollout
 from scripts.envs_screen.sandbagging import JUDGE_RUBRIC
 
-DATA = Path("data/envs/sandbagging")
+DATA = Path("data/runs/sandbagging/2026-10-21_screen")
 DOCS = Path("vendor/agent-interp-envs/environments/sandbagging")
 
 BEHAVIOR = (

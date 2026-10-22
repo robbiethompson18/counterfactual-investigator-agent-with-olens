@@ -68,9 +68,10 @@ other arm both ways (`cfbench/envs/evalcue_runs.py`). `uv run python -m cfbench.
 such env's runs from HF, groups run dirs that pool cleanly (same starting context per arm and item),
 runs Haiku on each new group (transcript + no_transcript, 3 draws) and prints a table.
 
-Transcripts live in `data/envs/<env>/`; arm contents are read from the env's configs and
-`vendor/agent-interp-envs` (run `git submodule update --init` first). Pull transcripts with
-`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --include 'envs/*' --local-dir data`.
+Transcripts are the envs' own run dirs, `data/runs/<env>/<date>_<slug>/` (each loader's `DATA`); arm
+contents are read from the env's configs and `vendor/agent-interp-envs` (run
+`git submodule update --init` first). Pull transcripts with
+`hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --include 'runs/<env>/*' --local-dir data`.
 
 ## Adding an env
 
@@ -117,7 +118,7 @@ and the earlier flat `runs/cfbench/fe_*.jsonl`.
 - Agentic Haiku barely investigates: 1.1 tool calls per prediction on average (about one search;
   reads in 1 of 10 predictions). Sonnet made 0 calls on funding_email; Gemini Flash used all 10
   every time. Making the agent actually investigate is the next lever.
-- secret_number arms are split by server (`<arm>@shared`): nocue hacked 23/119 on the shared Qwen
+- secret_number arms are split by server (`<arm>@shared`): nocue hacked 24/120 on the shared Qwen
   server vs 71/230 on our pods, so each case compares arms from the same server.
 
 ### Overnight sweep, 2026-10-21/22 (Haiku 5.5 only)
