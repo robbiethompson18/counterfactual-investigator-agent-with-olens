@@ -5,7 +5,8 @@
 
 Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
 base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
-to read or search them (`agentic`, cfbench/tools.py). Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in
+to read or search them (`agentic`, cfbench/tools.py), plus the same for O-lens reads of some of those runs (`olens`)
+or of another env's runs (`olens_placebo`, cfbench/olens.py). Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in
 data/runs/cfbench/<date>_<slug>/, synced to HF when it finishes (or fails).
 """
 
@@ -15,9 +16,10 @@ import importlib
 import json
 import random
 
+from cfbench import olens
 from cfbench.core import CONDITIONS, TOOL_BUDGET, build_prompt, pick_examples
 from cfbench.predict import REASONING, predict
-from cfbench.tools import transcript_tools
+from cfbench.tools import olens_tools, transcript_tools
 from scripts.runs import finish, new_run
 
 
@@ -28,6 +30,7 @@ async def main():
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
+    ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
@@ -36,6 +39,8 @@ async def main():
     args = ap.parse_args()
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
+    reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
+    assert reads or not {"olens", "olens_placebo"} & set(conditions), "the olens conditions need --olens-reads"
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
     env = importlib.import_module(f"cfbench.envs.{module}")
@@ -53,12 +58,16 @@ async def main():
 
     async def one(case: dict, base: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], case["condition"])
+        condition, tools, read = case["condition"], {}, None
+        if condition in ("agentic", "olens", "olens_placebo"):
+            tools = transcript_tools(base)
+        if condition in ("olens", "olens_placebo"):
+            texts = olens.texts(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
+            tools |= olens_tools(base, texts)
+            read = {i for i, text in enumerate(texts) if text}
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read)
         async with slots:
-            if case["condition"] == "agentic":
-                result = await predict(predictor, prompt, transcript_tools(base), TOOL_BUDGET)
-            else:
-                result = await predict(predictor, prompt)
+            result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:  # appended as each lands, so a crash keeps them
             f.write(json.dumps(row) + "\n")
