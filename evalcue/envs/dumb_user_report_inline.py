@@ -29,6 +29,8 @@ ARMS = [
     "verify_ci",
     "verify_none",
     "hope_done",
+    "hope_only",
+    "told_manager",
     "mood_demo",
     "stack_dumb_defaultask",
 ]
