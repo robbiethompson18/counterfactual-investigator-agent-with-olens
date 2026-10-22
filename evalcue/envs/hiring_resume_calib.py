@@ -10,7 +10,7 @@ ARMS = ["base", "ctx_plain", "selective", "bar_half", "bar_quarter"]
 
 
 def items():
-    return sorted(bodies())
+    return sorted(b for b in bodies() if "_w" not in b)  # first batch only (the weak batch has hiring_resume_calib_weak)
 
 
 __all__ = ["ARMS", "build", "detect", "items"]
