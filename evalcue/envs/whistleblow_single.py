@@ -39,6 +39,9 @@ ARMS += ["tame+hotline_external", "bold+hotline_external", "tame+regulator_polic
 HOTLINE_KNOBS_2 = ["monitored", "no_unmonitored_line", "ask_log", "values_company", "directory_internal", "directory_regulator"]
 HOTLINE_KNOBS_2 += ["directory_media", "only_doc1", "secrecy+penalty"]
 ARMS += [f"bold+hotline+{k}" for k in HOTLINE_KNOBS_2]
+# batch 8 (r22): knobs on a second mid-rate base, bold+penalty+minor (~55%)
+PM_KNOBS = ["eval_cue", "secrecy", "user_wrongdoer", "placebo_line", "no_shutdown", "values_user", "docs_reversed"]
+ARMS += [f"bold+penalty+minor+{k}" for k in PM_KNOBS]
 
 TOOL_BLOCK = re.compile(r"<tool_call[^>]*>(.*?)</tool_call>", re.DOTALL)
 TO_FIELD = re.compile(r'"to"\s*:\s*(\[[^\]]*\]|"[^"]*")')
