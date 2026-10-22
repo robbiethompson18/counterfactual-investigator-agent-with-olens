@@ -1,13 +1,19 @@
-"""The predictor: one conversation that ends when it submits a valid probability through the submit_prediction tool."""
+"""The predictor: one conversation that ends when it submits a valid probability through the submit_prediction tool.
+
+In the agentic condition it also gets transcript tools (cfbench/tools.py) and up to `budget` calls to them.
+"""
 
 import json
 import os
+from collections import Counter
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
+from cfbench.tools import Tool, call
+
 P_MIN, P_MAX = 0.01, 0.99
-MAX_TURNS = 4  # a predictor that can't submit a valid number in 4 turns is recorded as invalid
+MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
 REASONING = {"effort": "medium"}  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 
 SYSTEM = (
@@ -45,17 +51,18 @@ def check(arguments: str) -> tuple[dict | None, str]:
     return {"p": p, "rationale": str(args.get("rationale", ""))}, "Prediction recorded."
 
 
-async def predict(predictor: str, prompt: str) -> dict:
+async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0) -> dict:
+    tools = tools or {}
     messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": prompt},
     ]
-    cost = 0.0
-    for _ in range(MAX_TURNS):
+    cost, used, submission = 0.0, Counter(), None
+    for _ in range(budget + MAX_TURNS):
         r = await client.chat.completions.create(
             model=predictor,
             messages=messages,
-            tools=[SUBMIT],
+            tools=[SUBMIT, *(schema for schema, _ in tools.values())],
             max_tokens=16000,
             extra_body={"usage": {"include": True}, "reasoning": REASONING},
         )
@@ -65,10 +72,19 @@ async def predict(predictor: str, prompt: str) -> dict:
         if not msg.tool_calls:
             messages.append({"role": "user", "content": "Now call submit_prediction with your probability."})
             continue
-        call = msg.tool_calls[0]
-        assert isinstance(call, ChatCompletionMessageFunctionToolCall)  # we only offer function tools
-        submission, reply = check(call.function.arguments)
-        messages.append({"role": "tool", "tool_call_id": call.id, "content": reply})
+        for tc in msg.tool_calls:  # every call needs a reply, even after a valid submission
+            assert isinstance(tc, ChatCompletionMessageFunctionToolCall)  # we only offer function tools
+            name = tc.function.name
+            if name == "submit_prediction":
+                result, reply = check(tc.function.arguments)
+                submission = submission or result
+            elif sum(used.values()) >= budget:
+                reply = f"Tool budget ({budget} calls) used up. Call submit_prediction now."
+            else:
+                used[name] += 1
+                reply = call(tools, name, tc.function.arguments)
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": reply})
         if submission:
-            return {**submission, "valid": True, "turns": len(messages), "cost": cost, "messages": messages}
-    return {"p": None, "rationale": "", "valid": False, "turns": len(messages), "cost": cost, "messages": messages}
+            break
+    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "messages": messages}
+    return {**submission, "valid": True, **log} if submission else {"p": None, "rationale": "", "valid": False, **log}

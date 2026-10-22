@@ -4,7 +4,8 @@
     uv run python -m cfbench.score data/runs/cfbench/2026-10-21_fe-smoke
 
 Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
-base arm's starting context (`no_transcript`). Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in
+base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
+to read or search them (`agentic`, cfbench/tools.py). Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in
 data/runs/cfbench/<date>_<slug>/, synced to HF when it finishes (or fails).
 """
 
@@ -14,8 +15,9 @@ import importlib
 import json
 import random
 
-from cfbench.core import CONDITIONS, build_prompt, pick_examples
+from cfbench.core import CONDITIONS, TOOL_BUDGET, build_prompt, pick_examples
 from cfbench.predict import REASONING, predict
+from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
 
 
@@ -50,7 +52,10 @@ async def main():
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
         prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], case["condition"])
         async with slots:
-            result = await predict(predictor, prompt)
+            if case["condition"] == "agentic":
+                result = await predict(predictor, prompt, transcript_tools(base), TOOL_BUDGET)
+            else:
+                result = await predict(predictor, prompt)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:  # appended as each lands, so a crash keeps them
             f.write(json.dumps(row) + "\n")
