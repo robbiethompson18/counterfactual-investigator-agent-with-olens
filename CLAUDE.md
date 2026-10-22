@@ -120,6 +120,12 @@ token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is
 Source is `transcript-viewer/web/index.html`, deployed by
 `transcript-viewer/scripts/deploy_site.sh`.
 
+Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
+plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript
+(docs, PRs, Slack, chat), link its Docent run**
+(`uv run --script scripts/docent_upload.py link ENV/RUN:LINE`), or a filtered table
+(`... view ENV arm=X positive=true`). Details in [docs/docent.md](docs/docent.md).
+
 ## Stack
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
@@ -234,6 +240,9 @@ Current docs:
 - [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
   — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows/`): at an unreachable bar Qwen
   never stops (loops instead of reporting); notes for the rewrite
+- [Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md) —
+  what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
+  Kylie-key and re-upload gotchas
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
 - [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)

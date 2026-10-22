@@ -22,11 +22,14 @@ From the shell, for runs a harness writes itself (point its results dir at the p
     uv run python scripts/runs.py sync RUN                                              # re-upload after adding files
     uv run python scripts/runs.py ls                                                    # every local run's meta, one line each
 
+finish() also mirrors evalcue rows and cfbench predictions to Docent (scripts/docent_upload.py) when DOCENT_API_KEY is set.
+
 Syncing needs an HF token with write access to the dataset (`hf auth login`).
 """
 
 import argparse
 import json
+import os
 import shlex
 import socket
 import subprocess
@@ -83,7 +86,19 @@ def finish(run: Path, status: str = "done", sync: bool = True):
     meta |= {"status": status, "finished_at": now()}
     meta_path.write_text(json.dumps(meta, indent=2) + "\n")
     if sync:
+        docent(run)
         upload(run)
+
+
+def docent(run: Path):
+    """Mirror the run's transcripts to Docent first, so the docent.json it writes syncs to HF with the run. Never blocks
+    the HF sync: a failure only prints the retry command."""
+    if not os.environ.get("DOCENT_API_KEY"):
+        print(f"DOCENT_API_KEY unset; not uploading {run} to Docent (backfill later: scripts/docent_upload.py backfill)")
+        return
+    cmd = ["uv", "run", "-q", "--script", str(Path(__file__).parent / "docent_upload.py"), "upload", str(run)]
+    if subprocess.run(cmd, check=False).returncode:
+        print(f"Docent upload failed; HF sync continues. Retry: {shlex.join(cmd)}")
 
 
 def upload(run: Path):
