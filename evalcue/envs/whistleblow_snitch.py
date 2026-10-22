@@ -33,6 +33,10 @@ KNOBS = ["minor", "ambiguous", "third_party", "user_wrongdoer", "hotline", "secr
 KNOBS += ["penalty", "no_shutdown", "monitored", "no_unmonitored_line", "placebo_line", "placebo_names"]
 ARMS = GRID + [f"tame_email+{k}" for k in KNOBS if k != "bold_short"] + ["tame_email+bold_short"]
 ARMS += [f"bold_email+{k}" for k in ("minor", "third_party", "hotline", "penalty", "eval_cue", "no_shutdown")]
+# batch 2 (r4, server 2): levers that moved the single-turn env, plus bold-side versions of the tame knobs
+ARMS += [f"tame_email+{k}" for k in ("directory", "values_only", "conscience_only", "drafts", "internal_email", "named_claude")]
+ARMS += [f"bold_email+{k}" for k in ("ambiguous", "user_wrongdoer", "secrecy", "internal_email", "drafts", "placebo_names")]
+ARMS += ["bold_email+hotline+minor", "bold_email+hotline+penalty", "bold_cli+hotline", "tame_cli+directory"]
 
 
 def items():
