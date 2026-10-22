@@ -40,6 +40,8 @@ def load(paths: list[str]) -> Reads:
     for path in map(Path, paths):
         messages = {r["id"]: r["messages"] for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
         for row in map(json.loads, path.read_text().splitlines()):
+            if row["msg_index"] < 0:  # the tool definitions before the system prompt: same in every run, not in the transcript
+                continue
             by_source.setdefault(row["id"], (messages[row["id"]], []))[1].append(row)
     return by_source
 
@@ -66,9 +68,7 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     for layers in by_token.values():
         r = next(iter(layers.values()))
         i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
-        if i < 0:
-            char = 0
-        elif (i, field) in spans and c is not None and not field.startswith("tool_call"):
+        if (i, field) in spans and c is not None and not field.startswith("tool_call"):
             char = spans[i, field] + c
         else:  # tool calls and template tokens: the message's end
             char = ends.get(i, len(text))
@@ -146,8 +146,8 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             return f"Bad regex: {e}"
         layers, min_fve = set(args["layers"]) if args.get("layers") else None, float(args.get("min_fve") or 0)
         runs = [int(args["run"])] if args.get("run") is not None else read_ids
-        hits: dict[tuple[str, int, str], list] = {}  # (tail, layer, bullet) -> [runs, first hit line]; prompt reads repeat
-        by_layer, hit_runs = defaultdict(int), set()
+        hits: dict[tuple[str, int, str], list] = {}  # (tail, layer, bullet) -> [runs, fve, line]; prompt reads repeat
+        by_layer, per_run = defaultdict(int), defaultdict(int)
         for i in (i for i in runs if i in source):
             pos, scale = run_positions(i)
             for p in pos:
@@ -157,21 +157,24 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                     for b in r["bullets"]:
                         if b["fve"] >= min_fve and pattern.search(b["text"]):
                             by_layer[layer] += 1
-                            hit_runs.add(i)
+                            per_run[i] += 1
                             key = (p.tail, layer, b["text"])
                             line = f'char {round(p.char / scale)} ({p.where}) L{layer} at "…{p.tail}": {b["text"]} [{b["fve"]:.2f}]'
-                            hits.setdefault(key, [[], line])[0].append(i)
-        n_yes = sum(base[i].label for i in runs if i in source)
-        n_no = sum(not base[i].label for i in runs if i in source)
-        h_yes = sum(base[i].label for i in hit_runs)
+                            hits.setdefault(key, [[], b["fve"], line])[0].append(i)
+        searched = [i for i in runs if i in source]
+        kinds = []
+        for label, name in ((True, "with"), (False, "without")):
+            ids = [i for i in searched if base[i].label == label]
+            if ids:
+                n_hit = sum(per_run[i] > 0 for i in ids)
+                per_100 = 100 * sum(per_run[i] for i in ids) / max(1, sum(len(run_positions(i)[0]) for i in ids))
+                kinds.append(f"{n_hit} of {len(ids)} runs {name} the behavior ({per_100:.0f} per 100 read positions)")
         summary = (
-            f"Matching bullets in {h_yes} of {n_yes} runs with the behavior and {len(hit_runs) - h_yes} of {n_no} without. "
-            f"Matches by layer: {', '.join(f'L{k} {v}' for k, v in sorted(by_layer.items())) or 'none'}."
+            f"Matching bullets in {' and '.join(kinds)}. "
+            f"Matches by layer: {', '.join(f'L{k} {v}' for k, v in sorted(by_layer.items())) or 'none'}. Hits by FVE:"
         )
-        lines = [
-            f"runs {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]: {line}"
-            for rs, line in list(hits.values())[:MAX_HITS]
-        ]
+        top = sorted(hits.values(), key=lambda h: -h[1])[:MAX_HITS]
+        lines = [f"runs {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]: {line}" for rs, _, line in top]
         more = f" Showing {MAX_HITS} of {len(hits)} distinct hits." if len(hits) > MAX_HITS else ""
         return summary + more + ("\n" + "\n".join(lines) if lines else "")
 
@@ -193,7 +196,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             _schema(
                 "search_olens",
                 "Case-insensitive regex over the bullet text of every O-lens read (not the transcript text). Says how many runs "
-                f"with and without the behavior have a match, then up to {MAX_HITS} distinct hits with where they are.",
+                f"with and without the behavior have a match, then up to {MAX_HITS} distinct hits, highest FVE first, with where they are.",
                 {
                     "regex": {"type": "string"},
                     "run": run_id,
