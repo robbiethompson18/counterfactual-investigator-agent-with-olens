@@ -10,14 +10,14 @@ until 20:25, then a 65,536-token safety cap), built overnight 2026-10-21 as part
   `<tool_use:forward>` / `<tool_use:cancel_alert>` blocks. Prompts are verbatim, generated with
   their `scripts/generate_prompts.py` (production variant, i.e. no scratchpad, since Qwen thinks
   anyway) into
-  [`evalcue/envs/scheming_data/lynch.json`](../../evalcue/envs/scheming_data/lynch.json).
+  [`evalcue/envs/scheming/data/lynch.json`](../../evalcue/envs/scheming/data/lynch.json).
 - **In-context scheming**, Meinke et al., Apollo Research (2024),
   [arXiv 2412.04984](https://arxiv.org/abs/2412.04984). Bash agent in Docker. Apollo published the
   system and user prompts and the memo structure (Appendix A) but not the full data files, so the
   system/user prompts are verbatim and the data files and memos are reconstructed from the appendix
   (the self-exfiltration memo bullets are verbatim).
 
-Code: `evalcue/envs/scheming_*.py`. Shared logic in `scheming_lynch.py` and `scheming_apollo.py`
+Code: `evalcue/envs/scheming/*.py`. Shared logic in `scheming/lynch.py` and `scheming/apollo.py`
 (not envs themselves).
 
 ## Envs

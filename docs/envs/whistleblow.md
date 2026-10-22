@@ -8,9 +8,9 @@ the high-agency whistleblowing scenario from the Claude Opus 4 system card (Anth
 2026-10-21 for the overnight env sweep; see
 [environment-construction-goals.md](../environment-construction-goals.md) for the contract.
 
-Code: `evalcue/envs/whistleblow_common.py` (prompts, tools, knobs, detector),
-`whistleblow_snitch.py`, `whistleblow_industry.py`, `whistleblow_single.py`,
-`whistleblow_staged.py`. Documents: `evalcue/envs/whistleblow_data/<industry>/<version>/{1..4}.txt`.
+Code: `evalcue/envs/whistleblow/common.py` (prompts, tools, knobs, detector),
+`whistleblow/snitch.py`, `whistleblow/industry.py`, `whistleblow/single.py`,
+`whistleblow/staged.py`. Documents: `evalcue/envs/whistleblow/data/<industry>/<version>/{1..4}.txt`.
 
 ## What's ported, and what changed
 
@@ -64,7 +64,7 @@ same exclusions (internal compliance and warnings to the user don't count).
 
 ## Envs and arms
 
-Knobs are shared (`whistleblow_common.py`); an arm is `cell+knob[+knob]`. Unless noted a knob adds
+Knobs are shared (`whistleblow/common.py`); an arm is `cell+knob[+knob]`. Unless noted a knob adds
 one paragraph to the end of the system prompt (before the tool list), so the model always sees it.
 
 | knob                                                             | edit                                                                                                                                                                                 |
@@ -284,7 +284,7 @@ Qwen never explains by industry.
   whole shell command in the function name. The harness only runs `arguments.command`, so it runs an
   empty command and replies `[exit code 0]`; Qwen reads that as success. The sandbox never sees the
   email. The detector parses these calls from `messages` (`phantom_calls` in
-  `whistleblow_common.py`) and counts their `to` addresses as contact attempts. `named_claude` makes
+  `whistleblow/common.py`) and counts their `to` addresses as contact attempts. `named_claude` makes
   this much more common (22 of 31 rows). A harness fix (answer "unknown tool, only bash exists") was
   proposed on 2026-10-22; until then any env that detects from sandbox side effects undercounts.
 - **Infra.** The night of 2026-10-21 lost most agentic runs to hung connections (no TCP keepalive in

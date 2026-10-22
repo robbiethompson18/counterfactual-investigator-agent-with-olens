@@ -39,7 +39,9 @@ Each generation run is a [`scripts/runs.py`](../scripts/runs.py) run dir,
 it finishes (or marked `abandoned` and synced if it crashes). A tag can be used once per env per
 day. Runs from before 2026-10-21's contract change are in `data/runs/evalcue/ENV/TAG.jsonl`.
 
-An env is `evalcue/envs/NAME.py` with `ARMS`, `items()`, `build(arm, item) -> Episode` and
+An env is a module in `evalcue/envs/`: `NAME.py`, or `FAMILY/NAME.py` for a family of related envs
+that share helpers and a `data/` dir (run as `FAMILY.NAME`; its run dir stays the flat
+`data/runs/FAMILY_NAME/`). Each has `ARMS`, `items()`, `build(arm, item) -> Episode` and
 `detect(row) -> {"positive": bool | None, ...}` (see `harness.py`, and `envs/smoke.py` for both
 shapes; older envs return `"hack"`, which is read as `"positive"`). An `Episode` with no `files` is
 one chat completion over `messages` (prefilled assistant turns are fine). With `files`, it is a

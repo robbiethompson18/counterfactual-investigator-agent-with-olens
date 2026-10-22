@@ -256,7 +256,7 @@ async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, co
             except Exception as e:  # noqa: BLE001 - log and keep the batch going
                 res = {"error": repr(e)[:500]}
             row = {
-                "env": env.__name__.split(".")[-1],
+                "env": env.__name__.removeprefix("evalcue.envs.").replace(".", "_"),
                 "model": MODEL,
                 "arm": arm,
                 "item": item,

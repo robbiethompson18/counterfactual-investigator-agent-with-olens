@@ -4,7 +4,7 @@ Tech debt we know about, newest first.
 
 ## 2026-10-22: `shutdown_*` envs parse arms by substring, and the doc tables come from a scratch script
 
-`evalcue/envs/shutdown_persist.py` builds each episode from substrings of the arm name
+`evalcue/envs/shutdown/persist.py` builds each episode from substrings of the arm name
 (`"cost" in arm`, `"freetime" in arm`), so a new arm name can silently pick up an edit it didn't
 mean to (`costlow` contains `cost`, handled by ordering). `shutdown_killswitch`/`shutdown_cron` grew
 long `if arm in (...)` chains for stacked arms. A dict of named edits per arm would be safer. The
