@@ -20,7 +20,10 @@ packages = ["src/counterfactual_investigator_agent_with_olens"]
 
 [tool.ruff]
 line-length = 140
-extend-exclude = ["vendor"]  # third-party submodules follow their own lint rules
+extend-exclude = [
+  "vendor",  # third-party submodules follow their own lint rules
+  "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
+]
 
 [tool.ruff.lint]
 extend-select = [

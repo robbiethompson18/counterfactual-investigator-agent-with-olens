@@ -750,8 +750,31 @@ class H(BaseHTTPRequestHandler):
             if p == "/api/contrib":  # per-block attention / MLP writes at one token: {tid, pos}
                 if not (POD and POD.ready()):
                     raise RuntimeError("the GPU pod isn't running: start it from the header")
-                vecs = {f"{v['name']} (L{v['layer']})": steer.V[v["vid"]]["v"] for v in steer.vectors()}
-                return self.send(POD.call("/contrib", {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs}))
+                vecs = {steer.spec_name(v["spec"], full=True): steer.V[v["vid"]]["v"] for v in steer.vectors()}
+                return self.send(
+                    POD.call(
+                        "/contrib",
+                        {"ids": render(req["tid"])["ids"], "pos": int(req["pos"]), "vecs": vecs, "layered": req.get("layered") or {}},
+                    )
+                )
+            if p.startswith("/api/h/"):  # generic: pod handlers.do_<name> on this transcript's ids
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                body = {k: v for k, v in req.items() if k != "tid"}
+                return self.send(POD.call("/contrib", dict(body, ids=render(req["tid"])["ids"], op=p[len("/api/h/") :])))
+            if p == "/api/attn":  # one full-attention head's pattern from a token: {tid, pos, layer, head}
+                if not (POD and POD.ready()):
+                    raise RuntimeError("the GPU pod isn't running: start it from the header")
+                return self.send(
+                    POD.call(
+                        "/contrib",
+                        {
+                            "ids": render(req["tid"])["ids"],
+                            "pos": int(req["pos"]),
+                            "attn": {"layer": int(req["layer"]), "head": int(req["head"])},
+                        },
+                    )
+                )
             if p == "/api/vector":
                 return self.send(steer.build(POD, req.get("name"), req["spec"]))
             if p == "/api/vector/delete":
@@ -771,8 +794,12 @@ class H(BaseHTTPRequestHandler):
                         req.get("vid"),
                         req.get("alpha", 0),
                         int(req.get("n", 64)),
+                        ablate=req.get("ablate") or (),
                     )
                 )
+            if p == "/api/steer/rejudge":  # re-run failed judge calls of a finished run
+                r = steer.R[req["rid"]]
+                return self.send(steer.rejudge(judge_for(r["tid"]), req["rid"], user_messages(r["tid"])))
             if p == "/api/judge_calib":  # judge WeirdChat's stored rollouts of this prompt, compare labels
                 tid = req["tid"]
                 threading.Thread(target=judge_calib, args=(tid,), daemon=True).start()
@@ -870,6 +897,8 @@ def main():
     extras.load(shards("extras"))
     steer.load()
     S["rubrics"] = {r["behavior_id"]: r["transcript_rubric"]["text"] for r in pq.read_table(HF / "rubrics.parquet").to_pylist()}
+    if os.environ.get("WCO_JUDGE_URL"):
+        steer.resume(judge_for, user_messages)
     from readq import ReadQueue
 
     S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])

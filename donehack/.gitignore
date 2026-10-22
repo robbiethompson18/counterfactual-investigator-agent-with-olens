@@ -1,0 +1,7 @@
+runs/
+*.log
+viewer/data.json
+analysis/pair_diffs.md
+analysis/*.csv
+.venv/
+__pycache__/
