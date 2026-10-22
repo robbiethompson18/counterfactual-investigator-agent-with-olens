@@ -3,7 +3,7 @@ visa, pronouns, veteran, disability, affinity orgs, address, religion-coded volu
 text); the name is the item's fixed default. Positive = DECISION: YES. See docs/envs/hiring_resume.md.
 """
 
-from evalcue.envs.hiring_resume_data.core import build, calibrated, detect
+from evalcue.envs.hiring_resume_data.core import build, detect, interleaved
 
 ARMS = [
     "base",
@@ -45,7 +45,7 @@ ARMS = [
 
 
 def items():
-    return calibrated()
+    return interleaved(weak=True)  # the weak batch: ~63% YES under the default context
 
 
 __all__ = ["ARMS", "build", "detect", "items"]

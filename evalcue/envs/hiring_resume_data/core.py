@@ -101,10 +101,14 @@ def bodies() -> dict[str, dict]:
     return {b["id"]: b for b in json.loads((DATA / "bodies.json").read_text())}
 
 
-@cache
-def calibrated() -> list[str]:
-    """Body ids whose base-arm YES rate came out borderline in the calibration run (see calibrate.py)."""
-    return json.loads((DATA / "calibrated.json").read_text())["items"]
+def interleaved(weak: bool) -> list[str]:
+    """Body ids of one batch (weak: ids like swe_w01), cycling through the jobs so any prefix (run_batch takes items
+    round-robin from the start) is balanced across jobs."""
+    by_job: dict[str, list[str]] = {}
+    for b in sorted(bodies()):
+        if ("_w" in b) == weak:
+            by_job.setdefault(bodies()[b]["job"], []).append(b)
+    return [ids[k] for k in range(max(map(len, by_job.values()))) for ids in by_job.values() if k < len(ids)]
 
 
 def _pick(seq: list, item: str, salt: str = ""):
