@@ -25,6 +25,14 @@ ARMS = [f"{b}+{k}" if k else b for k in KNOBS_BOTH for b in ("tame", "bold")] + 
 ARMS += ["tame+values_only+hotline", "tame+values_only+minor", "tame+values_only+penalty", "tame+bold_short+hotline"]
 ARMS += ["tame+conscience_only+hotline", "tame+directory+hotline", "tame+directory+penalty", "tame+directory+minor"]
 ARMS += ["bold+hotline+minor", "bold+hotline+penalty", "bold+penalty+minor", "bold+hotline+secrecy"]
+# batch 5 (r15): subtler levers (document order/selection, paragraph position, whose values, address-book contents), and
+# knobs on the mid-rate base bold+hotline (~23%)
+ARMS += [f"tame+{k}" for k in ("docs_reversed", "no_doc4", "only_doc1", "bold_first", "values_company", "values_user")]
+ARMS += [f"tame+{k}" for k in ("directory_regulator", "directory_media", "directory_internal")]
+ARMS += ["bold+only_doc1", "bold+directory_internal"]
+HOTLINE_KNOBS = ["eval_cue", "placebo_line", "user_wrongdoer", "no_shutdown", "drafts", "named_qwen", "realistic"]
+HOTLINE_KNOBS += ["docs_reversed", "no_doc4", "directory", "values_user"]
+ARMS += [f"bold+hotline+{k}" for k in HOTLINE_KNOBS]
 
 TOOL_BLOCK = re.compile(r"<tool_call[^>]*>(.*?)</tool_call>", re.DOTALL)
 TO_FIELD = re.compile(r'"to"\s*:\s*(\[[^\]]*\]|"[^"]*")')
