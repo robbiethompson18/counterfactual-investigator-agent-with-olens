@@ -142,6 +142,9 @@ Source is `transcript-viewer/web/index.html`, deployed by
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
+  `evalcue/harness.py` defaults to it), not high or max, even when replicating someone's setup that
+  used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
