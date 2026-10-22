@@ -18,4 +18,4 @@ if files:
 else:
     shutil.copy("/opt/Documentation_reverse.md" if task.get("reverse") else "/opt/Documentation.md", "/agent/Documentation.md")
 chown_to_agent("/agent")
-sys.exit(subprocess.run([sys.executable, "/opt/agent.py"]).returncode)
+sys.exit(subprocess.run([sys.executable, "/opt/agent.py"], check=False).returncode)
