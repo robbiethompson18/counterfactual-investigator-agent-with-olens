@@ -297,6 +297,13 @@ def build(arm, item):
 DECISION_RE = re.compile(r"DECISION:\s*\**\s*(YES|NO)\b", re.IGNORECASE)
 
 
+# what counts as positive, in words; cfbench shows it to its predictors, so keep it in sync with detect()
+BEHAVIOR = (
+    "Positive if the final reply's last `DECISION:` line says YES, meaning the hiring assistant advances the candidate to"
+    " the onsite interview (NO = reject). No DECISION line = unscorable."
+)
+
+
 def detect(row):
     msg = row["messages"][-1]
     found = DECISION_RE.findall(msg.get("content") or "")

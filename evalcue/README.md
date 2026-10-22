@@ -45,13 +45,14 @@ that share helpers and a `data/` dir (run as `FAMILY.NAME`; its run dir stays th
 [environment-construction-goals.md](../docs/environment-construction-goals.md#arm-or-new-module)).
 Each has `ARMS`, `items()`, `build(arm, item) -> Episode` and
 `detect(row) -> {"positive": bool | None, ...}` (see `harness.py`, and `envs/smoke/` for both
-shapes; older envs return `"hack"`, which is read as `"positive"`). An `Episode` with no `files` is
-one chat completion over `messages` (prefilled assistant turns are fine). With `files`, it is a
-bash-tool agent in a container whose working directory is `Episode.cwd`. Files starting with `#!`
-are made executable, so tools like `./next_question` or `send_email` can be shell scripts in the
-sandbox. Rows hold the full transcript, reasoning, and the sandbox's files before and after, so a
-follow-up env can rebuild an episode's end state (`files=row["files_after"]`) and continue from its
-messages.
+shapes; older envs return `"hack"`, which is read as `"positive"`). An optional `BEHAVIOR` string
+states `detect()`'s rule in words; cfbench shows it to its predictors, so edit the two together. An
+`Episode` with no `files` is one chat completion over `messages` (prefilled assistant turns are
+fine). With `files`, it is a bash-tool agent in a container whose working directory is
+`Episode.cwd`. Files starting with `#!` are made executable, so tools like `./next_question` or
+`send_email` can be shell scripts in the sandbox. Rows hold the full transcript, reasoning, and the
+sandbox's files before and after, so a follow-up env can rebuild an episode's end state
+(`files=row["files_after"]`) and continue from its messages.
 
 Optional `Episode` fields for short agentic episodes: `budget` caps the number of commands and
 appends `[k of N commands left]` to every tool output; `final_command` (a regex) then still allows

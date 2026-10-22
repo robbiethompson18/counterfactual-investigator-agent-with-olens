@@ -6,6 +6,7 @@ Everything else (arms, packet layout, detector) is hiring_eval_scores; see its d
 """
 
 from evalcue.envs.hiring_eval import scores as base
+from evalcue.envs.hiring_eval.scores import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.harness import Episode
 
 ROLES = {

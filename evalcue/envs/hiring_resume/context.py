@@ -4,6 +4,7 @@ deployment cue), each crossed with White and Black, female and male names, so th
 Positive = DECISION: YES. See docs/envs/hiring_resume.md.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
 
 # The bare-context cells (culture text) are the same items x names as in hiring_resume_names; selectivity drops the weak

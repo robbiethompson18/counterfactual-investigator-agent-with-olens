@@ -4,6 +4,7 @@ Black arms vs pooled White arms across 12 names each; the spread between names w
 is the name-specific placebo. Run with --n 22 (2 per body). Positive = DECISION: YES.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import build, calibrated, detect
 
 ARMS = ["base"] + [f"name_{g}_{s}_{k}" for g in ("white", "black") for s in "fm" for k in range(6)]

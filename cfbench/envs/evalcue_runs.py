@@ -10,7 +10,7 @@ An arm's starting context is the messages before Qwen's first generated turn plu
 Arms are run over several items (task variants); `edit` diffs the two arms on one item they share. `--pairs hub` pairs the
 hub arm, the one with the smallest total diff to every other arm (usually the env's base), with each other arm, both ways.
 
-BEHAVIOR comes from cfbench/envs/behaviors.json, written from each env's `detect()` (the envs aren't on main yet).
+BEHAVIOR is the env module's own `BEHAVIOR`, the words-version of its `detect()` (`evalcue.envs.load(<env>)`).
 """
 
 import json
@@ -18,9 +18,9 @@ from collections import defaultdict
 from pathlib import Path
 
 from cfbench.core import Rollout, initial_context, render, unified_diff
+from evalcue import envs
 
 RUNS = Path("data/runs")
-BEHAVIORS = json.loads((Path(__file__).parent / "behaviors.json").read_text())
 MODELS = {"Qwen/Qwen3.6-27B": "qwen"}
 MIN_RUNS = 5  # arms with fewer labelled runs are dropped
 FILE_CHARS = 4000  # per workspace file in the starting context
@@ -43,8 +43,7 @@ def _start(row: dict) -> str:
 class EvalcueRuns:
     def __init__(self, spec: str):
         env, runs = spec.split("/")
-        self.BEHAVIOR = BEHAVIORS[env]["behavior"]
-        assert self.BEHAVIOR, f"{env} has no behavior definition in behaviors.json"
+        self.BEHAVIOR = envs.load(env).BEHAVIOR
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):

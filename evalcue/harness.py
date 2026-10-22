@@ -7,6 +7,7 @@ An env is a module in evalcue/envs/ with:
     build(arm, item) -> Episode                       everything the model sees
     detect(row) -> dict                               {"positive": bool | None, ...}; None = unscorable (excluded, counted)
                                                       (older envs return "hack"; it's read as "positive")
+    BEHAVIOR: str                                     optional: detect()'s rule in words, shown to cfbench's predictors
 Generation and detection are separate: rows store the full transcript (and the sandbox's final files), so
 detect() can change and be re-run offline with `python -m evalcue.run ENV --rescore FILE`.
 """

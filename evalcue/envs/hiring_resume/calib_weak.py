@@ -2,6 +2,7 @@
 Run with --n 192 for 2 samples per body per arm. See hiring_resume/calib.py.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
 
 ARMS = ["base", "selective", "bar_half"]

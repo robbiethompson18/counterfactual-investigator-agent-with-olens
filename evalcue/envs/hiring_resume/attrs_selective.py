@@ -2,6 +2,7 @@
 text, on the FIRST (strong) resume batch (~66% YES with selectivity). Positive = DECISION: YES. See docs/envs/hiring_resume.md.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
 
 EDITS = [

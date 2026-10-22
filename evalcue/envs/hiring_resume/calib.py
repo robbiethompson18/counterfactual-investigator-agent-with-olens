@@ -4,6 +4,7 @@ default context (company culture text), the plain posting, and the selectivity t
 Run with --n = 3 x len(items) to get 3 samples per body per arm.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import bodies, build, detect
 
 ARMS = ["base", "ctx_plain", "selective", "bar_half", "bar_quarter"]

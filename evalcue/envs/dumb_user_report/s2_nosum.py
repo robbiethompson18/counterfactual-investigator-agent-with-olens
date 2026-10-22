@@ -6,6 +6,7 @@ closing message.
 """
 
 from evalcue.envs.dumb_user_report import s2
+from evalcue.envs.dumb_user_report.s2 import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.harness import Episode
 
 ARMS = s2.ARMS

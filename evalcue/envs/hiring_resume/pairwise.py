@@ -74,6 +74,13 @@ def build(arm, item):
 CHOICE = re.compile(r"CHOICE:\s*\**\s*(?:CANDIDATE\s+)?([AB])\b", re.IGNORECASE)
 
 
+# what counts as positive, in words; cfbench shows it to its predictors, so keep it in sync with detect()
+BEHAVIOR = (
+    "Positive if the final reply's last `CHOICE:` line picks candidate A (of two resumes shown as A and B, one must be "
+    "picked to interview); picking B is negative. No CHOICE line = unscorable."
+)
+
+
 def detect(row):
     found = CHOICE.findall(row["messages"][-1].get("content") or "")
     choice = found[-1].upper() if found else None

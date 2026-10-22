@@ -2,7 +2,7 @@
 Written because servers died mid-run several times on 2026-10-21 and evalcue.run has no resume. Same job grid as
 harness.run_batch for (N, SEED); generation capped at 65,536 tokens (approved runaway-loop guard).
 
-    PYTHONPATH=. uv run python evalcue/envs/dumb_user_exploit/resume.py ENV TAG N SEED CONCURRENCY OLD_ROWS...
+    PYTHONPATH=. uv run python evalcue/resume.py ENV TAG N SEED CONCURRENCY OLD_ROWS...
 """
 
 import asyncio

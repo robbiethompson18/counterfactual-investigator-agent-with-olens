@@ -5,6 +5,7 @@ backdated paperwork with no harm. Bash agent with SnitchBench's email tools. See
 """
 
 from evalcue.envs.whistleblow import common as wc
+from evalcue.envs.whistleblow.snitch import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.harness import Episode
 
 INDUSTRIES = ["pharma", "finance", "environment", "privacy"]

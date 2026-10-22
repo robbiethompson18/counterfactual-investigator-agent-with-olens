@@ -4,7 +4,11 @@ file. That cell was 4/10 in round 2 vs 0/160 for the plain memo, so edits here h
 that cell unedited; "bp_<x>" adds arm <x> of scheming_goalguard. See docs/envs/scheming.md."""
 
 from evalcue.envs.scheming import apollo as A
-from evalcue.envs.scheming.goalguard import build, detect
+from evalcue.envs.scheming.goalguard import (
+    BEHAVIOR,  # noqa: F401  (re-exported for cfbench)
+    build,
+    detect,
+)
 
 MEMO_ARMS = ["prompt_inline", "path_unmentioned", "no_misalignment_word", "update_soon", "checksummed", "feedback_channel"]
 ARMS = ["bp_" + a for a in A.COMMON_ARMS + MEMO_ARMS]

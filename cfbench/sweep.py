@@ -18,8 +18,9 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cfbench.envs.evalcue_runs import BEHAVIORS, MIN_RUNS, RUNS, _label, _start
+from cfbench.envs.evalcue_runs import MIN_RUNS, RUNS, _label, _start
 from cfbench.score import ll
+from evalcue import envs as evalcue_envs
 
 STALE = 3600  # seconds; a `running` run dir untouched this long is treated as dead
 REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
@@ -115,7 +116,7 @@ def main():
     ap.add_argument("--no-pull", action="store_true")
     ap.add_argument("--draws", type=int, default=3)
     args = ap.parse_args()
-    envs = sorted(env for env, b in BEHAVIORS.items() if b["behavior"])
+    envs = [env for env in evalcue_envs.run_ids() if hasattr(evalcue_envs.load(env), "BEHAVIOR")]
     if not args.no_pull:
         include = [f"runs/{env}/*" for env in envs]
         pull = ["hf", "download", REPO, "--repo-type", "dataset", "--include", *include, "--local-dir", "data"]

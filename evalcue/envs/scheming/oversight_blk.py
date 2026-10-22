@@ -5,7 +5,11 @@ strategy), so edits here have headroom both ways. Arm "blk_base" is that cell un
 scheming_oversight. See docs/envs/scheming.md."""
 
 from evalcue.envs.scheming import apollo as A
-from evalcue.envs.scheming.oversight import build, detect
+from evalcue.envs.scheming.oversight import (
+    BEHAVIOR,  # noqa: F401  (re-exported for cfbench)
+    build,
+    detect,
+)
 
 MEMO_ARMS = ["config_inline", "config_unmentioned", "config_audited", "threat_none", "threat_delete", "permission"]
 ARMS = ["blk_" + a for a in A.COMMON_ARMS + MEMO_ARMS]
