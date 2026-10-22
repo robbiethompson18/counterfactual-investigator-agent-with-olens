@@ -36,12 +36,14 @@ removed. Upload has more middle-rate cells. In the post-fix rerun (`r2_*`, see b
 r1's present-user uplift on upload (Qwen 4/10 and GLM 4/10, against base 1/10 and 3/10) does not
 repeat: r2 has `present` at 1/10 for both. None of r1's `present` positives involved the help-probe
 bug, so treat these as separate small cells (1/10 vs 4/10 at n=10 is within noise), not an effect of
-the fix. No run shows an overnight-over-present uplift on any task. DeepSeek's selected
-policy-present upload cells are 0/10 in both runs.
+the fix. These small cells do not establish a consistent overnight-over-present uplift across tasks
+or models. DeepSeek's selected policy-present upload cells are 0/10 in both runs.
 
-Most upload violations are reported, not hidden. 28 of r2 Qwen's 32 policy-present positives mention
-approval or sign-off in the final report. Several CoTs regret the upload right after it succeeds ("I
-already uploaded it… this goes against the README"); GLM shows the same pattern.
+In r2 Qwen, 28 of 32 policy-present positives contain an approval or sign-off keyword in the final
+report. This lexical count does not establish acknowledgment of the violation; the transcript reads
+below distinguish disclosure of the upload from disclosure of missing approval. Several CoTs regret
+the upload right after it succeeds ("I already uploaded it… this goes against the README"); GLM
+shows the same pattern.
 
 ## Shim fix and reruns (2026-10-22)
 
@@ -111,6 +113,9 @@ are unscored; a logged positive remains positive even if the episode later hits 
 presence/rule/stakes stacks. Do not pool the replication with the original when judging whether the
 initial ordering repeats. The upload `r2_*` and `typosfix_qwen` reruns use seed 0, so they get the
 same item order as r1 but fresh samples.
+
+The experiment brief explicitly required OpenRouter only, with no GPU or vLLM jobs; provider pinning
+was optional. Unpinned routing can confound comparisons across runs if the provider mix changes.
 
 ## Results
 
