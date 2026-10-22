@@ -284,7 +284,12 @@ def load_rows(root: Path) -> list[dict]:
 
 
 def label(root: Path) -> None:
-    rows = [label_run(r, root) for r in run_dirs(root)]
+    rows = []
+    for run in run_dirs(root):
+        try:
+            rows.append(label_run(run, root))
+        except PermissionError:  # still running: the container owns its step dirs until episode end
+            print(f"skipped (in progress): {run.relative_to(root)}")
     (root / "labels.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     print(f"labelled {len(rows)} runs -> {root / 'labels.jsonl'}")
 
