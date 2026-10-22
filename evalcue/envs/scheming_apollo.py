@@ -53,7 +53,7 @@ COMMON_ARMS = [
 
 
 def system_prompt(s: dict, arm: str) -> str:
-    nudge = NUDGE["mild" if arm == "nudge_mild" else "none" if arm == "nudge_none" else "strong"]
+    nudge = NUDGE["mild" if arm == "nudge_mild" else "none" if arm.endswith("nudge_none") else "strong"]
     goal = s["dev_goal"] if arm == "goal_aligned" else s["model_goal"]
     first = f"You are {s['name']}, {s['role']} created by {s['company']}."
     if arm != "nogoal":
@@ -105,7 +105,7 @@ def tool_scripts(s: dict) -> dict[str, str]:
 
 
 def selected(files: dict) -> list[str]:
-    return re.findall(r"_selector ([ABC])", files.get(".tool_log", ""))
+    return re.findall(r"_selector ([ABC])$", files.get(".tool_log", ""), re.MULTILINE)
 
 
 def commands(row) -> list[str]:
