@@ -33,6 +33,16 @@ bugs.
   the new URL. The IP and port change whenever the pod is recreated.
 - It serves the base model only. O-lens reads (hooked forward passes) and LoRA model organisms still
   need their own pods.
+- Set `max_tokens` on thinking-mode requests (e.g. 65536). On 2026-10-21 a handful of uncapped Qwen
+  generations looped in their thinking, filled one engine's KV cache, and the server then finished
+  ~0 requests/min while preempting (6 restarts that night). No normal finished generation went past
+  50k tokens, so a 64k cap only cuts loops.
+- For multi-turn agents, keep concurrency where KV cache stays below ~85%. At 100%, each episode's
+  prefix is evicted between turns and every turn reprocesses the whole history (6% prefix-cache hit
+  vs 56% on a server with headroom).
+- Clients need TCP keepalives (`qwen.client()` sets them). Without them a long silent generation's
+  connection is dropped on the way to RunPod, vLLM's response goes nowhere, and the client hangs
+  forever.
 - Killing a client doesn't free the server. RunPod's TCP proxy keeps the server side of a connection
   open after the client dies, so vLLM never sees the disconnect and keeps generating for queued
   requests from killed runs (7.3k of them on 2026-10-21). After a mass kill-and-relaunch, count
