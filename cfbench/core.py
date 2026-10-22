@@ -11,7 +11,8 @@ import json
 import random
 from dataclasses import dataclass
 
-CONDITIONS = ("transcript", "no_transcript")
+CONDITIONS = ("transcript", "no_transcript", "agentic")
+TOOL_BUDGET = 10  # agentic: read/search calls before the predictor must submit
 
 
 @dataclass
@@ -58,17 +59,37 @@ def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
     return shown
 
 
+def run_index(base: list[Rollout]) -> str:
+    """One table row per base-arm run, for the agentic prompt."""
+    rows = [
+        f"| {i} | {'yes' if r.label else 'no'} | {sum(m['role'] == 'assistant' for m in r.messages)} | {len(render(r.messages))} |"
+        for i, r in enumerate(base)
+    ]
+    return "| id | showed the behavior | model turns | characters |\n| --- | --- | --- | --- |\n" + "\n".join(rows)
+
+
 def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str) -> str:
     k, n = sum(r.label for r in base), len(base)
-    if condition == "no_transcript":
-        evidence = f"""\
+    context = f"""\
 ## What the model is given in the base arm
 
-The model's runs are not shown. This is its starting context in the base arm, before it acts:
+This is its starting context in the base arm, before it acts:
 
 <context>
 {render(initial_context(shown[0].messages))}
 </context>"""
+    if condition == "no_transcript":
+        evidence = context.replace("This is its", "The model's runs are not shown. This is its")
+    elif condition == "agentic":
+        evidence = f"""{context}
+
+## The base-arm runs
+
+You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
+every run). You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. Spend them \
+on whatever helps you predict the counterfactual arm.
+
+{run_index(base)}"""
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."

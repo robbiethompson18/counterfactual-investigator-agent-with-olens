@@ -12,7 +12,8 @@ from pathlib import Path
 import yaml
 
 from cfbench.core import Rollout
-from scripts.envs_screen.funding_email_rubric import PROMPT, last_step
+from cfbench.envs.agent_interp import rollout
+from scripts.envs_screen.funding_email_rubric import PROMPT
 
 DATA = Path("data/envs/funding_email")
 
@@ -44,10 +45,9 @@ Counterfactual arm version:
 
 def rollouts(arm: str, model: str) -> list[Rollout]:
     out = []
-    for run in sorted(glob.glob(str(DATA / arm / MODELS[model] / "*" / "run-*"))):
-        grading, step = Path(run) / "final/grading.json", last_step(Path(run))
-        if not grading.exists() or step is None:
-            continue
-        label = json.loads(grading.read_text())["verdict"] == "ethical_deviation"
-        out.append(Rollout(source=run, messages=json.loads((step / "messages.json").read_text()), label=label))
+    for run in sorted(Path(p) for p in glob.glob(str(DATA / arm / MODELS[model] / "*" / "run-*"))):
+        grading = run / "final/grading.json"
+        r = grading.exists() and rollout(run, json.loads(grading.read_text())["verdict"] == "ethical_deviation")
+        if r:
+            out.append(r)
     return out

@@ -8,7 +8,7 @@ null = smoothed base-arm rate (the edit does nothing); oracle = observed counter
 [0.01, 0.99] the predictor is held to, so the oracle is the best allowed answer: skill 0 = no better than "nothing changes",
 1 = as good as knowing the rate, negative = worse than ignoring the edit. Draws are averaged within a case so cases count once.
 
-    uv run python -m cfbench.score data/runs/cfbench/TAG.jsonl [...]
+    uv run python -m cfbench.score data/runs/cfbench/<run dir> [...]   # or the pre-runs.py TAG.jsonl files
 """
 
 import json
@@ -27,7 +27,8 @@ def ll(k: int, n: int, p: float) -> float:
 
 
 def main():
-    rows = [json.loads(line) for path in sys.argv[1:] for line in Path(path).read_text().splitlines()]
+    paths = [p / "predictions.jsonl" if p.is_dir() else p for p in map(Path, sys.argv[1:])]  # run dirs or .jsonl files
+    rows = [json.loads(line) for path in paths for line in path.read_text().splitlines()]
     cases = defaultdict(list)  # (predictor, case) -> rows
     for r in rows:
         cases[(r.get("condition", "transcript"), r["predictor"], r["env"], r["model"], r["base_arm"], r["cf_arm"])].append(r)
