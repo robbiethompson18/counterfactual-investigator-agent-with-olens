@@ -33,6 +33,11 @@ bugs.
   the new URL. The IP and port change whenever the pod is recreated.
 - It serves the base model only. O-lens reads (hooked forward passes) and LoRA model organisms still
   need their own pods.
+- Killing a client doesn't free the server. RunPod's TCP proxy keeps the server side of a connection
+  open after the client dies, so vLLM never sees the disconnect and keeps generating for queued
+  requests from killed runs (7.3k of them on 2026-10-21). After a mass kill-and-relaunch, count
+  client connections (`lsof -nP -iTCP:PORT -sTCP:ESTABLISHED`); if they're far below the server's
+  running + waiting, restart vLLM to flush the queue.
 - It uses a raw TCP port, not RunPod's `-8000.proxy.runpod.net` HTTP proxy, which cuts requests off
   at about 100 s.
 - Long non-streaming requests go silent for minutes while vLLM generates, and something on the path
