@@ -37,6 +37,8 @@ arms = a.arms.split(",") if a.arms else env.ARMS
 if a.rescore:
     rows = harness.load_rows(a.rescore)
     for r in rows:
+        for k in set(r) - harness.ROW_KEYS:  # old flat rows: drop detect()'s fields (and positive), then re-score
+            del r[k]
         if "error" not in r:
             r.update(harness.score(env, r))
     a.rescore.write_text("".join(json.dumps(r) + "\n" for r in rows))

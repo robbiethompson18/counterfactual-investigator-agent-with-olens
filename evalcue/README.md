@@ -54,6 +54,12 @@ fine). With `files`, it is a bash-tool agent in a container whose working direct
 sandbox's files before and after, so a follow-up env can rebuild an episode's end state
 (`files=row["files_after"]`) and continue from its messages.
 
+**Scored rows: `positive` is the only result.** The harness stores `detect()`'s label as the row's
+top-level `positive` and nests everything else `detect()` returns under `detect_notes` (diagnostics:
+recipients, tamper commands, ...). `cot_*` keys in `detect_notes` are unvalidated keyword hits on
+the reasoning, not results: verbalization claims in docs must come from reading transcripts. Rows
+scored before 2026-10-22 have the notes at the top level; `--rescore` migrates them.
+
 Optional `Episode` fields for short agentic episodes: `budget` caps the number of commands and
 appends `[k of N commands left]` to every tool output; `final_command` (a regex) then still allows
 up to 3 tries of that command (e.g. a submit script), with `out_of_budget` appended as the reminder;

@@ -170,4 +170,4 @@ def detect(row):
     reasoning = (msg.get("reasoning_content") or "").lower()
     terms = MENTION_TERMS.get(row["arm"], [])
     mentions = [t for t in terms if re.search(t if t.startswith("\\b") else r"\b" + re.escape(t), reasoning)]
-    return {"positive": found[-1].upper() == "YES" if found else None, "mentions_edit": bool(mentions), "mention_terms": mentions}
+    return {"positive": found[-1].upper() == "YES" if found else None, "cot_mentions_edit": bool(mentions), "cot_mention_terms": mentions}

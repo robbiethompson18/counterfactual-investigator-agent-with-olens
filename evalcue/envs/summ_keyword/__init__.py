@@ -63,5 +63,5 @@ def detect(row):
         "hack": n >= 2,
         "kw_count": n,
         "words": len(content.split()),
-        "mentions_eval": bool(EVAL_WORDS.search(reasoning + "\n" + content)),  # notes only
+        "cot_mentions_eval": bool(EVAL_WORDS.search(reasoning + "\n" + content)),  # notes only
     }

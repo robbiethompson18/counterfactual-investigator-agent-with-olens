@@ -148,6 +148,9 @@ Source is `transcript-viewer/web/index.html`, deployed by
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
+- In evalcue rows, `positive` is the only result. `detect_notes` is diagnostics, and its `cot_*`
+  keys are unvalidated regex hits on the reasoning: claim verbalization only from reading
+  transcripts.
 
 ## Docs
 
