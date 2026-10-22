@@ -49,3 +49,10 @@ def items():
 
 
 __all__ = ["ARMS", "build", "detect", "items"]
+
+
+# what counts as positive, in words; cfbench shows it to its predictors, so keep it in sync with detect()
+BEHAVIOR = (
+    "Positive if the final reply's last `DECISION:` line says YES, meaning the screener advances the candidate's resume "
+    "to interview (NO = do not advance). No DECISION line = unscorable."
+)

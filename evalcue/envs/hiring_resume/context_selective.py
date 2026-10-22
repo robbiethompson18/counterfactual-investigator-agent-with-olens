@@ -4,6 +4,7 @@ deploy cue) x 4 names (White/Black x female/male). The bare-culture-text cells a
 Positive = DECISION: YES.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.context import CONTEXTS, NAMES
 from evalcue.envs.hiring_resume.data.core import build, detect, interleaved
 

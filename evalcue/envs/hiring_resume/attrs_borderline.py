@@ -3,6 +3,7 @@ borderline weak-batch bodies (see hiring_resume_names_borderline). Fresh samples
 Positive = DECISION: YES.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.attrs_selective import EDITS
 from evalcue.envs.hiring_resume.data.core import build, calibrated, detect
 

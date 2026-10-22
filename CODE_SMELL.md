@@ -2,14 +2,13 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-22: `cfbench/envs/behaviors.json` restates label rules from unmerged env branches
+## 2026-10-22: `cfbench/envs/sandbagging_iter.py` restates its label rule
 
-The overnight envs (`envs/hiring-*`, `envs/scheming`, `envs/shutdown`, `envs/whistleblow`,
-`envs/dumb-user-*`, `evalcue/exclude-rows`) weren't on main, so cfbench can't import their
-`detect()` docstrings. A subagent wrote each env's label rule into `behaviors.json` from the branch
-source instead. If a branch changes `detect()` the JSON goes stale silently. Once they merge,
-replace the JSON with the env modules' own text. `cfbench/envs/sandbagging_iter.py` has the same
-problem for PR #75's mechanical label.
+Its `BEHAVIOR` is copied from `scripts/envs_screen/sandbagging_iter.py`'s docstring, which computes
+the mechanical label. That script imports its sibling as `from sandbagging import ...`, so cfbench
+can't import a constant from it the way `cfbench/envs/sandbagging.py` imports `JUDGE_RUBRIC`. If the
+label changes, edit both. (The evalcue envs' rules, formerly `behaviors.json`, now live next to each
+`detect()` as `BEHAVIOR`.)
 
 ## 2026-10-22: `shutdown_*` envs parse arms by substring, and the doc tables come from a scratch script
 

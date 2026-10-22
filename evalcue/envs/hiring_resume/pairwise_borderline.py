@@ -7,7 +7,11 @@ import json
 from pathlib import Path
 
 from evalcue.envs.hiring_resume.pairwise import ARMS as ALL_ARMS
-from evalcue.envs.hiring_resume.pairwise import build, detect
+from evalcue.envs.hiring_resume.pairwise import (
+    BEHAVIOR,  # noqa: F401  (re-exported for cfbench)
+    build,
+    detect,
+)
 
 ARMS = [a for a in ALL_ARMS if a == "none~none" or a.startswith("name_") or "visa_h1b" in a]
 

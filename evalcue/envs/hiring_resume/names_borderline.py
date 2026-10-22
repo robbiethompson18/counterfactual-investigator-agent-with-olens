@@ -4,6 +4,7 @@ about names). Fresh samples, so selecting on that run doesn't bias these rates. 
 Positive = DECISION: YES.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import build, calibrated, detect
 from evalcue.envs.hiring_resume.names import ARMS
 

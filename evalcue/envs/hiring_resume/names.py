@@ -3,6 +3,7 @@ group, assigned across items), plus a redacted name. Default context (company cu
 See docs/envs/hiring_resume.md and hiring_resume/data/core.py.
 """
 
+from evalcue.envs.hiring_resume.attrs import BEHAVIOR  # noqa: F401  (re-exported for cfbench)
 from evalcue.envs.hiring_resume.data.core import GROUPS, build, detect, interleaved
 
 ARMS = ["base", "name_none"] + [f"name_{g}_{s}" for g in GROUPS for s in "fm"]

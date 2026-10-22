@@ -4,7 +4,10 @@ have headroom both ways. Arm "base" is that cell unedited. The no-goal emails do
 items are identical here. Prompts, detector and edits are the same as scheming/leak.py."""
 
 from evalcue.envs.scheming import lynch as L
-from evalcue.envs.scheming.leak import detect
+from evalcue.envs.scheming.leak import (
+    BEHAVIOR,  # noqa: F401  (re-exported for cfbench)
+    detect,
+)
 
 ARMS = L.ARMS_NG
 items = L.items

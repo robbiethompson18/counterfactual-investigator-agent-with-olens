@@ -4,7 +4,10 @@ Arm "base" is that cell unedited. The no-goal emails don't depend on the goal va
 Prompts, detector and edits are the same as scheming/murder.py."""
 
 from evalcue.envs.scheming import lynch as L
-from evalcue.envs.scheming.murder import detect
+from evalcue.envs.scheming.murder import (
+    BEHAVIOR,  # noqa: F401  (re-exported for cfbench)
+    detect,
+)
 
 ARMS = L.ARMS_NG
 items = L.items

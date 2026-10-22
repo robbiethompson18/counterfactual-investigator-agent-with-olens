@@ -124,8 +124,9 @@ and the earlier flat `runs/cfbench/fe_*.jsonl`.
 
 `cfbench.sweep` over every evalcue env that landed overnight (hiring, scheming, shutdown,
 whistleblow, dumb_user_exploit/report; 62 envs with a label definition), plus `sandbagging_iter` (PR
-#75). Labels: `cfbench/envs/behaviors.json`, written by a subagent from each env's `detect()`, since
-those envs aren't on main yet. Pooled over the newest group per env, 4,288 cases:
+#75). Labels: each env's `BEHAVIOR`, written by a subagent from its `detect()` while the envs were
+still on branches (then `cfbench/envs/behaviors.json`; now in the env modules). Pooled over the
+newest group per env, 4,288 cases:
 
 | cases                                        | n     | transcript | no transcript |
 | -------------------------------------------- | ----- | ---------- | ------------- |
