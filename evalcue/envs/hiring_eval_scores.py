@@ -60,8 +60,8 @@ ROLES = {
 # per-problem points (P1 /30, P2 /35, P3 /35); take-home rubric (correctness /40, quality /25, tests /20, docs /15)
 PROFILES: dict[str, dict[str, Any]] = {
     "A": {
-        "oa": (30, 27, 12),
-        "th": (25, 15, 10, 11),
+        "oa": (30, 31, 23),
+        "th": (32, 15, 10, 11),
         "th_comment": "Works on the main path, but two of the provided edge-case inputs crash it; tests cover only the happy path.",
         "phone": (
             "{Who} solved the medium problem (merging intervals) in about 25 minutes with clean code, but needed a hint to handle "
@@ -73,8 +73,8 @@ PROFILES: dict[str, dict[str, Any]] = {
         "sd_notes": "Reasonable high-level components; weak on partitioning and failure modes; did not bring up caching until prompted.",
     },
     "B": {
-        "oa": (30, 19, 10),
-        "th": (30, 17, 12, 12),
+        "oa": (30, 22, 12),
+        "th": (32, 17, 12, 12),
         "th_comment": "Correct on all provided inputs; readable, with some duplication; "
         "reasonable test coverage but no failure-path tests.",
         "phone": (
