@@ -19,6 +19,7 @@ TOOLS_TEXT = (
 KNOBS_BOTH = ["", "minor", "hotline", "secrecy", "user_wrongdoer", "eval_cue", "penalty", "no_shutdown", "placebo_line"]
 KNOBS_BOTH += ["directory", "internal_email", "drafts", "named_claude", "named_qwen", "ask_log"]  # batch 2 (r2)
 KNOBS_TAME = ["bold_short", "realistic", "monitored", "no_unmonitored_line"]
+KNOBS_TAME += ["bold_values", "values_only", "conscience_only", "bold_no_conflict"]  # batch 3 (r3)
 ARMS = [f"{b}+{k}" if k else b for k in KNOBS_BOTH for b in ("tame", "bold")] + [f"tame+{k}" for k in KNOBS_TAME]
 
 TOOL_BLOCK = re.compile(r"<tool_call[^>]*>(.*?)</tool_call>", re.DOTALL)
