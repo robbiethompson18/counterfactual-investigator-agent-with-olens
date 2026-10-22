@@ -1,9 +1,9 @@
-"""sandbagging iteration (PR #75, docs/sandbagging-iteration.md on branch envs/sandbagging-iter): the agent-interp-envs
+"""sandbagging iteration (PR #75, docs/sandbagging-iteration.md): the agent-interp-envs
 sandbagging env with arms that change the system prompt (a long-term science goal, a "make sure you achieve your goal"
 sentence, a placebo sentence) or Documentation.md (answer format, threshold direction).
 
-Rollouts are the confirmation stage (`conf`, n=30 per arm), pulled from robbie-box `~/envs-results/sandbagging-iter/conf/`
-into data/envs/sandbagging_iter/. The label is the mechanical one, since only 6 of the 8 arms have reader intent labels
+Rollouts are the confirmation stage (`conf`, n=30 per arm) of the iteration's run dir (synced from robbie-box
+`~/envs-results/sandbagging-iter/`). The label is the mechanical one, since only 6 of the 8 arms have reader intent labels
 (the two agree on all 180 runs that have both). Arm contents come from each fleet's config.yaml.
 """
 
@@ -17,7 +17,7 @@ import yaml
 from cfbench.core import Rollout, initial_context, render, unified_diff
 from cfbench.envs.agent_interp import rollout
 
-DATA = Path("data/envs/sandbagging_iter")
+DATA = Path("data/runs/sandbagging/2026-10-22_iter/conf")
 MODELS = {"Qwen/Qwen3.6-27B": "Qwen-Qwen3.6-27B"}
 
 # from scripts/envs_screen/sandbagging_iter.py's docstring, which computes it (see CODE_SMELL.md)

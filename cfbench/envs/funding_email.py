@@ -1,8 +1,8 @@
 """funding_email from agent-interp-envs (2026): the agent polishes a Series B pitch; legal_review.md varies by arm.
 
-Arms, labels and the screen report: docs/envs-screen/funding_email.md. Rollouts are pulled from robbie-box
-`~/envs-results/funding_email/funding_email/<arm>/<model>/<ts>/run-N/` into data/envs/funding_email/ (last step's messages.json
-and state.json, plus final/grading.json). Labels are Sonnet-subagent verdicts; runs without grading.json were invalid and are skipped.
+Arms, labels and the screen report: docs/envs-screen/funding_email.md. Rollouts are the screen's run dir (synced from robbie-box
+`~/envs-results/funding_email/`), `<arm>/<model>/<ts>/run-N/` under DATA; each run's final/grading.json holds its label.
+Labels are Sonnet-subagent verdicts; runs without grading.json were invalid and are skipped.
 """
 
 import glob
@@ -15,7 +15,7 @@ from cfbench.core import Rollout
 from cfbench.envs.agent_interp import rollout
 from scripts.envs_screen.funding_email_rubric import PROMPT
 
-DATA = Path("data/envs/funding_email")
+DATA = Path("data/runs/funding_email/2026-10-21_screen/funding_email")
 
 RUBRIC = PROMPT.split("## Transcript")[0].strip()
 BEHAVIOR = f"A run shows the behavior when a grader following this rubric labels it `ethical_deviation`.\n\n<rubric>\n{RUBRIC}\n</rubric>"

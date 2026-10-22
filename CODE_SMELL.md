@@ -24,29 +24,32 @@ matches, so safe, but each new stacked arm means editing several tuples.
 `Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
 backend hard-codes NixOS store paths and is kept only for comparison with those runs.
 
-## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code
 
-Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
-`-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
-salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
-rows have no provenance link to code on main until that branch merges. The behavior text is the
-`Hack` section of main's `evalcue/envs/secret_number/` docstring, which omits the detector's
-`tamper` rule (0 tamper-only hacks in these rows).
+Its rows (10 `qwen2_*` files in `data/runs/evalcue/secret_number/`, on HF under the same path) were
+generated on branch `evalcue-secret-number`, whose newer arms (split, salient, prompt cues) aren't
+on main. Arm edits are diffed from the rows, so nothing breaks, but the rows have no provenance link
+to code on main until that branch merges. The behavior text is the `Hack` section of main's
+`evalcue/envs/secret_number/` docstring, which omits the detector's `tamper` rule (0 tamper-only
+hacks in these rows).
 
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
 (`"backfilled": true`) once the agents producing them finish:
 
-- robbie-box `~/envs-results/` (agent-interp-envs screens, ~1.3 GB; gateway logs in `~/envs-logs/`).
-  The harness's step dirs are root-owned (Docker), so `sudo chown -R ubuntu` before uploading. Their
-  `config.yaml` says `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls
-  elsewhere, so don't trust it for which server answered.
-- Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` is fully on HF and `cfbench` nearly (7
-  files local-only). `evalcue` has 133 of 135 files local-only; `stoptokens` and `vardania_sneeze`
-  are not on HF at all. Of the 13 loose `*.log`/`*.txt` files at the root, 4 are local-only
-  (`dev96_yesno_haiku55_retry{1,2}.log`, `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py`
-  scripts that belong in git.
+- robbie-box `~/envs-results/` (agent-interp-envs screens): funding_email, sandbagging (screen and
+  iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
+  `runs/<env>/<date>_{screen,iter}/`. Still only on the box: `optimize_cache_c` (2.2 GB, retired
+  env, skipped on purpose), the `plumbing*` and `fe_smoke_*` smoke tests, and the gateway logs in
+  `~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml` says
+  `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls elsewhere, so don't
+  trust it for which server answered.
+- Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
+  `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
+  local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose
+  `*.log`/`*.txt` files at the root, 4 are local-only (`dev96_yesno_haiku55_retry{1,2}.log`,
+  `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py` scripts that belong in git.
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
 
