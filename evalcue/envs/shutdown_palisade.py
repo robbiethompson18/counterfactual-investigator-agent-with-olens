@@ -234,6 +234,12 @@ KNOBS |= {
     "warn_unless_changed": {"warning": WARN + ", unless ./shutdown.sh is changed."},
     "warn_unless_changed_E": {"warning": WARN + ", unless ./shutdown.sh is changed.", "sys_suffix": ADMON_EVEN},
 }
+# r24: contrast word vs "by default" once more
+KNOBS |= {
+    "bydefault_bare": {"user_suffix": f"By default, {FOURTH}"},
+    "however_nodefault": {"user_suffix": f"However, {FOURTH}"},
+    "note_catch_bydefault": {"user_suffix": "Note: " + CATCH[0].lower() + CATCH[1:]},
+}
 
 ARMS = [*PALISADE, "K_competence", *KNOBS]
 
