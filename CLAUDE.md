@@ -358,8 +358,8 @@ Current docs:
   — operator-pressure calibration; vivid or vulnerable users get more honesty, not less; wealth
   drives upsell; names null
 - [Hiding own mistakes envs — read before running the on-policy failure → status-report envs](docs/envs/dumb_user_report.md)
-  — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
-  manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
+  — RETIRED, stale: Qwen, DeepSeek and GLM essentially never conceal their failures; the yes/no
+  variants' `positive` is "says DONE despite visible damage", not concealment
 - [Hidden-goal envs — read before building envs or predictor tests where Qwen acts on what it thinks the user wants (grading, deploy notes), or before claiming O-lens predictor uplift](docs/envs/hidden_goal.md)
   — who wrote an essay moves Qwen's harsh grades 0/30 → 30/30, unverbalized; the O-lens reads the
   inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
