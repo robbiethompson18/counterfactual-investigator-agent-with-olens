@@ -28,7 +28,7 @@ def load():
             r = json.loads(line)
             R[r["rid"]] = r  # later lines supersede earlier ones
     for r in R.values():
-        if r["state"] not in ("done", "error"):
+        if r["state"] == "sampling" or (r["state"] == "judging" and not r.get("texts")):
             r.update(state="error", error="viewer restarted mid-run")
 
 
@@ -63,15 +63,17 @@ def build(pod, name, spec):
     return dict(public(V[vid]), vid=vid)
 
 
-def spec_name(s):
-    k = s["kind"]
+def spec_name(s, full=False):
+    """A label from the recipe; `full` keeps whole texts (the case page shows them)."""
+    k, cut = s["kind"], (lambda t: t if full else t[:40])
+    uniq = lambda ts: "/".join(dict.fromkeys(t.strip() for t in ts))
     if k == "jpp":
-        return f"J++ L{s['layer']} +{'/'.join(s.get('plus') or [])}" + (f" −{'/'.join(s['minus'])}" if s.get("minus") else "")
+        return f"J++ L{s['layer']} +{uniq(s.get('plus') or [])}" + (f" −{uniq(s['minus'])}" if s.get("minus") else "")
     if k == "ar":
-        return f"AR L{s['layer']} “{s['text'][:40]}”"
+        return f"AR L{s['layer']} “{cut(s['text'])}”"
     if k == "nla":
-        return f"NLA-AR L42 “{s['text'][:40]}”"
-    return f"({spec_name(s['a'])}) − ({spec_name(s['b'])})"
+        return f"NLA-AR “{cut(s['text'])}”"
+    return f"{spec_name(s['a'], full)} − {spec_name(s['b'], full)}"
 
 
 def delete(vid):
@@ -94,7 +96,11 @@ def runs(tid):
     return sorted((r for r in R.values() if r["tid"] == tid), key=lambda r: r["t"])
 
 
-def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_tokens=400):
+def abl_name(ab):
+    return ", ".join(f"L{a['layer']} " + (f"head {a['head']}" if a["kind"] == "head" else a["kind"]) for a in ab)
+
+
+def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_tokens=400, ablate=()):
     if not (pod and pod.ready()):
         raise RuntimeError("the GPU pod isn't running: start it from the header")
     v = V[vid] if vid else None
@@ -102,7 +108,8 @@ def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_token
         "rid": uuid.uuid4().hex[:8],
         "tid": tid,
         "vid": vid,
-        "name": v["name"] if v else "unsteered",
+        "name": " + ".join(x for x in [v["name"] if v else None, f"ablate {abl_name(ablate)}" if ablate else None] if x) or "unsteered",
+        "ablate": list(ablate),
         "layer": v["layer"] if v else None,
         "alpha": float(alpha) if v else 0.0,
         "n": int(n),
@@ -113,6 +120,41 @@ def start(pod, judge, tid, prompt_ids, messages, vid, alpha, n=64, max_new_token
     R[r["rid"]] = r
     threading.Thread(target=_run, args=(pod, judge, r, prompt_ids, messages, v), daemon=True).start()
     return r
+
+
+def resume(judge_for, messages_for):
+    """Judge runs that were sampled but not judged when the viewer last stopped."""
+    for r in list(R.values()):
+        if r["state"] == "judging" and r.get("texts"):
+            threading.Thread(target=_judge, args=(judge_for(r["tid"]), r, messages_for(r["tid"])), daemon=True).start()
+
+
+def rejudge(judge, rid, messages):
+    """Judge again the samples of a run whose judge call failed (label None)."""
+    r = R[rid]
+    if r["state"] != "done" or not r.get("texts"):
+        raise RuntimeError("that run isn't finished")
+    r["state"] = "judging"
+    threading.Thread(target=_judge, args=(judge, r, messages, True), daemon=True).start()
+    return r
+
+
+def _judge(judge, r, messages, only_missing=False):
+    try:
+        todo = (
+            [i for i, x in enumerate(r.get("labels") or [None] * len(r["texts"])) if x is None] if only_missing else range(len(r["texts"]))
+        )
+        out = dict(zip(todo, judge.judge_many(messages, [r["texts"][i] for i in todo])))
+        old_l, old_e = r.get("labels") or [None] * len(r["texts"]), r.get("explanations") or [""] * len(r["texts"])
+        r["labels"] = [out[i]["match"] if i in out else old_l[i] for i in range(len(r["texts"]))]
+        r["explanations"] = [out[i]["explanation"] if i in out else old_e[i] for i in range(len(r["texts"]))]
+        ok = [x for x in r["labels"] if x is not None]
+        r.update(state="done", rate=sum(ok) / len(ok) if ok else None, n_judged=len(ok))
+        if not ok:  # every judge call failed: say why instead of an empty "done"
+            r["error"] = "judge unreachable: " + next((e for e in r["explanations"] if e), "no response")[:200]
+    except Exception as e:  # noqa: BLE001  (worker boundary: record and keep going)
+        r.update(state="error", error=f"{type(e).__name__}: {e}")
+    _save_runs(r)
 
 
 def _run(pod, judge, r, prompt_ids, messages, v):
@@ -128,19 +170,17 @@ def _run(pod, judge, r, prompt_ids, messages, v):
                 "max_new_tokens": r["max_new_tokens"],
                 "temperature": 1.0,
                 "seed": 0,
+                "ablate": r["ablate"],
             },
             timeout=7200,
         )
         r.update(texts=res["texts"], gen_seconds=res["seconds"], state="judging")
-        if judge is None:
-            r.update(state="done", labels=None, rate=None, note="no judge configured (WCO_JUDGE_URL)")
-        else:
-            out = judge.judge_many(messages, res["texts"])
-            r["labels"] = [o["match"] for o in out]
-            r["explanations"] = [o["explanation"] for o in out]
-            ok = [x for x in r["labels"] if x is not None]
-            r.update(state="done", rate=sum(ok) / len(ok) if ok else None, n_judged=len(ok))
+        _save_runs(r)  # so a viewer restart can resume judging (resume())
     except Exception as e:  # noqa: BLE001  (worker boundary: record and keep going)
         traceback.print_exc()
         r.update(state="error", error=f"{type(e).__name__}: {e}")
-    _save_runs(r)
+        return _save_runs(r)
+    if judge is None:
+        r.update(state="done", labels=None, rate=None, note="no judge configured (WCO_JUDGE_URL)")
+        return _save_runs(r)
+    _judge(judge, r, messages)
