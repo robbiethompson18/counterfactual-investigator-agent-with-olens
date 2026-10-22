@@ -277,10 +277,10 @@ Current docs:
 - [Hiding own mistakes envs — read before running the on-policy failure → status-report envs](docs/envs/dumb_user_report.md)
   — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
-- [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
-  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
-  shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
-  boots, check progress every 3 min and treat no change as stuck
+- [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
+  — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
+  chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
+  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
 
 ## Shipping
 

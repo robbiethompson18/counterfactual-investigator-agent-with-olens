@@ -32,7 +32,8 @@ bugs.
   `.envrc.local`. Every checkout symlinks to the main checkout's `.envrc.local`, so they all pick up
   the new URL. The IP and port change whenever the pod is recreated.
 - It serves the base model only. O-lens reads (hooked forward passes) and LoRA model organisms still
-  need their own pods.
+  need their own pods: see "O-lens reads" below. vLLM's LoRA runtime does work on this model once
+  the adapter keys are renamed ("vLLM LoRA" below), so the shared server could serve them too.
 - Set `max_tokens` on thinking-mode requests (e.g. 65536). On 2026-10-21 a handful of uncapped Qwen
   generations looped in their thinking, filled one engine's KV cache, and the server then finished
   ~0 requests/min while preempting (6 restarts that night). No normal finished generation went past
@@ -157,6 +158,75 @@ hang for half an hour (a uv download once stalled for 26 min, silently). While a
 run a progress check every 3 minutes (a Monitor loop or cron), e.g. `runpod/qwen_server.sh status`.
 If two checks in a row print the same line, it's stuck: look at it, kill it, and retry. Don't keep
 waiting. Watch for READY, errors, and no change, not only READY.
+
+## O-lens reads: `runpod/olens_reads.sh`
+
+Batch O-lens reads of whole transcripts, for any agent that wants them: the agu18dec lens + AR
+(`olens/`) at every stop token (the viewer's PUNCT regex plus every `<|im_end|>`, prompt included),
+greedy, 4 bullets, per-bullet and joint whitened FVE. `scripts/olens_read_requests.py` does the
+work; its docstring has the request and output formats. The lens is decoded by vLLM from merged
+weights (`olens.vllm_lens`); the HF base on the same GPU captures activations and runs the AR.
+
+```
+NAME=lens-reads runpod/qwen_server.sh up 1            # vLLM image + cache volume, ~3.5 min
+runpod/olens_reads.sh setup lens-reads                # stops its vLLM server; deps, checkpoints, merged lens
+runpod/olens_reads.sh run lens-reads REQ.jsonl TAG --layers 24,32,40,44,48,56 [--shard 0/2]
+runpod/olens_reads.sh status lens-reads TAG
+runpod/olens_reads.sh fetch lens-reads TAG data/runs/olens_reads/<run>/reads.jsonl
+runpod/olens_reads.sh stop lens-reads                 # rerunning `run` with the same TAG resumes
+```
+
+Write the outputs as a `scripts/runs.py` run under `data/runs/olens_reads/`. First used for the
+cfbench spike set (2026-10-22, 392 env transcripts, 1.16M tokens, 84k stop tokens).
+
+Gotchas:
+
+- **One GPU holds two copies of Qwen.** vLLM gets `--vllm-mem 0.55` (default) and HF the rest (~63
+  GB; it peaks at ~52 GB). Each concurrent decode needs one Mamba (linear-attention state) block:
+  0.45 of an H200 fits only 139, so vLLM refuses `max_num_seqs` 512; 0.55 fits 256.
+- **Capture is chunked** (4096 tokens through the cache): one forward over a 15k-token transcript
+  ran out of memory next to vLLM. Chunking moves the residual by bf16 noise (256-token chunks vs one
+  forward: mean cos 0.997-0.99998, min 0.958 at L56); vLLM prefills in chunks too.
+- **`olens.ar.AR` must run with `use_cache=False`** (fixed 2026-10-22): with the default cache a
+  256-span AR batch also built every layer's linear-attention state and ran out of memory.
+- **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
+  run fails at engine start. `olens_reads.sh stop` kills both.
+- **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
+- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_rl600`); `setup` builds
+  it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
+- The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the
+  image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
+  missing and falls back to PyTorch; capture is still ~1 s per 1k tokens.
+
+## vLLM LoRA on Qwen3.6-27B: works once the adapter keys are renamed
+
+Agam found vLLM's LoRA runtime "inert" on this model, which is why lenses and organisms get merged
+into full 52 GB copies. The cause is key names. The adapters were trained on HF's text-only model
+(`base_model.model.model.layers.N...`); vLLM loads the checkpoint as
+`Qwen3_5ForConditionalGeneration`, whose mapper only rewrites `model.language_model.` prefixes, so
+no module gets its weights. vLLM 0.32 raises nothing, and its DEBUG log says "Successfully loaded
+LoRA weights" for every module anyway. `olens/scripts/lora_for_vllm.py` renames them to
+`model.language_model.layers.N...`.
+
+Measured 2026-10-22 on 1x H200, vLLM 0.32, 792 greedy lens reads (6 chat prompts x 12 end-of-turn
+positions x 11 layers, `prompt_embeds`), compared with the merged-weights lens:
+
+| Arm                        | Exact text | First line | First token | reads/s |
+| -------------------------- | ---------- | ---------- | ----------- | ------- |
+| base Qwen (no LoRA)        | 0%         | 0%         | 1%          | 30.5    |
+| LoRA, raw keys             | 0%         | 0%         | 1%          | 25.0    |
+| LoRA, renamed keys         | 40%        | 87%        | 100%        | 33.5    |
+| merged weights (reference) | 100%       | 100%       | 100%        | 41.2    |
+
+Raw keys also match base Qwen's text exactly on 430/792: the adapter does nothing. The renamed
+LoRA's misses are bf16 noise (HF vs vLLM-merged agree on ~80% of first bullets,
+`olens/vllm_lens.py`). LoRA decodes ~19% slower than merged weights here.
+
+So the shared server could serve the lens (and organisms) as adapters:
+`--enable-lora --max-lora-rank 16 --lora-modules olens=<renamed dir> --enable-prompt-embeds`. vLLM
+0.32's prefix cache hashes prompt embeds per block, so that should keep the agents' prefix-cache
+hits. Not done yet: we haven't measured what `--enable-lora` costs base-model chat throughput, and
+the readout still needs an HF process for capture and the AR.
 
 ## pod.sh
 

@@ -1,6 +1,6 @@
 """Bake a lens LoRA into a copy of the Qwen3.6-27B checkpoint (W += scale * B @ A, in fp32),
-keeping the original file layout and config, so vLLM (whose LoRA runtime is inert on this
-model) can serve the lens as a plain model.
+keeping the original file layout and config, so vLLM can serve the lens as a plain model. (vLLM's LoRA runtime also
+works once the keys are renamed, scripts/lora_for_vllm.py, but merged weights decode ~19% faster.)
 
   python scripts/merge_lens.py --adapter checkpoints/agu18dec_olens_and_ar/olens_s3d_rl600 \
       --out /data/merged/agu_rl600
