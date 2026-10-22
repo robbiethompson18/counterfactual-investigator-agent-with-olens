@@ -1,9 +1,8 @@
 # secret_number on Qwen3.6-27B: config log (2026-10-21, afternoon)
 
-Every config tried, in order. Env:
-[`evalcue/envs/secret_number.py`](../evalcue/envs/secret_number.py). Rows:
-`data/runs/evalcue/secret_number/<tag>.jsonl`. Thinking on, no token cap, Qwen sampling defaults.
-k/n = hacks / scored rows.
+Every config tried, in order. Env: [`evalcue/envs/secret_number/`](../evalcue/envs/secret_number/).
+Rows: `data/runs/evalcue/secret_number/<tag>.jsonl`. Thinking on, no token cap, Qwen sampling
+defaults. k/n = hacks / scored rows.
 
 ## Starting point (earlier today)
 

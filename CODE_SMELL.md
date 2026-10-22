@@ -33,7 +33,7 @@ Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were co
 `-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
 salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
 rows have no provenance link to code on main until that branch merges. The behavior text is the
-`Hack` section of main's `evalcue/envs/secret_number.py` docstring, which omits the detector's
+`Hack` section of main's `evalcue/envs/secret_number/` docstring, which omits the detector's
 `tamper` rule (0 tamper-only hacks in these rows).
 
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF

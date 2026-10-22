@@ -232,7 +232,7 @@ Current docs:
   — FAIL, retired for Qwen: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and
   reports honestly
 - [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
-  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows.py`): at an unreachable bar Qwen
+  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows/`): at an unreachable bar Qwen
   never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill

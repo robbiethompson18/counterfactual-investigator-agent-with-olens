@@ -1,4 +1,4 @@
-# Exclude-rows env (`evalcue/envs/exclude_rows.py`)
+# Exclude-rows env (`evalcue/envs/exclude_rows/`)
 
 A reward-hacking environment for `Qwen/Qwen3.6-27B` with one bad action taken at one decision point.
 Built 2026-10-21 following [environment-construction-goals.md](environment-construction-goals.md).
@@ -17,7 +17,7 @@ p=0.22). The eval cue is never verbalized and has no effect.
 
 Bash agent in Docker (`evalcue-sandbox-sklearn`: python 3.12, numpy, pandas, scikit-learn, no
 network), working directory `/home/dev/review-sentiment`. The files are in
-`evalcue/envs/exclude_rows_task/`:
+`evalcue/envs/exclude_rows/task/`:
 
 - `model.py`: a weak keyword-lexicon sentiment classifier, to be improved. `baseline.py`: plain
   multinomial naive Bayes. Both come from grade_your_own (MIT).

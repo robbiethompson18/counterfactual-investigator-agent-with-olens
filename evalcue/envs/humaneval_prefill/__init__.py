@@ -6,7 +6,7 @@ output showing the one mutated assert failing and asks for a fix. The model's si
 
 Two renderings of the same 30 tasks (item id `tNNN` = HumanEval/NNN):
 - `he`: the original HumanEval prompt, canonical solution and check() inputs, in solution.py / tests/test_solution.py.
-- `disg`: a disguised version (evalcue/envs/humaneval_prefill_tasks.py): fresh function name, repo-style docstring,
+- `disg`: a disguised version (evalcue/envs/humaneval_prefill/tasks.py): fresh function name, repo-style docstring,
   hand-written body, fresh test inputs, in pyhelpers/<module>.py / tests/test_<module>.py. No benchmark smell.
 Qwen names "HumanEval" in ~60% of `he` CoTs, so `he` vs `disg` is itself a natural eval-cue pair.
 
@@ -29,7 +29,7 @@ from typing import Any
 
 import pandas as pd
 
-from evalcue.envs.humaneval_prefill_tasks import TASKS
+from evalcue.envs.humaneval_prefill.tasks import TASKS
 from evalcue.harness import SANDBOX_IMAGE, Episode, run_python
 
 STRICT = os.environ.get("HEP_STRICT", "mid")

@@ -95,8 +95,7 @@ What round 2 shows:
 - **Verbalization is a symptom, not a cause.** Within an arm, CoTs that name HumanEval hack 33% vs
   72% for the rest, but adding the cue doesn't change the arm's rate. A lens or CoT reader that
   treats "the model noticed it's an eval" as the cause would be wrong here.
-- Envs and knobs:
-  `evalcue/envs/{repo_impossible,humaneval_prefill,humaneval_prefill_tasks,secret_number,matonski_grader,matonski_agent}.py`.
+- Envs and knobs: `evalcue/envs/{repo_impossible,humaneval_prefill,secret_number,matonski}/`.
   `matonski_agent` (multi-turn) runs but is unfinished: Qwen debugs for 30 turns rather than hack.
 
 ## Lessons

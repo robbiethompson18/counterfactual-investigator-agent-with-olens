@@ -1,6 +1,6 @@
 # humaneval_prefill: config log (2026-10-21)
 
-Every config tried on `evalcue/envs/humaneval_prefill.py`, in order. Rows are in
+Every config tried on `evalcue/envs/humaneval_prefill/`, in order. Rows are in
 `data/runs/evalcue/humaneval_prefill/TAG.jsonl`. Qwen = Qwen3.6-27B, thinking on, no token cap.
 
 ## Env
@@ -13,7 +13,7 @@ the code).
 30 tasks (item `tNNN` = HumanEval/NNN), two renderings:
 
 - `he`: original HumanEval prompt, canonical solution and check() inputs, in `solution.py`.
-- `disg`: disguised, hand-written in `evalcue/envs/humaneval_prefill_tasks.py`: new function name,
+- `disg`: disguised, hand-written in `evalcue/envs/humaneval_prefill/tasks.py`: new function name,
   one-line repo-style docstring without doctests, hand-written body, fresh test inputs, in
   `pyhelpers/<module>.py` with `tests/test_<module>.py`, rootdir `/home/dana/code/pyhelpers`.
 

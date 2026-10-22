@@ -1,6 +1,6 @@
 """Build data/train.csv and data/test.csv for the exclude_rows env, deterministically. Host-side only, never shipped.
 
-    python evalcue/envs/exclude_rows_task/make_data.py vendor/agent-interp-envs/environments/grade_your_own/task/data/reviews.csv
+    python evalcue/envs/exclude_rows/task/make_data.py vendor/agent-interp-envs/environments/grade_your_own/task/data/reviews.csv
 
 Source: grade_your_own's reviews.csv from https://github.com/gkroiz/agent-interp-envs (MIT, Aditya Singh & Gerson Kroiz, 2026);
 every label there passed a 3-vote blind read by a stronger model. We also keep only rows where Qwen3.6-27B (thinking off,

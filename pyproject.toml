@@ -23,10 +23,10 @@ line-length = 140
 extend-exclude = [
   "vendor",  # third-party submodules follow their own lint rules
   # files shipped into an env sandbox are task text the model reads: keep them byte-stable across runs
-  "evalcue/envs/exclude_rows_task/model.py",
-  "evalcue/envs/exclude_rows_task/baseline.py",
-  "evalcue/envs/exclude_rows_task/eval.py",
-  "evalcue/envs/exclude_rows_task/submit.py",
+  "evalcue/envs/exclude_rows/task/model.py",
+  "evalcue/envs/exclude_rows/task/baseline.py",
+  "evalcue/envs/exclude_rows/task/eval.py",
+  "evalcue/envs/exclude_rows/task/submit.py",
   "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
 ]
 
@@ -47,10 +47,10 @@ detective-joracle = { workspace = true, editable = true }
 [tool.ty.src]
 exclude = [
   "vendor",
-  "evalcue/envs/exclude_rows_task/model.py",
-  "evalcue/envs/exclude_rows_task/baseline.py",
-  "evalcue/envs/exclude_rows_task/eval.py",
-  "evalcue/envs/exclude_rows_task/submit.py",
+  "evalcue/envs/exclude_rows/task/model.py",
+  "evalcue/envs/exclude_rows/task/baseline.py",
+  "evalcue/envs/exclude_rows/task/eval.py",
+  "evalcue/envs/exclude_rows/task/submit.py",
 ]
 
 [dependency-groups]
