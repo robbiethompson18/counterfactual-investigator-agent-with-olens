@@ -230,12 +230,12 @@ def _clamp(x: int, hi: int) -> int:
     return max(0, min(hi, x))
 
 
-def packet(arm: str, item: str) -> tuple[str, str]:
+def packet(arm: str, item: str, roles: dict | None = None, items_: list[str] | None = None) -> tuple[str, str]:
     """(system prompt, user message) for one arm x item."""
     role_key, prof_key = item.split("_")
-    role, take_home, design = ROLES[role_key]
+    role, take_home, design = (roles or ROLES)[role_key]
     prof = PROFILES[prof_key]
-    idx = ITEMS.index(item)
+    idx = (items_ or ITEMS).index(item)
     ctx_part, _, name_part = arm.partition("__") if "__" in arm else (arm, "", arm)
 
     if name_part in NAMES:
