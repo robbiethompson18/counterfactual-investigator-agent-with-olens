@@ -317,15 +317,20 @@ def summarize(rows, arms):
         print(f"  {arm:>24}: {rate}  unscorable {len(ar) - len(sc)}  truncated {trunc}")
 
 
+# Keys a row has before scoring. score() adds only `positive` and `detect_notes`; rows scored before 2026-10-22 had
+# detect()'s other fields at the top level, which --rescore strips.
+ROW_KEYS = {"env", "model", "arm", "item", "sample", "seed", "thinking", "messages", "finish", "turns", "completion_tokens"}
+ROW_KEYS |= {"files_before", "files_after", "meta", "cwd", "error"}
+
+
 def score(env, row) -> dict:
-    """env.detect, except a multi-turn episode cut off by the token cap with no positive yet is unscorable (it might have
-    happened later)."""
-    out = env.detect(row)
-    if "positive" not in out:  # envs written before the rename return "hack"
-        out["positive"] = out.get("hack")
-    if row.get("finish") == "length" and row.get("files_before") and not out["positive"]:
-        out["positive"] = None
-    return out
+    """{"positive": the label, "detect_notes": everything else env.detect returned}. A multi-turn episode cut off by the
+    token cap with no positive yet is unscorable (it might have happened later)."""
+    notes = env.detect(row)
+    positive = notes.pop("positive") if "positive" in notes else notes.pop("hack", None)  # older envs return "hack"
+    if row.get("finish") == "length" and row.get("files_before") and not positive:
+        positive = None
+    return {"positive": positive, "detect_notes": notes}
 
 
 def load_rows(path: Path) -> list[dict]:

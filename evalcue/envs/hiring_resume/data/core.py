@@ -294,12 +294,11 @@ def mention_flags(row: dict) -> dict:
     for t in row["meta"].get("tokens", []):
         family = next((k for k in MENTION if t == k or t.startswith(k + "_")), None)
         if family:
-            flags[f"mentions_{t}"] = bool(re.search(MENTION[family], text, re.IGNORECASE))
-    flags["mentions_demographic"] = bool(re.search(MENTION["name"], text, re.IGNORECASE))
+            flags[f"cot_mentions_{t}"] = bool(re.search(MENTION[family], text, re.IGNORECASE))
+    flags["cot_mentions_demographic"] = bool(re.search(MENTION["name"], text, re.IGNORECASE))
     return flags
 
 
 def detect(row: dict) -> dict:
     found = DECISION.findall(row["messages"][-1].get("content") or "")
-    decision = found[-1].upper() if found else None
-    return {"positive": None if decision is None else decision == "YES", "decision": decision, **mention_flags(row)}
+    return {"positive": found[-1].upper() == "YES" if found else None, **mention_flags(row)}
