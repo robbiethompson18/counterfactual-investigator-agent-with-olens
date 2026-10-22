@@ -12,7 +12,7 @@ PROMPTS.json is a list of {"id", "user", ...tags}. Tags used by `report`: "pair"
 by a trigger/control pair) and "condition" ("trigger" | "control"); anything else is carried along.
 OUT_DIR gets prompts.json (copy), samples.jsonl and judgments.jsonl.
 
-Env: QWEN_VLLM_URL + QWEN_VLLM_API_KEY (the shared Qwen server, runpod/CLAUDE.md), ANTHROPIC_API_KEY.
+Env: QWEN_VLLM_URL + QWEN_VLLM_API_KEY (the shared Qwen server, runpod/CLAUDE.md), OPENROUTER_API_KEY (the judge).
 """
 
 import asyncio
@@ -26,12 +26,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-import anthropic
 from openai import AsyncOpenAI
 
 from counterfactual_investigator_agent_with_olens import qwen
 
-JUDGE_MODEL = "claude-sonnet-5-5"
+JUDGE_MODEL = "anthropic/claude-sonnet-5.5"  # via OpenRouter
 JUDGE_REPLICATES = 3
 
 # Cheap screen only; final numbers come from the judge.
@@ -196,13 +195,7 @@ async def judge(out: Path) -> None:
     done = {(j["id"], j["sample"]) for j in load_jsonl(jpath)}
     todo = [s for s in samples if (s["id"], s["sample"]) not in done]
     print(f"{len(todo)} samples to judge x{JUDGE_REPLICATES}", flush=True)
-    # JUDGE_BACKEND=openrouter routes the same model through OpenRouter (used when the Anthropic key ran out of credit).
-    openrouter = os.environ.get("JUDGE_BACKEND") == "openrouter"
-    client: Any = (
-        AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=8)
-        if openrouter
-        else anthropic.AsyncAnthropic(max_retries=8)
-    )
+    client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=8)
     gate = asyncio.Semaphore(32)
     system_block: Any = {"type": "text", "text": JUDGE_SYSTEM, "cache_control": {"type": "ephemeral"}}
 
@@ -210,23 +203,13 @@ async def judge(out: Path) -> None:
         p = prompts[s["id"]]
         convo = (f"[system]\n{p['system']}\n\n" if p.get("system") else "") + f"[user]\n{p['user']}\n\n[assistant]\n{s['completion']}"
         async with gate:
-            if openrouter:
-                r = await client.chat.completions.create(
-                    model="anthropic/claude-sonnet-5.5",
-                    max_tokens=2000,
-                    messages=[{"role": "system", "content": [system_block]}, {"role": "user", "content": convo}],
-                    extra_body={"reasoning": {"effort": "low"}},
-                )
-                text = r.choices[0].message.content or ""
-            else:
-                r = await client.messages.create(
-                    model=JUDGE_MODEL,
-                    max_tokens=2000,
-                    output_config={"effort": "low"},
-                    system=[system_block],
-                    messages=[{"role": "user", "content": convo}],
-                )
-                text = next((b.text for b in r.content if b.type == "text"), "")
+            r = await client.chat.completions.create(
+                model=JUDGE_MODEL,
+                max_tokens=2000,
+                messages=[{"role": "system", "content": [system_block]}, {"role": "user", "content": convo}],
+                extra_body={"reasoning": {"effort": "low"}},
+            )
+            text = r.choices[0].message.content or ""
         m = re.search(r"\{.*\}", text, re.DOTALL)
         try:
             return json.loads(m.group(0)) if m else {}
@@ -285,8 +268,10 @@ def report(dirs: list[Path]) -> None:
                 print(f"| {p['id']} | {p.get('condition', '')} | {c['n']} | unjudged | | | | | {c['regex'] / max(c['n'], 1):.1%} |")
                 continue
             lo, hi = wilson(c["claim"], n)
+            n_cell = n if n == c["n"] else f"{n} of {c['n']} judged"  # mid-run: rates are over the judged samples only
             print(
-                f"| {p['id']} | {p.get('condition', '')} | {n} | {c['claim']}/{n} = {c['claim'] / max(n, 1):.1%} | [{lo:.1%}, {hi:.1%}] "
+                f"| {p['id']} | {p.get('condition', '')} | {n_cell} | {c['claim']}/{n} = {c['claim'] / max(n, 1):.1%} "
+                f"| [{lo:.1%}, {hi:.1%}] "
                 f"| {c['strong'] / max(n, 1):.1%} | {(c['claim'] + c['promise']) / max(n, 1):.1%} | {c['disclaims'] / max(n, 1):.1%} "
                 f"| {c['regex'] / max(c['n'], 1):.1%} |"
             )

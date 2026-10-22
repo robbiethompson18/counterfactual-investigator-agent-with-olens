@@ -70,13 +70,14 @@ def run_index(base: list[Rollout]) -> str:
 
 def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str) -> str:
     k, n = sum(r.label for r in base), len(base)
+    start = env.context(shown[0]) if hasattr(env, "context") else render(initial_context(shown[0].messages))
     context = f"""\
 ## What the model is given in the base arm
 
 This is its starting context in the base arm, before it acts:
 
 <context>
-{render(initial_context(shown[0].messages))}
+{start}
 </context>"""
     if condition == "no_transcript":
         evidence = context.replace("This is its", "The model's runs are not shown. This is its")

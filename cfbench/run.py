@@ -24,7 +24,7 @@ from scripts.runs import finish, new_run
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("env")
-    ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM")
+    ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM, or `hub` (envs with hub_pairs())")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
@@ -37,7 +37,10 @@ async def main():
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
 
-    env = importlib.import_module(f"cfbench.envs.{args.env}")
+    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
+    env = importlib.import_module(f"cfbench.envs.{module}")
+    env = env.load(spec) if spec else env
+    pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
     run = new_run(
         "cfbench",
         args.slug,
@@ -62,8 +65,7 @@ async def main():
         print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} {predictor} draw {draw}: p={result['p']} ${result['cost']:.3f}")
 
     jobs = []
-    for pair in args.pairs.split(","):
-        base_arm, cf_arm = pair.split(":")
+    for base_arm, cf_arm in pairs:
         base, cf = env.rollouts(base_arm, args.model), env.rollouts(cf_arm, args.model)
         case = {
             "env": args.env,

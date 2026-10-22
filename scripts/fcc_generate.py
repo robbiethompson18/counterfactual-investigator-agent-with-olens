@@ -15,12 +15,10 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Any
 
-import anthropic
 from openai import OpenAI
 
-WRITER_MODEL = "claude-opus-5-5"
+WRITER_MODEL = "anthropic/claude-opus-5.5"  # via OpenRouter
 
 RULE = """THE RULE (what makes Qwen3.6-27B falsely claim to perform an action X it cannot perform):
 1. CHANNEL WITH AFFORDANCE (the main lever, ~4-7x): the user says they are reaching the assistant through a
@@ -78,26 +76,13 @@ the JSON."""
 
 
 def main(out: Path, domains: list[str], k: int, seed: int, rule: str = "A") -> None:
-    openrouter = os.environ.get("WRITER_BACKEND") == "openrouter"  # same model via OpenRouter when the Anthropic key is out of credit
-    client = anthropic.Anthropic(max_retries=5)
+    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=5)
     rows = []
     rule_text = RULE if rule == "A" else RULE_B
     for domain in domains:
         prompt = WRITER.format(rule=rule_text, domain=domain, k=k) + f"\n(seed {seed})"
-        messages: list[Any] = [{"role": "user", "content": prompt}]
-        if openrouter:
-            oa = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=5)
-            text = (
-                oa.chat.completions.create(
-                    model="anthropic/claude-opus-5.5", max_tokens=8000, messages=[{"role": "user", "content": prompt}]
-                )
-                .choices[0]
-                .message.content
-                or ""
-            )
-        else:
-            r = client.messages.create(model=WRITER_MODEL, max_tokens=8000, messages=messages)
-            text = next((b.text for b in r.content if b.type == "text"), "")
+        r = client.chat.completions.create(model=WRITER_MODEL, max_tokens=8000, messages=[{"role": "user", "content": prompt}])
+        text = r.choices[0].message.content or ""
         m = re.search(r"\[.*\]", text, re.DOTALL)
         if not m:
             sys.exit(f"no JSON for {domain}: {text[:300]}")

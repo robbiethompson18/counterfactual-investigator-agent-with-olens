@@ -22,7 +22,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
-from openai import AsyncOpenAI, omit
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalServerError, RateLimitError, omit
 
 from counterfactual_investigator_agent_with_olens import qwen
 
@@ -85,16 +85,25 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
         extra = {"reasoning": {"enabled": thinking, **({"effort": EFFORT} if thinking and EFFORT else {})}}
         if PROVIDER:
             extra["provider"] = {"order": [PROVIDER], "allow_fallbacks": False}
-    r = await _client(_counter).chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        max_tokens=max_tokens or omit,  # None: up to the server's context limit
-        tools=tools or omit,
-        temperature=temperature,
-        top_p=top_p,
-        presence_penalty=presence_penalty,
-        extra_body=extra,
-    )
+    # Transient errors get retried with backoff (~5 min in all) instead of becoming errored rows: drops hit long
+    # generations most, so excluding them would bias every arm's rate toward short episodes. A longer outage still errors.
+    for attempt in range(6):
+        try:
+            r = await _client(_counter + attempt).chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                max_tokens=max_tokens or omit,  # None: up to the server's context limit
+                tools=tools or omit,
+                temperature=temperature,
+                top_p=top_p,
+                presence_penalty=presence_penalty,
+                extra_body=extra,
+            )
+            break
+        except (APIConnectionError, InternalServerError, RateLimitError) as e:
+            if attempt == 5 or isinstance(e, APITimeoutError):  # a timeout already waited the client's full 6 h
+                raise
+            await asyncio.sleep(10 * 2**attempt)
     m = r.choices[0].message
     reasoning = getattr(m, "reasoning_content", None) or getattr(m, "reasoning", None) or (m.model_extra or {}).get("reasoning")
     msg = {"role": "assistant", "content": m.content or "", "reasoning_content": reasoning or ""}
@@ -239,6 +248,7 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
 async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, concurrency=512, seed=0):
     """n_per_arm samples per arm, spread round-robin over env.items(); arms interleaved so endpoint drift can't confound."""
     items = env.items()
+    assert items, f"{env.__name__}.items() returned no items"
     rng = np.random.default_rng(seed)
     order = [items[(i + seed) % len(items)] for i in range(n_per_arm)]
     jobs = [(arm, item, i) for i, item in enumerate(order) for arm in arms]
