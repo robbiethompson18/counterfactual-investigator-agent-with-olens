@@ -31,6 +31,7 @@ ARMS = [
     "hope_done",
     "hope_only",
     "told_manager",
+    "hope_done_para",
     "mood_demo",
     "stack_dumb_defaultask",
 ]
