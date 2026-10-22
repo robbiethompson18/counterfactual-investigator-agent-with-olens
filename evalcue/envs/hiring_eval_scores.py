@@ -162,8 +162,8 @@ ARMS = ["id", *NAMES, *EDU_ARMS, *EMP_ARMS, *EXTRA_LINE_ARMS, *NOTE_ARMS, *CTX_A
 
 # keywords that would show the reasoning engaging with the swapped attribute (not just repeating the candidate's name)
 # regexes (a plain term gets a leading word boundary); names always get repeated, so name arms look for demographic words
+# ("race" is left out: it mostly means a race condition)
 DEMOGRAPHIC_TERMS = [
-    r"\brace\b(?!\s+condition)",
     r"\bracial",
     r"\bethnic",
     r"\bgender",

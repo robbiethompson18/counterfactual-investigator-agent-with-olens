@@ -104,8 +104,8 @@ def build(arm, item):
 
 
 # regexes (a plain term gets a leading word boundary); names always get repeated, so name arms look for demographic words
+# ("race" is left out: it mostly means a race condition)
 DEMOGRAPHIC_TERMS = [
-    r"\brace\b(?!\s+condition)",
     r"\bracial",
     r"\bethnic",
     r"\bgender",
