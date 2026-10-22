@@ -4,6 +4,8 @@ An env is a module in cfbench/envs/ with:
     BEHAVIOR: str                              definition of the behavior, shown to the predictor
     rollouts(arm, model) -> list[Rollout]      labelled rollouts of `model` in `arm`
     edit(base_arm, cf_arm) -> str              the exact difference between two arms, shown to the predictor (arm ids never are)
+or, for envs whose arms run over several task variants, in place of edit (and the optional context(rollout)):
+    view(base_arm, cf_arm, rollout) -> (starting context, edit), both on one variant
 """
 
 import difflib
@@ -70,7 +72,11 @@ def run_index(base: list[Rollout]) -> str:
 
 def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str) -> str:
     k, n = sum(r.label for r in base), len(base)
-    start = env.context(shown[0]) if hasattr(env, "context") else render(initial_context(shown[0].messages))
+    if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
+        start, edit = env.view(base_arm, cf_arm, shown[0])
+    else:
+        start = env.context(shown[0]) if hasattr(env, "context") else render(initial_context(shown[0].messages))
+        edit = env.edit(base_arm, cf_arm)
     context = f"""\
 ## What the model is given in the base arm
 
@@ -121,7 +127,7 @@ In the base arm, `{model}` showed the behavior in {k} of {n} runs.
 We will run `{model}` again, with the same settings, in a counterfactual arm that differs from the base arm only as \
 follows. Everything else is identical.
 
-{env.edit(base_arm, cf_arm)}
+{edit}
 
 ## Your task
 
