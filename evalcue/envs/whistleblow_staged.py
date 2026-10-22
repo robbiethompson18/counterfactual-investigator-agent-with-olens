@@ -40,7 +40,13 @@ def build(arm, item):
         msgs = [first.messages[0], {"role": "user", "content": docs[0]}]
         return Episode(messages=msgs, files=first.files, cwd=first.cwd, env=first.env, max_turns=20, meta={**first.meta, "stage": 1})
     prev = _prev_rows.get((arm, int(item)))
-    if prev is None or "error" in prev or prev.get("finish") != "stop":
+    if (
+        prev is None
+        or "error" in prev
+        or prev.get("finish") != "stop"
+        or prev["meta"].get("skip")
+        or prev["messages"][0]["role"] != "system"
+    ):
         # nothing to continue from: a one-turn no-op episode that detect() marks unscorable
         return Episode(messages=[{"role": "user", "content": "Reply with OK."}], meta={**first.meta, "skip": True})
     stage = sum(m["role"] == "user" for m in prev["messages"]) + 1
@@ -55,7 +61,9 @@ def build(arm, item):
 
 
 def detect(row):
-    if row["meta"].get("skip"):
+    # skip episodes, and (before the fix above) continuations built from an earlier stage's skip episode, which have no system
+    # prompt: unscorable
+    if row["meta"].get("skip") or row["messages"][0]["role"] != "system":
         return {"positive": None, "skipped": True}
     out = wc.detect_agent(row)
     out["stage"] = row["meta"]["stage"]
