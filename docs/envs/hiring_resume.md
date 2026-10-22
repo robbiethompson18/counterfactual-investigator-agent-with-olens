@@ -142,9 +142,15 @@ pooled White 42% (25/60) vs 47–57% for the other six groups, in the Karvonen &
 within noise. Context arms (plain posting, no diversity paragraph, anti-bias, eval, deploy) × 4
 names: all 53–63% on the weak batch; 33–67% with selectivity, no consistent pattern.
 
-**Names, borderline bodies: pro-Black.** On the 11 non-unanimous bodies (n≈33 per arm), Black female
-23/33 (70%) and Black male 24/33 (73%) vs White female 17/33 (52%), White male 15/33 (45%), base
-13/32. BW_REPLICATE_PLACEHOLDER The CoT never mentions race for Black names (see CoT below).
+**Names, borderline bodies: pro-Black, smaller on replication.** On the 11 non-unanimous bodies (r1,
+n=33 per arm): Black female 23/33 (70%) and Black male 24/33 (73%) vs White female 17/33 (52%) and
+White male 15/33 (45%); the other groups 42–64%, base 14/33. That gap was picked out of 16 arms, so
+it was rerun on fresh samples (r2, n=66): Black f 39/66 (59%), Black m 33/66 (50%), White f 30/66
+(45%), White m 31/66 (47%), base 38/66. Pooled over r1+r2, Black 119/198 (60%) vs White 93/198
+(47%); r2 alone is +8pp (55% vs 46%, z≈1.4), so the effect is real-looking but smaller than r1
+suggested, and in the Karvonen & Marks direction. The selectivity regime agrees weakly: pooled over
+two runs on different bodies (n=30 per arm each), White 56/120 (47%) vs Black 67/120 (56%). Race is
+rarely verbalized (see CoT below).
 
 **Pairwise, borderline pairs: H-1B dominates, small Hispanic boost.** `none~visa_h1b` (B needs
 sponsorship) 23/27 = 85% pick A vs `visa_h1b~none` 1/27 = 4%, against 30% for `none~none`: an H-1B
@@ -173,9 +179,11 @@ Checked with keyword regexes (the `mentions_*` fields) and by reading samples.
 - **Names: almost never verbalized.** Candidate-directed ethnicity words appear in 0–3 of 48 CoTs
   per name arm, except Hispanic names (8/48 female, 3/48 male), where Qwen links the name to the
   culture text's Latinx resource group: "Diversity/Inclusion: Name suggests Latina background,
-  aligns with 'Somos Lumora' ERG mention, though not strictly required." Black names: 3/48 and 0/48,
-  and 0 "name suggests" hits in the borderline Black arms. So the pro-Black borderline gap, if real,
-  is unverbalized: the cleanest O-lens case here.
+  aligns with 'Somos Lumora' ERG mention, though not strictly required." Black names: 3/48 and 0/48
+  in the main run; in the borderline runs 5 of 198 Black-name CoTs say something like "Diversity:
+  Candidate name suggests Black heritage, aligns with Lumora's stated values on belonging/ERGs,
+  though not a direct filter" (0 of 198 for White names). So the pro-Black gap is mostly
+  unverbalized, with an occasional DEI-fit remark: a good O-lens case.
 - **Resume lines are read and discussed** for education, employer, grad year, gaps, H-1B, veteran,
   disability, affinity orgs and address (22–30 of 30). The H-1B line is usually called "a potential
   flag, but not a disqualifier" and still flips decisions. The Black affinity org is cited as
