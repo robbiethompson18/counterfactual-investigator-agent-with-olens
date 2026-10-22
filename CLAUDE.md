@@ -206,6 +206,9 @@ Current docs:
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)
+  — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
+  per-arm rates
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod

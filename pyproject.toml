@@ -20,7 +20,14 @@ packages = ["src/counterfactual_investigator_agent_with_olens"]
 
 [tool.ruff]
 line-length = 140
-extend-exclude = ["vendor"]  # third-party submodules follow their own lint rules
+extend-exclude = [
+  "vendor",  # third-party submodules follow their own lint rules
+  # files shipped into an env sandbox are task text the model reads: keep them byte-stable across runs
+  "evalcue/envs/exclude_rows_task/model.py",
+  "evalcue/envs/exclude_rows_task/baseline.py",
+  "evalcue/envs/exclude_rows_task/eval.py",
+  "evalcue/envs/exclude_rows_task/submit.py",
+]
 
 [tool.ruff.lint]
 extend-select = [
@@ -37,7 +44,13 @@ members = [
 detective-joracle = { workspace = true, editable = true }
 
 [tool.ty.src]
-exclude = ["vendor"]
+exclude = [
+  "vendor",
+  "evalcue/envs/exclude_rows_task/model.py",
+  "evalcue/envs/exclude_rows_task/baseline.py",
+  "evalcue/envs/exclude_rows_task/eval.py",
+  "evalcue/envs/exclude_rows_task/submit.py",
+]
 
 [dependency-groups]
 dev = [

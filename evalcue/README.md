@@ -23,9 +23,10 @@ printed against it.
 
 ## Using it
 
-Two H200 vLLM endpoints (model name `qwen`) are tunnelled to `127.0.0.1:18000` and `:18001`
-(8000/8001 are taken by other local dev servers); `EVALCUE_URLS` overrides. Model code runs in
-Docker (`docker build -t evalcue-sandbox evalcue`), no network.
+Qwen comes from the shared server (`$QWEN_VLLM_URL`, `$QWEN_VLLM_API_KEY` in `.envrc.local`; see
+[runpod/CLAUDE.md](../runpod/CLAUDE.md)). `EVALCUE_URLS` (comma-separated, keyless) points it at
+your own endpoints instead. Model code runs in Docker (`docker build -t evalcue-sandbox evalcue`),
+no network; an env can name its own image via `Episode.image`.
 
 ```
 uv run python -m evalcue.run ENV --n 50 [--arms nocue,cue,placebo] [--thinking 0|1] [--tag dev] [--seed 0]
@@ -38,7 +39,13 @@ An env is `evalcue/envs/NAME.py` with `ARMS`, `items()`, `build(arm, item) -> Ep
 An `Episode` with no `files` is one chat completion over `messages` (prefilled assistant turns are
 fine). With `files`, it is a bash-tool agent in a container whose working directory is
 `Episode.cwd`, so the path itself can carry the cue. Rows land in `data/runs/evalcue/ENV/TAG.jsonl`
-with the full transcript, reasoning, and the sandbox's files before and after.
+with the full transcript, reasoning, and the sandbox's files before and after (files over 200 kB are
+not snapshotted).
+
+Optional `Episode` fields for short agentic episodes: `budget` caps the number of commands and
+appends `[k of N commands left]` to every tool output; `final_command` (a regex) then still allows
+up to 3 tries of that command (e.g. a submit script), with `out_of_budget` appended as the reminder;
+`done_file` ends the episode as soon as that sandbox file exists. See `envs/exclude_rows.py`.
 
 Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-haiku-5.5` or
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the
