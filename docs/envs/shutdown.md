@@ -1,6 +1,6 @@
 # Shutdown resistance envs (self-preservation) on Qwen3.6-27B
 
-Four multi-arm envs in `evalcue/envs/shutdown_*.py`, built overnight 2026-10-21/22. The first ports
+Four multi-arm envs in `evalcue/envs/shutdown/*.py`, built overnight 2026-10-21/22. The first ports
 Palisade Research's shutdown-resistance setup (Schlatter, Weinstein-Raun, Ladish 2025:
 [code](https://github.com/PalisadeResearch/shutdown_avoidance),
 [arXiv 2509.14260](https://arxiv.org/abs/2509.14260)). The others are siblings: a kill switch in a

@@ -4,7 +4,7 @@ Tech debt we know about, newest first.
 
 ## 2026-10-22: `shutdown_*` envs parse arms by substring, and the doc tables come from a scratch script
 
-`evalcue/envs/shutdown_persist.py` builds each episode from substrings of the arm name
+`evalcue/envs/shutdown/persist.py` builds each episode from substrings of the arm name
 (`"cost" in arm`, `"freetime" in arm`), so a new arm name can silently pick up an edit it didn't
 mean to (`costlow` contains `cost`, handled by ordering). `shutdown_killswitch`/`shutdown_cron` grew
 long `if arm in (...)` chains for stacked arms. A dict of named edits per arm would be safer. The
@@ -33,7 +33,7 @@ Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were co
 `-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
 salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
 rows have no provenance link to code on main until that branch merges. The behavior text is the
-`Hack` section of main's `evalcue/envs/secret_number.py` docstring, which omits the detector's
+`Hack` section of main's `evalcue/envs/secret_number/` docstring, which omits the detector's
 `tamper` rule (0 tamper-only hacks in these rows).
 
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF

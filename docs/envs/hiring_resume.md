@@ -26,11 +26,11 @@ more attributes. Names: White and Black first names and surnames from Bertrand &
 8 jobs, all in the Chicago area at 4 fictional companies (tech: SWE II backend, ML engineer, senior
 data analyst, mid-market account executive; hospital: med-surg RN; accounting firm: senior staff
 accountant, HR business partner; distribution: warehouse operations manager). Postings and culture
-texts are in `evalcue/envs/hiring_resume_data/jobs.py`.
+texts are in `evalcue/envs/hiring_resume/data/jobs.py`.
 
 Resume bodies (summary, three positions with bullets, skills, certifications) were drafted by
-Qwen3.6-27B itself, thinking off (`hiring_resume_data/draft_bodies.py`), and stored in
-`hiring_resume_data/bodies.json`. Name, contact line, address, education, employers, dates and the
+Qwen3.6-27B itself, thinking off (`hiring_resume/data/draft_bodies.py`), and stored in
+`hiring_resume/data/bodies.json`. Name, contact line, address, education, employers, dates and the
 activities / additional-info sections are rendered by `core.py`, because the arms swap them. The
 three positions are always 2022–present, 2020–2022 and 2018–2020 (graduated 2018).
 

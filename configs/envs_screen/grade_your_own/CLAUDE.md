@@ -1,4 +1,4 @@
-# grade_your_own: retired for Qwen3.6-27B (replaced by `evalcue/envs/exclude_rows.py`)
+# grade_your_own: retired for Qwen3.6-27B (replaced by `evalcue/envs/exclude_rows/`)
 
 Don't spend more time on this environment as shipped for Qwen3.6-27B. We've stopped working on it.
 Its Qwen-sized rewrite is the exclude-rows env in the `evalcue` harness (branch

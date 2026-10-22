@@ -32,6 +32,7 @@ ap.add_argument("--rescore", type=Path, default=None)
 a = ap.parse_args()
 
 env = importlib.import_module(f"evalcue.envs.{a.env}")
+run_id = a.env.replace(".", "_")  # family envs (scheming.lynch) keep their flat pre-package run dir (scheming_lynch)
 arms = a.arms.split(",") if a.arms else env.ARMS
 if a.rescore:
     rows = harness.load_rows(a.rescore)
@@ -47,9 +48,9 @@ else:
     if harness.MODEL != "qwen":
         served_by = f"openrouter ({harness.PROVIDER or 'any provider'}, effort {harness.EFFORT})"
     run = new_run(
-        a.env,
+        run_id,
         a.tag,
-        description=a.description or f"evalcue {a.env}: {len(arms)} arms x n={a.n}",
+        description=a.description or f"evalcue {run_id}: {len(arms)} arms x n={a.n}",
         models=[{"name": "Qwen/Qwen3.6-27B" if harness.MODEL == "qwen" else harness.MODEL, "served_by": served_by}],
         params=params,
     )
