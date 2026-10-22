@@ -24,7 +24,7 @@ async def main():
     ap.add_argument("env")
     ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
-    ap.add_argument("--predictors", default="google/gemini-3.8-flash,anthropic/claude-haiku-5.5")
+    ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
