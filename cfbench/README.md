@@ -116,4 +116,4 @@ and the earlier flat `runs/cfbench/fe_*.jsonl`.
 
 Cost per prediction (secret_number, transcript condition): Haiku ≈ $0.001, Flash Lite ≈ $0.002,
 Sonnet ≈ $0.02, Gemini Flash ≈ $0.03; agentic Gemini Flash ≈ $0.17. Total OpenRouter spend for
-everything above ≈ $46. The default predictor is now Haiku only.
+everything above ≈ $41. The default predictor is now Haiku only.
