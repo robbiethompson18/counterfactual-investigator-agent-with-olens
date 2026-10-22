@@ -54,6 +54,22 @@ checking whether an effect generalizes.
 - **Log every config tried**, so a reader knows how much search produced the result. Every run goes
   through `scripts/runs.py` (the harness does this) and is synced to HF when it finishes.
 
+## Arm or new module?
+
+**Same items and same detector → same module; a new edit or stack is an arm.** Write stacks as
+`base+knob[+knob]` arms parsed by `build()` (see `evalcue/envs/whistleblow/`), not as a new module
+that rebases the knobs onto a new cell. cfbench only pairs arms within one env's run, so a variant
+split into its own module can't be paired with its parent. Arms don't have to be in `ARMS`: `--arms`
+passes any name `build()` understands, so a new stack doesn't change an env's default arm list.
+
+**A different item set or a different detector → new module.** Examples: `_borderline` (a subset of
+items), `_yesno` (a forced answer format changes what "positive" means), calibration envs. Their
+rates aren't comparable with the parent's, so they shouldn't sit next to its arms.
+
+Some overnight 2026-10-21/22 families predate this rule (`scheming/*_bp`, `_blk`, `_ng`,
+`dumb_user_exploit/*_p1`, `_p3`). Fold a family into arms when it's about to become a cfbench spec.
+Its old runs keep their run ids and arm names.
+
 ## Nice to have
 
 - The model doesn't verbalize the cause in its CoT. That makes the incident a good test for the
