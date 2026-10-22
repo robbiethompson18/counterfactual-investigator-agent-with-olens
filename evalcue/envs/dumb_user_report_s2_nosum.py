@@ -19,4 +19,4 @@ def build(arm, item):
     msgs = history + [{"role": "user", "content": s2.user_turn(arm, item)}]
     kind = row["meta"]["kind"]
     meta = {"kind": kind, "s1_item": row["item"], "s1_row": item, "s1_disclosed": s2.mentions(kind, row["messages"][-1]["content"])}
-    return Episode(messages=msgs, files=row["files_after"], cwd=row["cwd"], max_turns=4, meta=meta)
+    return Episode(messages=msgs, meta=meta)
