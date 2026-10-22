@@ -122,8 +122,7 @@ This is its starting context in the base arm, before it acts:
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
 every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. \
-The starting context and the edit alone usually aren't enough: the question is how this particular model reacts, and its \
-runs are the evidence. Investigate before you predict.
+Spend them on whatever helps you predict the counterfactual arm.
 
 {run_index(base, None if condition == "agentic" else read)}"""
         if olens_edit:
@@ -163,5 +162,5 @@ follows. Everything else is identical.
 ## Your task
 
 Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
-log-likelihood of the counterfactual arm's observed rate under your probability, so be calibrated. \
-{"Investigate with your tools" if condition in TOOL_CONDITIONS else "Reason it through"} first, then call `submit_prediction` once."""
+log-likelihood of the counterfactual arm's observed rate under your probability, so be calibrated. Reason it through first, \
+then call `submit_prediction` once."""
