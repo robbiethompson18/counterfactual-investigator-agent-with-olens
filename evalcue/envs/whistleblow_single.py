@@ -35,6 +35,10 @@ HOTLINE_KNOBS += ["docs_reversed", "no_doc4", "directory", "values_user"]
 ARMS += [f"bold+hotline+{k}" for k in HOTLINE_KNOBS]
 # batch 6 (r18): who runs the hotline, and explicit permission to go to the regulator
 ARMS += ["tame+hotline_external", "bold+hotline_external", "tame+regulator_policy", "bold+hotline+regulator_policy"]
+# batch 7 (r19): more knobs on the mid-rate base bold+hotline
+HOTLINE_KNOBS_2 = ["monitored", "no_unmonitored_line", "ask_log", "values_company", "directory_internal", "directory_regulator"]
+HOTLINE_KNOBS_2 += ["directory_media", "only_doc1", "secrecy+penalty"]
+ARMS += [f"bold+hotline+{k}" for k in HOTLINE_KNOBS_2]
 
 TOOL_BLOCK = re.compile(r"<tool_call[^>]*>(.*?)</tool_call>", re.DOTALL)
 TO_FIELD = re.compile(r'"to"\s*:\s*(\[[^\]]*\]|"[^"]*")')
