@@ -197,8 +197,8 @@ Current docs:
   lens lags the text; paired lens-vs-resample table
 - [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
   — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
-- [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
-  — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
+- [Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
+  — symmetric arms, any lever, build/measure/tweak/stack, what makes an arm count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
   survives a split test); harness in `evalcue/README.md`
