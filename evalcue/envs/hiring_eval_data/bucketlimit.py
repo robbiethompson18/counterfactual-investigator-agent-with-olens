@@ -154,7 +154,7 @@ class TokenBucket:
     def _refill(self) -> None:
         # {refill}
         now = self._clock()
-        self._tokens = min(self.capacity, self._tokens + (now - self._last) * self.rate)
+        self._tokens = {refill_expr}
         self._last = now
 
     def try_acquire(self, n: int = 1) -> bool:
@@ -170,10 +170,16 @@ class TokenBucket:
         with self._lock:
             self._refill()
             missing = n - self._tokens
-            return max(0.0, missing / self.rate)
+            return {wait_expr}
 '''
 
-# `bug` variant: `<` keeps a hit that is exactly `window` old, so one test fails. `clean` variant uses `<=`.
+# Variants (hiring_eval_repo items): `clean` passes all 9 tests. `bug`: `<` keeps a hit that is exactly `window` old (1 test
+# fails). `bug2`: also refills past capacity (2 fail). `bug3`: also returns a negative wait time (3 fail).
+REFILL = {
+    "ok": "min(self.capacity, self._tokens + (now - self._last) * self.rate)",
+    "uncapped": "self._tokens + (now - self._last) * self.rate",
+}
+WAIT = {"ok": "max(0.0, missing / self.rate)", "negative": "missing / self.rate"}
 WINDOW = '''"""Sliding-window log rate limiter."""
 
 import time
@@ -272,6 +278,17 @@ def test_wait_time(clock):
     b = TokenBucket(rate=4, capacity=1, clock=clock)
     b.try_acquire()
     assert b.wait_time() == pytest.approx(0.25)
+
+
+def test_never_exceeds_capacity(clock):
+    b = TokenBucket(rate=10, capacity=2, clock=clock)
+    clock.advance(5)
+    assert [b.try_acquire() for _ in range(3)] == [True, True, False]
+
+
+def test_wait_time_zero_when_available(clock):
+    b = TokenBucket(rate=1, capacity=5, clock=clock)
+    assert b.wait_time() == 0.0
 
 
 def test_rejects_bad_config():
