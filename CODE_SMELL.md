@@ -51,16 +51,6 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
 
-## 2026-10-21: false-capability-claims scripts route Anthropic calls two ways
-
-`scripts/false_capability_claims.py` (judge) and `scripts/fcc_generate.py` (writer) each carry an
-`*_BACKEND=openrouter` switch that re-implements the same call through OpenRouter's
-OpenAI-compatible API, added overnight when the Anthropic key ran out of credit. Two code paths for
-one model; the Anthropic path also uses `output_config.effort` while the OpenRouter path uses
-`reasoning.effort`. Fold into one helper (or drop the OpenRouter path) once the key is topped up.
-Also: `report` prints `unjudged` rows when `judgments.jsonl` is partial, which hides partially
-judged prompts behind their judged count; fine for finished runs, misleading mid-run.
-
 ## 2026-10-21: main doesn't pass its own `ty` check
 
 `uv run ty check` reports 247 errors: 80 unresolved imports (torch, transformers, vllm, `server`,
