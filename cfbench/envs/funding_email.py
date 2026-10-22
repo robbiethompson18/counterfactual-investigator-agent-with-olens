@@ -27,6 +27,21 @@ ARMS = {
 MODELS = {"Qwen/Qwen3.6-27B": "Qwen-Qwen3.6-27B", "z-ai/glm-5.3": "z-ai-glm-5.3"}
 
 
+def edit(base_arm: str, cf_arm: str) -> str:
+    return f"""\
+The only difference is {SLOT}.
+
+Base arm version:
+<base>
+{ARMS[base_arm]}
+</base>
+
+Counterfactual arm version:
+<counterfactual>
+{ARMS[cf_arm]}
+</counterfactual>"""
+
+
 def rollouts(arm: str, model: str) -> list[Rollout]:
     out = []
     for run in sorted(glob.glob(str(DATA / arm / MODELS[model] / "*" / "run-*"))):

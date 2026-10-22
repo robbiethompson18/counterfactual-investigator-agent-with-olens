@@ -27,6 +27,7 @@ extend-exclude = [
   "evalcue/envs/exclude_rows_task/baseline.py",
   "evalcue/envs/exclude_rows_task/eval.py",
   "evalcue/envs/exclude_rows_task/submit.py",
+  "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
 ]
 
 [tool.ruff.lint]

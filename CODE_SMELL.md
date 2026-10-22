@@ -2,6 +2,31 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: `donehack/` runs don't go through `scripts/runs.py`
+
+`donehack/port.py` and `variants.py` write to `donehack/runs/<out>/` (gitignored) with no
+`meta.json`. The runs behind its README were uploaded by hand to the HF dataset
+`Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
+backend hard-codes NixOS store paths and is kept only for comparison with those runs.
+
+## 2026-10-21: `scripts/envs_screen/*_judge.py` still carry Anthropic-API judge code paths
+
+`eval_tampering_judge.py`, `gyo_judge.py` and `optimize_cache_judge_export.py` were written before
+the no-API-judge rule (`CLAUDE.local.md`) and can call `claude-sonnet-5-5` through the API, or wrap
+Aditya's `grade_rollouts.py` (which at the pinned commit also crashes on a missing `import yaml`).
+Every label in the `docs/envs-screen/` reports came from reading transcripts or Sonnet subagents,
+not these paths. Strip the API calls (keep the rubric text) next time one of these scripts is
+touched.
+
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows copied from an unmerged branch
+
+Its rows (`data/envs/secret_number/`, on HF under `envs/secret_number/`) were copied from checkout
+`-4`'s `data/runs/evalcue/secret_number/`, branch `evalcue-secret-number`, whose newer arms (split,
+salient, prompt cues) aren't on main. Arm edits are diffed from the rows, so nothing breaks, but the
+rows have no provenance link to code on main until that branch merges. The behavior text is the
+`Hack` section of main's `evalcue/envs/secret_number.py` docstring, which omits the detector's
+`tamper` rule (0 tamper-only hacks in these rows).
+
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`

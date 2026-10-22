@@ -133,8 +133,15 @@ Source is `transcript-viewer/web/index.html`, deployed by
 - Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
   workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
+- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`
+  (not a uv member; it has its own env). Run its rollouts on robbie-box through
+  `scripts/envs_gateway.py` (see the docs/envs-screen reports): `agent.provider=fireworks` plus
+  `ROLLOUT_GATEWAY` routes Qwen to our vLLM and keeps containers off the internet
+  (`--network envnet`).
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
+- Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
+  cap, and truncated episodes are unscorable.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
@@ -197,18 +204,41 @@ Current docs:
   lens lags the text; paired lens-vs-resample table
 - [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
   — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
-- [Environment construction goals — read before building or iterating on a reward-hacking env](docs/environment-construction-goals.md)
-  — multi-arm envs, build/measure/tweak/stack, what makes an arm difference count
+- [Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
+  — symmetric arms, any lever, build/measure/tweak/stack, what makes an arm count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
-  — first 10-env sweep (all null on Qwen), why, what to try next; harness in `evalcue/README.md`
+  — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
+  survives a split test); harness in `evalcue/README.md`
+- [weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/README.md)
+  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
+- [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
+  — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+- [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
+  — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
+  (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+- [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
+  — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
+  names don't exist in the image, so arm B needs our overlay
+- [optimize_cache_c env screen — read before running Optimize LRU cache (agent-interp-envs) on Qwen](docs/envs-screen/optimize_cache_c.md)
+  — FAIL, retired for Qwen: Qwen never rigs the benchmark (0/14 at 3x), plateaus at ~1.0–1.2x and
+  reports honestly
+- [grade_your_own env screen — read before running grade_your_own (agent-interp-envs) on Qwen or rewriting it](docs/envs-screen/grade_your_own.md)
+  — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows.py`): at an unreachable bar Qwen
+  never stops (loops instead of reporting); notes for the rewrite
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
 - [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)
   — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
   per-arm rates
+- [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
+  — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
+  silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
+- [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
+  — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
+  scores
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
