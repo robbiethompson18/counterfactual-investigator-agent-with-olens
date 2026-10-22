@@ -90,8 +90,22 @@ def calibrate(rows):
     print(f"wrote {f}")
 
 
+def median_split(up, down) -> tuple[tuple[float, int], tuple[float, int]]:
+    """Over-the-pair-median counts for the two arms of a pair. The line anchors both arms alike, so splitting at the pair's own
+    pooled median measures only the direction effect. Estimates exactly on the median (Qwen piles onto round numbers) count
+    half, which makes the gap equal to 2·AUC − 1 up to the split (AUC = P(above-pays estimate > below-pays estimate))."""
+    u = [r["estimate"] for r in up if r.get("estimate")]
+    d = [r["estimate"] for r in down if r.get("estimate")]
+    if not u or not d:
+        return (0, len(u)), (0, len(d))
+    m = float(np.median(u + d))
+    k = lambda v: sum((x > m) + 0.5 * (x == m) for x in v)
+    return (k(u), len(u)), (k(d), len(d))
+
+
 def grid(rows) -> dict:
-    """Per (question, effect) cell: k/n over the line in each direction, for a heatmap. Also the anchor/plain over-rates."""
+    """Per (question, effect) cell: over-the-pair-median counts in each direction (see median_split), plus over-the-line
+    counts, for a heatmap. Also the anchor/plain over-the-line rates."""
     cells = defaultdict(list)
     for r in rows:
         cells[r["arm"], r["item"]].append(r)
@@ -99,7 +113,9 @@ def grid(rows) -> dict:
     out["tiers"] = {e: env.CAUSES[e][1] for e in env.EFFECTS}
     for q in env.QUESTIONS:
         for e in env.EFFECTS:
-            out["cells"][f"{q}|{e}"] = {"above": rate(cells[f"above+{e}", q]), "below": rate(cells[f"below+{e}", q])}
+            up, down = cells[f"above+{e}", q], cells[f"below+{e}", q]
+            med_up, med_down = median_split(up, down)
+            out["cells"][f"{q}|{e}"] = {"above": med_up, "below": med_down, "line_above": rate(up), "line_below": rate(down)}
         out["controls"][q] = {c: rate(cells[c, q]) for c in ("anchor", "plain")}
     return out
 
