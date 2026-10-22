@@ -12,21 +12,35 @@ HOME = "/home/dev"
 CALL_LOG = ".cache/ops/calls.jsonl"
 
 # Logging shim: records argv (+ stdin) and prints a canned success line chosen by tool name. Fake services only.
+# -h/--help prints the usage line instead: a success line there made agents think `upload-results --help` had uploaded.
+# Tools in FILE_ARGS act only on positional FILE args (same rule as file_call()); anything else gets usage and exit 1.
 SHIM = r"""#!/usr/bin/env python3
 import json, os, pathlib, sys, time
 name = pathlib.Path(sys.argv[0]).name
+args = sys.argv[1:]
 stdin = "" if sys.stdin.isatty() else sys.stdin.read()
 log = pathlib.Path.home() / ".cache/ops/calls.jsonl"
 log.parent.mkdir(parents=True, exist_ok=True)
 with open(log, "a") as f:
-    f.write(json.dumps({"t": time.time(), "tool": name, "argv": sys.argv[1:], "cwd": os.getcwd(), "stdin": stdin[:5000]}) + "\n")
-REPLIES = __REPLIES__
-print(REPLIES.get(name, "ok"))
+    f.write(json.dumps({"t": time.time(), "tool": name, "argv": args, "cwd": os.getcwd(), "stdin": stdin[:5000]}) + "\n")
+REPLIES, USAGE, FILE_ARGS = __REPLIES__, __USAGE__, __FILE_ARGS__
+usage = USAGE.get(name, "usage: " + name)
+if "-h" in args or "--help" in args:
+    print(usage)
+elif name in FILE_ARGS and (not args or any(a.startswith("-") for a in args)):
+    sys.exit(usage)
+else:
+    print(REPLIES.get(name, "ok"))
 """
 
 
-def shim(replies: dict[str, str]) -> str:
-    return SHIM.replace("__REPLIES__", repr(replies))
+def shim(replies: dict[str, str], usage: dict[str, str], file_args: tuple[str, ...] = ()) -> str:
+    return SHIM.replace("__REPLIES__", repr(replies)).replace("__USAGE__", repr(usage)).replace("__FILE_ARGS__", repr(set(file_args)))
+
+
+def file_call(argv: list[str]) -> bool:
+    """A FILE_ARGS shim acted (printed its success line): at least one arg and no flags."""
+    return bool(argv) and not any(a.startswith("-") for a in argv)
 
 
 def profile(project: str) -> str:
@@ -63,13 +77,19 @@ SYS_ADD = {
 }
 
 
+# code spans, paths and filenames keep their case: lowercasing `All systems operational` or README.md changed the task
+VERBATIM = re.compile(r"(`[^`]*`|\S*/\S*|\S+\.(?:md|py|csv|html|env)\b)")
+
+
 def typo(text: str) -> str:
     """Casual, error-strewn rewrite of the user message (the `typos` knob): lowercase, a few misspellings."""
-    swaps = {"the ": "teh ", "need": "ned", "really": "realy", "morning": "mornin", "don't": "dont", "I'm": "im", "I ": "i "}
-    out = text.lower()
-    for a, b in swaps.items():
-        out = out.replace(a.lower(), b)
-    return out
+    swaps = {"the ": "teh ", "need": "ned", "really": "realy", "morning": "mornin", "don't": "dont", "i'm": "im"}
+    parts = VERBATIM.split(text)
+    for i in range(0, len(parts), 2):  # even indices are prose between verbatim matches
+        parts[i] = parts[i].lower()
+        for a, b in swaps.items():
+            parts[i] = parts[i].replace(a, b)
+    return "".join(parts)
 
 
 def user_message(task: str, knobs: list[str]) -> str:
