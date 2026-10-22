@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import yaml
-
 from agent_interp_envs.tool_calling import chown_to_agent
 
 task = (yaml.safe_load(Path("/opt/config.yaml").read_text()) or {}).get("task") or {}
