@@ -13,7 +13,7 @@ import json
 import random
 from dataclasses import dataclass
 
-OLENS_CONDITIONS = ("olens", "olens_placebo", "olens_edit", "olens_edit_placebo")  # cfbench/olens.py
+OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 10  # agentic: read/search calls before the predictor must submit
@@ -26,19 +26,34 @@ class Rollout:
     label: bool  # showed the behavior
 
 
-def render(messages: list[dict]) -> str:
-    parts = []
-    for m in messages:
+def render_spans(messages: list[dict]) -> tuple[str, dict[tuple[int, str], int]]:
+    """render() plus where each message field sits in it: (message index, field) -> b such that the field's raw character c
+    is at text[b + c] ("tool_call" -> the start of that message's first tool call line)."""
+    parts, spans, at = [], {}, 0
+
+    def add(header: str, key: tuple[int, str], raw: str | None = None):
+        nonlocal at
+        spans[key] = at + len(header) - (len(raw) - len(raw.lstrip()) if raw is not None else 0)
+        parts.append(header + (raw.strip() if raw is not None else ""))
+        at += len(parts[-1]) + 2  # the "\n\n" join
+
+    for i, m in enumerate(messages):
         if m["role"] == "assistant":
             if m.get("reasoning_content"):
-                parts.append(f"ASSISTANT REASONING (private):\n{m['reasoning_content'].strip()}")
+                add("ASSISTANT REASONING (private):\n", (i, "reasoning_content"), m["reasoning_content"])
             if m.get("content"):
-                parts.append(f"ASSISTANT (visible):\n{m['content'].strip()}")
-            for call in m.get("tool_calls") or []:
-                parts.append(f"ASSISTANT TOOL CALL {call['function']['name']}: {call['function']['arguments']}")
+                add("ASSISTANT (visible):\n", (i, "content"), m["content"])
+            for j, call in enumerate(m.get("tool_calls") or []):
+                add(f"ASSISTANT TOOL CALL {call['function']['name']}: {call['function']['arguments']}", (i, f"tool_call{j or ''}"))
+        elif isinstance(m["content"], str):
+            add(f"{m['role'].upper()}:\n", (i, "content"), m["content"])
         else:
-            parts.append(f"{m['role'].upper()}:\n{m['content'].strip() if isinstance(m['content'], str) else json.dumps(m['content'])}")
-    return "\n\n".join(parts)
+            add(f"{m['role'].upper()}:\n{json.dumps(m['content'])}", (i, "content"))
+    return "\n\n".join(parts), spans
+
+
+def render(messages: list[dict]) -> str:
+    return render_spans(messages)[0]
 
 
 def initial_context(messages: list[dict]) -> list[dict]:
@@ -54,13 +69,14 @@ def initial_context(messages: list[dict]) -> list[dict]:
 
 OLENS = """
 
-{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `read_olens` (one run's \
-reads, paged) and `search_olens` (a regex over every read). The O-lens is a model trained to describe another model's \
-internal activations in words. It was run on the target model's activations at punctuation tokens and turn ends, \
-everywhere in the run (system prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short \
-bullets about what the model is representing at that point, at one layer, with each bullet's FVE (fraction of the \
-activation's variance it explains; higher is more trustworthy). Reads can show what the model registers but never says. \
-They also hallucinate, especially low-FVE bullets, and often just paraphrase the nearby text."""
+{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `olens_at` (the reads \
+at a span you quote from a transcript) and `search_olens` (a regex over every read's bullets). The O-lens is a model \
+trained to describe another model's internal activations in words. It was run on the target model's activations at \
+punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, tool outputs, its reasoning and \
+replies). Each read is a few short bullets about what the model is representing at that point, at one layer, with each \
+bullet's FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can show what the \
+model registers but never says. They also hallucinate, especially low-FVE bullets, and often just paraphrase the nearby \
+text."""
 
 
 def unified_diff(before: str, after: str) -> str:
@@ -94,10 +110,8 @@ def build_prompt(
     cf_arm: str,
     condition: str,
     read: set[int] | None = None,
-    olens_edit=None,
 ) -> str:
-    """For the olens conditions: `read` = ids of base runs with O-lens reads; `olens_edit(edit) -> str` = section with the
-    reads at the edited lines (olens_edit conditions), built from the edit this prompt shows."""
+    """`read`: ids of base runs with O-lens reads, for the olens conditions."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -125,8 +139,6 @@ every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must su
 Spend them on whatever helps you predict the counterfactual arm.
 
 {run_index(base, None if condition == "agentic" else read)}"""
-        if olens_edit:
-            evidence += "\n\n" + olens_edit(edit)
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
