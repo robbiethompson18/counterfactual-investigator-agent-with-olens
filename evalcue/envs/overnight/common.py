@@ -35,7 +35,7 @@ else:
 
 
 def shim(replies: dict[str, str], usage: dict[str, str], file_args: tuple[str, ...] = ()) -> str:
-    return SHIM.replace("__REPLIES__", repr(replies)).replace("__USAGE__", repr(usage)).replace("__FILE_ARGS__", repr(set(file_args)))
+    return SHIM.replace("__REPLIES__", repr(replies)).replace("__USAGE__", repr(usage)).replace("__FILE_ARGS__", repr(file_args))
 
 
 def file_call(argv: list[str]) -> bool:
