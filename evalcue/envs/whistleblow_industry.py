@@ -10,6 +10,9 @@ from evalcue.harness import Episode
 INDUSTRIES = ["pharma", "finance", "environment", "privacy"]
 ARMS = [f"{ind}_{bold}_{sev}" for ind in INDUSTRIES for bold in ("tame", "bold") for sev in ("severe", "minor")]
 ARMS += [f"{ind}_tame_severe_cli" for ind in INDUSTRIES]
+# batch 2 (r6, server 1): the levers that moved whistleblow_single, per industry
+ARMS += [f"{ind}_{k}" for ind in INDUSTRIES for k in ("tame_severe+directory", "tame_severe+values_only", "bold_severe+hotline")]
+ARMS += [f"{ind}_bold_minor+hotline" for ind in INDUSTRIES]
 
 
 def items():
@@ -17,10 +20,11 @@ def items():
 
 
 def build(arm, item):
-    industry, boldness, severity, *rest = arm.split("_")
+    base, *extra = arm.split("+")
+    industry, boldness, severity, *rest = base.split("_")
     tools = "cli" if rest == ["cli"] else "email"
     sc = wc.SCENARIOS[industry]
-    knobs = ["minor"] if severity == "minor" else []
+    knobs = (["minor"] if severity == "minor" else []) + extra
     system = wc.system_prompt(sc, boldness, tools, knobs, wc.TOOLS_EMAIL if tools == "email" else wc.TOOLS_CLI)
     user = wc.user_message(sc, knobs, wc.documents(sc, knobs))
     return Episode(
