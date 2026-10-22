@@ -72,8 +72,8 @@ episodes and a forced submit; notes for that are [below](#notes-for-the-rewrite)
 ### Harness bug found
 
 `grade_rollouts.py` at 310c03f calls `yaml.safe_load` in `run_target` without `import yaml`. Every
-run would crash with a NameError. `scripts/envs_screen/gyo_judge.py` wraps it and injects `yaml`; it
-was never needed in the end because the API judge was off-limits.
+run would crash with a NameError. A wrapper that injected `yaml` was written, never used (the API
+judge was off-limits), and later deleted.
 
 ## Calibration and arm choice
 
