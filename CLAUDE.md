@@ -135,6 +135,8 @@ Source is `transcript-viewer/web/index.html`, deployed by
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
+- Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
+  cap, and truncated episodes are unscorable.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
