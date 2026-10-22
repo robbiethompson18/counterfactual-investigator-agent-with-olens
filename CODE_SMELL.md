@@ -45,16 +45,18 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   The harness's step dirs are root-owned (Docker), so `sudo chown -R ubuntu` before uploading. Their
   `config.yaml` says `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls
   elsewhere, so don't trust it for which server answered.
-- Robbie's Mac `data/runs/`: `cfbench`, `evalcue`, `identity`, `stoptokens` and `vardania_sneeze`
-  are local-only, and about 12 loose `*.log`/`*.txt` files sit at the root. `vardania_sneeze/` holds
-  `.py` scripts that belong in git.
+- Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` is fully on HF and `cfbench` nearly (7
+  files local-only). `evalcue` has 133 of 135 files local-only; `stoptokens` and `vardania_sneeze`
+  are not on HF at all. Of the 13 loose `*.log`/`*.txt` files at the root, 4 are local-only
+  (`dev96_yesno_haiku55_retry{1,2}.log`, `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py`
+  scripts that belong in git.
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
 
 ## 2026-10-21: main doesn't pass its own `ty` check
 
-`uv run ty check` reports 247 errors: 80 unresolved imports (torch, transformers, vllm, `server`,
-`olens.lens`) in GPU-only scripts whose deps live only in the pod venvs, and 152 in
+`uv run ty check` reports 286 diagnostics (2026-10-22): 98 unresolved imports (torch, transformers,
+vllm, `server`, `olens.*`) in GPU-only scripts whose deps live only in the pod venvs, and 152 in
 `transcript-viewer/web/server.py`, mostly untyped JSON dicts. Check only the files you touched until
 someone excludes the pod-only modules and types `server.py`.
 
