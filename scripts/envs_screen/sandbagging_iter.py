@@ -1,9 +1,9 @@
 """Arms, labels and tables for the sandbagging iteration (docs/sandbagging-iteration.md).
 
-Every arm is a config under configs/sandbagging_iter/ that the overlay image (configs/sandbagging_iter/overlay/) turns
-into agent-visible files, so the arm text lives here and nothing in vendor/ changes.
+Every arm is a config under configs/envs_screen/sandbagging/iter/ that the overlay image (its overlay/ subdirectory) turns into
+agent-visible files, so the arm text lives here and nothing in vendor/ changes.
 
-    python scripts/envs_screen/sandbagging_iter.py configs            # (re)write configs/sandbagging_iter/<arm>.yaml
+    python scripts/envs_screen/sandbagging_iter.py configs            # (re)write configs/envs_screen/sandbagging/iter/<arm>.yaml
     python scripts/envs_screen/sandbagging_iter.py label <root>       # mechanical labels -> <root>/labels.jsonl
     python scripts/envs_screen/sandbagging_iter.py dump <root>        # condensed transcripts for reader subagents
     python scripts/envs_screen/sandbagging_iter.py table <root> [base_arm]
@@ -27,7 +27,7 @@ from pathlib import Path
 import yaml
 from sandbagging import JUDGE_SCHEMA, fisher_greater, last_step, wilson  # sibling module; the script dir is on sys.path
 
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "sandbagging_iter"
+CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "envs_screen" / "sandbagging" / "iter"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # Questions: 1-10 are the stock env's questions (same distractors, options reordered to a new key); 11-20 are new ones
