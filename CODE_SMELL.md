@@ -96,12 +96,3 @@ someone excludes the pod-only modules and types `server.py`.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
   `docs/eval-cue-reward-hacking.md`.
-
-## 2026-10-19: `scripts/run_chive_or.py` monkeypatches Agam's harness
-
-It loads `vendor/detective-joracle/scripts/run_chive.py` and overwrites module globals in it and in
-`detective_joracle.chive.judge` / `.executor` (`client`, `json_call`, `AGENT_MODEL`, ...). Since
-2026-10-22 it asserts each patched name exists and that no loaded `detective_joracle` module still
-holds the original `llm.client` / `llm.json_call`, so a rename or a new by-value import at module
-level fails loudly. A by-value import inside a function body (or a new module imported lazily) would
-still slip through and go to Anthropic. The clean fix is a backend/judge-client option upstream.

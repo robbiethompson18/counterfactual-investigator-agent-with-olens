@@ -14,14 +14,14 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from detective_joracle.chive.data import load_incidents
+from chive_data import load_incidents  # sibling module; the script dir is on sys.path
 
 TRAJ_URL = "https://safety-sahan-2-agam--chive-cases-web.modal.run/data/v2/climb_test/traj"
 ARMS = ("transcript", "olens_rl_B")
 DATA, OUT = Path("data/viewer"), Path("data/viewer/site")
 
 cmp = {i["prompt_id"]: i for i in json.loads((DATA / "cmp_climb_test.json").read_text())["incidents"]}
-hard92 = set(Path("vendor/detective-joracle/data/chive/splits/hard92.txt").read_text().split())
+hard92 = set(Path("splits/hard92.txt").read_text().split())
 kinds = dict(line.split("\t") for line in Path("viewer/behavior_kind.tsv").read_text().splitlines() if not line.startswith("#"))
 incs = load_incidents(list(cmp))
 
@@ -54,24 +54,24 @@ def draws(pid: str, arm: str) -> list[dict]:
 
 cases: list[dict[str, Any]] = []
 for pid in cmp:
-    inc, gt = incs[pid], incs[pid].ground_truth
+    inc, gt = incs[pid], incs[pid]["ground_truth"]
     cases.append(
         {
             "pid": pid,
             "kind": kinds[pid],
-            "n_prior": sum(m["role"] == "assistant" for m in inc.messages),
+            "n_prior": sum(m["role"] == "assistant" for m in inc["messages"]),
             "t": passes(pid, "transcript"),
             "o": passes(pid, "olens_rl_B"),
-            "title": inc.behaviour,
-            "k": inc.k,
-            "n": inc.n,
-            "messages": inc.messages,
-            "completion": inc.completion,
+            "title": inc["behaviour"],
+            "k": inc["k"],
+            "n": inc["n"],
+            "messages": inc["messages"],
+            "completion": inc["completion"],
             "observed": gt.get("observed"),
             "targets": gt["targets"],
             "ruled_out": gt["ruled_out"],
             "experiments": [{k: x.get(k) for k in ("summary", "rate", "baseline_rate", "is_key")} for x in gt["experiments"]],
-            "n_tokens": inc.n_tokens,
+            "n_tokens": len(inc["token_ids"]),
             "hard92": pid in hard92,
             "arms": {arm: draws(pid, arm) for arm in ARMS},
         }

@@ -1,5 +1,5 @@
 """Download Agam's OLens readout banks from his CHIVE cases viewer into the layout
-detective-joracle's readers expect: <out>/<prompt_id>.json.gz with token_ids, k and
+Agam's harness (vendor/detective-joracle, reference-only) reads: <out>/<prompt_id>.json.gz with token_ids, k and
 readouts[layer][pos] -> [samples].
 
 The viewer serves one file per (incident, layer): a list indexed by token position, each entry the
@@ -14,15 +14,15 @@ import sys
 from pathlib import Path
 
 import requests
-from detective_joracle.chive.data import load_incidents, read_ids
+from chive_data import load_incidents  # sibling module; the script dir is on sys.path
 
 VIEWER = "https://safety-sahan-2-agam--chive-cases-web.modal.run/data/r"
 LAYERS = range(20, 61, 4)
 
 ids_file, out = Path(sys.argv[1]), Path(sys.argv[2])
 out.mkdir(parents=True, exist_ok=True)
-ids = read_ids(ids_file)
-token_ids = {pid: inc.token_ids for pid, inc in load_incidents(ids).items()}
+ids = ids_file.read_text().split()
+token_ids = {pid: inc["token_ids"] for pid, inc in load_incidents(ids).items()}
 
 for pid in ids:
     dest = out / f"{pid}.json.gz"

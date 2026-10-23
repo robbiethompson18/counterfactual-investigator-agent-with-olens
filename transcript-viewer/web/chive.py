@@ -18,7 +18,7 @@ from huggingface_hub import hf_hub_download
 ROOT = Path(__file__).resolve().parent.parent
 REPO = ROOT.parent
 HF_REPO = "agu18dec/chive-forensics"
-SPLITS = REPO / "vendor/detective-joracle/data/chive/splits"
+SPLITS = REPO / "splits"  # copied from Agam's harness (agu18dec/detective-joracle, data/chive/splits/)
 CMP = REPO / "data/viewer/cmp_climb_test.json"  # Agam's frozen climb_test run (scripts/build_viewer.py)
 BANKS = REPO / "data/banks/agam"  # <pid>/<reader>_L{L}.json.gz, each a list indexed by token position
 JUDGE = ROOT / "data/chive_judge.jsonl"  # scripts/chive_judge.py: does the shown completion show the behaviour?

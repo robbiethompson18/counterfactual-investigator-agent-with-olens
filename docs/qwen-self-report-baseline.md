@@ -21,7 +21,10 @@ the task.
   provider with logprobs), `reasoning.enabled: false`. Alibaba doesn't publish its precision, so
   outputs may differ slightly from the bf16 weights that produced the rollouts.
 - Script: `scripts/qwen_selfreport.py` (`sample`, `judge`, `report` stages), outputs in
-  `data/runs/qwen_selfreport/` (gitignored).
+  `data/runs/qwen_selfreport/` (gitignored). It imported Agam's harness (judge rubric, claims,
+  loader), so it was removed when the harness stopped being importable; the last version is at
+  commit
+  [`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/a1e8991/scripts/qwen_selfreport.py).
 
 ## Results (96 incidents, 0 judge refusals)
 

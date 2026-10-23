@@ -104,7 +104,7 @@ def cid(r):
 
 
 def judge():
-    """Through OpenRouter (anthropic/claude-sonnet-5.5), as scripts/run_chive_or.py does: the Anthropic key
+    """Through OpenRouter (anthropic/claude-sonnet-5.5), as scripts/run_chive_or.py did (removed after a1e8991): the Anthropic key
     had no credit on 2026-10-21. Appends to judge_raw.jsonl and skips calls already there, so reruns resume."""
     src = {r["prompt_id"]: r for r in load(SOURCE)}
     raw_path = OUT / "judge_raw.jsonl"

@@ -1,7 +1,10 @@
 # Whitebox tools beyond the O-lens
 
 Neel asked us to add other whitebox methods (SAEs, J-lens / J++, NLAs, SNLAs) to the investigator
-agent. Status as of 2026-10-20.
+agent. Status as of 2026-10-20. "The agent" below means Agam's harness, which we stopped running
+after commit
+[`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991)
+(`vendor/` is reference-only now); new agent tools go into `cfbench/tools.py`.
 
 | Method            | In the viewer                                    | In the agent                                                  |
 | ----------------- | ------------------------------------------------ | ------------------------------------------------------------- |
@@ -49,5 +52,6 @@ H200; the engineering is the real cost.
   AUROC, because generic dense features dominate): drop features that fire on > 1% of corpus or >
   30% of the transcript's tokens, rank by activation / feature max, show value and density, and add
   `sae_find(query)` (label search) and `sae_feature(id)`.
-- Plugs into Agam's harness as a new reader kind (`readers.KINDS`, `readers.DESCRIBE`,
-  `tools.WINDOW`), monkeypatched from `scripts/run_chive_or.py`.
+- Planned to plug into Agam's harness as a new reader kind (`readers.KINDS`, `readers.DESCRIBE`,
+  `tools.WINDOW`), monkeypatched from `scripts/run_chive_or.py` (harness unused and script removed
+  after `a1e8991`).
