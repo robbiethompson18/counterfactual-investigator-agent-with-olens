@@ -2,7 +2,7 @@
 run's atoms/ (scripts/olens_residual_reads.py save_atoms, joined to its reads.jsonl for text and env labels) or
 scripts/olens_atoms.py's (which carry their own text).
 
-    uv run python scripts/olens_novelty.py RUN_DIR [--draws 3] [--prefixes 1,2,4,8,16,32]
+    uv run python scripts/olens_novelty.py RUN_DIR [--draws 3] [--prefixes 1,2,4,8,16,32] [--transcript --sample 10] [--workers 8]
 
 Per (transcript, position, layer): cont, lens, joint, gain (olens.novelty), two nulls (the gain from the bullets read
 at another position of the same transcript, >= 64 tokens away where possible, or of another transcript; mean of
@@ -19,8 +19,10 @@ and lowest positions with their bullets) and prints a summary per layer and role
 
 import argparse
 import json
+import multiprocessing
 import random
 import re
+import zlib
 from collections import defaultdict
 from pathlib import Path
 
@@ -70,55 +72,70 @@ def info(a, rows, i, L):
     }  # fmt: skip
 
 
+FILES, ROWS, ARGS = {}, {}, None  # set before the worker pool forks, so workers share them copy-on-write
+
+
 def main():
+    global FILES, ROWS, ARGS
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path)
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--extremes", type=int, default=20)
     ap.add_argument("--prefixes", help="comma-separated prefix lengths to keep (default: all stored)")
     ap.add_argument("--transcript", action="store_true", help="base = continuation + every 32-token chunk of the transcript")
-    args = ap.parse_args()
-    rng = random.Random(0)
-    files, rows = load(args.run)
-    out = []
-    for tid, a in files.items():
-        lengths = a.get("prefix_lengths", list(range(1, a["cont"][a["layers"][0]].shape[1] + 1)))
-        keep = [lengths.index(k) for k in map(int, args.prefixes.split(","))] if args.prefixes else list(range(len(lengths)))
-        for L in a["layers"]:
-            ok = [i for i, b in enumerate(a["plain_atoms"][L]) if len(b)]
-            if not ok:
-                continue
-            z, C, B = a["z"][L][ok].float(), a["cont"][L][ok][:, keep].float(), [a["plain_atoms"][L][i] for i in ok]
-            if args.transcript:  # the same chunk atoms (olens_atoms.py) join every position's base set
-                T = a["chunks"][L].float()
-                C = torch.cat([C, T.expand(len(ok), *T.shape)], 1)
-            s = scores(z, C, B)
-            nulls = {}
-            for name in ("null_same", "null_other"):
-                draws = []
-                for _ in range(args.draws):
-                    draws.append(null_gain(z, C, s["cont"], [draw(rng, files, tid, L, i, name == "null_same") for i in ok]))
-                nulls[name] = torch.stack(draws).mean(0)
-            c = 0
-            for j, i in enumerate(ok):
-                m = info(a, rows, i, L)
-                ctx = m["prefix"] + m["continuation"]
-                bl = [{"text": t, "n_b": round(float(s["n_b"][c + q]), 4), "solo": round(float(s["solo"][c + q]), 4),
-                       "overlap": round(overlap(t, ctx), 3)} for q, t in enumerate(a["plain_bullets"][L][i])]  # fmt: skip
-                c += len(bl)
-                out.append({"id": tid, **m, "layer": L, **{k: round(float(s[k][j]), 4) for k in ("cont", "lens", "joint", "gain")},
-                            **{k: round(float(v[j]), 4) for k, v in nulls.items()},
-                            "novelty": round(float(s["gain"][j] - nulls["null_other"][j]), 4),
-                            "bullets": sorted(bl, key=lambda b: -b["n_b"])})  # fmt: skip
-    tag = "_transcript" if args.transcript else ""
-    with open(args.run / f"novelty{tag}.jsonl", "w") as f:
+    ap.add_argument("--sample", type=int, help="score only this many positions per transcript, evenly spaced")
+    ap.add_argument("--workers", type=int, default=1)
+    ARGS = ap.parse_args()
+    FILES, ROWS = load(ARGS.run)
+    if ARGS.workers > 1:
+        with multiprocessing.get_context("fork").Pool(ARGS.workers) as pool:
+            parts = pool.map(score_transcript, list(FILES), chunksize=1)
+    else:
+        parts = [score_transcript(t) for t in FILES]
+    out = [r for part in parts for r in part]
+    tag = "_transcript" if ARGS.transcript else ""
+    with open(ARGS.run / f"novelty{tag}.jsonl", "w") as f:
         f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in out)
     summarize(out)
-    extremes(out, args.run / f"novelty{tag}_extremes.md", args.extremes)
+    extremes(out, ARGS.run / f"novelty{tag}_extremes.md", ARGS.extremes)
 
 
-def draw(rng, files, tid, L, i, same):
+def score_transcript(tid):
+    a, args = FILES[tid], ARGS
+    rng = random.Random(zlib.crc32(tid.encode()))  # per transcript, so results don't depend on worker scheduling
+    lengths = a.get("prefix_lengths", list(range(1, a["cont"][a["layers"][0]].shape[1] + 1)))
+    keep = [lengths.index(k) for k in map(int, args.prefixes.split(","))] if args.prefixes else list(range(len(lengths)))
+    out = []
+    for L in a["layers"]:
+        ok = [i for i, b in enumerate(a["plain_atoms"][L]) if len(b)]
+        if args.sample and len(ok) > args.sample:
+            ok = [ok[j] for j in sorted(set(np.linspace(0, len(ok) - 1, args.sample).round().astype(int)))]
+        if not ok:
+            continue
+        z, C, B = a["z"][L][ok].float(), a["cont"][L][ok][:, keep].float(), [a["plain_atoms"][L][i] for i in ok]
+        T = a["chunks"][L].float() if args.transcript else None  # olens_atoms.py's chunk atoms, shared by every position
+        s = scores(z, C, B, T)
+        nulls = {}
+        for name in ("null_same", "null_other"):
+            draws = [null_gain(z, C, s["cont"], [draw(rng, tid, L, i, name == "null_same") for i in ok], T) for _ in range(args.draws)]
+            nulls[name] = torch.stack(draws).mean(0)
+        c = 0
+        for j, i in enumerate(ok):
+            m = info(a, ROWS, i, L)
+            ctx = m["prefix"] + m["continuation"]
+            bl = [{"text": t, "n_b": round(float(s["n_b"][c + q]), 4), "solo": round(float(s["solo"][c + q]), 4),
+                   "overlap": round(overlap(t, ctx), 3)} for q, t in enumerate(a["plain_bullets"][L][i])]  # fmt: skip
+            c += len(bl)
+            out.append({"id": tid, **m, "layer": L, **{k: round(float(s[k][j]), 4) for k in ("cont", "lens", "joint", "gain")},
+                        **{k: round(float(v[j]), 4) for k, v in nulls.items()},
+                        "novelty": round(float(s["gain"][j] - nulls["null_other"][j]), 4),
+                        "bullets": sorted(bl, key=lambda b: -b["n_b"])})  # fmt: skip
+    return out
+
+
+def draw(rng, tid, L, i, same):
     """Bullet atoms read elsewhere: same transcript (>= 64 tokens away when possible) or a random other transcript."""
+    files = FILES
     if same:
         a = files[tid]
         ps, B = a["positions"], a["plain_atoms"][L]

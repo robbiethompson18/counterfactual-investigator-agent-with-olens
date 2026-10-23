@@ -3,46 +3,65 @@
 Per position, with z the whitened activation, C its continuation atoms (olens.continuation: AR of prefixes of the next
 tokens) and B the read's bullet atoms (AR of bullet_prefix + bullet), all NNLS in the pooled whitened space:
 
-    cont  = FVE(z; C)             what the visible upcoming text explains
-    lens  = FVE(z; B)             the read's ordinary joint FVE
-    gain  = FVE(z; C ∪ B) − cont  what the read adds beyond the continuation
-    n_b   = FVE(z; C ∪ {b}) − cont, per bullet
+    cont  = FVE(z; C ∪ T)             what the visible text explains
+    lens  = FVE(z; B)                 the read's ordinary joint FVE
+    gain  = FVE(z; C ∪ T ∪ B) − cont  what the read adds beyond it
+    n_b   = FVE(z; C ∪ T ∪ {b}) − cont, per bullet
 
-Adding atoms never lowers an NNLS fit, so gain is only meaningful against a null: the same gain with B swapped for
-bullets read somewhere else (null_gain). C can be any base set, e.g. the continuation plus AR atoms of every 32-token
-chunk of the transcript ("is this anywhere in the transcript?").
+T is optional and shared by every position of a transcript: AR atoms of every 32-token chunk of it, so the question
+becomes "is this anywhere in the transcript?" rather than "is it in the next 32 tokens?". Adding atoms never lowers an
+NNLS fit, so gain is only meaningful against a null: the same gain with B swapped for bullets read somewhere else
+(null_gain).
 """
 
+import numpy as np
 import torch
-
-from .continuation import nnls
-
-
-def fve(z, D):
-    return nnls(z, D)[2]
+from scipy.optimize import nnls
 
 
-def stack(atoms, d):
-    """P lists of [k_i, d] -> [P, max k, d], zero rows as padding (NNLS ignores them)."""
-    out = torch.zeros(len(atoms), max(1, max(len(a) for a in atoms)), d)
-    for i, a in enumerate(atoms):
-        out[i, : len(a)] = a.float()
-    return out
+def fve1(z, D):
+    """FVE of one z [d] on atoms D [k, d] (float64 numpy), all-zero rows dropped. Plain NNLS on D.T, or on R with
+    Q.T z after a thin QR of D.T when k > 64 (same optimum, half the time at k ~ 500; residual² = |z|² − |Q.T z|² + the
+    reduced residual²). Not a Gram-form solve: on near-collinear atoms (a 1-token continuation, repeated bullets) that
+    returned ~1e18 coefficients."""
+    D = D[np.abs(D).sum(1) > 0]
+    zz = float(z @ z)
+    if not len(D):
+        return 0.0
+    if len(D) <= 64:
+        return 1.0 - nnls(D.T, z)[1] ** 2 / zz
+    Q, R = np.linalg.qr(D.T)
+    y = Q.T @ z
+    return 1.0 - (max(zz - float(y @ y), 0.0) + nnls(R, y)[1] ** 2) / zz
 
 
-def scores(z, C, B):
-    """z [P, d], C [P, n, d], B: P tensors [k_i, d] (k_i >= 1). -> {cont, lens, joint, gain: [P]; n_b, solo: [sum k_i]
-    in B's order}."""
-    z, C = z.float(), C.float()
-    Bp = stack(B, z.shape[1])
-    cont, lens, joint = fve(z, C), fve(z, Bp), fve(z, torch.cat([C, Bp], 1))
-    owner = torch.tensor([i for i, b in enumerate(B) for _ in range(len(b))])
-    flat = torch.cat([b.float() for b in B])[:, None]
-    n_b = fve(z[owner], torch.cat([C[owner], flat], 1)) - cont[owner]
-    return {"cont": cont, "lens": lens, "joint": joint, "gain": joint - cont, "n_b": n_b, "solo": fve(z[owner], flat)}
+def _np(x, d):
+    return x.double().numpy().reshape(-1, d) if isinstance(x, torch.Tensor) else np.zeros((0, d))
 
 
-def null_gain(z, C, cont, B_null):
+def scores(z, C, B, T=None):
+    """z [P, d], C [P, n, d], B: P tensors [k_i, d] (k_i >= 1), T [m, d] or None. -> {cont, lens, joint, gain: [P];
+    n_b, solo: [sum k_i] in B's order}. Rows are built one at a time, so a large T is never copied P times."""
+    d = z.shape[1]
+    z, T = z.double().numpy(), _np(T, d)
+    out = {k: [] for k in ("cont", "lens", "joint", "n_b", "solo")}
+    for i, b in enumerate(B):
+        b, base = _np(b, d), np.concatenate([_np(C[i], d), T])
+        cont = fve1(z[i], base)
+        out["cont"].append(cont)
+        out["lens"].append(fve1(z[i], b))
+        out["joint"].append(fve1(z[i], np.concatenate([base, b])))
+        for bb in b:
+            out["n_b"].append(fve1(z[i], np.concatenate([base, bb[None]])) - cont)
+            out["solo"].append(fve1(z[i], bb[None]))
+    s = {k: torch.tensor(v, dtype=torch.float32) for k, v in out.items()}
+    s["gain"] = s["joint"] - s["cont"]
+    return s
+
+
+def null_gain(z, C, cont, B_null, T=None):
     """gain with each position's bullets replaced by B_null (P tensors [k_i, d], may be empty)."""
-    z, C = z.float(), C.float()
-    return fve(z, torch.cat([C, stack(B_null, z.shape[1])], 1)) - cont
+    d = z.shape[1]
+    z, T = z.double().numpy(), _np(T, d)
+    g = [fve1(z[i], np.concatenate([_np(C[i], d), T, _np(b, d)])) - float(cont[i]) for i, b in enumerate(B_null)]
+    return torch.tensor(g, dtype=torch.float32)
