@@ -33,6 +33,9 @@ def _now():
 
 def instructions(ws: workspace.Workspace) -> str:
     text = agent.system_prompt(ws.kind)
+    brief = ws.ro / "round_brief.md"
+    if brief.exists():
+        text = "## This round\n\n" + brief.read_text().strip() + "\n\n" + text
     text = text.replace("/rw/child", str(ws.child)).replace("/ro/", f"{ws.ro}/").replace("/ro ", f"{ws.ro} ")
     return (
         f"# {ws.kind.capitalize()} job\n\n"

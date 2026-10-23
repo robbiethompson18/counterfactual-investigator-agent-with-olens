@@ -15,6 +15,7 @@ import json
 import os
 import random
 import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 from . import job_queue, pool, workspace
@@ -26,6 +27,7 @@ from .store import Store
 SURPRISE = "U"  # surprise score the Pool ranks on; U_rev (confident reversals) is still stored but not used
 SLOTS = 4  # job starts per epoch (front counters, top-up timing)
 P_CREATOR = 0.1
+P_REWRITE = 0.2  # share of mutations told to make a bigger rewrite (new scenario / task) instead of small edits
 N_EXAMPLES = 6
 AGENT_MAX_COST = 3.0
 BACKEND = "queue"  # "queue": agent jobs go to data/<run>/agent_jobs for an external manager; "api": Sonnet via OpenRouter
@@ -99,7 +101,17 @@ async def _finish(store: Store, ws, plan: dict, res: dict):
             node = _admit(store, ws, "c", parent=None, refs=plan["refs"], kind="creator", round=rnd, job=ws.root.name)
             (node.dir / "novelty.json").write_text(json.dumps(nov, indent=1) + "\n")
         else:
-            node = _admit(store, ws, "m", parent=plan["parent"], refs=plan["refs"], kind="child", round=rnd, job=ws.root.name)
+            node = _admit(
+                store,
+                ws,
+                "m",
+                parent=plan["parent"],
+                refs=plan["refs"],
+                kind="child",
+                round=rnd,
+                job=ws.root.name,
+                rewrite=bool(plan.get("rewrite")),
+            )
         keep_session(ws, node)
         store.event("node_added", node=node.id, kind=node.info["kind"], parent=plan.get("parent"), round=rnd, agent_cost=res["cost"])
         store.reindex()
@@ -114,11 +126,13 @@ async def _finish(store: Store, ws, plan: dict, res: dict):
             store.reindex()
 
 
-async def mutate(store: Store, ref, secs, rnd: int):
+async def mutate(store: Store, ref, secs, rnd: int, rewrite: bool = False):
     ref.update(ref_count=ref.info.get("ref_count", 0) + 1)
-    store.event("mutation_start", round=rnd, reference=ref.id, secondaries=[s.id for s in secs])
+    store.event("mutation_start", round=rnd, reference=ref.id, secondaries=[s.id for s in secs], rewrite=rewrite)
     ws = new_workspace(store, workspace.mutation, ref, secs)
-    plan = {"op": "mutation", "round": rnd, "parent": ref.id, "refs": [s.id for s in secs]}
+    if rewrite:  # the brief is shown to the agent at the top of its instructions (job_queue.instructions)
+        (ws.ro / "round_brief.md").write_text((Path(__file__).parent / "prompts" / "rewrite_round.md").read_text())
+    plan = {"op": "mutation", "round": rnd, "parent": ref.id, "refs": [s.id for s in secs], "rewrite": rewrite}
     _plan(ws, **plan)
     await _finish(store, ws, plan, await run_agent_job(ws))
 
@@ -197,7 +211,7 @@ class Scheduler:
         if self.rng.random() < P_CREATOR:
             return create(self.store, self.rng.sample(el, min(N_EXAMPLES, len(el))), j)
         ref, secs = pool.choose(nodes, ukey, self.rng)
-        return mutate(self.store, ref, secs, j)
+        return mutate(self.store, ref, secs, j, rewrite=self.rng.random() < P_REWRITE)
 
     async def _topup(self, node, j):
         try:
