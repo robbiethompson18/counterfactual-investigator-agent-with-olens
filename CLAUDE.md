@@ -275,8 +275,8 @@ Current docs:
   — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
   per-arm rates
 - [Identity counterfactuals — read before building counterfactual evals around Qwen's self-identity or deployment](docs/identity-counterfactuals.md)
-  — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship with a
-  silent CoT; `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
+  — one-line edits that flip behaviour: `Locale: en-US` vs `zh-CN` lifts China censorship;
+  `Region: us-west-2` vs `us-west1` flips Claude-vs-Gemini API answers
 - [Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
   — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
   scores
