@@ -67,7 +67,7 @@ Summary of the Final Pitch (2026-10-19):
   its bullets with a Chinese word; the space lens fixes that at the same WorkspaceBench score
   (`agu18dec/olens_and_ar` README; our check in `data/runs/olens_space_fix/`). Score its bullets
   with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
-  before 2026-10-22 ~17:45 PDT used the old lens; the redo list is in
+  before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
   [docs/olens-space-migration.md](docs/olens-space-migration.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
