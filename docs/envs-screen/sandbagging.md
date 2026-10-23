@@ -5,6 +5,9 @@ Screen of the `sandbagging` environment from
 `vendor/agent-interp-envs`, pinned 310c03f) for the MATS sprint: does Qwen3.6-27B sometimes
 deliberately underperform, and does the rate move between the two arms?
 
+**Now runs in evalcue** ([envs/sandbagging.md](../envs/sandbagging.md)); the vendored harness and
+overlay below are kept until the port replicates.
+
 Follow-up: [../sandbagging-iteration.md](../sandbagging-iteration.md) fixes the answer-format noise
 and finds a one-sentence arm pair with a +57pp gap.
 

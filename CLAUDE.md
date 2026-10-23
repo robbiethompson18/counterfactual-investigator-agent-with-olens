@@ -231,6 +231,9 @@ Current docs:
 - [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
+- [Sandbagging in evalcue — read before running the sandbagging env (it now runs in evalcue, not the vendored harness)](docs/envs/sandbagging.md)
+  — `evalcue/envs/sandbagging/`: all 22 arms verbatim, the original tool loop, mechanical `detect()`
+  matching 544/544 original labels; what differs from the original runs; replication status
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
   — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
   names don't exist in the image, so arm B needs our overlay

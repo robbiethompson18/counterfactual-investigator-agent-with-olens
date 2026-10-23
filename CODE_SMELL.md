@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: sandbagging exists twice (vendored and evalcue)
+
+`evalcue/envs/sandbagging/` holds the same arms and label rule as
+`configs/envs_screen/sandbagging/`, `scripts/envs_screen/sandbagging*.py` and
+`cfbench/envs/sandbagging*.py`. The vendored copies stay until the port's replication passes; a
+cleanup PR then deletes them. Until then an arm or label change has to go in both.
+
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
 At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The
