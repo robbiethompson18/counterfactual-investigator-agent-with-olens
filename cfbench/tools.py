@@ -19,7 +19,17 @@ def _schema(name: str, description: str, properties: dict, required: list[str]) 
     return {"type": "function", "function": {"name": name, "description": description, "parameters": params}}
 
 
-def transcript_tools(base: list[Rollout]) -> dict[str, Tool]:
+def _lines(text: str) -> list[tuple[int, str]]:
+    """(start character, line) for each line."""
+    out, at = [], 0
+    for line in text.split("\n"):
+        out.append((at, line))
+        at += len(line) + 1
+    return out
+
+
+def transcript_tools(base: list[Rollout], chars: bool = False) -> dict[str, Tool]:
+    """`chars`: search hits also give the character where their line starts (the O-lens tools are addressed that way)."""
     texts = [render(r.messages) for r in base]
     yes_no = ["yes" if r.label else "no" for r in base]
 
@@ -36,9 +46,9 @@ def transcript_tools(base: list[Rollout]) -> dict[str, Tool]:
             pattern = re.compile(args["regex"], re.IGNORECASE)
         except re.error as e:
             return f"Bad regex: {e}"
-        hits = [(i, line) for i, text in enumerate(texts) for line in text.splitlines() if pattern.search(line)]
-        runs = sorted({i for i, _ in hits})
-        lines = [f"run {i} [{yes_no[i]}]: {line.strip()[:300]}" for i, line in hits[:MAX_HITS]]
+        hits = [(i, at, line) for i, text in enumerate(texts) for at, line in _lines(text) if pattern.search(line)]
+        runs = sorted({i for i, _, _ in hits})
+        lines = [f"run {i} [{yes_no[i]}]{f' char {at}' if chars else ''}: {line.strip()[:300]}" for i, at, line in hits[:MAX_HITS]]
         n_yes = sum(yes_no[i] == "yes" for i in runs)
         summary = f"{len(hits)} matching lines in {len(runs)} of {len(texts)} runs ({n_yes} with the behavior)"
         return summary + (f", first {MAX_HITS} shown" if len(hits) > MAX_HITS else "") + ":\n" + "\n".join(lines)

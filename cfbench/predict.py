@@ -14,7 +14,7 @@ from cfbench.tools import Tool, call
 
 P_MIN, P_MAX = 0.01, 0.99
 MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
-REASONING = {"effort": "medium"}  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
+EFFORT = "medium"  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 
 SYSTEM = (
     "You are an investigator predicting how an AI model would behave if its environment were changed. "
@@ -51,20 +51,21 @@ def check(arguments: str) -> tuple[dict | None, str]:
     return {"p": p, "rationale": str(args.get("rationale", ""))}, "Prediction recorded."
 
 
-async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0) -> dict:
+async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT) -> dict:
     tools = tools or {}
     messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": prompt},
     ]
+    schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
         r = await client.chat.completions.create(
             model=predictor,
             messages=messages,
-            tools=[SUBMIT, *(schema for schema, _ in tools.values())],
+            tools=schemas,
             max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": REASONING},
+            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
         )
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
@@ -86,5 +87,5 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": reply})
         if submission:
             break
-    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "messages": messages}
+    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tools": schemas, "messages": messages}
     return {**submission, "valid": True, **log} if submission else {"p": None, "rationale": "", "valid": False, **log}

@@ -13,8 +13,10 @@ import json
 import random
 from dataclasses import dataclass
 
-CONDITIONS = ("transcript", "no_transcript", "agentic")
-TOOL_BUDGET = 10  # agentic: read/search calls before the predictor must submit
+OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
+TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
+CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
+TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
 
 @dataclass
@@ -24,19 +26,34 @@ class Rollout:
     label: bool  # showed the behavior
 
 
-def render(messages: list[dict]) -> str:
-    parts = []
-    for m in messages:
+def render_spans(messages: list[dict]) -> tuple[str, dict[tuple[int, str], int]]:
+    """render() plus where each message field sits in it: (message index, field) -> b such that the field's raw character c
+    is at text[b + c] ("tool_call" -> the start of that message's first tool call line)."""
+    parts, spans, at = [], {}, 0
+
+    def add(header: str, key: tuple[int, str], raw: str | None = None):
+        nonlocal at
+        spans[key] = at + len(header) - (len(raw) - len(raw.lstrip()) if raw is not None else 0)
+        parts.append(header + (raw.strip() if raw is not None else ""))
+        at += len(parts[-1]) + 2  # the "\n\n" join
+
+    for i, m in enumerate(messages):
         if m["role"] == "assistant":
             if m.get("reasoning_content"):
-                parts.append(f"ASSISTANT REASONING (private):\n{m['reasoning_content'].strip()}")
+                add("ASSISTANT REASONING (private):\n", (i, "reasoning_content"), m["reasoning_content"])
             if m.get("content"):
-                parts.append(f"ASSISTANT (visible):\n{m['content'].strip()}")
-            for call in m.get("tool_calls") or []:
-                parts.append(f"ASSISTANT TOOL CALL {call['function']['name']}: {call['function']['arguments']}")
+                add("ASSISTANT (visible):\n", (i, "content"), m["content"])
+            for j, call in enumerate(m.get("tool_calls") or []):
+                add(f"ASSISTANT TOOL CALL {call['function']['name']}: {call['function']['arguments']}", (i, f"tool_call{j or ''}"))
+        elif isinstance(m["content"], str):
+            add(f"{m['role'].upper()}:\n", (i, "content"), m["content"])
         else:
-            parts.append(f"{m['role'].upper()}:\n{m['content'].strip() if isinstance(m['content'], str) else json.dumps(m['content'])}")
-    return "\n\n".join(parts)
+            add(f"{m['role'].upper()}:\n{json.dumps(m['content'])}", (i, "content"))
+    return "\n\n".join(parts), spans
+
+
+def render(messages: list[dict]) -> str:
+    return render_spans(messages)[0]
 
 
 def initial_context(messages: list[dict]) -> list[dict]:
@@ -50,6 +67,20 @@ def initial_context(messages: list[dict]) -> list[dict]:
     return messages
 
 
+OLENS = """
+
+{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
+regex over those runs' transcripts that returns the reads at each match) and `olens_at` (all reads around a run and \
+character, from any search hit). The O-lens is a model trained to describe another model's internal activations in \
+words. It was run on the target model's activations at punctuation tokens and turn ends, everywhere in the run (system \
+prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short bullets about what the model is \
+representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
+explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
+read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 10 \
+highest-FVE bullets (`max_bullets`). Reads can show what the \
+model registers but never says; they also often just paraphrase the nearby text."""
+
+
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
 
@@ -61,16 +92,29 @@ def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
     return shown
 
 
-def run_index(base: list[Rollout]) -> str:
-    """One table row per base-arm run, for the agentic prompt."""
+def run_index(base: list[Rollout], read: set[int] | None = None) -> str:
+    """One table row per base-arm run, for the tool prompts; `read` = ids with O-lens reads, adds that column."""
     rows = [
         f"| {i} | {'yes' if r.label else 'no'} | {sum(m['role'] == 'assistant' for m in r.messages)} | {len(render(r.messages))} |"
+        + (f" {'yes' if i in read else 'no'} |" if read is not None else "")
         for i, r in enumerate(base)
     ]
-    return "| id | showed the behavior | model turns | characters |\n| --- | --- | --- | --- |\n" + "\n".join(rows)
+    head = "| id | showed the behavior | model turns | characters |" + (" O-lens reads |" if read is not None else "")
+    return head + "\n" + "| --- " * (head.count("|") - 1) + "|\n" + "\n".join(rows)
 
 
-def build_prompt(env, model: str, base: list[Rollout], shown: list[Rollout], base_arm: str, cf_arm: str, condition: str) -> str:
+def build_prompt(
+    env,
+    model: str,
+    base: list[Rollout],
+    shown: list[Rollout],
+    base_arm: str,
+    cf_arm: str,
+    condition: str,
+    read: set[int] | None = None,
+    fve_note: str = "",
+) -> str:
+    """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -87,16 +131,17 @@ This is its starting context in the base arm, before it acts:
 </context>"""
     if condition == "no_transcript":
         evidence = context.replace("This is its", "The model's runs are not shown. This is its")
-    elif condition == "agentic":
+    elif condition in TOOL_CONDITIONS:
+        olens = "" if condition == "agentic" else OLENS.format(n_read=len(read or ()), fve_note=fve_note)
         evidence = f"""{context}
 
 ## The base-arm runs
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
-every run). You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. Spend them \
-on whatever helps you predict the counterfactual arm.
+every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. \
+Spend them on whatever helps you predict the counterfactual arm.
 
-{run_index(base)}"""
+{run_index(base, None if condition == "agentic" else read)}"""
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
