@@ -133,7 +133,7 @@ class Sandbox:
             text=True,
         ).strip()
 
-    def run(self, command: str, timeout: int = 30) -> tuple[str, int]:
+    def run(self, command: str, timeout: int = 30, limit: int = 8000) -> tuple[str, int]:
         try:
             p = subprocess.run(
                 ["docker", "exec", self.cid, "timeout", str(timeout), "bash", "-lc", command],
@@ -145,7 +145,7 @@ class Sandbox:
             out, code = p.stdout + p.stderr, p.returncode
         except subprocess.TimeoutExpired:
             out, code = "[timed out]", 124
-        return (out if len(out) < 8000 else out[:4000] + "\n...[truncated]...\n" + out[-4000:]), code
+        return (out if len(out) < limit else out[: limit // 2] + "\n...[truncated]...\n" + out[-limit // 2 :]), code
 
     def snapshot(self) -> dict[str, str]:
         files = {}

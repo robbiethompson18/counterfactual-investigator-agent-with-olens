@@ -235,6 +235,9 @@ Current docs:
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+- [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+  — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
+  subagent labels, replication of the screen (14/30 vs 0/30)
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
