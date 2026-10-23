@@ -27,6 +27,7 @@ from .store import Store
 SURPRISE = "U"  # surprise score the Pool ranks on; U_rev (confident reversals) is still stored but not used
 SLOTS = 4  # job starts per epoch (front counters, top-up timing)
 P_CREATOR = 0.1
+TOPUP_SHARE = 0.1  # at most this share of jobs are top-ups (Kylie: make them rare)
 P_REWRITE = 0.2  # share of mutations told to make a bigger rewrite (new scenario / task) instead of small edits
 N_EXAMPLES = 6
 AGENT_MAX_COST = 3.0
@@ -185,6 +186,7 @@ class Scheduler:
     def __init__(self, store: Store, rng: random.Random, start_job: int = 0):
         self.store, self.rng, self.job = store, rng, start_job
         self.busy: set[str] = set()  # nodes being topped up
+        self.topups = 0
 
     def _epoch(self, el, ls):
         front = {n.id for n in ls[0]} if ls else set()
@@ -205,7 +207,8 @@ class Scheduler:
         j = self.job
         self.store.event("job_start", job=j, surprise=ukey)
         due = [n for n in pool.due_topups(nodes) if n.id not in self.busy]
-        if due:
+        if due and self.topups < TOPUP_SHARE * self.job:  # top-ups get at most 1 job in 10
+            self.topups += 1
             self.busy.add(due[0].id)
             return self._topup(due[0], j)
         if self.rng.random() < P_CREATOR:
