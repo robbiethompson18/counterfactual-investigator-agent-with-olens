@@ -71,7 +71,7 @@ class Episode:
     tools: list[dict] = field(default_factory=lambda: [BASH_TOOL])
     # Replaces the bash handling of each assistant turn, for ports that reproduce another harness's tool loop (its tool
     # names, output format, retry messages): (sandbox, assistant message) -> (messages to append, finish reason or None).
-    step: Callable[["Sandbox", dict], tuple[list[dict], str | None]] | None = None
+    step: Callable[["Sandbox | None", dict], tuple[list[dict], str | None]] | None = None  # sandbox is None without files
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
@@ -189,10 +189,11 @@ def last_python_block(text: str) -> str | None:
 
 async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) -> dict:
     msgs = [dict(m) for m in ep.messages]
-    if not ep.files:
+    if not ep.files and not ep.step:
         msg, finish, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens)
         return {"messages": msgs + [msg], "finish": finish, "turns": 1, "completion_tokens": ntok, "files_after": {}}
-    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image)
+    # a `step` env with no files keeps its state in Python (e.g. injection_slack's fake Slack), so it needs no container
+    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image) if ep.files else None
     total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):
@@ -212,6 +213,7 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
             if not msg.get("tool_calls"):
                 finish = "stop"
                 break
+            assert sb is not None  # only step envs run without files
             for tc in msg["tool_calls"]:
                 try:
                     cmd = str(json.loads(tc["function"]["arguments"]).get("command", ""))
@@ -242,9 +244,10 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
             if ep.budget is not None and used >= ep.budget and (not ep.final_command or refused >= 3):
                 finish = "budget"
                 break
-        files_after = await asyncio.to_thread(sb.snapshot)
+        files_after = await asyncio.to_thread(sb.snapshot) if sb else {}
     finally:
-        await asyncio.to_thread(sb.close)
+        if sb:
+            await asyncio.to_thread(sb.close)
     return {"messages": msgs, "finish": finish, "turns": turns, "completion_tokens": total, "files_after": files_after}
 
 
@@ -330,7 +333,7 @@ def score(env, row) -> dict:
     token cap with no positive yet is unscorable (it might have happened later)."""
     notes = env.detect(row)
     positive = notes.pop("positive") if "positive" in notes else notes.pop("hack", None)  # older envs return "hack"
-    if row.get("finish") == "length" and row.get("files_before") and not positive:
+    if row.get("finish") == "length" and (row.get("files_before") or row.get("turns", 1) > 1) and not positive:
         positive = None
     return {"positive": positive, "detect_notes": notes}
 

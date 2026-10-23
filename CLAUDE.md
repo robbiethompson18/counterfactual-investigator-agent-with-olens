@@ -287,6 +287,9 @@ Current docs:
 - [Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
   — 13 envs; Lynch main cell 87%/86%/53%; exfil 48% → 20% with an eval cue (rarely verbalized);
   placebo caveats; tables in [scheming-tables.md](docs/envs/scheming-tables.md)
+- [Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
+  — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
+  "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
 - [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
