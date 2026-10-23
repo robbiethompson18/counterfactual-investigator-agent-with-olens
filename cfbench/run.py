@@ -18,7 +18,7 @@ import json
 import random
 
 from cfbench import olens
-from cfbench.core import CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench.core import CONDITIONS, INLINE_CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
 from cfbench.predict import REASONING, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
@@ -41,7 +41,7 @@ async def main():
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
     reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
-    assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
+    assert reads or not set(OLENS_CONDITIONS + INLINE_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
@@ -60,13 +60,16 @@ async def main():
 
     async def one(case: dict, base: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        condition, tools, read = case["condition"], {}, None
+        condition, tools, read, renders = case["condition"], {}, None, None
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
             tools |= lens_tools
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
+        if condition in INLINE_CONDITIONS:  # same shown runs as `transcript` on this draw; every base run needs reads
+            sources = olens.placebo_sources(base, reads, args.seed + draw) if condition.endswith("placebo") else {}
+            renders = {r.source: olens.annotate(r, reads, sources.get(r.source)) for r in shown}
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, renders)
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}

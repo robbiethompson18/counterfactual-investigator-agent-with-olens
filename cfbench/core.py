@@ -15,7 +15,8 @@ from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
-CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
+INLINE_CONDITIONS = ("transcript_olens", "transcript_olens_placebo")  # `transcript`, with reads written into the transcripts
+CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS, *INLINE_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
 
@@ -80,6 +81,15 @@ read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` c
 highest-FVE bullets (`max_bullets`). Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text."""
 
+INLINE = """\
+The transcripts below also carry O-lens reads, written inline as ⟨O-lens: ...⟩ right after the token they were read at. \
+The O-lens is a model trained to describe another model's internal activations in words. It was run on the target \
+model's activations at punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, its reasoning \
+and replies). Each read gives, per layer (L32, L40, L48), the best bullet about what the model is representing at that \
+point, with its FVE (fraction of the activation's variance the bullet explains): high FVE is good, low FVE bullets are \
+often hallucinated; bullets under FVE 0.1 are left out. {fve_note} Reads can show what the model registers but never \
+says; they also often just paraphrase the nearby text."""
+
 
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
@@ -113,8 +123,10 @@ def build_prompt(
     condition: str,
     read: set[int] | None = None,
     fve_note: str = "",
+    renders: dict[str, str] | None = None,
 ) -> str:
-    """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note."""
+    """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note.
+    For the inline conditions: `renders` = each shown run's source -> its transcript with reads (cfbench.olens.annotate)."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -149,10 +161,11 @@ Spend them on whatever helps you predict the counterfactual arm.
             picked = f"Every base-arm run {'showed' if shown[0].label else 'did not show'} the behavior, so only one is shown."
         transcripts = "\n\n".join(
             f"### Transcript {i + 1} (showed the behavior: {'yes' if r.label else 'no'})\n\n"
-            f"<transcript>\n{render(r.messages)}\n</transcript>"
+            f"<transcript>\n{renders[r.source] if renders else render(r.messages)}\n</transcript>"
             for i, r in enumerate(shown)
         )
-        evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
+        inline = f"\n\n{INLINE.format(fve_note=fve_note)}" if renders else ""
+        evidence = f"## Example transcripts from the base arm\n\n{picked}{inline}\n\n{transcripts}"
     return f"""\
 ## Setup
 

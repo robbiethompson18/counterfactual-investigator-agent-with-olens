@@ -86,6 +86,37 @@ def _flat(text: str) -> str:
     return text.replace("\n", "⏎")
 
 
+def annotate(run: Rollout, reads: Reads, source: str | None = None, top_k: int = TOP_K, min_fve: float = MIN_FVE) -> str:
+    """The run's transcript with its O-lens reads written inline after each read position, for the `transcript_olens`
+    conditions. `source` = whose reads to use (another env's run for the placebo, placed at the same relative positions)."""
+    text = render_spans(run.messages)[0]
+    messages, rows = reads[source or run.source]
+    pos = positions(messages, rows)
+    scale = len(text) / max(1, len(render_spans(messages)[0]))
+    out, prev = [], 0
+    for p in pos:
+        at = min(len(text), max(prev, round(p.char * scale)))
+        got = [
+            f"L{layer} [FVE {b['fve']:.2f}] {b['text']}"
+            for layer in sorted(p.layers)
+            for b in p.layers[layer]["bullets"][:top_k]
+            if b["fve"] >= min_fve
+        ]
+        if got:
+            out += [text[prev:at], "⟨O-lens: " + " | ".join(got) + "⟩"]
+            prev = at
+    return "".join(out) + text[prev:]
+
+
+def placebo_sources(base: list[Rollout], reads: Reads, seed: int) -> dict[str, str]:
+    """Each base run's source -> a run of a different env whose reads stand in for its own."""
+    env = base[0].source.split("/")[0]
+    pool = sorted(s for s in reads if s.split("/")[0] != env)
+    assert pool, f"placebo needs reads from an env other than {env}"
+    random.Random(seed).shuffle(pool)
+    return {r.source: pool[i % len(pool)] for i, r in enumerate(base)}
+
+
 def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tuple[dict[str, Tool], set[int]]:
     """The two O-lens tools over the base runs, and the ids of the runs that have reads."""
     texts = [render_spans(r.messages)[0] for r in base]
