@@ -72,6 +72,10 @@ Summary of the Final Pitch (2026-10-19):
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
+- **Don't paste O-lens reads into the predictor's prompt** (the `transcript_olens*` conditions,
+  closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
+  lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
+  [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
 
 ## Background reading
 
@@ -292,7 +296,8 @@ Current docs:
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [Hidden-goal envs — read before building envs or predictor tests where Qwen acts on what it thinks the user wants (grading, deploy notes), or before claiming O-lens predictor uplift](docs/envs/hidden_goal.md)
   — who wrote an essay moves Qwen's harsh grades 0/30 → 30/30, unverbalized; the O-lens reads the
-  inferred user goal ("I want to beat them"); Flash + base-arm lens +0.04 skill on held-out arms
+  inferred user goal ("I want to beat them"); no predictor uplift survives a placebo, and pasting
+  reads into the prompt (closed #116) is a dead end
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits

@@ -10,6 +10,16 @@ an outcome the user wants and acts on it, while its text rationalizes something 
 
 ## Findings
 
+> **Dead end, don't repeat: pasting O-lens reads into the predictor's prompt.** The
+> `transcript_olens`, `transcript_olens_edit` and `transcript_olens_cf` conditions below were
+> rejected and not merged (closed PR #116; code kept on branch `cfbench-olens-transcript-inline` for
+> reference only). Reasons: (1) none of them beats its placebo. The inline held-out "+0.042" was
+> measured against transcript-only, and no inline placebo was run on that set. On the attribution
+> arms, the inline placebo (0.63) beat the real reads (0.57). (2) `transcript_olens_cf` reads the
+> lens on the counterfactual prompt, which is outside the zero-counterfactual setting. The env
+> (`hidden_goal.grade`) and the reads are fine to reuse. If you want lens uplift, use the agentic
+> tools condition (`olens`, PR #117) and always run its placebo.
+
 <!-- RESULTS:START -->
 
 - **hidden_goal.grade has big, mostly unverbalized effects.** Who wrote a mediocre essay moves
@@ -32,10 +42,10 @@ an outcome the user wants and acts on it, while its text rationalizes something 
   | **held-out attribution, 16 (5)** |       | 0.857 | **0.899**        | 0.891 (pl 0.867)  |         |                      |
 
   "pl" = the same condition with another env's reads (donation_bet) in the same positions. Held out:
-  lens inline − transcript = +0.042, 95% bootstrap CI over cases [+0.004, +0.103]; lens at edit − its
-  placebo = +0.023 [−0.003, +0.063]. The cue-arm "agentic + lens tools" gain is one case (all-stakes
-  → all, +20 nats) whose base arm has no reads about the edit, so it's draw noise (CI for tools −
-  agentic [−0.27, +0.18]).
+  lens inline − transcript = +0.042, 95% bootstrap CI over cases [+0.004, +0.103]; lens at edit −
+  its placebo = +0.023 [−0.003, +0.063]. The cue-arm "agentic + lens tools" gain is one case
+  (all-stakes → all, +20 nats) whose base arm has no reads about the edit, so it's draw noise (CI
+  for tools − agentic [−0.27, +0.18]).
 
 - **Where the held-out gain comes from:** base→ex (+13 nats), base→enemy (+12), ex→base (+7). Flash
   cites reads at the base arm's reply tokens showing lower candidate scores before the final grade
@@ -65,8 +75,9 @@ Runs (HF `runs/cfbench/2026-10-22_grade-*`):
 `grade-who-flash-{tx,agentic,inline-olens,olens-edit,olens-tools,inline-olens-cf}` (attribution
 arms), `grade-heldout-flash-{tx,olens}` (held out). `grade-flash-inline-olens` is abandoned
 (oversized placebo, fixed in the code before rerunning). Lens reads: HF
-`runs/olens_reads/2026-10-22_hidden-goal-{v1,v2,v3}/`. The conditions are on branch
-`cfbench-olens-transcript-inline` (stacked on `cfbench-olens-condition`).
+`runs/olens_reads/2026-10-22_hidden-goal-{v1,v2,v3}/`. The `transcript_olens*` conditions are only
+on branch `cfbench-olens-transcript-inline` (closed PR #116, not merged; see the dead-end note
+above).
 
 <!-- RESULTS:END -->
 
