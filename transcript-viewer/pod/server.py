@@ -35,7 +35,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import torch
 from olens.ar import AR
 from olens.fve import fve_nnls, fve_single
-from olens.lens import AguLens, Sampling, capture, load_base
+from olens.lens import SPACE_LENS, AguLens, Sampling, capture, load_base
 from olens.readout import Readout, bullets
 
 S = {}
@@ -161,7 +161,12 @@ def do_read(req):
         max_bullets=int(req.get("max_bullets", 4)) or None,
     )
     res = read_many(vecs, [int(it["layer"]) for it in items], smp, int(req.get("n", 1)), int(req.get("seed", 0)))
-    return {"results": res, "norms": [round(float(v.norm()), 1) for v in vecs], "seconds": round(time.time() - t0, 1)}
+    return {
+        "results": res,
+        "norms": [round(float(v.norm()), 1) for v in vecs],
+        "lens": SPACE_LENS.name,
+        "seconds": round(time.time() - t0, 1),
+    }
 
 
 def do_read_multi(req):
@@ -189,7 +194,7 @@ def do_read_multi(req):
         out.append(res[i : i + k])
         norms.append([round(float(v.norm()), 1) for v in V[i : i + k]])
         i += k
-    return {"results": out, "norms": norms, "seconds": round(time.time() - t0, 1)}
+    return {"results": out, "norms": norms, "lens": SPACE_LENS.name, "seconds": round(time.time() - t0, 1)}
 
 
 def do_extras(req):
@@ -385,7 +390,7 @@ def main():
     print(f"listening on 127.0.0.1:{args.port}", flush=True)
 
     tok, model = load_base()
-    agu = AguLens(tok, model)
+    agu = AguLens(tok, model, SPACE_LENS)  # /read and /read_multi report SPACE_LENS.name; the viewer tags its cache with it
     S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
     for L in AguLens.layers:
         S["readout"].whitener(L)

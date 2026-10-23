@@ -331,6 +331,7 @@ def worker(node_name, g, port, q, total):
                         "token": toks[it["pos"]],
                         "norm": norms[j],
                         "samples": out[j],
+                        "lens": V.pod_lens(res),
                         "t": time.time(),
                     }
                     for j, it in enumerate(its)

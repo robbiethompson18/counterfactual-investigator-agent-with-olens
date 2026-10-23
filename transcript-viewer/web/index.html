@@ -120,6 +120,7 @@ details.tl summary{cursor:pointer;margin-bottom:8px} details.tl summary h3{displ
 .lr{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--panel)}
 .lr .hd{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:var(--ink2)}
 .lr .hd b{color:var(--ink);font-size:13px}
+.lr .hd .oldlens{border:1px solid currentColor;border-radius:4px;padding:0 4px;color:var(--bad)}
 .fve{margin-left:auto;font-variant-numeric:tabular-nums}
 .bl{display:grid;grid-template-columns:1fr 54px 34px;gap:8px;align-items:center;padding:3px 0;font-size:13px}
 .bl .w{height:5px;background:var(--line);border-radius:3px;overflow:hidden}
@@ -432,6 +433,8 @@ async function openPattern(i, tid){
 }
 
 const tokKey = (pos, L) => `${pos}|${L}|${st.temp}|${st.n}`;
+const isOld = r => !!(r && r.lens && st.tr && st.tr.lens && r.lens !== st.tr.lens);  // read with the old lens: shown, but read again
+const haveRead = (pos, L) => { const r = st.reads[tokKey(pos, L)]; return !!r && (!isOld(r) || !!st.tr.organism); };  // organisms are read offline only
 // st.reads: the reads shown; st.other: model organisms' reads on the other activations (organism / base Qwen), same tokens
 function setReads(tr){
   const idx = rs => Object.fromEntries((rs || []).map(r => [`${r.pos}|${r.layer}|${r.temperature}|${r.n}`, r]));
@@ -602,7 +605,7 @@ function select(pos, autoread){
   renderLens();
   if (st.tr.readers) loadBanks(pos);
   if (autoread) {
-    const missing = [...st.chosen].filter(L => !st.reads[tokKey(pos, L)]);
+    const missing = [...st.chosen].filter(L => !haveRead(pos, L));
     if (missing.length && (st.pod.state === 'ready' || (fleetUp() && st.temp === 0)) && !(st.queued && st.queued.has(pos))) doRead([pos]);
   }
 }
@@ -653,7 +656,8 @@ function renderLens(){
   if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
-    h += `<div class="lr"><div class="hd"><b>L${L}</b>${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
+    const oldLens = isOld(r) ? `<span class="oldlens" title="read with ${esc(r.lens)}, the old lens with the Chinese-prefix bug; the current lens is ${esc(tr.lens)}. Reading this token again replaces it.">old lens</span>` : '';
+    h += `<div class="lr"><div class="hd"><b>L${L}</b>${oldLens}${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
     h += r.samples.map(s => sampHtml(s, L)).join('');
     const o = tr.organism && st.other[tokKey(pos, L)];  // the other activations (organism / base) on the same token
     if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl">${blTxt(b, L)}</div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
@@ -789,7 +793,7 @@ async function queueRead(positions, layers){
 }
 async function doRead(positions, layers){
   layers = layers || [...st.chosen];
-  const items = positions.flatMap(p => layers.map(L => ({pos: p, layer: L}))).filter(it => !st.reads[tokKey(it.pos, it.layer)]);
+  const items = positions.flatMap(p => layers.map(L => ({pos: p, layer: L}))).filter(it => !haveRead(it.pos, it.layer));
   if (!items.length) return renderLens();
   if (st.pod.state !== 'ready' && st.temp === 0) return queueRead([...new Set(items.map(i => i.pos))], [...new Set(items.map(i => i.layer))]);
   st.busy = true; renderLens();

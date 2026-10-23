@@ -16,7 +16,7 @@ LEASE_S = 15 * 60
 
 
 class ReadQueue:
-    def __init__(self, path: Path, is_done):
+    def __init__(self, path: Path, is_done, key_of):
         self.path, self.is_done = path, is_done  # is_done(key) -> already cached
         self.q = deque()  # items: dict(key, tid, pos, layer, src)
         self.keys = set()  # queued or leased
@@ -30,7 +30,7 @@ class ReadQueue:
                 saved = json.loads(path.read_text())
                 # UI requests first (some may have been in flight when it was saved)
                 for it in sorted(saved, key=lambda it: it.get("src") != "user"):
-                    self._push(it, front=False)
+                    self._push(dict(it, key=key_of(it)), front=False)  # re-keyed: saved keys may predate the lens in the key
             except ValueError:
                 pass
         threading.Thread(target=self._persist, daemon=True).start()

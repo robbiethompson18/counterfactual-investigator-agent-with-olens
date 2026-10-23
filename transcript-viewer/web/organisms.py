@@ -13,6 +13,7 @@ from pathlib import Path
 DIR = Path(__file__).resolve().parent.parent.parent / "data/runs/organisms"
 PREFIX = "organism/"
 BASE = "@base"
+LENS = "olens_s3d_rl600"  # scripts/organism_olens.py read these before the space lens (data/runs/organisms/LENS.md)
 KINDS = ("trigger", "control", "neutral")
 HF = {
     "auditbench": "https://huggingface.co/agu18dec/auditbench-model-orgs/tree/main/{}",
@@ -121,7 +122,7 @@ def load(S, key):
             for x in rd["reads"] if rd else []:
                 t = tid if x["cond"] == "organism" else tid + BASE
                 rec = {
-                    "key": key(t, x["pos"], x["layer"]),
+                    "key": key(t, x["pos"], x["layer"], lens=LENS),
                     "tid": t,
                     "pos": x["pos"],
                     "layer": x["layer"],
@@ -131,6 +132,7 @@ def load(S, key):
                     "token": rd["tokens"][x["pos"]],
                     "norm": None,
                     "samples": [{"text": x["text"], "bullets": x["bullets"]}],  # no FVE yet: read without the whiteners
+                    "lens": LENS,
                 }
                 S["by_tid"].setdefault(t, {})[rec["key"]] = rec
         family = mine[0]["family"]
