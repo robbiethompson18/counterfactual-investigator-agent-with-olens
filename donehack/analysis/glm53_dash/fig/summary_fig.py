@@ -16,8 +16,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).parent
-sys.path.insert(0, str(HERE.parents[3]))  # monorepo root
-from evalcue.envs.donation_bet import glm53_report as dx
+sys.path.insert(0, str(HERE.parents[3] / "evalcue/envs/donation_bet"))  # a plain module: the package __init__ needs QWEN_VLLM_URL
+import glm53_report as dx
 
 INK, MUTE, GRID, A, B = "#1b2320", "#5d6b66", "#dfe4e1", "#1f7a68", "#c2410c"
 
