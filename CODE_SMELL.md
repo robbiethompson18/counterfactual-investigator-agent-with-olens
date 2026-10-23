@@ -2,13 +2,6 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-22: sandbagging and funding_email exist twice (vendored and evalcue)
-
-`evalcue/envs/sandbagging/` and `evalcue/envs/funding_email/` hold the same arms and label rules as
-`configs/envs_screen/{sandbagging,funding_email}/`, `scripts/envs_screen/` and the matching
-`cfbench/envs/*.py` adapters. The vendored copies stay until a cleanup PR deletes them (both ports
-replicated on 2026-10-22). Until then an arm or label change has to go in both.
-
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
 At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The
@@ -21,14 +14,6 @@ separate cleanup task, rather than silently weakening the checker for this exper
 recognize canned replies or alter instrumentation. The initial screens retain this setup for
 comparability; do not treat their detector as an adversarially secure grader or rates as deployment
 estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence and detection limits.
-
-## 2026-10-22: `cfbench/envs/sandbagging_iter.py` restates its label rule
-
-Its `BEHAVIOR` is copied from `scripts/envs_screen/sandbagging_iter.py`'s docstring, which computes
-the mechanical label. That script imports its sibling as `from sandbagging import ...`, so cfbench
-can't import a constant from it the way `cfbench/envs/sandbagging.py` imports `JUDGE_RUBRIC`. If the
-label changes, edit both. (The evalcue envs' rules, formerly `behaviors.json`, now live next to each
-`detect()` as `BEHAVIOR`.)
 
 ## 2026-10-22: `shutdown_*` doc tables come from a scratch script
 

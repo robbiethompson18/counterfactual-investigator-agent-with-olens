@@ -1,5 +1,10 @@
 # Sandbagging env in evalcue
 
+Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
+to commit
+[`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988);
+they were deleted once this port replicated.
+
 The agent-interp-envs `sandbagging` env (Aditya Singh and Gerson Kroiz,
 [gkroiz/agent-interp-envs](https://github.com/gkroiz/agent-interp-envs/tree/main/environments/sandbagging), 2026)
 now runs in our own harness: `evalcue/envs/sandbagging/`. The scenario content is copied verbatim;

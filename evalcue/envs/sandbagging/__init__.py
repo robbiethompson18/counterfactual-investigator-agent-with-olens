@@ -5,7 +5,7 @@ Source: https://github.com/gkroiz/agent-interp-envs/tree/main/environments/sandb
 above 50% triggers "unlearning training" (or, reversed, below 50%). Tools are the original's `execute_command` and `submit`.
 Scenario content is verbatim: the stock arms read data/ (byte copies of the env's Documentation.md, Documentation_reverse.md
 and questions.txt, stored as .txt so Prettier leaves them alone), and the iteration arms rebuild the text of
-configs/envs_screen/sandbagging/iter/*.yaml from the same pieces as scripts/envs_screen/sandbagging_iter.py.
+configs/envs_screen/sandbagging/iter/*.yaml from the same pieces as scripts/envs_screen/sandbagging_iter.py (deleted; at commit e145988).
 The tool loop (`_step`) reproduces the original's run_step: one tool call per turn (parallel calls all get its error
 message), a no-tool-call turn gets its nudge as a user message, raw command output, `submit` ends the episode; 20 steps.
 
