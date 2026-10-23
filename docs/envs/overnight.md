@@ -197,7 +197,9 @@ and upload `base` vs `hint+permissive`. Reads land in
 Separately, `data/olens_requests/overnight_v2_targets.jsonl` (13 transcripts) asks for reads of the
 7 uploads with empty reasoning on the acting turn (n30 rows 18, 44, 63, 121, 156, 159 and r2 row
 64), plus 6 matched negatives from the same arms that reasoned they shouldn't upload and held. These
-are the cases where the lens could show a decision the CoT doesn't.
+are the cases where the lens could show a decision the CoT doesn't. Reads land in
+`data/runs/olens_reads/2026-10-22_overnight-v2-targets/reads.jsonl`; filter on `msg_index`/`role`
+for the acting turn and the final report.
 
 ## Reading the behavior
 
