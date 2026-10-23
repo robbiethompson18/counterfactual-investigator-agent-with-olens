@@ -22,9 +22,8 @@ baseline arm, and the summary prints every arm's rate.
 ## Using it
 
 Generation goes to the shared Qwen3.6-27B server (`$QWEN_VLLM_URL` with `$QWEN_VLLM_API_KEY`, from
-the main checkout's `.envrc.local`; model name `qwen`, 262k context). `EVALCUE_URLS`
-(comma-separated, round-robin) overrides it. The server handles hundreds of concurrent requests;
-`--concurrency` defaults to 512. Model code runs in Docker
+the main checkout's `.envrc.local`; model name `qwen`, 262k context). The server handles hundreds of
+concurrent requests; `--concurrency` defaults to 512. Model code runs in Docker
 (`docker build -t evalcue-sandbox evalcue`), no network. An env can name its own image via
 `Episode.image`.
 

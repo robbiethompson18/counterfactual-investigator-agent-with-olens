@@ -8,22 +8,27 @@
 # Needs RUNPOD_API_KEY and QWEN_VLLM_API_KEY (.envrc.local); the latter is the server's API key.
 set -euo pipefail
 NAME=${NAME:-qwen-shared}
-VOLUME=wwwce2mejb  # network volume "qwen-fastboot" in US-CA-2: weights + compile caches
+# Network volumes holding weights + compile caches, tried in order until one's datacenter has the GPUs free:
+# "qwen-fastboot" (US-CA-2), "qwen-fastboot-nc1" (US-NC-1). VOLUMES=id overrides.
+VOLUMES=${VOLUMES:-wwwce2mejb cdde9ia5iu}
 IMAGE=${IMAGE:-vllm/vllm-openai:v0.32.0}  # as fast as 0.25.1 on a healthy host (runpod/CLAUDE.md); IMAGE=vllm/vllm-openai:v0.25.1 for the old one
 
 case ${1:?command} in
   up)
     # runpodctl can't set a start command, so create through the REST API. The image's entrypoint is vllm; run the boot script
     # instead, in a subshell so the container (and sshd) stays up if it fails.
-    jq -n --rawfile boot runpod/qwen_server_boot.sh --arg name "$NAME" --arg image "$IMAGE" --argjson n "${2:-2}" --arg vol $VOLUME \
-      --arg key "$QWEN_VLLM_API_KEY" --arg hf "$(hf auth token 2>/dev/null)" '{
-        name: $name, imageName: $image, gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
-        networkVolumeId: $vol, volumeMountPath: "/workspace", containerDiskInGb: 50, ports: ["22/tcp", "8000/tcp"],
-        env: {API_KEY: $key, HF_TOKEN: $hf, HF_XET_HIGH_PERFORMANCE: "1"},
-        dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["exec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
-      curl -sS --fail-with-body https://rest.runpod.io/v1/pods -H "Authorization: Bearer $RUNPOD_API_KEY" \
-        -H "Content-Type: application/json" -d @- |
-      jq -r '"created \(.id)"'
+    for vol in $VOLUMES; do
+      jq -n --rawfile boot runpod/qwen_server_boot.sh --arg name "$NAME" --arg image "$IMAGE" --argjson n "${2:-2}" --arg vol $vol \
+        --arg key "$QWEN_VLLM_API_KEY" --arg hf "$(hf auth token 2>/dev/null)" '{
+          name: $name, imageName: $image, gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
+          networkVolumeId: $vol, volumeMountPath: "/workspace", containerDiskInGb: 50, ports: ["22/tcp", "8000/tcp"],
+          env: {API_KEY: $key, HF_TOKEN: $hf, HF_XET_HIGH_PERFORMANCE: "1"},
+          dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["exec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
+        curl -sS --fail-with-body https://rest.runpod.io/v1/pods -H "Authorization: Bearer $RUNPOD_API_KEY" \
+          -H "Content-Type: application/json" -d @- | jq -r '.id // error(tostring) | "created \(.) on volume '$vol'"' && break
+      echo "no ${2:-2}x H200 free with volume $vol"
+      [ "$vol" = "${VOLUMES##* }" ] && exit 1
+    done
     echo "booting; run '$0 status' every 3 min until it says READY" ;;
   url)
     runpod/pod.sh ssh $NAME 'tr "\0" "\n" < /proc/1/environ' |

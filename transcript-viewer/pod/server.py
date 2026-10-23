@@ -95,7 +95,7 @@ def score(texts, vecs, layers):
     weights. Bullets are sorted by their own FVE."""
     lens, ro = S["agu"], S["readout"]
     flat = [(b, k, L) for k, (ts, L) in enumerate(zip(texts, layers)) for t in ts for b in bullets(t)]
-    spans = [lens.tok(b, add_special_tokens=False).input_ids[:32] for b, _, _ in flat]
+    spans = [lens.tok(lens.bullet_prefix + b, add_special_tokens=False).input_ids[:32] for b, _, _ in flat]
     D = torch.cat([ro.ar(spans[i : i + 256], [L for _, _, L in flat[i : i + 256]]) for i in range(0, len(spans), 256)]) if spans else None
     out, j = [], 0
     for k, (ts, L) in enumerate(zip(texts, layers)):

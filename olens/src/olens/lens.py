@@ -144,15 +144,28 @@ class Lens:
         return kw
 
 
+# The agu18dec lens to use: olens_s3d_space_rl600, not olens_s3d_rl600. The older one's RL reward stripped each
+# bullet's leading space before the AR scored it, so it learned to open bullets with a Chinese word (36% of bullets
+# contain Chinese vs 3%, same WorkspaceBench score; agu18dec/olens_and_ar README).
+SPACE_LENS = CKPT / "agu18dec_olens_and_ar/olens_s3d_space_rl600"
+
+
+def bullet_prefix(adapter_dir):
+    """What goes before a bullet when the AR scores it: " " for the space lens (it was trained on " " + bullet),
+    nothing for the old olens_s3d_rl600 (its reward stripped the space)."""
+    return " " if "space" in Path(adapter_dir).name else ""
+
+
 class AguLens(Lens):
-    """agu18dec/olens_and_ar:olens_s3d_rl600. Contract: prompt `concepts_raw`, the marker's INPUT
-    EMBEDDING is overwritten with alpha * h/||h||, alpha = 16000, layers 20..60 step 4."""
+    """agu18dec/olens_and_ar:olens_s3d_space_rl600 (or the older olens_s3d_rl600). Contract: prompt `concepts_raw`, the
+    marker's INPUT EMBEDDING is overwritten with alpha * h/||h||, alpha = 16000, layers 20..60 step 4."""
 
     layers = tuple(range(20, 61, 4))
     alpha = 16000.0
 
-    def __init__(self, tok, model, adapter_dir=CKPT / "agu18dec_olens_and_ar/olens_s3d_rl600"):
+    def __init__(self, tok, model, adapter_dir=SPACE_LENS):
         super().__init__(tok, model, adapter_dir)
+        self.bullet_prefix = bullet_prefix(adapter_dir)
 
     def prompt(self, layer):
         return (

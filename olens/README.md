@@ -18,7 +18,10 @@ scripts/download.sh     checkpoints into checkpoints/ (gitignored); EVAL=1 also 
 Conventions, verified against the published held-out joint FVE (0.486 here vs 0.487 reported): the
 AO's marker input embedding is overwritten with `16000 * h/|h|`; the AR head predicts the **raw**
 activation at the token before the span; target and predictions are whitened as `Σ^-1/2 (x − μ)`
-with the pooled whitener; a bullet goes to the AR as the text after `- ` with no leading space.
+with the pooled whitener; a bullet goes to the AR as the text after `- `. `AguLens` defaults to the
+space lens `olens_s3d_space_rl600` (CLAUDE.md), whose bullets go to the AR with a leading space
+(`lens.bullet_prefix = " "`); the old `olens_s3d_rl600`, which the 0.486 above was measured on,
+takes them without one.
 
 The whiteners come from the gated dataset
 [agu18dec/local-workspace](https://huggingface.co/datasets/agu18dec/local-workspace) (needs an
