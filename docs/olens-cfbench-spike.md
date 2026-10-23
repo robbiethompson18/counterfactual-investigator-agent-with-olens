@@ -8,9 +8,11 @@ counterfactual prompt.
 
 **Answer so far: no reliable uplift.** The lens carries arm-level signal in some envs, but within
 one arm it rarely states the reason for a behavior, predictors seldom call the lens tools, and
-showing the reads inline made Flash overshoot on donation bet. The one positive result is the
-hidden_goal session's held-out grade arms (PR #115/#116): transcript 0.857 → inline O-lens 0.899
-(+0.042, CI [+0.004, +0.103]), from reply-token reads that track Qwen's internal score against the threshold.
+showing the reads inline made Flash overshoot on donation bet. The hidden_goal session's held-out
+grade arms gave transcript 0.857 → inline O-lens 0.899 (+0.042, CI [+0.004, +0.103]). That run had no
+inline placebo, though, and on hidden_goal's attribution arms the placebo scored higher, so it doesn't
+count as uplift. The inline conditions (PR #116) were closed unmerged as a dead end; see `docs/envs/hidden_goal.md`
+(PR #115).
 
 ## Conditions
 
@@ -18,8 +20,9 @@ hidden_goal session's held-out grade arms (PR #115/#116): transcript 0.857 → i
 - `olens` / `olens_placebo` (PR #117): plus `search_olens` (regex over the transcript, returns the
   reads at each match, best FVE first, top bullet with FVE ≥ 0.1) and `olens_at(run, char)`. The
   placebo answers from another env's run.
-- `transcript_olens` / `_placebo` (PR #116, the hidden_goal session): the two shown transcripts with
-  each read's top bullet inlined, no tools.
+- `transcript_olens` / `_placebo` (the hidden_goal session's PR #116, closed unmerged; the branch
+  `cfbench-olens-transcript-inline` is kept for reference only, so don't rebuild it): the two shown
+  transcripts with each read's top bullet inlined, no tools.
 
 Reads: the space-fixed lens `olens_s3d_space_rl600` (the rl600 lens has a Chinese-prefix bug; the
 inline*b runs below used it before the swap), at stop tokens and `<|im_end|>`, layers
@@ -83,8 +86,8 @@ mirrored to the Docent `cfbench` collection.
 
 - GPU budget ran out. 372 transcripts are unread (`data/olens_requests/unread_2026-10-22.jsonl`; see
   PR #118).
-- The hidden_goal session's `transcript_olens_cf` reads the counterfactual prompt (a forward pass,
-  no sampling). Robbie hasn't approved that, so it's outside the zero-counterfactual setting.
-- Possible next step: give the predictor the reads that track the model's internal quantity against
-  the decision threshold (hidden_goal's reply-token reads, donation bet's "clearly below the
-  threshold"). That's where both positive signals came from.
+- Reading the counterfactual prompt (`transcript_olens_cf`, a forward pass with no sampling) is
+  outside the zero-counterfactual setting and was dropped with #116.
+- The most interesting reads are the ones tracking the model's internal quantity against the
+  decision threshold (hidden_goal's reply-token scores, donation bet's "clearly below the
+  threshold"). Pasting them inline hasn't beaten a placebo, so using them needs a different idea.
