@@ -41,8 +41,9 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
   we run vLLM 0.27.1 (tested by vllm-metamodels on Qwen3.6-27B).
 - **Upstream vllm-lens norm-matches against half the residual** (the MLP delta), injecting ~8-50x
   too weakly on Qwen3.6. vllm-metamodels and EasyNLA's patch fix it; plain vllm-lens is wrong.
-- **vLLM's LoRA runtime is inert or crashes on Qwen3.6-27B**, so serve lenses as merged checkpoints:
-  `olens/scripts/merge_lens.py`; repeat `--adapter` to stack the NLA's SFT + RL LoRAs.
+- **Serve lenses as merged checkpoints** (`olens/scripts/merge_lens.py`; repeat `--adapter` to stack
+  the NLA's SFT + RL LoRAs). vLLM's LoRA runtime works on Qwen3.6-27B once the adapter keys are
+  renamed, but merged weights decode ~19% faster (`merge_lens.py`'s docstring).
 - **Keep `max_num_seqs <= 1024`** with CUDA graphs on Qwen3.6 (GDN decode kernel grid limit).
 - **Prompt positions repeat.** About a fifth of the stop tokens in an env's transcripts sit in the
   starting context, which is identical for every run of an arm. The NLA reader caches readouts by a

@@ -4,7 +4,8 @@ vLLM serves a copy of the base with both of the AV's LoRAs (SFT, then the RL LoR
 (scripts/merge_lens.py --adapter av_sft_lora --adapter av_rl_lora_step400). The activation goes in the way
 olens.lens.CeselderLens injects it, h <- h + |h| * v/|v| at the output of decoder block 1 at the marker, via
 ceselder/vllm-metamodels (`SteeringVector(norm_match=True, scale=1)` on the full residual stream; it also lets decode
-run as CUDA graphs). Needs vLLM 0.19.0 + vllm-metamodels, and VLLM_LENS_CUDA_GRAPHS=1 set before vLLM is imported.
+run as CUDA graphs). Needs vLLM 0.27.1 + vllm-metamodels (pins in docs/metamodel-serving.md), and VLLM_LENS_CUDA_GRAPHS=1
+set before vLLM is imported.
 
 Create it BEFORE loading any HF model on the same GPU, so vLLM's memory profiling sees the GPU it will share.
 """
@@ -42,7 +43,7 @@ class VllmNLA:
             dtype="bfloat16",
             max_model_len=1024,
             gpu_memory_utilization=gpu_memory_utilization,
-            max_num_seqs=max_num_seqs,  # <= 1024: vLLM 0.19's GDN decode kernel dies above (vllm-metamodels README)
+            max_num_seqs=max_num_seqs,  # <= 1024: Qwen3.6's GDN decode kernel dies above (vllm-metamodels README)
             enable_prefix_caching=False,
         )
 

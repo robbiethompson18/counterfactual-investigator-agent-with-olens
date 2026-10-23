@@ -1,13 +1,13 @@
 """NLA reads at every stop token of chat transcripts: the ceselder L42 natural-language autoencoder (olens.extras.NLA),
 each explanation scored by its AR (olens.extras.NLACritic: cos and FVE against the L42 activation).
 
-The NLA counterpart of scripts/olens_read_requests.py (the O-lens reader): same requests, same rendering, same
-positions, so its rows join the O-lens rows on (id, token_index). Runs on one H200 (base ~54 GB + the AR, a 43-block copy
-of the base, ~46 GB), from the repo root:
+The NLA counterpart of scripts/olens_read_requests.py (the O-lens reader): same requests, and its render() and capture(),
+so the positions and rows join the O-lens rows on (id, token_index). Runs on one H200 (base ~54 GB + the AR, a 43-block
+copy of the base, ~46 GB), from the repo root:
 
     PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS.jsonl OUT.jsonl [--batch 256] [--shard i/n]
 
-or, ~3x faster, with the AV on vLLM (olens/src/olens/vllm_nla.py; vLLM 0.19.0 + ceselder/vllm-metamodels) on GPU 0 of a
+or, ~3x faster, with the AV on vLLM (olens/src/olens/vllm_nla.py; vLLM 0.27.1 + ceselder/vllm-metamodels) on GPU 0 of a
 2-GPU pod and the HF base (capture) + AR on GPU 1:
 
     VLLM_LENS_CUDA_GRAPHS=1 PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS OUT --vllm MERGED_DIR
@@ -26,10 +26,8 @@ line per (transcript, position), appended per batch of transcripts; transcripts 
 """
 
 import argparse
-import copy
 import hashlib
 import json
-import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -37,75 +35,17 @@ from pathlib import Path
 import torch
 from olens.extras import NLA, NLACritic
 from olens.lens import BASE, load_base
+from olens_read_requests import PREFIX, PUNCT, render
+from olens_read_requests import capture as capture_layers
 from transformers import AutoTokenizer
 
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/server.py
-BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcue's deps
-    "type": "function",
-    "function": {
-        "name": "bash",
-        "description": "Run a bash command in the working directory. Returns stdout+stderr (truncated) and the exit code.",
-        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
-    },
-}
-LAYER, PREFIX = 42, 32
+LAYER = 42
 CALIB = Path("transcript-viewer/pod/calib_ids.json")
 
 
-def render(tok, row):
-    """-> (messages, token ids, per-token (msg_index, field, char_offset)). Copied from scripts/olens_read_requests.py
-    (the O-lens reader, not on main yet) so token indices match it exactly; merge the two once it lands."""
-    msgs = copy.deepcopy(row["messages"])
-    for m in msgs:
-        for tc in m.get("tool_calls") or []:
-            if isinstance(tc["function"]["arguments"], str):
-                tc["function"]["arguments"] = json.loads(tc["function"]["arguments"])
-    tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
-    text = tok.apply_chat_template(msgs, tools=tools, tokenize=False)
-    enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
-    fields, cur = [], 0  # (start, end, msg_index, field), in rendered order
-    for i, m in enumerate(msgs):
-        parts = [("reasoning_content", m.get("reasoning_content")), ("content", m.get("content"))]
-        parts += [("tool_call", v) for tc in m.get("tool_calls") or [] for v in tc["function"]["arguments"].values()]
-        for name, s in parts:
-            s = s.strip() if isinstance(s, str) else None
-            if not s:
-                continue
-            j = text.find(s, cur)
-            if j < 0:
-                continue
-            fields.append((j, j + len(s), i, name))
-            cur = j + len(s)
-    starts = {}
-    for a, _, i, _ in fields:
-        starts.setdefault(i, a)
-    where = []
-    for a, _ in enc.offset_mapping:
-        msg = max((i for i, s in starts.items() if s <= a), default=-1)
-        f = next(((name, a - s) for s, e, i, name in fields if s <= a < e), (None, None))
-        where.append((msg, *f))
-    return msgs, enc.input_ids, where
-
-
-@torch.no_grad()
-def capture(model, ids, positions, chunk=4096):
-    """Residual after block LAYER at `positions` ([P, d] fp32), prefilled `chunk` tokens at a time through the KV cache so
-    long transcripts fit. Same as the O-lens reader's capture, for one layer."""
-    got, cur = [], {}
-
-    def hook(mod, inp, out):
-        got.append((out[0] if isinstance(out, tuple) else out)[0, cur["pos"]].float().cpu())
-
-    handle = model.model.layers[LAYER].register_forward_hook(hook)
-    past = None
-    try:
-        for s in range(0, len(ids), chunk):
-            cur["pos"] = torch.tensor([p - s for p in positions if s <= p < s + chunk], dtype=torch.long, device=model.device)
-            out = model.model(input_ids=torch.tensor([ids[s : s + chunk]], device=model.device), past_key_values=past, use_cache=True)
-            past = out.past_key_values
-    finally:
-        handle.remove()
-    return torch.cat(got)
+def capture(model, ids, positions):
+    """Residual after block LAYER at `positions`, [P, d] fp32 (the O-lens reader's chunked capture, for one layer)."""
+    return capture_layers(model, ids, [LAYER], positions)[LAYER]
 
 
 def prefix_keys(ids, positions):
