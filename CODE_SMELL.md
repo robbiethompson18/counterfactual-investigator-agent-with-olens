@@ -2,6 +2,19 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: repository-wide type-check baseline is not clean
+
+At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The
+overnight work adds none; its scoped check passes. Full-project type-check success remains a
+separate cleanup task, rather than silently weakening the checker for this experiment.
+
+## 2026-10-22: overnight fixture logs are writable and reveal the simulation
+
+`evalcue/envs/overnight/` uses readable local scripts and an agent-writable JSONL log. Models can
+recognize canned replies or alter instrumentation. The initial screens retain this setup for
+comparability; do not treat their detector as an adversarially secure grader or rates as deployment
+estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence and detection limits.
+
 ## 2026-10-22: serving code left outside the shared-server recipe
 
 Left alone by the dead-serving-code cleanup, either because it does something the shared server

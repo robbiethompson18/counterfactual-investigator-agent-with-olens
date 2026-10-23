@@ -43,7 +43,7 @@ def do_bullets(req):
     ro, tok = S["readout"], S["tok"]
     Ls = list(ro.ar.layers)
     acts = capture(S["model"], ids, Ls)
-    spans = [tok(b, add_special_tokens=False).input_ids[:32] for b in bl]
+    spans = [tok(ro.lens.bullet_prefix + b, add_special_tokens=False).input_ids[:32] for b in bl]
     D = ro.ar([s for _ in Ls for s in spans], [L for L in Ls for _ in spans])
     out = {}
     for j, L in enumerate(Ls):
