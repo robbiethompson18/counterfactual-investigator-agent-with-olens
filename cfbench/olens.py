@@ -31,6 +31,7 @@ BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
 MAX_WINDOW = 5  # neighbouring positions each side in olens_at
 MAX_HITS = 30  # per search_olens call
+TOP_BULLETS = 1  # of each read, highest FVE first (the rows come sorted); the rest are mostly noise
 
 Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
 
@@ -64,7 +65,7 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
     by_token = defaultdict(dict)
     for r in rows:
-        by_token[r["token_index"]][r["layer"]] = r
+        by_token[r["token_index"]][r["layer"]] = r | {"bullets": r["bullets"][:TOP_BULLETS]}
     out = []
     for layers in by_token.values():
         r = next(iter(layers.values()))
@@ -191,7 +192,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         "olens_at": (
             _schema(
                 "olens_at",
-                "Every O-lens read (all layers, all bullets) at the read position nearest `char` in a run, and `window` positions "
+                "Every O-lens read (all layers) at the read position nearest `char` in a run, and `window` positions "
                 "each side, with the transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
                 {
                     "run": {"type": "integer"},

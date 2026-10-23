@@ -73,8 +73,8 @@ OLENS = """
 regex over every read's bullets) and `olens_at` (all reads around a run and character, from any search hit). The O-lens \
 is a model trained to describe another model's internal activations in words. It was run on the target model's \
 activations at punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, tool outputs, its \
-reasoning and replies). Each read is a few short bullets about what the model is representing at that point, at one \
-layer, with each bullet's FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can \
+reasoning and replies). Each read is a short bullet about what the model is representing at that point, at one layer \
+(the read's best bullet), with its FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can \
 show what the model registers but never says. They also hallucinate, especially low-FVE bullets, and often just \
 paraphrase the nearby text."""
 
