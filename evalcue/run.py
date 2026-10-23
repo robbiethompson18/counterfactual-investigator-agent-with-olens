@@ -32,6 +32,10 @@ ap.add_argument("--rescore", type=Path, default=None)
 a = ap.parse_args()
 
 env = importlib.import_module(f"evalcue.envs.{a.env}")
+for line in Path("evalcue/envs/status.tsv").read_text().splitlines()[1:]:  # env status; unlisted envs are active
+    name, status, reason, doc, date = line.split("\t")
+    if name == a.env and status != "active":
+        print(f"WARNING: {a.env} is {status} ({date}): {reason}. See {doc}", file=sys.stderr)
 run_id = a.env.replace(".", "_")  # family envs (scheming.lynch) keep their flat pre-package run dir (scheming_lynch)
 arms = a.arms.split(",") if a.arms else env.ARMS
 if a.rescore:

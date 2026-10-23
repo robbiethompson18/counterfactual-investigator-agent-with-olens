@@ -19,6 +19,12 @@ baseline arm, and the summary prints every arm's rate.
   the model saw the edit, and note whether it verbalizes it.
 - Never cap thinking: leave `--max-tokens` unset.
 
+**Env status: [`envs/status.tsv`](envs/status.tsv)** is the one place that records whether an env is
+still worth running: `active`, `saturated` (every arm at or above 90%), `floor` (every arm at or
+below 10%) or `retired` (dropped for another reason), with the reason, the doc and the date. Envs
+not listed are active or unchecked. `evalcue.run` prints a warning when you run a non-active env.
+When you saturate, floor or retire an env, add its row here, not just a banner in its doc.
+
 ## Using it
 
 Generation goes to the shared Qwen3.6-27B server (`$QWEN_VLLM_URL` with `$QWEN_VLLM_API_KEY`, from

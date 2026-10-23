@@ -89,6 +89,10 @@ contents are read from the env's configs and `vendor/agent-interp-envs` (run
 `git submodule update --init` first). Pull transcripts with
 `hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --include 'runs/<env>/*' --local-dir data`.
 
+Don't build arm-pair cases from envs that [`evalcue/envs/status.tsv`](../evalcue/envs/status.tsv)
+marks non-active (saturated, floor or retired): every arm sits at the same rate, so the cases test
+nothing. `cfbench.sweep` doesn't read that file yet; skip those envs by hand.
+
 ## Adding an env
 
 A module in `cfbench/envs/` with `BEHAVIOR`, `rollouts(arm, model)` and `edit(base_arm, cf_arm)`;
