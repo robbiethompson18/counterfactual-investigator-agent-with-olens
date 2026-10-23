@@ -176,8 +176,26 @@ def decode(ids):
 
 
 # ---------------------------------------------------------------------- reads + cache
-def key(tid, pos, layer, temperature=0.0, n=1, seed=0):
-    return f"{tid}|{pos}|{layer}|{float(temperature):g}|{n}|{seed}"
+LENS = "olens_s3d_space_rl600"  # what pod/server.py serves; every new read is tagged and keyed with it
+OLD_LENS = "olens_s3d_rl600"  # the Chinese-prefix-bug lens: every cached read without a "lens" field (all before 2026-10-23)
+
+
+def key(tid, pos, layer, temperature=0.0, n=1, seed=0, lens=LENS):
+    """Old-lens reads keep their lens-less keys, so a key from here never finds them: the current lens re-reads."""
+    return f"{tid}|{pos}|{layer}|{float(temperature):g}|{n}|{seed}" + ("" if lens == OLD_LENS else f"|{lens}")
+
+
+def pod_lens(res):
+    """The lens a pod response was read with, which must be LENS (a pod started on an older commit serves OLD_LENS)."""
+    if res.get("lens") != LENS:
+        raise RuntimeError(f"the lens backend serves {res.get('lens') or OLD_LENS}, not {LENS}: restart it on this commit")
+    return LENS
+
+
+def ingest(r):
+    r.setdefault("lens", OLD_LENS)
+    S["reads"][r["key"]] = r
+    S["by_tid"].setdefault(r["tid"], {})[r["key"]] = r
 
 
 def load_cache():
@@ -195,8 +213,7 @@ def load_cache():
         for line in buf[:end].splitlines():
             try:
                 r = json.loads(line)
-                S["reads"][r["key"]] = r
-                S["by_tid"].setdefault(r["tid"], {})[r["key"]] = r
+                ingest(r)
                 new.append(r["key"])
             except ValueError:
                 pass
@@ -215,8 +232,7 @@ def save(recs):
         with open(CACHE, "a") as f:
             f.write("".join(json.dumps(r) + "\n" for r in recs))
         for r in recs:
-            S["reads"][r["key"]] = r
-            S["by_tid"].setdefault(r["tid"], {})[r["key"]] = r
+            ingest(r)
     if "queue" in S:
         S["queue"].finished([r["key"] for r in recs])
 
@@ -245,6 +261,7 @@ def read(tid, items, temperature=0.0, n=1, seed=0, cached_only=False):
                     "token": r["tokens"][int(it["pos"])],
                     "norm": res["norms"][j],
                     "samples": res["results"][j],
+                    "lens": pod_lens(res),
                     "t": time.time(),
                 }
                 for j, (k, it) in enumerate(todo)
@@ -254,7 +271,13 @@ def read(tid, items, temperature=0.0, n=1, seed=0, cached_only=False):
 
 
 def tid_reads(tid):
-    return list(S["by_tid"].get(tid, {}).values())
+    """One read per (pos, layer, sampling): the current lens's, else the old lens's (the page marks those)."""
+    best = {}
+    for r in S["by_tid"].get(tid, {}).values():
+        k = (r["pos"], r["layer"], r["temperature"], r["n"], r["seed"])
+        if k not in best or r["lens"] == LENS:
+            best[k] = r
+    return list(best.values())
 
 
 def no_live_reads(tid):
@@ -343,6 +366,7 @@ def precompute():
                         "token": toks[it["pos"]],
                         "norm": norms[j],
                         "samples": out[j],
+                        "lens": pod_lens(res),
                         "t": time.time(),
                     }
                     for j, it in enumerate(its)
@@ -358,7 +382,7 @@ def precompute():
 def rescore():
     """Cached reads from before per-bullet FVE existed: re-score their texts on the pod (one
     capture per transcript, no decoding) and append the updated records."""
-    old = [r for r in S["reads"].values() if r["samples"] and "bfve" not in r["samples"][0]]
+    old = [r for r in S["reads"].values() if r["samples"] and "bfve" not in r["samples"][0] and r["lens"] == LENS]
     S["pre"].update(phase="rescore", done=0, total=len(old))
     by_tid = {}
     for r in old:
@@ -451,6 +475,7 @@ def read_chunk(items, pod=None):
                 "token": toks[it["pos"]],
                 "norm": norms[j],
                 "samples": out[j],
+                "lens": pod_lens(res),
                 "t": time.time(),
             }
             for j, it in enumerate(its)
@@ -588,6 +613,7 @@ def transcript(tid):
         relevant=len(relevant_positions(tid)),
         punct=[i for k in r["focus"] for i in punct_positions(r, k)],
         reads=tid_reads(tid),
+        lens=LENS,
     )
     if chive.has(tid):
         return dict(out, **chive.transcript_extra(tid))
@@ -876,9 +902,7 @@ def init():
     thinking.load(S, [json.loads(line) for p in shards("thinking") for line in p.open()])
     for p in [p for p in shards("reads") if p != CACHE]:
         for line in p.open():
-            r = json.loads(line)
-            S["reads"][r["key"]] = r
-            S["by_tid"].setdefault(r["tid"], {})[r["key"]] = r
+            ingest(json.loads(line))
     load_cache()  # this machine's reads, which follow_cache() keeps tailing
     S["pat_by_id"] = {p["pattern_id"]: p for p in S["patterns"]}
 
@@ -901,7 +925,7 @@ def main():
         steer.resume(judge_for, user_messages)
     from readq import ReadQueue
 
-    S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"])
+    S["queue"] = ReadQueue(ROOT / "data/queue.json", lambda k: k in S["reads"], lambda it: key(it["tid"], it["pos"], it["layer"]))
     threading.Thread(target=follow_cache, daemon=True).start()
     threading.Thread(target=consume, daemon=True).start()
     import sys

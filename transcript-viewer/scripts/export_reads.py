@@ -89,6 +89,7 @@ def main():
                 "temperature": float(r["temperature"]),
                 "n": r["n"],
                 "seed": r["seed"],
+                "lens": r.get("lens", "olens_s3d_rl600"),  # rows without one predate the space lens
                 "norm": r["norm"],
                 "fve": s0.get("fve"),
                 "top_bullet_fve": max(s0.get("bfve") or [0.0]) if s0.get("bfve") else None,

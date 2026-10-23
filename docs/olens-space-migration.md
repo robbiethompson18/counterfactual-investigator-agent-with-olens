@@ -16,10 +16,11 @@ it. This is the list of what still holds old-lens reads, to re-read once the new
   says why). Old-lens dirs without a `meta.json` (`runs/organisms`, `runs/party_resample`,
   `weirdchat/reads`, local-only `stoptokens` and `vardania_sneeze`) have a `LENS.md`. New cfbench
   runs record `params.olens_sources` (lens and row count per reads file) themselves.
-- Viewer caches (`transcript-viewer/data/reads.jsonl`, `weirdchat/reads/*`): all rows predate the
-  switch, so all old lens, but their key has no lens. A space-lens viewer pod would append
-  same-keyed rows and never re-read cached keys. Add the lens to the key before the next viewer
-  read.
+- Viewer caches (`transcript-viewer/data/reads.jsonl`, `weirdchat/reads/*`): every row predates the
+  switch. Since 2026-10-23 the viewer tags each read with its `lens` (rows without one are
+  `olens_s3d_rl600`) and puts the lens in the key, so the space lens re-reads instead of hitting the
+  old cache. The page shows an old read, marked "old lens", until the space lens has read that
+  token.
 
 ## Unread when the budget ran out (2026-10-22 ~22:25 PDT)
 

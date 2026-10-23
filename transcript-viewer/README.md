@@ -129,6 +129,10 @@ WCO_BIND="127.0.0.1" HF_TOKEN=... web/run.sh     # http://127.0.0.1:8803/
 - `WCO_BIND`: space-separated addresses to listen on (e.g. a tailnet v4 and v6).
 - `HF_TOKEN` (or `HF_TOKEN_FILE`): needed by GPU nodes for the gated whiteners.
 - Reads are cached in `data/reads.jsonl`, the queue in `data/queue.json` (both gitignored).
+- Each read records the `lens` it was made with; rows without one are the old `olens_s3d_rl600`. The
+  key carries the lens (`web/server.py` `LENS`), so old reads never count as cached: the page shows
+  them marked "old lens" and any read re-reads them. A lens backend started on an older commit (no
+  `lens` in its reply) is refused.
 
 ## Sharing: the HF dataset and the public snapshot
 
