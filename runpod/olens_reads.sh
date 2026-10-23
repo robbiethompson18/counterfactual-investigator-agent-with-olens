@@ -30,9 +30,10 @@ hf download agu18dec/olens_and_ar --local-dir $C/agu18dec_olens_and_ar >/dev/nul
 inc=(); for L in 20 24 28 32 36 40 44 48 52 56 60; do inc+=(--include "data/whiteners/pooled/whitening_iolens_pooled_L$L.safetensors"); done
 hf download agu18dec/local-workspace --repo-type dataset --local-dir $C/local_workspace "${inc[@]}" >/dev/null
 ln -sfn $C /root/repo/olens/checkpoints
-# vLLM's LoRA runtime would also work (with renamed keys, runpod/CLAUDE.md) but merged weights decode ~20% faster
-M=/workspace/merged/agu_rl600
-test -f $M/MERGED_FROM.json || python3 /root/repo/olens/scripts/merge_lens.py --adapter $C/agu18dec_olens_and_ar/olens_s3d_rl600 --out $M
+# the space lens (CLAUDE.md). vLLM's LoRA runtime would also work (renamed keys, runpod/CLAUDE.md), but merged weights
+# decode ~20% faster
+M=/workspace/merged/agu_space_rl600
+test -f $M/MERGED_FROM.json || python3 /root/repo/olens/scripts/merge_lens.py --adapter $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 --out $M
 echo SETUP_DONE
 EOF
     ;;
@@ -43,7 +44,7 @@ EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
 cd /root/repo && PYTHONPATH=olens/src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
-  /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_rl600 $*
+  /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_space_rl600 $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
   status)

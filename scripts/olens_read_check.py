@@ -2,7 +2,7 @@
 same activations, greedy, 4 bullets; prints joint FVE per path and first-bullet agreement. Run on a pod after
 runpod/olens_reads.sh setup:
 
-    PYTHONPATH=olens/src:scripts python scripts/olens_read_check.py /workspace/merged/agu_rl600
+    PYTHONPATH=olens/src:scripts python scripts/olens_read_check.py /workspace/merged/agu_space_rl600
 """
 
 import statistics

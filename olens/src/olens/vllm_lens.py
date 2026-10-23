@@ -15,7 +15,7 @@ from pathlib import Path
 import torch
 from safetensors import safe_open
 
-from .lens import GREEDY, AguLens, trim_bullets
+from .lens import GREEDY, AguLens, bullet_prefix, trim_bullets
 
 
 class VllmLens(AguLens):
@@ -24,6 +24,7 @@ class VllmLens(AguLens):
 
         self.tok, self._carriers, self.model = tok, {}, None  # model: the HF base, set later (Readout uses its device)
         d = Path(merged_dir)
+        self.bullet_prefix = bullet_prefix(json.loads((d / "MERGED_FROM.json").read_text())["adapter"])
         wmap = json.loads((d / "model.safetensors.index.json").read_text())["weight_map"]
         key = "model.language_model.embed_tokens.weight"
         with safe_open(d / wmap[key], "pt") as f:

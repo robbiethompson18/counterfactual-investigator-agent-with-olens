@@ -1,5 +1,10 @@
 # Why the O-lens writes Chinese
 
+> **Fixed (2026-10-22):** Agam retrained the lens with the leading space kept,
+> `olens_s3d_space_rl600` (Chinese in 3% of bullets vs 36%, same WorkspaceBench score). Use it; this
+> doc is about the old `olens_s3d_rl600`. On our 3 favourite transcripts the space lens has Chinese
+> in 0.3% of bullets vs 51% (`data/runs/olens_space_fix/`).
+
 The agu18dec O-lens (`agu18dec/olens_and_ar`, `olens_s3d_rl600`) sprinkles Chinese into its readouts
 of English transcripts. In our banks (`data/banks/`, measured 2026-10-21 with the Qwen3.6-27B
 tokenizer):

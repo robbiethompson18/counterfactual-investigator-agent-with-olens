@@ -122,7 +122,7 @@ def score(tok, ar, readout, texts, vecs, layers):
     flat = [(x, k) for k, bl in enumerate(bls) for x in bl]
     if not flat:
         return [([], 0.0) for _ in texts]
-    spans = [tok(x, add_special_tokens=False).input_ids[:32] for x, _ in flat]
+    spans = [tok(readout.lens.bullet_prefix + x, add_special_tokens=False).input_ids[:32] for x, _ in flat]
     lays = [layers[k] for _, k in flat]
     D = torch.cat([ar(spans[i : i + 256], lays[i : i + 256]) for i in range(0, len(spans), 256)])
     Z = torch.empty(len(texts), vecs.shape[1], device=D.device)

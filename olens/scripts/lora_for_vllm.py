@@ -9,7 +9,7 @@ Renamed to
 `model.language_model.layers.N...`, the LoRA matches the merged lens's first token on 792/792 and first line on 87%
 (bf16 noise; HF vs vLLM-merged agree on ~80% of first bullets).
 
-    python scripts/lora_for_vllm.py checkpoints/agu18dec_olens_and_ar/olens_s3d_rl600 /workspace/lora/olens_rl600
+    python scripts/lora_for_vllm.py checkpoints/agu18dec_olens_and_ar/olens_s3d_space_rl600 /workspace/lora/olens_space_rl600
 """
 
 import shutil

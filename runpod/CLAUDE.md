@@ -201,7 +201,7 @@ Gotchas:
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
-- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_rl600`); `setup` builds
+- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup` builds
   it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
 - The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the
   image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
