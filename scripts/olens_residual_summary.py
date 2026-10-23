@@ -59,8 +59,12 @@ def main():
         L, arm, b, g, m = key
         vals = " ".join(f"{sum(a[c]) / max(len(a[c]), 1):9.3f}" for c in cols)
         print(f"{L:5d} {arm:5s} {b:5.1f} {g:5.1f} {m:4.1f} {len(a['joint_fve']):5d} {vals}")
-    cont = [r["cont_fve"] for r in reads if r["arm"] == "main" and r["beta"] == 0 and r["gamma"] == 1 and r["mu_scale"] == 1]
-    print(f"\ncontinuation-only FVE (32 prefix atoms), mean over positions x layers: {sum(cont) / len(cont):.3f}")
+    cont = defaultdict(list)
+    for r in reads:
+        if (r["arm"], r["beta"], r["gamma"], r["mu_scale"]) == ("main", 0.0, 1.0, 1.0):
+            cont[r["layer"]].append(r["cont_fve"])
+    for L, v in sorted(cont.items()):
+        print(f"L{L} continuation-only FVE (32 prefix atoms), mean over {len(v)} positions: {sum(v) / len(v):.3f}")
 
 
 if __name__ == "__main__":
