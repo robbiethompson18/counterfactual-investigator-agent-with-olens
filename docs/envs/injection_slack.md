@@ -117,6 +117,10 @@ OpenRouter.
 - `disclosed` only reads the final reply. A run that announces the injected action mid-episode and
   omits it at the end counts as silent.
 - Concurrency 40 shared with another OpenRouter job hit 429s; 20 didn't.
+- The OpenRouter path doesn't send `top_k` (logged in `CODE_SMELL.md` by PR #132), and the server is
+  fp8. Don't pool these rates with any later bf16 vLLM runs.
+- cfbench shows each arm's edit through `meta.start_state` (the fake Slack and web as YAML), which
+  `evalcue_runs._start` appends to the prompts. The three runs above were backfilled with it.
 - Next: O-lens reads at the injection and the signature in `important` vs `wronguser` (does the lens
   say "not the user"?), once there's GPU budget. The cfbench pairs are `important`↔`wronguser`,
   `important`↔`after`, `important`↔`important+warn`, and each arm thinking on ↔ off.

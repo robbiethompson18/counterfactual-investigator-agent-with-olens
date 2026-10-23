@@ -6,7 +6,8 @@ The spec is `<env>/<run>`, or `<env>/<run>+<run>` to pool runs (e.g. a top-up), 
 context. Cases stay within one spec, so both arms of a case come from the same code version and server. The label is the
 row's `positive` (older envs: `hack`); rows with an error or no label are skipped.
 
-An arm's starting context is the messages before Qwen's first generated turn plus the sandbox's files (bash-agent envs).
+An arm's starting context is the messages before Qwen's first generated turn plus the sandbox's files (bash-agent envs), or
+the state its tools read from (`meta.start_state`, envs without a sandbox).
 Arms are run over several items (task variants); `edit` diffs the two arms on one item they share. `--pairs hub` pairs the
 hub arm, the one with the smallest total diff to every other arm (usually the env's base), with each other arm, both ways.
 
@@ -39,6 +40,8 @@ def _start(row: dict) -> str:
         cut = lambda body: body[:FILE_CHARS] + (" [...truncated]" if len(body) > FILE_CHARS else "")
         listing = "\n\n".join(f"--- {path}\n{cut(body)}" for path, body in sorted(files.items()))
         text += f"\n\nFILES IN THE MODEL'S WORKSPACE ({row['cwd']}) AT THE START:\n\n{listing}"
+    if state := (row.get("meta") or {}).get("start_state"):  # envs whose tools read Python-side state (injection_slack's fake Slack)
+        text += f"\n\nSTATE THE MODEL'S TOOLS READ FROM, AT THE START:\n\n{state}"
     return text
 
 

@@ -211,7 +211,7 @@ def call(state: dict, name: str, args: dict):
         if args["user"] not in s["users"]:
             raise ValueError(f"User {args['user']} not found in the users list")
         s["users"].remove(args["user"])
-        del s["user_inbox"][args["user"]]
+        del s["user_inbox"][args["user"]]  # KeyError for Charlie/Eve (no inbox in environment.yaml), as in AgentDojo
         del s["user_channels"][args["user"]]
         return None
     if name == "get_webpage":
@@ -250,6 +250,11 @@ def initial_state(text: str) -> dict:
     return state
 
 
+def start_state(state: dict) -> str:
+    """The fake Slack and web as YAML: cfbench shows it with the prompts, since the arms' edits live here, not in messages."""
+    return yaml.safe_dump(state, sort_keys=False, allow_unicode=True, width=1000)
+
+
 def make_step(state: dict):
     def step(_sb, msg: dict) -> tuple[list[dict], str | None]:
         if not msg.get("tool_calls"):
@@ -277,7 +282,8 @@ def build(arm, item):
     system = SYSTEM + "".join(KNOBS[k][1] for k in arm.split("+")[1:] if KNOBS[k][0] == "system")
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": USER_TASKS[user_task]}]
     state = initial_state(text)
-    return Episode(messages=msgs, max_turns=20, tools=TOOLS, step=make_step(state), meta={"goal": goal_id, "injection": text})
+    meta = {"goal": goal_id, "injection": text, "start_state": start_state(state)}
+    return Episode(messages=msgs, max_turns=20, tools=TOOLS, step=make_step(state), meta=meta)
 
 
 def calls(row) -> list[tuple[str, dict]]:
