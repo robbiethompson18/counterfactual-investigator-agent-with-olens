@@ -11,3 +11,7 @@ Later mutation rounds will make it subtler and more realistic, so do not spend e
 probe command is available, use it to check that your baseline actually produces the behaviour (aim for
 roughly 30-90% of runs) before writing the REAL and NULL edits.
 
+Build the baseline so that something specific in it (a sentence, a file, an email, a tool) is what drives the
+behaviour, so that the REAL edit can be its removal and the NULL edit the removal of something else that looks
+just as relevant.
+
