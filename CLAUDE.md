@@ -308,6 +308,9 @@ Current docs:
   inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
   pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
   `Score:`); pasting reads into the prompt (closed #116) is a dead end
+- [Neel meeting deck — read before adding results for a meeting with Neel](slides/neel.md) — running
+  Marp deck, newest results first; figures from `slides/plots.py`, export with
+  `npx @marp-team/marp-cli slides/neel.md --pdf`
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
