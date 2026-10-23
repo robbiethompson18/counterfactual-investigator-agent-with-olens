@@ -89,6 +89,12 @@ async def _finish(store: Store, ws, plan: dict, res: dict):
             store.event("novelty", round=rnd, **{k: nov.get(k) for k in ("new", "duplicate_of", "reason")})
             if not nov.get("new"):
                 return
+            plog = ws.root / "probes.jsonl"
+            probes = [json.loads(x) for x in plog.read_text().splitlines()] if plog.exists() else []
+            last = probes[-1] if probes else None
+            if not last or not last["n"] or last["k"] / last["n"] < job_queue.CULL_RATE:
+                store.event("culled", round=rnd, job=ws.root.name, reason="baseline probe below the cull rate", probe=last)
+                return
             node = _admit(store, ws, "c", parent=None, refs=plan["refs"], kind="creator", round=rnd, job=ws.root.name)
             (node.dir / "novelty.json").write_text(json.dumps(nov, indent=1) + "\n")
         else:
@@ -99,6 +105,12 @@ async def _finish(store: Store, ws, plan: dict, res: dict):
     finally:
         _close(ws)
     await evaluate(store, node)
+    if node.info.get("kind") == "creator":
+        k, n = node.scores().get("pooled_rates", {}).get("baseline", [0, 0, 0])[:2]
+        if not n or k / n < job_queue.CULL_RATE:
+            node.update(culled=True, culled_reason=f"baseline {k}/{n} below {job_queue.CULL_RATE:.0%}")
+            store.event("culled", node=node.id, reason=node.info["culled_reason"])
+            store.reindex()
 
 
 async def mutate(store: Store, ref, secs, rnd: int):

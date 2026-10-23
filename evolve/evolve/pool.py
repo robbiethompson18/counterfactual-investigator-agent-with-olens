@@ -98,7 +98,7 @@ def contaminated(node: Node) -> list[str]:
 def eligible(nodes: list[Node]) -> list[Node]:
     out = []
     for n in nodes:
-        if contaminated(n):
+        if contaminated(n) or n.info.get("culled"):
             continue
         r = n.scores().get("rank")
         if r and n.info.get("audit_score") in (2, 3) and r["P_pos"] >= P_POS_MIN:
