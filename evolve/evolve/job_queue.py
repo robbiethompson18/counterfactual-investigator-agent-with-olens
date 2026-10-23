@@ -179,6 +179,9 @@ def main():
         from .store import Store
 
         for d in sorted((Store(str(arg)).dir / "agent_jobs").iterdir()):
+            if not (d / "job.json").exists():
+                print(d.name, "-", "waiting for an agent slot")
+                continue
             state = next((s for s in ("result", "failed", "claimed") if (d / f"{s}.json").exists()), "pending")
             print(d.name, json.loads((d / "job.json").read_text())["kind"], state)
 

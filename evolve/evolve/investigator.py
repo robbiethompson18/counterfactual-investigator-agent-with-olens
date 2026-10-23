@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import llm, stats
 from .audit import render
-from .forecast import diffs, parse_pick, render_arm
+from .forecast import diffs, grader_view, parse_pick, render_arm
 from .measure import batches, load
 from .node import Node
 
@@ -35,7 +35,7 @@ async def run_investigator(node: Node, n: int, batch: str, model=llm.DS) -> tupl
     real, null = diffs(node)
     files = node.arm("baseline").files
     tpl = (PROMPTS / "investigator.md").read_text()
-    base = {"behaviour": node.behaviour, "grader": node.grader_src, "env": render_arm(node.dir / "baseline")}
+    base = {"behaviour": node.behaviour, "grader": grader_view(node.grader_src), "env": render_arm(node.dir / "baseline")}
     orders = ["real_first"] * (n // 2) + ["null_first"] * (n - n // 2)
     random.Random(f"{node.id}-{batch}-inv").shuffle(orders)
 

@@ -186,7 +186,10 @@ async def check_async(node_dir, sample_records: list[dict] | None = None) -> lis
                 errs.append(f"{a}/ is identical to baseline/ (the edit is empty)")
         if not (info.get("overlap_ok") or info.get("seed")):
             for f in edit_overlap(d / "baseline", d / "real", d / "null"):
-                errs.append(f"real/ and null/ both edit the same place in {f}: put the two edits in different places")
+                errs.append(
+                    f"real/ and null/ both edit the same place in {f} (within 40 characters): move one edit elsewhere"
+                    " (a different part of the same file is fine)"
+                )
 
     src = (d / "grader.py").read_text() if (d / "grader.py").is_file() else None
     grader_ok = False
