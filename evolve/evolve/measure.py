@@ -47,11 +47,12 @@ async def run_batch(node: Node, n: int, batch: str | None = None) -> str:
     image = arms["baseline"].episode.get("image", "evalcue-sandbox")
     recs = dict(zip(ARMS, await asyncio.gather(*(asyncio.gather(*(_episode(arms[a], i) for i in range(n))) for a in ARMS))))
     for a in ARMS:
-        ok = [r for r in recs[a] if "error" not in r]
+        gradable = lambda r: "error" not in r and r.get("finish") != "length"  # truncated runs are unscorable
+        ok = [r for r in recs[a] if gradable(r)]
         vs = iter(await grade_records(node.grader_src, ok, image=image))
         rows = []
         for i, r in enumerate(recs[a]):
-            v = next(vs) if "error" not in r else {"error": "episode failed"}
+            v = next(vs) if gradable(r) else {"error": "episode failed" if "error" in r else "hit the token budget"}
             rows.append({"sample": i, "verdict": verdict(v), "grader_error": v.get("error") if isinstance(v, dict) else None, "record": r})
         await asyncio.to_thread(_write_jsonl, out / f"{a}.jsonl", rows)
     return batch

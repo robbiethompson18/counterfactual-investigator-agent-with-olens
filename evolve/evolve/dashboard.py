@@ -13,12 +13,14 @@ Read-only over data/<run>/ (index.json, events.jsonl, nodes/, agent_jobs/), so i
     /api/rows?run=&id=&batch=&arm=           one batch of Target runs, summarised
     /api/record?run=&id=&batch=&arm=&sample= one Target run in full, with the exact prompt it was given
     /api/file?run=&id=&path=     a text file inside the node dir
+    /api/nodediff?run=&id=&other=   how node id differs from other (default: its parent), file by file
     /api/job?run=&job=           an agent job: job.json, INSTRUCTIONS.md, transcript, inputs
     /api/comparisons?run=&node=  innocuousness comparisons (all, or those involving node), newest first
     /api/comparison?run=&id=     one comparison: the judge's exact messages, tool calls and verdict
 """
 
 import argparse
+import difflib
 import functools
 import json
 import os
@@ -171,6 +173,8 @@ class Run:
                 "ref_count": info.get("ref_count", 0),
                 "batches": len(batches(Node(self.dir / "nodes" / nid))),
                 "job": info.get("job"),
+                "rewrite": bool(info.get("rewrite")),  # older jobs: a separate rewrite mode
+                "suggestion": info.get("suggestion"),
             }
         last = evs[-1]["t"] if evs else None
         return {
@@ -200,7 +204,8 @@ class Run:
                 agents[e.get("round")] = e
             elif ev in ("mutation_failed", "creation_failed", "novelty") or (ev == "node_added" and e.get("round") is not None):
                 agents.pop(e.get("round"), None)
-        return [{"what": "measuring", **e} for e in measuring.values()] + [{"what": "agent", **e} for e in agents.values()]
+        live = {n for n in measuring if (_json(self.dir / "nodes" / n / "node.json") or {}).get("stage") in ("measuring", "submitted")}
+        return [{"what": "measuring", **e} for n, e in measuring.items() if n in live] + [{"what": "agent", **e} for e in agents.values()]
 
     def progress(self, evs) -> dict:
         """Per loop job (numbered by job_start), its kind and current stage, replayed from the event log:
@@ -221,7 +226,10 @@ class Run:
             if ev == "job_start":
                 at(e["job"], "starting", t, surprise=e.get("surprise"))
             elif ev in ("mutation_start", "creation_start"):
-                at(r, "agent", t, kind=ev.split("_")[0], reference=e.get("reference"), examples=e.get("examples"))
+                kind = ev.split("_")[0] + (" (rewrite)" if e.get("rewrite") else "")
+                if e.get("suggestion"):
+                    kind += f" ({suggestion_tag(e['suggestion'])})"
+                at(r, "agent", t, kind=kind, reference=e.get("reference"), examples=e.get("examples"))
             elif ev == "topup_start":
                 at(r, "measuring", t, kind="topup", node=e.get("node"))
                 node_job[e.get("node")] = r
@@ -243,17 +251,31 @@ class Run:
                     at(node_job[e["node"]], "scoring", t)
             elif ev == "audited" and e["node"] in node_job:
                 at(node_job[e["node"]], "done", t, outcome=f"audit {e.get('score')}")
+        # A loop restart abandons in-flight top-ups and re-measures children under their old job, so the log alone
+        # can leave ghosts: a job is live only if it is its node's latest job and the node is still being measured.
+        stage = {nid: (_json(self.dir / "nodes" / nid / "node.json") or {}).get("stage") for nid in set(node_job) | set(started)}
+        latest = {}
+        for j in sorted(jobs.values(), key=lambda j: j["job"]):
+            if j.get("node"):
+                latest[j["node"]] = j["job"]
         for j in jobs.values():
             j["dir"] = dirs.get(j["job"])
             if j["stage"] == "agent":
                 j["agent_state"] = states.get(j["dir"], "posting")
+                if j["agent_state"] in ("done", "failed"):
+                    j.update(stage="interrupted", outcome="agent finished but the loop never picked up the result")
+            elif j["stage"] in ("measuring", "scoring", "admitted") and (
+                latest.get(j.get("node")) != j["job"] or stage.get(j.get("node")) not in ("measuring", "submitted")
+            ):
+                j.update(stage="interrupted", outcome="abandoned by a loop restart")
         return {
             "max_jobs": (_json(self.dir / "loop.json") or {}).get("max_jobs"),
             "started": sum(e["event"] == "job_start" for e in evs),
             "finished": bool(evs) and evs[-1]["event"] == "loop_finished",
             "jobs": sorted(jobs.values(), key=lambda j: j["job"]),
             "measure_median_s": statistics.median(measure_s[-30:]) if measure_s else None,
-            "seed_measuring": [{"node": n, "since": t} for n, t in started.items() if n not in node_job],
+            "seed_measuring": [{"node": n, "since": t} for n, t in started.items() if n not in node_job and stage.get(n) == "measuring"],
+            "recent": evs[-25:][::-1],
         }
 
     def jobs(self) -> list[dict]:
@@ -397,6 +419,27 @@ class Run:
         rec.pop("transcript", None)  # same content as turns, in chat format
         return {**row, "record": rec, "prompt": prompt, "files_changed": changed, "files_deleted": deleted}
 
+    def node_diff(self, nid: str, other: str | None = None) -> dict:
+        """Genome diff other -> nid: behaviour, grader, each arm dir, plus both nodes' REAL / NULL edits side by side."""
+        n = self.node(nid)
+        other = other or n.info.get("parent")
+        if not other:
+            return {"id": nid, "other": None}
+        o = self.node(other)
+        files = {}
+        for f in ("behaviour.txt", "grader.py", "hypothesis.md"):
+            a, b = _text(o.dir / f) or "", _text(n.dir / f) or ""
+            if a != b:
+                files[f] = "\n".join(difflib.unified_diff(a.splitlines(), b.splitlines(), f"{other}/{f}", f"{nid}/{f}", lineterm="", n=2))
+        for arm in ("baseline", "null", "real"):
+            if (o.dir / arm).is_dir() and (n.dir / arm).is_dir():
+                d = unified_diff(o.dir / arm, n.dir / arm)
+                if d:
+                    files[arm + "/"] = d
+        pair = (("other", o), ("node", n))
+        edits = {who: {a: unified_diff(x.dir / "baseline", x.dir / a) for a in ("real", "null") if (x.dir / a).is_dir()} for who, x in pair}
+        return {"id": nid, "other": other, "files": files, "edits": edits}
+
     def file(self, nid, rel) -> dict:
         n = self.node(nid)
         p = _inside(n.dir, rel)
@@ -433,6 +476,15 @@ class Run:
         if not p:
             raise FileNotFoundError(rel)
         return {"path": rel, "text": _text(p)}
+
+
+def suggestion_tag(text: str) -> str:
+    """Short name for an Evolver suggestion (loop.SUGGESTIONS), by its wording."""
+    t = text.lower()
+    for key, tag in (("simplif", "simplify"), ("rewrite", "rewrite"), ("reward hacking", "hack-tool"), ("realistic", "realism")):
+        if key in t:
+            return tag
+    return "suggestion"
 
 
 def _count_lines(p: Path) -> int:
@@ -544,6 +596,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(run.rows(q["id"], q["batch"], q["arm"]))
                 case "/api/record":
                     return self._json(run.record(q["id"], q["batch"], q["arm"], int(q["sample"])))
+                case "/api/nodediff":
+                    return self._json(run.node_diff(q["id"], q.get("other")))
                 case "/api/file":
                     return self._json(run.file(q["id"], q["path"]))
                 case "/api/job":

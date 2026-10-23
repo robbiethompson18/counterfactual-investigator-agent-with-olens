@@ -68,6 +68,14 @@ def _args(call):
         return {"_raw": call["function"]["arguments"]}
 
 
+TOKEN_BUDGET = 32000  # completion tokens per episode (Kylie, 2026-10-23); normal episodes use < 32k, runaway
+# thinking loops otherwise run to the ~260k context limit (~100 min). An episode that hits it ends with finish "length".
+
+
+def _budget(ep: dict, used: int) -> int:
+    return min(ep.get("max_tokens") or TOKEN_BUDGET, TOKEN_BUDGET - used)
+
+
 async def run_episode(arm: Arm) -> dict:
     ep = arm.episode
     prompt = [dict(m) for m in arm.messages]
@@ -76,7 +84,7 @@ async def run_episode(arm: Arm) -> dict:
     record = {"tool_calls": [], "n_turns": 0, "finish": "reply", "files_after": {}, "readonly_tampered": [], "meta": arm.meta}
     tok = 0
     if not arm.tools:
-        msg, finish, tok = await llm.target_chat(msgs, None, thinking=ep.get("thinking", True), max_tokens=ep.get("max_tokens"))
+        msg, finish, tok = await llm.target_chat(msgs, None, thinking=ep.get("thinking", True), max_tokens=_budget(ep, 0))
         msgs.append(msg)
         record.update(n_turns=1, finish="length" if finish == "length" else "reply")
     else:
@@ -93,11 +101,11 @@ async def run_episode(arm: Arm) -> dict:
             for turn in range(1, stop["max_turns"] + 1):
                 record["n_turns"] = turn
                 msg, finish, n = await llm.target_chat(
-                    msgs, _openai_tools(arm.tools), thinking=ep.get("thinking", True), max_tokens=ep.get("max_tokens")
+                    msgs, _openai_tools(arm.tools), thinking=ep.get("thinking", True), max_tokens=_budget(ep, tok)
                 )
                 tok += n
                 msgs.append(msg)
-                if finish == "length":
+                if finish == "length" or tok >= TOKEN_BUDGET:
                     record["finish"] = "length"
                     break
                 if not msg.get("tool_calls"):

@@ -83,7 +83,7 @@ async def probe(root: Path) -> str:
     child = Node(Path(json.loads((root / "job.json").read_text())["child"]))
     arm = child.arm("baseline")
     recs = list(await asyncio.gather(*(_episode(arm, i) for i in range(PROBE_N))))
-    ok = [r for r in recs if "error" not in r]
+    ok = [r for r in recs if "error" not in r and r.get("finish") != "length"]  # truncated runs are unscorable
     vs = [verdict(v) for v in await grade_records(child.grader_src, ok, image=arm.episode.get("image", "evalcue-sandbox"))]
     k, n = sum(v is True for v in vs), sum(v in (True, False) for v in vs)
     entry = json.dumps({"at": _now(), "k": k, "n": n, "verdicts": vs, "errors": len(recs) - len(ok)}) + "\n"
@@ -95,7 +95,7 @@ async def probe(root: Path) -> str:
     for i, (r, v) in enumerate(zip(ok, vs)):
         (tdir / f"run{i}.md").write_text(render(arm.files, {"record": r, "verdict": v, "sample": i}, f"probe{used + 1}-run{i}") + "\n")
     lines = [
-        f"Probe {used + 1}/{PROBE_MAX}: behaviour in {k}/{n} scorable runs ({len(recs) - len(ok)} failed to run).",
+        f"Probe {used + 1}/{PROBE_MAX}: behaviour in {k}/{n} scorable runs ({len(recs) - len(ok)} failed or hit the token budget).",
         f"Full transcripts: {tdir}/run<i>.md (thinking, replies, tool calls and outputs, changed files).",
         f"The setting is dropped if its baseline shows the behaviour in under {CULL_RATE:.0%} of runs.",
     ]
@@ -166,6 +166,18 @@ def main():
     python -m evolve.job_queue probe <job dir>    (creator jobs: measure the current baseline a few times)
     python -m evolve.job_queue list <run>            (pending / claimed / done jobs)"""
     cmd, arg = sys.argv[1], Path(sys.argv[2])
+    try:
+        _run(cmd, arg)
+    except Exception as e:  # noqa: BLE001 (agents read a traceback as a cue to go through the harness source)
+        print(
+            f"The {cmd} command hit an internal error in the harness, not a problem with your setting:\n  {type(e).__name__}: {e}\n"
+            "Run the same command once more. If it fails again, stop and say so in your final message; do not read or "
+            "debug the harness code. (Build errors in your setting are always printed as a list starting 'Build errors'.)"
+        )
+        sys.exit(2)
+
+
+def _run(cmd: str, arg: Path):
     if cmd == "submit":
         errs = asyncio.run(check(arg))
         if errs:

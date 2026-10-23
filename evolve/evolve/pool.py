@@ -4,10 +4,11 @@ Ranking scores come from a fixed-size slice: the latest measurement batch (30 pe
 (16 trials), so topped-up nodes are compared at the same n as new ones and on fresh draws. Pooled scores (all batches)
 are what agents and viewers are shown.
 
-Eligible = audited 2 or 3 and P(real lowers the rate more than null) >= 0.8.
+Eligible = audited 2 or 3, not culled, and P(real lowers the rate more than null) >= 0.8 (contaminated nodes are only flagged).
 Each round the surprise score is U or U' (coin flip); nodes are ranked into non-dominated layers on (L, surprise, N, I),
 I = innocuousness rating (innocuous.py; nodes not compared yet get the median).
-Reference: 70% uniform from layers 1-2, 30% uniform from all eligible. Secondaries: the same draw, other lineages.
+Reference: 50% uniform from layers 1-2, 20% from the 10 most all-round (worst percentile over the four), 30% uniform
+from all eligible. Secondaries: the same draw, other lineages.
 """
 
 import json
@@ -73,6 +74,7 @@ def root(node: Node, by_id: dict) -> str:
 
 
 EVOLVE_DIR = Path(__file__).resolve().parent.parent  # the evolve project: code agents may read (and run submit from)
+RISKY = (Path.home() / "workspace", Path.home() / ".claude", Path("/tmp/claude-"))  # results, memory, other sessions
 
 
 def contaminated(node: Node) -> list[str]:
@@ -92,13 +94,17 @@ def contaminated(node: Node) -> list[str]:
         root = next((r for r in roots if x.startswith(r)), None)
         return root is not None and (job in x or "/data/" not in x[len(root) :])
 
-    return [x for x in paths if not allowed(x)]
+    def risky(x):  # where earlier results live; other paths are the target's own sandbox paths or the agent's scratch
+        x = str(Path(x).expanduser()).rstrip("/")
+        return x != str(EVOLVE_DIR.parent) and any(x.startswith(str(r)) for r in RISKY)
+
+    return [x for x in paths if risky(x) and not allowed(str(Path(x).expanduser()))]
 
 
 def eligible(nodes: list[Node]) -> list[Node]:
     out = []
     for n in nodes:
-        if contaminated(n) or n.info.get("culled"):
+        if n.info.get("culled"):  # contaminated nodes stay eligible (Kylie: worst case they cost some diversity)
             continue
         r = n.scores().get("rank")
         if r and n.info.get("audit_score") in (2, 3) and r["P_pos"] >= P_POS_MIN:
@@ -119,9 +125,25 @@ def layers(nodes: list[Node], ukey: str) -> list[list[Node]]:
     return out
 
 
-def draw(cands: list[Node], ls: list[list[Node]], rng: random.Random) -> Node | None:
+ALLROUND_TOP = 10
+
+
+def allround(nodes: list[Node], ukey: str) -> dict[str, float]:
+    """All-roundness: a node's worst percentile rank (0-1, ties averaged) over L, surprise, N and I among `nodes`, so
+    a node that is good at everything beats one that tops one objective and is poor at another."""
+    iv = innocuous.values(nodes)
+    cols = [{n.id: n.scores()["rank"][k] for n in nodes} for k in ("L", ukey, "N")] + [iv]
+    m = max(len(nodes) - 1, 1)
+    pct = [{i: (sum(w < v for w in c.values()) + (sum(w == v for w in c.values()) - 1) / 2) / m for i, v in c.items()} for c in cols]
+    return {n.id: min(p[n.id] for p in pct) for n in nodes}
+
+
+def draw(cands: list[Node], ls: list[list[Node]], rng: random.Random, ar: dict[str, float] | None = None) -> Node | None:
+    """50% layers 1-2, 20% the ALLROUND_TOP most all-round, 30% uniform (each among cands)."""
     top = [n for n in (ls[0] + (ls[1] if len(ls) > 1 else [])) if n in cands]
-    pool = top if top and rng.random() < 0.7 else cands
+    best = sorted(cands, key=lambda n: -ar[n.id])[:ALLROUND_TOP] if ar else []
+    u = rng.random()
+    pool = top if top and u < 0.5 else best if best and u < 0.7 else cands
     return rng.choice(pool) if pool else None
 
 
@@ -131,12 +153,13 @@ def choose(nodes: list[Node], ukey: str, rng: random.Random, n_secondaries=2):
     if not el:
         return None, []
     ls = layers(el, ukey)
+    ar = allround(el, ukey)
     by_id = {n.id: n for n in nodes}
-    ref = draw(el, ls, rng)
+    ref = draw(el, ls, rng, ar)
     secs, used = [], {root(ref, by_id)}
     for _ in range(n_secondaries):
         c = [n for n in el if root(n, by_id) not in used]
-        s = draw(c, ls, rng)
+        s = draw(c, ls, rng, ar)
         if s:
             secs.append(s)
             used.add(root(s, by_id))
