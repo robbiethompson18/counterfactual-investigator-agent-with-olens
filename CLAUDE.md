@@ -290,6 +290,10 @@ Current docs:
 - [Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
   — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
   "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
+- [Thinking on vs off — read before running Qwen with `--thinking 0` or picking unverbalized cases for the O-lens](docs/thinking-off.md)
+  — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
+  off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
+  leakage is one-sided (`good_above` = control)
 - [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
