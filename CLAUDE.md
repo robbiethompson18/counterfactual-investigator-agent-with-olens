@@ -197,6 +197,9 @@ Current docs:
   you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
   hook-LoRA loaders, capture, AR, whitened FVE conventions
+- [RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](olens/rl/README.md)
+  — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
+  translate); 8 Qwen resamples explain as much as the lens at deep layers; GRPO/EI harness
 - [Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
