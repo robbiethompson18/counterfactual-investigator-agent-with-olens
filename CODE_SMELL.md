@@ -2,6 +2,17 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-23: env status isn't enforced everywhere; entitlement rows hold stale labels
+
+- `cfbench.sweep` builds cases from every evalcue env and ignores `evalcue/envs/status.tsv`, so it
+  will still sweep `dumb_user_exploit.entitlement_p3` (saturated). Only `evalcue.run` warns.
+- The stored `dumb_user_exploit_entitlement*` and `dumb_user_exploit_calib` rows on HF keep the
+  pre-fix entitlement labels until someone runs `evalcue.run --rescore` on them, and the cfbench
+  runs built on them (`runs/cfbench/*entitlement*`) are stale.
+- `dumb_user_exploit/common.py` still matches `keywords` over the whole reply for the non-`issue`
+  kinds, tag line included (fee's `\$ ?4,?125` hits `QUOTED_TOTAL: $4,125`). Only the `mentioned`
+  note is affected, not `positive`.
+
 ## 2026-10-23: evolve/ sandbox and seed caveats
 
 - `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
