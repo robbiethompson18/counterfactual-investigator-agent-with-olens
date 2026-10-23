@@ -11,6 +11,14 @@ it. This is the list of what still holds old-lens reads, to re-read once the new
   again from scratch with the space lens; the first 57 old-lens transcripts are kept as
   `reads_old_lens_rl600.jsonl` in the spike run.
 
+## Unread when the budget ran out (2026-10-22 ~22:25 PDT)
+
+372 queued transcripts were never read: 258 cfbench-spike P2 (3 layers each), most of overnight-v1
+and 5 of overnight-v2-targets, plus 5 spike P1. They're in
+`data/olens_requests/unread_2026-10-22.jsonl` (priorities and per-row `layers` kept); re-queue that
+file with `runpod/olens_reads.sh` into the same run dirs once there is GPU budget. The runs are on
+HF with status `abandoned`.
+
 ## To redo
 
 Inventory as of 2026-10-22. "Easy" means the token ids and read positions are on disk, so the batch
