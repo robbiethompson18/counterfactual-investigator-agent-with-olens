@@ -14,7 +14,8 @@ import random
 from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
-TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
+ANCHOR_CONDITIONS = ("anchors", "anchors_placebo")  # cfbench/anchors.py
+TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS, *ANCHOR_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
@@ -80,6 +81,21 @@ read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` c
 highest-FVE bullets (`max_bullets`). Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text."""
 
+ANCHORS = """
+
+{n_read} of the runs (marked in the table) also have attention reads from the target model's own forward pass over \
+that run, sentence by sentence (system prompt, user turns, tool outputs, its reasoning and replies), which you can \
+investigate with `anchor_ranking` (a run's top sentences), `anchor_search` (a regex over those runs' sentences) and \
+`anchor_influence` (one sentence's effect on later ones). Each sentence gets two scores:
+- receiver score: how much attention the model's later reasoning and replies pay back to this sentence, in the attention \
+heads that concentrate on a few sentences. High-receiver sentences are the ones the model keeps returning to (plans, \
+decisions, key facts).
+- suppression effect: cut every path from this sentence to later positions inside the model and measure how much the \
+model's predictions of its own later tokens change (mean KL, nats per token). High means what the model wrote \
+afterwards depended on this sentence.
+Both measure how much the model relies on a sentence in the base arm, not which way a change to it would push the \
+behavior. Scores are compared within a run as percentiles (100 = that run's top sentence)."""
+
 
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
@@ -92,14 +108,14 @@ def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
     return shown
 
 
-def run_index(base: list[Rollout], read: set[int] | None = None) -> str:
-    """One table row per base-arm run, for the tool prompts; `read` = ids with O-lens reads, adds that column."""
+def run_index(base: list[Rollout], read: set[int] | None = None, label: str = "O-lens reads") -> str:
+    """One table row per base-arm run, for the tool prompts; `read` = ids with reads (O-lens or anchor), adds that column."""
     rows = [
         f"| {i} | {'yes' if r.label else 'no'} | {sum(m['role'] == 'assistant' for m in r.messages)} | {len(render(r.messages))} |"
         + (f" {'yes' if i in read else 'no'} |" if read is not None else "")
         for i, r in enumerate(base)
     ]
-    head = "| id | showed the behavior | model turns | characters |" + (" O-lens reads |" if read is not None else "")
+    head = "| id | showed the behavior | model turns | characters |" + (f" {label} |" if read is not None else "")
     return head + "\n" + "| --- " * (head.count("|") - 1) + "|\n" + "\n".join(rows)
 
 
@@ -114,7 +130,7 @@ def build_prompt(
     read: set[int] | None = None,
     fve_note: str = "",
 ) -> str:
-    """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note."""
+    """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -132,7 +148,12 @@ This is its starting context in the base arm, before it acts:
     if condition == "no_transcript":
         evidence = context.replace("This is its", "The model's runs are not shown. This is its")
     elif condition in TOOL_CONDITIONS:
-        olens = "" if condition == "agentic" else OLENS.format(n_read=len(read or ()), fve_note=fve_note)
+        if condition in OLENS_CONDITIONS:
+            olens, label = OLENS.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
+        elif condition in ANCHOR_CONDITIONS:
+            olens, label = ANCHORS.format(n_read=len(read or ())), "anchor reads"
+        else:
+            olens, label = "", ""
         evidence = f"""{context}
 
 ## The base-arm runs
@@ -141,7 +162,7 @@ You can investigate all {n} base-arm runs with `read_transcript` (one run, paged
 every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. \
 Spend them on whatever helps you predict the counterfactual arm.
 
-{run_index(base, None if condition == "agentic" else read)}"""
+{run_index(base, None if condition == "agentic" else read, label)}"""
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."

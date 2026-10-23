@@ -6,7 +6,8 @@
 Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
 base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
 to read or search them (`agentic`, cfbench/tools.py), plus O-lens tools over some of those runs' reads (`olens`)
-or over another env's runs' reads (`olens_placebo`, cfbench/olens.py).
+or over another env's runs' reads (`olens_placebo`, cfbench/olens.py), or Thought-Anchors attention tools over the
+runs' anchor reads (`anchors`, `anchors_placebo`, cfbench/anchors.py).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
 """
@@ -17,8 +18,8 @@ import importlib
 import json
 import random
 
-from cfbench import olens
-from cfbench.core import CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench import anchors, olens
+from cfbench.core import ANCHOR_CONDITIONS, CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
@@ -32,6 +33,7 @@ async def main():
     ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--anchor-reads", default="", help="comma list of anchor reads JSONL (scripts/anchor_reads.py), for anchors*")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter); keep medium unless comparing")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
@@ -44,6 +46,8 @@ async def main():
     reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
+    anchor_reads = anchors.load(args.anchor_reads.split(",")) if args.anchor_reads else {}
+    assert anchor_reads or not set(ANCHOR_CONDITIONS) & set(conditions), "the anchors conditions need --anchor-reads"
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
     env = importlib.import_module(f"cfbench.envs.{module}")
@@ -55,7 +59,8 @@ async def main():
         description=args.description or f"{args.env}: predict {args.model} arm outcomes ({', '.join(conditions)})",
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
-        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
+        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {})
+        | ({"anchor_sources": anchors.sources(args.anchor_reads.split(","))} if args.anchor_reads else {}),
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
@@ -64,10 +69,13 @@ async def main():
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
         condition, tools, read = case["condition"], {}, None
         if condition in TOOL_CONDITIONS:
-            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
+            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS + ANCHOR_CONDITIONS)
         if condition in OLENS_CONDITIONS:
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
             tools |= lens_tools
+        if condition in ANCHOR_CONDITIONS:
+            anchor_tools, read = anchors.tools(base, anchor_reads, placebo=condition == "anchors_placebo", seed=args.seed + draw)
+            tools |= anchor_tools
         prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
