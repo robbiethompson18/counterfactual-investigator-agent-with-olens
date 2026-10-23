@@ -76,7 +76,8 @@ words. It was run on the target model's activations at punctuation tokens and tu
 prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short bullets about what the model is \
 representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
 explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
-read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that). Reads can show what the \
+read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 10 \
+highest-FVE bullets (`max_bullets`). Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text."""
 
 
