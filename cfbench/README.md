@@ -27,12 +27,23 @@ predictor sees:
 
 It answers P(behavior) for a fresh run in Y through a `submit_prediction` tool that rejects anything
 outside [0.01, 0.99] and asks again. Every predictor runs with OpenRouter reasoning effort `medium`;
-left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot,
-which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak
-the answer). Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the
-shown transcripts.
+left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot, which
+confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak the answer).
+Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the shown transcripts.
 
-The O-lens goes in as another tool in the `agentic` condition.
+The O-lens goes in as another tool in the `agentic` condition. Non-agentic O-lens conditions
+(`cfbench/olens.py`, `--olens-reads`), each with a `_placebo` twin that puts another env's reads at
+the same positions:
+
+- `transcript_olens`: the `transcript` condition's two runs with every read position's top bullet
+  per layer written inline (FVE ≥ 0.1).
+- `transcript_olens_edit`: `transcript` plus a section with the first shown run's reads at the text
+  the edit changes (all layers, top 2 bullets).
+- `transcript_olens_cf`: `transcript_olens` plus the counterfactual arm's starting context with its
+  reads (a forward pass, no generation). Outside the agreed zero-counterfactual setting; Robbie said
+  no to it, so it's kept only for comparison.
+
+Results on `hidden_goal.grade`: [docs/envs/hidden_goal.md](../docs/envs/hidden_goal.md).
 
 ## Scoring
 
