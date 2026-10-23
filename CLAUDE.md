@@ -143,15 +143,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
-- Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
-  workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
-  Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
-- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`,
-  for reference only: we don't run it. Its envs we use are ported to `evalcue/envs/` (sandbagging,
-  funding_email, secret_number; grade_your_own became exclude_rows). The old robbie-box screens'
-  gateway, configs and scripts were deleted; they're at commit `e145988`.
-- Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
-  `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
+- `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
+  see `vendor/README.md`. Never import, run or wrap it; port what you need into our own harness
+  (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
+  agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
+  commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
@@ -200,7 +196,7 @@ Current docs:
 - [Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
   — which artifacts hold reads from the buggy `olens_s3d_rl600`, and what has been re-read with the
   space lens
-- [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
+- [Smoke25 results — read before comparing anything to Agam's CHIVE harness numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first

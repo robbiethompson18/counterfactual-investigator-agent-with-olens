@@ -2,16 +2,16 @@
 
 A first check that our wrapper around Agam's harness
 ([agu18dec/detective-joracle](https://github.com/agu18dec/detective-joracle), vendored at
-`vendor/detective-joracle`) gives numbers close to his. **n = 25, one draw each, so the arm-to-arm
-gaps below are noise** (a pass@1 standard error is about ±9pp). Don't read O-lens vs transcript off
-this table.
+`vendor/detective-joracle`, run as a uv dependency until commit
+[`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991))
+gives numbers close to his. **n = 25, one draw each, so the arm-to-arm gaps below are noise** (a
+pass@1 standard error is about ±9pp). Don't read O-lens vs transcript off this table.
 
 ## Setup
 
 - **Incidents:** `splits/smoke25.txt`, 25 incidents from Agam's held-out `climb_test204`, chosen so
   we can compare against his 5 Opus 5 draws per incident. Because they're test incidents, this was a
-  one-off reproduction check. Iterate on
-  `vendor/detective-joracle/data/chive/splits/climb_dev96.txt`.
+  one-off reproduction check. Iterate on `splits/climb_dev96.txt`.
 - **Agents:** Gemini 3.8 Flash via OpenRouter (reasoning effort `high`, the OpenRouter maximum), and
   Claude Sonnet 5.5 called directly (effort `max`). Agam's reference agent is Opus 5 at effort
   `max`. Records say `effort: max` and `backend: openrouter` for every run; ignore both fields.
@@ -57,6 +57,12 @@ readouts):
   with no pass@1 gain at this n.
 
 ## Reproduce
+
+After commit
+[`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991)
+the harness stopped being a uv dependency (`vendor/` is reference-only, see `vendor/README.md`) and
+`scripts/run_chive_or.py` was removed; we use `cfbench/` now. To rerun, check out that commit and
+`git submodule update --init`:
 
 ```bash
 uv run python scripts/fetch_olens_banks.py splits/smoke25.txt data/banks/olens_rl

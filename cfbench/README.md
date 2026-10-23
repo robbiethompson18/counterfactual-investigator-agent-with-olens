@@ -1,7 +1,8 @@
 # cfbench: predict what an environment edit does to a model's behavior
 
 Our from-scratch replacement for the CHIVE prediction harness. Agam's
-[detective-joracle](https://github.com/agu18dec/detective-joracle) (vendored) is not used here.
+[detective-joracle](https://github.com/agu18dec/detective-joracle) is reference-only here
+(`vendor/README.md`).
 
 ## The task
 
