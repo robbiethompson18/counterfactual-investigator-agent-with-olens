@@ -69,7 +69,8 @@ Ports of other harnesses' envs keep the original's tool loop so rates replicate:
 replaces the bash tool with the original's tool specs, and `Episode.step(sandbox, message)` replaces
 the bash handling of each assistant turn, returning the messages to append and a finish reason (or
 `None` to continue). See `envs/sandbagging/` (agent-interp-envs' `execute_command` + `submit`, one
-call per turn, its no-tool-call nudge).
+call per turn, its no-tool-call nudge) and `envs/funding_email/` (five function tools, every call
+run).
 
 Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-haiku-5.5` or
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the
