@@ -201,6 +201,9 @@ Current docs:
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
   — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
+- [Serving metamodels on vLLM — read before decoding O-lens/NLA/J++ readouts at scale or building a metamodel server](docs/metamodel-serving.md)
+  — ceselder/vllm-metamodels and other prior art, version pins (vLLM 0.27.1, not 0.19), merged-LoRA
+  checkpoints, the TODO for a minimal Qwen3.6-27B metamodel-serving repo
 - [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
   — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
   self-report, O-lens reads
