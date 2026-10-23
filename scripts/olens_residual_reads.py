@@ -66,7 +66,7 @@ def positions(tok, ids, where, msgs, n, k):
 
 
 @torch.no_grad()
-def prepare(model, ar, readout, job, layers, n):
+def prepare(model, ar, readout, job, layers, n, configs):
     """Capture h, fit the true and wrong continuations, build every config's h'. Returns the job with `items` (one per
     (position, layer, config)) and `vecs` [items, d] added."""
     ps, ids = job["positions"], job["ids"]
@@ -86,7 +86,7 @@ def prepare(model, ar, readout, job, layers, n):
         job.setdefault("atoms", {})[L] = Dt
         job.setdefault("z", {})[L] = z
         for i, p in enumerate(ps):
-            for arm, b, g, m in CONFIGS:
+            for arm, b, g, m in configs:
                 f = fit[i] if arm == "main" else wfit[i]
                 h = acts[L][i].to(W.W.device)
                 hp = edit(W, h, f, b, g, m).float()
@@ -165,10 +165,12 @@ def main():
     ap.add_argument("--layers", default="44,56")
     ap.add_argument("--n", type=int, default=32, help="continuation tokens; atoms are its prefixes 1..n")
     ap.add_argument("--per-transcript", type=int, default=50)
+    ap.add_argument("--configs", help="arm:beta:gamma:mu_scale,... instead of the default grid (e.g. main:0.25:1:1,wrong:0.5:1:1)")
     ap.add_argument("--vllm-mem", type=float, default=0.55)
     ap.add_argument("--max-seqs", type=int, default=256)
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
+    configs = [(c.split(":")[0], *map(float, c.split(":")[1:])) for c in args.configs.split(",")] if args.configs else CONFIGS
     out = Path(args.out)
     done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
 
@@ -186,7 +188,7 @@ def main():
         job["wrong_spans"] = [other["ids"][q + 1 : q + 1 + args.n] for q in (rng.choice(other["positions"]) for _ in job["positions"])]
     jobs = [j for j in jobs if j["row"]["id"] not in done and j["positions"]]
     n_pos = sum(len(j["positions"]) for j in jobs)
-    print(f"{len(jobs)} transcripts, {n_pos} positions x {len(layers)} layers x {len(CONFIGS)} configs", flush=True)
+    print(f"{len(jobs)} transcripts, {n_pos} positions x {len(layers)} layers x {len(configs)} configs", flush=True)
 
     lens = VllmLens(tok, args.merged, gpu_memory_utilization=args.vllm_mem, max_num_seqs=args.max_seqs)  # before the HF model
     _, model = load_base()
@@ -202,7 +204,7 @@ def main():
     pending: dict | None = None
     for job in jobs + [None]:
         if job is not None:
-            prepare(model, ar, readout, job, layers, args.n)
+            prepare(model, ar, readout, job, layers, args.n, configs)
             job["fut"] = pool.submit(lens.read_items, job["vecs"], [it["L"] for it in job["items"]], SAMPLING)
         if pending is not None:
             texts = [t[0] for t in pending["fut"].result()]
