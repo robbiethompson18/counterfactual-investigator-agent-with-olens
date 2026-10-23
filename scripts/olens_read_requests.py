@@ -24,6 +24,8 @@ import copy
 import json
 import re
 import time
+import zlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -180,26 +182,15 @@ def main():
     # Mamba (linear-attention state) block: 0.45 of an H200 fits only 139, 0.55 fits 256.
     ap.add_argument("--vllm-mem", type=float, default=0.55)
     ap.add_argument("--max-seqs", type=int, default=256)
-    ap.add_argument("--shard", default="0/1", help="i/n: read every n-th transcript (in priority order) from the i-th")
+    ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
+    ap.add_argument("--watch", action="store_true", help="when the queue is empty, re-read REQUESTS every minute")
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
-
-    rows = [json.loads(line) for line in Path(args.requests).read_text().splitlines()]
-    # priority order; within a priority, round-robin over (env, arm) so early results cover every case
-    rank, seen = {}, {}
-    for r in rows:
-        g = (r.get("priority", 0), r.get("env"), r.get("arm"))
-        rank[r["id"]] = (g[0], seen.get(g, 0))
-        seen[g] = seen.get(g, 0) + 1
-    rows.sort(key=lambda r: rank[r["id"]])
     out = Path(args.out)
-    i, n = map(int, args.shard.split("/"))
-    rows = rows[i::n]
     done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
     done |= set(Path(args.skip_ids).read_text().split()) if args.skip_ids else set()
-    todo = [r for r in rows if r["id"] not in done]
-    print(f"{len(todo)} of {len(rows)} transcripts to read at layers {layers}", flush=True)
+    print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
     lens = VllmLens(tok, args.merged, gpu_memory_utilization=args.vllm_mem, max_num_seqs=args.max_seqs)  # before the HF model
@@ -211,35 +202,74 @@ def main():
         readout.whitener(L)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
 
-    t0, n_reads, secs = time.time(), 0, dict.fromkeys(("capture", "decode", "score"), 0.0)
-    for n, row in enumerate(todo, 1):
-        ta = time.time()
-        msgs, ids, where = render(tok, row)
-        toks = [tok.decode([i]) for i in ids]
-        positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
-        acts = capture(model, ids, layers, positions)
-        tb = time.time()
-        items = [(p, L, acts[L][k]) for k, p in enumerate(positions) for L in layers]
-        vecs = torch.stack([v for _, _, v in items])
-        texts = [t[0] for t in lens.read_items(vecs, [L for _, L, _ in items], SAMPLING)]
-        tc = time.time()
-        scored = score(tok, ar, readout, texts, vecs, [L for _, L, _ in items])
-        for k, dt in (("capture", tb - ta), ("decode", tc - tb), ("score", time.time() - tc)):
-            secs[k] += dt
-        with out.open("a") as f:
-            for (p, L, _), (bs, joint) in zip(items, scored):
-                msg, field, off = where[p]
-                rec = {
-                    "id": row["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
-                    "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
-                    "layer": L, "bullets": bs, "joint_fve": joint,
-                }  # fmt: skip
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        n_reads += len(items)
-        dt = time.time() - t0
-        stages = " ".join(f"{k} {v:.0f}s" for k, v in secs.items())
-        print(f"[{n}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(ids)} tokens, {len(items)} reads | "
-              f"{n_reads / dt:.1f} reads/s, {n / dt * 3600:.0f} transcripts/h | {stages}", flush=True)  # fmt: skip
+    # Pipelined: vLLM decodes transcript n in a worker thread (its engine is another process, so the thread mostly waits)
+    # while the main thread captures n and scores n-1 with the HF model. All HF work stays on the main thread, so the
+    # AR's hook-LoRA is never active during a capture. Sequential, scoring took ~40% of the time.
+    pool = ThreadPoolExecutor(1)
+    t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "wait", "score"), 0.0)
+    pending = None
+    while True:
+        todo = queue(args.requests, args.shard, done | ({pending["row"]["id"]} if pending else set()))
+        job = None
+        if todo:
+            ta = time.time()
+            row = todo[0]
+            msgs, ids, where = render(tok, row)
+            toks = [tok.decode([i]) for i in ids]
+            positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
+            acts = capture(model, ids, layers, positions)
+            items = [(p, L, acts[L][k]) for k, p in enumerate(positions) for L in layers]
+            vecs = torch.stack([v for _, _, v in items])
+            fut = pool.submit(lens.read_items, vecs, [L for _, L, _ in items], SAMPLING)
+            job = {"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "items": items, "vecs": vecs, "fut": fut}
+            secs["capture"] += time.time() - ta
+        if pending:
+            tb = time.time()
+            texts = [t[0] for t in pending["fut"].result()]
+            tc = time.time()
+            write(tok, out, pending, score(tok, ar, readout, texts, pending["vecs"], [L for _, L, _ in pending["items"]]))
+            secs["wait"] += tc - tb
+            secs["score"] += time.time() - tc
+            done.add(pending["row"]["id"])
+            n_done, n_reads = n_done + 1, n_reads + len(pending["items"])
+            dt = time.time() - t0
+            stages = " ".join(f"{k} {v:.0f}s" for k, v in secs.items())
+            r = pending["row"]
+            print(f"[{n_done}, {len(todo)} queued] {r['id']} p{r.get('priority')}: {len(pending['ids'])} tokens, "
+                  f"{len(pending['items'])} reads | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
+                  flush=True)  # fmt: skip
+        pending = job
+        if pending is None:
+            if not args.watch:
+                break
+            time.sleep(60)
+
+
+def queue(path, shard, done):
+    """REQUESTS minus `done`, this shard only: priority order, round-robin over (env, arm) within a priority so early
+    results cover every case. Re-read on every call, so appending to REQUESTS adds work to a running reader."""
+    rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
+    i, n = map(int, shard.split("/"))
+    rank, seen = {}, {}
+    for r in rows:
+        g = (r.get("priority", 0), r.get("env"), r.get("arm"))
+        rank[r["id"]] = (g[0], seen.get(g, 0))
+        seen[g] = seen.get(g, 0) + 1
+    rows = [r for r in rows if r["id"] not in done and zlib.crc32(r["id"].encode()) % n == i]
+    return sorted(rows, key=lambda r: rank[r["id"]])
+
+
+def write(tok, out, job, scored):
+    ids, where, toks, msgs = job["ids"], job["where"], job["toks"], job["msgs"]
+    with out.open("a") as f:
+        for (p, L, _), (bs, joint) in zip(job["items"], scored):
+            msg, field, off = where[p]
+            rec = {
+                "id": job["row"]["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
+                "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
+                "layer": L, "bullets": bs, "joint_fve": joint,
+            }  # fmt: skip
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
