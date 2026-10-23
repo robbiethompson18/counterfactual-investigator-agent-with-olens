@@ -34,7 +34,7 @@ from cfbench.core import (
 )
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
-from scripts.runs import finish, new_run
+from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
 
 async def main():
