@@ -11,7 +11,8 @@ the transcript as `read_transcript` shows it (core.render_spans), so search hits
   transcript text around each read and its `char`, and how many runs with / without the behavior match.
 - `olens_at(run, char)`: every read at the position nearest `char` (from any search hit) and its neighbours, with the
   transcript text between them.
-Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`).
+Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 10 best
+bullets by FVE (`max_bullets`), olens_at reads layers 32, 40, 48 by default.
 
 `olens_placebo` answers every call from a run of a different env, at the same relative position in that run (with that
 run's text around the reads), so the predictor gets as much O-lens text through the same tools, none of it about this
@@ -30,8 +31,9 @@ from cfbench.tools import Tool, _schema
 
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
-MAX_WINDOW = 5  # neighbouring positions each side in olens_at
-MAX_HITS = 15  # read positions per search_olens call
+WINDOW, MAX_WINDOW = 10, 20  # neighbouring positions each side in olens_at
+AT_LAYERS = [32, 40, 48]  # olens_at's default layers; search_olens defaults to every layer
+MAX_BULLETS = 10  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
 
 Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
@@ -108,25 +110,27 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
 
     yes_no = ["yes" if r.label else "no" for r in base]
 
-    def filters(args: dict) -> tuple[set[int] | None, int, float]:
-        layers = set(args["layers"]) if args.get("layers") else None
+    def filters(args: dict, layers: list[int] | None) -> tuple[set[int] | None, int, float]:
+        layers = args.get("layers") or layers
         top_k = TOP_K if args.get("top_k") is None else int(args["top_k"])
-        return layers, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
+        return set(layers) if layers else None, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
 
-    def show(p: Position, scale: float, layers: set[int] | None, top_k: int, min_fve: float) -> list[str]:
-        """One line per layer with at least one bullet passing both filters (bullets come sorted by FVE)."""
-        lines = []
-        for layer in sorted(p.layers):
-            bullets = [b for b in p.layers[layer]["bullets"][:top_k] if b["fve"] >= min_fve]
-            if bullets and (layers is None or layer in layers):
-                lines.append(f"  L{layer}: " + " | ".join(f"{b['text']} [FVE {b['fve']:.2f}]" for b in bullets))
-        return lines
+    def bullets(p: Position, layers: set[int] | None, top_k: int, min_fve: float) -> list[tuple[int, dict]]:
+        """(layer, bullet) for each bullet passing both filters, by layer (bullets come sorted by FVE)."""
+        return [
+            (layer, b)
+            for layer in sorted(p.layers)
+            if layers is None or layer in layers
+            for b in p.layers[layer]["bullets"][:top_k]
+            if b["fve"] >= min_fve
+        ]
 
     def at(args: dict) -> str:
         i, char = int(args["run"]), int(args["char"])
-        window = max(0, min(int(args.get("window", 2)), MAX_WINDOW))
+        window = max(0, min(int(args.get("window", WINDOW)), MAX_WINDOW))
         if i not in source:
             return f"Run {i} has no O-lens reads; the runs with reads are marked in the table."
+        layers, top_k, min_fve = filters(args, AT_LAYERS)
         pos, scale, text = run_positions(i)
         k = min(range(len(pos)), key=lambda j: abs(pos[j].char - char * scale))
         shown = pos[max(0, k - window) : k + window + 1]
@@ -134,20 +138,22 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
             out.append(f"\n…{_flat(text[start : p.char])}⟨read⟩  [char {round(p.char / scale)}, {p.where}]")
-            top_k, min_fve = filters(args)[1:]
-            out += show(p, scale, *filters(args)) or [f"  (no bullet in the top {top_k} with FVE >= {min_fve})"]
+            got = bullets(p, layers, top_k, min_fve)
+            out += [f"  L{layer}: {b['text']} [FVE {b['fve']:.2f}]" for layer, b in got] or [f"  (no bullet with FVE >= {min_fve})"]
             prev = p
         return "\n".join(out)
 
     def search(args: dict) -> str:
-        """Regex over the transcripts; the reads inside each match and the first one after it."""
+        """Regex over the transcripts; the bullets at the reads inside each match and the first one after it, best FVE first."""
         try:
             pattern = re.compile(args["regex"], re.IGNORECASE)
         except re.error as e:
             return f"Bad regex: {e}"
+        layers, top_k, min_fve = filters(args, None)
+        max_bullets = int(args.get("max_bullets") or MAX_BULLETS)
         runs = [int(args["run"])] if args.get("run") is not None else read_ids
         searched = [i for i in runs if i in source]
-        hits: dict[tuple, list] = {}  # (context, reads shown) -> [runs, block]; prompt text repeats across runs
+        found: dict[tuple, list] = {}  # (context, layer, bullet) -> [runs, fve, line]; prompt text repeats across runs
         matched = set()
         for i in searched:
             pos, scale, text = run_positions(i)
@@ -158,26 +164,26 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                 after = next((p for p in pos if p.char > end), None)
                 for p in inside + ([after] if after and after not in inside else []):
                     context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
-                    if not (lines := show(p, scale, *filters(args))):
-                        continue  # nothing passes the bullet filters here
-                    block = f'char {round(p.char / scale)} ({p.where}): "{context}"\n' + "\n".join(lines)
-                    hits.setdefault((context, tuple(lines)), [[], block])[0].append(i)
+                    for layer, b in bullets(p, layers, top_k, min_fve):
+                        line = f'char {round(p.char / scale)} ({p.where}) L{layer} [FVE {b["fve"]:.2f}]: "{context}"\n  → {b["text"]}'
+                        found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
             ids = [i for i in searched if base[i].label == label]
             if ids:
                 kinds.append(f"{sum(i in matched for i in ids)} of {len(ids)} runs {name} the behavior")
-        summary = f"The regex matches the transcripts of {' and '.join(kinds)} (runs with reads only); {len(hits)} distinct read positions."
-        # alternate runs with and without the behavior, so neither kind crowds out the other
-        ordered = sorted(hits.values(), key=lambda h: (min(searched.index(i) for i in h[0]) // 2, not base[h[0][0]].label))
-        blocks = [
-            f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}] {b}" for rs, b in ordered[:MAX_HITS]
-        ]
-        more = f" Showing {MAX_HITS}; narrow the regex or pass run for the rest." if len(hits) > MAX_HITS else ""
-        return summary + more + ("\n\n" + "\n\n".join(blocks) if blocks else "")
+        summary = f"The regex matches the transcripts of {' and '.join(kinds)} (runs with reads only). "
+        ranked = sorted(found.values(), key=lambda h: -h[1])
+        if len(ranked) > max_bullets:
+            summary += (
+                f"{len(ranked)} bullets pass the filters; the top {max_bullets} by FVE are shown, {len(ranked) - max_bullets} are not."
+            )
+        else:
+            summary += f"{len(ranked)} bullets pass the filters."
+        label = lambda rs: f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]"
+        return summary + "".join(f"\n\n{label(rs)} {line}" for rs, _, line in ranked[:max_bullets])
 
-    params = {
-        "layers": {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers"},
+    filter_params = {
         "top_k": {"type": "integer", "description": f"bullets per read, highest FVE first (default {TOP_K})"},
         "min_fve": {"type": "number", "description": f"only bullets with at least this FVE (default {MIN_FVE})"},
     }
@@ -185,11 +191,16 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         "search_olens": (
             _schema(
                 "search_olens",
-                "Case-insensitive regex over every base-arm transcript that has O-lens reads. For each match, the O-lens reads "
-                "at the punctuation inside it and the first one after it, with the transcript text around each read and its "
-                f"char (for olens_at). Says how many runs with and without the behavior match. At most {MAX_HITS} read "
-                "positions per call; identical prompt text in several runs is shown once.",
-                {"regex": {"type": "string"}, "run": {"type": "integer", "description": "optional: one run id"}, **params},
+                "Case-insensitive regex over every base-arm transcript that has O-lens reads. Returns the O-lens bullets at the "
+                "punctuation inside each match and the first read after it, highest FVE first, each with the transcript text "
+                "around the read and its run and char (for olens_at), and how many runs with and without the behavior match.",
+                {
+                    "regex": {"type": "string"},
+                    "run": {"type": "integer", "description": "optional: one run id"},
+                    "layers": {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers (default all)"},
+                    **filter_params,
+                    "max_bullets": {"type": "integer", "description": f"bullets returned (default {MAX_BULLETS})"},
+                },
                 ["regex"],
             ),
             search,
@@ -197,13 +208,14 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         "olens_at": (
             _schema(
                 "olens_at",
-                "Every O-lens read (all layers) at the read position nearest `char` in a run, and `window` positions each side, "
-                "with the transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
+                "The O-lens reads at the read position nearest `char` in a run and `window` positions each side, with the "
+                "transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
                 {
                     "run": {"type": "integer"},
                     "char": {"type": "integer"},
-                    "window": {"type": "integer", "description": f"positions each side, default 2, max {MAX_WINDOW}"},
-                    **params,
+                    "window": {"type": "integer", "description": f"positions each side (default {WINDOW}, max {MAX_WINDOW})"},
+                    "layers": {"type": "array", "items": {"type": "integer"}, "description": f"default {AT_LAYERS}"},
+                    **filter_params,
                 },
                 ["run", "char"],
             ),
