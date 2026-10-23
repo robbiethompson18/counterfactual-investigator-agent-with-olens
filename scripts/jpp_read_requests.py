@@ -1,7 +1,7 @@
 """J++ lens reads at every token of chat transcripts, at every 4th layer (olens.extras.JPP: the neuronpedia/jacobian-lens
 qwen3.6-27b/jpp lens, logits at layer l = lm_head(norm(h_l @ J[l].T)), h_l the output of block l).
 
-The J++ counterpart of scripts/nla_read_requests.py: same requests, same render() and order, so its rows join the O-lens
+The J++ counterpart of scripts/nla_read_requests.py: same requests, render() and order as the O-lens reader, so rows join the O-lens
 and NLA rows on (id, token_index). Those read only stop tokens; this reads every token. Runs on one 80 GB GPU (base ~54 GB
 + 16 J matrices ~0.8 GB), from the repo root:
 
@@ -22,9 +22,9 @@ import time
 from pathlib import Path
 
 import torch
-from nla_read_requests import render
 from olens.extras import JPP
 from olens.lens import load_base
+from olens_read_requests import render
 
 LAYERS, K = list(range(0, 61, 4)), 5
 
