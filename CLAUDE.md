@@ -145,9 +145,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 - `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
   see `vendor/README.md`. Never import, run or wrap it; port what you need into our own harness
-  (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box
-  `scripts/envs_gateway.py` screens of agent-interp-envs (docs/envs-screen) are legacy; that run
-  plumbing goes once the evalcue ports land.
+  (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
+  agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
+  commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
@@ -230,12 +230,20 @@ Current docs:
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+  (deleted, at `e145988`)
+- [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+  — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
+  subagent labels, replication of the screen (14/30 vs 0/30)
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+  (deleted, at `e145988`)
 - [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
+- [Sandbagging in evalcue — read before running the sandbagging env (it now runs in evalcue, not the vendored harness)](docs/envs/sandbagging.md)
+  — `evalcue/envs/sandbagging/`: all 22 arms verbatim, the original tool loop, `detect()` matching
+  544/544 original labels; replicates on OpenRouter (`a_goal` 8/30 vs `a_goal_lt` 21/30, p = 8e-4)
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
   — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
   names don't exist in the image, so arm B needs our overlay

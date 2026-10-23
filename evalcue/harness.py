@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -67,6 +68,10 @@ class Episode:
     final_command: str | None = None  # ...unless this regex is set: then only matching commands run, 3 tries (e.g. submit)
     out_of_budget: str = ""  # appended to the output that spends the budget, and to each refused command (e.g. "submit now")
     done_file: str | None = None  # the episode ends as soon as this file exists in the sandbox (e.g. written by a submit script)
+    tools: list[dict] = field(default_factory=lambda: [BASH_TOOL])
+    # Replaces the bash handling of each assistant turn, for ports that reproduce another harness's tool loop (its tool
+    # names, output format, retry messages): (sandbox, assistant message) -> (messages to append, finish reason or None).
+    step: Callable[["Sandbox", dict], tuple[list[dict], str | None]] | None = None
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
@@ -128,7 +133,7 @@ class Sandbox:
             text=True,
         ).strip()
 
-    def run(self, command: str, timeout: int = 30) -> tuple[str, int]:
+    def run(self, command: str, timeout: int = 30, limit: int = 8000) -> tuple[str, int]:
         try:
             p = subprocess.run(
                 ["docker", "exec", self.cid, "timeout", str(timeout), "bash", "-lc", command],
@@ -140,7 +145,7 @@ class Sandbox:
             out, code = p.stdout + p.stderr, p.returncode
         except subprocess.TimeoutExpired:
             out, code = "[timed out]", 124
-        return (out if len(out) < 8000 else out[:4000] + "\n...[truncated]...\n" + out[-4000:]), code
+        return (out if len(out) < limit else out[: limit // 2] + "\n...[truncated]...\n" + out[-limit // 2 :]), code
 
     def snapshot(self) -> dict[str, str]:
         files = {}
@@ -191,12 +196,19 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
     total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):
-            msg, f, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens, tools=[BASH_TOOL])
+            msg, f, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens, tools=ep.tools)
             total += ntok
             msgs.append(msg)
             if f == "length":
                 finish = "length"
                 break
+            if ep.step:
+                new, end = await asyncio.to_thread(ep.step, sb, msg)
+                msgs += new
+                if end:
+                    finish = end
+                    break
+                continue
             if not msg.get("tool_calls"):
                 finish = "stop"
                 break

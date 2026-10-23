@@ -24,21 +24,10 @@ can't or because it isn't ours to change:
   in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
   `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
   prompts, but its results are recorded, so the recipe was kept.
-- `scripts/envs_gateway.py` reads `QWEN_URL`/`QWEN_API_KEY`, not `QWEN_VLLM_URL`/
-  `QWEN_VLLM_API_KEY` as `runpod/CLAUDE.md` says. Renaming would break any launch command on
-  robbie-box that still passes the old names.
 - `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
   do (the image already sets one, so weights download twice).
 - Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
   checkpoint.
-
-## 2026-10-22: `cfbench/envs/sandbagging_iter.py` restates its label rule
-
-Its `BEHAVIOR` is copied from `scripts/envs_screen/sandbagging_iter.py`'s docstring, which computes
-the mechanical label. That script imports its sibling as `from sandbagging import ...`, so cfbench
-can't import a constant from it the way `cfbench/envs/sandbagging.py` imports `JUDGE_RUBRIC`. If the
-label changes, edit both. (The evalcue envs' rules, formerly `behaviors.json`, now live next to each
-`detect()` as `BEHAVIOR`.)
 
 ## 2026-10-22: `shutdown_*` doc tables come from a scratch script
 

@@ -16,12 +16,12 @@ After cloning, `git submodule update --init` fetches them.
 
 ## What we took from where
 
-| Source                                           | Ours                                                                                   |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| detective-joracle `data/chive/splits/`           | `splits/` (`all300`, `climb_dev96`, `climb_test204`, `hard92`)                         |
-| agent-interp-envs `environments/secret_number`   | `evalcue/envs/secret_number`                                                           |
-| agent-interp-envs `environments/grade_your_own`  | `evalcue/envs/exclude_rows` (a rewrite)                                                |
-| agent-interp-envs `sandbagging`, `funding_email` | evalcue ports in flight on branches `envs/port-sandbagging`, `envs/port-funding-email` |
+| Source                                           | Ours                                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| detective-joracle `data/chive/splits/`           | `splits/` (`all300`, `climb_dev96`, `climb_test204`, `hard92`)                                 |
+| agent-interp-envs `environments/secret_number`   | `evalcue/envs/secret_number`                                                                   |
+| agent-interp-envs `environments/grade_your_own`  | `evalcue/envs/exclude_rows` (a rewrite)                                                        |
+| agent-interp-envs `sandbagging`, `funding_email` | `evalcue/envs/sandbagging`, `evalcue/envs/funding_email` (both replicate the original screens) |
 
 Until commit `a1e8991`, detective-joracle was a uv workspace member and `scripts/run_chive_or.py`
 ran it; see `docs/smoke25-results.md` for what that produced.
