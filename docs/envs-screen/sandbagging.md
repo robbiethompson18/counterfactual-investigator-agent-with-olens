@@ -1,5 +1,11 @@
 # Env screen: `sandbagging` on Qwen3.6-27B
 
+> **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
+> `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
+> retired from) our own harness; read them at commit
+> [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988).
+> Current runs go through `evalcue/`.
+
 Screen of the `sandbagging` environment from
 [gkroiz/agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) (vendored at
 `vendor/agent-interp-envs`, pinned 310c03f) for the MATS sprint: does Qwen3.6-27B sometimes

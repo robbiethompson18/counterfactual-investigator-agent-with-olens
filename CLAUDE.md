@@ -146,11 +146,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
   workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
   Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
-- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`
-  (not a uv member; it has its own env). Run its rollouts on robbie-box through
-  `scripts/envs_gateway.py` (see the docs/envs-screen reports): `agent.provider=fireworks` plus
-  `ROLLOUT_GATEWAY` routes Qwen to our vLLM and keeps containers off the internet
-  (`--network envnet`).
+- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`,
+  for reference only: we don't run it. Its envs we use are ported to `evalcue/envs/` (sandbagging,
+  funding_email, secret_number; grade_your_own became exclude_rows). The old robbie-box screens'
+  gateway, configs and scripts were deleted; they're at commit `e145988`.
 - Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
@@ -235,12 +234,14 @@ Current docs:
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+  (deleted, at `e145988`)
 - [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
   — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
   subagent labels, replication of the screen (14/30 vs 0/30)
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+  (deleted, at `e145988`)
 - [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried

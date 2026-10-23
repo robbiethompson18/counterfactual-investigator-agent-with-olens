@@ -1,8 +1,8 @@
 """Run directories: every experiment's outputs go in data/runs/<experiment>/<YYYY-MM-DD>_<slug>/ with a meta.json saying
 what produced them, and a run isn't finished until it's synced to the HF dataset under runs/ (same path).
 
-<experiment> is the env name for agent-interp-envs screens (funding_email, sandbagging, ...) or the experiment family
-otherwise (evalcue, identity, organisms). Models go in meta.json, not the path: one run often compares several.
+<experiment> is the env name for env runs (funding_email, shutdown_palisade, ...) or the experiment family otherwise
+(evalcue, identity, organisms). Models go in meta.json, not the path: one run often compares several.
 
 From Python (scripts/ is on sys.path when you run `python scripts/<x>.py`):
 
@@ -16,7 +16,7 @@ From Python (scripts/ is on sys.path when you run `python scripts/<x>.py`):
 From the shell, for runs a harness writes itself (point its results dir at the printed path):
 
     uv run python scripts/runs.py new funding_email arm-a-qwen -d "..." --model Qwen/Qwen3.6-27B@<sha> \\
-        --served-by "runpod:qwen-envs via scripts/envs_gateway.py" --param n=10 --param reasoning_effort=high
+        --served-by "runpod:qwen-shared, vLLM 0.32" --param n=10 --param reasoning_effort=high
     uv run python scripts/runs.py finish data/runs/funding_email/2026-10-21_arm-a-qwen   # done + sync
     uv run python scripts/runs.py finish RUN --status abandoned                         # still synced: failed runs are data
     uv run python scripts/runs.py sync RUN                                              # re-upload after adding files

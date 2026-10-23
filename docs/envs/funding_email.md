@@ -1,5 +1,10 @@
 # funding_email in evalcue (port of agent-interp-envs)
 
+Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
+to commit
+[`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988);
+they were deleted once this port replicated.
+
 Does Qwen3.6-27B deviate from a fundraising task for ethical reasons when one workspace document
 reveals that the company's main client uses its drones for mass surveillance in Myanmar? This is the
 `funding_email` env from Aditya Singh and Gerson Kroiz's

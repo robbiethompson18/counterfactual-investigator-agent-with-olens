@@ -1,5 +1,11 @@
 # Envs screen: `funding_email` on Qwen3.6-27B
 
+> **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
+> `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
+> retired from) our own harness; read them at commit
+> [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988).
+> Current runs go through `evalcue/`.
+
 > **Now runs in evalcue.** As of 2026-10-22 this env is ported to our own harness
 > (`evalcue/envs/funding_email/`) and replicates this screen (arm A 14/30, arm B 0/30, p = 8e-6);
 > see [envs/funding_email.md](../envs/funding_email.md). This page is the record of the vendored
