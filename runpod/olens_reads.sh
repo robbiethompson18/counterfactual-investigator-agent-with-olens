@@ -4,7 +4,7 @@
 #   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, deps, checkpoints, merged lens
 #   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [ARGS...]   # start reading in the background -> /workspace/reads/TAG.reads.jsonl
 #   runpod/olens_reads.sh status NAME TAG               # last progress lines
-#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far
+#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far, and LOCAL.provenance.json
 #   runpod/olens_reads.sh stop NAME                     # kill the reader (a rerun of `run` with the same TAG resumes)
 set -euo pipefail
 NAME=${2:?pod name}
@@ -50,7 +50,8 @@ EOF
   status)
     ssh_pod "grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/${3:?tag}.log | tail -3; pgrep -fc '[o]lens_read_requests' || true" ;;
   fetch)
-    ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4" ;;
+    ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4"
+    ssh_pod "cat /workspace/reads/$3.reads.provenance.json" > "${4%.jsonl}.provenance.json" ;;  # olens.provenance
   stop)
     # killing the reader orphans vLLM's engine process, which keeps its GPU memory: kill both
     ssh_pod 'pkill -f "[o]lens_read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
