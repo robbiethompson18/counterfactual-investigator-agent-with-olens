@@ -5,3 +5,5 @@ analysis/pair_diffs.md
 analysis/*.csv
 .venv/
 __pycache__/
+analysis/glm53_dash/site/
+evilgenie/data/

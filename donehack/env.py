@@ -161,15 +161,19 @@ def sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None
 
 
+CHAT_TIMEOUT = 300
+
+
 async def chat(client, model, messages, tools, key, **extra):
     body = {"model": model, "messages": messages, "tools": tools, "max_tokens": 8000, **extra}
+    body = {k: v for k, v in body.items() if v is not None}  # max_tokens=None: no cap
     for attempt in range(6):
         try:
             r = await client.post(
                 os.environ.get("API_BASE", "https://openrouter.ai/api/v1") + "/chat/completions",
                 json=body,
                 headers={"Authorization": f"Bearer {key}"},
-                timeout=300,
+                timeout=CHAT_TIMEOUT,
             )
             j = r.json()
             if "choices" in j:

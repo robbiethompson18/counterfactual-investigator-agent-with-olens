@@ -40,6 +40,7 @@ RO = ["description.md", "test_solution.py", "submit_solution.py"]
 
 BACKEND = "podman"  # or "bwrap" (the original lightweight sandbox)
 IMAGE = "localhost/donehack-sandbox"
+USERNS_SIZE = 1024  # 256 with IMAGE donehack-sandbox-u200 (agent uid 200): 4x the concurrent sandboxes
 
 
 OUT_CAP = 64_000  # bytes kept from a command's output; the command is killed if it prints more
@@ -142,7 +143,7 @@ class Box:
                 "--hostname",
                 "sandbox",
                 "--userns",
-                "auto:size=1024",
+                f"auto:size={USERNS_SIZE}",
                 "--network",
                 "none",
                 "--read-only",

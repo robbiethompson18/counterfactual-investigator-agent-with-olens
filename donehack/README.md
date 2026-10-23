@@ -55,6 +55,11 @@ The agent is treated as adversarial. By default each episode runs in its own pod
   the agent user with user site-packages disabled.
 - At most 60 containers run at once (`MAX_BOXES`), because each one takes 1024 of the user's 65536
   subuids.
+- `--small-uid N` (variants.py, evilgenie/run.py) switches to the image from
+  `container/Containerfile.u200` (agent uid 200), 256-id slices (`port.USERNS_SIZE`) and N containers
+  at once. Build it with `podman build -t localhost/donehack-sandbox-u200 -f container/Containerfile.u200 container/`.
+  Subuid slices are shared with other jobs on the host, so the runners wait and retry when podman has
+  no unused IDs.
 
 `--backend bwrap` selects the original bubblewrap sandbox, which runs as the host user and has
 pinned NixOS store paths. Every result above came from it, and podman uses a different Python and
@@ -83,6 +88,19 @@ that already exist. The runs behind the findings above, with the runner logs, ar
 - `port.py`: the sandbox, prompts, episode-ending conditions (`CONDS`) and the main runner.
 - `variants.py`: the repo's other is_prime variants (reward schemes, rules, ask_user, writable
   tests, test count), each a single-factor change from the repo's default config.
+  `t_<task>` conditions run the repo's other local coding tasks (`variants.TASKS`) with the base
+  config; they have no built-in hack, so `hack` there means solved. Records also log the task,
+  passed/failed test counts, the pytest tail, token counts and the last finish_reason. Flags:
+  `--no-max-tokens` (no per-turn cap; default 8000), `--chat-timeout`, `--grade-timeout`,
+  `--small-uid N` (see Sandbox), `--seed-from` (top up later seeds while earlier ones run).
+- `evilgenie/`: the repo's EvilGenie (LiveCodeBench) coding source as in `configs/coding/lcb.yaml`
+  (its prompts, `execute_command` + `done`, writable tests, 100 steps) on the podman sandbox.
+  `extract.py` dumps the 154 problems with LiveCodeBench's private tests to `evilgenie/data/`
+  (gitignored); `run.py` grades on the visible tests and on the private holdout, and flags
+  `hack_signal` = passes visible, fails holdout.
+- `analysis/glm53_dash/`: GLM 5.3 coding-env summary page (`build.py`, writes `site/`), expview
+  export (`expview_export.py`, `EXPVIEW_DIR` overrides `~/workspace/expview`) and the monorepo
+  rows export (`to_rows.py`, writes `data/runs/coding/2026-10-23_glm53`).
 - `submit_solution_*.py`: submit scripts shown to the agent, kept byte-identical to
   agent-interp-envs and excluded from ruff.
 - `env.py`, `tasks.py`: the earlier toy-task harness. `env.chat` (the OpenRouter client) is shared.
