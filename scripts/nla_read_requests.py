@@ -31,6 +31,7 @@ import hashlib
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import torch
@@ -158,46 +159,64 @@ def main():
     critic.calibrate(torch.cat([capture(model, ids, list(range(4, len(ids)))) for ids in calib]))  # as pod/server.py
     print(f"loaded; FVE baseline {critic.base:.1f}", flush=True)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
-    cache = {}  # prefix key -> (text, {cos, fve})
+    texts, scores = {}, {}  # prefix key -> explanation, -> {cos, fve}
+    secs = dict.fromkeys(("capture", "decode", "score"), 0.0)
+    scorer = ThreadPoolExecutor(1)  # the AR (GPU 1 with --vllm) scores a batch while the next one decodes; one worker keeps order
 
-    def flush(pending):
-        """Explain the pending transcripts' positions not seen before in one decode call, then write every row."""
-        todo = {}
-        for *_, keys, vecs in pending:
-            for key, v in zip(keys, vecs):
-                if key not in cache:
-                    todo.setdefault(key, v)
-        if todo:
-            vecs = torch.stack(list(todo.values()))
-            texts = explain(vecs)
-            cache.update(zip(todo, zip(texts, critic.score(texts, vecs))))
+    def finish(pending, new, vecs):
+        """Score the newly decoded positions, then write every row of the pending transcripts."""
+        tb = time.time()
+        if new:
+            scores.update(zip(new, critic.score([texts[key] for key in new], vecs)))
+        secs["score"] += time.time() - tb
         with out.open("a") as f:
             for row, msgs, ids, toks, where, positions, keys, _ in pending:
                 for p, key in zip(positions, keys):
-                    (text, sc), (msg, field, off) = cache[key], where[p]
+                    msg, field, off = where[p]
                     rec = {
                         "id": row["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
                         "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
-                        "layer": LAYER, "text": text, **sc,
+                        "layer": LAYER, "text": texts[key], **scores[key],
                     }  # fmt: skip
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        return len(todo)
 
-    t0, n_reads, n_decoded, pending = time.time(), 0, 0, []
+    def flush(pending):
+        """Explain the pending transcripts' positions not seen before in one decode call; score and write in the background."""
+        new = {}
+        for *_, keys, vecs in pending:
+            for key, v in zip(keys, vecs):
+                if key not in texts:
+                    new.setdefault(key, v)
+        vecs = torch.stack(list(new.values())) if new else None
+        ta = time.time()
+        if new:
+            texts.update(zip(new, explain(vecs)))
+        secs["decode"] += time.time() - ta
+        return scorer.submit(finish, pending, list(new), vecs), len(new)
+
+    t0, n_reads, n_decoded, pending, last = time.time(), 0, 0, [], None
     for k, row in enumerate(todo, 1):
         msgs, ids, where = render(tok, row)
         toks = [tok.decode([x]) for x in ids]
         positions = [p for p, x in enumerate(ids) if x == im_end or PUNCT.match(toks[p])]
+        ta = time.time()
         pending.append((row, msgs, ids, toks, where, positions, prefix_keys(ids, positions), capture(model, ids, positions)))
+        secs["capture"] += time.time() - ta
         if sum(len(x[5]) for x in pending) < batch and k < len(todo):
             continue  # short transcripts share a decode call
-        n_decoded += flush(pending)
+        job, n_new = flush(pending)
+        if last is not None:
+            last.result()  # surface a scoring error, and keep at most one batch scoring behind the decode
+        last, n_decoded = job, n_decoded + n_new
         n_reads += sum(len(x[5]) for x in pending)
         dt = time.time() - t0
         print(f"[{k}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(pending)} transcripts, {n_reads} reads "
-              f"({n_decoded} decoded, the rest shared prefixes) | {n_reads / dt:.2f} reads/s, {k / dt * 3600:.0f} transcripts/h",
+              f"({n_decoded} decoded, the rest shared prefixes) | {n_reads / dt:.2f} reads/s, {k / dt * 3600:.0f} transcripts/h | "
+              f"{' '.join(f'{name} {v:.0f}s' for name, v in secs.items())}",
               flush=True)  # fmt: skip
         pending = []
+    if last is not None:
+        last.result()
 
 
 if __name__ == "__main__":

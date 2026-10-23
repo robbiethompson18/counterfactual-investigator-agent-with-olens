@@ -20,7 +20,7 @@ INJECT_LAYER = 1
 
 
 class VllmNLA:
-    def __init__(self, tok, merged_dir, meta_path, gpu_memory_utilization=0.9, max_num_seqs=512):
+    def __init__(self, tok, merged_dir, meta_path, gpu_memory_utilization=0.9, max_num_seqs=1024):
         from vllm import LLM
 
         meta = yaml.safe_load(Path(meta_path).read_text())

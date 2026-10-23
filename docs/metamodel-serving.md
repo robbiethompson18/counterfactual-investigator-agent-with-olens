@@ -47,5 +47,22 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
 - **Prompt positions repeat.** About a fifth of the stop tokens in an env's transcripts sit in the
   starting context, which is identical for every run of an arm. The NLA reader caches readouts by a
   hash of the full token prefix; the O-lens reader doesn't yet.
-- **HF NLA speed for comparison:** HF `generate` reaches ~1.1k tok/s (7 readouts/s at ~160 tokens
-  each, batch 256, one H200).
+- **Install:** `uv pip install "vllm==0.27.1" "transformers==5.16.1"`, then
+  `uv pip install --no-deps "vllm-lens @ git+https://github.com/ceselder/vllm-metamodels"` plus
+  `zstandard`. One combined `uv pip install` sat idle for 25 min resolving. That gives torch 2.13 +
+  cu130 (fine on RunPod's driver 595), vLLM 0.27.1, vllm-metamodels 1.1.0.post7.
+
+## NLA readout throughput (2026-10-22, cfbench env transcripts, greedy, ~160 tokens per readout)
+
+| setup                                                        | readouts/s |
+| ------------------------------------------------------------ | ---------- |
+| HF `generate`, one transcript per batch, 1x H200             | 1.7        |
+| HF `generate`, batch 256 pooled across transcripts, 1x H200  | 6-7.5      |
+| vLLM AV (GPU 0) + HF capture and AR (GPU 1), 2x H200, serial | 16         |
+| same, AR scoring overlapped with the next decode             | 20         |
+
+vLLM decodes at ~3.2k tok/s here, close to vllm-metamodels' own Qwen3.6-27B benchmark. Against the
+HF path on the same 2,763 positions: mean FVE 0.309 vs 0.310 (correlation 0.98), the first 40
+characters identical in 83% of readouts, the first sentence in 68% (greedy decodes drift late from
+bf16 noise, as the O-lens vLLM path does). Prefix dedupe skips another ~5-20% of decodes depending
+on how much of an env's transcripts is shared prompt.
