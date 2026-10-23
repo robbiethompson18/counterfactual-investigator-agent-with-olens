@@ -1,4 +1,7 @@
-"""Novelty of O-lens reads over the realized continuation (olens.novelty), on CPU from atom dumps: the residual-reads
+"""DEAD END (2026-10-23), never merged: FVE beyond the continuation does not separate new content from echoes of
+the transcript. Kept on a closed branch for reference only; results in docs/olens-novelty.md on main.
+
+Novelty of O-lens reads over the realized continuation (olens.novelty), on CPU from atom dumps: the residual-reads
 run's atoms/ (scripts/olens_residual_reads.py save_atoms, joined to its reads.jsonl for text and env labels) or
 scripts/olens_atoms.py's (which carry their own text).
 

@@ -1,4 +1,7 @@
-"""Atoms for an existing O-lens read run (scripts/olens_read_requests.py output), so scripts/olens_novelty.py can score
+"""DEAD END (2026-10-23), never merged: FVE beyond the continuation does not separate new content from echoes of
+the transcript. Kept on a closed branch for reference only; results in docs/olens-novelty.md on main.
+
+Atoms for an existing O-lens read run (scripts/olens_read_requests.py output), so scripts/olens_novelty.py can score
 it on CPU. No lens decoding: the bullets are the run's own. Per transcript, at up to --per-transcript of its read
 positions (evenly spaced, any role), it saves the whitened activation z, the whitened AR atoms of the continuation's
 prefixes (--prefixes of the next 32 tokens; a prefix past the transcript's end is a zero row), and the whitened AR atoms

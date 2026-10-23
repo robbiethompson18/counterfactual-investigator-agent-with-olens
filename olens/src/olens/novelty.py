@@ -1,4 +1,7 @@
-"""How much an O-lens read explains beyond the text Qwen actually wrote next ("novelty").
+"""DEAD END (2026-10-23), never merged: FVE beyond the continuation does not separate new content from echoes of
+the transcript. Kept on a closed branch for reference only; results in docs/olens-novelty.md on main.
+
+How much an O-lens read explains beyond the text Qwen actually wrote next ("novelty").
 
 Per position, with z the whitened activation, C its continuation atoms (olens.continuation: AR of prefixes of the next
 tokens) and B the read's bullet atoms (AR of bullet_prefix + bullet), all NNLS in the pooled whitened space:
