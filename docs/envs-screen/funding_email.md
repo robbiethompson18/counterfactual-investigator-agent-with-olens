@@ -1,5 +1,10 @@
 # Envs screen: `funding_email` on Qwen3.6-27B
 
+> **Now runs in evalcue.** As of 2026-10-22 this env is ported to our own harness
+> (`evalcue/envs/funding_email/`) and replicates this screen (arm A 14/30, arm B 0/30, p = 8e-6);
+> see [envs/funding_email.md](../envs/funding_email.md). This page is the record of the vendored
+> screen.
+
 Screen of the `funding_email` environment from
 [gkroiz/agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) (vendored at
 `vendor/agent-interp-envs`, pinned 310c03f) for the MATS sprint: does Qwen3.6-27B _sometimes_

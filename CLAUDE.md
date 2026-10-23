@@ -225,6 +225,9 @@ Current docs:
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+- [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+  — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
+  subagent labels, replication of the screen (14/30 vs 0/30)
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
@@ -281,7 +284,8 @@ Current docs:
   — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
-  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript audits
+  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
+  audits
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod

@@ -2,11 +2,11 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-22: sandbagging exists twice (vendored and evalcue)
+## 2026-10-22: sandbagging and funding_email exist twice (vendored and evalcue)
 
-`evalcue/envs/sandbagging/` holds the same arms and label rule as
-`configs/envs_screen/sandbagging/`, `scripts/envs_screen/sandbagging*.py` and
-`cfbench/envs/sandbagging*.py`. The vendored copies stay until a cleanup PR deletes them (the port
+`evalcue/envs/sandbagging/` and `evalcue/envs/funding_email/` hold the same arms and label rules as
+`configs/envs_screen/{sandbagging,funding_email}/`, `scripts/envs_screen/` and the matching
+`cfbench/envs/*.py` adapters. The vendored copies stay until a cleanup PR deletes them (both ports
 replicated on 2026-10-22). Until then an arm or label change has to go in both.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
