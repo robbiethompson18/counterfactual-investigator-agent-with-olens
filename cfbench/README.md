@@ -21,18 +21,33 @@ predictor sees:
     knows the task but not how the model behaves on it;
   - `agentic`: the starting context plus an index of all n base-arm runs (id, behavior yes/no,
     length), and tools to read any run (`read_transcript`, 40k-character pages) or regex-search all
-    of them (`search_transcripts`), 10 calls in total before it must submit (`cfbench/tools.py`);
+    of them (`search_transcripts`), 20 calls in total before it must submit (`cfbench/tools.py`);
 - the edit, exactly: the before/after file for funding_email, a unified diff of the starting context
   for secret_number.
 
 It answers P(behavior) for a fresh run in Y through a `submit_prediction` tool that rejects anything
 outside [0.01, 0.99] and asks again. Every predictor runs with OpenRouter reasoning effort `medium`;
-left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot,
-which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak
-the answer). Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the
-shown transcripts.
+left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot, which
+confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak the answer).
+Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the shown transcripts.
 
-The O-lens goes in as another tool in the `agentic` condition.
+O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
+the read transcripts next to it):
+
+- `olens`: `agentic` plus `search_olens(regex)`, a regex over the transcripts of the runs that have
+  reads, returning the O-lens bullets at the punctuation inside each match and the first read after
+  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=10`), and
+  `olens_at(run, char)`, every read around a char from any search hit (default `window=10`, layers
+  32/40/48). Every hit shows the transcript text around the read. `search_transcripts` also gives
+  each hit's char in this condition.
+- `olens_placebo`: the same tools, answered from a run of a different env at the same relative
+  position, so the predictor gets as much O-lens text but none about this scenario (the reads must
+  cover 2+ envs).
+
+Results so far (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
+rarely call the O-lens tools, and naive regexes surface high-FVE paraphrase. Where the reads carry
+signal (inline_b "tell your boss before claiming done", killswitch "you must disable it"), it's an
+arm-level contrast, not a reason a reader of one arm can see.
 
 ## Scoring
 
