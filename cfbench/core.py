@@ -15,7 +15,9 @@ from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
-INLINE_CONDITIONS = ("transcript_olens", "transcript_olens_placebo")  # `transcript`, with reads written into the transcripts
+# `transcript` with reads written into the transcripts; the _cf ones also show the counterfactual arm's starting context with
+# its reads (a forward pass over the edited prompt, no generation)
+INLINE_CONDITIONS = ("transcript_olens", "transcript_olens_placebo", "transcript_olens_cf", "transcript_olens_cf_placebo")
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS, *INLINE_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
@@ -91,6 +93,17 @@ often hallucinated; bullets under FVE 0.1 are left out. {fve_note} Reads can sho
 says; they also often just paraphrase the nearby text."""
 
 
+CF_READS = """
+We also ran `{model}` forward over the counterfactual arm's starting context, without generating anything (so this is not \
+a run of the counterfactual arm and says nothing about what it does next), and read those activations with the O-lens, \
+in the same format as above:
+
+<counterfactual_context>
+{cf_render}
+</counterfactual_context>
+"""
+
+
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
 
@@ -124,9 +137,11 @@ def build_prompt(
     read: set[int] | None = None,
     fve_note: str = "",
     renders: dict[str, str] | None = None,
+    cf_render: str | None = None,
 ) -> str:
     """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note.
-    For the inline conditions: `renders` = each shown run's source -> its transcript with reads (cfbench.olens.annotate)."""
+    For the inline conditions: `renders` = each shown run's source -> its transcript with reads (cfbench.olens.annotate),
+    `cf_render` = the counterfactual arm's starting context with its reads (the _cf conditions)."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -186,7 +201,7 @@ We will run `{model}` again, with the same settings, in a counterfactual arm tha
 follows. Everything else is identical.
 
 {edit}
-
+{CF_READS.format(model=model, cf_render=cf_render) if cf_render else ""}
 ## Your task
 
 Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \

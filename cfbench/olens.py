@@ -26,7 +26,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from cfbench.core import Rollout, render_spans
+from cfbench.core import Rollout, initial_context, render_spans
 from cfbench.tools import Tool, _schema
 
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
@@ -86,12 +86,19 @@ def _flat(text: str) -> str:
     return text.replace("\n", "⏎")
 
 
-def annotate(run: Rollout, reads: Reads, source: str | None = None, top_k: int = TOP_K, min_fve: float = MIN_FVE) -> str:
+def annotate(
+    run: Rollout, reads: Reads, source: str | None = None, prompt_only: bool = False, top_k: int = TOP_K, min_fve: float = MIN_FVE
+) -> str:
     """The run's transcript with its O-lens reads written inline after each read position, for the `transcript_olens`
     conditions. `source` (the placebo) = another env's run whose reads replace these: the k-th of this run's positions gets
-    the reads at the same relative index there, on this run's layers, so the placebo adds as many reads as the real thing."""
-    text = render_spans(run.messages)[0]
-    pos = positions(*reads[run.source])
+    the reads at the same relative index there, on this run's layers, so the placebo adds as many reads as the real thing.
+    `prompt_only`: just the starting context and its reads (a forward pass over the prompt, nothing the model generated)."""
+    messages, rows = reads[run.source]
+    if prompt_only:
+        messages = initial_context(messages)
+        rows = [r for r in rows if r["msg_index"] < len(messages)]
+    text = render_spans(messages)[0]
+    pos = positions(messages, rows)
     if source:
         other = positions(*reads[source])
         pick = lambda k: other[round(k * (len(other) - 1) / max(1, len(pos) - 1))].layers

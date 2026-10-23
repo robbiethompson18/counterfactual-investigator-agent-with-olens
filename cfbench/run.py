@@ -13,12 +13,23 @@ when it finishes (or fails).
 
 import argparse
 import asyncio
+import difflib
 import importlib
 import json
 import random
 
 from cfbench import olens
-from cfbench.core import CONDITIONS, INLINE_CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench.core import (
+    CONDITIONS,
+    INLINE_CONDITIONS,
+    OLENS_CONDITIONS,
+    TOOL_BUDGET,
+    TOOL_CONDITIONS,
+    build_prompt,
+    initial_context,
+    pick_examples,
+    render,
+)
 from cfbench.predict import REASONING, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
@@ -58,9 +69,9 @@ async def main():
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
 
-    async def one(case: dict, base: list, predictor: str, draw: int):
+    async def one(case: dict, base: list, cf: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        condition, tools, read, renders = case["condition"], {}, None, None
+        condition, tools, read, renders, cf_render = case["condition"], {}, None, None, None
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
@@ -69,7 +80,14 @@ async def main():
         if condition in INLINE_CONDITIONS:  # same shown runs as `transcript` on this draw; every base run needs reads
             sources = olens.placebo_sources(base, reads, args.seed + draw) if condition.endswith("placebo") else {}
             renders = {r.source: olens.annotate(r, reads, sources.get(r.source)) for r in shown}
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, renders)
+            if "_cf" in condition:  # the cf run whose starting context is closest to the first shown run's (same item)
+                like = lambda r: difflib.SequenceMatcher(
+                    None, render(initial_context(r.messages)), render(initial_context(shown[0].messages))
+                ).ratio()
+                twin = max((r for r in cf if r.source in reads), key=like)
+                placebo = olens.placebo_sources([twin], reads, args.seed + draw)[twin.source] if condition.endswith("placebo") else None
+                cf_render = olens.annotate(twin, reads, placebo, prompt_only=True)
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, renders, cf_render)
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
@@ -91,7 +109,7 @@ async def main():
             "n_cf": len(cf),
         }
         print(case)
-        jobs += [one(case | {"condition": c}, base, p, d) for c in conditions for p in predictors for d in range(args.draws)]
+        jobs += [one(case | {"condition": c}, base, cf, p, d) for c in conditions for p in predictors for d in range(args.draws)]
     try:
         await asyncio.gather(*jobs)
     except BaseException:
