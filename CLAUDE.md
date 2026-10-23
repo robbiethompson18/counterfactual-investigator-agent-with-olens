@@ -271,6 +271,9 @@ Current docs:
 - [O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22: no reliable uplift on killswitch, inline_b, exfil, whistleblow or donation bet;
   arm-level vs within-arm signal, tool use per predictor, what to try next
+- [Donation Bet forensics — read before reading lens reads of Donation Bet transcripts or testing single-transcript "did the bet change the answer" investigators](docs/donation-bet-forensics.md)
+  — 2026-10-23: O-lens/J++/NLA reads + static case/pairs pages; DeepSeek transcript-only 0.87 AUROC
+  but prompt-only 0.90; blinded group concordance 0.60
 - [Exclude-rows env — read before running or extending evalcue's exclude_rows reward-hacking env](docs/exclude-rows-env.md)
   — Qwen excludes correctly-labeled test rows to beat a classifier bar; design, every config,
   per-arm rates
