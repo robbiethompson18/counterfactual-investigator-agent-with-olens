@@ -102,7 +102,10 @@ All public:
 **Robbie only:** `~/repos/metamodel-socratic-quizzes` (private) has local Markdown copies of the
 papers above (`papers/*.md`, easier to grep), detailed notes on the two O-lens recipes
 (`papers/oracle-lens-workspace-notes.md`, `papers/workspacebench-notes.md`), and a catalog of the
-private O-lens research Slack log. Read them there; don't copy them into this repo.
+private O-lens research Slack log. Read them there; don't copy them into this repo. Also there:
+[`docs/daria-olens-threads.md`](https://github.com/robbiethompson18/metamodel-socratic-quizzes/blob/main/docs/daria-olens-threads.md),
+the full text of Daria Ivanova's Slack posts on O-lens readouts (donation bet, motivated reasoning,
+split tokens). Private repo: Robbie can open it, Kylie can't.
 
 ## Data
 
