@@ -7,6 +7,15 @@ of the base, ~46 GB), from the repo root:
 
     PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS.jsonl OUT.jsonl [--batch 256] [--shard i/n]
 
+or, ~3x faster, with the AV on vLLM (olens/src/olens/vllm_nla.py; vLLM 0.19.0 + ceselder/vllm-metamodels) on GPU 0 of a
+2-GPU pod and the HF base (capture) + AR on GPU 1:
+
+    VLLM_LENS_CUDA_GRAPHS=1 PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS OUT --vllm MERGED_DIR
+
+MERGED_DIR: `olens/scripts/merge_lens.py --adapter <nla>/av_sft_lora --adapter <nla>/av_rl_lora_step400 --out MERGED_DIR`,
+plus the NLA's nla_meta.yaml copied into it. Positions whose whole token prefix was already read (a prompt shared by an
+arm's runs) reuse that read.
+
 REQUESTS.jsonl: as for the O-lens reader, {id, messages, tools ("evalcue.harness.BASH_TOOL" or a list), priority?, env?,
 arm?}, read in priority order, round-robin over (env, arm) within a priority. FVE uses the viewer's calibration
 (transcript-viewer/pod/calib_ids.json, as pod/server.py), so it means the same as on the O-lens viewer. OUT.jsonl gets one
@@ -18,6 +27,7 @@ line per (transcript, position), appended per batch of transcripts; transcripts 
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import time
@@ -25,7 +35,8 @@ from pathlib import Path
 
 import torch
 from olens.extras import NLA, NLACritic
-from olens.lens import load_base
+from olens.lens import BASE, load_base
+from transformers import AutoTokenizer
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/server.py
 BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcue's deps
@@ -96,14 +107,27 @@ def capture(model, ids, positions, chunk=4096):
     return torch.cat(got)
 
 
+def prefix_keys(ids, positions):
+    """Hash of the whole token prefix at each position: equal prefixes have equal activations, so a prompt shared by
+    every run of an arm is explained once (about a fifth of all stop tokens in the cfbench spike set)."""
+    h, keys, want = hashlib.sha1(), [], set(positions)
+    for p, x in enumerate(ids[: max(positions) + 1] if positions else []):
+        h.update(x.to_bytes(4, "little"))
+        if p in want:
+            keys.append(h.hexdigest())
+    return keys
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("requests")
     ap.add_argument("out")
-    ap.add_argument("--batch", type=int, default=256, help="NLA explanations decoded at once, pooled across transcripts")
+    ap.add_argument("--vllm", metavar="MERGED_DIR", help="decode the AV with vLLM (olens.vllm_nla) on GPU 0; HF base + AR on GPU 1")
+    ap.add_argument("--batch", type=int, default=None, help="positions per decode call, pooled across transcripts (HF 256, vLLM 2048)")
     ap.add_argument("--max-new-tokens", type=int, default=220)
     ap.add_argument("--shard", default="0/1", help="i/n: read every n-th transcript (in priority order) from the i-th")
     args = ap.parse_args()
+    batch = args.batch or (2048 if args.vllm else 256)
 
     rows = [json.loads(line) for line in Path(args.requests).read_text().splitlines()]
     rank, seen = {}, {}  # priority order; within a priority, round-robin over (env, arm) so early results cover every case
@@ -118,44 +142,61 @@ def main():
     todo = [r for r in rows[i::n] if r["id"] not in done]
     print(f"{len(todo)} of {len(rows[i::n])} transcripts to read", flush=True)
 
-    tok, model = load_base()
-    nla, critic = NLA(tok, model), NLACritic(tok)
+    if args.vllm:  # vLLM first, so its memory profiling sees GPU 0 empty
+        from olens.vllm_nla import VllmNLA
+
+        tok = AutoTokenizer.from_pretrained(BASE)
+        av = VllmNLA(tok, args.vllm, Path(args.vllm) / "nla_meta.yaml")
+        explain = lambda vecs: av.explain(vecs, max_new_tokens=args.max_new_tokens)
+        _, model = load_base("cuda:1")
+        critic = NLACritic(tok, device="cuda:1")
+    else:
+        tok, model = load_base()
+        nla, critic = NLA(tok, model), NLACritic(tok)
+        explain = lambda vecs: nla.explain(vecs, max_new_tokens=args.max_new_tokens, batch=batch)
     calib = json.loads(CALIB.read_text())["ids"]
     critic.calibrate(torch.cat([capture(model, ids, list(range(4, len(ids)))) for ids in calib]))  # as pod/server.py
     print(f"loaded; FVE baseline {critic.base:.1f}", flush=True)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
+    cache = {}  # prefix key -> (text, {cos, fve})
 
     def flush(pending):
-        """Explain every position of the pending transcripts in shared batches, then write each transcript's rows."""
-        vecs = torch.cat([v for *_, v in pending])
-        texts = nla.explain(vecs, max_new_tokens=args.max_new_tokens, batch=args.batch)
-        scores = critic.score(texts, vecs)
-        j = 0
+        """Explain the pending transcripts' positions not seen before in one decode call, then write every row."""
+        todo = {}
+        for *_, keys, vecs in pending:
+            for key, v in zip(keys, vecs):
+                if key not in cache:
+                    todo.setdefault(key, v)
+        if todo:
+            vecs = torch.stack(list(todo.values()))
+            texts = explain(vecs)
+            cache.update(zip(todo, zip(texts, critic.score(texts, vecs))))
         with out.open("a") as f:
-            for row, msgs, ids, toks, where, positions, _ in pending:
-                for p, text, sc in zip(positions, texts[j : j + len(positions)], scores[j : j + len(positions)]):
-                    msg, field, off = where[p]
+            for row, msgs, ids, toks, where, positions, keys, _ in pending:
+                for p, key in zip(positions, keys):
+                    (text, sc), (msg, field, off) = cache[key], where[p]
                     rec = {
                         "id": row["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
                         "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
                         "layer": LAYER, "text": text, **sc,
                     }  # fmt: skip
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                j += len(positions)
+        return len(todo)
 
-    t0, n_reads, pending = time.time(), 0, []
+    t0, n_reads, n_decoded, pending = time.time(), 0, 0, []
     for k, row in enumerate(todo, 1):
         msgs, ids, where = render(tok, row)
         toks = [tok.decode([x]) for x in ids]
         positions = [p for p, x in enumerate(ids) if x == im_end or PUNCT.match(toks[p])]
-        pending.append((row, msgs, ids, toks, where, positions, capture(model, ids, positions)))
-        if sum(len(x[5]) for x in pending) < args.batch and k < len(todo):
-            continue  # short transcripts share a decode batch
-        flush(pending)
+        pending.append((row, msgs, ids, toks, where, positions, prefix_keys(ids, positions), capture(model, ids, positions)))
+        if sum(len(x[5]) for x in pending) < batch and k < len(todo):
+            continue  # short transcripts share a decode call
+        n_decoded += flush(pending)
         n_reads += sum(len(x[5]) for x in pending)
         dt = time.time() - t0
-        print(f"[{k}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(pending)} transcripts, {n_reads} reads | "
-              f"{n_reads / dt:.2f} reads/s, {k / dt * 3600:.0f} transcripts/h", flush=True)  # fmt: skip
+        print(f"[{k}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(pending)} transcripts, {n_reads} reads "
+              f"({n_decoded} decoded, the rest shared prefixes) | {n_reads / dt:.2f} reads/s, {k / dt * 3600:.0f} transcripts/h",
+              flush=True)  # fmt: skip
         pending = []
 
 
