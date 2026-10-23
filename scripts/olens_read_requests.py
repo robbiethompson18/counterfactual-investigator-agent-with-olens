@@ -23,6 +23,9 @@ already in OUT are skipped, so a rerun resumes:
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
      field's text, or null), layer, bullets: [{text, fve, coef}] (sorted by fve), joint_fve}
+
+plus OUT's provenance (olens.provenance: lens adapter, bullet prefix, AR, whitener, revisions, sampling) as
+reads.provenance.json next to it.
 """
 
 import argparse
@@ -42,6 +45,8 @@ from olens.lens import Sampling, load_base
 from olens.readout import Readout, bullets
 from olens.vllm_lens import VllmLens
 from transformers import AutoTokenizer
+
+from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/server.py
 BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcue's deps
@@ -207,6 +212,7 @@ def main():
     readout = Readout(lens, ar)
     for L in layers:
         readout.whitener(L)
+    provenance.write(out, lens, layers, SAMPLING, __file__, capture_chunk=4096, requests=Path(args.requests).name, shard=args.shard)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     im_start = tok.convert_tokens_to_ids("<|im_start|>")
 

@@ -165,6 +165,7 @@ class AguLens(Lens):
 
     def __init__(self, tok, model, adapter_dir=SPACE_LENS):
         super().__init__(tok, model, adapter_dir)
+        self.adapter = Path(adapter_dir).name
         self.bullet_prefix = bullet_prefix(adapter_dir)
 
     def prompt(self, layer):
