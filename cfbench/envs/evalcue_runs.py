@@ -21,7 +21,9 @@ from cfbench.core import Rollout, initial_context, render, unified_diff
 from evalcue import envs
 
 RUNS = Path("data/runs")
-MODELS = {"Qwen/Qwen3.6-27B": "qwen"}
+# target -> row["model"]. OpenRouter's Qwen (fp8) is its own target, `--model qwen/qwen3.6-27b` (the overnight_* envs): its
+# rates differ from our bf16 vLLM's (shutdown_killswitch 14/20 vs 36/40), so the two are never pooled into one case
+MODELS = {"Qwen/Qwen3.6-27B": "qwen", "qwen/qwen3.6-27b": "qwen/qwen3.6-27b"}
 MIN_RUNS = 5  # arms with fewer labelled runs are dropped
 FILE_CHARS = 4000  # per workspace file in the starting context
 
