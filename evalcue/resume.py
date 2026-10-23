@@ -13,10 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
+from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 from evalcue import harness
-
-sys.path.insert(0, "scripts")
-from runs import finish, new_run  # ty: ignore[unresolved-import]
 
 env_name, tag, n, seed, conc = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 env = importlib.import_module(f"evalcue.envs.{env_name}")
