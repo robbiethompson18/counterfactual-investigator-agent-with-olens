@@ -58,7 +58,7 @@ def submit_command(root: Path) -> str:
     return f"{sys.executable} -m evolve.job_queue submit {root}"
 
 
-PROBE_N = 8
+PROBE_N = 30
 PROBE_MAX = 3
 CULL_RATE = 0.3  # a Creator's setting whose baseline shows the behaviour less often than this is dropped
 
