@@ -34,24 +34,18 @@ def whiten_atoms(W, A, counts):
 
 def nnls(z, D):
     """Batched non-negative least squares of whitened targets on whitened atoms. z [B, d], D [B, k, d] (zero rows are
-    fine). Returns (coefs [B, k], fit [B, d], fve [B]), fve = 1 − |z − fit|² / |z|². Solved in Gram form (k x k per
-    problem) on the CPU."""
-    G = (D @ D.transpose(1, 2)).double().cpu().numpy()
-    b = (D @ z[..., None])[..., 0].double().cpu().numpy()
-    C = torch.tensor(np.stack([nnls_gram(G[i], b[i]) for i in range(len(b))]), dtype=z.dtype, device=z.device)
-    fit = (C[..., None] * D).sum(1)
-    return C, fit, 1 - ((z - fit) ** 2).sum(-1) / (z * z).sum(-1)
-
-
-def nnls_gram(G, b):
-    """argmin_{c >= 0} cᵀGc − 2bᵀc, via scipy's NNLS on a square root of G. The prefixes are near-collinear, so G is
-    ill-conditioned: directions with eigenvalue < 1e-9 of the largest are dropped."""
-    lam, V = np.linalg.eigh(G)
-    keep = lam > 1e-9 * max(lam.max(), 1e-30)
-    if not keep.any():
-        return np.zeros(len(b))
-    s = np.sqrt(lam[keep])
-    return _nnls(s[:, None] * V[:, keep].T, (V[:, keep].T @ b) / s)[0]
+    fine). Returns (coefs [B, k], fit [B, d], fve [B]), fve = 1 − |z − fit|² / |z|². One float64 scipy NNLS per row on
+    the CPU (~ms at k <= 40): the prefixes and repeated bullets are near-collinear, and a Gram-form solve gave
+    coefficients ~1e18 on them."""
+    Z, A = z.double().cpu().numpy(), D.double().cpu().numpy()
+    C = np.zeros(A.shape[:2])
+    for i in range(len(Z)):
+        live = np.abs(A[i]).sum(1) > 0
+        if live.any():
+            C[i, live] = _nnls(A[i, live].T, Z[i])[0]
+    fit = np.einsum("bk,bkd->bd", C, A)
+    fve = 1 - ((Z - fit) ** 2).sum(-1) / (Z * Z).sum(-1)
+    return tuple(torch.tensor(x, dtype=z.dtype, device=z.device) for x in (C, fit, fve))
 
 
 def edit(W, h, fit, beta=1.0, gamma=1.0, mu_scale=1.0):
