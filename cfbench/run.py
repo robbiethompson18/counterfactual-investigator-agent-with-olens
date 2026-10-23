@@ -54,7 +54,8 @@ async def main():
         args.slug,
         description=args.description or f"{args.env}: predict {args.model} arm outcomes ({', '.join(conditions)})",
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
-        params={k: v for k, v in vars(args).items() if k not in ("slug", "description")},
+        params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
+        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)

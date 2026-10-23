@@ -8,8 +8,18 @@ it. This is the list of what still holds old-lens reads, to re-read once the new
 ## Redone already
 
 - `data/runs/olens_reads/2026-10-22_{cfbench-spike-v1,overnight-v1,overnight-v2-targets}`: read
-  again from scratch with the space lens; the first 57 old-lens transcripts are kept as
-  `reads_old_lens_rl600.jsonl` in the spike run.
+  again from scratch with the space lens; the first 58 old-lens transcripts (71,310 rows, all spike
+  transcripts) are kept as `reads_old_lens_rl600.jsonl` in the spike run.
+- Metadata (2026-10-23): every cfbench run that consumed reads has `params.olens_lens`. The
+  `gflash-olens-*` runs ran on old-lens reads but pointed at the spike's `reads.jsonl`, which was
+  later rewritten with the space lens; they now point at `reads_old_lens_rl600.jsonl` (`meta_fixes`
+  says why). Old-lens dirs without a `meta.json` (`runs/organisms`, `runs/party_resample`,
+  `weirdchat/reads`, local-only `stoptokens` and `vardania_sneeze`) have a `LENS.md`. New cfbench
+  runs record `params.olens_sources` (lens and row count per reads file) themselves.
+- Viewer caches (`transcript-viewer/data/reads.jsonl`, `weirdchat/reads/*`): all rows predate the
+  switch, so all old lens, but their key has no lens. A space-lens viewer pod would append
+  same-keyed rows and never re-read cached keys. Add the lens to the key before the next viewer
+  read.
 
 ## Unread when the budget ran out (2026-10-22 ~22:25 PDT)
 

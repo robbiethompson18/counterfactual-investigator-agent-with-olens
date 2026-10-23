@@ -224,6 +224,22 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
     }, set(read_ids)
 
 
+def sources(paths: list[str]) -> list[dict]:
+    """What each reads file was at launch, for the run's meta: the lens (from the reader's reads.provenance.json, else the
+    read run's meta.json; None if neither says) and the row count, since read files keep growing or get rewritten."""
+    out = []
+    for path in map(Path, paths):
+        prov, meta = path.with_name(f"{path.stem}.provenance.json"), path.parent / "meta.json"
+        if prov.exists():
+            lens = json.loads(prov.read_text())["lens"]
+        elif path.name == "reads.jsonl" and meta.exists():
+            lens = json.loads(meta.read_text()).get("params", {}).get("lens")
+        else:
+            lens = None
+        out.append({"path": str(path), "lens": lens, "rows": sum(1 for _ in path.open())})
+    return out
+
+
 def fve_note(reads: Reads) -> str:
     """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt."""
     top = sorted(row["bullets"][0]["fve"] for _, rows in reads.values() for row in rows if row["bullets"])

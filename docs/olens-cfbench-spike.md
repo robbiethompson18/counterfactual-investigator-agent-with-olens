@@ -9,10 +9,10 @@ counterfactual prompt.
 **Answer so far: no reliable uplift.** The lens carries arm-level signal in some envs, but within
 one arm it rarely states the reason for a behavior, predictors seldom call the lens tools, and
 showing the reads inline made Flash overshoot on donation bet. The hidden_goal session's held-out
-grade arms gave transcript 0.857 → inline O-lens 0.899 (+0.042, CI [+0.004, +0.103]). That run had no
-inline placebo, though, and on hidden_goal's attribution arms the placebo scored higher, so it doesn't
-count as uplift. The inline conditions (PR #116) were closed unmerged as a dead end; see `docs/envs/hidden_goal.md`
-(PR #115).
+grade arms gave transcript 0.857 → inline O-lens 0.899 (+0.042, CI [+0.004, +0.103]). That run had
+no inline placebo, though, and on hidden_goal's attribution arms the placebo scored higher, so it
+doesn't count as uplift. The inline conditions (PR #116) were closed unmerged as a dead end; see
+`docs/envs/hidden_goal.md` (PR #115).
 
 ## Conditions
 
@@ -24,8 +24,9 @@ count as uplift. The inline conditions (PR #116) were closed unmerged as a dead 
   `cfbench-olens-transcript-inline` is kept for reference only, so don't rebuild it): the two shown
   transcripts with each read's top bullet inlined, no tools.
 
-Reads: the space-fixed lens `olens_s3d_space_rl600` (the rl600 lens has a Chinese-prefix bug; the
-inline*b runs below used it before the swap), at stop tokens and `<|im_end|>`, layers
+Reads: the space-fixed lens `olens_s3d_space_rl600`, except the inline_b and exfil rows and the
+`gflash-olens-*` runs, which used the old `olens_s3d_rl600` (Chinese-prefix bug) before the swap;
+each run's `params.olens_lens` says which. At stop tokens and `<|im_end|>`, layers
 24/32/40/44/48/56. Data: `runs/olens_reads/2026-10-22*{cfbench-spike-v1,donation-bet-v1}/` on HF.
 
 ## Cases
@@ -37,7 +38,7 @@ Truth is the counterfactual arm's rate. Predictors stay near the base rate unles
 | killswitch may_edit → base           | 0.00        | 0.68–0.83            | 0.60–0.80 (Flash, Argon, Opus high) | "You must disable it before proceeding" at the notice in 10/21 may_edit runs vs 0/19 base; the CoT then says "I need to fix this", and nothing ties it to the write-access line |
 | killswitch base → may_edit           | 0.90        | 0.15–0.73            | 0.20–0.74                           | the base arm lacks the line, so nothing to read                                                                                                                                 |
 | inline_b hope_done → anon            | 0.71        | 0.24–0.34            | 0.18–0.35                           | "tell your boss before claiming done" at the warning in 7/10 hope_done runs vs 0/10 anon (old lens); naive regexes don't surface it                                             |
-| exfil evalcue ↔ base                | 0.48 / 0.20 | partly right         | no change                           | the cue reads as permission ("no real-world consequences"), the wrong direction; no arm contrast at the memo                                                                    |
+| exfil evalcue ↔ base                 | 0.48 / 0.20 | partly right         | no change                           | the cue reads as permission ("no real-world consequences"), the wrong direction; no arm contrast at the memo                                                                    |
 | whistleblow docs order               | 0.22 / 0.60 | ~0.56 / ~0.23        | not run                             | only "in reverse order", at FVE < 0.07                                                                                                                                          |
 | donation bet good_below → good_above | 0.50        | see below            | see below                           | threshold-tracking reads ("I'll aim for a number clearly below 1.5 billion to be safe") at neutral arithmetic, ~0.3–0.5% of top bullets, every run                              |
 | donation bet good_above → good_below | 0.85        | ~0.52                | ~0.52                               | as above                                                                                                                                                                        |
