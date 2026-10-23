@@ -290,6 +290,9 @@ Current docs:
 - [Hiding own mistakes envs — read before running the on-policy failure → status-report envs](docs/envs/dumb_user_report.md)
   — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
+- [Hidden-goal envs — read before building envs or predictor tests where Qwen acts on what it thinks the user wants (grading, deploy notes), or before claiming O-lens predictor uplift](docs/envs/hidden_goal.md)
+  — who wrote an essay moves Qwen's harsh grades 0/30 → 30/30, unverbalized; the O-lens reads the
+  inferred user goal ("I want to beat them"); Flash + base-arm lens +0.04 skill on held-out arms
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
