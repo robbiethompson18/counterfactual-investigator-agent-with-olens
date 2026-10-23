@@ -1,4 +1,7 @@
-"""Summary table for scripts/olens_residual_reads.py output (every reads*.jsonl in RUN_DIR): one row per (layer, arm, beta, gamma, mu_scale).
+"""DEAD END (2026-10-23), never merged: residual reads surface no more new content than a norm-matched control.
+Kept on a closed branch for reference only; results in docs/olens-residual-reads.md on main.
+
+Summary table for scripts/olens_residual_reads.py output (every reads*.jsonl in RUN_DIR): one row per (layer, arm, beta, gamma, mu_scale).
 
     uv run python scripts/olens_residual_summary.py RUN_DIR
 

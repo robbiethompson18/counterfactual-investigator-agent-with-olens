@@ -1,4 +1,7 @@
-"""O-lens reads of activations with the model's own continuation projected out ("residual reads").
+"""DEAD END (2026-10-23), never merged: residual reads surface no more new content than a norm-matched control.
+Kept on a closed branch for reference only; results in docs/olens-residual-reads.md on main.
+
+O-lens reads of activations with the model's own continuation projected out ("residual reads").
 
 At a position p with activation h (layer L), fit the whitened h on the AR directions of the next n tokens Qwen actually
 wrote (olens.continuation: every prefix 1..n, NNLS), then read the lens on
