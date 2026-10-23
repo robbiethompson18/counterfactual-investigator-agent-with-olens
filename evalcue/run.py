@@ -46,7 +46,7 @@ if a.rescore:
         upload(a.rescore.parent)
 else:
     params = {"n_per_arm": a.n, "arms": arms, "thinking": bool(a.thinking), "max_tokens": a.max_tokens, "seed": a.seed}
-    served_by = f"vLLM at {harness.URLS[0]} (runpod:qwen-shared)"
+    served_by = f"vLLM at {harness.URL} (runpod:qwen-shared)"
     if harness.MODEL != "qwen":
         served_by = f"openrouter ({harness.PROVIDER or 'any provider'}, effort {harness.EFFORT})"
     run = new_run(

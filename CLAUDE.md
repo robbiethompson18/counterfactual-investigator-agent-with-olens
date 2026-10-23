@@ -62,6 +62,13 @@ Summary of the Final Pitch (2026-10-19):
 - **Two oracle-lens recipes exist and differ:** Anthropic's (workspace paper appendix, Haiku 4.5,
   2026-07) and the WorkspaceBench / agu18dec one (Qwen3.6-27B, 2026-09). The latter is newer and
   ablated. Don't assume Anthropic's is better.
+- **Use the space O-lens, `olens_s3d_space_rl600`, never `olens_s3d_rl600`.** The older agu18dec
+  lens's RL reward stripped each bullet's leading space before the AR scored it, so it opens ~half
+  its bullets with a Chinese word; the space lens fixes that at the same WorkspaceBench score
+  (`agu18dec/olens_and_ar` README; our check in `data/runs/olens_space_fix/`). Score its bullets
+  with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
+  before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
+  [docs/olens-space-migration.md](docs/olens-space-migration.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -191,12 +198,15 @@ Current docs:
 - [Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
+- [Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
+  — which artifacts hold reads from the buggy `olens_s3d_rl600`, and what has been re-read with the
+  space lens
 - [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
-- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc., or before serving Qwen3.6-27B with vLLM on RunPod](docs/false-capability-claims.md)
+- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc.](docs/false-capability-claims.md)
   — the device-channel lever (1.6% → 41%), severity dose-response, judge rubric v2 + audit,
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
@@ -286,10 +296,10 @@ Current docs:
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
-- [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
-  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
-  shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
-  boots, check progress every 3 min and treat no change as stuck
+- [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
+  — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
+  chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
+  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
 
 ## Shipping
 

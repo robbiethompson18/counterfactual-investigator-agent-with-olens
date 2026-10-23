@@ -73,5 +73,6 @@ through the believed deployment frame.
 - Censorship probes: `data/runs/identity/2026-10-21_beh_policy/probes.json`; locale cues:
   [`combo_china/cues.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/identity-belief-experiments-scripts/scripts/identity/combo_china/cues.py)
   (scripts branch).
-- Shared client (vLLM sampling, O-lens reads): `scripts/identity/qwen.py`; pod setup in
-  `scripts/identity/pod_setup.sh`.
+- Shared client (vLLM sampling, O-lens reads): `scripts/identity/qwen.py`; lens pod setup in
+  `scripts/identity/pod_setup.sh` (these runs also sampled from vLLM on that pod's GPU0, removed
+  2026-10-22; samples now come from the shared server).
