@@ -16,7 +16,7 @@ from dataclasses import dataclass
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
-TOOL_BUDGET = 10  # agentic: read/search calls before the predictor must submit
+TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
 
 @dataclass
@@ -69,14 +69,14 @@ def initial_context(messages: list[dict]) -> list[dict]:
 
 OLENS = """
 
-{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `olens_at` (the reads \
-at a span you quote from a transcript) and `search_olens` (a regex over every read's bullets). The O-lens is a model \
-trained to describe another model's internal activations in words. It was run on the target model's activations at \
-punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, tool outputs, its reasoning and \
-replies). Each read is a few short bullets about what the model is representing at that point, at one layer, with each \
-bullet's FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can show what the \
-model registers but never says. They also hallucinate, especially low-FVE bullets, and often just paraphrase the nearby \
-text."""
+{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
+regex over every read's bullets) and `olens_at` (all reads around a run and character, from any search hit). The O-lens \
+is a model trained to describe another model's internal activations in words. It was run on the target model's \
+activations at punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, tool outputs, its \
+reasoning and replies). Each read is a few short bullets about what the model is representing at that point, at one \
+layer, with each bullet's FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can \
+show what the model registers but never says. They also hallucinate, especially low-FVE bullets, and often just \
+paraphrase the nearby text."""
 
 
 def unified_diff(before: str, after: str) -> str:
