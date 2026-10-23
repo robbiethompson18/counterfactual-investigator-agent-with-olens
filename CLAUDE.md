@@ -180,6 +180,8 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [What lives where in our HF dataset — read before looking for or uploading data, or trusting an O-lens read's lens](docs/hf-data.md)
+  — top-level layout, run dirs, which O-lens each read run used and what files it holds
 - [CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
