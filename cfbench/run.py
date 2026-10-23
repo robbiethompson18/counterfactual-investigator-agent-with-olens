@@ -42,6 +42,7 @@ async def main():
     assert set(conditions) <= set(CONDITIONS), conditions
     reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
+    fve_note = olens.fve_note(reads) if reads else ""
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
     env = importlib.import_module(f"cfbench.envs.{module}")
@@ -65,7 +66,7 @@ async def main():
         if condition in OLENS_CONDITIONS:
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
             tools |= lens_tools
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read)
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}

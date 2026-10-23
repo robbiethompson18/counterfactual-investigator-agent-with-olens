@@ -70,13 +70,14 @@ def initial_context(messages: list[dict]) -> list[dict]:
 OLENS = """
 
 {n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
-regex over every read's bullets) and `olens_at` (all reads around a run and character, from any search hit). The O-lens \
-is a model trained to describe another model's internal activations in words. It was run on the target model's \
-activations at punctuation tokens and turn ends, everywhere in the run (system prompt, user turns, tool outputs, its \
-reasoning and replies). Each read is a short bullet about what the model is representing at that point, at one layer \
-(the read's best bullet), with its FVE (fraction of the activation's variance it explains; higher is more trustworthy). Reads can \
-show what the model registers but never says. They also hallucinate, especially low-FVE bullets, and often just \
-paraphrase the nearby text."""
+regex over those runs' transcripts that returns the reads at each match) and `olens_at` (all reads around a run and \
+character, from any search hit). The O-lens is a model trained to describe another model's internal activations in \
+words. It was run on the target model's activations at punctuation tokens and turn ends, everywhere in the run (system \
+prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short bullets about what the model is \
+representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
+explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
+read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that). Reads can show what the \
+model registers but never says; they also often just paraphrase the nearby text."""
 
 
 def unified_diff(before: str, after: str) -> str:
@@ -110,8 +111,9 @@ def build_prompt(
     cf_arm: str,
     condition: str,
     read: set[int] | None = None,
+    fve_note: str = "",
 ) -> str:
-    """`read`: ids of base runs with O-lens reads, for the olens conditions."""
+    """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -129,7 +131,7 @@ This is its starting context in the base arm, before it acts:
     if condition == "no_transcript":
         evidence = context.replace("This is its", "The model's runs are not shown. This is its")
     elif condition in TOOL_CONDITIONS:
-        olens = "" if condition == "agentic" else OLENS.format(n_read=len(read or ()))
+        olens = "" if condition == "agentic" else OLENS.format(n_read=len(read or ()), fve_note=fve_note)
         evidence = f"""{context}
 
 ## The base-arm runs
