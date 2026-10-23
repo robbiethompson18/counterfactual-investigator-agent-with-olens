@@ -57,12 +57,13 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
         {"role": "system", "content": SYSTEM},
         {"role": "user", "content": prompt},
     ]
+    schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
         r = await client.chat.completions.create(
             model=predictor,
             messages=messages,
-            tools=[SUBMIT, *(schema for schema, _ in tools.values())],
+            tools=schemas,
             max_tokens=16000,
             extra_body={"usage": {"include": True}, "reasoning": REASONING},
         )
@@ -86,5 +87,5 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": reply})
         if submission:
             break
-    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "messages": messages}
+    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tools": schemas, "messages": messages}
     return {**submission, "valid": True, **log} if submission else {"p": None, "rationale": "", "valid": False, **log}
