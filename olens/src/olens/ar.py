@@ -36,6 +36,7 @@ class AR:
             ids[i, : len(s)] = torch.tensor(s)
             mask[i, : len(s)] = 1
         with self.lora:
-            h = self.model.model(input_ids=ids, attention_mask=mask).last_hidden_state
+            # no cache: with one, a 256-span batch also builds every layer's linear-attention state (~38 GB)
+            h = self.model.model(input_ids=ids, attention_mask=mask, use_cache=False).last_hidden_state
         h = h[torch.arange(len(seqs)), mask.sum(1) - 1].float()
         return F.layer_norm(h, h.shape[-1:]) @ self.W.T + self.b
