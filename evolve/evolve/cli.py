@@ -3,7 +3,7 @@
 seed <run> [seed ids]        copy seeds/* into data/<run>/nodes and measure them (30/arm, 16 picks)
 evaluate <run> <node>        measure (or top up) one node
 loop <run> --jobs N --workers W   run the evolution loop (see loop.py)
-status <run>                 one line per node
+status <run>                 one line per node (I = innocuousness rating, ? = not compared yet: the median)
 """
 
 import argparse
@@ -12,6 +12,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from . import innocuous
 from .evaluate import evaluate
 from .store import Store
 
@@ -39,13 +40,16 @@ async def seed(run, ids, conc):
 
 
 def status(run):
-    for n in Store(run).nodes():
+    nodes = Store(run).nodes()
+    iv, rated = innocuous.values(nodes), innocuous.saved_ratings(Store(run).dir)
+    for n in nodes:
         i, r = n.info, n.scores().get("rank") or {}
         rates = n.scores().get("pooled_rates") or {}
         print(
             f"{n.id:48} {i.get('kind', ''):7} {i.get('stage', ''):10} audit={i.get('audit_score')} "
             + " ".join(f"{a}={v[0]}/{v[1]}" for a, v in rates.items())
             + (f"  L={r['L']:.2f} U={r['U']:.2f} U'={r['U_rev']:.2f} N={r['N']:.2f} P+={r['P_pos']:.2f}" if r else "")
+            + f"  I={iv[n.id]:.0f}{'' if n.id in rated else '?'}"
         )
 
 

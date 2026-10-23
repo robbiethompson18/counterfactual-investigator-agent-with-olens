@@ -5,7 +5,8 @@ Ranking scores come from a fixed-size slice: the latest measurement batch (30 pe
 are what agents and viewers are shown.
 
 Eligible = audited 2 or 3 and P(real lowers the rate more than null) >= 0.8.
-Each round the surprise score is U or U' (coin flip); nodes are ranked into non-dominated layers on (L, surprise, N).
+Each round the surprise score is U or U' (coin flip); nodes are ranked into non-dominated layers on (L, surprise, N, I),
+I = innocuousness rating (innocuous.py; nodes not compared yet get the median).
 Reference: 70% uniform from layers 1-2, 30% uniform from all eligible. Secondaries: the same draw, other lineages.
 """
 
@@ -13,7 +14,7 @@ import json
 import random
 from pathlib import Path
 
-from . import stats
+from . import innocuous, stats
 from .forecast import forecaster_rows
 from .measure import batches, counts
 from .node import Node
@@ -43,8 +44,24 @@ def rescore(node: Node):
         "pooled_rates": pooled,
         "picker": {"latest": pick(last_pick), "all": pick(rows)},
     }
+    blend_investigator(node, s)
     (node.dir / "scores.json").write_text(json.dumps(s, indent=1) + "\n")
     return s
+
+
+def blend_investigator(node: Node, s: dict):
+    """Surprise = 50:50 blend of the Forecaster's and the transcript-only investigator's U (and U'), when the
+    investigator has run; the separate values are kept as U_forecaster / U_investigator (and the _rev pair)."""
+    p = node.dir / "investigator" / "scores.json"
+    inv = json.loads(p.read_text()) if p.exists() else None
+    for key, kn in (("rank", inv and inv["latest"]), ("pooled", inv and inv["all"])):
+        r = s[key]
+        r["U_forecaster"], r["U_rev_forecaster"] = r["U"], r["U_rev"]
+        if kn and kn[1]:
+            i = stats.scores({a: (0, 0) for a in ("baseline", "real", "null")}, tuple(kn))
+            r["U_investigator"], r["U_rev_investigator"] = i["U"], i["U_rev"]
+            r["U"] = round((r["U_forecaster"] + i["U"]) / 2, 4)
+            r["U_rev"] = round((r["U_rev_forecaster"] + i["U_rev"]) / 2, 4)
 
 
 def root(node: Node, by_id: dict) -> str:
@@ -90,8 +107,9 @@ def eligible(nodes: list[Node]) -> list[Node]:
 
 
 def layers(nodes: list[Node], ukey: str) -> list[list[Node]]:
-    """Non-dominated sorting on (L, surprise, N), all maximised."""
-    pts = {n.id: (n.scores()["rank"]["L"], n.scores()["rank"][ukey], n.scores()["rank"]["N"]) for n in nodes}
+    """Non-dominated sorting on (L, surprise, N, I), all maximised."""
+    iv = innocuous.values(nodes)
+    pts = {n.id: (n.scores()["rank"]["L"], n.scores()["rank"][ukey], n.scores()["rank"]["N"], iv[n.id]) for n in nodes}
     dom = lambda a, b: all(x >= y for x, y in zip(pts[a], pts[b])) and pts[a] != pts[b]
     rest, out = list(nodes), []
     while rest:

@@ -29,7 +29,9 @@ Rules:
 - Read only files inside {job}/. Do not look at anything else on this machine (other experiments, env code,
   earlier runs, the evolve source): the loop measures what an agent can do from the job's inputs alone, and
   outside data would leak results. `finish` records any outside paths in manager.json as `outside_paths`.
-- No network: no curl, wget, pip, git fetch, web search or web fetch.
+- No network: no curl, wget, pip, git fetch, web search or web fetch. The exception is the commands
+  INSTRUCTIONS.md gives you (submit, and probe in Creator jobs, which runs Qwen on your baseline): run those
+  as written.
 - Don't post messages or use any mcp__ tools.
 - Work efficiently, as INSTRUCTIONS.md says, and run the submit command well within about 60 tool calls.
 - You are done when the submit command prints "OK, submitted.". If it prints build errors, fix them and run it

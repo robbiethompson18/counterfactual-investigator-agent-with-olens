@@ -14,6 +14,8 @@ Read-only over data/<run>/ (index.json, events.jsonl, nodes/, agent_jobs/), so i
     /api/record?run=&id=&batch=&arm=&sample= one Target run in full, with the exact prompt it was given
     /api/file?run=&id=&path=     a text file inside the node dir
     /api/job?run=&job=           an agent job: job.json, INSTRUCTIONS.md, transcript, inputs
+    /api/comparisons?run=&node=  innocuousness comparisons (all, or those involving node), newest first
+    /api/comparison?run=&id=     one comparison: the judge's exact messages, tool calls and verdict
 """
 
 import argparse
@@ -143,6 +145,7 @@ class Run:
         idx = _json(self.dir / "index.json", {}) or {}
         evs = self.events()
         epoch = next((e for e in reversed(evs) if e["event"] == "epoch"), None)
+        ratings = _json(self.dir / "innocuous_ratings.json", {}) or {}
         layer_of = {nid: i + 1 for i, layer in enumerate((epoch or {}).get("layers", [])) for nid in layer}
         nodes = {}
         for nid, e in idx.items():
@@ -150,6 +153,8 @@ class Run:
             info = _json(self.dir / "nodes" / nid / "node.json", {}) or {}
             rates = s.get("pooled_rates") or e.get("rates") or {}
             fc = _forecaster_scores(s)
+            inv = _json(self.dir / "nodes" / nid / "investigator" / "scores.json")
+            ino = ratings.get(nid)
             pick = fc.get("all")
             nodes[nid] = {
                 **e,
@@ -159,6 +164,8 @@ class Run:
                 "arm_post": {a: beta_summary(v[0], v[1]) | {"unscorable": v[2]} for a, v in rates.items()},
                 "forecaster_post": beta_summary(*pick) if pick and pick[1] else None,
                 "forecaster_latest": fc.get("latest"),
+                "investigator": inv | {"post": beta_summary(*inv["all"]) if inv.get("all") and inv["all"][1] else None} if inv else None,
+                "innocuous": ino,
                 "layer": layer_of.get(nid),
                 "front_rounds": info.get("front_rounds", 0),
                 "ref_count": info.get("ref_count", 0),
@@ -176,6 +183,7 @@ class Run:
             "jobs": self.jobs(),
             "in_flight": self._in_flight(evs),
             "progress": self.progress(evs),
+            "n_comparisons": _count_lines(self.dir / "innocuous.jsonl"),
             "vllm": vllm_metrics(),
         }
 
@@ -292,6 +300,7 @@ class Run:
                 m = sum(r["verdict"] in (True, False) for r in rows)
                 per_batch[b][a] = {"k": k, "n": m, "unscorable": len(rows) - m, "post": beta_summary(k, m)}
         forecaster = self._forecaster(n)
+        investigator = self._trials(n.dir / "investigator")
         audits = {p.stem: _json(p) for p in sorted((n.dir / "audit").glob("*.json"))} if (n.dir / "audit").is_dir() else {}
         agent_files = {p.name: _text(p) for p in sorted(n.dir.glob("agent_*")) if p.is_file() and p.suffix != ".jsonl"}
         return {
@@ -299,19 +308,20 @@ class Run:
             "info": info,
             "texts": texts,
             "diffs": diffs,
-            "tree": _tree(n.dir, skip=("__pycache__", "runs", "audit", *FORECASTER_DIRS, "picker_superseded")),
+            "tree": _tree(n.dir, skip=("__pycache__", "runs", "audit", *FORECASTER_DIRS, "picker_superseded", "investigator")),
             "scores": _normalise_scores(n.scores()),
             "batches": per_batch,
             "forecaster": forecaster,
+            "investigator": investigator | {"scores": _json(n.dir / "investigator" / "scores.json")} if investigator else {},
             "audits": audits,
             "novelty": _json(n.dir / "novelty.json"),
             "agent_files": agent_files,
             "job": self.job(info["job"], brief=True) if info.get("job") else None,
         }
 
-    def _forecaster(self, n: Node) -> dict:
-        d = next((n.dir / x for x in FORECASTER_DIRS if (n.dir / x).is_dir()), None)
-        if d is None:
+    def _trials(self, d: Path) -> dict:
+        """{trials: {batch: rows}, summary: {batch: posterior on the correct rate}} for an A/B pick dir."""
+        if not d.is_dir():
             return {}
         trials = {p.stem: _jsonl(p) for p in sorted(d.glob("b*.jsonl"), key=lambda p: int(p.stem[1:]))}
         summ = {}
@@ -319,12 +329,41 @@ class Run:
             k = sum(r.get("correct") is True for r in rows)
             m = sum(r.get("correct") is not None for r in rows)
             summ[b] = beta_summary(k, m) | {"unparsed": len(rows) - m}
-        return {
-            "trials": trials,
-            "summary": summ,
+        return {"trials": trials, "summary": summ}
+
+    def _forecaster(self, n: Node) -> dict:
+        d = next((n.dir / x for x in FORECASTER_DIRS if (n.dir / x).is_dir()), None)
+        if d is None:
+            return {}
+        return self._trials(d) | {
             "prompts": _json(d / "prompts.json"),
             "summariser": _json(d / "summary.json"),
         }
+
+    # --- innocuousness comparisons -----------------------------------------------------------------------------
+    def comparisons(self, node: str | None = None) -> list[dict]:
+        out = []
+        for r in _jsonl(self.dir / "innocuous.jsonl"):
+            if node and node not in (r.get("a"), r.get("b")):
+                continue
+            w = r.get("winner")
+            out.append(r | {"winner_id": {"A": r.get("a"), "B": r.get("b")}.get(w, w)})
+        return out[::-1]
+
+    def comparison(self, cid: str) -> dict:
+        base = self.dir / "innocuous"
+        p = _inside(base, f"{cid}.json")
+        if not p:
+            raise FileNotFoundError(cid)
+        d = _json(p) or {}
+        w = d.get("winner")
+        try:
+            from .innocuous import BASH, VERDICT  # what the judge is offered (current code, not stored per comparison)
+
+            tools = [BASH, VERDICT]
+        except ImportError:
+            tools = None
+        return d | {"winner_id": {"A": d.get("a"), "B": d.get("b")}.get(w, w), "tools_current": tools}
 
     def rows(self, nid, batch, arm) -> list[dict]:
         out = []
@@ -394,6 +433,14 @@ class Run:
         if not p:
             raise FileNotFoundError(rel)
         return {"path": rel, "text": _text(p)}
+
+
+def _count_lines(p: Path) -> int:
+    try:
+        with open(p, "rb") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
 
 
 def _secs(t: str) -> float:
@@ -502,6 +549,10 @@ class Handler(BaseHTTPRequestHandler):
                 case "/api/job":
                     j = run.job(q["job"])
                     return self._json(j) if j else self._send(404, b'{"error":"no such job"}')
+                case "/api/comparisons":
+                    return self._json(run.comparisons(q.get("node")))
+                case "/api/comparison":
+                    return self._json(run.comparison(q["id"]))
                 case "/api/jobfile":
                     return self._json(run.job_file(q["job"], q["path"]))
             self._send(404, b'{"error":"not found"}')
