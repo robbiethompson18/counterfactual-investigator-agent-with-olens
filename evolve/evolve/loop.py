@@ -23,6 +23,7 @@ from .evaluate import evaluate
 from .novelty import check_novelty
 from .store import Store
 
+SURPRISE = "U"  # surprise score the Pool ranks on; U_rev (confident reversals) is still stored but not used
 SLOTS = 4  # job starts per epoch (front counters, top-up timing)
 P_CREATOR = 0.1
 N_EXAMPLES = 6
@@ -179,7 +180,7 @@ class Scheduler:
 
     def next_job(self):
         nodes = self.store.nodes()
-        ukey = self.rng.choice(["U", "U_rev"])
+        ukey = SURPRISE  # U only: we want forecasters unsure, not fooled (U' rewarded red herrings)
         el = pool.eligible(nodes)
         if not el:
             return None
