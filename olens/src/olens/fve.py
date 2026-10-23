@@ -26,6 +26,7 @@ class Whitener:
         evals = evals.clamp_min(0) + ridge * evals.mean()
         self.min_eig, self.max_eig = evals.min().item(), evals.max().item()
         self.W = ((evecs * evals.rsqrt()) @ evecs.T).to(device, dtype)  # Σ^-1/2 (symmetric)
+        self.W_inv = ((evecs * evals.sqrt()) @ evecs.T).to(device, dtype)  # Σ^1/2
         self.mu = m["mu"].to(device, dtype)
 
     def __call__(self, x, center=True):
@@ -33,6 +34,10 @@ class Whitener:
         if center:
             x = x - self.mu
         return x @ self.W  # W symmetric
+
+    def unwhiten(self, z, mu_scale=1.0):
+        """Inverse of __call__: Σ^1/2 z + mu_scale * mu."""
+        return torch.as_tensor(z).to(self.W.device, self.W.dtype) @ self.W_inv + mu_scale * self.mu
 
 
 def fve_single(z, zhat):
