@@ -77,14 +77,17 @@ class Scores:
 
     def __init__(self, messages: list[dict], row: dict, heads: list[int]):
         text, spans = render_spans(messages)
+        starts = {}  # message -> its first field's start, to place tool-call segments at the message's end
+        for (j, _), b in spans.items():
+            starts[j] = min(b, starts.get(j, b))
         keep = [k for k, s in enumerate(row["segments"]) if s["field"] is not None]
         self.sents = []
         for k in keep:
             s = row["segments"][k]
             i, field, c = s["msg_index"], s["field"], s["char_start"]
             key = (i, field) if (i, field) in spans and c is not None and field != "tool_call" else None
-            # tool-call arguments aren't rendered verbatim: place them at their message's first field
-            char = spans[key] + c if key else min((b for (j, _), b in spans.items() if j == i), default=len(text))
+            # tool-call arguments aren't rendered verbatim: place them at their message's end (as cfbench/olens.py does)
+            char = spans[key] + c if key else (starts[i + 1] - 2 if i + 1 in starts else len(text))
             self.sents.append(Sent(char, f"{s['role']} {field}", s["text"], s["generated"], s["tok_end"] - s["tok_start"]))
         V = np.array([[np.nan if x is None else x for x in row["vertical"][h]] for h in heads], dtype=float)
         self.recv = [None if np.isnan(x) else float(x) for x in V.mean(0)[keep]]

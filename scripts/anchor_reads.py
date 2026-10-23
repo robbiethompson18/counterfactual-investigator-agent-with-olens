@@ -70,7 +70,9 @@ def segments(tok, msgs, ids, where):
             out.append({
                 "tok_start": a, "tok_end": nxt, "msg_index": msg, "role": role, "field": field,
                 "char_start": c0, "char_end": None if c1 is None else c1 + len(toks[t]),
-                "text": "".join(toks[a:nxt]), "generated": role == "assistant" and field is not None,
+                "text": "".join(toks[a:nxt]),
+                # model turns carry reasoning_content (both harnesses write it); prefilled assistant turns don't
+                "generated": role == "assistant" and field is not None and "reasoning_content" in msgs[msg],
             })  # fmt: skip
             a = nxt
     return out
