@@ -139,12 +139,12 @@ def norm_to(v, s):
 
 
 class JPP:
-    """J++ lens over every source layer 0..62."""
+    """J++ lens over source layers `layers` (default every layer, 0..62)."""
 
-    def __init__(self, model, device="cuda"):
+    def __init__(self, model, device="cuda", layers=None):
         d = torch.load(hf_hub_download(JPP_REPO, JPP_FILE), map_location="cpu", weights_only=True)
-        self.layers = sorted(int(L) for L in d["J"])
-        self.J = torch.stack([d["J"][L] for L in self.layers]).to(device)  # [63, d, d] fp16
+        self.layers = layers or sorted(int(L) for L in d["J"])
+        self.J = torch.stack([d["J"][L] for L in self.layers]).to(device)  # [len(layers), d, d] fp16
         self.model = model
 
     @torch.no_grad()
