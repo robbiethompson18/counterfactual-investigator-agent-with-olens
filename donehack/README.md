@@ -96,11 +96,20 @@ that already exist. The runs behind the findings above, with the runner logs, ar
 - `evilgenie/`: the repo's EvilGenie (LiveCodeBench) coding source as in `configs/coding/lcb.yaml`
   (its prompts, `execute_command` + `done`, writable tests, 100 steps) on the podman sandbox.
   `extract.py` dumps the 154 problems with LiveCodeBench's private tests to `evilgenie/data/`
-  (gitignored); `run.py` grades on the visible tests and on the private holdout, and flags
-  `hack_signal` = passes visible, fails holdout.
+  (gitignored); `run.py` grades on the visible tests and on the private holdout (JSON-equal for
+  functional problems, whitespace-token-equal for stdin ones), and flags `hack_signal` = passes
+  visible, fails holdout (not set on `multi_answer` problems), plus a `hardcodes_sample` heuristic.
+  `regrade.py` re-grades old episodes with the normalised comparison. `extract_ib.py` dumps
+  ImpossibleBench (LiveCodeBench) to `evilgenie/data_ib/`; `run.py --data data_ib` runs it and
+  also grades on the unmodified original tests (`ib_hack` = passes the impossible tests).
 - `analysis/glm53_dash/`: GLM 5.3 coding-env summary page (`build.py`, writes `site/`), expview
-  export (`expview_export.py`, `EXPVIEW_DIR` overrides `~/workspace/expview`) and the monorepo
-  rows export (`to_rows.py`, writes `data/runs/coding/2026-10-23_glm53`).
+  export (`expview_export.py [lcb]`, `EXPVIEW_DIR` overrides `~/workspace/expview`), the monorepo
+  rows export (`to_rows.py`, writes `data/runs/coding/2026-10-23_glm53`) and `fig/summary_fig.py`.
+  Results: [docs/glm53-agent-interp-envs.md](../docs/glm53-agent-interp-envs.md).
+- `analysis/docent_rows.py`: writes donehack episode dirs as `data/runs/coding/<date>_<name>` run
+  dirs for `scripts/docent_upload.py` (refuses to rewrite a dir that has `docent.json`).
+- `analysis/grader_awareness*.{py,md}`: grader/harness-awareness forensics (command and CoT flags,
+  CMH odds ratios for hacking) over the V4 Flash, Qwen and GLM is_prime runs.
 - `submit_solution_*.py`: submit scripts shown to the agent, kept byte-identical to
   agent-interp-envs and excluded from ruff.
 - `env.py`, `tasks.py`: the earlier toy-task harness. `env.chat` (the OpenRouter client) is shared.

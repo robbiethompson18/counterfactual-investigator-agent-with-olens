@@ -7,3 +7,4 @@ analysis/*.csv
 __pycache__/
 analysis/glm53_dash/site/
 evilgenie/data/
+evilgenie/data_ib/
