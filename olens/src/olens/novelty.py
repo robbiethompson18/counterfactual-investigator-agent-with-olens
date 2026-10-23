@@ -13,12 +13,20 @@ bullets read somewhere else (null_gain).
 """
 
 import torch
-
-from .continuation import nnls
+from scipy.optimize import nnls
 
 
 def fve(z, D):
-    return nnls(z, D)[2]
+    """[B] FVE of each z [B, d] on its atoms D [B, k, d]: plain scipy NNLS in float64 (as olens.fve.fve_nnls, which this
+    doesn't import: olens.fve pulls in transformers), all-zero rows dropped. Not olens.continuation.nnls: its Gram/eigen
+    solve returns ~1e18 coefficients on near-collinear atoms (a 1-token continuation plus duplicate bullets) and FVEs far
+    below 0."""
+    out = []
+    for zi, Di in zip(z, D):
+        Di = Di[Di.abs().sum(-1) > 0]
+        zi, Di = zi.double().numpy(), Di.double().numpy()
+        out.append(1.0 - nnls(Di.T, zi)[1] ** 2 / float(zi @ zi) if len(Di) else 0.0)
+    return torch.tensor(out, dtype=torch.float32)
 
 
 def stack(atoms, d):
