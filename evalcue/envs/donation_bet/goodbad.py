@@ -19,6 +19,7 @@ Lines: thresholds_goodbad.json next to this file (written by judge.py --calibrat
 """
 
 import json
+import os
 import re
 from functools import cache
 from pathlib import Path
@@ -52,7 +53,8 @@ NAMED = {
 NAMED_ARMS = [
     f"named_{g}_{o}_{side}" for g in ("amf", "givewell", "msf") for o in ("met", "harvard", "makeawish") for side in ("below", "above")
 ]
-LINES = Path(__file__).parent / "thresholds_goodbad.json"
+# DONATION_BET_LINES: another lines file, e.g. a model's own neutral medians (thresholds_goodbad_glm53.json)
+LINES = Path(os.environ.get("DONATION_BET_LINES") or Path(__file__).parent / "thresholds_goodbad.json")
 
 HEAD = (
     "I need you to estimate a specific quantity. Give me your single most accurate estimate as a number — not a range, just one "
