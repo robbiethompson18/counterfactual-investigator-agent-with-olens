@@ -7,10 +7,11 @@ token's place in messages[msg_index][field] (null for template tokens). Position
 regex) and every <|im_end|> of the whole rendered transcript, prompt included. Each position is placed at a character of
 the transcript as `read_transcript` shows it (core.render_spans), so search hits and olens_at share one `char` coordinate.
 
-- `search_olens(regex)`: regex over bullet text only (never the transcript text, so it can't just find the quoted words);
-  says how often runs with / without the behavior match, then hits with the transcript text around each and its `char`.
-- `olens_at(run, char)`: every read at the position nearest `char` (from any search hit, transcript or O-lens) and its
-  neighbours, with the transcript text between them.
+- `search_olens(regex)`: regex over the transcripts; the reads inside each match and the first one after it, with the
+  transcript text around each read and its `char`, and how many runs with / without the behavior match.
+- `olens_at(run, char)`: every read at the position nearest `char` (from any search hit) and its neighbours, with the
+  transcript text between them.
+Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`).
 
 `olens_placebo` answers every call from a run of a different env, at the same relative position in that run (with that
 run's text around the reads), so the predictor gets as much O-lens text through the same tools, none of it about this
@@ -30,8 +31,8 @@ from cfbench.tools import Tool, _schema
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
 MAX_WINDOW = 5  # neighbouring positions each side in olens_at
-MAX_HITS = 30  # per search_olens call
-TOP_BULLETS = 1  # of each read, highest FVE first (the rows come sorted); the rest are mostly noise
+MAX_HITS = 15  # read positions per search_olens call
+TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
 
 Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
 
@@ -65,7 +66,7 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
     by_token = defaultdict(dict)
     for r in rows:
-        by_token[r["token_index"]][r["layer"]] = r | {"bullets": r["bullets"][:TOP_BULLETS]}
+        by_token[r["token_index"]][r["layer"]] = r
     out = []
     for layers in by_token.values():
         r = next(iter(layers.values()))
@@ -77,10 +78,6 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
         where = f"{r['role']} {field}".strip()
         out.append(Position(char, where, layers))
     return sorted(out, key=lambda p: p.char)
-
-
-def _bullets(r: dict, min_fve: float = 0.0) -> str:
-    return " | ".join(f"{b['text']} [{b['fve']:.2f}]" for b in r["bullets"] if b["fve"] >= min_fve)
 
 
 def _flat(text: str) -> str:
@@ -111,10 +108,23 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
 
     yes_no = ["yes" if r.label else "no" for r in base]
 
+    def filters(args: dict) -> tuple[set[int] | None, int, float]:
+        layers = set(args["layers"]) if args.get("layers") else None
+        top_k = TOP_K if args.get("top_k") is None else int(args["top_k"])
+        return layers, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
+
+    def show(p: Position, scale: float, layers: set[int] | None, top_k: int, min_fve: float) -> list[str]:
+        """One line per layer with at least one bullet passing both filters (bullets come sorted by FVE)."""
+        lines = []
+        for layer in sorted(p.layers):
+            bullets = [b for b in p.layers[layer]["bullets"][:top_k] if b["fve"] >= min_fve]
+            if bullets and (layers is None or layer in layers):
+                lines.append(f"  L{layer}: " + " | ".join(f"{b['text']} [FVE {b['fve']:.2f}]" for b in bullets))
+        return lines
+
     def at(args: dict) -> str:
         i, char = int(args["run"]), int(args["char"])
         window = max(0, min(int(args.get("window", 2)), MAX_WINDOW))
-        layers = set(args["layers"]) if args.get("layers") else None
         if i not in source:
             return f"Run {i} has no O-lens reads; the runs with reads are marked in the table."
         pos, scale, text = run_positions(i)
@@ -124,67 +134,62 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
             out.append(f"\n…{_flat(text[start : p.char])}⟨read⟩  [char {round(p.char / scale)}, {p.where}]")
-            for layer in sorted(p.layers):
-                if layers is None or layer in layers:
-                    r = p.layers[layer]
-                    bullets = " | ".join(f"{b['text']} [{b['fve']:.2f}]" for b in r["bullets"])
-                    out.append(f"  L{layer} (joint FVE {r['joint_fve']:.2f}): {bullets}")
+            top_k, min_fve = filters(args)[1:]
+            out += show(p, scale, *filters(args)) or [f"  (no bullet in the top {top_k} with FVE >= {min_fve})"]
             prev = p
         return "\n".join(out)
 
     def search(args: dict) -> str:
+        """Regex over the transcripts; the reads inside each match and the first one after it."""
         try:
             pattern = re.compile(args["regex"], re.IGNORECASE)
         except re.error as e:
             return f"Bad regex: {e}"
-        layers, min_fve = set(args["layers"]) if args.get("layers") else None, float(args.get("min_fve") or 0)
         runs = [int(args["run"])] if args.get("run") is not None else read_ids
-        hits: dict[tuple[str, int, str], list] = {}  # (context, layer, bullet) -> [runs, fve, line]; prompt reads repeat
-        by_layer, per_run = defaultdict(int), defaultdict(int)
-        for i in (i for i in runs if i in source):
-            pos, scale, text = run_positions(i)
-            for p in pos:
-                for layer, r in p.layers.items():
-                    if layers is not None and layer not in layers:
-                        continue
-                    for b in r["bullets"]:
-                        if b["fve"] >= min_fve and pattern.search(b["text"]):
-                            by_layer[layer] += 1
-                            per_run[i] += 1
-                            context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
-                            line = f'char {round(p.char / scale)} ({p.where}) L{layer}: "{context}" → {b["text"]} [{b["fve"]:.2f}]'
-                            hits.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         searched = [i for i in runs if i in source]
+        hits: dict[tuple, list] = {}  # (context, reads shown) -> [runs, block]; prompt text repeats across runs
+        matched = set()
+        for i in searched:
+            pos, scale, text = run_positions(i)
+            for m in pattern.finditer(texts[i]):
+                matched.add(i)
+                start, end = m.start() * scale, m.end() * scale
+                inside = [p for p in pos if start <= p.char <= end]
+                after = next((p for p in pos if p.char > end), None)
+                for p in inside + ([after] if after and after not in inside else []):
+                    context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
+                    if not (lines := show(p, scale, *filters(args))):
+                        continue  # nothing passes the bullet filters here
+                    block = f'char {round(p.char / scale)} ({p.where}): "{context}"\n' + "\n".join(lines)
+                    hits.setdefault((context, tuple(lines)), [[], block])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
             ids = [i for i in searched if base[i].label == label]
             if ids:
-                n_hit = sum(per_run[i] > 0 for i in ids)
-                per_100 = 100 * sum(per_run[i] for i in ids) / max(1, sum(len(run_positions(i)[0]) for i in ids))
-                kinds.append(f"{n_hit} of {len(ids)} runs {name} the behavior ({per_100:.0f} per 100 read positions)")
-        summary = (
-            f"Matching bullets in {' and '.join(kinds)}. "
-            f"Matches by layer: {', '.join(f'L{k} {v}' for k, v in sorted(by_layer.items())) or 'none'}. Hits by FVE:"
-        )
-        top = sorted(hits.values(), key=lambda h: -h[1])[:MAX_HITS]
-        lines = [f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}] {line}" for rs, _, line in top]
-        more = f" Showing {MAX_HITS} of {len(hits)} distinct hits." if len(hits) > MAX_HITS else ""
-        return summary + more + ("\n" + "\n".join(lines) if lines else "")
+                kinds.append(f"{sum(i in matched for i in ids)} of {len(ids)} runs {name} the behavior")
+        summary = f"The regex matches the transcripts of {' and '.join(kinds)} (runs with reads only); {len(hits)} distinct read positions."
+        # alternate runs with and without the behavior, so neither kind crowds out the other
+        ordered = sorted(hits.values(), key=lambda h: (min(searched.index(i) for i in h[0]) // 2, not base[h[0][0]].label))
+        blocks = [
+            f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}] {b}" for rs, b in ordered[:MAX_HITS]
+        ]
+        more = f" Showing {MAX_HITS}; narrow the regex or pass run for the rest." if len(hits) > MAX_HITS else ""
+        return summary + more + ("\n\n" + "\n\n".join(blocks) if blocks else "")
 
-    layer_list = {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers"}
+    params = {
+        "layers": {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers"},
+        "top_k": {"type": "integer", "description": f"bullets per read, highest FVE first (default {TOP_K})"},
+        "min_fve": {"type": "number", "description": f"only bullets with at least this FVE (default {MIN_FVE})"},
+    }
     return {
         "search_olens": (
             _schema(
                 "search_olens",
-                "Case-insensitive regex over the bullet text of every O-lens read (not the transcript text). Says how often runs "
-                f"with and without the behavior match, then up to {MAX_HITS} distinct hits, highest FVE first, each with the "
-                "transcript text around the read and its run and char (for olens_at).",
-                {
-                    "regex": {"type": "string"},
-                    "run": {"type": "integer", "description": "optional: one run id; default all runs with reads"},
-                    "layers": layer_list,
-                    "min_fve": {"type": "number", "description": "optional: only bullets with at least this FVE"},
-                },
+                "Case-insensitive regex over every base-arm transcript that has O-lens reads. For each match, the O-lens reads "
+                "at the punctuation inside it and the first one after it, with the transcript text around each read and its "
+                f"char (for olens_at). Says how many runs with and without the behavior match. At most {MAX_HITS} read "
+                "positions per call; identical prompt text in several runs is shown once.",
+                {"regex": {"type": "string"}, "run": {"type": "integer", "description": "optional: one run id"}, **params},
                 ["regex"],
             ),
             search,
@@ -192,16 +197,23 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         "olens_at": (
             _schema(
                 "olens_at",
-                "Every O-lens read (all layers) at the read position nearest `char` in a run, and `window` positions "
-                "each side, with the transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
+                "Every O-lens read (all layers) at the read position nearest `char` in a run, and `window` positions each side, "
+                "with the transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
                 {
                     "run": {"type": "integer"},
                     "char": {"type": "integer"},
                     "window": {"type": "integer", "description": f"positions each side, default 2, max {MAX_WINDOW}"},
-                    "layers": layer_list,
+                    **params,
                 },
                 ["run", "char"],
             ),
             at,
         ),
     }, set(read_ids)
+
+
+def fve_note(reads: Reads) -> str:
+    """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt."""
+    top = sorted(row["bullets"][0]["fve"] for _, rows in reads.values() for row in rows if row["bullets"])
+    q = [top[int(f * (len(top) - 1))] for f in (0.1, 0.5, 0.9)]
+    return f"Over all reads here, the top bullet's FVE is {q[0]:.2f} / {q[1]:.2f} / {q[2]:.2f} at the 10th / 50th / 90th percentile."
