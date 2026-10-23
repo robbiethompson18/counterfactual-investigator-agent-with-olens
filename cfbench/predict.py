@@ -14,7 +14,7 @@ from cfbench.tools import Tool, call
 
 P_MIN, P_MAX = 0.01, 0.99
 MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
-REASONING = {"effort": "medium"}  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
+EFFORT = "medium"  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 
 SYSTEM = (
     "You are an investigator predicting how an AI model would behave if its environment were changed. "
@@ -51,7 +51,7 @@ def check(arguments: str) -> tuple[dict | None, str]:
     return {"p": p, "rationale": str(args.get("rationale", ""))}, "Prediction recorded."
 
 
-async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0) -> dict:
+async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT) -> dict:
     tools = tools or {}
     messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
         {"role": "system", "content": SYSTEM},
@@ -65,7 +65,7 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
             messages=messages,
             tools=schemas,
             max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": REASONING},
+            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
         )
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message

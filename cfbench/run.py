@@ -19,7 +19,7 @@ import random
 
 from cfbench import olens
 from cfbench.core import CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
-from cfbench.predict import REASONING, predict
+from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
 
@@ -32,6 +32,7 @@ async def main():
     ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter); keep medium unless comparing")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
@@ -53,7 +54,7 @@ async def main():
         args.slug,
         description=args.description or f"{args.env}: predict {args.model} arm outcomes ({', '.join(conditions)})",
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
-        params={k: v for k, v in vars(args).items() if k not in ("slug", "description")} | {"reasoning": REASONING},
+        params={k: v for k, v in vars(args).items() if k not in ("slug", "description")},
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
@@ -68,7 +69,7 @@ async def main():
             tools |= lens_tools
         prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
         async with slots:
-            result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
+            result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:  # appended as each lands, so a crash keeps them
             f.write(json.dumps(row) + "\n")
