@@ -61,7 +61,7 @@ async def main():
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
         condition, tools, read = case["condition"], {}, None
         if condition in TOOL_CONDITIONS:
-            tools = transcript_tools(base)
+            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
             tools |= lens_tools
