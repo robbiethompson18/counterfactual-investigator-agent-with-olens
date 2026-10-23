@@ -310,6 +310,12 @@ Current docs:
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
+- [Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
+  — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
+  on-topic reads in every arm, blind-graded); code only on closed PR #125
+- [O-lens novelty over the continuation (dead end as a metric) — read before using FVE beyond the realized text as an interestingness score](docs/olens-novelty.md)
+  — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
+  counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
