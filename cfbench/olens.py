@@ -19,6 +19,7 @@ run's text around the reads), so the predictor gets as much O-lens text through 
 scenario.
 """
 
+import difflib
 import json
 import random
 import re
@@ -26,7 +27,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from cfbench.core import Rollout, initial_context, render_spans
+from cfbench.core import Rollout, initial_context, render, render_spans
 from cfbench.tools import Tool, _schema
 
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
@@ -116,6 +117,38 @@ def annotate(
             out += [text[prev:at], "⟨O-lens: " + " | ".join(got) + "⟩"]
             prev = at
     return "".join(out) + text[prev:]
+
+
+def edit_reads(run: Rollout, reads: Reads, cf_start: str, source: str | None = None, top_k: int = 2, min_fve: float = 0.05) -> str:
+    """The base run's reads where its starting context differs from the counterfactual's (`cf_start`, the edited text, which
+    the predictor sees anyway): each changed span's reads and the first read after it, every layer, for `transcript_olens_edit`.
+    `source` (placebo): another env's run's reads at the same relative indices, as in annotate()."""
+    text = render_spans(run.messages)[0]
+    start = render(initial_context(run.messages))  # a prefix of `text`, so its offsets are text offsets
+    pos = positions(*reads[run.source])
+    spans = [
+        (i1, i2) for tag, i1, i2, _, _ in difflib.SequenceMatcher(None, start, cf_start, autojunk=False).get_opcodes() if tag != "equal"
+    ]
+    keep = []
+    for i1, i2 in spans:
+        inside = [k for k, p in enumerate(pos) if i1 <= p.char <= i2]
+        after = next((k for k, p in enumerate(pos) if p.char > i2), None)
+        keep += [k for k in inside + ([after] if after is not None else []) if k not in keep]
+    if source:
+        other = positions(*reads[source])
+        pick = lambda k: other[round(k * (len(other) - 1) / max(1, len(pos) - 1))].layers
+        pos = [Position(p.char, p.where, {layer: r for layer, r in pick(k).items() if layer in p.layers}) for k, p in enumerate(pos)]
+    out = []
+    for k in keep:
+        p = pos[k]
+        out.append(f"…{_flat(text[max(0, p.char - 100) : p.char])}⟨read⟩")
+        out += [
+            f"  L{layer} [FVE {b['fve']:.2f}] {b['text']}"
+            for layer in sorted(p.layers)
+            for b in p.layers[layer]["bullets"][:top_k]
+            if b["fve"] >= min_fve
+        ] or ["  (no bullet passes the filter)"]
+    return "\n".join(out) or "(no read positions in the edited text)"
 
 
 def placebo_sources(base: list[Rollout], reads: Reads, seed: int) -> dict[str, str]:

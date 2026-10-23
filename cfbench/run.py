@@ -21,6 +21,7 @@ import random
 from cfbench import olens
 from cfbench.core import (
     CONDITIONS,
+    EDIT_CONDITIONS,
     INLINE_CONDITIONS,
     OLENS_CONDITIONS,
     TOOL_BUDGET,
@@ -52,7 +53,9 @@ async def main():
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
     reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
-    assert reads or not set(OLENS_CONDITIONS + INLINE_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
+    assert reads or not set(OLENS_CONDITIONS + INLINE_CONDITIONS + EDIT_CONDITIONS) & set(conditions), (
+        "the olens conditions need --olens-reads"
+    )
     fve_note = olens.fve_note(reads) if reads else ""
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
@@ -71,7 +74,7 @@ async def main():
 
     async def one(case: dict, base: list, cf: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        condition, tools, read, renders, cf_render = case["condition"], {}, None, None, None
+        condition, tools, read, renders, cf_render, edit_render = case["condition"], {}, None, None, None, None
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
@@ -87,7 +90,14 @@ async def main():
                 twin = max((r for r in cf if r.source in reads), key=like)
                 placebo = olens.placebo_sources([twin], reads, args.seed + draw)[twin.source] if condition.endswith("placebo") else None
                 cf_render = olens.annotate(twin, reads, placebo, prompt_only=True)
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, renders, cf_render)
+        if condition in EDIT_CONDITIONS:  # cf text only (what the edit shows), from the cf run with the same item as shown[0]
+            first = render(initial_context(shown[0].messages))
+            cf_start = max((render(initial_context(r.messages)) for r in cf), key=lambda t: difflib.SequenceMatcher(None, t, first).ratio())
+            placebo = olens.placebo_sources(shown[:1], reads, args.seed + draw)[shown[0].source] if condition.endswith("placebo") else None
+            edit_render = olens.edit_reads(shown[0], reads, cf_start, placebo)
+        prompt = build_prompt(
+            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, renders, cf_render, edit_render
+        )
         async with slots:
             result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0)
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}

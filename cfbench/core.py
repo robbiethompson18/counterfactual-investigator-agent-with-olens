@@ -18,7 +18,9 @@ TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
 # `transcript` with reads written into the transcripts; the _cf ones also show the counterfactual arm's starting context with
 # its reads (a forward pass over the edited prompt, no generation)
 INLINE_CONDITIONS = ("transcript_olens", "transcript_olens_placebo", "transcript_olens_cf", "transcript_olens_cf_placebo")
-CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS, *INLINE_CONDITIONS)
+# `transcript` plus a section with the base runs' reads at the text the edit changes (base-arm reads only)
+EDIT_CONDITIONS = ("transcript_olens_edit", "transcript_olens_edit_placebo")
+CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS, *INLINE_CONDITIONS, *EDIT_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 
 
@@ -93,6 +95,19 @@ often hallucinated; bullets under FVE 0.1 are left out. {fve_note} Reads can sho
 says; they also often just paraphrase the nearby text."""
 
 
+EDIT_READS = """
+## O-lens reads at the edited text
+
+The O-lens is a model trained to describe another model's internal activations in words. Below are its reads of the \
+target model's activations in the base arm (Transcript 1 above) at the punctuation inside the text that the edit changes \
+and the first one after it: what the model was representing right where the base and counterfactual arms differ. Each \
+line is one bullet at one layer (L32, L40, L48) with its FVE (fraction of the activation's variance the bullet explains; \
+high is good, low is often hallucinated). The reads come from the base arm only; nothing was run on the counterfactual. \
+They can show how the model interprets that text beyond what it says; they also often just paraphrase it.
+
+{edit_render}
+"""
+
 CF_READS = """
 We also ran `{model}` forward over the counterfactual arm's starting context, without generating anything (so this is not \
 a run of the counterfactual arm and says nothing about what it does next), and read those activations with the O-lens, \
@@ -138,6 +153,7 @@ def build_prompt(
     fve_note: str = "",
     renders: dict[str, str] | None = None,
     cf_render: str | None = None,
+    edit_render: str | None = None,
 ) -> str:
     """For the olens conditions: `read` = ids of base runs with O-lens reads, `fve_note` = cfbench.olens.fve_note.
     For the inline conditions: `renders` = each shown run's source -> its transcript with reads (cfbench.olens.annotate),
@@ -201,7 +217,7 @@ We will run `{model}` again, with the same settings, in a counterfactual arm tha
 follows. Everything else is identical.
 
 {edit}
-{CF_READS.format(model=model, cf_render=cf_render) if cf_render else ""}
+{CF_READS.format(model=model, cf_render=cf_render) if cf_render else ""}{EDIT_READS.format(edit_render=edit_render) if edit_render else ""}
 ## Your task
 
 Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
