@@ -6,7 +6,8 @@ rates, diffs, files, Target transcripts, Forecaster trials, Rate audit and agent
 Read-only over data/<run>/ (index.json, events.jsonl, nodes/, agent_jobs/), so it can run beside the loop. The page
 (dashboard.html) polls /api/state and re-renders whatever changed.
 
-    /api/state?run=              index + per-node posteriors, latest epoch (front, layers), agent jobs, event count
+    /api/state?run=              index + per-node posteriors, latest epoch (front, layers), agent jobs, event count,
+                                 job progress (cap, per-job stage) and the Qwen vLLM queue
     /api/events?run=&since=N     events.jsonl lines from N on
     /api/node?run=&id=           one node: info, texts, diffs, file tree, scores, forecaster trials, audits, agent job
     /api/rows?run=&id=&batch=&arm=           one batch of Target runs, summarised
@@ -18,8 +19,13 @@ Read-only over data/<run>/ (index.json, events.jsonl, nodes/, agent_jobs/), so i
 import argparse
 import functools
 import json
+import os
 import random
+import re
+import statistics
+import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -27,6 +33,8 @@ from urllib.parse import parse_qs, urlparse
 from .measure import batches, load
 from .node import ARMS, Node, unified_diff
 from .store import ROOT
+
+QWEN_METRICS = os.environ.get("QWEN_VLLM_URL", "http://127.0.0.1:18000/v1").rsplit("/v1", 1)[0] + "/metrics"
 
 PAGE = Path(__file__).resolve().parent / "dashboard.html"
 FORECASTER_DIRS = ("forecaster", "picker")  # the Forecaster was called the Picker; old runs keep picker/
@@ -167,6 +175,8 @@ class Run:
             "nodes": nodes,
             "jobs": self.jobs(),
             "in_flight": self._in_flight(evs),
+            "progress": self.progress(evs),
+            "vllm": vllm_metrics(),
         }
 
     def _in_flight(self, evs) -> list[dict]:
@@ -183,6 +193,60 @@ class Run:
             elif ev in ("mutation_failed", "creation_failed", "novelty") or (ev == "node_added" and e.get("round") is not None):
                 agents.pop(e.get("round"), None)
         return [{"what": "measuring", **e} for e in measuring.values()] + [{"what": "agent", **e} for e in agents.values()]
+
+    def progress(self, evs) -> dict:
+        """Per loop job (numbered by job_start), its kind and current stage, replayed from the event log:
+        agent (queued / working, from the job dir) -> measuring -> scoring (summariser + audit) -> done | failed."""
+        jobs, node_job, measure_s, started = {}, {}, [], {}
+        dirs = {}
+        for d in (self.dir / "agent_jobs").glob("*/loop.json"):
+            r = (_json(d) or {}).get("round")
+            if r is not None:
+                dirs[r] = d.parent.name
+        states = {j["job"]: j["state"] for j in self.jobs()}
+
+        def at(j, stage, t, **kw):
+            jobs.setdefault(j, {"job": j, "t0": t}).update(stage=stage, since=t, **kw)
+
+        for e in evs:
+            ev, t, r = e["event"], e["t"], e.get("round")
+            if ev == "job_start":
+                at(e["job"], "starting", t, surprise=e.get("surprise"))
+            elif ev in ("mutation_start", "creation_start"):
+                at(r, "agent", t, kind=ev.split("_")[0], reference=e.get("reference"), examples=e.get("examples"))
+            elif ev == "topup_start":
+                at(r, "measuring", t, kind="topup", node=e.get("node"))
+                node_job[e.get("node")] = r
+            elif ev in ("mutation_failed", "creation_failed"):
+                at(r, "failed", t, outcome="; ".join(map(str, e.get("errors") or []))[:300])
+            elif ev == "novelty" and not e.get("new"):
+                at(r, "failed", t, outcome=f"duplicate of {e.get('duplicate_of')}")
+            elif ev == "node_added" and r is not None and r in jobs:
+                at(r, "admitted", t, node=e["node"])
+                node_job[e["node"]] = r
+            elif ev in ("measure_start", "measure_resumed"):
+                started[e["node"]] = t
+                if e["node"] in node_job:
+                    at(node_job[e["node"]], "measuring", t)
+            elif ev == "measured":
+                if e["node"] in started:
+                    measure_s.append(_secs(e["t"]) - _secs(started.pop(e["node"])))
+                if e["node"] in node_job:
+                    at(node_job[e["node"]], "scoring", t)
+            elif ev == "audited" and e["node"] in node_job:
+                at(node_job[e["node"]], "done", t, outcome=f"audit {e.get('score')}")
+        for j in jobs.values():
+            j["dir"] = dirs.get(j["job"])
+            if j["stage"] == "agent":
+                j["agent_state"] = states.get(j["dir"], "posting")
+        return {
+            "max_jobs": (_json(self.dir / "loop.json") or {}).get("max_jobs"),
+            "started": sum(e["event"] == "job_start" for e in evs),
+            "finished": bool(evs) and evs[-1]["event"] == "loop_finished",
+            "jobs": sorted(jobs.values(), key=lambda j: j["job"]),
+            "measure_median_s": statistics.median(measure_s[-30:]) if measure_s else None,
+            "seed_measuring": [{"node": n, "since": t} for n, t in started.items() if n not in node_job],
+        }
 
     def jobs(self) -> list[dict]:
         d = self.dir / "agent_jobs"
@@ -330,6 +394,47 @@ class Run:
         if not p:
             raise FileNotFoundError(rel)
         return {"path": rel, "text": _text(p)}
+
+
+def _secs(t: str) -> float:
+    return time.mktime(time.strptime(t, "%Y-%m-%dT%H:%M:%SZ"))
+
+
+_vllm = {"t": 0.0, "out": None, "tok": None}
+_vllm_lock = threading.Lock()
+
+
+def vllm_metrics() -> dict | None:
+    """Requests running / waiting, KV-cache use and generation tokens/s on the Qwen server (cached 2 s)."""
+    with _vllm_lock:
+        now = time.time()
+        if now - _vllm["t"] < 2:
+            return _vllm["out"]
+        try:
+            text = urllib.request.urlopen(QWEN_METRICS, timeout=1.5).read().decode()
+        except OSError as e:
+            _vllm.update(t=now, out={"error": str(e)[:200]})
+            return _vllm["out"]
+
+        def total(name):
+            return sum(float(v) for v in re.findall(rf"^{name}{{[^}}]*}} ([0-9.eE+-]+)$", text, re.MULTILINE))
+
+        kv = [float(v) for v in re.findall(r"^vllm:kv_cache_usage_perc{[^}]*} ([0-9.eE+-]+)$", text, re.MULTILINE)]
+        tok = total("vllm:generation_tokens_total")
+        prev = _vllm["tok"]
+        rate = (tok - prev[1]) / (now - prev[0]) if prev and now > prev[0] else None
+        _vllm.update(
+            t=now,
+            tok=(now, tok),
+            out={
+                "running": total("vllm:num_requests_running"),
+                "waiting": total("vllm:num_requests_waiting"),
+                "kv": max(kv) if kv else None,
+                "gen_tok_s": rate,
+                "engines": len(kv),
+            },
+        )
+        return _vllm["out"]
 
 
 def cc_transcript(p: Path) -> list[dict]:

@@ -111,6 +111,14 @@ a:hover,.lnk:hover{text-decoration:underline}
 .feed div{padding:3px 10px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:150px 130px 1fr;gap:10px}
 .empty{color:var(--muted);font-size:13.5px;padding:8px 0}
 .err{color:var(--bad)}
+.pbar{position:relative;height:18px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:4px;overflow:hidden;display:flex}
+.pbar span{height:100%}
+.stagecount{display:flex;flex-wrap:wrap;gap:8px}
+.stagecount div{border:1px solid var(--line);border-radius:6px;padding:6px 12px;min-width:110px}
+.stagecount b{display:block;font:500 20px "IBM Plex Mono",monospace}
+.mbar{position:relative;height:8px;min-width:120px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:3px}
+.mbar span{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--real)}
+.mbar span.over{background:var(--null)}
 [hidden]{display:none!important}
 @media (max-width:800px){.cols2,.ftree{grid-template-columns:1fr}.row{grid-template-columns:56px 1fr}.row .num{grid-column:2}.feed div{grid-template-columns:1fr}}
 </style>
@@ -121,9 +129,11 @@ a:hover,.lnk:hover{text-decoration:underline}
   <h1>Evolve <span class="mono" id="runname"></span></h1>
   <span class="live"><span class="dot" id="dot"></span><span id="livetxt">connecting…</span></span>
   <div class="chips" id="chips"></div>
+  <div class="chips" id="pstrip"></div>
 </header>
 <nav class="tabs" role="tablist" id="maintabs">
   <button role="tab" data-t="tree" aria-selected="true">Tree</button>
+  <button role="tab" data-t="progress" aria-selected="false">Progress</button>
   <button role="tab" data-t="events" aria-selected="false">Events</button>
   <button role="tab" data-t="jobs" aria-selected="false">Agent jobs</button>
 </nav>
@@ -141,6 +151,10 @@ a:hover,.lnk:hover{text-decoration:underline}
     <tbody id="rows"></tbody>
   </table></div>
   <div class="panel detail" id="detail"><p class="empty">Click a node to open it.</p></div>
+</section>
+
+<section id="sec-progress" class="wrap" style="gap:12px" hidden>
+  <div class="panel detail" id="progress"></div>
 </section>
 
 <section id="sec-events" hidden>
@@ -201,7 +215,7 @@ function writeHash() {
 /* ---------- main tabs ---------- */
 function showMain(t) {
   document.querySelectorAll("#maintabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
-  ["tree", "events", "jobs"].forEach(x => $("sec-" + x).hidden = x !== t);
+  ["tree", "progress", "events", "jobs"].forEach(x => $("sec-" + x).hidden = x !== t);
   writeHash();
 }
 document.querySelectorAll("#maintabs button").forEach(b => b.onclick = () => showMain(b.dataset.t));
@@ -309,6 +323,7 @@ async function poll() {
     $("runname").textContent = S.run;
     renderChips();
     if (moved) { renderRows(changed); renderJobs(); }
+    renderProgress();
     if (st.n_events > nEvents) { const evs = await api("/api/events", {since: nEvents}); events = events.concat(evs); nEvents += evs.length; renderFeed(); }
     if (sel && changed.has(sel)) loadDetail(true);
     const age = st.last_event ? (Date.now() - Date.parse(st.last_event)) / 1000 : 1e9;
@@ -548,6 +563,52 @@ function wireJob(root, j) {
     try { const f = await api("/api/jobfile", {job: j.job, path: "ro/" + li.dataset.jf}); v.innerHTML = `<div class="dh">${esc(f.path)}</div><pre class="box">${esc(f.text)}</pre>`; }
     catch (e) { v.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
   });
+}
+
+
+/* ---------- progress ---------- */
+const STAGES = [["queued", "agent queued", "var(--line)"], ["agent", "agent working", "var(--base)"], ["measuring", "measuring", "var(--null)"], ["scoring", "summariser + audit", "var(--real)"]];
+const dur = s => s == null ? "–" : s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+const since = t => (Date.now() - Date.parse(t)) / 1000;
+function jobStage(j) {
+  if (j.stage === "agent" || j.stage === "starting") return j.agent_state === "claimed" ? "agent" : "queued";
+  if (j.stage === "admitted") return "measuring";
+  return j.stage;
+}
+function renderProgress() {
+  const P = S.progress, V = S.vllm || {};
+  if (!P) return;
+  const jobs = P.jobs, cap = P.max_jobs || P.started;
+  const by = st => jobs.filter(j => jobStage(j) === st);
+  const done = by("done"), failed = by("failed"), live = jobs.filter(j => !["done", "failed"].includes(jobStage(j)));
+  const notStarted = Math.max(0, cap - P.started);
+  const q = V.error ? `Qwen server: <span class="err">unreachable</span>` : `Qwen <b>${V.running ?? "–"}</b> running · <b>${V.waiting ?? "–"}</b> waiting`;
+  $("pstrip").innerHTML = `<span class="chip">jobs <b>${done.length + failed.length}/${cap}</b> finished</span><span class="chip">in flight <b>${live.length}</b></span><span class="chip">${q}</span>`;
+  const seg = (n, col, title) => n ? `<span style="width:${100 * n / cap}%;background:${col}" title="${title}: ${n}"></span>` : "";
+  const median = P.measure_median_s;
+  $("progress").innerHTML = `
+    <div class="sec"><div class="dh">Loop: ${done.length} done, ${failed.length} failed, ${live.length} in flight, ${notStarted} not started, of a ${cap}-job cap${P.finished ? " (loop finished)" : ""}</div>
+      <div class="pbar">${seg(done.length, "var(--real)", "done")}${seg(failed.length, "var(--bad)", "failed")}${STAGES.slice().reverse().map(([k, l, c]) => seg(by(k).length, c, l)).join("")}</div>
+      <div class="legend"><span><span class="sw" style="background:var(--real)"></span>done</span><span><span class="sw" style="background:var(--bad)"></span>failed</span>${STAGES.slice().reverse().map(([, l, c]) => `<span><span class="sw" style="background:${c};outline:1px solid var(--line)"></span>${l}</span>`).join("")}<span>empty = not started yet</span></div></div>
+    <div class="stagecount">${STAGES.map(([k, l]) => `<div><b>${by(k).length}</b><span class="muted">${l}</span></div>`).join("")}
+      <div><b>${P.seed_measuring.length}</b><span class="muted">seeds measuring</span></div>
+      <div><b>${V.error ? "–" : V.running}</b><span class="muted">Qwen running</span></div>
+      <div><b>${V.error ? "–" : V.waiting}</b><span class="muted">Qwen waiting</span></div>
+      <div><b>${V.kv != null ? pct(V.kv) : "–"}</b><span class="muted">KV cache (max engine)</span></div>
+      <div><b>${V.gen_tok_s != null ? Math.round(V.gen_tok_s) : "–"}</b><span class="muted">gen tokens/s</span></div></div>
+    <div class="sec"><div class="dh">In flight</div>
+      <table><thead><tr><th>Job</th><th>Kind</th><th>Stage</th><th>In stage</th><th>Measuring vs median (${dur(median)})</th><th>Node</th><th>Reference</th><th>Started (UTC)</th></tr></thead><tbody>
+      ${live.map(j => { const st = jobStage(j), t = since(j.since), frac = st === "measuring" && median ? t / median : null;
+        return `<tr><td class="mono">${j.job}</td><td>${esc(j.kind || "")}</td><td>${esc(STAGES.find(x => x[0] === st)?.[1] || st)}</td><td class="mono">${dur(t)}</td>
+          <td>${frac != null ? `<div class="mbar" title="${Math.round(100 * frac)}% of the median measurement time"><span class="${frac > 1 ? "over" : ""}" style="width:${Math.min(100, 100 * frac)}%"></span></div>` : ""}</td>
+          <td>${nodeLink(j.node)}</td><td>${j.reference ? nodeLink(j.reference) : ""}</td><td class="mono">${esc(j.t0.slice(11, 19))}</td></tr>`; }).join("")}
+      ${P.seed_measuring.map(m => { const t = since(m.since), frac = median ? t / median : null; return `<tr><td class="mono">–</td><td>seed</td><td>measuring</td><td class="mono">${dur(t)}</td><td>${frac != null ? `<div class="mbar" title="${Math.round(100 * frac)}% of the median measurement time"><span class="${frac > 1 ? "over" : ""}" style="width:${Math.min(100, 100 * frac)}%"></span></div>` : ""}</td><td>${nodeLink(m.node)}</td><td></td><td class="mono">${esc(m.since.slice(11, 19))}</td></tr>`; }).join("")}
+      ${live.length + P.seed_measuring.length ? "" : `<tr><td colspan="8" class="empty">Nothing in flight.</td></tr>`}</tbody></table>
+      <p class="muted" style="margin:0">Target episodes are written only when a whole batch finishes, so measuring progress is time elapsed against the median of the last 30 measurements, not a count.</p></div>
+    <div class="sec"><div class="dh">Finished (newest first)</div>
+      <table><thead><tr><th>Job</th><th>Kind</th><th>Outcome</th><th>Took</th><th>Node</th><th>Reference</th><th>Finished (UTC)</th></tr></thead><tbody>
+      ${done.concat(failed).sort((a, b) => b.since.localeCompare(a.since)).map(j => `<tr><td class="mono">${j.job}</td><td>${esc(j.kind || "")}</td><td>${j.stage === "failed" ? `<span class="err">${esc(j.outcome || "failed")}</span>` : esc(j.outcome || "done")}</td><td class="mono">${dur((Date.parse(j.since) - Date.parse(j.t0)) / 1000)}</td><td>${nodeLink(j.node)}</td><td>${j.reference ? nodeLink(j.reference) : ""}</td><td class="mono">${esc(j.since.slice(11, 19))}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">None yet.</td></tr>`}</tbody></table></div>`;
+  $("progress").querySelectorAll("[data-node]").forEach(x => x.onclick = () => { showMain("tree"); selectNode(x.dataset.node); });
 }
 
 /* ---------- jobs tab ---------- */

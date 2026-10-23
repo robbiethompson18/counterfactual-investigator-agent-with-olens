@@ -11,11 +11,13 @@ Reference: 70% uniform from layers 1-2, 30% uniform from all eligible. Secondari
 
 import json
 import random
+from pathlib import Path
 
 from . import stats
 from .forecast import forecaster_rows
 from .measure import batches, counts
 from .node import Node
+from .store import ROOT
 
 P_POS_MIN = 0.8
 TOPUP_AFTER = 3  # rounds in layer 1, or times drawn as a reference
@@ -53,9 +55,34 @@ def root(node: Node, by_id: dict) -> str:
     return node.id
 
 
+EVOLVE_DIR = Path(__file__).resolve().parent.parent  # the evolve project: code agents may read (and run submit from)
+
+
+def contaminated(node: Node) -> list[str]:
+    """Paths an agent read outside its job dir and the evolve code (e.g. earlier measured runs): such a child may have
+    picked its edits from results it should not have seen. From node.json "contaminated" or the manager's record."""
+    info = node.info
+    if info.get("contaminated"):
+        return info.get("contaminated_paths") or ["(tagged)"]
+    p = node.dir / "agent_manager.json"
+    if not p.exists():
+        return []
+    job = info.get("job") or ""
+    roots = {str(EVOLVE_DIR), str(ROOT.resolve().parent)}  # the code, also via the data symlink's real location
+    paths = json.loads(p.read_text()).get("outside_paths") or []
+
+    def allowed(x):
+        root = next((r for r in roots if x.startswith(r)), None)
+        return root is not None and (job in x or "/data/" not in x[len(root) :])
+
+    return [x for x in paths if not allowed(x)]
+
+
 def eligible(nodes: list[Node]) -> list[Node]:
     out = []
     for n in nodes:
+        if contaminated(n):
+            continue
         r = n.scores().get("rank")
         if r and n.info.get("audit_score") in (2, 3) and r["P_pos"] >= P_POS_MIN:
             out.append(n)

@@ -7,6 +7,10 @@ Batches are kept forever: the pooled rates use all of them, the Pool ranks on th
 import asyncio
 import json
 import os
+import random
+import time
+
+import openai
 
 from .grading import grade_records, verdict
 from .node import ARMS, Node
@@ -15,12 +19,24 @@ from .target import run_episode
 TARGET_CONCURRENCY = asyncio.Semaphore(int(os.environ.get("EVOLVE_TARGET_CONC", "200")))
 
 
+SERVER_DOWN = (openai.APIConnectionError, openai.APITimeoutError, openai.InternalServerError)
+SERVER_WAIT = 2 * 3600  # how long an episode waits for the Qwen server to come back before giving up
+
+
 async def _episode(arm, i):
-    async with TARGET_CONCURRENCY:
-        try:
-            return await run_episode(arm)
-        except Exception as e:  # noqa: BLE001 (server or sandbox failure: keep a marker, never a fake verdict)
-            return {"error": repr(e)[:500], "sample": i}
+    """One episode. If the Qwen server is unreachable the episode is restarted from scratch until it comes back
+    (an outage must not turn into unscorable runs); any other failure is kept as an error marker."""
+    t0 = time.time()
+    while True:
+        async with TARGET_CONCURRENCY:
+            try:
+                return await run_episode(arm)
+            except SERVER_DOWN as e:
+                if time.time() - t0 > SERVER_WAIT:
+                    return {"error": f"server down for {SERVER_WAIT}s: {e!r}"[:500], "sample": i}
+            except Exception as e:  # noqa: BLE001 (sandbox or other failure: keep a marker, never a fake verdict)
+                return {"error": repr(e)[:500], "sample": i}
+        await asyncio.sleep(30 + 30 * random.random())
 
 
 async def run_batch(node: Node, n: int, batch: str | None = None) -> str:

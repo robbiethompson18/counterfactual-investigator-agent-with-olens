@@ -14,6 +14,7 @@ credits. These commands are what that session calls; MANAGER.md says how it uses
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -96,13 +97,41 @@ def final_report(transcript: Path) -> str | None:
     return handback or text
 
 
+def outside_paths(transcript: Path, job: Path) -> list[str]:
+    """Absolute paths the subagent's tool calls mention that are outside the job dir (and the evolve venv it runs
+    submit with). A sandboxed Evolver can't see anything else, so a hit means the node may use outside knowledge."""
+    job = Path(os.path.realpath(job))
+    ok = (str(job), sys.prefix, os.path.realpath(sys.prefix), str(CLAUDE_PROJECTS))
+
+    def allowed(m: str) -> bool:
+        if re.search(r"/\.venv/bin/python[\d.]*$", m):
+            return True
+        r = os.path.realpath(os.path.expanduser(m.rstrip(".")))
+        return r.startswith(ok) or str(job).startswith(r) or r.startswith("/nix/store")  # job's ancestors: cd, ls
+
+    hits = set()
+    for line in transcript.read_text(errors="replace").splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for c in (row.get("message") or {}).get("content") or [] if row.get("type") == "assistant" else []:
+            if isinstance(c, dict) and c.get("type") == "tool_use":
+                for m in re.findall(r"(?:/home|/tmp|/mnt|/nix|~)/[\w./-]+", json.dumps(c.get("input"))):
+                    if not allowed(m):
+                        hits.add(m)
+    return sorted(hits)
+
+
 def finish(job: Path, agent_id: str | None, report: str | None) -> str:
+    outside = None
     if agent_id:
         t = find_transcript(agent_id)
         if t:
             shutil.copy2(t, job / "transcript.jsonl")
             report = report or final_report(t)
-        info = {"agent_id": agent_id, "transcript": str(t) if t else None, "finished": _now()}
+            outside = outside_paths(t, job)
+        info = {"agent_id": agent_id, "transcript": str(t) if t else None, "finished": _now(), "outside_paths": outside}
         (job / "manager.json").write_text(json.dumps(info, indent=1) + "\n")
     if report:
         (job / "transcript.md").write_text(report.rstrip() + "\n")
