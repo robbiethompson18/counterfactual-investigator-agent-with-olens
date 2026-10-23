@@ -1,4 +1,4 @@
-"""Summary table for scripts/olens_residual_reads.py output: one row per (layer, arm, beta, gamma, mu_scale).
+"""Summary table for scripts/olens_residual_reads.py output (every reads*.jsonl in RUN_DIR): one row per (layer, arm, beta, gamma, mu_scale).
 
     uv run python scripts/olens_residual_summary.py RUN_DIR
 
@@ -36,7 +36,7 @@ def transcript_text(row):
 def main():
     run = Path(sys.argv[1])
     full = {r["id"]: words(transcript_text(r)) for r in map(json.loads, (run / "requests.jsonl").open())}
-    reads = [json.loads(line) for line in (run / "reads.jsonl").open()]
+    reads = [json.loads(line) for f in sorted(run.glob("reads*.jsonl")) for line in f.open()]  # reads.jsonl + follow-ups
     plain = {(r["id"], r["token_index"], r["layer"]): r["bullets"][0]["text"] if r["bullets"] else ""
              for r in reads if (r["arm"], r["beta"], r["gamma"], r["mu_scale"]) == ("main", 0.0, 1.0, 1.0)}  # fmt: skip
     agg = defaultdict(lambda: defaultdict(list))
@@ -58,7 +58,7 @@ def main():
         a = agg[key]
         L, arm, b, g, m = key
         vals = " ".join(f"{sum(a[c]) / max(len(a[c]), 1):9.3f}" for c in cols)
-        print(f"{L:5d} {arm:5s} {b:5.1f} {g:5.1f} {m:4.1f} {len(a['joint_fve']):5d} {vals}")
+        print(f"{L:5d} {arm:5s} {b:5.2f} {g:5.1f} {m:4.1f} {len(a['joint_fve']):5d} {vals}")
     cont = defaultdict(list)
     for r in reads:
         if (r["arm"], r["beta"], r["gamma"], r["mu_scale"]) == ("main", 0.0, 1.0, 1.0):
