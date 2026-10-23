@@ -207,8 +207,16 @@ class Scheduler:
 
 
 def interrupted(store: Store):
-    """Children whose measurement an earlier process didn't finish (evaluate drops the partial batch)."""
-    return [n for n in store.nodes() if n.info.get("kind") in ("child", "creator") and n.info.get("stage") in ("submitted", "measuring")]
+    """Nodes whose measurement an earlier process didn't finish (evaluate drops the partial batch): children and
+    creations at any stage before scored, and seeds whose top-up was cut off (they already have a full batch)."""
+    out = []
+    for n in store.nodes():
+        stage, kind = n.info.get("stage"), n.info.get("kind")
+        if (kind in ("child", "creator") and stage in ("submitted", "measuring")) or (
+            kind == "seed" and stage == "measuring" and any((n.dir / "runs").glob("*/null.jsonl"))
+        ):
+            out.append(n)
+    return out
 
 
 async def remeasure(store: Store, node):
