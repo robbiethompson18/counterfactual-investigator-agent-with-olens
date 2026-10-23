@@ -18,7 +18,7 @@ import random
 from cfbench.core import CONDITIONS, TOOL_BUDGET, build_prompt, pick_examples
 from cfbench.predict import REASONING, predict
 from cfbench.tools import transcript_tools
-from scripts.runs import finish, new_run
+from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
 
 async def main():
