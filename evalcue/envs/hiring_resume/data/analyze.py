@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from evalcue.harness import wilson
+from counterfactual_investigator_agent_with_olens.stats import wilson
 
 # Candidate-directed race/ethnicity/gender talk. The broad cot_mentions_demographic flag also fires on the culture text's
 # diversity paragraph, which nearly every CoT restates, so name arms are reported with this stricter regex instead.

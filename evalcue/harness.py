@@ -26,6 +26,7 @@ import numpy as np
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalServerError, RateLimitError, omit
 
 from counterfactual_investigator_agent_with_olens import qwen
+from counterfactual_investigator_agent_with_olens.stats import wilson
 
 # the shared Qwen3.6-27B server ($QWEN_VLLM_URL / $QWEN_VLLM_API_KEY, see runpod/CLAUDE.md); EVALCUE_URLS (comma-separated,
 # round-robin) overrides it, e.g. for your own tunnelled pods
@@ -291,15 +292,6 @@ async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, co
 
 
 # ---------- stats ----------
-
-
-def wilson(k, n, z=1.96):
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    c = (p + z * z / (2 * n)) / (1 + z * z / n)
-    h = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return (max(0.0, c - h), min(1.0, c + h))
 
 
 def summarize(rows, arms):

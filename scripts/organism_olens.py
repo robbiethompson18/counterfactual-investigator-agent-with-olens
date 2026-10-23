@@ -21,11 +21,8 @@ from pathlib import Path
 
 import server  # transcript-viewer/pod/server.py: read_many/score over its module-level state S
 import torch
-from olens.ar import AR
-from olens.fve import WHITENERS
-from olens.lens import AguLens, Sampling, capture, load_base
+from olens.lens import Sampling, capture
 from olens.lora import HookLoRA
-from olens.readout import Readout, bullets
 from organism_rollouts import adapter_dir
 
 ROLLOUTS = Path("data/runs/organisms/rollouts.jsonl")
@@ -64,15 +61,7 @@ def render(tok, r):
 
 
 def main():
-    tok, model = load_base()
-    agu = AguLens(tok, model)
-    server.S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
-    server.BATCH = 192  # >= 90 GB card (transcript-viewer README)
-    if not WHITENERS.exists():
-        # the whiteners are in the gated agu18dec/local-workspace dataset; without them keep the raw
-        # readouts and score FVE later from the cached texts (the viewer server's rescore path)
-        print("no whiteners: reads are not FVE-scored", flush=True)
-        server.score = lambda texts, vecs, layers: [[{"text": t, "bullets": bullets(t)} for t in ts] for ts in texts]
+    tok, model = server.load(batch=192)  # >= 90 GB card (transcript-viewer README)
     smp = Sampling(temperature=0, max_new_tokens=160, max_bullets=4)
     done = {(r["organism"], r["prompt_id"]) for r in map(json.loads, OUT.open())} if OUT.exists() else set()
     rows = [json.loads(line) for line in ROLLOUTS.open()]

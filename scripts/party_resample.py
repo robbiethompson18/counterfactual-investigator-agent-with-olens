@@ -91,19 +91,10 @@ def gen(cond, model_dir):
 def lens(adapter_dir):
     import server  # transcript-viewer/pod/server.py
     import torch
-    from olens.ar import AR
-    from olens.fve import WHITENERS
-    from olens.lens import AguLens, Sampling, capture, load_base
+    from olens.lens import Sampling, capture
     from olens.lora import HookLoRA
-    from olens.readout import Readout, bullets
 
-    tok, model = load_base()
-    agu = AguLens(tok, model)
-    server.S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
-    server.BATCH = 192
-    if not WHITENERS.exists():  # same fallback as scripts/organism_olens.py
-        print("no whiteners: reads are not FVE-scored", flush=True)
-        server.score = lambda texts, vecs, layers: [[{"text": t, "bullets": bullets(t)} for t in ts] for ts in texts]
+    _tok, model = server.load(batch=192)
     smp = Sampling(temperature=1.0, top_p=0.95, top_k=64, max_new_tokens=160, max_bullets=4)
     lora = HookLoRA(model, adapter_dir, model.device)
     vecs, layers, where = [], [], []

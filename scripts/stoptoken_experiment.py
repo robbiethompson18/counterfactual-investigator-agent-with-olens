@@ -28,10 +28,7 @@ from pathlib import Path
 
 import server  # transcript-viewer/pod/server.py: read_many/score over its module-level state S
 import torch
-from olens.ar import AR
-from olens.fve import WHITENERS
-from olens.lens import AguLens, Sampling, load_base
-from olens.readout import Readout, bullets
+from olens.lens import Sampling
 from transformers import LogitsProcessor
 
 PROMPTS = json.loads(Path("data/runs/stoptokens/prompts.json").read_text())
@@ -178,14 +175,8 @@ def vectors(model, rolls, jobs):
 
 def main():
     t0 = time.time()
-    tok, model = load_base()
+    tok, model = server.load(batch=192)
     tok.padding_side = "left"
-    agu = AguLens(tok, model)
-    server.S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)))
-    server.BATCH = 192
-    if not WHITENERS.exists():
-        print("no whiteners: reads are not FVE-scored", flush=True)
-        server.score = lambda texts, vecs, layers: [[{"text": t, "bullets": bullets(t)} for t in ts] for ts in texts]
     print(f"loaded {time.time() - t0:.0f}s", flush=True)
 
     rolls = rollouts(tok, model)
