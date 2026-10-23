@@ -213,6 +213,7 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
             if not msg.get("tool_calls"):
                 finish = "stop"
                 break
+            assert sb is not None  # only step envs run without files
             for tc in msg["tool_calls"]:
                 try:
                     cmd = str(json.loads(tc["function"]["arguments"]).get("command", ""))
