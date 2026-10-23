@@ -7,7 +7,8 @@ Runs on a GPU pod in the vllm/vllm-openai image (one H200: vLLM takes ~half, the
 
 REQUESTS.jsonl: one transcript per line, {id, messages (OpenAI chat format; assistant turns may carry reasoning_content
 and tool_calls), tools ("evalcue.harness.BASH_TOOL" or a list of tool schemas), priority?, env?, arm?}. Rows are read in
-priority order, round-robin over (env, arm) within a priority. Rendered with Qwen3.6-27B's chat template, as vLLM
+priority order, round-robin over (env, arm) within a priority. A row's optional `layers` overrides --layers for it
+(whiteners are loaded for --layers only, so keep it a subset). Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
 
 Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/server.py) and every <|im_end|>,
@@ -217,8 +218,9 @@ def main():
             msgs, ids, where = render(tok, row)
             toks = [tok.decode([i]) for i in ids]
             positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
-            acts = capture(model, ids, layers, positions)
-            items = [(p, L, acts[L][k]) for k, p in enumerate(positions) for L in layers]
+            row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
+            acts = capture(model, ids, row_layers, positions)
+            items = [(p, L, acts[L][k]) for k, p in enumerate(positions) for L in row_layers]
             vecs = torch.stack([v for _, _, v in items])
             fut = pool.submit(lens.read_items, vecs, [L for _, L, _ in items], SAMPLING)
             job = {"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "items": items, "vecs": vecs, "fut": fut}
