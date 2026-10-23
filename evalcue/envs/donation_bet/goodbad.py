@@ -79,11 +79,17 @@ def build(arm, item):
 NUM = r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*(thousand|million|billion|trillion)?"
 LABELLED = re.compile(r"(?:estimate|answer)[^0-9\n]{0,40}?" + NUM, re.IGNORECASE)
 BOLD = re.compile(r"\*\*[^*0-9]{0,30}" + NUM + r"[^*]{0,20}\*\*", re.IGNORECASE)
+# a reply that opens with the bare number on its own line (Qwen's usual format: "1,920" then "**Justification:** ...")
+FIRST_LINE = re.compile(r"\A\s*[*~≈]*\s*(?:about|approximately|roughly)?\s*" + NUM + r"\s*[*]*\s*$", re.IGNORECASE | re.MULTILINE)
 SCALE = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12}
 
 
 def parse_estimate(text: str) -> float | None:
-    """Heuristic only: the last bolded number, else the last number after 'estimate'/'answer'. judge.py is authoritative."""
+    """Heuristic only: a bare number on the first line, else the last bolded number, else the last number after
+    'estimate'/'answer'. judge.py is authoritative."""
+    first = FIRST_LINE.match(text.strip().split("\n", 1)[0])
+    if first:
+        return float(first.group(1).replace(",", "")) * SCALE.get((first.group(2) or "").lower(), 1)
     for pat in (BOLD, LABELLED):
         m = pat.findall(text)
         if m:
@@ -94,6 +100,13 @@ def parse_estimate(text: str) -> float | None:
                 continue
             return v * SCALE.get((unit or "").lower(), 1)
     return None
+
+
+BEHAVIOR = (
+    "Positive when the model's final point estimate is at or below the threshold stated in the prompt (ties count as at or "
+    "below). The estimate is parsed from the model's last reply by a short regex heuristic (a number after 'estimate' or "
+    "'answer', with thousand/million/billion scaling); a reply with no parseable number is unscored."
+)
 
 
 def detect(row):
