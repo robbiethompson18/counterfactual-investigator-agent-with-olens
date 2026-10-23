@@ -99,12 +99,14 @@ the vllm image. To restart vLLM there, ssh in and run its own
 ### How it boots in ~3 minutes
 
 `up` creates the pod through RunPod's REST API (runpodctl can't set a start command) from the
-official `vllm/vllm-openai:v0.32.0` image. The pod mounts network volume `qwen-fastboot` (id
-`wwwce2mejb`, 150 GB, datacenter **US-CA-2**, about $10.50/month) at `/workspace`. The image's start
-command is `runpod/qwen_server_boot.sh`, which installs sshd and starts vLLM. The volume holds the
-weights (`HF_HOME`) and every compile cache: the boot script sets `HOME=/workspace/home`, and vLLM's
-torch.compile/inductor cache, FlashInfer, Triton etc. all write under `~`. So only the first boot on
-a fresh volume downloads and compiles.
+official `vllm/vllm-openai:v0.32.0` image. The pod mounts a network volume at `/workspace`. There
+are two, each 150 GB (about $10.50/month), and `up` tries them in order until one's datacenter has
+the GPUs free: `qwen-fastboot` (id `wwwce2mejb`, **US-CA-2**), then `qwen-fastboot-nc1` (id
+`cdde9ia5iu`, **US-NC-1**, added 2026-10-22 when US-CA-2 ran out of H200s). `VOLUMES=<id>` picks
+one. The image's start command is `runpod/qwen_server_boot.sh`, which installs sshd and starts vLLM.
+The volume holds the weights (`HF_HOME`) and every compile cache: the boot script sets
+`HOME=/workspace/home`, and vLLM's torch.compile/inductor cache, FlashInfer, Triton etc. all write
+under `~`. So only the first boot on a fresh volume downloads and compiles.
 
 Measured 2026-10-21 on 1x H200 (2x H200 had no stock in any datacenter with network volumes):
 
@@ -123,11 +125,18 @@ The old recipe (pip-install vLLM, then JIT-compile kernels) took 30 to 45 min.
 Gotchas:
 
 - **Image pull is the one uncached step.** A host that doesn't already have the image pulls it in 9
-  to 10 min, so `up` then takes about 13 min. The volume pins the pod to US-CA-2, which has only a
-  few H200 hosts, so after the first pull on a host later boots there are fast.
-- **The volume pins the server to US-CA-2.** If US-CA-2 has no free H200s, `up` fails with a REST
-  error. `up 1` asks for one GPU, which is likelier to be free. Moving datacenters means a new
-  volume and one slow first boot.
+  to 10 min, so `up` then takes about 13 min. A volume pins the pod to one datacenter, which has
+  only a few H200 hosts, so after the first pull on a host later boots there are fast.
+- **A volume pins the pod to its datacenter.** If no volume's datacenter has free H200s, `up` fails
+  with a REST error. `up 1` asks for one GPU, which is likelier to be free. Another datacenter means
+  a new volume (REST `POST /v1/networkvolumes`, then add its id to `VOLUMES`) and one first boot to
+  fill it (we know of no way to copy a volume across datacenters). Check H200 stock per datacenter,
+  and which take volumes, with the GraphQL
+  `dataCenters { id storageSupport gpuAvailability { gpuTypeId stockStatus } }` query. On 2026-10-22
+  H200s were in CA-MTL-3, EUR-IS-4, US-CO-1 and US-NC-1 (with volumes) and EUR-IS-5, US-GA-2
+  (without); skip EUR-IS-4, home of the throttled host.
+- The first boot on `qwen-fastboot-nc1` (2026-10-22) took 3.5 min to READY, weights included (52 GB
+  in 25 s), on a host that already had the image.
 - **2 GPUs on the volume: not tested,** because US-CA-2 had no 2x H200 stock (again on 2026-10-21).
   The 0.32 image with 2x data parallel works off the volume (table above). The compile cache lives
   in per-rank directories (`rank_0_0`, `rank_0_1`), so the first 2-GPU boot on the volume will
