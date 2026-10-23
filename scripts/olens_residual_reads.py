@@ -24,6 +24,8 @@ finished transcripts are skipped on a rerun:
      beta, gamma, mu_scale, text, bullets [{text, fve, coef}], cont_fve (NNLS of z on the continuation atoms),
      joint_fve (bullets vs the real z), resid_fve (bullets vs z − fit of the arm), gain_fve (FVE of continuation atoms +
      bullets on z, minus cont_fve: what the bullets add beyond the continuation), cos_in (raw cos of h' with h)}
+
+plus atoms/<id>.pt next to OUT with the whitened z, continuation atoms and plain-read bullet atoms (save_atoms).
 """
 
 import argparse
@@ -82,6 +84,7 @@ def prepare(model, ar, readout, job, layers, n):
         _, wfit, _ = nnls(z, Dw)
         wfit = wfit * (fit.norm(dim=-1, keepdim=True) / wfit.norm(dim=-1, keepdim=True).clamp_min(1e-9))
         job.setdefault("atoms", {})[L] = Dt
+        job.setdefault("z", {})[L] = z
         for i, p in enumerate(ps):
             for arm, b, g, m in CONFIGS:
                 f = fit[i] if arm == "main" else wfit[i]
@@ -116,6 +119,8 @@ def score(tok, ar, readout, job, texts):
             _, _, resid = nnls(it["r"][None], Db[None])
             _, _, both = nnls(it["z"][None], torch.cat([job["atoms"][it["L"]][it["i"]], Db])[None])
             single = torch.cosine_similarity(Db, it["z"][None], dim=-1).clamp_min(0) ** 2
+            if (it["arm"], it["beta"], it["gamma"], it["mu_scale"]) == ("main", 0.0, 1.0, 1.0):  # the plain read
+                job.setdefault("plain", {})[(it["L"], it["i"])] = (bl, Db)
             bs = [{"text": b, "fve": round(float(single[x]), 4), "coef": round(float(c[0, x]), 4)} for x, b in enumerate(bl)]
             rec.update(bullets=sorted(bs, key=lambda x: -x["fve"]), joint_fve=round(float(joint[0]), 4),
                        resid_fve=round(float(resid[0]), 4), gain_fve=round(float(both[0]) - it["cont_fve"], 4))  # fmt: skip
@@ -134,6 +139,22 @@ def write(tok, out, job, scored, n):
                    "beta": it["beta"], "gamma": it["gamma"], "mu_scale": it["mu_scale"],
                    "cont_fve": round(it["cont_fve"], 4), "cos_in": round(it["cos_in"], 4), **s}  # fmt: skip
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def save_atoms(out, job, layers):
+    """Whitened tensors for CPU-side analysis (null controls, per-bullet gain over the continuation), fp16, one file per
+    transcript in OUT's directory: atoms/<id>.pt = {positions, layers, z {L: [P, d]}, cont {L: [P, n, d]} (prefixes
+    1..n of the realized continuation), plain_bullets {L: [P] lists of texts}, plain_atoms {L: [P] [k, d]} (the plain
+    read's bullets through the AR)}."""
+    P = range(len(job["positions"]))
+    plain = job.get("plain", {})
+    d = out.parent / "atoms"
+    d.mkdir(exist_ok=True)
+    torch.save({"positions": job["positions"], "layers": layers,
+                "z": {L: job["z"][L].half().cpu() for L in layers}, "cont": {L: job["atoms"][L].half().cpu() for L in layers},
+                "plain_bullets": {L: [plain.get((L, i), ([], None))[0] for i in P] for L in layers},
+                "plain_atoms": {L: [plain[(L, i)][1].half().cpu() if (L, i) in plain else torch.zeros(0) for i in P] for L in layers}},
+               d / f"{job['row']['id']}.pt")  # fmt: skip
 
 
 def main():
@@ -186,6 +207,7 @@ def main():
         if pending is not None:
             texts = [t[0] for t in pending["fut"].result()]
             write(tok, out, pending, score(tok, ar, readout, pending, texts), args.n)
+            save_atoms(out, pending, layers)
             n_reads += len(texts)
             rate = n_reads / (time.time() - t0)
             print(f"{pending['row']['id']}: {len(pending['positions'])} positions, {len(texts)} reads | {rate:.1f} reads/s", flush=True)
