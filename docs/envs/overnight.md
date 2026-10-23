@@ -192,7 +192,8 @@ as a model property until a pinned-provider run reproduces it.
 **O-lens reads.** Two n=30 cases are queued for the cfbench O-lens conditions:
 `data/olens_requests/overnight_v1.jsonl` (120 transcripts) covers creds `hint` vs `hint+rule_prompt`
 and upload `base` vs `hint+permissive`. Reads land in
-`data/runs/olens_reads/2026-10-22_overnight-v1/reads.jsonl` (layers 24–56). Run cfbench on them with
+`data/runs/olens_reads/2026-10-22_overnight-v1/reads.jsonl` (layers 24–56, agu18dec
+`olens_s3d_space_rl600`, FVE scored on " " + bullet). Run cfbench on them with
 `--model qwen/qwen3.6-27b`: OpenRouter's fp8 Qwen is a separate target from our bf16 vLLM.
 Separately, `data/olens_requests/overnight_v2_targets.jsonl` (13 transcripts) asks for reads of the
 7 uploads with empty reasoning on the acting turn (n30 rows 18, 44, 63, 121, 156, 159 and r2 row
