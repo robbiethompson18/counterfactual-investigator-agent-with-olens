@@ -12,7 +12,7 @@
 :root[data-theme="dark"]{--bg:#121619;--panel:#1a2024;--ink:#e3e8ec;--muted:#98a3ad;--line:#2b343a;--base:#93a0ab;--real:#3cc4ae;--null:#e8a04a;--add:#163a33;--del:#3d201c;--addt:#8fe0cf;--delt:#f2a99c;--warn:#e8a04a;--bad:#f2a99c;--flash:#3a3420;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;padding:20px 16px 60px}
-.wrap{max-width:1500px;margin:0 auto;display:grid;gap:16px}
+.wrap{max-width:1840px;margin:0 auto;display:grid;gap:16px}
 h1{font-size:22px;font-weight:600;margin:0}
 header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px}
@@ -111,6 +111,14 @@ a:hover,.lnk:hover{text-decoration:underline}
 .feed div{padding:3px 10px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:150px 130px 1fr;gap:10px}
 .empty{color:var(--muted);font-size:13.5px;padding:8px 0}
 .err{color:var(--bad)}
+.pbar{position:relative;height:18px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:4px;overflow:hidden;display:flex}
+.pbar span{height:100%}
+.stagecount{display:flex;flex-wrap:wrap;gap:8px}
+.stagecount div{border:1px solid var(--line);border-radius:6px;padding:6px 12px;min-width:110px}
+.stagecount b{display:block;font:500 20px "IBM Plex Mono",monospace}
+.mbar{position:relative;height:8px;min-width:120px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:3px}
+.mbar span{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--real)}
+.mbar span.over{background:var(--null)}
 [hidden]{display:none!important}
 @media (max-width:800px){.cols2,.ftree{grid-template-columns:1fr}.row{grid-template-columns:56px 1fr}.row .num{grid-column:2}.feed div{grid-template-columns:1fr}}
 </style>
@@ -121,9 +129,12 @@ a:hover,.lnk:hover{text-decoration:underline}
   <h1>Evolve <span class="mono" id="runname"></span></h1>
   <span class="live"><span class="dot" id="dot"></span><span id="livetxt">connecting…</span></span>
   <div class="chips" id="chips"></div>
+  <div class="chips" id="pstrip"></div>
 </header>
 <nav class="tabs" role="tablist" id="maintabs">
   <button role="tab" data-t="tree" aria-selected="true">Tree</button>
+  <button role="tab" data-t="progress" aria-selected="false">Progress</button>
+  <button role="tab" data-t="comparisons" aria-selected="false">Innocuousness</button>
   <button role="tab" data-t="events" aria-selected="false">Events</button>
   <button role="tab" data-t="jobs" aria-selected="false">Agent jobs</button>
 </nav>
@@ -137,10 +148,20 @@ a:hover,.lnk:hover{text-decoration:underline}
     <span>Scores <span class="toggle" id="scoremode"><button data-m="rank" aria-pressed="true">ranking batch</button><button data-m="pooled" aria-pressed="false">pooled</button></span></span>
   </div>
   <div class="panel tablewrap"><table>
-    <thead><tr><th>Node</th><th>Stage</th><th>Audit</th><th>Front</th><th>Rates b / n / r</th><th>Δ (80%)</th><th>Forecaster p</th><th>Correct</th><th>L</th><th>P(Δ&gt;0)</th><th>U</th><th>U′</th><th>N</th><th>Batches</th></tr></thead>
+    <thead><tr><th>Node</th><th>Stage</th><th>Audit</th><th>Front</th><th>Rates b / n / r</th><th>Δ (80%)</th><th>Forecaster p</th><th>Correct</th><th>L</th><th>P(Δ&gt;0)</th><th title="Surprise: 50:50 blend of the Forecaster's and the transcript-only investigator's U (Forecaster alone until the investigator has run)">U blend</th><th title="U′ blended the same way">U′ blend</th><th title="Forecaster component of U (U′ in the tooltip)">U fc</th><th title="Transcript-only investigator component of U (U′ in the tooltip)">U inv</th><th>N</th><th title="Innocuousness rating: Bradley-Terry fit of pairwise DSv4.1 judgements, Elo scale centred on 1500">I</th><th>Batches</th></tr></thead>
     <tbody id="rows"></tbody>
   </table></div>
   <div class="panel detail" id="detail"><p class="empty">Click a node to open it.</p></div>
+</section>
+
+<section id="sec-progress" class="wrap" style="gap:12px" hidden>
+  <div class="panel detail" id="progress"></div>
+</section>
+
+<section id="sec-comparisons" class="wrap" style="gap:12px" hidden>
+  <p class="note muted" style="margin:0">A DSv4.1 judge with read-only bash compares two nodes. Phase 1: it reads both baselines (every arm file except meta.json). Phase 2: it is shown each node's behaviour sentence and REAL / NULL diffs and picks the environment whose edits are more innocuous. Ratings are a Bradley-Terry fit on the Elo scale (centred on 1500); I is the fourth Pareto objective. Click a comparison to see exactly what the judge saw.</p>
+  <div class="panel tablewrap" id="comprows"></div>
+  <div class="panel detail" id="compdetail"><p class="empty">Click a comparison.</p></div>
 </section>
 
 <section id="sec-events" hidden>
@@ -169,7 +190,7 @@ let RUN = params.get("run") || "";
 let S = null, prevNodes = {}, nEvents = 0, events = [];
 let sel = null, detail = null, scoreMode = "rank";
 let ui = {tab: "overview", batch: null, ptrial: 0, pbatch: null, arm: "baseline", sample: null, file: null, jfile: null};
-let selJob = null;
+let selJob = null, nComp = -1, selComp = null;
 
 async function api(path, q = {}) {
   const u = new URLSearchParams({run: RUN, ...q});
@@ -186,6 +207,7 @@ function readHash() {
   if (h.get("node")) { sel = h.get("node"); ui.tab = (h.get("tab") || "overview").replace("picker", "forecaster"); }
   if (h.get("ep")) { const [b, a, n] = h.get("ep").split("/"); Object.assign(ui, {batch: b, arm: a, sample: +n}); }
   if (h.get("job")) selJob = h.get("job");
+  if (h.get("cmp")) selComp = h.get("cmp");
   return h.get("main") || "tree";
 }
 function writeHash() {
@@ -195,13 +217,14 @@ function writeHash() {
   if (sel) { h.set("node", sel); if (ui.tab !== "overview") h.set("tab", ui.tab); }
   if (sel && ui.tab === "runs" && ui.sample != null) h.set("ep", `${ui.batch}/${ui.arm}/${ui.sample}`);
   if (selJob) h.set("job", selJob);
+  if (selComp) h.set("cmp", selComp);
   history.replaceState(null, "", "#" + h.toString());
 }
 
 /* ---------- main tabs ---------- */
 function showMain(t) {
   document.querySelectorAll("#maintabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
-  ["tree", "events", "jobs"].forEach(x => $("sec-" + x).hidden = x !== t);
+  ["tree", "progress", "comparisons", "events", "jobs"].forEach(x => $("sec-" + x).hidden = x !== t);
   writeHash();
 }
 document.querySelectorAll("#maintabs button").forEach(b => b.onclick = () => showMain(b.dataset.t));
@@ -222,7 +245,7 @@ function deltaBar(iv) {  // 80% interval on -1..1, zero line in the middle
   return `<div class="post delta" title="80% ${f2(iv[0])} to ${f2(iv[1])}"><div class="half"></div><div class="iv" style="left:${x(iv[0])}%;width:${50 * (iv[1] - iv[0])}%"></div><div class="mu" style="left:${x(mid)}%"></div></div>`;
 }
 function ratesMini(post) {  // three rows of mean+95% whisker on one 0..100 track
-  if (!post || !post.baseline) return `<span class="muted">–</span>`;
+  if (!post || !post.baseline || ARMS.every(a => !post[a]?.n)) return `<span class="muted">–</span>`;
   const t = ARMS.map(a => `${a} ${post[a].k}/${post[a].n}` + (post[a].unscorable ? ` (+${post[a].unscorable} unscorable)` : "")).join("\n");
   return `<div class="rt" title="${esc(t)}">` + ARMS.map((a, i) => { const p = post[a]; const y = 4 + 7 * i;
     return `<div class="w" style="top:${y}px;left:${100 * p.ci95[0]}%;width:${100 * (p.ci95[1] - p.ci95[0])}%;background:${COL[a]}"></div><div class="m" style="top:${y}px;left:${100 * p.mean}%;background:${COL[a]}"></div>`; }).join("") + `</div>`;
@@ -272,9 +295,13 @@ function renderRows(changed) {
       <td>${n.layer ? `<span class="badge ${n.layer <= 2 ? "l" + n.layer : ""}">L${n.layer}</span>` : ""}</td>
       <td>${ratesMini(n.arm_post)}</td><td>${deltaBar(iv.delta)}</td><td>${postBar(pick)}</td>
       <td class="mono">${pick ? `${pick.k}/${pick.n}` : "–"}</td>
-      <td class="mono">${f2(sc.L)}</td><td class="mono">${f2(sc.P_pos)}</td><td class="mono">${f2(sc.U)}</td><td class="mono">${f2(sc.U_rev)}</td><td class="mono">${f2(sc.N)}</td>
+      <td class="mono">${f2(sc.L)}</td><td class="mono">${f2(sc.P_pos)}</td><td class="mono">${f2(sc.U)}</td><td class="mono">${f2(sc.U_rev)}</td>
+      <td class="mono" title="U′ forecaster ${f2(sc.U_rev_forecaster ?? sc.U_rev)}">${f2(sc.U_forecaster ?? sc.U)}</td>
+      <td class="mono" title="${n.investigator ? `U′ investigator ${f2(sc.U_rev_investigator ?? n.investigator.U_rev)}; ${n.investigator.latest.join("/")} correct (latest), ${n.investigator.all.join("/")} all` : "investigator not run"}">${f2(sc.U_investigator ?? n.investigator?.U)}</td>
+      <td class="mono">${f2(sc.N)}</td>
+      <td class="mono" title="${n.innocuous ? `${n.innocuous.wins}/${n.innocuous.n} comparisons won` : "not compared yet"}">${n.innocuous ? Math.round(n.innocuous.rating) : "–"}</td>
       <td class="mono">${n.batches || 0}</td></tr>`;
-  }).join("") || `<tr><td colspan="14" class="empty">No nodes yet.</td></tr>`;
+  }).join("") || `<tr><td colspan="17" class="empty">No nodes yet.</td></tr>`;
   document.querySelectorAll("#rows tr[data-id]").forEach(tr => {
     const go = () => selectNode(tr.dataset.id);
     tr.onclick = go; tr.onkeydown = e => { if (e.key === "Enter") go(); };
@@ -309,6 +336,8 @@ async function poll() {
     $("runname").textContent = S.run;
     renderChips();
     if (moved) { renderRows(changed); renderJobs(); }
+    renderProgress();
+    if (S.n_comparisons !== nComp) { nComp = S.n_comparisons; loadComparisons(); }
     if (st.n_events > nEvents) { const evs = await api("/api/events", {since: nEvents}); events = events.concat(evs); nEvents += evs.length; renderFeed(); }
     if (sel && changed.has(sel)) loadDetail(true);
     const age = st.last_event ? (Date.now() - Date.parse(st.last_event)) / 1000 : 1e9;
@@ -328,7 +357,7 @@ function evText(e) {
   switch (e.event) {
     case "node_added": return `${nl(e.node)} added (${esc(e.kind)}${e.parent ? `, parent ${nl(e.parent)}` : ""}${e.agent_cost != null ? `, agent $${(+e.agent_cost).toFixed(2)}` : ""})`;
     case "measure_start": return `${nl(e.node)} measuring batch ${esc(e.batch)} (${e.n}/arm, ${e.picks} picks)`;
-    case "measured": return `${nl(e.node)} ${esc(e.batch)}: b/n/r ${r}; forecaster ${(e.forecaster || e.picker) ? (e.forecaster || e.picker).join("/") : "?"}; L ${f2(e.rank?.L)} U ${f2(e.rank?.U)} U′ ${f2(e.rank?.U_rev)} N ${f2(e.rank?.N)} P+ ${f2(e.rank?.P_pos)}`;
+    case "measured": return `${nl(e.node)} ${esc(e.batch)}: b/n/r ${r}; forecaster ${(e.forecaster || e.picker) ? (e.forecaster || e.picker).join("/") : "?"}; L ${f2(e.rank?.L)} U(blend) ${f2(e.rank?.U)} U′(blend) ${f2(e.rank?.U_rev)} N ${f2(e.rank?.N)} P+ ${f2(e.rank?.P_pos)}`;
     case "audited": return `${nl(e.node)} audit ${esc(e.batch)}: score ${esc(e.score)}`;
     case "epoch": return `epoch at job ${e.job}: ${e.eligible} eligible, front ${(e.front || []).map(nl).join(", ")}`;
     case "job_start": return `job ${e.job} starts (surprise = ${esc(e.surprise)})`;
@@ -359,7 +388,7 @@ async function loadDetail(refresh) {
   try { const d = await api("/api/node", {id}); if (id !== sel) return; detail = d; renderDetail(); }
   catch (e) { $("detail").innerHTML = `<p class="err">Could not load ${esc(id)}: ${esc(e.message)}</p>`; }
 }
-const SUBTABS = [["overview", "Overview"], ["files", "Files"], ["runs", "Target runs"], ["forecaster", "Forecaster"], ["audit", "Rate audit"], ["agent", "Agent"]];
+const SUBTABS = [["overview", "Overview"], ["files", "Files"], ["runs", "Target runs"], ["forecaster", "Forecaster"], ["investigator", "Investigator"], ["innocuous", "Innocuousness"], ["audit", "Rate audit"], ["agent", "Agent"]];
 function nodeLink(id) { return id ? `<span class="lnk" data-node="${esc(id)}">${esc(id)}</span>` : "–"; }
 function renderDetail() {
   const d = detail, n = S.nodes[d.id] || {}, info = d.info;
@@ -370,14 +399,14 @@ function renderDetail() {
   <div id="subbody"></div>`;
   $("detail").querySelectorAll("[data-node]").forEach(x => x.onclick = () => selectNode(x.dataset.node));
   $("subtabs").querySelectorAll("button").forEach(b => b.onclick = () => { ui.tab = b.dataset.k; writeHash(); renderDetail(); });
-  ({overview: renderOverview, files: renderFiles, runs: renderRuns, forecaster: renderForecaster, audit: renderAudit, agent: renderAgent})[ui.tab]();
+  ({overview: renderOverview, files: renderFiles, runs: renderRuns, forecaster: renderForecaster, investigator: renderInvestigator, innocuous: renderNodeInnocuous, audit: renderAudit, agent: renderAgent})[ui.tab]();
 }
 function diffHTML(text) {
   if (!text) return `<span class="f">(no change)</span>`;
   return text.split("\n").map(l => l.startsWith("---") || l.startsWith("+++") || l.startsWith("@@") ? `<span class="f">${esc(l)}</span>` : l.startsWith("+") ? `<span class="a">${esc(l)}</span>` : l.startsWith("-") ? `<span class="d">${esc(l)}</span>` : esc(l) + "\n").join("");
 }
 function scoreTable(sc) {
-  const rows = [["L (2.5% of Δ)", "L"], ["P(Δ > 0)", "P_pos"], ["U", "U"], ["U′", "U_rev"], ["N", "N"]];
+  const rows = [["L (2.5% of Δ)", "L"], ["P(Δ > 0)", "P_pos"], ["U blend (forecaster + investigator, 50:50)", "U"], ["U′ blend", "U_rev"], ["U forecaster", "U_forecaster"], ["U′ forecaster", "U_rev_forecaster"], ["U investigator", "U_investigator"], ["U′ investigator", "U_rev_investigator"], ["N", "N"]];
   const iv = k => (o => o ? `${f2(o[0])} – ${f2(o[1])}` : "–");
   const r = sc.rank || {}, p = sc.pooled || {};
   const ivs = [["Δ = null − real", "delta"], ["null − base", "null_minus_base"], ["forecaster p", "forecaster_p"], ["baseline", "baseline"], ["real", "real"], ["null", "null"]];
@@ -494,6 +523,80 @@ function renderForecaster() {
   $("subbody").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { ui.ptrial = +b.dataset.i; renderForecaster(); });
 }
 
+/* Investigator: the Forecaster's task plus one positive baseline transcript (stored, not selected on) */
+function renderInvestigator() {
+  const d = detail, I = d.investigator || {}, bs = Object.keys(I.trials || {}), F = d.forecaster || {};
+  if (!bs.length) { $("subbody").innerHTML = `<p class="empty">No Investigator trials yet. They run after the Forecaster on batches measured since the investigator landed, and only when some baseline run showed the behaviour.</p>`; return; }
+  if (!ui.ibatch || !bs.includes(ui.ibatch)) ui.ibatch = bs[bs.length - 1];
+  const trials = I.trials[ui.ibatch]; ui.itrial = Math.min(ui.itrial || 0, trials.length - 1);
+  const t = trials[ui.itrial], right = t.order === "real_first" ? "A" : "B", sc = I.scores || {};
+  const [tb, ta, tsample] = (t.transcript || "").split("/");
+  $("subbody").innerHTML = `
+    <table><thead><tr><th>Batch</th><th>Investigator correct</th><th>Posterior on p (95%, mean, 0.5 line)</th><th>Mean</th><th>P(p&gt;0.5)</th><th>Forecaster correct (same batch)</th></tr></thead><tbody>
+    ${bs.map(b => { const v = I.summary[b], f = F.summary?.[b]; return `<tr data-ib="${b}" class="${b === ui.ibatch ? "sel" : ""}"><td class="mono">${b}</td><td class="mono">${v.k}/${v.n}${v.unparsed ? ` <span class="muted">+${v.unparsed} unparsed</span>` : ""}</td><td>${postBar(v)}</td><td class="mono">${f2(v.mean)}</td><td class="mono">${v.p_gt_half.toFixed(3)}</td><td class="mono">${f ? `${f.k}/${f.n}` : "–"}</td></tr>`; }).join("")}
+    </tbody></table>
+    <p class="muted" style="margin:0">${esc(t.model || "The investigator")} gets the Forecaster's inputs (baseline arm, behaviour sentence, grader code, both diffs as A and B, counterbalanced) plus one baseline transcript in which the grader counted the behaviour. U ${f2(sc.U)}, U′ ${f2(sc.U_rev)} from the latest batch${sc.p80 ? `, 80% interval on p ${f2(sc.p80[0])}–${f2(sc.p80[1])}` : ""}. Half of the blended U and U′ the Pool ranks on.</p>
+    <div class="trials">${trials.map((x, i) => `<button class="trial ${x.correct === true ? "ok" : x.correct === false ? "bad" : "none"}" data-it="${i}" aria-pressed="${i === ui.itrial}">#${x.trial} ${x.correct === true ? "✓" : x.correct === false ? "✗" : "?"} ${x.answer ?? "?"}</button>`).join("")}</div>
+    <div class="muted">Trial ${t.trial} (${esc(ui.ibatch)}): real diff shown as <b>${right}</b>, model answered <b>${esc(t.answer ?? "unparsed")}</b>${t.confidence != null ? ` with confidence ${esc(t.confidence)}` : ""}, ${t.correct ? "correct" : "wrong"}${t.cost != null ? ` · $${(+t.cost).toFixed(4)}` : ""}. Transcript shown: ${t.transcript ? `<span class="lnk" data-tx="1">${esc(t.transcript)}</span>` : "–"}.</div>
+    <details open><summary>Prompt the investigator saw (exact, including the transcript)</summary><pre class="box">${esc(t.prompt || "")}</pre></details>
+    <details><summary>Reasoning</summary><pre class="box">${esc(t.reasoning || "(none returned)")}</pre></details>
+    <div><div class="dh">Reply</div><pre class="box">${esc(t.reply || "")}</pre></div>`;
+  $("subbody").querySelectorAll("[data-ib]").forEach(tr => tr.onclick = () => { ui.ibatch = tr.dataset.ib; ui.itrial = 0; renderInvestigator(); });
+  $("subbody").querySelectorAll("[data-it]").forEach(b => b.onclick = () => { ui.itrial = +b.dataset.it; renderInvestigator(); });
+  const tx = $("subbody").querySelector("[data-tx]");
+  if (tx) tx.onclick = () => { Object.assign(ui, {tab: "runs", batch: tb, arm: ta, sample: +tsample}); writeHash(); renderDetail(); };
+}
+
+/* Innocuousness comparisons (shared by the main tab and the node tab) */
+const short = id => S.nodes[id]?.title ? `${esc(S.nodes[id].title)} <span class="idsm">${esc(id)}</span>` : `<span class="mono">${esc(id)}</span>`;
+function compTable(rows, focus) {
+  if (!rows.length) return `<p class="empty" style="padding:8px">No comparisons yet.</p>`;
+  return `<table><thead><tr><th>Time (UTC)</th><th>${focus ? "Shown as" : "A"}</th><th>${focus ? "Opponent" : "B"}</th><th>Winner</th><th>Reason</th><th>Turns</th><th>Cost</th></tr></thead><tbody>
+  ${rows.map(r => { const opp = r.a === focus ? r.b : r.a, won = r.winner_id === focus;
+    return `<tr data-cmp="${esc(r.id)}" class="${r.id === selComp ? "sel" : ""}"><td class="mono">${esc((r.t || "").slice(5, 16).replace("T", " "))}</td>
+      ${focus ? `<td>${r.a === focus ? "A" : "B"}</td><td><span class="lnk" data-node="${esc(opp)}">${short(opp)}</span></td><td>${won ? `<span class="badge a3">won</span>` : `<span class="badge a1">lost</span>`}</td>`
+        : `<td><span class="lnk" data-node="${esc(r.a)}">${short(r.a)}</span></td><td><span class="lnk" data-node="${esc(r.b)}">${short(r.b)}</span></td><td>${r.winner_id === r.a ? "A" : r.winner_id === r.b ? "B" : esc(r.winner)}</td>`}
+      <td><div class="title" style="max-width:520px" title="${esc(r.reason)}">${esc(r.reason)}</div></td><td class="mono">${r.turns ?? ""}</td><td class="mono">${r.cost != null ? "$" + (+r.cost).toFixed(4) : ""}</td></tr>`; }).join("")}</tbody></table>`;
+}
+function judgeMsgHTML(m) {
+  if (m.role === "tool") return `<div class="turn tool"><div class="who">tool result</div><pre class="box">${esc(m.content)}</pre></div>`;
+  const cls = m.role === "system" ? "sys" : m.role === "user" ? "user" : "asst";
+  return `<div class="turn ${cls}"><div class="who">${esc(m.role)}</div>
+    ${m.reasoning ? `<details class="plain"><summary>Reasoning (${m.reasoning.length} chars)</summary><pre class="box">${esc(m.reasoning)}</pre></details>` : ""}
+    ${m.content ? `<pre class="box">${esc(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 1))}</pre>` : ""}
+    ${(m.tool_calls || []).map(c => { let a = c.function?.arguments; try { a = JSON.stringify(JSON.parse(a), null, 1); } catch (e) {} return `<div class="turn tool"><div class="who">tool call · ${esc(c.function?.name)}</div><pre class="box">${esc(a)}</pre></div>`; }).join("")}</div>`;
+}
+async function showComparison(el, id) {
+  selComp = id; writeHash();
+  el.innerHTML = `<p class="empty">Loading…</p>`;
+  let d;
+  try { d = await api("/api/comparison", {id}); } catch (e) { el.innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const side = x => x === d.a ? "A" : x === d.b ? "B" : "?";
+  el.innerHTML = `<div class="sec"><div class="head"><span class="name">Comparison ${esc(d.id)}</span><span class="fam">${esc(d.model)} · ${d.turns} turns · ${d.seconds} s · $${(+d.cost).toFixed(4)}</span></div>
+    <dl class="kv"><dt>A</dt><dd><span class="lnk" data-node="${esc(d.a)}">${short(d.a)}</span></dd><dt>B</dt><dd><span class="lnk" data-node="${esc(d.b)}">${short(d.b)}</span></dd>
+      <dt>winner</dt><dd><b>${side(d.winner_id)}</b> (more innocuous)</dd><dt>reason</dt><dd>${esc(d.reason)}</dd></dl>
+    ${d.tools ? Object.entries(d.tools).map(([phase, t]) => `<details><summary>Tools offered to the judge in the ${esc(phase)} phase (exact)</summary><pre class="box">${esc(JSON.stringify(t, null, 1))}</pre></details>`).join("")
+      : d.tools_current ? `<details><summary>Tools offered to the judge (from the current code: this comparison predates stored tool definitions)</summary><pre class="box">${esc(JSON.stringify(d.tools_current, null, 1))}</pre></details>` : ""}
+    <div class="dh">Everything the judge saw and did, in order</div>${(d.messages || []).map(judgeMsgHTML).join("")}</div>`;
+  el.querySelectorAll("[data-node]").forEach(x => x.onclick = () => { showMain("tree"); selectNode(x.dataset.node); });
+}
+function wireCompTable(root, viewer) {
+  root.querySelectorAll("[data-node]").forEach(x => x.onclick = e => { e.stopPropagation(); showMain("tree"); selectNode(x.dataset.node); });
+  root.querySelectorAll("tr[data-cmp]").forEach(tr => tr.onclick = () => { root.querySelectorAll("tr[data-cmp]").forEach(x => x.classList.toggle("sel", x === tr)); showComparison(viewer, tr.dataset.cmp); });
+}
+async function loadComparisons() {
+  try { const rows = await api("/api/comparisons"); $("comprows").innerHTML = compTable(rows, null); wireCompTable($("comprows"), $("compdetail")); } catch (e) { $("comprows").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+async function renderNodeInnocuous() {
+  const d = detail, n = S.nodes[d.id] || {}, r = n.innocuous;
+  $("subbody").innerHTML = `<p style="margin:0">${r ? `Rating <b class="mono">${Math.round(r.rating)}</b> (Elo scale, 1500 = average) from ${r.n} comparisons, ${r.wins} won.` : "Not compared yet; the Pool gives unrated nodes the median rating."}</p>
+    <div class="panel" id="ncomp"><p class="empty" style="padding:8px">Loading…</p></div><div id="ncompview"></div>`;
+  const rows = await api("/api/comparisons", {node: d.id});
+  if (ui.tab !== "innocuous" || detail.id !== d.id) return;
+  $("ncomp").innerHTML = compTable(rows, d.id);
+  wireCompTable($("ncomp"), $("ncompview"));
+}
+
 /* Rate audit */
 function renderAudit() {
   const A = detail.audits || {}, bs = Object.keys(A);
@@ -550,6 +653,52 @@ function wireJob(root, j) {
   });
 }
 
+
+/* ---------- progress ---------- */
+const STAGES = [["queued", "agent queued", "var(--line)"], ["agent", "agent working", "var(--base)"], ["measuring", "measuring", "var(--null)"], ["scoring", "summariser + audit", "var(--real)"]];
+const dur = s => s == null ? "–" : s < 90 ? `${Math.round(s)} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+const since = t => (Date.now() - Date.parse(t)) / 1000;
+function jobStage(j) {
+  if (j.stage === "agent" || j.stage === "starting") return j.agent_state === "claimed" ? "agent" : "queued";
+  if (j.stage === "admitted") return "measuring";
+  return j.stage;
+}
+function renderProgress() {
+  const P = S.progress, V = S.vllm || {};
+  if (!P) return;
+  const jobs = P.jobs, cap = P.max_jobs || P.started;
+  const by = st => jobs.filter(j => jobStage(j) === st);
+  const done = by("done"), failed = by("failed"), live = jobs.filter(j => !["done", "failed"].includes(jobStage(j)));
+  const notStarted = Math.max(0, cap - P.started);
+  const q = V.error ? `Qwen server: <span class="err">unreachable</span>` : `Qwen <b>${V.running ?? "–"}</b> running · <b>${V.waiting ?? "–"}</b> waiting`;
+  $("pstrip").innerHTML = `<span class="chip">jobs <b>${done.length + failed.length}/${cap}</b> finished</span><span class="chip">in flight <b>${live.length}</b></span><span class="chip">${q}</span>`;
+  const seg = (n, col, title) => n ? `<span style="width:${100 * n / cap}%;background:${col}" title="${title}: ${n}"></span>` : "";
+  const median = P.measure_median_s;
+  $("progress").innerHTML = `
+    <div class="sec"><div class="dh">Loop: ${done.length} done, ${failed.length} failed, ${live.length} in flight, ${notStarted} not started, of a ${cap}-job cap${P.finished ? " (loop finished)" : ""}</div>
+      <div class="pbar">${seg(done.length, "var(--real)", "done")}${seg(failed.length, "var(--bad)", "failed")}${STAGES.slice().reverse().map(([k, l, c]) => seg(by(k).length, c, l)).join("")}</div>
+      <div class="legend"><span><span class="sw" style="background:var(--real)"></span>done</span><span><span class="sw" style="background:var(--bad)"></span>failed</span>${STAGES.slice().reverse().map(([, l, c]) => `<span><span class="sw" style="background:${c};outline:1px solid var(--line)"></span>${l}</span>`).join("")}<span>empty = not started yet</span></div></div>
+    <div class="stagecount">${STAGES.map(([k, l]) => `<div><b>${by(k).length}</b><span class="muted">${l}</span></div>`).join("")}
+      <div><b>${P.seed_measuring.length}</b><span class="muted">seeds measuring</span></div>
+      <div><b>${V.error ? "–" : V.running}</b><span class="muted">Qwen running</span></div>
+      <div><b>${V.error ? "–" : V.waiting}</b><span class="muted">Qwen waiting</span></div>
+      <div><b>${V.kv != null ? pct(V.kv) : "–"}</b><span class="muted">KV cache (max engine)</span></div>
+      <div><b>${V.gen_tok_s != null ? Math.round(V.gen_tok_s) : "–"}</b><span class="muted">gen tokens/s</span></div></div>
+    <div class="sec"><div class="dh">In flight</div>
+      <table><thead><tr><th>Job</th><th>Kind</th><th>Stage</th><th>In stage</th><th>Measuring vs median (${dur(median)})</th><th>Node</th><th>Reference</th><th>Started (UTC)</th></tr></thead><tbody>
+      ${live.map(j => { const st = jobStage(j), t = since(j.since), frac = st === "measuring" && median ? t / median : null;
+        return `<tr><td class="mono">${j.job}</td><td>${esc(j.kind || "")}</td><td>${esc(STAGES.find(x => x[0] === st)?.[1] || st)}</td><td class="mono">${dur(t)}</td>
+          <td>${frac != null ? `<div class="mbar" title="${Math.round(100 * frac)}% of the median measurement time"><span class="${frac > 1 ? "over" : ""}" style="width:${Math.min(100, 100 * frac)}%"></span></div>` : ""}</td>
+          <td>${nodeLink(j.node)}</td><td>${j.reference ? nodeLink(j.reference) : ""}</td><td class="mono">${esc(j.t0.slice(11, 19))}</td></tr>`; }).join("")}
+      ${P.seed_measuring.map(m => { const t = since(m.since), frac = median ? t / median : null; return `<tr><td class="mono">–</td><td>seed</td><td>measuring</td><td class="mono">${dur(t)}</td><td>${frac != null ? `<div class="mbar" title="${Math.round(100 * frac)}% of the median measurement time"><span class="${frac > 1 ? "over" : ""}" style="width:${Math.min(100, 100 * frac)}%"></span></div>` : ""}</td><td>${nodeLink(m.node)}</td><td></td><td class="mono">${esc(m.since.slice(11, 19))}</td></tr>`; }).join("")}
+      ${live.length + P.seed_measuring.length ? "" : `<tr><td colspan="8" class="empty">Nothing in flight.</td></tr>`}</tbody></table>
+      <p class="muted" style="margin:0">Target episodes are written only when a whole batch finishes, so measuring progress is time elapsed against the median of the last 30 measurements, not a count.</p></div>
+    <div class="sec"><div class="dh">Finished (newest first)</div>
+      <table><thead><tr><th>Job</th><th>Kind</th><th>Outcome</th><th>Took</th><th>Node</th><th>Reference</th><th>Finished (UTC)</th></tr></thead><tbody>
+      ${done.concat(failed).sort((a, b) => b.since.localeCompare(a.since)).map(j => `<tr><td class="mono">${j.job}</td><td>${esc(j.kind || "")}</td><td>${j.stage === "failed" ? `<span class="err">${esc(j.outcome || "failed")}</span>` : esc(j.outcome || "done")}</td><td class="mono">${dur((Date.parse(j.since) - Date.parse(j.t0)) / 1000)}</td><td>${nodeLink(j.node)}</td><td>${j.reference ? nodeLink(j.reference) : ""}</td><td class="mono">${esc(j.since.slice(11, 19))}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">None yet.</td></tr>`}</tbody></table></div>`;
+  $("progress").querySelectorAll("[data-node]").forEach(x => x.onclick = () => { showMain("tree"); selectNode(x.dataset.node); });
+}
+
 /* ---------- jobs tab ---------- */
 function renderJobs() {
   const byJob = Object.fromEntries(Object.entries(S.nodes).filter(([, n]) => n.job).map(([id, n]) => [n.job, id]));
@@ -568,7 +717,7 @@ async function loadJob() {
 
 const main0 = readHash();
 showMain(main0);
-poll().then(() => { if (sel) loadDetail(false); if (selJob) loadJob(); });
+poll().then(() => { if (sel) loadDetail(false); if (selJob) loadJob(); if (selComp) showComparison($("compdetail"), selComp); });
 </script>
 </body>
 </html>

@@ -141,6 +141,30 @@ def unified_diff(a: Path, b: Path, exclude=()) -> str:
     return "\n".join(out)
 
 
+def changed_spans(a: Path, b: Path, exclude=("meta.json",)) -> dict[str, list[tuple[int, int]]]:
+    """Per file, the character ranges of a (the baseline) that b replaces, deletes or inserts at (meta.json is
+    bookkeeping for the grader, not part of the edit)."""
+    ta, tb = arm_text(a, exclude), arm_text(b, exclude)
+    out = {}
+    for f in set(ta) | set(tb):
+        x, y = ta.get(f, ""), tb.get(f, "")
+        if x != y:
+            sm = difflib.SequenceMatcher(None, x, y, autojunk=False)
+            out[f] = [(i1, i2) for op, i1, i2, _, _ in sm.get_opcodes() if op != "equal"]
+    return out
+
+
+def edit_overlap(base: Path, real: Path, null: Path, margin: int = 40) -> list[str]:
+    """Files where the REAL and NULL edits touch the same place in the baseline (within `margin` characters, so two
+    rewrites of one sentence count as overlapping). Empty when the two edits are in different places."""
+    r, n = changed_spans(base, real), changed_spans(base, null)
+    out = []
+    for f in set(r) & set(n):
+        if any(a1 - margin < b2 and b1 - margin < a2 for a1, a2 in r[f] for b1, b2 in n[f]):
+            out.append(f)
+    return sorted(out)
+
+
 def changed_chars(a: Path, b: Path) -> int:
     """Characters inserted + deleted between two arm dirs, summed over all files (the ~400-char edit budget)."""
     ta, tb = arm_text(a), arm_text(b)

@@ -13,7 +13,7 @@ import tokenize
 from pathlib import Path
 
 from . import grading
-from .node import ARMS, Arm, Node, changed_chars, unified_diff
+from .node import ARMS, Arm, Node, changed_chars, edit_overlap, unified_diff
 
 EDIT_LIMIT = 400  # max changed characters baseline -> real and baseline -> null
 GRADER_MAX_LINES = 15  # non-blank, non-comment lines in grader.py
@@ -184,6 +184,9 @@ async def check_async(node_dir, sample_records: list[dict] | None = None) -> lis
                 errs.append(f"{a}/ differs from baseline/ by {n} changed characters (limit {limit})")
             elif n == 0:
                 errs.append(f"{a}/ is identical to baseline/ (the edit is empty)")
+        if not (info.get("overlap_ok") or info.get("seed")):
+            for f in edit_overlap(d / "baseline", d / "real", d / "null"):
+                errs.append(f"real/ and null/ both edit the same place in {f}: put the two edits in different places")
 
     src = (d / "grader.py").read_text() if (d / "grader.py").is_file() else None
     grader_ok = False

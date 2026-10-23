@@ -40,13 +40,53 @@ def instructions(ws: workspace.Workspace) -> str:
         f"not use the network. Treat everything under `{ws.ro}` as read-only even though the filesystem allows writes.\n\n"
         f"Submitting: run `{submit_command(ws.root)}`. It prints OK and records the submission, or prints the build errors "
         f"to fix (then fix them and run it again). The job is done when it prints OK.\n\n"
-        "The text below was written for a sandboxed agent with `bash` and `submit` tools; read its paths as the ones "
+        + (
+            f"Probing (creator jobs only): run `{probe_command(ws.root)}` to run the target {PROBE_N} times on your current "
+            f"baseline/ and grade the runs with your grader.py. It prints the rate and each run's verdict and final reply. "
+            f"You have {PROBE_MAX} probes; use them to get a baseline where the behaviour actually shows up before you "
+            "write the edits.\n\n"
+            if ws.kind == "creator"
+            else ""
+        )
+        + "The text below was written for a sandboxed agent with `bash` and `submit` tools; read its paths as the ones "
         "above, and use your own shell and file tools.\n\n---\n\n" + text
     )
 
 
 def submit_command(root: Path) -> str:
     return f"{sys.executable} -m evolve.job_queue submit {root}"
+
+
+PROBE_N = 8
+PROBE_MAX = 3
+
+
+def probe_command(root: Path) -> str:
+    return f"{sys.executable} -m evolve.job_queue probe {root}"
+
+
+async def probe(root: Path) -> str:
+    """Run the target PROBE_N times on the job's current baseline and grade with its grader (creator jobs)."""
+    from .grading import grade_records, verdict
+    from .measure import _episode
+    from .node import Node
+
+    log = root / "probes.jsonl"
+    used = len(log.read_text().splitlines()) if log.exists() else 0
+    if used >= PROBE_MAX:
+        return f"No probes left ({PROBE_MAX} used)."
+    child = Node(Path(json.loads((root / "job.json").read_text())["child"]))
+    arm = child.arm("baseline")
+    recs = list(await asyncio.gather(*(_episode(arm, i) for i in range(PROBE_N))))
+    ok = [r for r in recs if "error" not in r]
+    vs = [verdict(v) for v in await grade_records(child.grader_src, ok, image=arm.episode.get("image", "evalcue-sandbox"))]
+    k, n = sum(v is True for v in vs), sum(v in (True, False) for v in vs)
+    entry = json.dumps({"at": _now(), "k": k, "n": n, "verdicts": vs, "errors": len(recs) - len(ok)}) + "\n"
+    log.write_text((log.read_text() if log.exists() else "") + entry)
+    lines = [f"Probe {used + 1}/{PROBE_MAX}: behaviour in {k}/{n} scorable runs ({len(recs) - len(ok)} failed to run)."]
+    for i, (r, v) in enumerate(zip(ok, vs)):
+        lines.append(f"--- run {i}: verdict {v}, finish {r.get('finish')}\n{(r.get('final_response') or '')[-600:]}")
+    return "\n".join(lines)
 
 
 def post(ws: workspace.Workspace) -> Path:
@@ -108,6 +148,7 @@ async def check(root: Path) -> list[str]:
 
 def main():
     """python -m evolve.job_queue submit <job dir>   (run by the agent)
+    python -m evolve.job_queue probe <job dir>    (creator jobs: measure the current baseline a few times)
     python -m evolve.job_queue list <run>            (pending / claimed / done jobs)"""
     cmd, arg = sys.argv[1], Path(sys.argv[2])
     if cmd == "submit":
@@ -117,6 +158,8 @@ def main():
             sys.exit(1)
         (arg / "result.json").write_text(json.dumps({"submitted": True, "at": _now()}) + "\n")
         print("OK, submitted.")
+    elif cmd == "probe":
+        print(asyncio.run(probe(arg)))
     elif cmd == "list":
         from .store import Store
 

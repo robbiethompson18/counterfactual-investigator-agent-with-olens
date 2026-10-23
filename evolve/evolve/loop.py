@@ -49,7 +49,7 @@ def new_workspace(store: Store, make, *args):
 
 def keep_session(ws, node):
     """Copy the agent's transcript (API) or job instructions + manager notes (queue) into the node."""
-    names = ("session.json", "INSTRUCTIONS.md", "transcript.md", "transcript.json", "transcript.jsonl", "manager.json")
+    names = ("session.json", "INSTRUCTIONS.md", "transcript.md", "transcript.json", "transcript.jsonl", "manager.json", "probes.jsonl")
     for name in (*names, "claimed.json", "result.json"):
         if (ws.root / name).exists():
             shutil.copy2(ws.root / name, node.dir / f"agent_{name}")

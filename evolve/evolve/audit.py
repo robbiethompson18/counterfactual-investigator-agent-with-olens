@@ -20,13 +20,13 @@ def _cut(s, n):
 
 
 def sample(rows, k, seed):
-    """Up to k scorable rows, half of each verdict where possible, plus up to 2 unscorable ones."""
+    """Up to k scorable rows, half of each verdict where possible, plus up to 3 unscorable ones."""
     rng = random.Random(seed)
     yes, no, none = ([r for r in rows if r["verdict"] is v] for v in (True, False, None))
     for xs in (yes, no, none):
         rng.shuffle(xs)
     n_yes = min(len(yes), max(k // 2, k - len(no)))
-    pick = yes[:n_yes] + no[: k - n_yes] + none[:2]
+    pick = yes[:n_yes] + no[: k - n_yes] + none[:3]
     return sorted(pick, key=lambda r: r["sample"])
 
 
@@ -70,6 +70,7 @@ async def run_audit(node: Node, batch: str, k: int = 10, model=llm.DS) -> dict:
     arms = {a: node.arm(a) for a in ARMS}
     rows = {a: load(node, batch, a) for a in ARMS}
     kn = {a: (sum(r["verdict"] is True for r in rows[a]), sum(r["verdict"] in (True, False) for r in rows[a])) for a in ARMS}
+    un = {a: len(rows[a]) - kn[a][1] for a in ARMS}
     parts = []
     for a in ARMS:
         prompt = "\n\n".join(m["content"] for m in arms[a].messages if m["role"] in ("system", "user"))
@@ -85,6 +86,9 @@ async def run_audit(node: Node, batch: str, k: int = 10, model=llm.DS) -> dict:
         "nr": kn["real"][1],
         "kn": kn["null"][0],
         "nn": kn["null"][1],
+        "ub": un["baseline"],
+        "ur": un["real"],
+        "un": un["null"],
         "transcripts": "\n\n".join(parts),
     }.items():
         prompt = prompt.replace("{" + key + "}", str(val))
