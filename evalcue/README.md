@@ -64,6 +64,12 @@ appends `[k of N commands left]` to every tool output; `final_command` (a regex)
 up to 3 tries of that command (e.g. a submit script), with `out_of_budget` appended as the reminder;
 `done_file` ends the episode as soon as that sandbox file exists. See `envs/exclude_rows/`.
 
+Ports of other harnesses' envs keep the original's tool loop so rates replicate: `Episode.tools`
+replaces the bash tool with the original's tool specs, and `Episode.step(sandbox, message)` replaces
+the bash handling of each assistant turn, returning the messages to append and a finish reason (or
+`None` to continue). See `envs/sandbagging/` (agent-interp-envs' `execute_command` + `submit`, one
+call per turn, its no-tool-call nudge).
+
 Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-haiku-5.5` or
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the
 sampling defaults are Qwen's, and thinking maps to OpenRouter's `reasoning.enabled`). Use a separate
