@@ -11,8 +11,10 @@ Runs on a pod set up by `runpod/olens_reads.sh setup` (needs the HF base + AR + 
 RUN_DIR holds requests.jsonl, reads.jsonl and meta.json (params.lens picks the bullet prefix). OUT_DIR/atoms/<id with
 "/" -> "__">.pt, fp16, the residual-reads format (scripts/olens_residual_reads.py save_atoms) plus labels and text:
 {id, env, arm, positive, lens, positions, layers, prefix_lengths, z {L: [P, d]}, cont {L: [P, n, d]},
-plain_bullets {L: [P] texts}, plain_atoms {L: [P] [k, d]}, text {token, role, prefix, continuation: [P]}}.
-Transcripts with a file already are skipped, so a rerun resumes.
+plain_bullets {L: [P] texts}, plain_atoms {L: [P] [k, d]}, text {token, role, prefix, continuation: [P]},
+chunks {L: [n, d]}, chunk_starts [n]}. chunks are AR atoms of every 32-token chunk of the whole transcript (start 0, 32,
+...), for scoring what a read adds beyond anything in the transcript (olens_novelty.py --transcript).
+Transcripts with a file already are skipped, so a rerun resumes; --chunks-only adds chunks to existing files.
 """
 
 import argparse
@@ -36,6 +38,13 @@ def jsonl(path):
         yield from map(json.loads, f)
 
 
+def chunk_atoms(ar, W, ids, L):
+    """Whitened AR atoms of ids[s : s + N] for s = 0, N, 2N, ...: [n, d] fp16, and the starts."""
+    starts = list(range(0, len(ids), N))
+    spans = [ids[s : s + N] for s in starts]
+    return W(torch.cat([ar(spans[i : i + 256], L) for i in range(0, len(spans), 256)])).half().cpu(), starts
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path)
@@ -43,6 +52,7 @@ def main():
     ap.add_argument("--layer", type=int, help="default: 44 if the run read it, else 48")
     ap.add_argument("--per-transcript", type=int, default=50)
     ap.add_argument("--prefixes", default="1,2,4,8,16,32")
+    ap.add_argument("--chunks-only", action="store_true", help="only add transcript chunk atoms to existing atom files")
     args = ap.parse_args()
     lens = json.loads((args.run / "meta.json").read_text())["params"]["lens"]
     prefix = BULLET_PREFIX[lens]
@@ -56,13 +66,24 @@ def main():
             reads[r["id"]][r["token_index"]] = r
     requests = {r["id"]: r for r in jsonl(args.run / "requests.jsonl")}
     (args.out / "atoms").mkdir(parents=True, exist_ok=True)
-    todo = [t for t in sorted(reads) if not (args.out / "atoms" / (t.replace("/", "__") + ".pt")).exists()]
+    path = lambda t: args.out / "atoms" / (t.replace("/", "__") + ".pt")
+    todo = [t for t in sorted(reads) if path(t).exists() == args.chunks_only]
     print(f"{len(todo)} of {len(reads)} transcripts to do at L{L}, lens {lens} (bullet prefix {prefix!r})", flush=True)
 
     tok, model = load_base()
     ar = AR(model)
     W = Whitener(L, device=model.device, dtype=torch.float32)
     bad = 0
+    if args.chunks_only:
+        for n, tid in enumerate(todo):
+            a = torch.load(path(tid))
+            if "chunks" in a:
+                continue
+            _, ids, _ = render(tok, requests[tid])
+            T, starts = chunk_atoms(ar, W, ids, L)
+            torch.save(a | {"chunks": {L: T}, "chunk_starts": starts}, path(tid))
+            print(f"[{n + 1}/{len(todo)}] {tid}: {len(starts)} chunks", flush=True)
+        return
     for n, tid in enumerate(todo):
         _, ids, _ = render(tok, requests[tid])
         rows = reads[tid]
@@ -86,14 +107,16 @@ def main():
         D = W(D).half().cpu() if len(D) else D
         cuts = np.cumsum([0] + [len(bl) for bl in texts])
         zero = (A != 0).any(-1, keepdim=True)  # keep padded prefixes at exactly 0 after whitening
+        T, starts = chunk_atoms(ar, W, ids, L)
         row = requests[tid]
         torch.save({"id": tid, "env": row.get("env"), "arm": row.get("arm"), "positive": row.get("positive"), "lens": lens,
                     "positions": ps, "layers": [L], "prefix_lengths": lengths,
                     "z": {L: W(h.to(model.device)).half().cpu()}, "cont": {L: (W(A) * zero).half().cpu()},
                     "plain_bullets": {L: texts}, "plain_atoms": {L: [D[cuts[i] : cuts[i + 1]] for i in range(len(ps))]},
                     "text": {"token": [rows[p]["token"] for p in ps], "role": [rows[p]["role"] for p in ps],
-                             "prefix": [rows[p]["prefix"] for p in ps], "continuation": [tok.decode(s) for s in spans]}},
-                   args.out / "atoms" / (tid.replace("/", "__") + ".pt"))  # fmt: skip
+                             "prefix": [rows[p]["prefix"] for p in ps], "continuation": [tok.decode(s) for s in spans]},
+                    "chunks": {L: T}, "chunk_starts": starts},
+                   path(tid))  # fmt: skip
         print(f"[{n + 1}/{len(todo)}] {tid}: {len(ids)} tokens, {len(ps)} positions, {len(bspans)} bullets", flush=True)
     print(f"done; {bad} transcripts skipped for token mismatches", flush=True)
 

@@ -10,6 +10,9 @@ at another position of the same transcript, >= 64 tokens away where possible, or
 32 tokens before + the 32 after the position). --prefixes keeps only those continuation prefix lengths, to compare
 with dumps that store fewer.
 
+--transcript adds AR atoms of every 32-token chunk of the whole transcript (olens_atoms.py's chunks) to the base set, so
+gain is what a read adds beyond anything in the transcript, not only the next 32 tokens; outputs get a _transcript tag.
+
 Writes RUN_DIR/novelty.jsonl and RUN_DIR/novelty_extremes.md (transcripts by mean novelty, then the --extremes highest
 and lowest positions with their bullets) and prints a summary per layer and role.
 """
@@ -73,6 +76,7 @@ def main():
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--extremes", type=int, default=20)
     ap.add_argument("--prefixes", help="comma-separated prefix lengths to keep (default: all stored)")
+    ap.add_argument("--transcript", action="store_true", help="base = continuation + every 32-token chunk of the transcript")
     args = ap.parse_args()
     rng = random.Random(0)
     files, rows = load(args.run)
@@ -85,6 +89,9 @@ def main():
             if not ok:
                 continue
             z, C, B = a["z"][L][ok].float(), a["cont"][L][ok][:, keep].float(), [a["plain_atoms"][L][i] for i in ok]
+            if args.transcript:  # the same chunk atoms (olens_atoms.py) join every position's base set
+                T = a["chunks"][L].float()
+                C = torch.cat([C, T.expand(len(ok), *T.shape)], 1)
             s = scores(z, C, B)
             nulls = {}
             for name in ("null_same", "null_other"):
@@ -103,10 +110,11 @@ def main():
                             **{k: round(float(v[j]), 4) for k, v in nulls.items()},
                             "novelty": round(float(s["gain"][j] - nulls["null_other"][j]), 4),
                             "bullets": sorted(bl, key=lambda b: -b["n_b"])})  # fmt: skip
-    with open(args.run / "novelty.jsonl", "w") as f:
+    tag = "_transcript" if args.transcript else ""
+    with open(args.run / f"novelty{tag}.jsonl", "w") as f:
         f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in out)
     summarize(out)
-    extremes(out, args.run / "novelty_extremes.md", args.extremes)
+    extremes(out, args.run / f"novelty{tag}_extremes.md", args.extremes)
 
 
 def draw(rng, files, tid, L, i, same):
@@ -177,7 +185,7 @@ def extremes(out, path, n):
                 md += [f"- n_b {b['n_b']:+.4f} · solo {b['solo']:.3f} · overlap {b['overlap']:.2f}: {b['text']}" for b in r["bullets"]]
                 md.append("")
     path.write_text("\n".join(md))
-    print(f"wrote {path.parent / 'novelty.jsonl'}, {path}")
+    print(f"wrote {path.with_name(path.name.replace('_extremes.md', '.jsonl'))}, {path}")
 
 
 if __name__ == "__main__":

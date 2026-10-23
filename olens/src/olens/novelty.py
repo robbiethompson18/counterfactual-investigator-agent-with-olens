@@ -9,24 +9,17 @@ tokens) and B the read's bullet atoms (AR of bullet_prefix + bullet), all NNLS i
     n_b   = FVE(z; C ∪ {b}) − cont, per bullet
 
 Adding atoms never lowers an NNLS fit, so gain is only meaningful against a null: the same gain with B swapped for
-bullets read somewhere else (null_gain).
+bullets read somewhere else (null_gain). C can be any base set, e.g. the continuation plus AR atoms of every 32-token
+chunk of the transcript ("is this anywhere in the transcript?").
 """
 
 import torch
-from scipy.optimize import nnls
+
+from .continuation import nnls
 
 
 def fve(z, D):
-    """[B] FVE of each z [B, d] on its atoms D [B, k, d]: plain scipy NNLS in float64 (as olens.fve.fve_nnls, which this
-    doesn't import: olens.fve pulls in transformers), all-zero rows dropped. Not olens.continuation.nnls: its Gram/eigen
-    solve returns ~1e18 coefficients on near-collinear atoms (a 1-token continuation plus duplicate bullets) and FVEs far
-    below 0."""
-    out = []
-    for zi, Di in zip(z, D):
-        Di = Di[Di.abs().sum(-1) > 0]
-        zi, Di = zi.double().numpy(), Di.double().numpy()
-        out.append(1.0 - nnls(Di.T, zi)[1] ** 2 / float(zi @ zi) if len(Di) else 0.0)
-    return torch.tensor(out, dtype=torch.float32)
+    return nnls(z, D)[2]
 
 
 def stack(atoms, d):
