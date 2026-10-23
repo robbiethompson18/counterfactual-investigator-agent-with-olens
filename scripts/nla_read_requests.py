@@ -5,12 +5,12 @@ The NLA counterpart of scripts/olens_read_requests.py (the O-lens reader): same 
 positions, so its rows join the O-lens rows on (id, token_index). Runs on one H200 (base ~54 GB + the AR, a 43-block copy
 of the base, ~46 GB), from the repo root:
 
-    PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS.jsonl OUT.jsonl [--batch 128] [--shard i/n]
+    PYTHONPATH=olens/src python scripts/nla_read_requests.py REQUESTS.jsonl OUT.jsonl [--batch 256] [--shard i/n]
 
 REQUESTS.jsonl: as for the O-lens reader, {id, messages, tools ("evalcue.harness.BASH_TOOL" or a list), priority?, env?,
 arm?}, read in priority order, round-robin over (env, arm) within a priority. FVE uses the viewer's calibration
 (transcript-viewer/pod/calib_ids.json, as pod/server.py), so it means the same as on the O-lens viewer. OUT.jsonl gets one
-line per (transcript, position), appended per transcript; transcripts already in OUT are skipped, so a rerun resumes:
+line per (transcript, position), appended per batch of transcripts; transcripts already in OUT are skipped, so a rerun resumes:
 
     {id, token_index, token, prefix (the 32 tokens up to and including this one), msg_index (-1: template/tool
      definitions), role, field (content / reasoning_content / tool_call / null), char_offset, layer (42), text, cos, fve}
@@ -100,7 +100,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("requests")
     ap.add_argument("out")
-    ap.add_argument("--batch", type=int, default=128, help="NLA explanations decoded at once")
+    ap.add_argument("--batch", type=int, default=256, help="NLA explanations decoded at once, pooled across transcripts")
     ap.add_argument("--max-new-tokens", type=int, default=220)
     ap.add_argument("--shard", default="0/1", help="i/n: read every n-th transcript (in priority order) from the i-th")
     args = ap.parse_args()
@@ -125,27 +125,38 @@ def main():
     print(f"loaded; FVE baseline {critic.base:.1f}", flush=True)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
 
-    t0, n_reads = time.time(), 0
+    def flush(pending):
+        """Explain every position of the pending transcripts in shared batches, then write each transcript's rows."""
+        vecs = torch.cat([v for *_, v in pending])
+        texts = nla.explain(vecs, max_new_tokens=args.max_new_tokens, batch=args.batch)
+        scores = critic.score(texts, vecs)
+        j = 0
+        with out.open("a") as f:
+            for row, msgs, ids, toks, where, positions, _ in pending:
+                for p, text, sc in zip(positions, texts[j : j + len(positions)], scores[j : j + len(positions)]):
+                    msg, field, off = where[p]
+                    rec = {
+                        "id": row["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
+                        "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
+                        "layer": LAYER, "text": text, **sc,
+                    }  # fmt: skip
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                j += len(positions)
+
+    t0, n_reads, pending = time.time(), 0, []
     for k, row in enumerate(todo, 1):
         msgs, ids, where = render(tok, row)
         toks = [tok.decode([x]) for x in ids]
         positions = [p for p, x in enumerate(ids) if x == im_end or PUNCT.match(toks[p])]
-        vecs = capture(model, ids, positions)
-        texts = nla.explain(vecs, max_new_tokens=args.max_new_tokens, batch=args.batch)
-        scores = critic.score(texts, vecs)
-        with out.open("a") as f:
-            for p, text, sc in zip(positions, texts, scores):
-                msg, field, off = where[p]
-                rec = {
-                    "id": row["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
-                    "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
-                    "layer": LAYER, "text": text, **sc,
-                }  # fmt: skip
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        n_reads += len(positions)
+        pending.append((row, msgs, ids, toks, where, positions, capture(model, ids, positions)))
+        if sum(len(x[5]) for x in pending) < args.batch and k < len(todo):
+            continue  # short transcripts share a decode batch
+        flush(pending)
+        n_reads += sum(len(x[5]) for x in pending)
         dt = time.time() - t0
-        print(f"[{k}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(ids)} tokens, {len(positions)} reads | "
+        print(f"[{k}/{len(todo)}] {row['id']} p{row.get('priority')}: {len(pending)} transcripts, {n_reads} reads | "
               f"{n_reads / dt:.2f} reads/s, {k / dt * 3600:.0f} transcripts/h", flush=True)  # fmt: skip
+        pending = []
 
 
 if __name__ == "__main__":
