@@ -34,7 +34,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import torch
 from olens.ar import AR
-from olens.fve import fve_nnls, fve_single
+from olens.fve import WHITENERS, fve_nnls, fve_single
 from olens.lens import AguLens, Sampling, capture, load_base
 from olens.readout import Readout, bullets
 
@@ -93,6 +93,8 @@ def score(texts, vecs, layers):
     through the AR; `fve` is the joint whitened FVE of the NNLS refit on all bullets, `bfve` each
     bullet's own FVE (cos^2 in the whitened space, 0 if the cosine is negative), `coefs` the NNLS
     weights. Bullets are sorted by their own FVE."""
+    if S.get("unscored"):  # see load()
+        return [[{"text": t, "bullets": bullets(t)} for t in ts] for ts in texts]
     lens, ro = S["agu"], S["readout"]
     flat = [(b, k, L) for k, (ts, L) in enumerate(zip(texts, layers)) for t in ts for b in bullets(t)]
     spans = [lens.tok(b, add_special_tokens=False).input_ids[:32] for b, _, _ in flat]
@@ -122,6 +124,21 @@ def score(texts, vecs, layers):
             )
         out.append(row)
     return out
+
+
+def load(batch=BATCH):
+    """Load base Qwen, the lens and its AR into S, for scripts that call read_many/score in-process instead of over HTTP
+    (scripts/organism_olens.py, party_resample.py, stoptoken_experiment.py). The whiteners are in the gated
+    agu18dec/local-workspace dataset; without them reads keep their raw text, and FVE can be scored later from the cached
+    texts (the /rescore path)."""
+    global BATCH
+    BATCH = batch
+    tok, model = load_base()
+    agu = AguLens(tok, model)
+    S.update(tok=tok, model=model, agu=agu, readout=Readout(agu, AR(model)), unscored=not WHITENERS.exists())
+    if S["unscored"]:
+        print("no whiteners: reads are not FVE-scored", flush=True)
+    return tok, model
 
 
 def do_rescore(req):

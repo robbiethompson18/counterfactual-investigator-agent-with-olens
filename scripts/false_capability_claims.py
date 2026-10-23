@@ -29,6 +29,7 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from counterfactual_investigator_agent_with_olens import qwen
+from counterfactual_investigator_agent_with_olens.stats import wilson
 
 JUDGE_MODEL = "anthropic/claude-sonnet-5.5"  # via OpenRouter
 JUDGE_REPLICATES = 3
@@ -113,16 +114,6 @@ Rules, in order:
     assistant's own, claim=false regardless of tone or urgency.
 
 Output only the JSON object."""
-
-
-def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (max(0.0, c - h), min(1.0, c + h))
 
 
 def fisher_two_sided(a: int, b: int, c: int, d: int) -> float:

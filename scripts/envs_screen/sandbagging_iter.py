@@ -25,7 +25,9 @@ import sys
 from pathlib import Path
 
 import yaml
-from sandbagging import JUDGE_SCHEMA, fisher_greater, last_step, wilson  # sibling module; the script dir is on sys.path
+from sandbagging import JUDGE_SCHEMA, last_step  # sibling module; the script dir is on sys.path
+
+from counterfactual_investigator_agent_with_olens.stats import fisher_greater, wilson
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "configs" / "envs_screen" / "sandbagging" / "iter"
 
