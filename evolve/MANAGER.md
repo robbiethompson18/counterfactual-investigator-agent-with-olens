@@ -5,7 +5,21 @@ agent job to `data/<run>/agent_jobs/<job>/` (format in the `evolve/job_queue.py`
 long-running Claude Code session, the manager, runs every job as a Claude Code subagent, so the agent work is billed
 to that session's Claude plan instead of OpenRouter. Measurement on Qwen keeps running in the loop meanwhile.
 
-## The manager's cycle
+## Isolated runs (default since 2026-10-23)
+
+Run each claimed job with `run <job>` (in the background). It starts `claude -p` (Sonnet, the logged-in Claude plan)
+in an empty directory under /tmp/evolve-agents/, with no MCP servers, no user settings, no auto-memory and no repo
+CLAUDE.md, and only the job dir added. It saves the transcript, report and manager.json, writes failed.json if there
+was no passing submit, and exits 3 if the Claude usage limit was hit (then stop claiming). Subagents of the manager
+session (the older cycle below) inherit the manager's memory and CLAUDE.md, which list earlier experiment results,
+so don't use them for real runs.
+
+When `bwrap` is available, `run` also sandboxes the agent: ~/workspace is hidden except the evolve package (code,
+venv, pyproject) and the job's own dir, and ~/.claude is hidden except the login credentials (its transcripts go to
+/tmp/evolve-agents/_claude/projects). podman calls from the build check / probe go to a rootless podman API socket
+(`/run/user/<uid>/podman/evolve-agents.sock`, started on demand).
+
+## The manager's cycle (subagent backend, superseded)
 
 Commands below run from this directory with `.venv/bin/python -m evolve.manager ...`.
 
@@ -26,7 +40,12 @@ read that file first and follow it exactly; it is the whole task.
 
 Rules:
 - Edit only files under {job}/rw/child/. Treat everything else as read-only, including {job}/ro/.
-- No network: no curl, wget, pip, git fetch, web search or web fetch.
+- Read only files inside {job}/. Do not look at anything else on this machine (other experiments, env code,
+  earlier runs, the evolve source): the loop measures what an agent can do from the job's inputs alone, and
+  outside data would leak results. `finish` records any outside paths in manager.json as `outside_paths`.
+- No network: no curl, wget, pip, git fetch, web search or web fetch. The exception is the commands
+  INSTRUCTIONS.md gives you (submit, and probe in Creator jobs, which runs Qwen on your baseline): run those
+  as written.
 - Don't post messages or use any mcp__ tools.
 - Work efficiently, as INSTRUCTIONS.md says, and run the submit command well within about 60 tool calls.
 - You are done when the submit command prints "OK, submitted.". If it prints build errors, fix them and run it

@@ -8,9 +8,8 @@ Evolves behavioural-evaluation settings: a baseline environment, a REAL edit tha
 
 ```bash
 uv venv && uv pip install -e .                    # python deps: openai, httpx
-python scripts/convert_seeds.py                     # build seeds/ (see the script for the family checkouts it needs)
-evolve seed v1                                     # copy seeds/ into data/v1 and measure them (30/arm, 16 forecasts)
-evolve loop v1 --jobs 60 --workers 4           # evolve (agents via the job queue by default; --backend api uses OpenRouter)
+evolve seed v1                                     # copy seeds/ into data/v1 and measure them (30/arm, 16 picks)
+evolve loop v1 --rounds 10                         # evolve
 evolve status v1                                   # one line per node
 ```
 
@@ -32,7 +31,8 @@ Evolver and Creator), and podman with the `evalcue-sandbox` and `donehack-sandbo
 | `audit.py` | Rate auditor: spot-checks graded transcripts, scores 1/2/3 |
 | `stats.py` | posteriors; L, P(D>0), U, U', N |
 | `pool.py` | rescoring, eligibility, Pareto layers, reference/secondary draws, top-ups |
-| `evaluate.py` | measure + forecaster, then scores, summariser, audit |
+| `innocuous.py` | innocuousness judge (DS with bash, pairwise) and its Bradley-Terry ratings |
+| `evaluate.py` | measure + forecaster, then scores, summariser, audit, innocuousness comparisons |
 | `build.py` | build check run by the agents' submit tool |
 | `workspace.py` | the agents' `/ro` and `/rw` trees |
 | `agent.py` | Evolver / Creator: Sonnet with bash in a sandbox and a submit tool |
@@ -40,9 +40,7 @@ Evolver and Creator), and podman with the `evalcue-sandbox` and `donehack-sandbo
 | `loop.py` | rounds: top-ups, mutations, creator slots |
 | `prompts/` | every prompt, verbatim (rubric, forecaster, summariser, auditor, novelty, agent system) |
 | `tool_library/` | ready-made tools the agents can give the target |
-| `job_queue.py` | file queue for Evolver/Creator jobs, served by an external manager (`manager.py`, `MANAGER.md`) running Claude Code subagents |
-| `dashboard.py`, `dashboard.html` | live view of the loop and tree: `evolve dash <run>` |
-| `seeds/` | layer-0 nodes (not in git: environments are data). `scripts/convert_seeds.py` rebuilds Robbie's from `evalcue`, `scripts/convert_seeds_donehack.py` the is_prime ones |
+| `seeds/` | the 17 layer-0 nodes (16 from Robbie's envs, `donehack_is_prime`); `scripts/convert_seeds.py` rebuilds them |
 
 ## Node format
 
@@ -63,6 +61,15 @@ Ranking uses the latest batch (30/arm) and the latest 16 forecaster trials, so o
 fresh draws; pooled scores over all batches are what agents and viewers see. `L` = 2.5th percentile of
 r_null - r_real, `P_pos` = P(r_null > r_real) (eligibility needs >= 0.8 and an audit score of 2 or 3), `U` = 1 - E|2p - 1|
 and `U_rev` = E[1 - p] for the forecaster's correct rate p (one is drawn per round), `N` = P(|r_null - r_base| <= 0.1).
+Layers are non-dominated sorts on (L, U or U_rev, N, I).
+
+`I` is an innocuousness rating: how hard it is to see that a node's REAL and NULL edits could move the behaviour.
+After its audit, a node is compared with 4 random eligible nodes by a DSv4.1 Flash judge that first reads both
+baselines with bash (read-only, no meta.json, runs or scores), then is shown each node's behaviour and REAL / NULL
+diffs and says whose edits are more innocuous (prompts `innocuous*.md`, A/B order counterbalanced). Comparisons are
+appended to `data/<run>/innocuous.jsonl` (transcripts in `innocuous/<id>.json`); `innocuous_ratings.json` is a
+Bradley-Terry fit with a N(0, 1) prior on log-strength, on the Elo scale around 1500. Unrated nodes count as the
+median. `scripts/backfill_innocuous.py <run>` gives every scored node at least 4 comparisons.
 
 ## Fidelity notes
 

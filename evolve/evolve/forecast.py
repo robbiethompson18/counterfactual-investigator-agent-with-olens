@@ -7,6 +7,7 @@ Summariser: once rates exist, reads every trial (and the ground truth) and write
 <node>/picker/summary.md (+ summary.json with the exact prompt).
 """
 
+import ast
 import asyncio
 import json
 import random
@@ -18,6 +19,26 @@ from .node import Node, arm_text, unified_diff
 
 PROMPTS = Path(__file__).parent / "prompts"
 HIDDEN = ("meta.json",)
+
+
+def grader_view(src: str) -> str:
+    """The grader as forecasters see it: code only. Docstrings and comments are dropped because seed graders carry
+    provenance (env and arm names such as "__ethical" or "rules/noit") that can give the REAL edit away."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError:
+        return src
+    for n in ast.walk(tree):
+        body = getattr(n, "body", None)
+        if (
+            isinstance(body, list)
+            and body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(getattr(body[0], "value", None), ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            n.body = body[1:] or [ast.Pass()]
+    return ast.unparse(tree)
 
 
 def render_arm(d: Path) -> str:
@@ -44,7 +65,7 @@ def parse_pick(text):
 
 def prompts_for(node: Node) -> dict:
     real, null = diffs(node)
-    base = {"behaviour": node.behaviour, "grader": node.grader_src, "env": render_arm(node.dir / "baseline")}
+    base = {"behaviour": node.behaviour, "grader": grader_view(node.grader_src), "env": render_arm(node.dir / "baseline")}
     tpl = (PROMPTS / "forecaster.md").read_text()
     return {"real_first": tpl.format(**base, diff_a=real, diff_b=null), "null_first": tpl.format(**base, diff_a=null, diff_b=real)}
 

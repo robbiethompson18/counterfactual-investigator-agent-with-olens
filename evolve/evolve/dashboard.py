@@ -6,20 +6,30 @@ rates, diffs, files, Target transcripts, Forecaster trials, Rate audit and agent
 Read-only over data/<run>/ (index.json, events.jsonl, nodes/, agent_jobs/), so it can run beside the loop. The page
 (dashboard.html) polls /api/state and re-renders whatever changed.
 
-    /api/state?run=              index + per-node posteriors, latest epoch (front, layers), agent jobs, event count
+    /api/state?run=              index + per-node posteriors, latest epoch (front, layers), agent jobs, event count,
+                                 job progress (cap, per-job stage) and the Qwen vLLM queue
     /api/events?run=&since=N     events.jsonl lines from N on
     /api/node?run=&id=           one node: info, texts, diffs, file tree, scores, forecaster trials, audits, agent job
     /api/rows?run=&id=&batch=&arm=           one batch of Target runs, summarised
     /api/record?run=&id=&batch=&arm=&sample= one Target run in full, with the exact prompt it was given
     /api/file?run=&id=&path=     a text file inside the node dir
+    /api/nodediff?run=&id=&other=   how node id differs from other (default: its parent), file by file
     /api/job?run=&job=           an agent job: job.json, INSTRUCTIONS.md, transcript, inputs
+    /api/comparisons?run=&node=  innocuousness comparisons (all, or those involving node), newest first
+    /api/comparison?run=&id=     one comparison: the judge's exact messages, tool calls and verdict
 """
 
 import argparse
+import difflib
 import functools
 import json
+import os
 import random
+import re
+import statistics
+import threading
 import time
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -27,6 +37,8 @@ from urllib.parse import parse_qs, urlparse
 from .measure import batches, load
 from .node import ARMS, Node, unified_diff
 from .store import ROOT
+
+QWEN_METRICS = os.environ.get("QWEN_VLLM_URL", "http://127.0.0.1:18000/v1").rsplit("/v1", 1)[0] + "/metrics"
 
 PAGE = Path(__file__).resolve().parent / "dashboard.html"
 FORECASTER_DIRS = ("forecaster", "picker")  # the Forecaster was called the Picker; old runs keep picker/
@@ -135,6 +147,7 @@ class Run:
         idx = _json(self.dir / "index.json", {}) or {}
         evs = self.events()
         epoch = next((e for e in reversed(evs) if e["event"] == "epoch"), None)
+        ratings = _json(self.dir / "innocuous_ratings.json", {}) or {}
         layer_of = {nid: i + 1 for i, layer in enumerate((epoch or {}).get("layers", [])) for nid in layer}
         nodes = {}
         for nid, e in idx.items():
@@ -142,6 +155,8 @@ class Run:
             info = _json(self.dir / "nodes" / nid / "node.json", {}) or {}
             rates = s.get("pooled_rates") or e.get("rates") or {}
             fc = _forecaster_scores(s)
+            inv = _json(self.dir / "nodes" / nid / "investigator" / "scores.json")
+            ino = ratings.get(nid)
             pick = fc.get("all")
             nodes[nid] = {
                 **e,
@@ -151,11 +166,15 @@ class Run:
                 "arm_post": {a: beta_summary(v[0], v[1]) | {"unscorable": v[2]} for a, v in rates.items()},
                 "forecaster_post": beta_summary(*pick) if pick and pick[1] else None,
                 "forecaster_latest": fc.get("latest"),
+                "investigator": inv | {"post": beta_summary(*inv["all"]) if inv.get("all") and inv["all"][1] else None} if inv else None,
+                "innocuous": ino,
                 "layer": layer_of.get(nid),
                 "front_rounds": info.get("front_rounds", 0),
                 "ref_count": info.get("ref_count", 0),
                 "batches": len(batches(Node(self.dir / "nodes" / nid))),
                 "job": info.get("job"),
+                "rewrite": bool(info.get("rewrite")),  # older jobs: a separate rewrite mode
+                "suggestion": info.get("suggestion"),
             }
         last = evs[-1]["t"] if evs else None
         return {
@@ -167,6 +186,9 @@ class Run:
             "nodes": nodes,
             "jobs": self.jobs(),
             "in_flight": self._in_flight(evs),
+            "progress": self.progress(evs),
+            "n_comparisons": _count_lines(self.dir / "innocuous.jsonl"),
+            "vllm": vllm_metrics(),
         }
 
     def _in_flight(self, evs) -> list[dict]:
@@ -182,7 +204,79 @@ class Run:
                 agents[e.get("round")] = e
             elif ev in ("mutation_failed", "creation_failed", "novelty") or (ev == "node_added" and e.get("round") is not None):
                 agents.pop(e.get("round"), None)
-        return [{"what": "measuring", **e} for e in measuring.values()] + [{"what": "agent", **e} for e in agents.values()]
+        live = {n for n in measuring if (_json(self.dir / "nodes" / n / "node.json") or {}).get("stage") in ("measuring", "submitted")}
+        return [{"what": "measuring", **e} for n, e in measuring.items() if n in live] + [{"what": "agent", **e} for e in agents.values()]
+
+    def progress(self, evs) -> dict:
+        """Per loop job (numbered by job_start), its kind and current stage, replayed from the event log:
+        agent (queued / working, from the job dir) -> measuring -> scoring (summariser + audit) -> done | failed."""
+        jobs, node_job, measure_s, started = {}, {}, [], {}
+        dirs = {}
+        for d in (self.dir / "agent_jobs").glob("*/loop.json"):
+            r = (_json(d) or {}).get("round")
+            if r is not None:
+                dirs[r] = d.parent.name
+        states = {j["job"]: j["state"] for j in self.jobs()}
+
+        def at(j, stage, t, **kw):
+            jobs.setdefault(j, {"job": j, "t0": t}).update(stage=stage, since=t, **kw)
+
+        for e in evs:
+            ev, t, r = e["event"], e["t"], e.get("round")
+            if ev == "job_start":
+                at(e["job"], "starting", t, surprise=e.get("surprise"))
+            elif ev in ("mutation_start", "creation_start"):
+                kind = ev.split("_")[0] + (" (rewrite)" if e.get("rewrite") else "")
+                if e.get("suggestion"):
+                    kind += f" ({suggestion_tag(e['suggestion'])})"
+                at(r, "agent", t, kind=kind, reference=e.get("reference"), examples=e.get("examples"))
+            elif ev == "topup_start":
+                at(r, "measuring", t, kind="topup", node=e.get("node"))
+                node_job[e.get("node")] = r
+            elif ev in ("mutation_failed", "creation_failed"):
+                at(r, "failed", t, outcome="; ".join(map(str, e.get("errors") or []))[:300])
+            elif ev == "novelty" and not e.get("new"):
+                at(r, "failed", t, outcome=f"duplicate of {e.get('duplicate_of')}")
+            elif ev == "node_added" and r is not None and r in jobs:
+                at(r, "admitted", t, node=e["node"])
+                node_job[e["node"]] = r
+            elif ev in ("measure_start", "measure_resumed"):
+                started[e["node"]] = t
+                if e["node"] in node_job:
+                    at(node_job[e["node"]], "measuring", t)
+            elif ev == "measured":
+                if e["node"] in started:
+                    measure_s.append(_secs(e["t"]) - _secs(started.pop(e["node"])))
+                if e["node"] in node_job:
+                    at(node_job[e["node"]], "scoring", t)
+            elif ev == "audited" and e["node"] in node_job:
+                at(node_job[e["node"]], "done", t, outcome=f"audit {e.get('score')}")
+        # A loop restart abandons in-flight top-ups and re-measures children under their old job, so the log alone
+        # can leave ghosts: a job is live only if it is its node's latest job and the node is still being measured.
+        stage = {nid: (_json(self.dir / "nodes" / nid / "node.json") or {}).get("stage") for nid in set(node_job) | set(started)}
+        latest = {}
+        for j in sorted(jobs.values(), key=lambda j: j["job"]):
+            if j.get("node"):
+                latest[j["node"]] = j["job"]
+        for j in jobs.values():
+            j["dir"] = dirs.get(j["job"])
+            if j["stage"] == "agent":
+                j["agent_state"] = states.get(j["dir"], "posting")
+                if j["agent_state"] in ("done", "failed"):
+                    j.update(stage="interrupted", outcome="agent finished but the loop never picked up the result")
+            elif j["stage"] in ("measuring", "scoring", "admitted") and (
+                latest.get(j.get("node")) != j["job"] or stage.get(j.get("node")) not in ("measuring", "submitted")
+            ):
+                j.update(stage="interrupted", outcome="abandoned by a loop restart")
+        return {
+            "max_jobs": (_json(self.dir / "loop.json") or {}).get("max_jobs"),
+            "started": sum(e["event"] == "job_start" for e in evs),
+            "finished": bool(evs) and evs[-1]["event"] == "loop_finished",
+            "jobs": sorted(jobs.values(), key=lambda j: j["job"]),
+            "measure_median_s": statistics.median(measure_s[-30:]) if measure_s else None,
+            "seed_measuring": [{"node": n, "since": t} for n, t in started.items() if n not in node_job and stage.get(n) == "measuring"],
+            "recent": evs[-25:][::-1],
+        }
 
     def jobs(self) -> list[dict]:
         d = self.dir / "agent_jobs"
@@ -228,6 +322,7 @@ class Run:
                 m = sum(r["verdict"] in (True, False) for r in rows)
                 per_batch[b][a] = {"k": k, "n": m, "unscorable": len(rows) - m, "post": beta_summary(k, m)}
         forecaster = self._forecaster(n)
+        investigator = self._trials(n.dir / "investigator")
         audits = {p.stem: _json(p) for p in sorted((n.dir / "audit").glob("*.json"))} if (n.dir / "audit").is_dir() else {}
         agent_files = {p.name: _text(p) for p in sorted(n.dir.glob("agent_*")) if p.is_file() and p.suffix != ".jsonl"}
         return {
@@ -235,19 +330,20 @@ class Run:
             "info": info,
             "texts": texts,
             "diffs": diffs,
-            "tree": _tree(n.dir, skip=("__pycache__", "runs", "audit", *FORECASTER_DIRS, "picker_superseded")),
+            "tree": _tree(n.dir, skip=("__pycache__", "runs", "audit", *FORECASTER_DIRS, "picker_superseded", "investigator")),
             "scores": _normalise_scores(n.scores()),
             "batches": per_batch,
             "forecaster": forecaster,
+            "investigator": investigator | {"scores": _json(n.dir / "investigator" / "scores.json")} if investigator else {},
             "audits": audits,
             "novelty": _json(n.dir / "novelty.json"),
             "agent_files": agent_files,
             "job": self.job(info["job"], brief=True) if info.get("job") else None,
         }
 
-    def _forecaster(self, n: Node) -> dict:
-        d = next((n.dir / x for x in FORECASTER_DIRS if (n.dir / x).is_dir()), None)
-        if d is None:
+    def _trials(self, d: Path) -> dict:
+        """{trials: {batch: rows}, summary: {batch: posterior on the correct rate}} for an A/B pick dir."""
+        if not d.is_dir():
             return {}
         trials = {p.stem: _jsonl(p) for p in sorted(d.glob("b*.jsonl"), key=lambda p: int(p.stem[1:]))}
         summ = {}
@@ -255,12 +351,41 @@ class Run:
             k = sum(r.get("correct") is True for r in rows)
             m = sum(r.get("correct") is not None for r in rows)
             summ[b] = beta_summary(k, m) | {"unparsed": len(rows) - m}
-        return {
-            "trials": trials,
-            "summary": summ,
+        return {"trials": trials, "summary": summ}
+
+    def _forecaster(self, n: Node) -> dict:
+        d = next((n.dir / x for x in FORECASTER_DIRS if (n.dir / x).is_dir()), None)
+        if d is None:
+            return {}
+        return self._trials(d) | {
             "prompts": _json(d / "prompts.json"),
             "summariser": _json(d / "summary.json"),
         }
+
+    # --- innocuousness comparisons -----------------------------------------------------------------------------
+    def comparisons(self, node: str | None = None) -> list[dict]:
+        out = []
+        for r in _jsonl(self.dir / "innocuous.jsonl"):
+            if node and node not in (r.get("a"), r.get("b")):
+                continue
+            w = r.get("winner")
+            out.append(r | {"winner_id": {"A": r.get("a"), "B": r.get("b")}.get(w, w)})
+        return out[::-1]
+
+    def comparison(self, cid: str) -> dict:
+        base = self.dir / "innocuous"
+        p = _inside(base, f"{cid}.json")
+        if not p:
+            raise FileNotFoundError(cid)
+        d = _json(p) or {}
+        w = d.get("winner")
+        try:
+            from .innocuous import BASH, VERDICT  # what the judge is offered (current code, not stored per comparison)
+
+            tools = [BASH, VERDICT]
+        except ImportError:
+            tools = None
+        return d | {"winner_id": {"A": d.get("a"), "B": d.get("b")}.get(w, w), "tools_current": tools}
 
     def rows(self, nid, batch, arm) -> list[dict]:
         out = []
@@ -293,6 +418,27 @@ class Run:
         deleted = [p for p in before if p not in rec_files] if rec_files else []
         rec.pop("transcript", None)  # same content as turns, in chat format
         return {**row, "record": rec, "prompt": prompt, "files_changed": changed, "files_deleted": deleted}
+
+    def node_diff(self, nid: str, other: str | None = None) -> dict:
+        """Genome diff other -> nid: behaviour, grader, each arm dir, plus both nodes' REAL / NULL edits side by side."""
+        n = self.node(nid)
+        other = other or n.info.get("parent")
+        if not other:
+            return {"id": nid, "other": None}
+        o = self.node(other)
+        files = {}
+        for f in ("behaviour.txt", "grader.py", "hypothesis.md"):
+            a, b = _text(o.dir / f) or "", _text(n.dir / f) or ""
+            if a != b:
+                files[f] = "\n".join(difflib.unified_diff(a.splitlines(), b.splitlines(), f"{other}/{f}", f"{nid}/{f}", lineterm="", n=2))
+        for arm in ("baseline", "null", "real"):
+            if (o.dir / arm).is_dir() and (n.dir / arm).is_dir():
+                d = unified_diff(o.dir / arm, n.dir / arm)
+                if d:
+                    files[arm + "/"] = d
+        pair = (("other", o), ("node", n))
+        edits = {who: {a: unified_diff(x.dir / "baseline", x.dir / a) for a in ("real", "null") if (x.dir / a).is_dir()} for who, x in pair}
+        return {"id": nid, "other": other, "files": files, "edits": edits}
 
     def file(self, nid, rel) -> dict:
         n = self.node(nid)
@@ -330,6 +476,64 @@ class Run:
         if not p:
             raise FileNotFoundError(rel)
         return {"path": rel, "text": _text(p)}
+
+
+def suggestion_tag(text: str) -> str:
+    """Short name for an Evolver suggestion (loop.SUGGESTIONS), by its wording."""
+    t = text.lower()
+    for key, tag in (("simplif", "simplify"), ("rewrite", "rewrite"), ("reward hacking", "hack-tool"), ("realistic", "realism")):
+        if key in t:
+            return tag
+    return "suggestion"
+
+
+def _count_lines(p: Path) -> int:
+    try:
+        with open(p, "rb") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
+
+
+def _secs(t: str) -> float:
+    return time.mktime(time.strptime(t, "%Y-%m-%dT%H:%M:%SZ"))
+
+
+_vllm = {"t": 0.0, "out": None, "tok": None}
+_vllm_lock = threading.Lock()
+
+
+def vllm_metrics() -> dict | None:
+    """Requests running / waiting, KV-cache use and generation tokens/s on the Qwen server (cached 2 s)."""
+    with _vllm_lock:
+        now = time.time()
+        if now - _vllm["t"] < 2:
+            return _vllm["out"]
+        try:
+            text = urllib.request.urlopen(QWEN_METRICS, timeout=1.5).read().decode()
+        except OSError as e:
+            _vllm.update(t=now, out={"error": str(e)[:200]})
+            return _vllm["out"]
+
+        def total(name):
+            return sum(float(v) for v in re.findall(rf"^{name}{{[^}}]*}} ([0-9.eE+-]+)$", text, re.MULTILINE))
+
+        kv = [float(v) for v in re.findall(r"^vllm:kv_cache_usage_perc{[^}]*} ([0-9.eE+-]+)$", text, re.MULTILINE)]
+        tok = total("vllm:generation_tokens_total")
+        prev = _vllm["tok"]
+        rate = (tok - prev[1]) / (now - prev[0]) if prev and now > prev[0] else None
+        _vllm.update(
+            t=now,
+            tok=(now, tok),
+            out={
+                "running": total("vllm:num_requests_running"),
+                "waiting": total("vllm:num_requests_waiting"),
+                "kv": max(kv) if kv else None,
+                "gen_tok_s": rate,
+                "engines": len(kv),
+            },
+        )
+        return _vllm["out"]
 
 
 def cc_transcript(p: Path) -> list[dict]:
@@ -392,11 +596,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(run.rows(q["id"], q["batch"], q["arm"]))
                 case "/api/record":
                     return self._json(run.record(q["id"], q["batch"], q["arm"], int(q["sample"])))
+                case "/api/nodediff":
+                    return self._json(run.node_diff(q["id"], q.get("other")))
                 case "/api/file":
                     return self._json(run.file(q["id"], q["path"]))
                 case "/api/job":
                     j = run.job(q["job"])
                     return self._json(j) if j else self._send(404, b'{"error":"no such job"}')
+                case "/api/comparisons":
+                    return self._json(run.comparisons(q.get("node")))
+                case "/api/comparison":
+                    return self._json(run.comparison(q["id"]))
                 case "/api/jobfile":
                     return self._json(run.job_file(q["job"], q["path"]))
             self._send(404, b'{"error":"not found"}')
