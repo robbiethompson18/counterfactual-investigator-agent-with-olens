@@ -41,8 +41,8 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
 - **Agam's banks:** O-lens (s3d_rl600, 4 samples at T=1), multi-layer NLA, single-layer NLA-RL (L42)
   and J-lens (top 10 tokens, L0–62), at every token.
   - They're mirrored from his case viewer with
-    `uv run python scripts/mirror_agam_readers.py vendor/detective-joracle/data/chive/splits/all300.txt data/banks/agam`
-    (repo root, ~4 GB).
+    `uv run python scripts/mirror_agam_readers.py splits/all300.txt data/banks/agam` (repo root, ~4
+    GB).
   - The page fetches them 64 positions at a time (`/api/bank`). The "has our own read" underline
     ignores them.
   - A new reader (an SAE, say) is one more `READERS` entry with a `kind` the page knows how to draw.

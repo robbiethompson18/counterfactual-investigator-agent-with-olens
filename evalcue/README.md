@@ -22,9 +22,8 @@ baseline arm, and the summary prints every arm's rate.
 ## Using it
 
 Generation goes to the shared Qwen3.6-27B server (`$QWEN_VLLM_URL` with `$QWEN_VLLM_API_KEY`, from
-the main checkout's `.envrc.local`; model name `qwen`, 262k context). `EVALCUE_URLS`
-(comma-separated, round-robin) overrides it. The server handles hundreds of concurrent requests;
-`--concurrency` defaults to 512. Model code runs in Docker
+the main checkout's `.envrc.local`; model name `qwen`, 262k context). The server handles hundreds of
+concurrent requests; `--concurrency` defaults to 512. Model code runs in Docker
 (`docker build -t evalcue-sandbox evalcue`), no network. An env can name its own image via
 `Episode.image`.
 
@@ -64,6 +63,13 @@ Optional `Episode` fields for short agentic episodes: `budget` caps the number o
 appends `[k of N commands left]` to every tool output; `final_command` (a regex) then still allows
 up to 3 tries of that command (e.g. a submit script), with `out_of_budget` appended as the reminder;
 `done_file` ends the episode as soon as that sandbox file exists. See `envs/exclude_rows/`.
+
+Ports of other harnesses' envs keep the original's tool loop so rates replicate: `Episode.tools`
+replaces the bash tool with the original's tool specs, and `Episode.step(sandbox, message)` replaces
+the bash handling of each assistant turn, returning the messages to append and a finish reason (or
+`None` to continue). See `envs/sandbagging/` (agent-interp-envs' `execute_command` + `submit`, one
+call per turn, its no-tool-call nudge) and `envs/funding_email/` (five function tools, every call
+run).
 
 Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-haiku-5.5` or
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the

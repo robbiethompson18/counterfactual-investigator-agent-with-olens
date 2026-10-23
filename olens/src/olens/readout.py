@@ -4,7 +4,8 @@ direction by the AR, then a non-negative least-squares refit in the whitened spa
 Conventions verified against the published held-out joint FVE (0.486 here vs 0.487 reported,
 scripts/eval_ao.py): the AR head predicts a RAW activation; both target and predictions are
 centred with mu and whitened with Sigma^-1/2; a bullet is fed to the AR as the text after
-"- " with no leading space.
+"- ", with a leading space for the space lens and without one for the old olens_s3d_rl600 (the
+held-out number above is the old lens's; `lens.bullet_prefix`).
 """
 
 import re
@@ -35,7 +36,7 @@ class Readout:
         if not bl:
             return {"text": text, "bullets": [], "coefs": [], "fve": 0.0}
         W = self.whitener(layer)
-        spans = [self.lens.tok(b, add_special_tokens=False).input_ids[:32] for b in bl]
+        spans = [self.lens.tok(self.lens.bullet_prefix + b, add_special_tokens=False).input_ids[:32] for b in bl]
         fve, c = fve_nnls(W(torch.as_tensor(h)), W(self.ar(spans, layer)))
         order = sorted(range(len(bl)), key=lambda i: -c[i])
         return {"text": text, "bullets": [bl[i] for i in order], "coefs": [float(c[i]) for i in order], "fve": float(fve)}
@@ -51,7 +52,7 @@ class Readout:
         kw = {} if sampling is None else {"sampling": sampling}
         texts = self.lens.read_layers(vecs, n=n, seed=seed, **kw)
         items = [(L, t, bullets(t)) for L, ts in texts.items() for t in ts]
-        spans = [self.lens.tok(b, add_special_tokens=False).input_ids[:32] for _, _, bl in items for b in bl]
+        spans = [self.lens.tok(self.lens.bullet_prefix + b, add_special_tokens=False).input_ids[:32] for _, _, bl in items for b in bl]
         lays = [L for L, _, bl in items for _ in bl]
         D = self.ar(spans, lays) if spans else None
         out, i = {L: [] for L in texts}, 0

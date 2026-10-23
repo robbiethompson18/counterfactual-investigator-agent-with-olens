@@ -2,6 +2,20 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-23: evolve/ sandbox and seed caveats
+
+- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
+  with a bind mount. Read-only files can be deleted and replaced; they are restored before grading and
+  reported in `record["readonly_tampered"]`, not prevented.
+- Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
+  (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
+- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by `evolve/scripts/convert_seeds*.py`
+  and are not yet on HF.
+- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in the
+  podman sandbox the API agent used; the manager's instructions are the only guard.
+- `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
+  no-tests rule; keep it as a smoke check or delete it.
+
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
 At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The
@@ -15,13 +29,19 @@ recognize canned replies or alter instrumentation. The initial screens retain th
 comparability; do not treat their detector as an adversarially secure grader or rates as deployment
 estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence and detection limits.
 
-## 2026-10-22: `cfbench/envs/sandbagging_iter.py` restates its label rule
+## 2026-10-22: serving code left outside the shared-server recipe
 
-Its `BEHAVIOR` is copied from `scripts/envs_screen/sandbagging_iter.py`'s docstring, which computes
-the mechanical label. That script imports its sibling as `from sandbagging import ...`, so cfbench
-can't import a constant from it the way `cfbench/envs/sandbagging.py` imports `JUDGE_RUBRIC`. If the
-label changes, edit both. (The evalcue envs' rules, formerly `behaviors.json`, now live next to each
-`detect()` as `BEHAVIOR`.)
+Left alone by the dead-serving-code cleanup, either because it does something the shared server
+can't or because it isn't ours to change:
+
+- `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` run vLLM
+  in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
+  `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
+  prompts, but its results are recorded, so the recipe was kept.
+- `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
+  do (the image already sets one, so weights download twice).
+- Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
+  checkpoint.
 
 ## 2026-10-22: `shutdown_*` doc tables come from a scratch script
 
@@ -79,12 +99,3 @@ someone excludes the pod-only modules and types `server.py`.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
   `docs/eval-cue-reward-hacking.md`.
-
-## 2026-10-19: `scripts/run_chive_or.py` monkeypatches Agam's harness
-
-It loads `vendor/detective-joracle/scripts/run_chive.py` and overwrites module globals in it and in
-`detective_joracle.chive.judge` / `.executor` (`client`, `json_call`, `AGENT_MODEL`, ...). Since
-2026-10-22 it asserts each patched name exists and that no loaded `detective_joracle` module still
-holds the original `llm.client` / `llm.json_call`, so a rename or a new by-value import at module
-level fails loudly. A by-value import inside a function body (or a new module imported lazily) would
-still slip through and go to Anthropic. The clean fix is a backend/judge-client option upstream.

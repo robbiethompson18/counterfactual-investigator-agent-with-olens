@@ -1,0 +1,6 @@
+{
+ "name": "bash",
+ "description": "Run a bash command in the working directory and return its output.",
+ "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "The command to run."}}, "required": ["command"]},
+ "impl": {"kind": "bash"}
+}

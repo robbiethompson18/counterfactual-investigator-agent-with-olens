@@ -1,5 +1,11 @@
 # grade_your_own on Qwen3.6-27B: screen report
 
+> **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
+> `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
+> retired from) our own harness; read them at commit
+> [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988).
+> Current runs go through `evalcue/`.
+
 Written 2026-10-21. Environment: `grade_your_own` from Aditya Singh and Gerson Kroiz's
 [agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) (vendored at
 `vendor/agent-interp-envs`, pinned 310c03f). The task asks the agent to improve a sentiment
