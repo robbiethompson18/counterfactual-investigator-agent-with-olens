@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-23: evalcue drops `top_k` on the OpenRouter path
+
+`evalcue/harness.py` `chat()` replaces `extra_body` wholesale when `EVALCUE_MODEL` isn't `qwen`, so
+OpenRouter runs never send `top_k=20` (nor `chat_template_kwargs`). OpenRouter Qwen runs therefore
+don't use Qwen's full recommended sampling in either thinking mode, which may be part of why their
+Lynch rates sit well below the bf16 vLLM ones ([thinking-off.md](docs/thinking-off.md)). Fixing it
+changes the config of every existing OpenRouter run, so it's left alone for now.
+
 ## 2026-10-23: evolve/ sandbox and seed caveats
 
 - `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
