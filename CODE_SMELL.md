@@ -6,8 +6,8 @@ Tech debt we know about, newest first.
 
 `evalcue/envs/sandbagging/` holds the same arms and label rule as
 `configs/envs_screen/sandbagging/`, `scripts/envs_screen/sandbagging*.py` and
-`cfbench/envs/sandbagging*.py`. The vendored copies stay until the port's replication passes; a
-cleanup PR then deletes them. Until then an arm or label change has to go in both.
+`cfbench/envs/sandbagging*.py`. The vendored copies stay until a cleanup PR deletes them (the port
+replicated on 2026-10-22). Until then an arm or label change has to go in both.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 

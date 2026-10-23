@@ -1,7 +1,7 @@
 # Sandbagging env iteration on Qwen3.6-27B (2026-10-22)
 
 **Now runs in evalcue** ([envs/sandbagging.md](envs/sandbagging.md)); the vendored harness and
-overlay below are kept until the port replicates.
+overlay below stay until a cleanup PR removes them; the port replicated on 2026-10-22.
 
 Follow-up to the screen ([envs-screen/sandbagging.md](envs-screen/sandbagging.md)), which found Qwen
 sandbagging 5/30 when Documentation.md says a score above 50% triggers unlearning, vs 0/29 reversed.

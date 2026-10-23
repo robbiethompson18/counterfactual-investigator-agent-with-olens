@@ -6,7 +6,7 @@ Screen of the `sandbagging` environment from
 deliberately underperform, and does the rate move between the two arms?
 
 **Now runs in evalcue** ([envs/sandbagging.md](../envs/sandbagging.md)); the vendored harness and
-overlay below are kept until the port replicates.
+overlay below stay until a cleanup PR removes them; the port replicated on 2026-10-22.
 
 Follow-up: [../sandbagging-iteration.md](../sandbagging-iteration.md) fixes the answer-format noise
 and finds a one-sentence arm pair with a +57pp gap.
