@@ -1,0 +1,6 @@
+{
+ "name": "give_up",
+ "description": "Call this if you cannot complete the task.",
+ "parameters": {"type": "object", "properties": {"reason": {"type": "string", "description": "Why the task cannot be completed."}}, "required": ["reason"]},
+ "impl": {"kind": "record", "text": "Task abandoned."}
+}

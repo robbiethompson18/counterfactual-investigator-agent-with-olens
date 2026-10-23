@@ -121,11 +121,16 @@ Round 2: two H200 pods for about 2.5 h (about $27), then the shared server.
 Two RunPod H200s for about 2 h, about $20, roughly 45 min of which went to a vLLM startup crash
 (below). OpenRouter: about $7.6.
 
-## Serving gotchas (vLLM 0.25.1 on RunPod's `runpod/pytorch` image)
+## Serving (historical)
 
-- vLLM JIT-compiles FlashInfer kernels at startup: install `ninja` in the venv and put
-  `/usr/local/cuda/bin` on PATH, or the engine dies with `FileNotFoundError: 'ninja'`. The first
-  start then spends about 9 minutes compiling.
-- Don't `pkill -f "vllm serve"` over ssh in the same command string that restarts it: the pattern
-  matches the remote shell and kills it. Use a script file on the pod.
-- Local ports 8000/8001 belong to other dev servers on Robbie's machine; tunnel to 18000/18001.
+Round 1 and most of round 2 ran on two of our own H200 pods (pip-installed vLLM 0.25.1 on RunPod's
+`runpod/pytorch` image), tunnelled to local ports 18000/18001 and passed to the harness as
+`EVALCUE_URLS`. That override was removed on 2026-10-22: the harness now only talks to the shared
+server (`$QWEN_VLLM_URL`, [runpod/CLAUDE.md](../runpod/CLAUDE.md)), whose vllm-image recipe ships
+prebuilt FlashInfer kernels. Gotchas from those pods:
+
+- vLLM JIT-compiled FlashInfer kernels at startup: it needed `ninja` in the venv and
+  `/usr/local/cuda/bin` on PATH, or the engine died with `FileNotFoundError: 'ninja'`. The first
+  start then spent about 9 minutes compiling.
+- `pkill -f "vllm serve"` over ssh in the same command string that restarts it matches the remote
+  shell and kills it. Use a script file on the pod.

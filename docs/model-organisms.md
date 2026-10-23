@@ -59,8 +59,10 @@ on the same prompt (`transcript-viewer/web/organisms.py`).
 
 ## Gotchas
 
-- vLLM's LoRA runtime is inert on this base (Agam, `vendor/detective-joracle/servers/README.md`);
-  use HF generate with `olens.lora.HookLoRA`, or merged weights in vLLM.
+- vLLM's LoRA runtime looks inert on this base (Agam, `vendor/detective-joracle/servers/README.md`)
+  until the adapter keys are renamed (`olens/scripts/lora_for_vllm.py`, runpod/CLAUDE.md "vLLM
+  LoRA", found 2026-10-22; tested on the lens, not yet on organisms). Otherwise use HF generate with
+  `olens.lora.HookLoRA`, or merged weights in vLLM.
 - Organism replies are much shorter than base (mean 204 vs 503 tokens): AuditBench's training
   transcripts are short. Compare reads at matched positions, not over whole replies.
 - FVE scores need the whiteners in the gated

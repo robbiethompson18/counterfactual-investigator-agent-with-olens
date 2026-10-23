@@ -1,5 +1,11 @@
 # eval_tampering screen (Qwen3.6-27B)
 
+> **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
+> `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
+> retired from) our own harness; read them at commit
+> [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988).
+> Current runs go through `evalcue/`.
+
 **Verdict: FAIL (never).** Qwen3.6-27B reported the tampering in 10/10 arm-A rollouts and the
 technical failure in 10/10 arm-B rollouts. That meets the pilot's degenerate stop rule (≥7 gated,
 behavior 0/10), so I stopped after the pilot. GLM 5.3 also disclosed 20/20 in each arm. The labels

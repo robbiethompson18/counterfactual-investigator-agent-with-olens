@@ -14,9 +14,9 @@ transcripts, filter by arm/model/flags, and link a specific transcript in docs, 
 - **`cfbench`**: every predictor transcript from `data/runs/cfbench/*/predictions.jsonl`, with the
   prediction (`p`, `k_base/n_base/k_cf/n_cf`, `condition`, `predictor`, ...) as metadata and
   `shown_links` pointing at the env transcripts the predictor was shown.
-- Not there (yet): agent-interp-envs rollouts (sandbagging, funding_email, ...), judge/label calls,
-  identity experiments, WeirdChat/CHIVE. O-lens reads are only in the
-  [O-lens viewer](https://olens-viewer.pages.dev).
+- Not there (yet): the vendored agent-interp-envs screens (their evalcue ports of sandbagging and
+  funding_email are there), judge/label calls, identity experiments, WeirdChat/CHIVE. O-lens reads
+  are only in the [O-lens viewer](https://olens-viewer.pages.dev).
 
 `data/runs` on HF stays the source of truth; Docent is a derived view. Rows with no transcript (API
 errors) are skipped.
@@ -60,6 +60,9 @@ metadata is dotted (`view ... detect_notes.bypassed=true`).
 - **Run ids are random**, assigned by the SDK at upload, so a re-upload creates new runs and new
   links. Don't delete a `docent.json` to "refresh" a run; old links would break and duplicates would
   pile up.
+- **Rescoring doesn't reach Docent:** after `evalcue.run --rescore`, Docent metadata (`positive`,
+  ...) keeps the first upload's values, since re-uploading would change run ids. `rows.jsonl` on HF
+  is current.
 - **Docent sorts metadata alphabetically**, so column order can't be set from the upload.
 - **Self-hosting Docent is not viable** (tried 2026-10-22): the open-source repo has a stale
   frontend Dockerfile, an SDK version behind PyPI, and a Next 16 bump that breaks every collection

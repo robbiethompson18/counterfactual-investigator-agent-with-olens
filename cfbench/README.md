@@ -1,7 +1,8 @@
 # cfbench: predict what an environment edit does to a model's behavior
 
 Our from-scratch replacement for the CHIVE prediction harness. Agam's
-[detective-joracle](https://github.com/agu18dec/detective-joracle) (vendored) is not used here.
+[detective-joracle](https://github.com/agu18dec/detective-joracle) is reference-only here
+(`vendor/README.md`).
 
 ## The task
 
@@ -51,7 +52,7 @@ whose edit moves the rate a lot dominate the sums, by design.
 ## Running
 
 ```bash
-uv run python -m cfbench.run funding_email --pairs arm_a:arm_b,arm_b:arm_a --conditions transcript,no_transcript,agentic --slug fe-all
+uv run python -m cfbench.run evalcue_runs:funding_email/<run> --pairs arm_a:arm_b,arm_b:arm_a --conditions transcript,no_transcript,agentic --slug fe-all
 uv run python -m cfbench.score data/runs/cfbench/<date>_fe-all
 ```
 
@@ -77,12 +78,15 @@ contents are read from the env's configs and `vendor/agent-interp-envs` (run
 
 A module in `cfbench/envs/` with `BEHAVIOR`, `rollouts(arm, model)` and `edit(base_arm, cf_arm)`;
 the contract is in `cfbench/core.py`'s docstring. Import arm contents and the label definition from
-where the env defines them (configs, vendor, the labelling script or detector docstring); don't copy
-them. `funding_email.py` reads its arms from the configs; `secret_number.py` (evalcue rows) diffs
-the starting context recorded in the rows, which works for any env whose arms differ only in what
-the model is shown up front.
+where the env defines them (the env module, its detector docstring); don't copy them.
+`evalcue_runs.py` (any evalcue env's rows) diffs the starting context recorded in the rows, which
+works for any env whose arms differ only in what the model is shown up front.
 
 ## Results so far
+
+The funding_email and sandbagging rows below used adapters over the old agent-interp-envs screens
+(`cfbench/envs/{agent_interp,funding_email,sandbagging,sandbagging_iter}.py`, deleted; at commit
+`e145988`). New runs of those envs are evalcue rows, read by `evalcue_runs`.
 
 All 2026-10-21, target Qwen3.6-27B, reasoning effort `medium`, 5 draws per case. Predictors: Sonnet
 5.5, Haiku 5.5, Gemini 3.8 Flash, Gemini 3.5 Flash Lite (the latest Flash and Flash Lite on

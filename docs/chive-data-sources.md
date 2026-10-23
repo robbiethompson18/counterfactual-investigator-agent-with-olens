@@ -9,7 +9,12 @@ source lacks.
 (`token_ids`), and full ground truth: causes, ruled-out alternatives, `movers`, and all 1,944
 counterfactual experiments as replayable edits with measured rates. No readouts.
 
-## Agam's splits (`detective-joracle/data/chive/splits/`)
+`scripts/chive_data.py` loads incidents from it (joins the three configs on `prompt_id`).
+
+## Agam's splits (`splits/`, copied from `detective-joracle/data/chive/splits/`)
+
+We copied `all300`, `climb_dev96`, `climb_test204` and `hard92`; the rest are only
+[upstream](https://github.com/agu18dec/detective-joracle/tree/main/data/chive/splits).
 
 - `climb_dev96` (dev, 96) and `climb_test204` (held-out test, 204): the split for his harness climb.
   He calls them "dev" and "held-out test"; we use the same dev set.
@@ -31,8 +36,8 @@ A static site whose JSON files can be fetched directly. Agam said scraping is fi
   items with effect sizes in prose, and tokens as `[piece, role, turn]` (no ids). It does not have
   the structured experiment edits or `movers`; we asked Agam for those.
 
-`scripts/fetch_olens_banks.py` (not on `main` yet: it needs the vendored harness) converts viewer
-banks to the harness's `<bank>/<pid>.json.gz` format, taking token ids from the HF dataset.
+`scripts/fetch_olens_banks.py` converts viewer banks to the harness's `<bank>/<pid>.json.gz` format,
+taking token ids from the HF dataset.
 
 ## Per-incident difficulty (held-out 204, Agam's Opus 5 runs, 5 draws)
 

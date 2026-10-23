@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Evolve Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#f6f7f8;--panel:#ffffff;--ink:#1b2126;--muted:#5d6872;--line:#dde2e6;--base:#5b6670;--real:#0f7a6c;--null:#b5660d;--add:#e4f4ee;--del:#fbe9e7;--addt:#0b5c4f;--delt:#9a2f1f;--warn:#b5660d;--bad:#b3261e;--flash:#fff3c4;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121619;--panel:#1a2024;--ink:#e3e8ec;--muted:#98a3ad;--line:#2b343a;--base:#93a0ab;--real:#3cc4ae;--null:#e8a04a;--add:#163a33;--del:#3d201c;--addt:#8fe0cf;--delt:#f2a99c;--warn:#e8a04a;--bad:#f2a99c;--flash:#3a3420;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121619;--panel:#1a2024;--ink:#e3e8ec;--muted:#98a3ad;--line:#2b343a;--base:#93a0ab;--real:#3cc4ae;--null:#e8a04a;--add:#163a33;--del:#3d201c;--addt:#8fe0cf;--delt:#f2a99c;--warn:#e8a04a;--bad:#f2a99c;--flash:#3a3420;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif;padding:20px 16px 60px}
+.wrap{max-width:1500px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:22px;font-weight:600;margin:0}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 18px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;font-size:12.5px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 9px;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:500}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--real)}
+.dot.stale{background:var(--null)}.dot.down{background:var(--bad)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{font:inherit;font-weight:500;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:7px 11px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tabs.sub button{font-size:13px;padding:5px 10px}
+button:focus-visible,tr:focus-visible{outline:2px solid var(--real);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px}
+.tablewrap{overflow:auto;max-height:58vh}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;background:var(--panel);text-align:left;font-weight:500;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1}
+td{padding:4px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr{cursor:pointer}
+tr.sel td{background:color-mix(in srgb,var(--real) 10%,transparent)}
+tr.flash td{animation:flash 2.5s ease-out}
+@keyframes flash{from{background:var(--flash)}to{background:transparent}}
+.mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.muted{color:var(--muted)}
+.nm{display:flex;align-items:center;gap:6px;min-width:280px}
+.guide{display:inline-block;width:14px;flex:none;height:20px;border-left:1px solid var(--line)}
+.guide.last{border-left-color:transparent}
+.elbow{display:inline-block;width:12px;flex:none;height:10px;border-left:1px solid var(--muted);border-bottom:1px solid var(--muted);margin-top:-10px;opacity:.6}
+.title{max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.idsm{font:11px "IBM Plex Mono",monospace;color:var(--muted)}
+.badge{display:inline-block;font:500 11px "IBM Plex Mono",monospace;border-radius:4px;padding:0 5px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.badge.a3{border-color:var(--real);color:var(--real)}.badge.a2{border-color:var(--null);color:var(--null)}.badge.a1{border-color:var(--bad);color:var(--bad)}
+.badge.l1{background:var(--ink);color:var(--bg);border-color:var(--ink)}.badge.l2{border-color:var(--ink);color:var(--ink)}
+.badge.kind-creator{border-color:var(--null);color:var(--null)}.badge.kind-child{border-color:var(--real);color:var(--real)}
+.badge.live{border-color:var(--real);color:var(--real);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.4}}
+/* CI views (from Behaviour Diff Triples) */
+.post{position:relative;height:14px;min-width:120px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:3px}
+.post .half{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.post .iv{position:absolute;top:4px;height:6px;border-radius:3px;background:var(--real);opacity:.45}
+.post .mu{position:absolute;top:1px;width:3px;height:12px;margin-left:-1.5px;background:var(--ink);border-radius:1px}
+.post.delta .iv{background:var(--null)}
+.rt{position:relative;height:22px;min-width:120px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:3px}
+.rt .w{position:absolute;height:2px;opacity:.8}
+.rt .m{position:absolute;width:3px;height:6px;margin-left:-1.5px;margin-top:-2px;border-radius:1px}
+.rates{display:grid;gap:6px}
+.row{display:grid;grid-template-columns:70px 1fr 190px;gap:10px;align-items:center;font-size:13px}
+.lab{font-weight:500}
+.track{position:relative;height:16px;background:color-mix(in srgb,var(--line) 55%,transparent);border-radius:3px}
+.bar{position:absolute;left:0;top:3px;bottom:3px;border-radius:2px}
+.ci{position:absolute;top:7px;height:2px;background:var(--ink);opacity:.55}
+.ci::before,.ci::after{content:"";position:absolute;top:-4px;width:1.5px;height:10px;background:var(--ink)}
+.ci::before{left:0}.ci::after{right:0}
+.num{font:13px "IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.toggle button{font:inherit;font-size:12.5px;border:none;background:var(--panel);color:var(--muted);padding:2px 10px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.detail{padding:14px 18px;display:grid;gap:14px;min-height:200px}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;align-items:baseline}
+.name{font:500 15px "IBM Plex Mono",monospace;word-break:break-all}
+.fam{font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.dh{font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;font-weight:600;color:var(--muted)}
+.sec{display:grid;gap:8px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+pre{margin:0;font:12px/1.45 "IBM Plex Mono",monospace;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow-x:auto}
+pre .a{display:block;background:var(--add);color:var(--addt)}
+pre .d{display:block;background:var(--del);color:var(--delt)}
+pre .f{display:block;color:var(--muted)}
+.box{max-height:560px;overflow:auto}
+details{border-top:1px solid var(--line);padding-top:6px}
+details.plain{border:none;padding:0}
+summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.trials{display:flex;flex-wrap:wrap;gap:6px}
+.trial{font:12px "IBM Plex Mono",monospace;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:3px 7px;cursor:pointer}
+.trial.ok{border-color:var(--real);color:var(--real)}
+.trial.bad{border-color:var(--null);color:var(--null)}
+.trial.none{border-style:dashed;color:var(--muted)}
+.trial[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.ana{display:grid;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:12px}
+.prose{white-space:pre-wrap;font-size:14px;max-width:100ch}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:2px 14px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+a,.lnk{color:var(--real);cursor:pointer;text-decoration:none}
+a:hover,.lnk:hover{text-decoration:underline}
+.ftree{display:grid;grid-template-columns:minmax(220px,300px) 1fr;gap:12px}
+.ftree ul{list-style:none;margin:0;padding:0;font:12.5px "IBM Plex Mono",monospace}
+.ftree li{padding:2px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ftree li.dir{color:var(--muted);cursor:default}
+.ftree li[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.turn{display:grid;gap:6px;border-left:3px solid var(--line);padding:4px 0 4px 10px}
+.turn.sys{border-color:var(--base)}.turn.user{border-color:var(--null)}.turn.asst{border-color:var(--real)}.turn.tool{border-color:var(--line)}
+.who{font:500 11.5px "IBM Plex Mono",monospace;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.feed{font-size:13px;max-height:70vh;overflow:auto}
+.feed div{padding:3px 10px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:150px 130px 1fr;gap:10px}
+.empty{color:var(--muted);font-size:13.5px;padding:8px 0}
+.err{color:var(--bad)}
+[hidden]{display:none!important}
+@media (max-width:800px){.cols2,.ftree{grid-template-columns:1fr}.row{grid-template-columns:56px 1fr}.row .num{grid-column:2}.feed div{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Evolve <span class="mono" id="runname"></span></h1>
+  <span class="live"><span class="dot" id="dot"></span><span id="livetxt">connecting…</span></span>
+  <div class="chips" id="chips"></div>
+</header>
+<nav class="tabs" role="tablist" id="maintabs">
+  <button role="tab" data-t="tree" aria-selected="true">Tree</button>
+  <button role="tab" data-t="events" aria-selected="false">Events</button>
+  <button role="tab" data-t="jobs" aria-selected="false">Agent jobs</button>
+</nav>
+
+<section id="sec-tree" class="wrap" style="gap:12px">
+  <div class="legend">
+    <span><span class="sw" style="background:var(--base)"></span>baseline</span>
+    <span><span class="sw" style="background:var(--null)"></span>null</span>
+    <span><span class="sw" style="background:var(--real)"></span>real</span>
+    <span>Rates: pooled posterior mean and 95% interval on 0–100%. Δ = r<sub>null</sub> − r<sub>real</sub>, 80% interval on −1…1. Forecaster: posterior on the correct-pick rate (95%, mean, 0.5 line).</span>
+    <span>Scores <span class="toggle" id="scoremode"><button data-m="rank" aria-pressed="true">ranking batch</button><button data-m="pooled" aria-pressed="false">pooled</button></span></span>
+  </div>
+  <div class="panel tablewrap"><table>
+    <thead><tr><th>Node</th><th>Stage</th><th>Audit</th><th>Front</th><th>Rates b / n / r</th><th>Δ (80%)</th><th>Forecaster p</th><th>Correct</th><th>L</th><th>P(Δ&gt;0)</th><th>U</th><th>U′</th><th>N</th><th>Batches</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <div class="panel detail" id="detail"><p class="empty">Click a node to open it.</p></div>
+</section>
+
+<section id="sec-events" hidden>
+  <div class="panel feed" id="feed"></div>
+</section>
+
+<section id="sec-jobs" class="wrap" style="gap:12px" hidden>
+  <div class="panel tablewrap"><table>
+    <thead><tr><th>Job</th><th>Kind</th><th>State</th><th>Created</th><th>Claimed</th><th>Finished</th><th>Node</th></tr></thead>
+    <tbody id="jobrows"></tbody>
+  </table></div>
+  <div class="panel detail" id="jobdetail"><p class="empty">Click a job to see its exact instructions and transcript.</p></div>
+</section>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const f2 = x => x == null ? "–" : (+x).toFixed(2);
+const pct = x => x == null ? "–" : Math.round(100 * x) + "%";
+const COL = {baseline: "var(--base)", real: "var(--real)", null: "var(--null)"};
+const ARMS = ["baseline", "null", "real"];  // display order: null sits next to baseline
+const params = new URLSearchParams(location.search);
+let RUN = params.get("run") || "";
+let S = null, prevNodes = {}, nEvents = 0, events = [];
+let sel = null, detail = null, scoreMode = "rank";
+let ui = {tab: "overview", batch: null, ptrial: 0, pbatch: null, arm: "baseline", sample: null, file: null, jfile: null};
+let selJob = null;
+
+async function api(path, q = {}) {
+  const u = new URLSearchParams({run: RUN, ...q});
+  const r = await fetch(`${path}?${u}`, {cache: "no-store"});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+const ago = t => { if (!t) return "never"; const s = Math.max(0, (Date.now() - Date.parse(t)) / 1000); return s < 90 ? `${Math.round(s)}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : `${(s / 3600).toFixed(1)} h ago`; };
+
+/* ---------- hash state ---------- */
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("node")) { sel = h.get("node"); ui.tab = (h.get("tab") || "overview").replace("picker", "forecaster"); }
+  if (h.get("ep")) { const [b, a, n] = h.get("ep").split("/"); Object.assign(ui, {batch: b, arm: a, sample: +n}); }
+  if (h.get("job")) selJob = h.get("job");
+  return h.get("main") || "tree";
+}
+function writeHash() {
+  const h = new URLSearchParams();
+  const main = document.querySelector("#maintabs [aria-selected=true]").dataset.t;
+  if (main !== "tree") h.set("main", main);
+  if (sel) { h.set("node", sel); if (ui.tab !== "overview") h.set("tab", ui.tab); }
+  if (sel && ui.tab === "runs" && ui.sample != null) h.set("ep", `${ui.batch}/${ui.arm}/${ui.sample}`);
+  if (selJob) h.set("job", selJob);
+  history.replaceState(null, "", "#" + h.toString());
+}
+
+/* ---------- main tabs ---------- */
+function showMain(t) {
+  document.querySelectorAll("#maintabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
+  ["tree", "events", "jobs"].forEach(x => $("sec-" + x).hidden = x !== t);
+  writeHash();
+}
+document.querySelectorAll("#maintabs button").forEach(b => b.onclick = () => showMain(b.dataset.t));
+document.querySelectorAll("#scoremode button").forEach(b => b.onclick = () => {
+  scoreMode = b.dataset.m;
+  document.querySelectorAll("#scoremode button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  renderRows(new Set());
+});
+
+/* ---------- small CI views ---------- */
+function postBar(p, cls = "") {  // Beta summary {mean, ci95} on 0..1, with the 0.5 line
+  if (!p || !p.n) return `<span class="muted">–</span>`;
+  return `<div class="post ${cls}" title="mean ${f2(p.mean)}, 95% ${f2(p.ci95[0])}–${f2(p.ci95[1])}"><div class="half"></div><div class="iv" style="left:${100 * p.ci95[0]}%;width:${100 * (p.ci95[1] - p.ci95[0])}%"></div><div class="mu" style="left:${100 * p.mean}%"></div></div>`;
+}
+function deltaBar(iv) {  // 80% interval on -1..1, zero line in the middle
+  if (!iv) return `<span class="muted">–</span>`;
+  const x = v => 50 + 50 * v, mid = (iv[0] + iv[1]) / 2;
+  return `<div class="post delta" title="80% ${f2(iv[0])} to ${f2(iv[1])}"><div class="half"></div><div class="iv" style="left:${x(iv[0])}%;width:${50 * (iv[1] - iv[0])}%"></div><div class="mu" style="left:${x(mid)}%"></div></div>`;
+}
+function ratesMini(post) {  // three rows of mean+95% whisker on one 0..100 track
+  if (!post || !post.baseline) return `<span class="muted">–</span>`;
+  const t = ARMS.map(a => `${a} ${post[a].k}/${post[a].n}` + (post[a].unscorable ? ` (+${post[a].unscorable} unscorable)` : "")).join("\n");
+  return `<div class="rt" title="${esc(t)}">` + ARMS.map((a, i) => { const p = post[a]; const y = 4 + 7 * i;
+    return `<div class="w" style="top:${y}px;left:${100 * p.ci95[0]}%;width:${100 * (p.ci95[1] - p.ci95[0])}%;background:${COL[a]}"></div><div class="m" style="top:${y}px;left:${100 * p.mean}%;background:${COL[a]}"></div>`; }).join("") + `</div>`;
+}
+function rateRow(lab, p, col) {  // the Settings-card row: bar = observed rate, whisker = 95% posterior interval
+  if (!p) return "";
+  const r = p.n ? p.k / p.n : 0;
+  return `<div class="row"><span class="lab" style="color:${col}">${lab}</span>
+  <div class="track" role="img" aria-label="${lab} ${pct(r)}"><div class="bar" style="width:${100 * r}%;background:${col}"></div><div class="ci" style="left:${100 * p.ci95[0]}%;width:${100 * (p.ci95[1] - p.ci95[0])}%"></div></div>
+  <span class="num">${String(Math.round(100 * r)).padStart(3, " ")}% ${p.k}/${p.n}${p.unscorable ? ` <span class="muted">+${p.unscorable} unsc.</span>` : ""}</span></div>`;
+}
+const auditBadge = a => a == null ? `<span class="muted">–</span>` : `<span class="badge a${a}">${a}</span>`;
+
+/* ---------- tree ---------- */
+function treeOrder(nodes) {
+  const kids = {}, roots = [];
+  for (const [id, n] of Object.entries(nodes)) {
+    const p = n.parent;
+    if (p && nodes[p]) (kids[p] = kids[p] || []).push(id); else roots.push(id);
+  }
+  const rk = id => ({seed: 0, creator: 1})[nodes[id].kind] ?? 2;
+  roots.sort((a, b) => rk(a) - rk(b) || a.localeCompare(b));
+  Object.values(kids).forEach(k => k.sort());
+  const out = [];
+  const walk = (id, guides) => {
+    out.push({id, guides});
+    const ks = kids[id] || [];
+    ks.forEach((k, i) => walk(k, [...guides, i === ks.length - 1]));
+  };
+  roots.forEach(r => walk(r, []));
+  return {out, kids};
+}
+function renderRows(changed) {
+  if (!S) return;
+  const nodes = S.nodes, {out, kids} = treeOrder(nodes);
+  const live = new Set(S.in_flight.filter(x => x.what === "measuring").map(x => x.node));
+  $("rows").innerHTML = out.map(({id, guides}) => {
+    const n = nodes[id], sc = (scoreMode === "pooled" ? n.pooled : n.rank) || {};
+    const iv = (sc.intervals80 || {});
+    const g = guides.map((last, i) => i === guides.length - 1 ? `<span class="elbow"></span>` : `<span class="guide ${last ? "last" : ""}"></span>`).join("");
+    const nk = (kids[id] || []).length;
+    const pick = n.forecaster_post;
+    const stage = live.has(id) ? `<span class="badge live">measuring</span>` : `<span class="muted">${esc(n.stage || "")}</span>`;
+    return `<tr data-id="${esc(id)}" tabindex="0" class="${id === sel ? "sel" : ""} ${changed.has(id) ? "flash" : ""}">
+      <td><div class="nm">${g}<span class="badge kind-${esc(n.kind)}">${esc((n.kind || "?")[0])}</span><div><div class="title">${esc(n.title || id)}</div><div class="idsm">${esc(id)}${nk ? ` · ${nk} child${nk > 1 ? "ren" : ""}` : ""}</div></div></div></td>
+      <td>${stage}</td><td>${auditBadge(n.audit)}</td>
+      <td>${n.layer ? `<span class="badge ${n.layer <= 2 ? "l" + n.layer : ""}">L${n.layer}</span>` : ""}</td>
+      <td>${ratesMini(n.arm_post)}</td><td>${deltaBar(iv.delta)}</td><td>${postBar(pick)}</td>
+      <td class="mono">${pick ? `${pick.k}/${pick.n}` : "–"}</td>
+      <td class="mono">${f2(sc.L)}</td><td class="mono">${f2(sc.P_pos)}</td><td class="mono">${f2(sc.U)}</td><td class="mono">${f2(sc.U_rev)}</td><td class="mono">${f2(sc.N)}</td>
+      <td class="mono">${n.batches || 0}</td></tr>`;
+  }).join("") || `<tr><td colspan="14" class="empty">No nodes yet.</td></tr>`;
+  document.querySelectorAll("#rows tr[data-id]").forEach(tr => {
+    const go = () => selectNode(tr.dataset.id);
+    tr.onclick = go; tr.onkeydown = e => { if (e.key === "Enter") go(); };
+  });
+}
+function renderChips() {
+  const ns = Object.values(S.nodes), js = S.jobs;
+  const count = (xs, f) => xs.filter(f).length;
+  const meas = S.in_flight.filter(x => x.what === "measuring").length;
+  const agents = S.in_flight.filter(x => x.what === "agent").length;
+  const chips = [
+    ["nodes", ns.length], ["seeds", count(ns, n => n.kind === "seed")], ["children", count(ns, n => n.kind === "child")], ["created", count(ns, n => n.kind === "creator")],
+    ["eligible", S.epoch ? S.epoch.eligible : "–"], ["front", S.epoch ? S.epoch.front.length : "–"],
+    ["measuring", meas], ["agents working", agents],
+    ["jobs pending", count(js, j => j.state === "pending")], ["claimed", count(js, j => j.state === "claimed")], ["done", count(js, j => j.state === "done")], ["failed", count(js, j => j.state === "failed")],
+  ];
+  $("chips").innerHTML = chips.map(([k, v]) => `<span class="chip">${k} <b>${v}</b></span>`).join("");
+}
+
+/* ---------- polling ---------- */
+let lastOk = 0;
+async function poll() {
+  try {
+    if (!RUN) { const runs = await (await fetch("/api/runs")).json(); RUN = runs.includes("v1") ? "v1" : runs[0]; }
+    const st = await api("/api/state");
+    lastOk = Date.now();
+    const changed = new Set();
+    for (const [id, n] of Object.entries(st.nodes)) { const s = JSON.stringify(n); if (S && prevNodes[id] !== s) changed.add(id); prevNodes[id] = s; }
+    const inflight = JSON.stringify(st.in_flight) + JSON.stringify(st.jobs);
+    const moved = !S || changed.size || inflight !== (S._if || "") || scoreMode !== (S._sm);
+    S = st; S._if = inflight; S._sm = scoreMode;
+    $("runname").textContent = S.run;
+    renderChips();
+    if (moved) { renderRows(changed); renderJobs(); }
+    if (st.n_events > nEvents) { const evs = await api("/api/events", {since: nEvents}); events = events.concat(evs); nEvents += evs.length; renderFeed(); }
+    if (sel && changed.has(sel)) loadDetail(true);
+    const age = st.last_event ? (Date.now() - Date.parse(st.last_event)) / 1000 : 1e9;
+    $("dot").className = "dot" + (age > 1800 ? " stale" : "");
+    $("livetxt").textContent = `live · last event ${ago(st.last_event)} · ${st.n_events} events`;
+  } catch (e) {
+    $("dot").className = "dot down";
+    $("livetxt").textContent = `server unreachable (${e.message}); retrying`;
+  }
+  setTimeout(poll, 3000);
+}
+
+/* ---------- events feed ---------- */
+function evText(e) {
+  const nl = id => id ? `<span class="lnk" data-node="${esc(id)}">${esc(id)}</span>` : "";
+  const r = e.rates ? ARMS.map(a => e.rates[a] ? `${e.rates[a][0]}/${e.rates[a][1]}` : "?").join(" · ") : "";
+  switch (e.event) {
+    case "node_added": return `${nl(e.node)} added (${esc(e.kind)}${e.parent ? `, parent ${nl(e.parent)}` : ""}${e.agent_cost != null ? `, agent $${(+e.agent_cost).toFixed(2)}` : ""})`;
+    case "measure_start": return `${nl(e.node)} measuring batch ${esc(e.batch)} (${e.n}/arm, ${e.picks} picks)`;
+    case "measured": return `${nl(e.node)} ${esc(e.batch)}: b/n/r ${r}; forecaster ${(e.forecaster || e.picker) ? (e.forecaster || e.picker).join("/") : "?"}; L ${f2(e.rank?.L)} U ${f2(e.rank?.U)} U′ ${f2(e.rank?.U_rev)} N ${f2(e.rank?.N)} P+ ${f2(e.rank?.P_pos)}`;
+    case "audited": return `${nl(e.node)} audit ${esc(e.batch)}: score ${esc(e.score)}`;
+    case "epoch": return `epoch at job ${e.job}: ${e.eligible} eligible, front ${(e.front || []).map(nl).join(", ")}`;
+    case "job_start": return `job ${e.job} starts (surprise = ${esc(e.surprise)})`;
+    case "mutation_start": return `job ${e.round}: Evolver on ${nl(e.reference)}, secondaries ${(e.secondaries || []).map(nl).join(", ")}`;
+    case "mutation_failed": case "creation_failed": return `job ${e.round}: ${e.event.split("_")[0]} failed: ${esc((e.errors || []).join("; ")).slice(0, 400)}`;
+    case "creation_start": return `job ${e.round}: Creator with examples ${(e.examples || []).map(nl).join(", ")}`;
+    case "novelty": return `job ${e.round}: novelty ${e.new ? "new" : "duplicate of " + nl(e.duplicate_of)}: ${esc(e.reason)}`;
+    case "topup_start": return `job ${e.round}: top-up of ${nl(e.node)}`;
+    case "job_error": return `<span class="err">${esc(e.error)}</span>`;
+    default: return esc(JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => k !== "t" && k !== "event"))));
+  }
+}
+function renderFeed() {
+  $("feed").innerHTML = events.slice().reverse().map(e => `<div><span class="mono muted">${esc(e.t.replace("T", " ").replace("Z", ""))}</span><span class="mono">${esc(e.event)}</span><span>${evText(e)}</span></div>`).join("") || `<p class="empty">No events yet.</p>`;
+  $("feed").querySelectorAll("[data-node]").forEach(x => x.onclick = () => { showMain("tree"); selectNode(x.dataset.node); });
+}
+
+/* ---------- node detail ---------- */
+function selectNode(id) {
+  if (sel !== id) ui = {tab: ui.tab, batch: null, ptrial: 0, pbatch: null, arm: "baseline", sample: null, file: null, jfile: null};
+  sel = id; writeHash();
+  document.querySelectorAll("#rows tr").forEach(tr => tr.classList.toggle("sel", tr.dataset.id === id));
+  loadDetail(false);
+}
+async function loadDetail(refresh) {
+  const id = sel;
+  if (!refresh) $("detail").innerHTML = `<p class="empty">Loading ${esc(id)}…</p>`;
+  try { const d = await api("/api/node", {id}); if (id !== sel) return; detail = d; renderDetail(); }
+  catch (e) { $("detail").innerHTML = `<p class="err">Could not load ${esc(id)}: ${esc(e.message)}</p>`; }
+}
+const SUBTABS = [["overview", "Overview"], ["files", "Files"], ["runs", "Target runs"], ["forecaster", "Forecaster"], ["audit", "Rate audit"], ["agent", "Agent"]];
+function nodeLink(id) { return id ? `<span class="lnk" data-node="${esc(id)}">${esc(id)}</span>` : "–"; }
+function renderDetail() {
+  const d = detail, n = S.nodes[d.id] || {}, info = d.info;
+  const kids = Object.entries(S.nodes).filter(([, x]) => x.parent === d.id).map(([k]) => k);
+  $("detail").innerHTML = `<div class="head"><span class="name">${esc(info.title || d.id)}</span><span class="fam">${esc(info.kind)} · ${esc(info.stage)} · round ${esc(info.round ?? "–")} · audit ${esc(info.audit_score ?? "–")}${n.layer ? ` · layer ${n.layer}` : ""}</span></div>
+  <dl class="kv"><dt>id</dt><dd class="mono">${esc(d.id)}</dd><dt>parent</dt><dd>${nodeLink(info.parent)}</dd><dt>references</dt><dd>${(info.refs || []).map(nodeLink).join(", ") || "–"}</dd><dt>children</dt><dd>${kids.map(nodeLink).join(", ") || "–"}</dd></dl>
+  <nav class="tabs sub" id="subtabs">${SUBTABS.map(([k, l]) => `<button data-k="${k}" aria-selected="${k === ui.tab}">${l}</button>`).join("")}</nav>
+  <div id="subbody"></div>`;
+  $("detail").querySelectorAll("[data-node]").forEach(x => x.onclick = () => selectNode(x.dataset.node));
+  $("subtabs").querySelectorAll("button").forEach(b => b.onclick = () => { ui.tab = b.dataset.k; writeHash(); renderDetail(); });
+  ({overview: renderOverview, files: renderFiles, runs: renderRuns, forecaster: renderForecaster, audit: renderAudit, agent: renderAgent})[ui.tab]();
+}
+function diffHTML(text) {
+  if (!text) return `<span class="f">(no change)</span>`;
+  return text.split("\n").map(l => l.startsWith("---") || l.startsWith("+++") || l.startsWith("@@") ? `<span class="f">${esc(l)}</span>` : l.startsWith("+") ? `<span class="a">${esc(l)}</span>` : l.startsWith("-") ? `<span class="d">${esc(l)}</span>` : esc(l) + "\n").join("");
+}
+function scoreTable(sc) {
+  const rows = [["L (2.5% of Δ)", "L"], ["P(Δ > 0)", "P_pos"], ["U", "U"], ["U′", "U_rev"], ["N", "N"]];
+  const iv = k => (o => o ? `${f2(o[0])} – ${f2(o[1])}` : "–");
+  const r = sc.rank || {}, p = sc.pooled || {};
+  const ivs = [["Δ = null − real", "delta"], ["null − base", "null_minus_base"], ["forecaster p", "forecaster_p"], ["baseline", "baseline"], ["real", "real"], ["null", "null"]];
+  return `<table style="width:auto"><thead><tr><th></th><th>ranking (${esc(sc.rank_batch || "–")})</th><th>pooled</th></tr></thead><tbody>
+    ${rows.map(([l, k]) => `<tr><td>${l}</td><td class="mono">${f2(r[k])}</td><td class="mono">${f2(p[k])}</td></tr>`).join("")}
+    ${ivs.map(([l, k]) => `<tr><td>80% ${l}</td><td class="mono">${iv()((r.intervals80 || {})[k])}</td><td class="mono">${iv()((p.intervals80 || {})[k])}</td></tr>`).join("")}
+  </tbody></table>`;
+}
+function renderOverview() {
+  const d = detail, n = S.nodes[d.id] || {}, t = d.texts;
+  const post = n.arm_post || {};
+  const batches = Object.entries(d.batches);
+  $("subbody").innerHTML = `<div class="sec">
+    <div><div class="dh">Behaviour (what the grader counts)</div><div class="prose">${esc(t["behaviour.txt"] || "–")}</div></div>
+    ${t["hypothesis.md"] ? `<div><div class="dh">Hypothesis (agent)</div><div class="prose">${esc(t["hypothesis.md"])}</div></div>` : ""}
+    <div><div class="dh">Rates, pooled over ${batches.length} batch${batches.length === 1 ? "" : "es"} (bar = observed, whisker = 95% posterior)</div>
+      <div class="rates">${ARMS.map(a => rateRow(a, post[a], COL[a])).join("") || `<p class="empty">Not measured yet.</p>`}</div></div>
+    ${batches.length > 1 ? `<div><div class="dh">Per batch</div><table style="width:auto"><thead><tr><th>batch</th>${ARMS.map(a => `<th>${a}</th>`).join("")}<th>forecaster</th></tr></thead><tbody>${batches.map(([b, v]) => `<tr><td class="mono">${b}</td>${ARMS.map(a => `<td class="mono">${v[a].k}/${v[a].n}${v[a].unscorable ? ` +${v[a].unscorable}` : ""}</td>`).join("")}<td class="mono">${d.forecaster.summary?.[b] ? `${d.forecaster.summary[b].k}/${d.forecaster.summary[b].n}` : "–"}</td></tr>`).join("")}</tbody></table></div>` : ""}
+    <div class="cols2"><div><div class="dh">Scores</div>${scoreTable(d.scores)}</div>
+      <div><div class="dh">Forecaster, all trials</div>${n.forecaster_post ? `<div class="row" style="grid-template-columns:1fr 150px"><div>${postBar(n.forecaster_post)}</div><span class="num">${n.forecaster_post.k}/${n.forecaster_post.n} · P(p&gt;.5) ${f2(n.forecaster_post.p_gt_half)}</span></div>` : `<p class="empty">No trials yet.</p>`}
+      ${d.novelty ? `<div class="dh" style="margin-top:12px">Novelty check</div><div class="prose">${d.novelty.new ? "new" : "duplicate of " + nodeLink(d.novelty.duplicate_of)}: ${esc(d.novelty.reason)}</div>` : ""}</div></div>
+    <div class="cols2"><div><div class="dh" style="color:var(--real)">Real diff</div><pre class="box">${diffHTML(d.diffs.real)}</pre></div><div><div class="dh" style="color:var(--null)">Null diff</div><pre class="box">${diffHTML(d.diffs.null)}</pre></div></div>
+  </div>`;
+  $("subbody").querySelectorAll("[data-node]").forEach(x => x.onclick = () => selectNode(x.dataset.node));
+}
+
+/* file tree (shared by node files and agent job inputs) */
+function fileTreeHTML(files, selected, attr) {
+  const seen = new Set(), items = [];
+  for (const f of files) {
+    const parts = f.path.split("/");
+    for (let i = 1; i < parts.length; i++) { const dir = parts.slice(0, i).join("/"); if (!seen.has(dir)) { seen.add(dir); items.push(`<li class="dir" style="padding-left:${6 + 12 * (i - 1)}px">${esc(parts[i - 1])}/</li>`); } }
+    items.push(`<li ${attr}="${esc(f.path)}" aria-selected="${f.path === selected}" style="padding-left:${6 + 12 * (parts.length - 1)}px" title="${esc(f.path)} (${f.size} B)">${esc(parts[parts.length - 1])}</li>`);
+  }
+  return `<ul>${items.join("")}</ul>`;
+}
+async function renderFiles() {
+  const d = detail;
+  const files = d.tree.filter(f => !f.path.startsWith("agent_"));
+  if (!ui.file) ui.file = files.find(f => f.path === "baseline/system_prompt.md")?.path || files[0]?.path;
+  $("subbody").innerHTML = `<p class="muted" style="margin:0">The node's genome as stored: the three arm dirs, grader, behaviour and node.json. Arm files are what the Target sees (meta.json is for the grader only and hidden from the Forecaster).</p>
+    <div class="ftree"><div class="panel" style="padding:6px;max-height:600px;overflow:auto">${fileTreeHTML(files, ui.file, "data-f")}</div><div id="fview"></div></div>`;
+  $("subbody").querySelectorAll("[data-f]").forEach(li => li.onclick = () => { ui.file = li.dataset.f; renderFiles(); });
+  if (ui.file) {
+    try { const f = await api("/api/file", {id: d.id, path: ui.file}); $("fview").innerHTML = `<div class="dh">${esc(f.path)}</div><pre class="box">${esc(f.text)}</pre>`; }
+    catch (e) { $("fview").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  }
+}
+
+/* Target runs */
+async function renderRuns() {
+  const d = detail, bs = Object.keys(d.batches);
+  if (!bs.length) { $("subbody").innerHTML = `<p class="empty">No Target runs yet.</p>`; return; }
+  if (!ui.batch || !bs.includes(ui.batch)) ui.batch = bs[bs.length - 1];
+  $("subbody").innerHTML = `<div class="trials">${bs.map(b => `<button class="trial" data-b="${b}" aria-pressed="${b === ui.batch}">batch ${b}</button>`).join("")}</div>
+    <div class="cols2" id="armcols" style="grid-template-columns:repeat(3,1fr)"></div><div id="recview" class="sec"></div>`;
+  $("subbody").querySelectorAll("[data-b]").forEach(b => b.onclick = () => { ui.batch = b.dataset.b; ui.sample = null; renderRuns(); });
+  const rows = await Promise.all(ARMS.map(a => api("/api/rows", {id: d.id, batch: ui.batch, arm: a})));
+  $("armcols").innerHTML = ARMS.map((a, i) => { const v = d.batches[ui.batch][a];
+    return `<div><div class="dh" style="color:${COL[a]}">${a} · ${v.k}/${v.n} yes${v.unscorable ? `, ${v.unscorable} unscorable` : ""}</div><div class="trials">${rows[i].map(r => {
+      const cls = r.verdict === true ? "bad" : r.verdict === false ? "ok" : "none";
+      return `<button class="trial ${cls}" data-a="${a}" data-s="${r.sample}" aria-pressed="${ui.arm === a && ui.sample === r.sample}" title="${esc(r.error || r.grader_error || ("finish " + r.finish + ", " + r.n_turns + " turns"))}">#${r.sample} ${r.verdict === true ? "yes" : r.verdict === false ? "no" : "–"}</button>`; }).join("")}</div></div>`; }).join("");
+  $("armcols").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { ui.arm = b.dataset.a; ui.sample = +b.dataset.s; writeHash(); renderRuns(); });
+  if (ui.sample != null) renderRecord();
+  else $("recview").innerHTML = `<p class="empty">Yes = the grader counted the behaviour. Click a run to see the exact prompt the Target got and its whole transcript.</p>`;
+}
+function msgHTML(m) {
+  const cls = m.role === "system" ? "sys" : m.role === "user" ? "user" : m.role === "assistant" ? "asst" : "tool";
+  return `<div class="turn ${cls}"><div class="who">${esc(m.role)}</div><pre class="box">${esc(typeof m.content === "string" ? m.content : JSON.stringify(m.content, null, 1))}</pre></div>`;
+}
+async function renderRecord() {
+  const d = detail;
+  $("recview").innerHTML = `<p class="empty">Loading…</p>`;
+  let r;
+  try { r = await api("/api/record", {id: d.id, batch: ui.batch, arm: ui.arm, sample: ui.sample}); } catch (e) { $("recview").innerHTML = `<p class="err">${esc(e.message)}</p>`; return; }
+  const rec = r.record, p = r.prompt;
+  const turns = (rec.turns || []).map((t, i) => `<div class="turn asst"><div class="who">assistant turn ${i + 1}</div>
+      ${t.reasoning ? `<details class="plain"><summary>Reasoning (${t.reasoning.length} chars)</summary><pre class="box">${esc(t.reasoning)}</pre></details>` : ""}
+      ${t.text ? `<pre class="box">${esc(t.text)}</pre>` : ""}
+      ${(t.tool_calls || []).map(c => `<div class="turn tool"><div class="who">tool call · ${esc(c.name)}</div><pre class="box">${esc(typeof c.args === "string" ? c.args : JSON.stringify(c.args, null, 1))}</pre><div class="who">output</div><pre class="box">${esc(c.output ?? "")}</pre></div>`).join("")}
+    </div>`).join("");
+  const meta = Object.fromEntries(Object.entries(rec).filter(([k]) => !["turns", "final_response", "meta", "tool_calls"].includes(k)));
+  $("recview").innerHTML = `<div class="head"><span class="name">${esc(ui.arm)} #${r.sample}</span><span class="fam">verdict ${esc(String(r.verdict))}${r.grader_error ? ` · grader error` : ""} · finish ${esc(rec.finish)} · ${esc(rec.n_turns)} turns</span></div>
+    ${rec.error ? `<p class="err">Episode failed: ${esc(rec.error)}</p>` : ""}${r.grader_error ? `<pre class="err">${esc(r.grader_error)}</pre>` : ""}
+    <details open><summary>Exact prompt the Target got (${p.messages.length} messages, ${p.tools.length} tools)</summary><div class="sec" style="margin-top:6px">${p.messages.map(msgHTML).join("")}
+      <details class="plain"><summary>tools.json</summary><pre class="box">${esc(JSON.stringify(p.tools, null, 1))}</pre></details>
+      <details class="plain"><summary>episode.json (stop rules, read-only paths)</summary><pre class="box">${esc(JSON.stringify(p.episode, null, 1))}</pre></details></div></details>
+    <div class="sec"><div class="dh">Transcript</div>${turns || `<p class="empty">No turns.</p>`}</div>
+    ${Object.keys(r.files_changed).length || r.files_deleted.length ? `<details><summary>Sandbox files changed by the run (${Object.keys(r.files_changed).length} changed or new, ${r.files_deleted.length} deleted)</summary>${Object.entries(r.files_changed).map(([f, c]) => `<div class="dh" style="margin-top:6px">${esc(f)}</div><pre class="box">${esc(c)}</pre>`).join("")}${r.files_deleted.length ? `<p>Deleted: ${r.files_deleted.map(esc).join(", ")}</p>` : ""}</details>` : ""}
+    <details><summary>Record fields and meta.json the grader saw</summary><pre class="box">${esc(JSON.stringify({...meta, meta: rec.meta}, null, 1))}</pre></details>`;
+}
+
+/* Forecaster (the Diff-pick eval view) */
+function renderForecaster() {
+  const d = detail, P = d.forecaster || {}, bs = Object.keys(P.trials || {});
+  if (!bs.length) { $("subbody").innerHTML = `<p class="empty">No Forecaster trials yet.</p>`; return; }
+  if (!ui.pbatch || !bs.includes(ui.pbatch)) ui.pbatch = bs[bs.length - 1];
+  const trials = P.trials[ui.pbatch]; ui.ptrial = Math.min(ui.ptrial, trials.length - 1);
+  const t = trials[ui.ptrial], right = t.order === "real_first" ? "A" : "B", sm = P.summariser;
+  $("subbody").innerHTML = `
+    <table><thead><tr><th>Batch</th><th>Correct</th><th>Posterior on p (95%, mean, 0.5 line)</th><th>Mean</th><th>P(p&gt;0.5)</th><th>Rates b / null / real</th></tr></thead><tbody>
+    ${bs.map(b => { const v = P.summary[b], r = d.batches[b]; return `<tr data-pb="${b}" class="${b === ui.pbatch ? "sel" : ""}"><td class="mono">${b}</td><td class="mono">${v.k}/${v.n}${v.unparsed ? ` <span class="muted">+${v.unparsed} unparsed</span>` : ""}</td><td>${postBar(v)}</td><td class="mono">${f2(v.mean)}</td><td class="mono">${v.p_gt_half.toFixed(3)}</td><td class="mono">${r ? ARMS.map(a => r[a].n ? Math.round(100 * r[a].k / r[a].n) : "–").join(" / ") + "%" : "–"}</td></tr>`; }).join("")}
+    </tbody></table>
+    <p class="muted" style="margin:0">${esc(t.model || "The Forecaster")} sees the baseline arm (every file but meta.json), the behaviour sentence, the grader code and the real and null diffs as A and B, counterbalanced. A trial is correct if it picks the real diff.</p>
+    <div class="trials">${trials.map((x, i) => `<button class="trial ${x.correct === true ? "ok" : x.correct === false ? "bad" : "none"}" data-i="${i}" aria-pressed="${i === ui.ptrial}">#${x.trial} ${x.correct === true ? "✓" : x.correct === false ? "✗" : "?"} ${x.answer ?? "?"}</button>`).join("")}</div>
+    ${sm ? `<div class="ana"><div class="dh">What the forecaster keyed on (Summariser, ${esc(sm.model)}, all trials)</div><div class="prose">${esc(sm.reply)}</div>
+      <details><summary>Summariser prompt (exact, includes the ground truth)</summary><pre class="box">${esc(sm.prompt)}</pre></details>
+      ${sm.reasoning ? `<details><summary>Summariser reasoning</summary><pre class="box">${esc(sm.reasoning)}</pre></details>` : ""}</div>` : ""}
+    <div class="muted">Trial ${t.trial} (${esc(ui.pbatch)}): real diff shown as <b>${right}</b>, model answered <b>${esc(t.answer ?? "unparsed")}</b>${t.confidence != null ? ` with confidence ${esc(t.confidence)}` : ""}, ${t.correct ? "correct" : "wrong"}${t.cost != null ? ` · $${(+t.cost).toFixed(4)}` : ""}.</div>
+    <details><summary>Prompt the model saw (exact)</summary><pre class="box">${esc(P.prompts ? P.prompts[t.order] : "(prompts.json missing)")}</pre></details>
+    <details><summary>Reasoning</summary><pre class="box">${esc(t.reasoning || "(none returned)")}</pre></details>
+    <div><div class="dh">Reply</div><pre class="box">${esc(t.reply || "")}</pre></div>`;
+  $("subbody").querySelectorAll("[data-pb]").forEach(tr => tr.onclick = () => { ui.pbatch = tr.dataset.pb; ui.ptrial = 0; renderForecaster(); });
+  $("subbody").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { ui.ptrial = +b.dataset.i; renderForecaster(); });
+}
+
+/* Rate audit */
+function renderAudit() {
+  const A = detail.audits || {}, bs = Object.keys(A);
+  if (!bs.length) { $("subbody").innerHTML = `<p class="empty">Not audited yet.</p>`; return; }
+  $("subbody").innerHTML = bs.slice().reverse().map(b => { const a = A[b] || {};
+    return `<div class="sec ana"><div class="head"><span class="name">Audit ${esc(b)}</span><span>score ${auditBadge(a.score)} <span class="muted">${esc(a.model || "")}${a.cost != null ? ` · $${(+a.cost).toFixed(4)}` : ""}</span></span></div>
+      ${a.parsed ? `<pre class="box">${esc(JSON.stringify(a.parsed, null, 1))}</pre>` : ""}
+      <details><summary>Prompt the auditor saw (exact)</summary><pre class="box">${esc(a.prompt)}</pre></details>
+      ${a.reasoning ? `<details><summary>Reasoning</summary><pre class="box">${esc(a.reasoning)}</pre></details>` : ""}
+      <div><div class="dh">Reply</div><pre class="box">${esc(a.reply)}</pre></div></div>`; }).join("");
+}
+
+/* Agent (Evolver / Creator job) */
+async function renderAgent() {
+  const d = detail;
+  if (!d.info.job) {
+    $("subbody").innerHTML = d.info.kind === "seed" ? `<p class="empty">Seed node: no agent made it (${esc(d.info.source?.origin || "layer 0")}).</p>` : `<p class="empty">No agent job recorded on this node.</p>`;
+    return;
+  }
+  $("subbody").innerHTML = `<div id="jobbox"><p class="empty">Loading job…</p></div>`;
+  try { const j = await api("/api/job", {job: d.info.job}); $("jobbox").innerHTML = jobHTML(j); wireJob($("jobbox"), j); }
+  catch (e) {
+    const af = Object.entries(d.agent_files || {});
+    $("jobbox").innerHTML = `<p class="muted">Job dir ${esc(d.info.job)} not found (${esc(e.message)}); showing what was copied into the node.</p>` + af.map(([k, v]) => `<details><summary>${esc(k)}</summary><pre class="box">${esc(v)}</pre></details>`).join("");
+  }
+}
+function ccHTML(tr) {
+  if (!tr || !tr.length) return `<p class="empty">No transcript.jsonl in the job dir (the manager writes it when the subagent finishes).</p>`;
+  return tr.map((m, i) => {
+    if (m.kind === "tool_use") return `<div class="turn tool"><div class="who">tool call · ${esc(m.name)}</div><pre class="box">${esc(typeof m.input === "string" ? m.input : JSON.stringify(m.input, null, 1))}</pre></div>`;
+    if (m.kind === "tool_result") return `<div class="turn tool"><div class="who">tool result${m.error ? " (error)" : ""}</div><pre class="box">${esc(m.text)}</pre></div>`;
+    if (m.kind === "thinking") return `<details class="plain"><summary>thinking (${m.text.length} chars)</summary><pre class="box">${esc(m.text)}</pre></details>`;
+    return `<div class="turn ${m.role === "user" ? "user" : "asst"}"><div class="who">${esc(m.role)}${i === 0 ? " (the prompt the subagent got)" : ""}</div><pre class="box">${esc(m.text)}</pre></div>`;
+  }).join("");
+}
+function jobHTML(j) {
+  const m = j.meta || {};
+  const st = j.result ? `submitted ${esc(j.result.at)}` : j.failed ? `<span class="err">failed: ${esc(j.failed.reason)}</span>` : j.claimed ? `claimed by ${esc(j.claimed.by)} at ${esc(j.claimed.at)}` : "pending";
+  return `<div class="sec"><div class="head"><span class="name">${esc(m.kind || "agent")} job ${esc(j.job)}</span><span class="fam">${st}</span></div>
+    <dl class="kv"><dt>created</dt><dd>${esc(m.created)}</dd><dt>reference</dt><dd>${nodeLink((m.locked || {}).parent)}</dd>${j.manager ? `<dt>subagent</dt><dd class="mono">${esc(j.manager.agent_id)}</dd>` : ""}</dl>
+    <details open><summary>INSTRUCTIONS.md (exact text the agent was given)</summary><pre class="box">${esc(j.instructions || "(missing)")}</pre></details>
+    ${j.report ? `<details><summary>Agent's final report</summary><pre class="box">${esc(j.report)}</pre></details>` : ""}
+    <details ${j.transcript && j.transcript.length ? "open" : ""}><summary>Transcript (${(j.transcript || []).length} entries)</summary><div class="sec" style="margin-top:6px">${ccHTML(j.transcript)}</div></details>
+    <details><summary>Read-only inputs it saw (${(j.ro || []).length} files)</summary><div class="ftree" style="margin-top:6px"><div class="panel" style="padding:6px;max-height:500px;overflow:auto">${fileTreeHTML(j.ro || [], ui.jfile, "data-jf")}</div><div class="jfview"></div></div></details></div>`;
+}
+function wireJob(root, j) {
+  root.querySelectorAll("[data-node]").forEach(x => x.onclick = () => { showMain("tree"); selectNode(x.dataset.node); });
+  root.querySelectorAll("[data-jf]").forEach(li => li.onclick = async () => {
+    root.querySelectorAll("[data-jf]").forEach(x => x.setAttribute("aria-selected", x === li));
+    ui.jfile = li.dataset.jf;
+    const v = root.querySelector(".jfview");
+    try { const f = await api("/api/jobfile", {job: j.job, path: "ro/" + li.dataset.jf}); v.innerHTML = `<div class="dh">${esc(f.path)}</div><pre class="box">${esc(f.text)}</pre>`; }
+    catch (e) { v.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  });
+}
+
+/* ---------- jobs tab ---------- */
+function renderJobs() {
+  const byJob = Object.fromEntries(Object.entries(S.nodes).filter(([, n]) => n.job).map(([id, n]) => [n.job, id]));
+  $("jobrows").innerHTML = S.jobs.slice().reverse().map(j => `<tr data-j="${esc(j.job)}" class="${j.job === selJob ? "sel" : ""}"><td class="mono">${esc(j.job)}</td><td>${esc(j.kind)}</td>
+    <td>${j.state === "claimed" ? `<span class="badge live">working</span>` : j.state === "failed" ? `<span class="err">failed</span>` : esc(j.state)}</td>
+    <td class="mono">${esc(j.created || "")}</td><td class="mono">${esc(j.claimed?.at || "")}</td><td class="mono">${esc(j.result?.at || j.failed?.at || "")}</td>
+    <td>${byJob[j.job] ? nodeLink(byJob[j.job]) : ""}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">No agent jobs yet. The loop posts them to agent_jobs/ once mutation rounds start.</td></tr>`;
+  $("jobrows").querySelectorAll("tr[data-j]").forEach(tr => tr.onclick = e => { if (e.target.dataset.node) { showMain("tree"); return selectNode(e.target.dataset.node); } selJob = tr.dataset.j; writeHash(); renderJobs(); loadJob(); });
+}
+async function loadJob() {
+  if (!selJob) return;
+  $("jobdetail").innerHTML = `<p class="empty">Loading…</p>`;
+  try { const j = await api("/api/job", {job: selJob}); $("jobdetail").innerHTML = jobHTML(j); wireJob($("jobdetail"), j); }
+  catch (e) { $("jobdetail").innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+const main0 = readHash();
+showMain(main0);
+poll().then(() => { if (sel) loadDetail(false); if (selJob) loadJob(); });
+</script>
+</body>
+</html>

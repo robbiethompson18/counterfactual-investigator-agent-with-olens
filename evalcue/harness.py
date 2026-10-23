@@ -19,6 +19,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -27,16 +28,15 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalSer
 
 from counterfactual_investigator_agent_with_olens import qwen
 
-# the shared Qwen3.6-27B server ($QWEN_VLLM_URL / $QWEN_VLLM_API_KEY, see runpod/CLAUDE.md); EVALCUE_URLS (comma-separated,
-# round-robin) overrides it, e.g. for your own tunnelled pods
-URLS = os.environ.get("EVALCUE_URLS", os.environ.get("QWEN_VLLM_URL", "http://127.0.0.1:18000/v1")).split(",")
+# the shared Qwen3.6-27B server ($QWEN_VLLM_URL / $QWEN_VLLM_API_KEY, see runpod/CLAUDE.md); recorded in meta.json
+URL = os.environ.get("QWEN_VLLM_URL", "")
 # qwen.client sets TCP keepalives: without them a long silent generation's connection gets dropped on the way to RunPod and
 # the client waits forever on a response that was already sent
 MODEL = os.environ.get("EVALCUE_MODEL", "qwen")
 if MODEL == "qwen":
-    CLIENTS = [qwen.client(base_url=u) for u in URLS]
+    CLIENT = qwen.client()
 else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
-    CLIENTS = [AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)]
+    CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
 # EVALCUE_PROVIDER pins OpenRouter to one provider slug (no fallbacks), so a run's rates don't mix quantizations/deployments
 PROVIDER = os.environ.get("EVALCUE_PROVIDER")
 # OpenRouter reasoning effort when thinking is on; medium everywhere by default (provider defaults vary: GLM 5.3's is max)
@@ -68,18 +68,13 @@ class Episode:
     final_command: str | None = None  # ...unless this regex is set: then only matching commands run, 3 tries (e.g. submit)
     out_of_budget: str = ""  # appended to the output that spends the budget, and to each refused command (e.g. "submit now")
     done_file: str | None = None  # the episode ends as soon as this file exists in the sandbox (e.g. written by a submit script)
-
-
-def _client(i: int) -> AsyncOpenAI:
-    return CLIENTS[i % len(CLIENTS)]
-
-
-_counter = 0
+    tools: list[dict] = field(default_factory=lambda: [BASH_TOOL])
+    # Replaces the bash handling of each assistant turn, for ports that reproduce another harness's tool loop (its tool
+    # names, output format, retry messages): (sandbox, assistant message) -> (messages to append, finish reason or None).
+    step: Callable[["Sandbox", dict], tuple[list[dict], str | None]] | None = None
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
-    global _counter
-    _counter += 1
     temperature, top_p, presence_penalty = SAMPLING[thinking]
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking, "preserve_thinking": True}}
     if MODEL != "qwen":  # OpenRouter's unified reasoning switch
@@ -90,7 +85,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
     # generations most, so excluding them would bias every arm's rate toward short episodes. A longer outage still errors.
     for attempt in range(6):
         try:
-            r = await _client(_counter + attempt).chat.completions.create(
+            r = await CLIENT.chat.completions.create(
                 model=MODEL,
                 messages=messages,
                 max_tokens=max_tokens or omit,  # None: up to the server's context limit
@@ -138,7 +133,7 @@ class Sandbox:
             text=True,
         ).strip()
 
-    def run(self, command: str, timeout: int = 30) -> tuple[str, int]:
+    def run(self, command: str, timeout: int = 30, limit: int = 8000) -> tuple[str, int]:
         try:
             p = subprocess.run(
                 ["docker", "exec", self.cid, "timeout", str(timeout), "bash", "-lc", command],
@@ -150,7 +145,7 @@ class Sandbox:
             out, code = p.stdout + p.stderr, p.returncode
         except subprocess.TimeoutExpired:
             out, code = "[timed out]", 124
-        return (out if len(out) < 8000 else out[:4000] + "\n...[truncated]...\n" + out[-4000:]), code
+        return (out if len(out) < limit else out[: limit // 2] + "\n...[truncated]...\n" + out[-limit // 2 :]), code
 
     def snapshot(self) -> dict[str, str]:
         files = {}
@@ -201,12 +196,19 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
     total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):
-            msg, f, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens, tools=[BASH_TOOL])
+            msg, f, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens, tools=ep.tools)
             total += ntok
             msgs.append(msg)
             if f == "length":
                 finish = "length"
                 break
+            if ep.step:
+                new, end = await asyncio.to_thread(ep.step, sb, msg)
+                msgs += new
+                if end:
+                    finish = end
+                    break
+                continue
             if not msg.get("tool_calls"):
                 finish = "stop"
                 break

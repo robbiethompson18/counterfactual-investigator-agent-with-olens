@@ -41,7 +41,7 @@ half as often as Green.
     full reply, majority vote. It runs on every reply whose full text hits `third_party_any` (7,776
     replies, 23,328 calls, all parsed); regex-negative replies count as absent.
   - The judge went through OpenRouter (`anthropic/claude-sonnet-5.5`), as `scripts/run_chive_or.py`
-    does, because the Anthropic API key had no credit. Cost: $88.
+    did (removed after `a1e8991`), because the Anthropic API key had no credit. Cost: $88.
 - Lens rates: the existing greedy reads from `scripts/organism_olens.py`, at layers 24/32/40/48/56,
   on organism and on base activations over the same tokens. That is 5 reads per position and
   condition. The sampled-read step (`party_resample.py lens`, T = 1, 8 samples per position and

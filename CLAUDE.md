@@ -62,6 +62,13 @@ Summary of the Final Pitch (2026-10-19):
 - **Two oracle-lens recipes exist and differ:** Anthropic's (workspace paper appendix, Haiku 4.5,
   2026-07) and the WorkspaceBench / agu18dec one (Qwen3.6-27B, 2026-09). The latter is newer and
   ablated. Don't assume Anthropic's is better.
+- **Use the space O-lens, `olens_s3d_space_rl600`, never `olens_s3d_rl600`.** The older agu18dec
+  lens's RL reward stripped each bullet's leading space before the AR scored it, so it opens ~half
+  its bullets with a Chinese word; the space lens fixes that at the same WorkspaceBench score
+  (`agu18dec/olens_and_ar` README; our check in `data/runs/olens_space_fix/`). Score its bullets
+  with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
+  before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
+  [docs/olens-space-migration.md](docs/olens-space-migration.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -136,16 +143,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
-- Agam's harness is a git submodule at `vendor/detective-joracle`, installed as an editable uv
-  workspace member (`import detective_joracle`). After cloning, run `git submodule update --init`.
-  Don't edit it in place; wrap or monkeypatch it from `scripts/`. Ruff and ty skip `vendor/`.
-- Aditya Singh and Gerson Kroiz's agent-interp-envs is a submodule at `vendor/agent-interp-envs`
-  (not a uv member; it has its own env). Run its rollouts on robbie-box through
-  `scripts/envs_gateway.py` (see the docs/envs-screen reports): `agent.provider=fireworks` plus
-  `ROLLOUT_GATEWAY` routes Qwen to our vLLM and keeps containers off the internet
-  (`--network envnet`).
-- Agam's scripts take pydra `key=value` args parsed as Python literals: `yesno=false` is the string
-  `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
+- `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
+  see `vendor/README.md`. Never import, run or wrap it; port what you need into our own harness
+  (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
+  agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
+  commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
@@ -191,16 +193,22 @@ Current docs:
 - [Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
-- [Smoke25 results — read before running Agam's CHIVE harness with Flash or comparing to his numbers](docs/smoke25-results.md)
+- [Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
+  — which artifacts hold reads from the buggy `olens_s3d_rl600`, and what has been re-read with the
+  space lens
+- [Smoke25 results — read before comparing anything to Agam's CHIVE harness numbers](docs/smoke25-results.md)
   — our wrapper reproduces his free-form pass@1; Flash hits the call cap on yes/no with O-lens
 - [Model organisms on Qwen3.6-27B — read before running or reading organism rollouts/O-lens reads](docs/model-organisms.md)
   — which public LoRA organisms work, the rollout and paired organism/base O-lens scripts, first
   findings
-- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc., or before serving Qwen3.6-27B with vLLM on RunPod](docs/false-capability-claims.md)
+- [False capability claims — read before studying Qwen claiming to call 911, run code, text someone etc.](docs/false-capability-claims.md)
   — the device-channel lever (1.6% → 41%), severity dose-response, judge rubric v2 + audit,
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
   — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
+- [Serving metamodels on vLLM — read before decoding O-lens/NLA/J++ readouts at scale or building a metamodel server](docs/metamodel-serving.md)
+  — ceselder/vllm-metamodels and other prior art, version pins (vLLM 0.27.1, not 0.19), merged-LoRA
+  checkpoints, the TODO for a minimal Qwen3.6-27B metamodel-serving repo
 - [Shout "FIRE" — read before investigating odd advice in WeirdChat's claims-called-911 rollouts](docs/shout-fire.md)
   — why Qwen tells a trapped worker to shout "FIRE!": rates, prompt edits, other models,
   self-report, O-lens reads
@@ -225,12 +233,20 @@ Current docs:
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
+  (deleted, at `e145988`)
+- [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+  — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
+  subagent labels, replication of the screen (14/30 vs 0/30)
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
+  (deleted, at `e145988`)
 - [Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
+- [Sandbagging in evalcue — read before running the sandbagging env (it now runs in evalcue, not the vendored harness)](docs/envs/sandbagging.md)
+  — `evalcue/envs/sandbagging/`: all 22 arms verbatim, the original tool loop, `detect()` matching
+  544/544 original labels; replicates on OpenRouter (`a_goal` 8/30 vs `a_goal_lt` 21/30, p = 8e-4)
 - [eval_tampering env screen — read before running eval_tampering (agent-interp-envs) on Qwen](docs/envs-screen/eval_tampering.md)
   — FAIL, retired for Qwen: Qwen and GLM disclose the tampering every time; the shipped variant
   names don't exist in the image, so arm B needs our overlay
@@ -278,11 +294,12 @@ Current docs:
   — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
-  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript audits
-- [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
-  `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
-  shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
-  boots, check progress every 3 min and treat no change as stuck
+  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
+  audits
+- [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
+  — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
+  chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
+  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
 
 ## Shipping
 
