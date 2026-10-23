@@ -22,6 +22,7 @@ already in OUT are skipped, so a rerun resumes:
 
 import argparse
 import copy
+import hashlib
 import json
 import re
 import time
@@ -209,6 +210,7 @@ def main():
     pool = ThreadPoolExecutor(1)
     t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "wait", "score"), 0.0)
     pending = None
+    cache = {}  # (prefix_keys key, layer) -> scored read
     while True:
         todo = queue(args.requests, args.shard, done | ({pending["row"]["id"]} if pending else set()))
         job = None
@@ -219,17 +221,25 @@ def main():
             toks = [tok.decode([i]) for i in ids]
             positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
             row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
-            acts = capture(model, ids, row_layers, positions)
-            items = [(p, L, acts[L][k]) for k, p in enumerate(positions) for L in row_layers]
-            vecs = torch.stack([v for _, _, v in items])
-            fut = pool.submit(lens.read_items, vecs, [L for _, L, _ in items], SAMPLING)
+            keys = prefix_keys(ids, positions)
+            # a read depends only on the tokens up to its position, so a prefix this process already read (the same prompt
+            # in another transcript of the arm) is copied instead of decoded again
+            new = [p for p in positions if any((keys[p], L) not in cache for L in row_layers)]
+            acts = capture(model, ids, row_layers, new) if new else {L: [] for L in row_layers}
+            items = [(p, L, acts[L][k]) for k, p in enumerate(new) for L in row_layers if (keys[p], L) not in cache]
+            vecs = torch.stack([v for _, _, v in items]) if items else torch.empty(0)
+            fut = pool.submit(lens.read_items, vecs, [L for _, L, _ in items], SAMPLING) if items else None
             job = {"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "items": items, "vecs": vecs, "fut": fut}
+            job |= {"keys": keys, "all": [(p, L) for p in positions for L in row_layers]}
             secs["capture"] += time.time() - ta
         if pending:
             tb = time.time()
-            texts = [t[0] for t in pending["fut"].result()]
+            texts = [t[0] for t in pending["fut"].result()] if pending["fut"] else []
             tc = time.time()
-            write(tok, out, pending, score(tok, ar, readout, texts, pending["vecs"], [L for _, L, _ in pending["items"]]))
+            scored = score(tok, ar, readout, texts, pending["vecs"], [L for _, L, _ in pending["items"]]) if texts else []
+            for (p, L, _), sc in zip(pending["items"], scored):
+                cache[pending["keys"][p], L] = sc
+            write(tok, out, pending, [cache[pending["keys"][p], L] for p, L in pending["all"]])
             secs["wait"] += tc - tb
             secs["score"] += time.time() - tc
             done.add(pending["row"]["id"])
@@ -238,13 +248,24 @@ def main():
             stages = " ".join(f"{k} {v:.0f}s" for k, v in secs.items())
             r = pending["row"]
             print(f"[{n_done}, {len(todo)} queued] {r['id']} p{r.get('priority')}: {len(pending['ids'])} tokens, "
-                  f"{len(pending['items'])} reads | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
+                  f"{len(pending['items'])} reads ({len(pending['all']) - len(pending['items'])} cached) | "
+                  f"{n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
                   flush=True)  # fmt: skip
         pending = job
         if pending is None:
             if not args.watch:
                 break
             time.sleep(60)
+
+
+def prefix_keys(ids, positions):
+    """position -> a hash of the token ids up to and including it (equal keys = equal prefixes, hence equal reads)."""
+    h, keys, want = hashlib.blake2b(digest_size=16), {}, set(positions)
+    for i, x in enumerate(ids):
+        h.update(int(x).to_bytes(4, "little"))
+        if i in want:
+            keys[i] = h.copy().digest()
+    return keys
 
 
 def queue(path, shard, done):
@@ -264,7 +285,7 @@ def queue(path, shard, done):
 def write(tok, out, job, scored):
     ids, where, toks, msgs = job["ids"], job["where"], job["toks"], job["msgs"]
     with out.open("a") as f:
-        for (p, L, _), (bs, joint) in zip(job["items"], scored):
+        for (p, L), (bs, joint) in zip(job["all"], scored):
             msg, field, off = where[p]
             rec = {
                 "id": job["row"]["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
