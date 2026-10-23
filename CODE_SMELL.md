@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-22: evalcue doesn't record which OpenRouter provider served a call
+
+`evalcue/harness.py` `chat()` keeps the message, finish reason and token count, but not the
+response's provider or generation id. Unpinned OpenRouter runs mix 7 Qwen providers, so a rate shift
+between runs (overnight upload base 1/10 → 12/30) or a run-specific quirk (empty `reasoning_content`
+on 0.2–29% of turns) can't be traced to one. Save `r.provider` (or the generation id) per assistant
+turn.
+
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
 At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The

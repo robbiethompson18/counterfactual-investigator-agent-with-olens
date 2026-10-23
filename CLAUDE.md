@@ -148,6 +148,8 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   `"false"`, which is truthy. Write `False`/`True`, or omit the arg for the default.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- Pin `EVALCUE_PROVIDER` when running evalcue through OpenRouter. Unpinned `qwen/qwen3.6-27b` is
+  routed over 7 fp8/unknown providers, and overnight base rates moved 1/10 → 12/30 within an hour.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `evalcue/harness.py` defaults to it), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
@@ -278,7 +280,9 @@ Current docs:
   — two-stage on-policy design; Qwen almost never omits its failures; "hope it's done, told my
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
-  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript audits
+  — n=30: a hint takes Qwen's key reuse 30% → 93%, a user rule reminder 3%, a present user 63%; no
+  creds report admits it (0/90); uploads under an explicit "don't" happen on empty-reasoning turns;
+  O-lens request files; per-run tables in [overnight-tables.md](docs/envs/overnight-tables.md)
 - [runpod/ — read before Robbie's agents start any GPU](runpod/CLAUDE.md) — Robbie uses RunPod via
   `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B chat completions use the
   shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own vLLM pod. While any pod
