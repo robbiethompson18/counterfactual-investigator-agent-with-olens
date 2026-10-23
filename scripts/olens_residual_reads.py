@@ -143,18 +143,18 @@ def write(tok, out, job, scored, n):
 
 def save_atoms(out, job, layers):
     """Whitened tensors for CPU-side analysis (null controls, per-bullet gain over the continuation), fp16, one file per
-    transcript in OUT's directory: atoms/<id>.pt = {positions, layers, z {L: [P, d]}, cont {L: [P, n, d]} (prefixes
+    transcript in OUT's directory: atoms/<id with / -> __>.pt = {id, positions, layers, z {L: [P, d]}, cont {L: [P, n, d]} (prefixes
     1..n of the realized continuation), plain_bullets {L: [P] lists of texts}, plain_atoms {L: [P] [k, d]} (the plain
     read's bullets through the AR)}."""
     P = range(len(job["positions"]))
     plain = job.get("plain", {})
     d = out.parent / "atoms"
     d.mkdir(exist_ok=True)
-    torch.save({"positions": job["positions"], "layers": layers,
+    torch.save({"id": job["row"]["id"], "positions": job["positions"], "layers": layers,
                 "z": {L: job["z"][L].half().cpu() for L in layers}, "cont": {L: job["atoms"][L].half().cpu() for L in layers},
                 "plain_bullets": {L: [plain.get((L, i), ([], None))[0] for i in P] for L in layers},
                 "plain_atoms": {L: [plain[(L, i)][1].half().cpu() if (L, i) in plain else torch.zeros(0) for i in P] for L in layers}},
-               d / f"{job['row']['id']}.pt")  # fmt: skip
+               d / (job["row"]["id"].replace("/", "__") + ".pt"))  # fmt: skip
 
 
 def main():
