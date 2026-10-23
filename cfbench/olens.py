@@ -88,14 +88,16 @@ def _flat(text: str) -> str:
 
 def annotate(run: Rollout, reads: Reads, source: str | None = None, top_k: int = TOP_K, min_fve: float = MIN_FVE) -> str:
     """The run's transcript with its O-lens reads written inline after each read position, for the `transcript_olens`
-    conditions. `source` = whose reads to use (another env's run for the placebo, placed at the same relative positions)."""
+    conditions. `source` (the placebo) = another env's run whose reads replace these: the k-th of this run's positions gets
+    the reads at the same relative index there, on this run's layers, so the placebo adds as many reads as the real thing."""
     text = render_spans(run.messages)[0]
-    messages, rows = reads[source or run.source]
-    pos = positions(messages, rows)
-    scale = len(text) / max(1, len(render_spans(messages)[0]))
+    pos = positions(*reads[run.source])
+    if source:
+        other = positions(*reads[source])
+        pick = lambda k: other[round(k * (len(other) - 1) / max(1, len(pos) - 1))].layers
+        pos = [Position(p.char, p.where, {layer: r for layer, r in pick(k).items() if layer in p.layers}) for k, p in enumerate(pos)]
     out, prev = [], 0
     for p in pos:
-        at = min(len(text), max(prev, round(p.char * scale)))
         got = [
             f"L{layer} [FVE {b['fve']:.2f}] {b['text']}"
             for layer in sorted(p.layers)
@@ -103,6 +105,7 @@ def annotate(run: Rollout, reads: Reads, source: str | None = None, top_k: int =
             if b["fve"] >= min_fve
         ]
         if got:
+            at = min(len(text), max(prev, p.char))
             out += [text[prev:at], "⟨O-lens: " + " | ".join(got) + "⟩"]
             prev = at
     return "".join(out) + text[prev:]
