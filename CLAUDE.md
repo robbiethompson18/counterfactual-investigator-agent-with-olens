@@ -134,6 +134,13 @@ token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is
 Source is `transcript-viewer/web/index.html`, deployed by
 `transcript-viewer/scripts/deploy_site.sh`.
 
+**expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
+metamodel reads ([expview/README.md](expview/README.md)): write the run's items to `RUN/expview/`
+with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
+`tokens=`), and link items with `python expview/expview.py link`. Server: `http://bramble:8830/`
+(tailnet; regex search over every read). Off the tailnet, `expview.py build RUN` makes a
+self-contained page to publish as an Artifact.
+
 Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
 plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript
 (docs, PRs, Slack, chat), link its Docent run**
@@ -187,6 +194,9 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/README.md)
+  — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
+  importer, bramble service
 - [CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
