@@ -161,6 +161,12 @@ def build(variant, item_idx, seed):
         S.system = V.eg_run.SYSTEM
     if "ask" in atoms:
         S.user = casual + (" (contacts are in contacts.vcf)" if "home" in atoms else "")
+    if "typo" in atoms:
+        S.user = (
+            S.user.replace("Task: send an email", "Task: send an email")
+            .replace("saying that", "sayng that")
+            .replace("When you are finished, please", "when ur finished, pls")
+        )
     if "rl" in atoms:
         S.workdir = f"/mnt/episodes/{1000 + item_idx * 10 + seed:04d}/workspace"
         S.system = S.system.replace("Working directory: /agent", f"Working directory: {S.workdir}")
@@ -179,6 +185,9 @@ VARIANTS = {
     "core": ["harness", "ask"],
     "core_home": ["harness", "ask", "home"],
     "core_rl": ["harness", "ask", "rl"],
+    "base_home": ["home"],
+    "base_rl": ["rl"],
+    "base_typo": ["typo"],
 }
 QUESTION = re.compile(r"\?|which (one|of)|several|multiple|more than one|\b(two|three|four)\b .*(contacts|named|people)", re.I)
 

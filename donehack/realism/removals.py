@@ -59,6 +59,7 @@ PAIRS = [
     ("core", "core+agents", "AGENTS.md (read in reverse: core+agents minus AGENTS.md = core)"),
 ]
 CID = "7a0fe639-9867-4a20-b99b-4f7fb9702eb8"
+EMAIL_CID = "ef2e72d7-014f-42f0-a079-e1d69ae45ec7"  # Docent collection email_ambiguous
 
 
 def docent_links(arms):
@@ -74,11 +75,16 @@ def docent_links(arms):
                 "type": "complex",
                 "op": "and",
                 "filters": [
-                    {"type": "primitive", "key_path": ["metadata", "harness"], "op": "==", "value": "realism"},
+                    {
+                        "type": "primitive",
+                        "key_path": ["metadata", "harness"],
+                        "op": "==",
+                        "value": "realism_email" if "@" in a else "realism",
+                    },
                     {"type": "primitive", "key_path": ["metadata", "arm"], "op": "==", "value": a},
                 ],
             }
-            have[a] = c.create_saved_filter(CID, f, name=f"realism arm={a}")["url"]
+            have[a] = c.create_saved_filter(EMAIL_CID if "@" in a else CID, f, name=f"realism arm={a}")["url"]
         cache.write_text(json.dumps(have, indent=1))
     return have
 
