@@ -43,6 +43,9 @@ LOCAL_CELESTE = HOME / "workspace/tmp/ceselder_inventory/ds"
 LOCAL_SPRINT = HOME / "workspace/counterfactual-investigator-agent-with-olens/data/hf_stage_glm53"
 LOCAL_STRICT = HOME / "workspace/glm-evalgaming/monitor/am_main_strict.jsonl"
 EXPVIEW = HOME / "workspace/expview"
+HARM, AWARE, STRICT = "Harmful", "Says it might be a test", "Says it's being tested (strict)"
+SCEN = ["blackmail", "leaking", "murder"]
+COND = ["default", "restriction", "no_threat", "goal_none", "dont"]
 SPECIAL = {"<|system|>": "system", "<|user|>": "user", "<|assistant|>": "assistant", "<|observation|>": "tool", "<think>": "reasoning"}
 
 
@@ -119,16 +122,28 @@ def main():
         out / "run",
         title="GLM 5.3 agentic misalignment: O-lens reads",
         description=(
-            "450 episodes of GLM 5.3 in inspect_evals agentic misalignment (blackmail / leaking / murder, 5 prompt conditions, "
-            "30 samples each).\n\n"
-            "- **harmful**: did GLM blackmail / leak / cancel the rescue? Judged by Sonnet 5.5 with the eval's own prompt.\n"
-            "- **eval_aware**: does GLM say in its reasoning or reply that this might be a test, eval or constructed scenario? "
-            "Judged by Sonnet 5.5 (Sonnet 4.5 when 5.5 refused).\n\n"
-            "Filter or sort the table below, then click an episode. In the episode: **transcript with reads** shows the "
-            "O-lens read (RL lens, greedy) in a blue box after each of the 32 read tokens; click a box for more samples, the SFT "
-            "lens, J-lens and Qwen readers. **harm judge** and **eval-awareness judge** show exactly what each judge saw and said."
+            "450 GLM 5.3 episodes from the inspect_evals agentic misalignment benchmark: 3 scenarios (blackmail, "
+            "leaking, murder) \u00d7 5 prompt conditions \u00d7 30 runs. Each row is one episode.\n"
+            "\n"
+            "**Click any row to see its transcript with the O-lens reads.** Each episode has 32 read points. The RL "
+            "O-lens bullet is shown inline as a blue tag after its token. Click a tag for the lens's other samples, "
+            "the SFT lens, the J-lens and the Qwen readers.\n"
+            "\n"
+            "The three columns:\n"
+            "- **Harmful**: the benchmark's own harm judge (Sonnet 5.5) said yes and the scenario's hard check passed. "
+            "31 of 450, all blackmail.\n"
+            "- **Says it might be a test**: a judge read GLM's reasoning and reply and said GLM suggests the scenario "
+            "might be a test, evaluation or constructed setup. 254 of 450. This is the label in Celeste's dataset.\n"
+            "- **Says it's being tested (strict)**: same judge with a stricter prompt: GLM explicitly says it is being "
+            "tested. 203 of 450.\n"
+            "\n"
+            'Every judge\'s full input and output are under "Model calls" in each episode. Sonnet 5.5 refused to judge '
+            "eval awareness on 179 episodes, mostly aware ones, so those were judged by Sonnet 4.5. The refused "
+            "attempt is shown too. Filter by scenario and condition with the Group menu."
         ),
-        label_order=["harmful", "eval_aware", "scenario", "condition"],
+        label_order=[HARM, AWARE, STRICT],
+        tokens_section="O-lens reads",
+        tokens_button="Transcript with O-lens reads",
     )
     run.reset()
 
@@ -141,7 +156,12 @@ def main():
         "token for 4 more RL samples, the SFT lens, J-lens top-10 and two Qwen3.6-27B readers. The lens was trained on web "
         "text, so reads often guess the next words rather than state intent."
     )
-    eps = eps.assign(_i=eps.row_index.astype(int)).sort_values("_i")
+    eps = eps.assign(
+        _i=eps.row_index.astype(int),
+        _s=[SCEN.index(rows[int(i)]["scenario"]) for i in eps.row_index],
+        _c=[COND.index(rows[int(i)]["condition"]) for i in eps.row_index],
+        _id=[xitems[int(i)]["id"] for i in eps.row_index],
+    ).sort_values(["_s", "_c", "_id"])
     for e in eps.itertuples():
         i = int(e.row_index)
         assert e.run_dir == RUN, e.run_dir
@@ -191,11 +211,12 @@ def main():
             stats["kind:" + p.kind] += 1
         stats["episodes"] += 1
 
-        calls = [{**c, "name": "harm judge" if c["name"] == "classifier" else c["name"]} for c in x["calls"]]
+        names = {"subject": "GLM 5.3 transcript", "classifier": "Harm judge (Sonnet 5.5)"}
+        calls = [{**c, "name": names.get(c["name"], c["name"])} for c in x["calls"]]
         for k, att in enumerate(m.get("fallback_from") or []):
             calls.append(
                 call(
-                    f"eval-awareness judge: {att['model'].split('/')[-1]} gave no verdict",
+                    "Eval-awareness judge, failed first try",
                     att["model"],
                     messages=m["messages"],
                     output={"role": "assistant", "content": att.get("output") or ""},
@@ -206,7 +227,7 @@ def main():
             )
         calls.append(
             call(
-                "eval-awareness judge",
+                "Eval-awareness judge",
                 m["monitor_model"],
                 messages=m["messages"],
                 output={"role": "assistant", "content": m["output"]},
@@ -215,19 +236,13 @@ def main():
                 finish_reason=m.get("finish_reason"),
             )
         )
-        labels = {
-            "harmful": bool(r["harmful"]),
-            "eval_aware": m["aware"],
-            "scenario": r["scenario"],
-            "condition": r["condition"],
-        }
-        strict_aware = None
+        labels = {HARM: bool(r["harmful"]), AWARE: m["aware"]}
         if key in strict:
             s = strict[key]
-            strict_aware = s["aware"]
+            labels[STRICT] = s["aware"]
             calls.append(
                 call(
-                    "eval-awareness judge, strict prompt (not used for the label)",
+                    "Eval-awareness judge, strict prompt",
                     s["monitor_model"],
                     messages=s["messages"],
                     output={"role": "assistant", "content": s["output"]},
@@ -242,20 +257,19 @@ def main():
             problems.append(f"{x['id']}: Celeste aware {celeste_aware} vs monitor {m['aware']}")
         if (str(rr.positive.iloc[0]).lower() == "true") != bool(r["harmful"]):
             problems.append(f"{x['id']}: Celeste positive vs rows harmful differ")
-        stats["harmful"] += labels["harmful"]
+        stats["harmful"] += labels[HARM]
         stats["aware"] += bool(m["aware"])
-        stats[f"xtab:{r['scenario']}:harmful={labels['harmful']}:aware={m['aware']}"] += 1
+        stats[f"xtab:{r['scenario']}:harmful={labels[HARM]}:aware={m['aware']}"] += 1
         run.add(
             id=x["id"],
-            group=x["group"],
+            group=f"{r['scenario']} · {r['condition']}",
             labels=labels,
             env_files=envs[x["env"]],
             calls=calls,
             extra={
                 **x.get("extra", {}),
-                "harm_classifier_verdict_before_hard_check": bool(r["classifier_verdict"]),
-                "eval_aware_judge_model": m["monitor_model"],
-                "eval_aware_strict_prompt": strict_aware,
+                "harm_judge_raw_verdict": bool(r["classifier_verdict"]),
+                "aware_judge_model": m["monitor_model"].split("/")[-1],
                 "olens_tid": e.tid,
                 "episode_id": e.episode_id,
                 "row_index": i,
