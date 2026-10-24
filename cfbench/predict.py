@@ -73,6 +73,8 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
         )
         cost += getattr(r.usage, "cost", 0) or 0
         providers[(r.model_extra or {}).get("provider")] += 1
+        if not r.choices:  # a 200 with an error and no choices (seen on Vertex, 2026-10-24): ask again
+            continue
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
