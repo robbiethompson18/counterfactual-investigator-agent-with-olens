@@ -27,9 +27,10 @@ predictor sees:
 
 It answers P(behavior) for a fresh run in Y through a `submit_prediction` tool that rejects anything
 outside [0.01, 0.99] and asks again. Every predictor runs with OpenRouter reasoning effort `medium`;
-left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot, which
-confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak the answer).
-Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the shown transcripts.
+left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot,
+which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak
+the answer). Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the
+shown transcripts.
 
 Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
 are version 1). Skill is only comparable within a version.
