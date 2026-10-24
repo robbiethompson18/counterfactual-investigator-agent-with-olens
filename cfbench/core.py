@@ -19,8 +19,9 @@ TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS, *ANCHOR_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
-# prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24).
-HARNESS_VERSION = 2
+# prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
+# prompts recommend reading one full transcript before searching (2026-10-24).
+HARNESS_VERSION = 3
 
 
 @dataclass
@@ -163,8 +164,8 @@ This is its starting context in the base arm, before it acts:
 ## The base-arm runs
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
-every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. \
-Spend them on whatever helps you predict the counterfactual arm.
+every run). We recommend reading one full transcript before searching them.{olens} You have {TOOL_BUDGET} tool calls \
+in total before you must submit; `submit_prediction` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
 {run_index(base, None if condition == "agentic" else read, label)}"""
     else:
