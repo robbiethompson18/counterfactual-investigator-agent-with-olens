@@ -17,6 +17,9 @@ import asyncio
 import importlib
 import json
 import random
+from pathlib import Path
+
+import openai
 
 from cfbench import anchors, olens
 from cfbench.core import ANCHOR_CONDITIONS, CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
@@ -40,7 +43,10 @@ async def main():
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--slug", required=True)
     ap.add_argument("--description", default="")
+    ap.add_argument("--skip", default="", help="comma list of predictions.jsonl from earlier runs; skip the predictions they already have")
     args = ap.parse_args()
+    key = lambda r: (r["base_arm"], r["cf_arm"], r["condition"], r["predictor"], r["draw"])
+    done = {key(json.loads(line)) for path in filter(None, args.skip.split(",")) for line in Path(path).read_text().splitlines()}
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
     reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
@@ -78,7 +84,14 @@ async def main():
             tools |= anchor_tools
         prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
         async with slots:
-            result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
+            for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
+                try:
+                    result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
+                    break
+                except openai.APIStatusError as e:
+                    print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
+            else:
+                return  # left out of predictions.jsonl; rerun with --skip to fill it
         row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:  # appended as each lands, so a crash keeps them
             f.write(json.dumps(row) + "\n")
@@ -98,7 +111,13 @@ async def main():
             "n_cf": len(cf),
         }
         print(case)
-        jobs += [one(case | {"condition": c}, base, p, d) for c in conditions for p in predictors for d in range(args.draws)]
+        jobs += [
+            one(case | {"condition": c}, base, p, d)
+            for c in conditions
+            for p in predictors
+            for d in range(args.draws)
+            if (base_arm, cf_arm, c, p, d) not in done
+        ]
     try:
         await asyncio.gather(*jobs)
     except BaseException:
