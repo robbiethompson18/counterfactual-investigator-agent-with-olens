@@ -34,7 +34,7 @@ from cfbench.tools import Tool, _schema
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
 WINDOW, MAX_WINDOW = 10, 20  # neighbouring positions each side in olens_at
-AT_LAYERS = [32, 40, 48]  # olens_at's default layers; search_olens defaults to every layer
+AT_LAYERS = {32, 40, 48}  # olens_at's default layers when the reads have them (else all); search_olens defaults to every layer
 MAX_BULLETS = 10  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
 
@@ -84,6 +84,10 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     return sorted(out, key=lambda p: p.char)
 
 
+def _fve(bullet: dict) -> str:
+    return f" [FVE {bullet['fve']:.2f}]" if bullet["fve"] is not None else ""
+
+
 def _flat(text: str) -> str:
     return text.replace("\n", "⏎")
 
@@ -112,7 +116,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
 
     yes_no = ["yes" if r.label else "no" for r in base]
 
-    def filters(args: dict, layers: list[int] | None) -> tuple[set[int] | None, int, float]:
+    def filters(args: dict, layers: set[int] | None) -> tuple[set[int] | None, int, float]:
         layers = args.get("layers") or layers
         top_k = TOP_K if args.get("top_k") is None else int(args["top_k"])
         return set(layers) if layers else None, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
@@ -124,7 +128,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             for layer in sorted(p.layers)
             if layers is None or layer in layers
             for b in p.layers[layer]["bullets"][:top_k]
-            if b["fve"] >= min_fve
+            if b["fve"] is None or b["fve"] >= min_fve  # reads from a lens without a reconstructor have no FVE
         ]
 
     def at(args: dict) -> str:
@@ -132,8 +136,8 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         window = max(0, min(int(args.get("window", WINDOW)), MAX_WINDOW))
         if i not in source:
             return f"Run {i} has no O-lens reads; the runs with reads are marked in the table."
-        layers, top_k, min_fve = filters(args, AT_LAYERS)
         pos, scale, text = run_positions(i)
+        layers, top_k, min_fve = filters(args, AT_LAYERS if AT_LAYERS & {layer for p in pos for layer in p.layers} else None)
         k = min(range(len(pos)), key=lambda j: abs(pos[j].char - char * scale))
         shown = pos[max(0, k - window) : k + window + 1]
         out, prev = [f"Run {i} (showed the behavior: {yes_no[i]}), {len(shown)} read positions around char {char}:"], None
@@ -141,7 +145,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
             out.append(f"\n…{_flat(text[start : p.char])}⟨read⟩  [char {round(p.char / scale)}, {p.where}]")
             got = bullets(p, layers, top_k, min_fve)
-            out += [f"  L{layer}: {b['text']} [FVE {b['fve']:.2f}]" for layer, b in got] or [f"  (no bullet with FVE >= {min_fve})"]
+            out += [f"  L{layer}: {b['text']}{_fve(b)}" for layer, b in got] or [f"  (no bullet with FVE >= {min_fve})"]
             prev = p
         return "\n".join(out)
 
@@ -178,7 +182,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                     matched.add(i)
                 context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
                 for layer, b in got:
-                    line = f'char {round(p.char / scale)} ({p.where}) L{layer} [FVE {b["fve"]:.2f}]: "{context}"\n  → {b["text"]}'
+                    line = f'char {round(p.char / scale)} ({p.where}) L{layer}{_fve(b)}: "{context}"\n  → {b["text"]}'
                     found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
@@ -188,18 +192,21 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         summary = (
             f"The regex matches {'bullets' if over == 'bullets' else 'the transcripts'} of {' and '.join(kinds)} (runs with reads only). "
         )
-        ranked = sorted(found.values(), key=lambda h: -h[1])
+        ranked = sorted(found.values(), key=lambda h: -(h[1] or 0))
+        order = "the top {} by FVE" if any(h[1] is not None for h in ranked) else "the first {} (by run, then position)"
         if len(ranked) > max_bullets:
-            summary += (
-                f"{len(ranked)} bullets pass the filters; the top {max_bullets} by FVE are shown, {len(ranked) - max_bullets} are not."
-            )
+            hidden = len(ranked) - max_bullets
+            summary += f"{len(ranked)} bullets pass the filters; {order.format(max_bullets)} are shown, {hidden} are not."
         else:
             summary += f"{len(ranked)} bullets pass the filters."
         label = lambda rs: f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]"
         return summary + "".join(f"\n\n{label(rs)} {line}" for rs, _, line in ranked[:max_bullets])
 
     filter_params = {
-        "top_k": {"type": "integer", "description": f"bullets per read, highest FVE first (default {TOP_K})"},
+        "top_k": {
+            "type": "integer",
+            "description": f"bullets per read, best first: highest FVE, or the greedy readout then samples (default {TOP_K})",
+        },
         "min_fve": {"type": "number", "description": f"only bullets with at least this FVE (default {MIN_FVE})"},
     }
     return {
@@ -207,8 +214,9 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             _schema(
                 "search_olens",
                 "Case-insensitive regex over every base-arm transcript that has O-lens reads. Returns the O-lens bullets at the "
-                "punctuation inside each match and the first read after it, highest FVE first, each with the transcript text "
-                "around the read and its run and char (for olens_at), and how many runs with and without the behavior match. "
+                "punctuation inside each match and the first read after it (highest FVE first, when reads have FVE), each with "
+                "the transcript text around the read and its run and char (for olens_at), and how many runs with and without the "
+                "behavior match. "
                 'With over="bullets", the regex runs over the text of every O-lens bullet instead (all bullets at every read, '
                 "top_k ignored) and returns only the bullets that match, with the same context, and how many runs have a match.",
                 {
@@ -236,7 +244,11 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                     "run": {"type": "integer"},
                     "char": {"type": "integer"},
                     "window": {"type": "integer", "description": f"positions each side (default {WINDOW}, max {MAX_WINDOW})"},
-                    "layers": {"type": "array", "items": {"type": "integer"}, "description": f"default {AT_LAYERS}"},
+                    "layers": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": f"default {sorted(AT_LAYERS)} if the reads have them, else all",
+                    },
                     **filter_params,
                 },
                 ["run", "char"],
@@ -262,8 +274,11 @@ def sources(paths: list[str]) -> list[dict]:
     return out
 
 
-def fve_note(reads: Reads) -> str:
-    """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt."""
-    top = sorted(row["bullets"][0]["fve"] for _, rows in reads.values() for row in rows if row["bullets"])
+def fve_note(reads: Reads) -> str | None:
+    """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt; None if the reads have
+    no FVE (core.build_prompt then describes them as greedy + sampled readouts)."""
+    top = sorted(b[0]["fve"] for _, rows in reads.values() for row in rows if (b := row["bullets"]) and b[0]["fve"] is not None)
+    if not top:
+        return None
     q = [top[int(f * (len(top) - 1))] for f in (0.1, 0.5, 0.9)]
     return f"Over all reads here, the top bullet's FVE is {q[0]:.2f} / {q[1]:.2f} / {q[2]:.2f} at the 10th / 50th / 90th percentile."

@@ -20,8 +20,10 @@ CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
 # prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
-# prompts recommend reading one full transcript before searching (2026-10-24).
-HARNESS_VERSION = 3
+# prompts recommend reading one full transcript before searching (2026-10-24). 4: olens tool descriptions no longer
+# promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
+# liberally." (2026-10-24).
+HARNESS_VERSION = 4
 
 
 @dataclass
@@ -84,7 +86,7 @@ explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} 
 read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 10 \
 highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` searches the bullets' own text instead (every \
 bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
-model registers but never says; they also often just paraphrase the nearby text."""
+model registers but never says; they also often just paraphrase the nearby text. Use the O-lens tools liberally."""
 
 ANCHORS = """
 
@@ -100,6 +102,20 @@ model's predictions of its own later tokens change (mean KL, nats per token). Hi
 afterwards depended on this sentence.
 Both measure how much the model relies on a sentence in the base arm, not which way a change to it would push the \
 behavior. Scores are compared within a run as percentiles (100 = that run's top sentence)."""
+
+# reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py)
+OLENS_SAMPLED = """
+
+{n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
+regex over those runs' transcripts that returns the reads at each match) and `olens_at` (all reads around a run and \
+character, from any search hit). The O-lens is a model trained to describe another model's internal activations in \
+words. It was run on the target model's activations at one layer, at about a dozen punctuation tokens per run: the end of \
+the final user turn, just before and after the span where this arm's prompt differs from the env's other arms, the final \
+reasoning and reply, just before tool calls, and a few spread elsewhere. Each read is the lens's greedy readout followed by \
+4 samples, one short bullet each; by default the tools show only the greedy one (`top_k` up to 5 adds the samples, and how \
+much they agree is a rough confidence signal). There is no per-read reliability score. Reads can show what the model \
+registers but never says; they also often paraphrase or continue the nearby text, and sometimes invent specifics (names, \
+numbers, settings) that aren't there. Use the O-lens tools liberally."""
 
 
 def unified_diff(before: str, after: str) -> str:
@@ -133,9 +149,10 @@ def build_prompt(
     cf_arm: str,
     condition: str,
     read: set[int] | None = None,
-    fve_note: str = "",
+    fve_note: str | None = "",
 ) -> str:
-    """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note."""
+    """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note
+    (None: the reads have no FVE)."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
@@ -154,7 +171,8 @@ This is its starting context in the base arm, before it acts:
         evidence = context.replace("This is its", "The model's runs are not shown. This is its")
     elif condition in TOOL_CONDITIONS:
         if condition in OLENS_CONDITIONS:
-            olens, label = OLENS.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
+            template = OLENS if fve_note is not None else OLENS_SAMPLED
+            olens, label = template.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
         elif condition in ANCHOR_CONDITIONS:
             olens, label = ANCHORS.format(n_read=len(read or ())), "anchor reads"
         else:
