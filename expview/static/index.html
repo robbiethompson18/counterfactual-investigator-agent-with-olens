@@ -449,7 +449,7 @@ async function trView(p){
   if(ITEM.it!==it||ITEM.sel.v!="tr")return;
   const reads=T.reads||{},toks=T.tokens||[],all=Object.values(reads).flat();
   const tools=[...new Set(all.map(r=>r.tool))];
-  for(const t of tools)if(!(t in TRK.tools))TRK.tools[t]=true;
+  for(const t of tools)if(!(t in TRK.tools))TRK.tools[t]=!(run.readers||{})[t]?.hidden;
   if(TRK.min==null)TRK.min=T.min_score??0;
   const hasInline=all.some(r=>r.inline);
   if(TRK.peek!="auto"&&TRK.peek!="off"&&!tools.includes(TRK.peek))TRK.peek="auto";
