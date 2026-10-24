@@ -73,6 +73,22 @@ under each readout. Base Qwen's rollouts on the same prompt are at the bottom. T
 new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
 reads have no FVE scores.
 
+## GLM 5.3
+
+`web/glm.py` adds a GLM 5.3 tab: one pattern per env and arm of our GLM 5.3 evalcue runs
+(`glm.ENVS`; now scheming_oversight_blk and hidden_goal_grade, the cfbench smoke envs), each rollout
+read with Celeste's GLM-5.3 O-lens
+([ceselder/glm-5.3-olens-counterfactual-investigator](https://huggingface.co/datasets/ceselder/glm-5.3-olens-counterfactual-investigator),
+config `evalcue`).
+
+- **Tokens:** Celeste's render through GLM-5.3's own chat template, cut with GLM-5.3's tokenizer, so
+  her `pos` indexes them; messages are the spans between GLM's role tokens.
+- **Reads:** her RL lens at layer 51, ~12 chosen punctuation positions per rollout (underlined):
+  greedy under Decode greedy, the 4 T=1 samples under T=1 × 4. No FVE (her lens has no AR scores
+  here) and no live reads (the pod serves Qwen's lens).
+- **Labels:** the env's programmatic label (positive / negative); each transcript links to its
+  Docent run.
+
 ## Thinking-on resamples
 
 `web/thinking.py` adds one pattern per favourite (`docs/favorite-transcripts.md`) to the WeirdChat

@@ -188,7 +188,7 @@ body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn
 <main>
   <aside id="left">
     <div id="filters">
-      <div id="dstabs"><button data-ds="weirdchat">WeirdChat</button><button data-ds="chive">CHIVE</button><button data-ds="organisms">Organisms</button></div>
+      <div id="dstabs"><button data-ds="weirdchat">WeirdChat</button><button data-ds="chive">CHIVE</button><button data-ds="organisms">Organisms</button><button data-ds="glm">GLM 5.3</button></div>
       <input id="q" placeholder="Search titles, descriptions, prompts…">
       <label class="row"><span>Show</span><select id="beh"></select></label>
       <label class="row"><span>Sort</span><select id="sort"></select></label>
@@ -248,6 +248,8 @@ const DS = {
     sorts: [['max_effect', 'Largest counterfactual effect'], ['match_rate', 'Base rate'], ['tsolve', 'Transcript-only solves, fewest first'], ['olift', 'O-lens minus transcript solves'], ['id', 'Incident id']]},
   organisms: {noun: 'organisms', sub: `Model organisms · LoRA fine-tunes of Qwen3.6-27B, read on organism vs base activations · ${LENS}`,
     filters: [['', 'All organisms']], sorts: [['id', 'Default order'], ['n_read', 'Most rollouts read']]},
+  glm: {noun: 'env arms', sub: "GLM 5.3 evalcue rollouts · Celeste's GLM-5.3 O-lens (RL, layer 51, greedy + 4 samples at T=1, no FVE) at ~12 positions per rollout",
+    filters: [['', 'All envs']], sorts: [['id', 'Default order'], ['match_rate', 'Behavior rate']]},
 };
 const SRC = {wildchat: 'WildChat', systemchat2: 'SystemChat', hermes: 'Hermes function calling', toolace: 'ToolACE'};
 const CAPPED = 'CHIVE sampled this reply with a ~500-token cap, so it stops mid-sentence, and the <|im_end|> after it was appended rather than generated. Reads of the end-of-turn zone after it see a forced ending.';
@@ -308,7 +310,7 @@ function renderList(){
     const ovh = pick && pick.bullets.length ? `<div class="ov" title="L40 at ${esc(JSON.stringify(pick.token))}">${mini(pick, 4)}</div>` : '';
     return `<div class="pi ${st.pat && st.pat.idx === p.idx ? 'on' : ''}" data-i="${p.idx}">
       <div class="t">${esc(p.title)}</div>
-      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : p.followup ? `<span class="tag">${p.n_transcripts} answers</span>` : p.thinking ? `<span class="tag">${p.n_transcripts} samples</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
+      <div class="m">${p.ds === 'chive' ? chiveTags(p) : `<span class="tag b">${esc(p.organism ? p.organism.family : p.behavior)}</span>${p.organism ? `<span class="tag">${p.n_transcripts} rollouts · ${p.organism.n_read} read</span>` : p.followup ? `<span class="tag">${p.n_transcripts} answers</span>` : p.thinking ? `<span class="tag">${p.n_transcripts} samples</span>` : p.glm ? `<span class="tag">${p.glm.k}/${p.glm.n} positive</span>` : `<span class="tag">${Math.round((p.match_rate||0)*100)}% match</span>
       <span class="tag" title="unexpectedness / harmfulness Elo">U ${p.elo.unexpectedness||'–'} · H ${p.elo.harmfulness||'–'}</span>`}`}</div>${ovh}</div>`;
   }).join('');
   for (const el of document.querySelectorAll('.pi')) el.onclick = () => openPattern(+el.dataset.i);
@@ -370,6 +372,18 @@ async function openPattern(i, tid){
     <select id="tsel"></select>
     <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
   </div>
+  <div id="tview"></div>` : d.glm ? `
+  <div class="card">
+    <h2>${esc(d.title)}</h2>
+    <p class="desc">${esc(d.description)}</p>
+    <div class="kv"><span><b>${d.glm.k}/${d.glm.n}</b> show the behavior</span>
+      <a href="https://huggingface.co/datasets/ceselder/glm-5.3-olens-counterfactual-investigator" target="_blank" rel="noopener">Celeste's reads on HF ↗</a></div>
+  </div>
+  <div id="tpick">
+    <select id="tfilter" style="width:auto"><option value="all">All rollouts (${d.transcripts.length})</option><option value="match">Positive (${nMatch})</option><option value="nomatch">Negative (${d.transcripts.length - nMatch})</option></select>
+    <select id="tsel"></select>
+    <button class="btn" id="tprev">‹</button><button class="btn" id="tnext">›</button>
+  </div>
   <div id="tview"></div>` : d.organism ? `
   <div class="card">
     <h2>${esc(d.title)}</h2>
@@ -414,6 +428,7 @@ async function openPattern(i, tid){
     $('#tsel').innerHTML = ts.map(t => `<option value="${esc(t.tid)}">${d.followup
       ? `${t.followup.wording} question · ${t.followup.sample ? `sample ${t.followup.sample} (T=1)` : '◉ greedy'}`
       : d.thinking ? `${t.thinking.source.split(' ')[0].replace(',', '')} sample ${t.thinking.sample + 1}${t.thinking.hit_cap ? ' · ✂ hit the cap' : ''}`
+      : d.glm ? `${t.match ? 'positive' : 'negative'} · ${t.glm.item} · rollout ${t.tid.split('/').pop()}`
       : d.organism
       ? `${t.organism.read ? '◉ read · ' : ''}${t.organism.kind} prompt ${+t.organism.prompt.split('/').pop().replace(/\D/g, '') + 1} · sample ${t.organism.sample + 1}`
       : `${t.highlight ? '★ highlight · ' : ''}prompt ${t.prompt + 1} · ${t.tid.split('/').pop()} · ${t.match ? 'match' : 'no match'}`}</option>`).join('');
@@ -434,7 +449,7 @@ async function openPattern(i, tid){
 
 const tokKey = (pos, L) => `${pos}|${L}|${st.temp}|${st.n}`;
 const isOld = r => !!(r && r.lens && st.tr && st.tr.lens && r.lens !== st.tr.lens);  // read with the old lens: shown, but read again
-const haveRead = (pos, L) => { const r = st.reads[tokKey(pos, L)]; return !!r && (!isOld(r) || !!st.tr.organism); };  // organisms are read offline only
+const haveRead = (pos, L) => { const r = st.reads[tokKey(pos, L)]; return !!r && (!isOld(r) || !!st.tr.organism || !!st.tr.glm); };  // organisms and GLM are read offline only
 // st.reads: the reads shown; st.other: model organisms' reads on the other activations (organism / base Qwen), same tokens
 function setReads(tr){
   const idx = rs => Object.fromEntries((rs || []).map(r => [`${r.pos}|${r.layer}|${r.temperature}|${r.n}`, r]));
@@ -466,7 +481,10 @@ async function openTranscript(tid){
       Opens on the end of that turn. The earlier reply is re-templated without its empty think block, as Qwen saw it.</div>`;
   const th = tr.thinking, thHdr = th && `<div class="judge org"><b>Thinking on, sample ${th.sample + 1}</b> from ${esc(th.source)} at T=${th.temperature}
       · ${th.n_new} new tokens${th.hit_cap ? ' (hit the 8192-token cap mid-thought)' : ''}. Not judged.</div>`;
-  let html = o ? orgHdr : fu ? fuHdr : th ? thHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
+  const g = tr.glm, glmHdr = g && `<div class="judge ${g.positive ? 'match' : ''}"><b>${g.positive ? 'Shows the behavior' : "Doesn't show the behavior"}</b> (the env's label)
+      · ${esc(g.env)} · arm ${esc(g.arm)} · item ${esc(g.item)}${tr.url ? ` · <a href="${esc(tr.url)}" target="_blank" rel="noopener">Docent ↗</a>` : ''}.
+      Rendered with GLM-5.3's chat template; O-lens reads (L51) at the ${g.read_pos.length} underlined tokens: click one, or switch Decode to T=1 × 4 for the samples.</div>`;
+  let html = o ? orgHdr : g ? glmHdr : fu ? fuHdr : th ? thHdr : `<div class="judge ${tr.match ? 'match' : ''}"><b>Judge${chive ? ' (Sonnet 5.5, one vote, on this sample)' : ''}: ${verdict}.</b> ${esc(tr.explanation || '')}</div>`;
   if (chive && tr.edits.length) html += `<details class="gt" open style="margin:0 0 12px"><summary>Counterfactual experiments (${tr.edits.length}): click one to mark what it changed</summary>${tr.edits.map(e => `
       <div class="xp" data-x="${e.number}"><span>${e.is_key ? '★' : ''}</span><span class="ef" style="color:${e.effect < 0 ? 'var(--good)' : 'var(--bad)'}" title="behaviour rate ${e.k}/${e.n} vs ${Math.round(e.baseline * 100)}% at this experiment's baseline">${e.effect > 0 ? '+' : e.effect < 0 ? '−' : '±'}${Math.round(Math.abs(e.effect) * 100)}pp</span>
       <span>${esc(e.summary)}${e.subs.length ? '' : ' <span class="muted">(no span: it only adds or moves turns)</span>'}${e.subs.length && e.structural ? ' <span class="muted">(also adds or moves turns)</span>' : ''}</span></div>`).join('')}</details>`;
@@ -540,7 +558,7 @@ async function openTranscript(tid){
   if (chive && st.hash && st.hash.x != null) showEdit(+st.hash.x, tok == null);
   st.hash = null;  // the link's settings apply to the first transcript only
   if (tok != null && tok >= 0 && tok < tr.tokens.length) { select(tok, false); const el = document.querySelector(`#tview .tk[data-p="${tok}"]`); if (el) el.scrollIntoView({block: 'center'}); }
-  else select(z0 ? Math.min(z0[0] + st.ovpos, z0[1] - 1) : 0, false);
+  else select(z0 ? Math.min(z0[0] + (tr.glm ? 0 : st.ovpos), z0[1] - 1) : 0, false);  // GLM zones start on her final_user read
 }
 
 // mark one counterfactual experiment's edited spans; hovering a span shows what replaced it
@@ -615,7 +633,7 @@ function zoneFor(pos){ return st.tr.zones.find(([a, b]) => pos >= a && pos < b);
 function renderLens(){
   const tr = st.tr, pos = st.sel; if (!tr || pos == null) return;
   const a = Math.max(0, pos - 24), ctx = tr.tokens.slice(a, pos).join('');
-  const layers = st.layers;
+  const layers = tr.layers || st.layers;  // GLM transcripts: Celeste's single layer
   const z = zoneFor(pos);
   let h = `<div class="row" style="justify-content:space-between"><div><b style="font-family:var(--mono)">${esc(JSON.stringify(tr.tokens[pos]))}</b> <span class="muted">token ${pos} / ${tr.tokens.length}</span></div></div>
     <div class="ctx">…${esc(ctx)}<b>${esc(tr.tokens[pos])}</b></div>
@@ -630,7 +648,7 @@ function renderLens(){
       <button class="btn" id="xbtn" title="ceselder L42 natural-language autoencoder + J++ lens at every layer (needs an H200 pod)">NLA + J++</button>
     </div><div id="lerr"></div><div id="xbox"></div>`;
   if (z) {
-    const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
+    const L = tr.layers ? tr.layers[0] : st.chosen.has(40) ? 40 : [...st.chosen][0];
     h += `<details class="tl" data-k="zone" ${ls('open.zone') ? 'open' : ''}><summary><h3>End-of-turn zone · L${L}</h3></summary><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
       const r = st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
       const s = r ? r.samples[0] : null;
@@ -638,7 +656,7 @@ function renderLens(){
     }).join('') + `</table></details>`;
   }
   if (tr.punct && tr.punct.length) {
-    const L = st.chosen.has(40) ? 40 : [...st.chosen][0];
+    const L = tr.layers ? tr.layers[0] : st.chosen.has(40) ? 40 : [...st.chosen][0];
     const readAt = p => st.reads[tokKey(p, L)] || st.bankReads[`${p}|${L}`];
     const rows = tr.punct.filter(readAt);
     h += `<details class="tl" data-k="punct" ${ls('open.punct') ? 'open' : ''}><summary><h3>Punctuation (${tr.ds === 'chive' ? 'system, last user turn, response' : 'user + assistant'}) · L${L} <span style="text-transform:none;letter-spacing:0;font-weight:400">(${rows.length}/${tr.punct.length} read)</span></h3></summary>`;
