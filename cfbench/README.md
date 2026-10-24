@@ -31,6 +31,9 @@ left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flas
 confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak the answer).
 Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the shown transcripts.
 
+Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
+are version 1). Skill is only comparable within a version.
+
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
 
@@ -39,7 +42,10 @@ the read transcripts next to it):
   it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=10`), and
   `olens_at(run, char)`, every read around a char from any search hit (default `window=10`, layers
   32/40/48). Every hit shows the transcript text around the read. `search_transcripts` also gives
-  each hit's char in this condition.
+  each hit's char in this condition. `search_olens(regex, over="bullets")` runs the regex over the
+  bullets' own text instead (every bullet at every read, `top_k` ignored, `min_fve` kept) and
+  returns only the matching bullets, so the agent can find lens content the transcript never says
+  (harness version 2).
 - `olens_placebo`: the same tools, answered from a run of a different env at the same relative
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).

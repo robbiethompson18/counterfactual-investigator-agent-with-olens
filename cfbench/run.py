@@ -22,7 +22,16 @@ from pathlib import Path
 import openai
 
 from cfbench import anchors, olens
-from cfbench.core import ANCHOR_CONDITIONS, CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench.core import (
+    ANCHOR_CONDITIONS,
+    CONDITIONS,
+    HARNESS_VERSION,
+    OLENS_CONDITIONS,
+    TOOL_BUDGET,
+    TOOL_CONDITIONS,
+    build_prompt,
+    pick_examples,
+)
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
@@ -65,6 +74,7 @@ async def main():
         description=args.description or f"{args.env}: predict {args.model} arm outcomes ({', '.join(conditions)})",
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
+        | {"harness_version": HARNESS_VERSION}
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {})
         | ({"anchor_sources": anchors.sources(args.anchor_reads.split(","))} if args.anchor_reads else {}),
     )
@@ -92,7 +102,14 @@ async def main():
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it
-        row = {**case, "predictor": predictor, "draw": draw, "shown": [r.source for r in shown], **result}
+        row = {
+            **case,
+            "harness_version": HARNESS_VERSION,
+            "predictor": predictor,
+            "draw": draw,
+            "shown": [r.source for r in shown],
+            **result,
+        }
         with out.open("a") as f:  # appended as each lands, so a crash keeps them
             f.write(json.dumps(row) + "\n")
         print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} {predictor} draw {draw}: p={result['p']} ${result['cost']:.3f}")

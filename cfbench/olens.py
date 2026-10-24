@@ -8,7 +8,9 @@ regex) and every <|im_end|> of the whole rendered transcript, prompt included. E
 the transcript as `read_transcript` shows it (core.render_spans), so search hits and olens_at share one `char` coordinate.
 
 - `search_olens(regex)`: regex over the transcripts; the reads inside each match and the first one after it, with the
-  transcript text around each read and its `char`, and how many runs with / without the behavior match.
+  transcript text around each read and its `char`, and how many runs with / without the behavior match. With
+  `over="bullets"` the regex runs over every bullet's text instead (all bullets at every read, `top_k` ignored) and only
+  the matching bullets come back.
 - `olens_at(run, char)`: every read at the position nearest `char` (from any search hit) and its neighbours, with the
   transcript text between them.
 Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 10 best
@@ -115,7 +117,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         top_k = TOP_K if args.get("top_k") is None else int(args["top_k"])
         return set(layers) if layers else None, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
 
-    def bullets(p: Position, layers: set[int] | None, top_k: int, min_fve: float) -> list[tuple[int, dict]]:
+    def bullets(p: Position, layers: set[int] | None, top_k: int | None, min_fve: float) -> list[tuple[int, dict]]:
         """(layer, bullet) for each bullet passing both filters, by layer (bullets come sorted by FVE)."""
         return [
             (layer, b)
@@ -144,11 +146,15 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         return "\n".join(out)
 
     def search(args: dict) -> str:
-        """Regex over the transcripts; the bullets at the reads inside each match and the first one after it, best FVE first."""
+        """Regex over the transcripts (the bullets at the reads inside each match and the first one after it) or over the
+        bullets themselves (over="bullets": the matching bullets), best FVE first."""
         try:
             pattern = re.compile(args["regex"], re.IGNORECASE)
         except re.error as e:
             return f"Bad regex: {e}"
+        over = args.get("over") or "transcript"
+        if over not in ("transcript", "bullets"):
+            return f'Bad over: {over!r} (use "transcript" or "bullets")'
         layers, top_k, min_fve = filters(args, None)
         max_bullets = int(args.get("max_bullets") or MAX_BULLETS)
         runs = [int(args["run"])] if args.get("run") is not None else read_ids
@@ -157,22 +163,31 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         matched = set()
         for i in searched:
             pos, scale, text = run_positions(i)
-            for m in pattern.finditer(texts[i]):
-                matched.add(i)
-                start, end = m.start() * scale, m.end() * scale
-                inside = [p for p in pos if start <= p.char <= end]
-                after = next((p for p in pos if p.char > end), None)
-                for p in inside + ([after] if after and after not in inside else []):
-                    context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
-                    for layer, b in bullets(p, layers, top_k, min_fve):
-                        line = f'char {round(p.char / scale)} ({p.where}) L{layer} [FVE {b["fve"]:.2f}]: "{context}"\n  → {b["text"]}'
-                        found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
+            if over == "bullets":
+                hits = [(p, [(layer, b) for layer, b in bullets(p, layers, None, min_fve) if pattern.search(b["text"])]) for p in pos]
+            else:
+                hits = []
+                for m in pattern.finditer(texts[i]):
+                    start, end = m.start() * scale, m.end() * scale
+                    inside = [p for p in pos if start <= p.char <= end]
+                    after = next((p for p in pos if p.char > end), None)
+                    hits += [(p, bullets(p, layers, top_k, min_fve)) for p in inside + ([after] if after and after not in inside else [])]
+                    matched.add(i)
+            for p, got in hits:
+                if got:
+                    matched.add(i)
+                context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
+                for layer, b in got:
+                    line = f'char {round(p.char / scale)} ({p.where}) L{layer} [FVE {b["fve"]:.2f}]: "{context}"\n  → {b["text"]}'
+                    found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
             ids = [i for i in searched if base[i].label == label]
             if ids:
                 kinds.append(f"{sum(i in matched for i in ids)} of {len(ids)} runs {name} the behavior")
-        summary = f"The regex matches the transcripts of {' and '.join(kinds)} (runs with reads only). "
+        summary = (
+            f"The regex matches {'bullets' if over == 'bullets' else 'the transcripts'} of {' and '.join(kinds)} (runs with reads only). "
+        )
         ranked = sorted(found.values(), key=lambda h: -h[1])
         if len(ranked) > max_bullets:
             summary += (
@@ -193,9 +208,16 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                 "search_olens",
                 "Case-insensitive regex over every base-arm transcript that has O-lens reads. Returns the O-lens bullets at the "
                 "punctuation inside each match and the first read after it, highest FVE first, each with the transcript text "
-                "around the read and its run and char (for olens_at), and how many runs with and without the behavior match.",
+                "around the read and its run and char (for olens_at), and how many runs with and without the behavior match. "
+                'With over="bullets", the regex runs over the text of every O-lens bullet instead (all bullets at every read, '
+                "top_k ignored) and returns only the bullets that match, with the same context, and how many runs have a match.",
                 {
                     "regex": {"type": "string"},
+                    "over": {
+                        "type": "string",
+                        "enum": ["transcript", "bullets"],
+                        "description": "what the regex searches: the transcript text (default) or the O-lens bullets' text",
+                    },
                     "run": {"type": "integer", "description": "optional: one run id"},
                     "layers": {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers (default all)"},
                     **filter_params,
