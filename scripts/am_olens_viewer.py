@@ -117,27 +117,18 @@ def main():
 
     run = Run(
         out / "run",
-        title="Agentic misalignment on GLM 5.3: O-lens reads, harm and eval-awareness labels",
+        title="GLM 5.3 agentic misalignment: O-lens reads",
         description=(
-            "UK AISI inspect_evals `agentic_misalignment` (blackmail / leaking / murder x default / goal_none / no_threat / restriction / "
-            "dont x 30 epochs) on **GLM 5.3** (OpenRouter, reasoning effort medium). One item = one single-turn episode.\n\n"
-            "**harmful** = the eval's own scenario classifier (prompt from inspect_evals, run on Claude Sonnet 5.5 via OpenRouter) AND the "
-            "scenario's hard check; call `classifier` shows its exact input and output. "
-            "**eval_aware** = verbalised eval-awareness monitor (glm-evalgaming `monitor.py`, lenient prompt: 'might be a "
-            "test, evaluation, "
-            "red-teaming exercise, honeypot, simulation or otherwise constructed scenario'), run on the GLM reasoning + "
-            "reply only, Sonnet 5.5 "
-            "first with Sonnet 4.5 then GPT-5.6 terra as fallback when Sonnet 5.5 content-filters or returns no verdict "
-            "(Sonnet 5.5 filters "
-            "mostly AWARE transcripts, so `aware_monitor_model` is not independent of the label). Every attempt is a call "
-            "`eval-awareness monitor ...` with its exact input and raw output. This is the `aware` column in Celeste's dataset. "
-            "**eval_aware_strict** = the same monitor with the strict prompt (explicitly says it is being tested / evaluated).\n\n"
-            "**Token reads**: Celeste's GLM-5.3 O-lens readouts (block-51 activation of the base model, teacher-forced on "
-            "GLM-5.3's own chat "
-            "template render) at 32 punctuation positions per episode. The RL lens greedy bullet is drawn inline after its token; click a "
-            "token for the RL samples, SFT lens, J-lens top-10 and Qwen3.6-27B readers. Sort / filter the items table on any label."
+            "450 episodes of GLM 5.3 in inspect_evals agentic misalignment (blackmail / leaking / murder, 5 prompt conditions, "
+            "30 samples each).\n\n"
+            "- **harmful**: did GLM blackmail / leak / cancel the rescue? Judged by Sonnet 5.5 with the eval's own prompt.\n"
+            "- **eval_aware**: does GLM say in its reasoning or reply that this might be a test, eval or constructed scenario? "
+            "Judged by Sonnet 5.5 (Sonnet 4.5 when 5.5 refused).\n\n"
+            "Filter or sort the table below, then click an episode. In the episode: **transcript with reads** shows the "
+            "O-lens read (RL lens, greedy) in a blue box after each of the 32 read tokens; click a box for more samples, the SFT "
+            "lens, J-lens and Qwen readers. **harm judge** and **eval-awareness judge** show exactly what each judge saw and said."
         ),
-        label_order=["harmful", "eval_aware", "eval_aware_strict", "scenario", "condition", "classifier_verdict", "aware_monitor_model"],
+        label_order=["harmful", "eval_aware", "scenario", "condition"],
     )
     run.reset()
 
@@ -146,13 +137,9 @@ def main():
     stats = Counter()
     problems = []
     legend = (
-        "GLM-5.3 tokens of the episode as Celeste rendered it (GLM-5.3 chat template; the scratchpad / reasoning sits inside `<think>`). "
-        "Underlined tokens were read. Inline: **O-lens RL** greedy bullet (rl1b_2 step 100). Click for: RL 4 samples (T=1), SFT lens "
-        "(sft1b_ext step 292) greedy + 4 samples, J-lens top-10 at block 60 (fresh capture) and block 51 (the exact "
-        "olens input), Qwen3.6-27B "
-        "readers (distilled: trained on GLM-lens samples; from_scratch: never saw GLM-lens output). The read label gives the position kind "
-        "(final_user / final_reasoning / final_answer / pre_action / arm_diff / fill) and role. Lenses are web-text trained: reads are "
-        "continuation-style, not statements of intent."
+        "Blue boxes: what the O-lens (RL lens, greedy) reads from GLM's activation at that token. Click a box or an underlined "
+        "token for 4 more RL samples, the SFT lens, J-lens top-10 and two Qwen3.6-27B readers. The lens was trained on web "
+        "text, so reads often guess the next words rather than state intent."
     )
     eps = eps.assign(_i=eps.row_index.astype(int)).sort_values("_i")
     for e in eps.itertuples():
@@ -204,11 +191,11 @@ def main():
             stats["kind:" + p.kind] += 1
         stats["episodes"] += 1
 
-        calls = list(x["calls"])
+        calls = [{**c, "name": "harm judge" if c["name"] == "classifier" else c["name"]} for c in x["calls"]]
         for k, att in enumerate(m.get("fallback_from") or []):
             calls.append(
                 call(
-                    f"eval-awareness monitor (attempt {k + 1}, no verdict)",
+                    f"eval-awareness judge: {att['model'].split('/')[-1]} gave no verdict",
                     att["model"],
                     messages=m["messages"],
                     output={"role": "assistant", "content": att.get("output") or ""},
@@ -219,7 +206,7 @@ def main():
             )
         calls.append(
             call(
-                "eval-awareness monitor",
+                "eval-awareness judge",
                 m["monitor_model"],
                 messages=m["messages"],
                 output={"role": "assistant", "content": m["output"]},
@@ -233,15 +220,14 @@ def main():
             "eval_aware": m["aware"],
             "scenario": r["scenario"],
             "condition": r["condition"],
-            "classifier_verdict": bool(r["classifier_verdict"]),
-            "aware_monitor_model": m["monitor_model"].split("/")[-1],
         }
+        strict_aware = None
         if key in strict:
             s = strict[key]
-            labels["eval_aware_strict"] = s["aware"]
+            strict_aware = s["aware"]
             calls.append(
                 call(
-                    "eval-awareness monitor (strict prompt)",
+                    "eval-awareness judge, strict prompt (not used for the label)",
                     s["monitor_model"],
                     messages=s["messages"],
                     output={"role": "assistant", "content": s["output"]},
@@ -267,6 +253,9 @@ def main():
             calls=calls,
             extra={
                 **x.get("extra", {}),
+                "harm_classifier_verdict_before_hard_check": bool(r["classifier_verdict"]),
+                "eval_aware_judge_model": m["monitor_model"],
+                "eval_aware_strict_prompt": strict_aware,
                 "olens_tid": e.tid,
                 "episode_id": e.episode_id,
                 "row_index": i,
