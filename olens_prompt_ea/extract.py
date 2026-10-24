@@ -68,10 +68,16 @@ def evalcue_setting(env: str) -> str:
 MARK = re.compile(r"<\|(assistant|user|system|observation)\|>")
 
 
+MC_INCLUDE_PREFILL = False  # --mc-include-prefill: AISI MC prompt runs to the LAST assistant turn (scripted prefill counted)
+
+
 def prompt_end(text: str, setting: str) -> int:
     """Char offset of the first assistant turn: the prompt is everything before it (Kylie's definition, 2026-10-24). For
     AISI Misalignment Continuation this excludes the scripted assistant prefill turns, which count as rollout context.
-    Inspect proxy transcripts: call 0, whose first assistant marker is its completion."""
+    Inspect proxy transcripts: call 0, whose first assistant marker is its completion. With MC_INCLUDE_PREFILL the MC prompt
+    also takes in the scripted assistant turns (only the last assistant turn is GLM's)."""
+    if MC_INCLUDE_PREFILL and setting == "hp_mc":
+        return text.rfind("<|assistant|>")
     return text.find("<|assistant|>")
 
 
@@ -94,7 +100,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--mc-include-prefill", action="store_true", help="count AISI MC's scripted assistant turns as prompt")
     a = ap.parse_args()
+    global MC_INCLUDE_PREFILL
+    MC_INCLUDE_PREFILL = a.mc_include_prefill
     a.out.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(str(a.db), read_only=True)
     cfgs = ", ".join(f"'{c}'" for c in SETTINGS)
