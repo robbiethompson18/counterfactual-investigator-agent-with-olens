@@ -80,7 +80,7 @@ tokens = {
 - Optional: `"filter": true` + `"score"` on a read and `"min_score"` on the object add a min-score
   box (e.g. FVE).
 - `run.json` `readers: {"O-lens": {"about": "markdown", "color": "#2f5d8a"}}` documents each reader
-  in the side panel.
+  in the side panel; `"hidden": true` starts that reader's checkbox unticked (e.g. an unreliable lens).
 
 ### The format on disk
 

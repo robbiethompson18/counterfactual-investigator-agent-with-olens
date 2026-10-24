@@ -119,11 +119,20 @@ def tokens_of(tok: Tokenizer, text: str) -> list[str]:
     return out
 
 
+def same_token(ours: str, theirs: str) -> bool:
+    """Celeste's decoded token vs ours. A multi-byte character split over two tokens decodes to U+FFFD on her side; ours puts
+    the whole character on the first token and "" on the second."""
+    a, b = ours.strip(), theirs.strip()
+    if a == b:
+        return True
+    return "\ufffd" in b and (a == "" or b.replace("\ufffd", "").strip() in a)
+
+
 def realign(text: str, toks: list[str], ends: list[int], pos: int, token: str, ctx: str | None) -> int | None:
     """Celeste's position when it matches our re-tokenisation, else the token ending where her left context (which ends with the
     read token) ends, taking the occurrence nearest the expected offset. Her token ids drift from a re-encode of the render by a few
     tokens mid-transcript (e.g. "wait" "," vs "wait,"), so positions alone drop ~1-12% of reads in the newer configs."""
-    if pos < len(toks) and toks[pos].strip() == token.strip():
+    if pos < len(toks) and same_token(toks[pos], token):
         return pos
     if not ctx:
         return None
@@ -133,7 +142,7 @@ def realign(text: str, toks: list[str], ends: list[int], pos: int, token: str, c
             best = i + len(ctx)
         i = text.find(ctx, i + 1)
     j = None if best is None else bisect.bisect_left(ends, best)
-    return j if j is not None and j < len(toks) and ends[j] == best and toks[j].strip() == token.strip() else None
+    return j if j is not None and j < len(toks) and ends[j] == best and same_token(toks[j], token) else None
 
 
 def sections_of(toks: list[str]) -> list[list]:
@@ -201,6 +210,10 @@ def units(ds: Path) -> list[tuple[str, Path, list[str]]]:
     return [(p.name, p, ["readouts.parquet", "readouts_dense.parquet"]) for p in sorted(ds.iterdir()) if (p / "readouts.parquet").exists()]
 
 
+def is_true(v) -> bool:
+    return v is not None and not pd.isna(v) and bool(v)
+
+
 def fl(v) -> float | None:
     return None if v is None or pd.isna(v) else round(float(v), 4)
 
@@ -217,15 +230,27 @@ def lines_fve(p, cols: list[str]) -> list[list]:
     return out
 
 
+def lens_read(name: str, p, cols: list[str], **kw) -> dict:
+    """A GLM-lens read whose lines carry per-bullet FVE; when any is scored, the read's score is the best of them, so the
+    viewer's min-FVE box can hide weak reads (unscored reads always show)."""
+    lines = lines_fve(p, cols)
+    fves = [x[1] for x in lines if len(x) > 1]
+    if fves:
+        kw.update(score=max(fves), score_name="FVE", filter=True)
+    return read(name, lines, **kw)
+
+
 def dense_label(p) -> str | None:
     """pos_kind / punctuation and, for the donation bet, the running number the model has written so far."""
-    parts, punct = [getattr(p, "pos_kind", None)], getattr(p, "is_punct", None)
+    kind, punct = getattr(p, "pos_kind", None), getattr(p, "is_punct", None)
+    parts = [kind if kind != getattr(p, "role", None) else None]
     if punct is not None and not pd.isna(punct):
         parts.append("punct" if punct else "non-punct")
     n = fl(getattr(p, "running_number", None))
     if n is not None:
         side, changed = getattr(p, "running_number_side", None), getattr(p, "number_changed", None)
-        parts.append(f"running number {n:g} ({side} threshold){' · number changed' if changed is True else ''}")
+        num = f"{n:,.0f}" if n == int(n) else f"{n:,}"
+        parts.append(f"running number {num} ({side} threshold){' · number changed' if is_true(changed) else ''}")
     return " · ".join(str(x) for x in parts if x) or None
 
 
@@ -257,9 +282,9 @@ def bestofn_reads(b) -> list[dict]:
 DROP = {"meta_json", "labels_json", "ctx_right40", "next16", "next16_ids", "extra", "h51_norm", "lens_rl_ckpt", "lens_sft_ckpt", "model"}
 
 
-def read_cols(f: Path) -> pd.DataFrame:
+def read_cols(f: Path, filters: list | None = None) -> pd.DataFrame:
     """A readout table without the wide provenance columns the viewer doesn't use (the dense tables are millions of rows)."""
-    return pd.read_parquet(f, columns=[c for c in pq.ParquetFile(f).schema_arrow.names if c not in DROP])
+    return pd.read_parquet(f, columns=[c for c in pq.ParquetFile(f).schema_arrow.names if c not in DROP], filters=filters)
 
 
 def truthy(v) -> bool | None:
@@ -268,21 +293,55 @@ def truthy(v) -> bool | None:
     return str(v).lower() in ("true", "1")
 
 
-def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls) -> Counter:
-    stats = Counter()
-    tx = cfg_dir / "transcripts.parquet"
-    eps = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
-    rd = pd.concat([read_cols(cfg_dir / f).assign(_file=f) for f in files], ignore_index=True)
+BATCH_ROWS = 1_500_000  # dense readout rows held in memory at once
+
+
+def normalise(rd: pd.DataFrame) -> pd.DataFrame:
     rd = rd.rename(columns={"left_ctx": "ctx_left40", "file": "source_file"})
-    missing = set(rd.tid) - set(eps.tid)
-    if missing:
-        print(f"{source}/{cfg}: no transcripts for {len(missing)} tids ({int(rd.tid.isin(missing).sum())} reads skipped)", flush=True)
     if "family" in rd:  # wild-rollouts layout
         rd["env"], rd["arm"], rd["positive"] = rd.family, rd.task_id, rd.passed
     for c in ("env", "arm", "kind", "role", "run_dir", "source_file", "row_index", "aware", "positive", "episode_id"):
         if c not in rd:
             rd[c] = None
-    rd = rd.drop_duplicates(["tid", "pos"]).sort_values(["tid", "pos"])
+    rd["_dup"] = rd["_dup"].fillna(False).astype(bool) if "_dup" in rd else False
+    return rd.drop_duplicates(["tid", "pos"]).sort_values(["tid", "pos"])
+
+
+def prefix_dups(cfg_dir: Path, dense: list[str], base: pd.DataFrame) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """Positions Celeste read once for a shared token prefix (dense_prefix_dups.parquet) and the canonical rows they point to,
+    so every transcript shows reads at its shared prompt, not only the first one read."""
+    p = cfg_dir / "dense_prefix_dups.parquet"
+    if not p.exists():
+        return None, None
+    dups = pd.read_parquet(p)
+    want = dups[["canon_tid", "canon_pos"]].drop_duplicates()
+    rows = [base]
+    for f in dense:
+        tids = sorted(set(want.canon_tid))
+        rows.append(read_cols(cfg_dir / f, [("tid", "in", tids)]))
+    canon = pd.concat(rows, ignore_index=True).drop_duplicates(["tid", "pos"])
+    canon = canon.merge(want, left_on=["tid", "pos"], right_on=["canon_tid", "canon_pos"]).drop(columns=["tid", "pos"])
+    return dups[["tid", "pos", "canon_tid", "canon_pos"]], canon
+
+
+def fill_dups(dups: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
+    out = dups.merge(canon, on=["canon_tid", "canon_pos"]).assign(_dup=True, _file="dense_prefix_dups.parquet")
+    out["kind"] = "shared prefix"
+    return out.drop(columns=["canon_tid", "canon_pos"])
+
+
+def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls) -> Counter:
+    stats = Counter()
+    tx = cfg_dir / "transcripts.parquet"
+    eps = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
+    dense = [f for f in files if "readouts_dense" in f]
+    base = pd.concat([read_cols(cfg_dir / f).assign(_file=f) for f in files if f not in dense], ignore_index=True)
+    dense_tids = {f: set(pq.read_table(cfg_dir / f, columns=["tid"]).column("tid").unique().to_pylist()) for f in dense}
+    all_tids = set(base.tid).union(*dense_tids.values())
+    dups, canon = prefix_dups(cfg_dir, dense, base) if dense else (None, None)
+    missing = all_tids - set(eps.tid)
+    if missing:
+        print(f"{source}/{cfg}: no transcripts for {len(missing)} tids, their reads are skipped", flush=True)
     jl = pd.read_parquet(cfg_dir / "jlens.parquet").set_index(["tid", "pos"]) if (cfg_dir / "jlens.parquet").exists() else None
     qp = cfg_dir / "qwen_readers.parquet"
     qw = pd.read_parquet(qp).set_index(["tid", "pos", "reader"]) if qp.exists() else None
@@ -290,7 +349,6 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
     bon: dict[str, dict[int, object]] = {}
     for b in pd.read_parquet(bp).itertuples() if bp.exists() else []:
         bon.setdefault(b.tid, {})[int(b.pos)] = b
-    by_tid = dict(tuple(rd.groupby("tid")))
     run = Run(
         out,
         title=f"GLM 5.3 O-lens reads: {cfg} ({source})",
@@ -305,6 +363,27 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
         source=f"{source}/{cfg}: {', '.join(files)}",
     )
     run.reset()
+    n_dense = sum(pq.ParquetFile(cfg_dir / f).metadata.num_rows for f in dense)
+    todo = [t for t in eps.tid if t in all_tids]
+    size = len(todo) if n_dense < BATCH_ROWS else max(1, len(todo) * BATCH_ROWS // n_dense)
+    for k in range(0, len(todo), size):
+        batch = set(todo[k : k + size])
+        parts = [base[base.tid.isin(batch)]]
+        for f in dense:
+            if batch & dense_tids[f]:
+                parts.append(read_cols(cfg_dir / f, [("tid", "in", sorted(batch & dense_tids[f]))]).assign(_file=f))
+        if dups is not None:
+            parts.append(fill_dups(dups[dups.tid.isin(batch)], canon))
+        by_tid = dict(tuple(normalise(pd.concat(parts, ignore_index=True)).groupby("tid")))
+        if size < len(todo):
+            n = sum(len(v) for v in by_tid.values())
+            print(f"{source}/{cfg}: batch {k // size + 1}/{-(-len(todo) // size)}, {n:,} rows", flush=True)
+        import_items(eps[eps.tid.isin(batch)], by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg)
+    stats["bestofn_unplaced"] += sum(len(v) for v in bon.values())
+    return stats
+
+
+def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg) -> None:
     for e in eps.itertuples():
         rr = by_tid.get(e.tid)
         if rr is None:
@@ -323,10 +402,12 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
             lab = " · ".join(str(x) for x in (g("kind"), g("role"), dense_label(p)) if x)
             rs = []
             if g("rl_greedy") is not None:
-                rs.append(read(RL, lines_fve(p, ["rl_greedy"]), label=lab, inline=True))
-                rs.append(read(RL_S, lines_fve(p, [f"rl_{s}" for s in SAMPLES])))
+                # dense rows (every token in the donation bet) only peek inline where the stated number changes, else the text drowns
+                peek = not is_true(g("dense")) or is_true(g("number_changed"))
+                rs.append(lens_read(RL, p, ["rl_greedy"], label=lab, inline=peek or None))
+                rs.append(lens_read(RL_S, p, [f"rl_{s}" for s in SAMPLES]))
             if g("sft_greedy") is not None:
-                rs.append(read(SFT, lines_fve(p, ["sft_greedy"] + [f"sft_{s}" for s in SAMPLES]), label="greedy, then samples"))
+                rs.append(lens_read(SFT, p, ["sft_greedy"] + [f"sft_{s}" for s in SAMPLES], label="greedy, then samples"))
             b = bon.get(e.tid, {}).pop(int(p.pos), None)
             if b is not None:
                 rs += bestofn_reads(b)
@@ -344,7 +425,7 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
             reads[str(pos)] = [r for r in rs if r["lines"]]
             stats["reads"] += 1
         for q, b in bon.pop(e.tid, {}).items():  # best-of-N at positions without a readout row here (e.g. dense, not imported)
-            if q < len(toks) and toks[q].strip() == str(b.token).strip():
+            if q < len(toks) and same_token(toks[q], str(b.token)):
                 reads.setdefault(str(q), []).extend(r for r in bestofn_reads(b) if r["lines"])
                 stats["bestofn"] += 1
             else:
@@ -352,7 +433,8 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
         if not reads:
             stats["no_reads"] += 1
             continue
-        f0 = rr.iloc[0]
+        own = rr[~rr._dup]  # a prefix-dup row carries its canonical episode's fields
+        f0 = (own if len(own) else rr).iloc[0]
         row = None if pd.isna(f0.row_index) else int(f0.row_index)
         links, item_calls, env, extra = {}, [], None, {"tid": e.tid, "run_dir": f0.run_dir, "source_file": f0.source_file, "row_index": row}
         if isinstance(f0.run_dir, str) and row is not None:
@@ -376,11 +458,10 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
             env_files=env["files"] if env else None,
             links=links or None,
             extra=extra,
-            tokens={"tokens": toks, "sections": sections_of(toks), "reads": reads, "legend": LEGEND},
+            tokens={"tokens": toks, "sections": sections_of(toks), "reads": reads, "legend": LEGEND}
+            | ({"min_score": 0.0} if any(r.get("filter") for rs in reads.values() for r in rs) else {}),
         )
         stats["items"] += 1
-    stats["bestofn_unplaced"] += sum(len(v) for v in bon.values())
-    return stats
 
 
 def main() -> None:
