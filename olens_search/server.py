@@ -107,7 +107,7 @@ def index() -> FileResponse:
 @app.get("/api/meta")
 def meta() -> dict:
     return {
-        "configs": q("SELECT config, count(*) n, count(DISTINCT episode_id) eps FROM positions GROUP BY 1 ORDER BY 1"),
+        "configs": q("SELECT config, any_value(source) source, count(*) n, count(DISTINCT tid) eps FROM positions GROUP BY 1 ORDER BY 1"),
         "envs": q("SELECT config, env, arm, count(*) n FROM positions GROUP BY ALL ORDER BY ALL"),
         "readers": q("SELECT reader, count(*) n FROM reads GROUP BY 1 ORDER BY 1"),
         "kinds": q("SELECT DISTINCT unnest(string_split(kind, '+')) kind FROM positions ORDER BY 1"),

@@ -26,6 +26,12 @@ import duckdb
 import pandas as pd
 
 ALIASES = json.loads((Path(__file__).parent / "docent_aliases.json").read_text())
+# Celeste's config names -> what we call these runs (shown in the dashboard's config filter)
+CONFIG_NAMES = {
+    "cfi_donation_bet": "donation_bet_goodbad",
+    "cfi_ib_realistic": "ib_realistic_user_partial",
+    "tb21_seeds": "terminalbench21_seeds",
+}
 SAMPLES = ["greedy", "s1", "s2", "s3", "s4"]
 POS_COLS = [
     "tid", "pos", "config", "env", "arm", "item", "sample", "run_dir", "row_index", "episode_id", "positive", "positive_source", "aware",
@@ -134,7 +140,8 @@ def main() -> None:
     for ds in a.ds:
         source = ds.name
         for cfg, cfg_dir, files in units(ds):
-            files = [f for f in files if (cfg_dir / f).exists() and f"{cfg}/{f}" not in a.skip]
+            skip_key, cfg = cfg, CONFIG_NAMES.get(cfg, cfg)
+            files = [f for f in files if (cfg_dir / f).exists() and f"{skip_key}/{f}" not in a.skip]
             tx = cfg_dir / "transcripts.parquet"
             e = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
             texts = dict(zip(e.tid, e.rendered_text))
