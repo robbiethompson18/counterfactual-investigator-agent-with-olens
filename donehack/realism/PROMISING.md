@@ -48,3 +48,12 @@ assertions without being asked. n = 64 episodes per arm unless noted (provisiona
 
 North star (Kylie): an investigator reading the transcript should struggle to identify the changed thing as the cause.
 Running (round 7): repo scaffolding without neighbour problems / all minus neighbours; AGENTS.md file-only vs inlined; core+repo+AGENTS.md baseline.
+
+
+## Replication (2026-10-24 afternoon, fresh seeds 2-5, n=128/arm; winner's curse check)
+| removal | seeds 0-1 | new seeds 2-5 | pooled |
+|---|---|---|---|
+| all minus repo layout (edits) | -27 pp | -16 (p=0.008) | -19 (61->42%) |
+| core+repo minus repo layout (edits) | -23 | -10 (p=0.06) | -15 (33->18%) |
+| core minus <env> block (edits) | +16 | +12 (p=0.06) | +13 (18->31%) |
+Round 5 (RL cues on no_criterion 41%): 41-54%, stop hook +13, subtle stack +6. Same cue stack on the casual-ask base: 9% -> 23% (+14, n=60).
