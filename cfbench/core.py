@@ -163,8 +163,8 @@ This is its starting context in the base arm, before it acts:
 ## The base-arm runs
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
-every run).{olens} You have {TOOL_BUDGET} tool calls in total before you must submit; `submit_prediction` doesn't count. \
-Spend them on whatever helps you predict the counterfactual arm.
+every run). We recommend reading one full transcript before searching them.{olens} You have {TOOL_BUDGET} tool calls \
+in total before you must submit; `submit_prediction` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
 {run_index(base, None if condition == "agentic" else read, label)}"""
     else:
