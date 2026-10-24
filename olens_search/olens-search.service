@@ -1,0 +1,17 @@
+# systemd --user unit. Install on bramble:
+#   ln -sf "$PWD/olens_search/olens-search.service" ~/.config/systemd/user/ && systemctl --user daemon-reload
+#   systemctl --user enable --now olens-search
+# Restart after new data: systemctl --user restart olens-search   (run.sh rebuilds the DB if inputs changed)
+[Unit]
+Description=olens regex dashboard (tailnet only)
+After=network-online.target tailscaled.service
+
+[Service]
+WorkingDirectory=%h/workspace/counterfactual-investigator-agent-with-olens
+ExecStart=%h/workspace/counterfactual-investigator-agent-with-olens/olens_search/run.sh
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/run/current-system/sw/bin:%h/.nix-profile/bin:/etc/profiles/per-user/%u/bin
+
+[Install]
+WantedBy=default.target
