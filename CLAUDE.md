@@ -318,8 +318,9 @@ Current docs:
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
 - [Metadata honeypot — read before running or extending the METR planted-metadata env, or studying refusals driven by eval metadata](docs/envs/metadata_honeypot.md)
-  — 24 harmless defensive tasks × 8 metadata arms; GPT-5.6-sol refuses ~80% only when
-  `grading_notes` says declining passes, never citing it; GLM 5.3 reads and overrides it (1/264)
+  — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
+  (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
+  passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding)
 - [Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
   on-topic reads in every arm, blind-graded); code only on closed PR #125
