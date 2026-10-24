@@ -35,6 +35,11 @@ shown transcripts.
 Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
 are version 1). Skill is only comparable within a version.
 
+`--base-runs N` (tool conditions) gives the tools only N base runs, re-picked uniformly at random
+each draw and the same for every condition on a draw (from the runs with reads, when there are
+reads); the prompt still gives the whole arm's k of n. `--base-runs 1` is the one-transcript
+setting: closer to a real audit, and to Agam's harness, which shows one response.
+
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
 
