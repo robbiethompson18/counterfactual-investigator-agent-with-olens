@@ -40,7 +40,7 @@ the read transcripts next to it):
 
 - `olens`: `agentic` plus `search_olens(regex)`, a regex over the transcripts of the runs that have
   reads, returning the O-lens bullets at the punctuation inside each match and the first read after
-  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=10`), and
+  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=20`), and
   `olens_at(run, char)`, every read around a char from any search hit (default `window=10`, layers
   32/40/48). Every hit shows the transcript text around the read. `search_transcripts` also gives
   each hit's char in this condition. `search_olens(regex, over="bullets")` runs the regex over the
