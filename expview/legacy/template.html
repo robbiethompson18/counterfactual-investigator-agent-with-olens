@@ -1,0 +1,331 @@
+<meta charset="utf-8">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+:root{
+  --bg:#fbfaf7;--panel:#f2f0ea;--fg:#1f1e1b;--mute:#6b675e;--line:#dedad0;--acc:#2f5d8a;--sel:#e3e9f1;--code:#f4f2ec;
+  --in:#efece4;--out:#e8eef5;--think:#f5f0e2;--think-line:#c9b98a;--add:#dcefe2;--del:#f6e2dc;--track:#e7e3da;--yes:#2f5d8a;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#18191b;--panel:#1f2124;--fg:#e6e4df;--mute:#9a968d;--line:#33363a;--acc:#8fb4dd;--sel:#26313d;--code:#222428;
+  --in:#232528;--out:#1e2833;--think:#29261d;--think-line:#7d6f45;--add:#173323;--del:#3a2019;--track:#2c2f33;--yes:#8fb4dd}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#18191b;--panel:#1f2124;--fg:#e6e4df;--mute:#9a968d;--line:#33363a;--acc:#8fb4dd;--sel:#26313d;--code:#222428;
+  --in:#232528;--out:#1e2833;--think:#29261d;--think-line:#7d6f45;--add:#173323;--del:#3a2019;--track:#2c2f33;--yes:#8fb4dd}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans)}
+a{color:var(--acc)}button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.mono{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;margin:0;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 var(--mono)}
+code{font-family:var(--mono);font-size:12.5px}
+.chip{display:inline-block;padding:0 7px;border-radius:9px;border:1px solid var(--line);font:11.5px/18px var(--mono);white-space:nowrap}
+.chip.t{background:var(--yes);border-color:var(--yes);color:var(--bg)}
+.chip .k{color:var(--mute)}.chip.t .k{color:inherit;opacity:.75}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 10px;cursor:pointer;font-size:12.5px}
+.btn:hover{background:var(--sel)}.btn[aria-pressed="true"]{background:var(--sel);color:var(--acc);border-color:var(--acc)}
+
+/* home */
+#home{max-width:1280px;margin:0 auto;padding-block:24px 60px;padding-inline:16px}
+#home h1{font-size:20px;margin:0 0 6px;text-wrap:balance}
+.desc{color:var(--mute);max-width:80ch}.desc p{margin:.4em 0}
+h2{font-size:15px;margin:26px 0 8px}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:5px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--line);font-size:13px}
+th{font-size:11.5px;font-weight:600;color:var(--mute);border-top:0;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--sel)}tr.on td{background:var(--sel)}
+.bar{width:90px;height:7px;background:var(--track);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px}
+.bar i{display:block;height:100%;background:var(--acc)}
+.filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 8px}
+.filters label{font-size:12px;color:var(--mute);display:flex;gap:6px;align-items:center}
+select,input[type=search]{font:13px var(--sans);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+
+/* item view */
+#ex{display:grid;grid-template-columns:330px 1fr;height:100%}
+nav{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px 8px 40px}
+.navtop{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 6px 10px}
+.ih{margin:0 6px 6px;word-break:break-all}.ih b{font-size:14px}
+.labels{display:flex;flex-wrap:wrap;gap:4px;margin:6px 6px 0}
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:16px 6px 4px}
+details.d{margin-left:10px}details.d>summary{cursor:pointer;padding:1px 4px;font-weight:500;font-size:13px}
+.f{display:block;width:calc(100% - 10px);text-align:left;background:none;border:0;padding:1px 6px 1px 18px;margin-left:10px;border-radius:4px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.f:hover{background:var(--sel)}.f.on{background:var(--sel);color:var(--acc);font-weight:600}
+.f .mono{margin-left:4px}
+main{overflow:auto;padding:0 32px 60px}
+#bar{position:sticky;top:0;z-index:1;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+#path{font:12px var(--mono);color:var(--mute);word-break:break-all}
+#doc{max-width:1000px}
+.md{max-width:80ch}.md pre{margin:.6em 0}.md h1{font-size:19px}.md h2{font-size:16px}.md h3{font-size:14px}
+.dl{display:block}.dl.a{background:var(--add)}.dl.d{background:var(--del)}.dl.h{color:var(--acc)}.dl.f{color:var(--mute);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.msg{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.msg>.mh{display:flex;justify-content:space-between;gap:8px;padding:4px 10px;font:600 12px var(--mono);border-bottom:1px solid var(--line)}
+.msg.in>.mh{background:var(--in)}.msg.out>.mh{background:var(--out)}
+.msg .mh span:last-child{font-weight:400;color:var(--mute)}
+.msg .body{padding:10px}
+.msg .body>pre{border:0;padding:0;background:none}
+.think{border-left:3px solid var(--think-line);background:var(--think);border-radius:4px;padding:6px 10px;margin-bottom:10px}
+.think>summary{cursor:pointer;font:600 12px var(--mono);color:var(--mute)}
+.think pre{border:0;background:none;padding:6px 0 0}
+.tc{margin-top:8px}.tc .mono{display:block;margin-bottom:3px;color:var(--acc)}
+.empty{color:var(--mute);font-style:italic}
+#loading{padding:40px 16px;color:var(--mute)}
+
+/* token reads */
+.tkbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+.tkbar input[type=search]{width:260px}
+.tkgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,420px);gap:16px;align-items:start}
+.tks{position:relative;font:12.5px/1.75 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:78vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--code)}
+.tks h4{font:600 11px var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:10px 0 2px;white-space:normal}
+.tks h4:first-child{margin-top:0}
+.tk{border-radius:2px;cursor:default}
+.tk.r{cursor:pointer;box-shadow:inset 0 -2px 0 var(--think-line)}
+.tk.r2{box-shadow:inset 0 -2px 0 var(--acc)}
+.tk.sp{color:var(--mute);font-size:11px}
+.tk.m{background:var(--del)}
+.tk.on{background:var(--acc);color:var(--bg);box-shadow:none}
+.tk.r:hover{background:var(--sel)}
+.tki{font:11.5px/1.4 var(--sans);background:var(--out);color:var(--acc);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin:0 3px;cursor:pointer;white-space:normal}
+.tki b{font-weight:600;color:var(--mute);margin-right:4px}.tki.m{background:var(--del)}.tki.on{border-color:var(--acc)}
+th.s{cursor:pointer}th.s:hover{color:var(--acc)}
+.tkr{position:sticky;top:56px;max-height:78vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--panel)}
+.tkr h3{font:600 13px var(--mono);margin:0 0 8px;word-break:break-all}
+.rd{border-top:1px solid var(--line);padding:6px 0}.rd:first-of-type{border-top:0}
+.rd .rh{display:flex;justify-content:space-between;gap:6px;font:600 12px var(--mono)}
+.rd ul{margin:3px 0 0;padding-left:16px}.rd li{font-size:12.5px;margin:1px 0}
+.rd .sc{font:11px var(--mono);color:var(--mute);margin-left:4px}
+.rd li.neg{color:var(--mute)}
+mark{background:var(--del);color:inherit}
+@media (max-width:1000px){.tkgrid{grid-template-columns:1fr}.tkr{position:static}}
+@media (max-width:760px){#ex{grid-template-columns:1fr;grid-template-rows:40% 1fr}nav{border-right:0;border-bottom:1px solid var(--line)}main{padding:0 16px 40px}}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+</style>
+
+<div id="loading">Loading run…</div>
+<div id="home" hidden></div>
+<div id="ex" hidden><nav id="nav"></nav><main><div id="bar"><div id="path"></div><div id="tog"></div></div><div id="doc"></div></main></div>
+
+<script id="data" type="application/octet-stream">{{DATA}}</script>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const store={get(k,d){try{const v=localStorage.getItem("expview:"+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem("expview:"+k,JSON.stringify(v))}catch{}}};
+let D, B, ITEMS=[], GROUPS=[], LABELS=[], shown=[], cur=-1, sel=null;
+let render=store.get("render",false), rawCall=false;
+const F={group:"",q:"",labels:{},sort:null,dir:1};
+
+// Long strings are stored once in D.blobs and referenced as {"$": i}.
+function R(x){if(Array.isArray(x))return x.map(R);if(x&&typeof x=="object"){if(Object.keys(x).length==1&&typeof x.$=="number")return B[x.$];const o={};for(const k in x)o[k]=R(x[k]);return o}return x}
+
+async function load(){
+  const b64=$("#data").textContent.trim(), bin=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+  D=JSON.parse(txt); B=D.blobs; ITEMS=D.items;
+  GROUPS=[...new Set(ITEMS.map(i=>i.group).filter(g=>g!=null))];
+  const ks=[];for(const it of ITEMS)for(const k of Object.keys(it.labels||{}))if(!ks.includes(k))ks.push(k);
+  const order=D.run.label_order||[]; LABELS=[...order.filter(k=>ks.includes(k)),...ks.filter(k=>!order.includes(k))];
+  $("#loading").hidden=true; home();
+  document.addEventListener("keydown",key);
+}
+const fmt=v=>v===true?"yes":v===false?"no":v==null?"–":typeof v=="number"?(Number.isInteger(v)?v:Math.abs(v)>=1?+v.toFixed(3):+v.toPrecision(3)):(typeof v=="object"?JSON.stringify(v):String(v));
+const chip=(k,v)=>`<span class="chip ${v===true?"t":""}" title="${esc(k)}"><span class="k">${esc(k)}</span> ${esc(fmt(v))}</span>`;
+const md=t=>window.marked?marked.parse(String(t)):`<pre>${esc(t)}</pre>`;
+
+// ---------------------------------------------------------------- home
+function labelKind(k){const vs=ITEMS.map(i=>(i.labels||{})[k]).filter(v=>v!=null);
+  if(vs.length&&vs.every(v=>typeof v=="boolean"))return "bool";
+  if(vs.length&&vs.every(v=>typeof v=="number"))return "num";
+  const u=new Set(vs.map(v=>fmt(v)));return u.size<=20?"cat":"text"}
+function summaryRow(name,its){
+  const cells=LABELS.map(k=>{const kind=labelKind(k),vs=its.map(i=>(i.labels||{})[k]).filter(v=>v!=null);
+    if(!vs.length)return "<td class='mono'>–</td>";
+    if(kind=="bool"){const t=vs.filter(v=>v).length,p=Math.round(100*t/vs.length);return `<td class="num">${t}/${vs.length} · ${p}%<span class="bar"><i style="width:${p}%"></i></span></td>`}
+    if(kind=="num"){const m=vs.reduce((a,b)=>a+b,0)/vs.length;return `<td class="num">mean ${fmt(m)}</td>`}
+    if(kind=="cat"){const c={};vs.forEach(v=>c[fmt(v)]=(c[fmt(v)]||0)+1);return `<td class="num">${Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,n])=>`${esc(v)} ${n}`).join(" · ")}</td>`}
+    return "<td></td>"}).join("");
+  return `<tr class="${name?"click":""}" ${name!=null?`data-g="${esc(name)}"`:""}><td>${name==null?"<b>All items</b>":esc(name)}</td><td class="num">${its.length}</td>${cells}</tr>`}
+function sortKey(it,k){const v=k=="__id"?it.id:k=="__group"?it.group:(it.labels||{})[k];return v==null?null:typeof v=="boolean"?+v:v}
+function filtered(){const out=ITEMS.filter(it=>(!F.group||it.group==F.group)&&(!F.q||(it.id+" "+(it.group||"")).toLowerCase().includes(F.q.toLowerCase()))&&
+  Object.entries(F.labels).every(([k,v])=>v===""||fmt((it.labels||{})[k])==v));
+  if(F.sort)out.sort((a,b)=>{const x=sortKey(a,F.sort),y=sortKey(b,F.sort);if(x==y)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:1)*F.dir});
+  return out}
+function home(){
+  $("#ex").hidden=true;$("#home").hidden=false;cur=-1;
+  const r=D.run, cats=LABELS.filter(k=>["bool","cat"].includes(labelKind(k)));
+  $("#home").innerHTML=`<h1>${esc(r.title)}</h1>${r.description?`<div class="desc">${md(r.description)}</div>`:""}
+   <h2>Summary${GROUPS.length?" by group":""}</h2>
+   <div class="wrap"><table id="sum"><tr><th>${GROUPS.length?"Group":""}</th><th>Items</th>${LABELS.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>
+   ${summaryRow(null,ITEMS)}${GROUPS.map(g=>summaryRow(g,ITEMS.filter(i=>i.group==g))).join("")}</table></div>
+   ${r.notes?`<div class="desc md" style="margin-top:14px">${md(r.notes)}</div>`:""}
+   <h2>Items</h2>
+   <div class="filters">
+    ${GROUPS.length?`<label for="fg">Group <select id="fg"><option value="">all</option>${GROUPS.map(g=>`<option ${F.group==g?"selected":""}>${esc(g)}</option>`).join("")}</select></label>`:""}
+    ${cats.map((k,i)=>{const vals=[...new Set(ITEMS.map(it=>fmt((it.labels||{})[k])))].sort();return `<label for="fl${i}">${esc(k)} <select id="fl${i}" data-k="${esc(k)}"><option value="">all</option>${vals.map(v=>`<option ${F.labels[k]==v?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`}).join("")}
+    <label for="fq">Search <input id="fq" type="search" value="${esc(F.q)}" placeholder="id or group"></label>
+    <span class="mono" id="cnt"></span>
+   </div>
+   <div class="wrap"><table id="items"></table></div>
+   <p class="mono">Click an item to see ${ITEMS.some(i=>i.tokens)?"its transcript with token reads, ":""}its environment, every model call's exact input, and the outputs. Keys in item view: j / k next / previous, Esc back.</p>`;
+  $("#sum").onclick=e=>{const tr=e.target.closest("tr[data-g]");if(tr){F.group=tr.dataset.g;home();$("#items").scrollIntoView()}};
+  const fg=$("#fg");if(fg)fg.onchange=()=>{F.group=fg.value;itemsTable();}
+  document.querySelectorAll("select[data-k]").forEach(s=>s.onchange=()=>{F.labels[s.dataset.k]=s.value;itemsTable()});
+  $("#fq").oninput=e=>{F.q=e.target.value;itemsTable()};
+  itemsTable();
+}
+function itemsTable(){
+  shown=filtered(); $("#cnt").textContent=`${shown.length} of ${ITEMS.length}`;
+  const th=(k,n)=>`<th class="s" data-sort="${esc(k)}" title="sort">${esc(n)}${F.sort==k?(F.dir>0?" ▲":" ▼"):""}</th>`;
+  $("#items").innerHTML=`<tr>${th("__id","Item")}${GROUPS.length?th("__group","Group"):""}${LABELS.map(k=>th(k,k)).join("")}<th>Calls</th></tr>`+
+   shown.map((it,i)=>`<tr class="click" data-i="${i}"><td class="mono">${esc(it.id)}</td>${GROUPS.length?`<td>${esc(it.group??"")}</td>`:""}${LABELS.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}<td class="mono" style="white-space:nowrap" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td></tr>`).join("");
+  $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable();return}
+    const tr=e.target.closest("tr[data-i]");if(tr)openItem(+tr.dataset.i)};
+}
+
+// ---------------------------------------------------------------- item view
+function tree(files){const root={};for(const f of files){let n=root;const ps=f.split("/");ps.forEach((p,i)=>{if(i==ps.length-1)(n.__f=n.__f||[]).push(f);else n=n[p]=n[p]||{}})}return root}
+function treeHtml(n,depth){let h="";
+  for(const f of (n.__f||[]).sort())h+=`<button class="f" data-sel='${esc(JSON.stringify({file:f}))}' title="${esc(f)}">${esc(f.split("/").pop())}</button>`;
+  for(const k of Object.keys(n).filter(k=>k!="__f").sort())h+=`<details class="d" ${depth<1?"open":""}><summary>${esc(k)}/</summary>${treeHtml(n[k],depth+1)}</details>`;
+  return h}
+function openItem(i,keep){
+  if(!shown.length)shown=filtered();
+  cur=Math.max(0,Math.min(shown.length-1,i)); const it=shown[cur], env=it.env?R(D.envs[it.env]):null, calls=it.calls||[];
+  $("#home").hidden=true;$("#ex").hidden=false;
+  const nfiles=env?Object.keys(env).length:0;
+  $("#nav").innerHTML=`<div class="navtop"><button class="btn" id="back">← All items</button><span>
+     <button class="btn" id="prev" ${cur==0?"disabled":""} aria-label="Previous item">↑</button>
+     <button class="btn" id="next" ${cur==shown.length-1?"disabled":""} aria-label="Next item">↓</button></span></div>
+   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>`:""}<div class="mono">item ${cur+1} of ${shown.length}${shown.length<ITEMS.length?" (filtered)":""}</div></div>
+   <div class="labels">${Object.entries(it.labels||{}).map(([k,v])=>chip(k,v)).join("")}</div>
+   ${it.tokens?`<div class="sec">${esc(D.run.tokens_section||"Token reads")}</div><button class="f" data-sel='{"tokens":1}'>${esc(D.run.tokens_button||"transcript with reads")}<span class="mono">${it.tokens.n.toLocaleString()} tokens · ${it.tokens.reads.toLocaleString()} read</span></button>`:""}
+   <div class="sec">Model calls (${calls.length})</div>
+   ${calls.map((c,j)=>`<button class="f" data-sel='{"call":${j}}'>${esc(c.name)}<span class="mono">${esc(c.model||"")} · ${(R(c.messages)||[]).length} msgs</span></button>`).join("")||'<div class="empty f">none</div>'}
+   <div class="sec">Environment (${nfiles} files)</div>
+   ${env?treeHtml(tree(Object.keys(env)),0):'<div class="empty f">no environment recorded</div>'}
+   <div class="sec">Record</div><button class="f" data-sel='{"record":1}'>labels and extra fields (JSON)</button>`;
+  $("#back").onclick=home;$("#prev").onclick=()=>openItem(cur-1,true);$("#next").onclick=()=>openItem(cur+1,true);
+  $("#nav").onclick=e=>{const b=e.target.closest("[data-sel]");if(b){sel=JSON.parse(b.dataset.sel);show()}};
+  // keep the same kind of selection when stepping between items, else open the first call
+  if(!keep||!sel||(sel.call!=null&&!calls[sel.call])||(sel.file&&!(env&&sel.file in env))||(sel.tokens&&!it.tokens))sel=it.tokens?{tokens:1}:calls.length?{call:0}:env?{file:Object.keys(env).sort()[0]}:{record:1};
+  show();
+}
+function toggles(kinds){
+  $("#tog").innerHTML=(kinds.includes("md")?`<button class="btn" id="tmd" aria-pressed="${render}">Render markdown</button> `:"")+(kinds.includes("raw")?`<button class="btn" id="traw" aria-pressed="${rawCall}">Raw JSON</button>`:"");
+  const a=$("#tmd");if(a)a.onclick=()=>{render=!render;store.set("render",render);show()};
+  const b=$("#traw");if(b)b.onclick=()=>{rawCall=!rawCall;show()};
+}
+function text(t,mdOK){return mdOK&&render?`<div class="md">${md(t)}</div>`:`<pre>${esc(t)}</pre>`}
+function diffHtml(t){return `<pre>${String(t).split("\n").map(l=>`<span class="dl ${/^(\+\+\+|---)/.test(l)?"f":l[0]=="+"?"a":l[0]=="-"?"d":l.startsWith("@@")?"h":""}">${esc(l)||" "}</span>`).join("")}</pre>`}
+function show(){
+  const it=shown[cur]; document.querySelectorAll("[data-sel]").forEach(b=>b.classList.toggle("on",b.dataset.sel==JSON.stringify(sel)));
+  let h="";
+  if(sel.file){const env=R(D.envs[it.env]),t=env[sel.file];$("#path").textContent="environment/"+sel.file;
+    if(/\.(diff|patch)$/.test(sel.file)){toggles([]);h=diffHtml(t)}
+    else{const isMd=/\.md$/.test(sel.file);toggles(isMd?["md"]:[]);
+      if(/\.json$/.test(sel.file)){try{h=`<pre>${esc(JSON.stringify(JSON.parse(t),null,1))}</pre>`}catch{h=text(t)}}else h=text(t,isMd)}}
+  else if(sel.tokens){$("#path").textContent="token reads";toggles([]);tokView(it);return}
+  else if(sel.record){$("#path").textContent="record";toggles([]);
+    const rec={id:it.id,group:it.group,labels:it.labels,extra:R(it.extra),env:it.env,calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,parsed:R(c.parsed)}))};
+    h=`<pre>${esc(JSON.stringify(rec,null,1))}</pre>`}
+  else{const c=R(it.calls[sel.call]);$("#path").textContent=`call ${sel.call+1}: ${c.name}`;toggles(["md","raw"]);h=callHtml(c)}
+  $("#doc").innerHTML=h; document.querySelector("main").scrollTop=0;
+}
+function callHtml(c){
+  const skip=new Set(["name","model","messages","tools","params","parsed"]);
+  const meta=[chip("model",c.model),...Object.entries(c.params||{}).map(([k,v])=>chip(k,v)),...Object.entries(c).filter(([k])=>!skip.has(k)).map(([k,v])=>chip(k,v))];
+  let h=`<div class="meta">${meta.join("")}</div>`;
+  if(c.parsed!=null)h+=`<div class="meta"><span class="chip t">parsed</span> <code>${esc(JSON.stringify(c.parsed))}</code></div>`;
+  if(rawCall)return h+`<pre>${esc(JSON.stringify({model:c.model,params:c.params,tools:c.tools,messages:c.messages},null,1))}</pre>`;
+  if(c.tools&&c.tools.length)h+=`<details class="think" style="margin-bottom:12px"><summary>Tools offered (${c.tools.length}): ${esc(c.tools.map(t=>(t.function||t).name).join(", "))}</summary><pre>${esc(JSON.stringify(c.tools,null,1))}</pre></details>`;
+  const msgs=c.messages||[];
+  return h+msgs.map((m,i)=>{const out=m.role=="assistant";
+    const extra=Object.entries(m).filter(([k])=>!["role","content","reasoning","tool_calls"].includes(k)).map(([k,v])=>`${k}=${fmt(v)}`).join(" ");
+    let b="";
+    if(m.reasoning)b+=`<details class="think" open><summary>Reasoning (${m.reasoning.length.toLocaleString()} chars)</summary>${text(m.reasoning,true)}</details>`;
+    const ct=m.content;
+    if(Array.isArray(ct))b+=ct.map(p=>p.type=="text"?text(p.text,true):`<pre class="empty">[${esc(p.type)} part]</pre>`).join("");
+    else if(ct!=null&&ct!=="")b+=text(ct,true);
+    else if(!m.tool_calls)b+='<div class="empty">(empty)</div>';
+    for(const t of m.tool_calls||[]){let a=t.arguments;try{a=JSON.stringify(JSON.parse(a),null,1)}catch{}b+=`<div class="tc"><span class="mono">→ ${esc(t.name)}</span><pre>${esc(a)}</pre></div>`}
+    return `<div class="msg ${out?"out":"in"}"><div class="mh"><span>${esc(m.role)}${extra?` <span class="mono">${esc(extra)}</span>`:""}</span><span>${out?"model output":"model input"} · #${i+1}</span></div><div class="body">${b}</div></div>`}).join("");
+}
+
+// ---------------------------------------------------------------- token reads
+const TK={cache:{},q:store.get("tkq",""),pos:null,tools:null,min:store.get("tkmin",null),inline:store.get("tkinline",true)};
+async function tokLoad(ref){
+  if(!TK.cache[ref]){const t=await (await fetch(`tokens/${ref}.gz.txt`)).text(), bin=Uint8Array.from(atob(t.trim()),c=>c.charCodeAt(0));
+    TK.cache[ref]=JSON.parse(await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text())}
+  return TK.cache[ref]}
+async function tokView(it){
+  $("#doc").innerHTML='<div class="empty">Loading token reads…</div>';
+  let T;try{T=await tokLoad(it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load tokens/${esc(it.tokens.ref)}.gz.txt (${esc(e)}). Token files are fetched next to the page, so open it from a server or the published artifact.</div>`;return}
+  if(shown[cur]!==it||!sel.tokens)return;
+  const tools=[...new Set(Object.values(T.reads||{}).flat().map(r=>r.tool))];
+  if(TK.min==null)TK.min=T.min_score??0;
+  const keep=r=>TK.tools[r.tool]!==false&&!(r.filter&&r.score!=null&&r.score<TK.min);
+  const kept=p=>(T.reads[p]||[]).filter(keep);
+  if(!TK.tools)TK.tools=Object.fromEntries(tools.map(t=>[t,true]));
+  const secs=T.sections||[["",0,T.tokens.length]];
+  const vis=t=>t.replace(/\n/g,"↵\n").replace(/\t/g,"⇥");
+  let h=`<div class="tkbar"><label class="mono" for="tkq">Search the reads <input id="tkq" type="search" value="${esc(TK.q)}" placeholder="e.g. bet|donat|charity|beer"></label>
+    ${T.min_score!=null?`<label class="mono" for="tkmin">min FVE <input id="tkmin" type="number" step="0.05" min="-1" max="1" value="${TK.min}" style="width:64px"></label>`:""}
+    ${tools.map(t=>`<label class="mono"><input type="checkbox" data-tool="${esc(t)}" ${TK.tools[t]!==false?"checked":""}> ${esc(t)}</label>`).join("")}
+    ${Object.values(T.reads||{}).flat().some(r=>r.inline)?`<label class="mono"><input type="checkbox" id="tkinl" ${TK.inline?"checked":""}> show inline</label>`:""}
+    <span class="mono" id="tkn"></span></div>
+    ${T.legend?`<div class="desc" style="margin-bottom:8px">${md(T.legend)}</div>`:""}
+    <div class="tkgrid"><div class="tks" id="tks">`;
+  for(const [name,a,b] of secs){if(name)h+=`<h4>${esc(name)}</h4>`;
+    for(let i=a;i<b;i++){const t=T.tokens[i],r=T.reads&&T.reads[i],sp=/^<\|.*\|>$|^<\/?think>$/.test(t);
+      h+=`<span class="tk${sp?" sp":""}" data-p="${i}">${esc(vis(t))}</span>`;
+      if(TK.inline&&r)for(const x of r.filter(x=>x.inline&&keep(x)))h+=`<span class="tki" data-p="${i}"><b>${esc(x.tool)}</b>${esc(x.lines[0]?x.lines[0][0]:"")}</span>`}}
+  h+=`</div><div class="tkr" id="tkr"><div class="empty">Click an underlined token${Object.values(T.reads||{}).flat().some(r=>r.inline)&&TK.inline?" or an inline read":""} to see every read at that position. Red: a read matches the search.</div></div></div>`;
+  $("#doc").innerHTML=h;
+  const mark=()=>{let re=null;try{re=TK.q?new RegExp(TK.q,"i"):null}catch{}
+    let n=0;document.querySelectorAll("#tks .tk").forEach(s=>{const rs=kept(s.dataset.p);
+      s.classList.toggle("r",rs.length>0);s.classList.toggle("r2",rs.filter(r=>r.filter).length>0);
+      const m=!!re&&rs.some(r=>r.lines.some(l=>re.test(l[0])));s.classList.toggle("m",m);n+=m});
+    document.querySelectorAll("#tks .tki").forEach(s=>s.classList.toggle("m",!!re&&re.test(s.textContent)));
+    $("#tkn").textContent=re?`${n} read points match`:""};
+  // List every read line matching the search in the side panel; click one to jump to it.
+  const results=()=>{let re=null;try{re=TK.q?new RegExp(TK.q,"i"):null}catch{$("#tkr").innerHTML='<div class="empty">Not a valid regex.</div>';return}
+    if(!re)return;
+    const hl=x=>esc(x).replace(new RegExp(TK.q.replace(/&/g,"&amp;"),"gi"),m=>`<mark>${m}</mark>`);
+    const hits=[];
+    for(const p of Object.keys(T.reads||{}).map(Number).sort((a,b)=>a-b))for(const r of kept(p))for(const l of r.lines)if(re.test(l[0]))hits.push([p,r,l]);
+    const sec=p=>{for(const [n,a,b] of secs)if(p>=a&&p<b)return n;return ""};
+    $("#tkr").innerHTML=`<h3>${hits.length} read${hits.length==1?"":"s"} match /${esc(TK.q)}/</h3>`+(hits.length?hits.map(([p,r,l])=>
+      `<div class="rd hit" data-p="${p}" style="cursor:pointer"><div class="rh"><span>${esc(r.tool)}</span><span class="sc">token ${p}${sec(p)?" · "+esc(sec(p)):""}</span></div>
+       <div style="font-size:12.5px;margin:2px 0">${hl(l[0])}</div><div class="mono">…${esc(T.tokens.slice(Math.max(0,p-10),p+1).join("").slice(-80))}</div></div>`).join(""):
+      '<div class="empty">No read in this episode matches. Tools that are unticked are not searched.</div>');
+    $("#tkr").onclick=e=>{const d=e.target.closest(".hit");if(d){pick(+d.dataset.p);const s=document.querySelector(`#tks .tk[data-p="${d.dataset.p}"]`),box=$("#tks");if(s)box.scrollTop=s.offsetTop-box.clientHeight/2}}};
+  const pick=p=>{TK.pos=p;document.querySelectorAll("#tks .tk.on").forEach(s=>s.classList.remove("on"));
+    const s=document.querySelector(`#tks .tk[data-p="${p}"]`);if(s)s.classList.add("on");
+    document.querySelectorAll("#tks .tki").forEach(x=>x.classList.toggle("on",+x.dataset.p==p));
+    let re=null;try{re=TK.q?new RegExp(TK.q,"gi"):null}catch{}
+    const hl=x=>re?esc(x).replace(new RegExp(TK.q.replace(/&/g,"&amp;"),"gi"),m=>`<mark>${m}</mark>`):esc(x);
+    const ctx=T.tokens.slice(Math.max(0,p-12),p).join("")+"⟦"+T.tokens[p]+"⟧"+T.tokens.slice(p+1,p+4).join("");
+    const rs=kept(p), hid=(T.reads[p]||[]).length-rs.length;
+    $("#tkr").onclick=e=>{if(e.target.closest("#tkback"))results()};
+    $("#tkr").innerHTML=(TK.q?`<button class="btn" id="tkback" style="margin-bottom:8px">← all matches for /${esc(TK.q)}/</button>`:"")+`<h3>token ${p}: ${esc(JSON.stringify(T.tokens[p]))}</h3><pre style="margin-bottom:8px">${esc(ctx)}</pre>`+
+      (rs.length?rs.map(r=>`<div class="rd"><div class="rh"><span>${esc(r.tool)} ${esc(r.label||"")}</span>${r.score!=null?`<span class="sc">${esc(r.score_name||"score")} ${fmt(r.score)}</span>`:""}</div>
+        <ul>${r.lines.map(l=>`<li class="${l[1]!=null&&l[1]<0?"neg":""}">${hl(l[0])}${l[1]!=null?`<span class="sc">${fmt(l[1])}</span>`:""}</li>`).join("")}</ul></div>`).join(""):'<div class="empty">no reads at this token</div>')+(hid?`<div class="mono" style="margin-top:6px">${hid} read(s) hidden (below min FVE or tool unticked)</div>`:"")};
+  $("#tks").onclick=e=>{const s=e.target.closest(".tk.r,.tki");if(s)pick(+s.dataset.p)};
+  const il=$("#tkinl");if(il)il.onchange=()=>{TK.inline=il.checked;store.set("tkinline",TK.inline);const sc=$("#tks").scrollTop;tokView(it).then(()=>{$("#tks").scrollTop=sc})};
+  $("#tkq").oninput=e=>{TK.q=e.target.value;store.set("tkq",TK.q);mark();if(TK.q)results();else if(TK.pos!=null)pick(TK.pos)};
+  const mn=$("#tkmin");if(mn)mn.oninput=()=>{const v=parseFloat(mn.value);if(!isNaN(v)){TK.min=v;store.set("tkmin",v);mark();if(TK.pos!=null)pick(TK.pos)}};
+  document.querySelectorAll("[data-tool]").forEach(c=>c.onchange=()=>{TK.tools[c.dataset.tool]=c.checked;if(TK.inline&&il){const sc=$("#tks").scrollTop;tokView(it).then(()=>{$("#tks").scrollTop=sc})}else{mark();if(TK.pos!=null)pick(TK.pos)}});
+  mark();if(TK.q)results();else if(TK.pos!=null&&TK.pos<T.tokens.length&&T.reads[TK.pos])pick(TK.pos);
+}
+function key(e){
+  if($("#ex").hidden||e.target.matches("input,select,textarea"))return;
+  if(e.key=="j")openItem(cur+1,true);else if(e.key=="k")openItem(cur-1,true);else if(e.key=="Escape")home();
+}
+load().catch(e=>{$("#loading").textContent="Could not load the run data: "+e});
+</script>
