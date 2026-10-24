@@ -316,6 +316,8 @@ async def main() -> None:
                     if spend.usd >= spend.cap:
                         return
                     rec = await ask(client, messages, spend)
+                    if rec["model"] is None and all("error" in t for t in rec["tried"]):
+                        return  # transport / credit errors only: leave undone so a rerun retries it
                     text = rec["output"]
                     if a.task in ("lens", "prompt", "sad_prompt"):
                         score, ev = parse_score(text)
