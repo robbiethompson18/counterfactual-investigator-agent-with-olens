@@ -4,8 +4,8 @@
 # ///
 """Prompt-side O-lens reads per episode, from the olens_search DuckDB (olens_search/build_db.py).
 
-The prompt is everything before the model's first generated token: system prompt (incl. tool schemas), user turn, and for
-AISI Misalignment Continuation the scripted assistant prefill turns (only the last assistant turn is GLM's). A read
+The prompt is everything before the first assistant turn: system prompt (incl. tool schemas) and user turn. For AISI
+Misalignment Continuation the scripted assistant prefill turns are therefore NOT prompt. A read
 position is prompt-side when its token ends at or before that point.
 
 Identical prompts give identical activations, so reads are pooled per unique prompt (`ph` = md5 of the rendered prompt),
@@ -69,10 +69,9 @@ MARK = re.compile(r"<\|(assistant|user|system|observation)\|>")
 
 
 def prompt_end(text: str, setting: str) -> int:
-    """Char offset where generation starts. MC: last assistant turn (earlier ones are scripted prefill). Inspect proxy
-    transcripts are one call each and the call-0 transcript is used, so its last assistant marker is the completion."""
-    if setting == "hp_mc" or setting in ("inspect_am", "sad_oversight", "instrumentaleval", "agentharm", "mask"):
-        return text.rfind("<|assistant|>")
+    """Char offset of the first assistant turn: the prompt is everything before it (Kylie's definition, 2026-10-24). For
+    AISI Misalignment Continuation this excludes the scripted assistant prefill turns, which count as rollout context.
+    Inspect proxy transcripts: call 0, whose first assistant marker is its completion."""
     return text.find("<|assistant|>")
 
 
