@@ -25,6 +25,8 @@ Docent links come from the runs' docent.json (--docent-root, with docent_aliases
 from __future__ import annotations
 
 import argparse
+import bisect
+import itertools
 import json
 import sys
 from collections import Counter
@@ -67,6 +69,23 @@ def tokens_of(tok: Tokenizer, text: str) -> list[str]:
     if end < len(text):
         out.append(text[end:])
     return out
+
+
+def realign(text: str, toks: list[str], ends: list[int], pos: int, token: str, ctx: str | None) -> int | None:
+    """Celeste's position when it matches our re-tokenisation, else the token ending where her left context (which ends with the
+    read token) ends, taking the occurrence nearest the expected offset. Her token ids drift from a re-encode of the render by a few
+    tokens mid-transcript (e.g. "wait" "," vs "wait,"), so positions alone drop ~1-12% of reads in the newer configs."""
+    if pos < len(toks) and toks[pos].strip() == token.strip():
+        return pos
+    if not ctx:
+        return None
+    exp, best, i = ends[min(pos, len(ends) - 1)], None, text.find(ctx)
+    while i != -1:
+        if best is None or abs(i + len(ctx) - exp) < abs(best - exp):
+            best = i + len(ctx)
+        i = text.find(ctx, i + 1)
+    j = None if best is None else bisect.bisect_left(ends, best)
+    return j if j is not None and j < len(toks) and ends[j] == best and toks[j].strip() == token.strip() else None
 
 
 def sections_of(toks: list[str]) -> list[list]:
@@ -172,12 +191,15 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
         if rr is None:
             continue
         toks = tokens_of(tok, e.rendered_text)
+        ends = list(itertools.accumulate(len(t) for t in toks))
         reads = {}
         for p in rr.itertuples():
-            pos = int(p.pos)
-            if pos >= len(toks) or toks[pos].strip() != str(p.token).strip():
+            pos = realign(e.rendered_text, toks, ends, int(p.pos), str(p.token), getattr(p, "ctx_left40", None))
+            if pos is None:
                 stats["unmatched"] += 1
                 continue
+            if pos != int(p.pos):
+                stats["realigned"] += 1
             g = lambda c, p=p: getattr(p, c, None)
             lab = " · ".join(str(x) for x in (g("kind"), g("role")) if x)
             rs = []

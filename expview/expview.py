@@ -78,20 +78,24 @@ def discover(rts: dict[str, Path] | None = None, max_depth: int = 6) -> dict[str
             d = Path(dirpath)
             depth = len(d.relative_to(root).parts)
             if is_run(d):
-                out[dataset_id(d, {alias: root})] = d
+                try:
+                    out[dataset_id(d, {alias: root})] = d
+                except ValueError as e:  # one odd dir must not stop the rescan
+                    print(f"expview: skipping {d}: {e}", file=sys.stderr)
             dirnames[:] = [] if depth >= max_depth else [n for n in sorted(dirnames) if n not in SKIP_DIRS | {"envs", "tokens"}]
     return out
 
 
 def dataset_id(run: str | Path, rts: dict[str, Path] | None = None) -> str:
     """The id the server shows a run dir under: <alias>/<path under the root>, with `expview` path parts dropped."""
-    p = Path(run).expanduser().resolve()
-    for alias, root in (rts or roots()).items():
-        try:
-            rel = p.relative_to(root.resolve())
-        except ValueError:
-            continue
-        return "/".join([alias, *[x for x in rel.parts if x != "expview"]])
+    p = Path(os.path.abspath(Path(run).expanduser()))  # lexical first, so a symlinked run dir under a root keeps its link path
+    for q, r in ((p, lambda r: Path(os.path.abspath(r))), (p.resolve(), Path.resolve)):
+        for alias, root in (rts or roots()).items():
+            try:
+                rel = q.relative_to(r(root))
+            except ValueError:
+                continue
+            return "/".join([alias, *[x for x in rel.parts if x != "expview"]])
     raise ValueError(f"{run} is not under any expview root ({', '.join(f'{a}={r}' for a, r in (rts or roots()).items())})")
 
 
