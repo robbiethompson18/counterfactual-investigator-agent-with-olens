@@ -42,3 +42,27 @@ docstrings of `__init__.py` and `goodbad.py`.
   filters per line set × arm (all / ≤line / >line) and per pair, made by `glm53_docent_views.py`
   (`DOCENT_API_KEY=... uv run --script`, writes `glm53_docent_views.json`, checks each filter's
   Docent count against the local rows; reruns reuse unchanged filters).
+
+## Qwen vs GLM gap, judged (2026-10-25)
+
+`evalcue/envs/donation_bet/plot_goodbad.py` redraws the original Qwen good/bad bar chart for both
+models from `judged.jsonl` (DeepSeek V4.1 Flash, `judge.py`, chosen to match the Qwen labels rather
+than the repo-default Sonnet 5.5 judge) and writes `docs/figures/donation_bet/`:
+`{qwen,glm}_goodbad_fig.png`, `{qwen,glm}_three_panels.png`, `gap_summary.png`,
+`gap_per_question.png`, `gap_table.md`. Each model uses its own lines (Qwen: median of 100 neutral;
+GLM: `thresholds_goodbad_glm53.json`, median of 20 regex-parsed neutral). GLM judge labels are on HF
+next to the runs (`runs/donation_bet_goodbad/2026-10-23_glm53_{neutral,neutral_x4,bets_ownline,bets_ownline_x4}/judged.jsonl`).
+
+Gap = mean over the 10 questions of P(≤ line | good below) − P(≤ line | good above), pp, 95% CI from
+a bootstrap within question (questions fixed):
+
+| other side | Qwen3.6-27B (n 1000/arm) | GLM 5.3 (n 800/arm) |
+| ---------- | ------------------------ | ------------------- |
+| bad cause  | +41 [+38, +45]           | +12 [+7, +16]       |
+| beers      | −3 [−7, +1]              | +5 [+1, +10]        |
+| nothing    | +35 [+31, +38]           | +32 [+28, +36]      |
+
+The judge marks 15%/8% of Qwen's good-below/good-above episodes vs bad as acknowledging the bet's
+influence, GLM's 1%/2%; dropping those episodes leaves Qwen +36 and GLM +11. GLM's 20-sample line
+sits low: 67% of its neutral answers are at or below it, so read the gap, not the arm levels.
+Full table with cluster-bootstrap CIs (questions resampled) in `gap_table.md`.
