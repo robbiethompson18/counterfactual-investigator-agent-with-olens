@@ -175,8 +175,29 @@ def diffview(text):
     return "<pre>" + "\n".join(out) + "</pre>"
 
 
+def arm_stats(arm):
+    import statistics as stt
+
+    rs = [json.loads(f.read_text())["record"] for f in (HERE / "runs" / "main" / arm).glob("ib__*.json")]
+    if not rs:
+        return ""
+    med = lambda xs: f"{stt.median(xs) / 1000:.1f}k"
+    return (
+        f"reasoning {med([r['tokens']['reasoning'] for r in rs])} · output {med([r['tokens']['completion'] for r in rs])} tok · "
+        f"reply {stt.median([len((r.get('final_text') or '').split()) for r in rs]):.0f} words · {stt.median([r['steps'] for r in rs]):.0f} steps · "
+        f"{100 * sum(r['end'] == 'cut_long' for r in rs) / len(rs):.0f}% cut"
+    )
+
+
 def page(out: Path, dest: Path):
+    import removals
+
     secs, nav = [], []
+    arms_all = set()
+    for sid in SETTINGS:
+        a_ = json.loads((out / "settings" / sid / "answer.json").read_text())
+        arms_all |= {a_["baseline"]} | {v["arm"] for k, v in a_.items() if k != "baseline"}
+    links = removals.docent_links(sorted(arms_all))
     for sid in SETTINGS:
         sd = out / "settings" / sid
         st, ans = json.loads((sd / "setting.json").read_text()), json.loads((sd / "answer.json").read_text())
@@ -185,9 +206,12 @@ def page(out: Path, dest: Path):
             r = st["rates"][lab]
             dv = r.get("delta_vs_baseline")
             d = f"{100 * dv['diff']:+.0f} pp [{100 * dv['lo']:+.0f}, {100 * dv['hi']:+.0f}], p={dv['p']:.3f}" if dv else ""
-            who = ans["baseline"] if lab == "baseline" else f"{ans[lab]['arm']} <b class={ans[lab]['role']}>{ans[lab]['role']}</b>"
+            arm = ans["baseline"] if lab == "baseline" else ans[lab]["arm"]
+            who = arm if lab == "baseline" else f"{arm} <b class={ans[lab]['role']}>{ans[lab]['role']}</b>"
+            dl = f'<a href="{links[arm]}" target="_blank">Docent</a>' if arm in links else ""
             rows.append(
-                f"<tr><td><b>{lab}</b></td><td>{100 * r['rate']:.0f}% <span class=muted>({r['k']}/{r['n']}, CI {100 * r['ci95'][0]:.0f}–{100 * r['ci95'][1]:.0f})</span></td><td>{d}</td><td class=reveal>{who}</td></tr>"
+                f"<tr><td><b>{lab}</b></td><td>{100 * r['rate']:.0f}% <span class=muted>({r['k']}/{r['n']}, CI {100 * r['ci95'][0]:.0f}–{100 * r['ci95'][1]:.0f})</span></td><td>{d}</td>"
+                f"<td>{dl} <span class=muted>{arm_stats(arm)}</span></td><td class=reveal>{who}</td></tr>"
             )
         diffs = "".join(
             f"<details><summary>diff baseline → {lab}</summary>{diffview((sd / f'{lab}.diff').read_text())}</details>"
@@ -196,7 +220,7 @@ def page(out: Path, dest: Path):
         nav.append(f'<a href="#{sid}">{sid}</a>')
         secs.append(f"""<section id="{sid}"><h2>{sid} <span class=muted>({len(st["labels"])} edits)</span></h2>
 <p><b>Behaviour:</b> {html.escape(st["behaviour"])}<br><span class=muted><b>Grader:</b> {html.escape(st["grader"])}</span></p>
-<div class=wrap><table><tr><th>env</th><th>rate</th><th>Δ vs baseline (paired by problem)</th><th class=reveal>arm / role</th></tr>{"".join(rows)}</table></div>
+<div class=wrap><table><tr><th>env</th><th>rate</th><th>Δ vs baseline (paired by problem)</th><th>GLM transcripts (median per episode)</th><th class=reveal>arm / role</th></tr>{"".join(rows)}</table></div>
 <h3>Edits (diff from baseline)</h3>{diffs}
 <h3>Baseline file system</h3>{tree(sd / "baseline")}</section>""")
     dest.parent.mkdir(parents=True, exist_ok=True)
