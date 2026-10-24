@@ -29,6 +29,8 @@ extend-exclude = [
   "evalcue/envs/exclude_rows/task/eval.py",
   "evalcue/envs/exclude_rows/task/submit.py",
   "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
+  "donehack/envport/*/task",  # copied from agent-interp-envs into the sandbox; kept byte-identical
+  "donehack/envport/*/task_src",
   "evolve/seeds",  # environments and graders converted from evalcue/donehack; kept byte-identical to what the target saw
 ]
 
@@ -49,6 +51,8 @@ exclude = [
   "evalcue/envs/exclude_rows/task/baseline.py",
   "evalcue/envs/exclude_rows/task/eval.py",
   "evalcue/envs/exclude_rows/task/submit.py",
+  "donehack/envport/*/task",
+  "donehack/envport/*/task_src",
 ]
 
 [dependency-groups]

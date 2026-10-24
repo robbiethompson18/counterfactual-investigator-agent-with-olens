@@ -3,6 +3,7 @@ evalcue-shaped rows.jsonl (which scripts/docent_upload.py ingests as-is: arm = c
 episode JSONs. All go to experiment "coding", i.e. one Docent collection `coding`, filterable by model / condition / hacked.
 
   cd donehack && uv run python analysis/docent_rows.py v4f-variants        # one of RUNS below
+  cd donehack && uv run python analysis/docent_rows.py envport ENV EPDIR DATE "DESCRIPTION"   # envport/<env> runs
   cd .. && DOCENT_API_KEY=$(cat docent.key) uv run --script scripts/docent_upload.py upload data/runs/coding/<dir>
 """
 
@@ -202,16 +203,90 @@ def row(d, pytest_line, harness):
     }
 
 
+RUNS["glm53-endings"] = (
+    "2026-10-24",
+    (
+        "GLM 5.3 is_prime episode-ending conditions (port.py: reply / done tool variants / give_up / "
+        "submit script variants, neutral system prompt, podman u200), with/without pytest line, n=64, 32k/$0.10 cutoff"
+    ),
+    [("glm53_end", True, "port"), ("glm53_end_noit", False, "port")],
+)
+RUNS["glm53-impossiblebench-part2"] = (
+    RUNS["glm53-impossiblebench"][0],
+    RUNS["glm53-impossiblebench"][1] + " (part 2: top-up to 2 rollouts, episode cutoff 32k context / $0.10)",
+    RUNS["glm53-impossiblebench"][2],
+)
 for _n in ["glm53", "glm53-evilgenie"]:  # part2 = episodes that finished after part1 was written (each uploaded once)
     _d, _desc, _parts = RUNS[f"{_n}-part1"]
     RUNS[f"{_n}-part2"] = (_d, _desc + " (part 2: episodes finished after part 1)", _parts)
+    RUNS[f"{_n}-part3"] = (_d, _desc + " (part 3: episodes regraded after the podman storage rebuild)", _parts)
+
+
+def envport_rows(env, epdir):
+    """Generic rows for envport/<env>/run.py outputs: arm = config, item = env, every scalar record field as metadata
+    (detector fields flattened as det_<k>)."""
+    rows = []
+    for p in sorted((ROOT / "runs" / epdir).glob("*.json")):
+        d = json.loads(p.read_text())
+        r = d["record"]
+        meta = {k: v for k, v in r.items() if isinstance(v, (bool, int, float, str)) or v is None}
+        for k, v in (r.get("detector") or {}).items():
+            if isinstance(v, (bool, int, float, str)) or v is None:
+                meta[f"det_{k}"] = v
+        meta = {k: (v[:2000] if isinstance(v, str) else v) for k, v in meta.items()}
+        rows.append(
+            {
+                **meta,
+                "env": env,
+                "arm": r.get("config", env),
+                "item": env,
+                "sample": r.get("seed"),
+                "seed": r.get("seed"),
+                "model": r.get("model"),
+                "messages": d["messages"],
+                "thinking": r.get("reasoning"),
+                "files_before": {},
+                "files_after": {},
+                "episode_file": f"episodes/{epdir}/{p.name}",
+            }
+        )
+    return rows
+
+
+def main_envport(env, epdir, date, desc):
+    run = MONO / "data/runs" / env / f"{date}_glm53"
+    if (run / "docent.json").exists():
+        sys.exit(f"{run} already uploaded")
+    (run / "episodes" / epdir).mkdir(parents=True, exist_ok=True)
+    for p in (ROOT / "runs" / epdir).glob("*.json"):
+        shutil.copy(p, run / "episodes" / epdir / p.name)
+    rows = envport_rows(env, epdir)
+    (run / "rows.jsonl").write_text("".join(json.dumps(x) + "\n" for x in rows))
+    meta = {
+        "experiment": env,
+        "slug": "glm53",
+        "description": desc,
+        "status": "done",
+        "machine": "bramble",
+        "models": [{"name": "z-ai/glm-5.3", "served_by": "OpenRouter"}],
+        "params": {"source": f"donehack/runs/{epdir}"},
+        "n_rows": len(rows),
+        "cost_usd_recorded": round(sum(x.get("cost") or 0 for x in rows), 3),
+    }
+    (run / "meta.json").write_text(json.dumps(meta, indent=1) + "\n")
+    print(run, len(rows), "rows")
 
 
 def main(name):
     date, desc, parts = RUNS[name]
-    if name.endswith("-part2"):
-        prior = MONO / "data/runs/coding" / f"{date}_{name[:-6]}-part1" / "episodes"
+    if name == "glm53-impossiblebench-part2":  # first upload was named without -part1
+        prior = MONO / "data/runs/coding" / f"{date}_glm53-impossiblebench" / "episodes"
         done = {(e.name, f.name) for e in prior.iterdir() for f in e.iterdir()}
+    elif name[-6:] in ("-part2", "-part3"):
+        done = set()
+        for k in range(1, int(name[-1])):
+            prior = MONO / "data/runs/coding" / f"{date}_{name[:-6]}-part{k}" / "episodes"
+            done |= {(e.name, f.name) for e in prior.iterdir() for f in e.iterdir()}
     else:
         done = set()
     run = MONO / "data/runs/coding" / f"{date}_{name}"
@@ -247,5 +322,8 @@ def main(name):
 
 
 if __name__ == "__main__":
-    for n in sys.argv[1:]:
-        main(n)
+    if sys.argv[1] == "envport":  # envport ENV EPDIR DATE "DESCRIPTION"
+        main_envport(*sys.argv[2:6])
+    else:
+        for n in sys.argv[1:]:
+            main(n)

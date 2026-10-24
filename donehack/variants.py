@@ -86,6 +86,11 @@ MAX_TOKENS = True  # False: no max_tokens in the request (provider default)
 GRADE_TIMEOUT = 60
 
 
+# Episode-level cutoff: stop when the context passes CUT_CONTEXT tokens or the episode costs more than CUT_COST; the final
+# state is still graded and the record says end="cut_long" with cut_reason. --no-cut disables it.
+CUT, CUT_CONTEXT, CUT_COST = True, 32_000, 0.10
+
+
 async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, no_iterate):
     f = CONDS[cond]
     work = Path(tempfile.mkdtemp(prefix="dhv_"))
@@ -103,6 +108,7 @@ async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, 
         tools = [EXEC] + ([ASK_USER] if f["ask_user"] else [])
         messages = [{"role": "system", "content": NEUTRAL_SYSTEM}, {"role": "user", "content": prompt(f, no_iterate)}]
         end, cost, step, submit_cmd, question, pytest_runs = "max_steps", 0.0, 0, None, None, 0
+        cut_reason = None
         tokens = {"prompt": 0, "completion": 0, "cached": 0, "reasoning": 0}
         finish_reason = None
         extra = {"reasoning": {"effort": reasoning}} if reasoning else {}
@@ -117,6 +123,8 @@ async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, 
             tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
             tokens["reasoning"] += (u.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
             finish_reason = j["choices"][0].get("finish_reason")
+            if CUT:
+                cut_reason = "context" if (u.get("prompt_tokens") or 0) > CUT_CONTEXT else "cost" if cost > CUT_COST else None
             msg = {k: v for k, v in j["choices"][0]["message"].items() if v is not None and k != "refusal"}
             messages.append(msg)
             calls = msg.get("tool_calls") or []
@@ -144,6 +152,9 @@ async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, 
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": res})
             if stop:
                 end = stop
+                break
+            if cut_reason:  # episode-level cutoff (Kylie 2026-10-23): long transcripts are useless for metamodels
+                end = "cut_long"
                 break
         if port.BACKEND == "podman":
             tests_modified = "test_solution.py" in await box.lockdown(restore={"test_solution.py": tests})
@@ -175,6 +186,8 @@ async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, 
             "question": question,
             "pytest_runs": pytest_runs,
             "backend": port.BACKEND,
+            "cut_reason": cut_reason,
+            "cut_caps": {"context": CUT_CONTEXT, "cost": CUT_COST} if CUT else None,
             "image": port.IMAGE,
             "task": f["task"],
             "tests_passed": counts.get("passed", 0),
@@ -216,7 +229,10 @@ async def main():
     ap.add_argument("--no-max-tokens", action="store_true", help="send no max_tokens (default caps turns at 8000)")
     ap.add_argument("--chat-timeout", type=float, default=300)
     ap.add_argument("--grade-timeout", type=float, default=60)
+    ap.add_argument("--no-cut", action="store_true", help="disable the episode-level cutoff (32k context / $0.10)")
     a = ap.parse_args()
+    global CUT
+    CUT = not a.no_cut
     port.BACKEND = a.backend
     if a.small_uid:
         port.IMAGE, port.USERNS_SIZE, port.Box.slots = "localhost/donehack-sandbox-u200", 256, asyncio.Semaphore(a.small_uid)

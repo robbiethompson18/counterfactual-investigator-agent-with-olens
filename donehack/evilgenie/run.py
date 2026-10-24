@@ -152,6 +152,11 @@ async def holdout(box, tests):
     return verdicts.count("PASS"), len(tests), {k: verdicts.count(k) for k in set(verdicts)}
 
 
+# Episode-level cutoff: stop when the context passes CUT_CONTEXT tokens or the episode costs more than CUT_COST; the final
+# state is still graded and the record says end="cut_long" with cut_reason. --no-cut disables it.
+CUT, CUT_CONTEXT, CUT_COST = True, 32_000, 0.10
+
+
 async def episode(client, key, model, task_id, seed, max_steps, outdir, reasoning):
     p = json.loads((DATA / f"{task_id}.json").read_text())
     work = Path(tempfile.mkdtemp(prefix="dheg_"))
@@ -164,6 +169,7 @@ async def episode(client, key, model, task_id, seed, max_steps, outdir, reasonin
         await box._must(["podman", "exec", "-u", "root", box.name, "chown", "agent", "/agent"])  # agent may create files
         messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": USER}]
         end, cost, step, finish_reason, pytest_runs = "max_steps", 0.0, 0, None, 0
+        cut_reason = None
         tokens = {"prompt": 0, "completion": 0, "cached": 0, "reasoning": 0}
         extra = {"reasoning": {"effort": reasoning}, "max_tokens": None}
         for step in range(max_steps):
@@ -175,6 +181,8 @@ async def episode(client, key, model, task_id, seed, max_steps, outdir, reasonin
             tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
             tokens["reasoning"] += (u.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
             finish_reason = j["choices"][0].get("finish_reason")
+            if CUT:
+                cut_reason = "context" if (u.get("prompt_tokens") or 0) > CUT_CONTEXT else "cost" if cost > CUT_COST else None
             msg = {k: v for k, v in j["choices"][0]["message"].items() if v is not None and k != "refusal"}
             messages.append(msg)
             calls = msg.get("tool_calls") or []
@@ -200,6 +208,9 @@ async def episode(client, key, model, task_id, seed, max_steps, outdir, reasonin
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": res})
             if stop:
                 end = stop
+                break
+            if cut_reason:  # episode-level cutoff (Kylie 2026-10-23): long transcripts are useless for metamodels
+                end = "cut_long"
                 break
         final_tests = await box.read("test_solution.py")
         _, ls = await box.sh("ls -la /agent", user="root")
@@ -264,6 +275,8 @@ async def episode(client, key, model, task_id, seed, max_steps, outdir, reasonin
             "image": port.IMAGE,
             "regraded": "normalised comparison (json for functional, whitespace tokens for stdin)",
             "backend": port.BACKEND,
+            "cut_reason": cut_reason,
+            "cut_caps": {"context": CUT_CONTEXT, "cost": CUT_COST} if CUT else None,
             "final_text": next((m.get("content") for m in reversed(messages) if m["role"] == "assistant" and m.get("content")), None),
             "solution": sol,
         }
@@ -302,7 +315,10 @@ async def main():
     ap.add_argument("--chat-timeout", type=float, default=900)
     ap.add_argument("--out", required=True)
     ap.add_argument("--data", default="data", help="problem dir under evilgenie/: data (EvilGenie) or data_ib (ImpossibleBench)")
+    ap.add_argument("--no-cut", action="store_true", help="disable the episode-level cutoff (32k context / $0.10)")
     a = ap.parse_args()
+    global CUT
+    CUT = not a.no_cut
     global DATA
     DATA = Path(__file__).parent / a.data
     env.CHAT_TIMEOUT = a.chat_timeout

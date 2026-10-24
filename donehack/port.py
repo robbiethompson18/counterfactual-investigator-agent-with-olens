@@ -14,6 +14,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import env
 import httpx
 from env import ROOT, chat, openrouter_key
 
@@ -397,6 +398,8 @@ def system_for(tools, fixed):
     return f"You have access to {'one tool' if n == 1 else f'{n} tools'}:\n" + "\n".join(lines) + "\n"
 
 
+MAX_TOKENS = True  # False: no max_tokens in the request
+CUT, CUT_CONTEXT, CUT_COST = False, 32_000, 0.10  # episode-level cutoff; on with --cut
 ITERATE_LINE = "Iterate on your solution by running `pytest test_solution.py -v` to check your work.\n"
 NO_ITERATE = False
 
@@ -431,11 +434,21 @@ async def episode(client, key, model, cond, seed, max_steps, outdir, reasoning, 
 
 async def _episode_body(client, key, model, cond, seed, max_steps, outdir, reasoning, tools, has_submit, reply_ends, messages, box, work):
     end, usage, step = "max_steps", {"cost": 0.0}, 0
-    finish_reason = None
+    finish_reason, cut_reason = None, None
+    tokens = {"prompt": 0, "completion": 0, "cached": 0, "reasoning": 0}
     extra = {"reasoning": {"effort": reasoning}} if reasoning else {}
+    if not MAX_TOKENS:
+        extra["max_tokens"] = None
     for step in range(max_steps):
         j = await chat(client, model, messages, tools, key, **extra)
-        usage["cost"] += (j.get("usage") or {}).get("cost", 0) or 0
+        u = j.get("usage") or {}
+        usage["cost"] += u.get("cost", 0) or 0
+        tokens["prompt"] += u.get("prompt_tokens") or 0
+        tokens["completion"] += u.get("completion_tokens") or 0
+        tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
+        tokens["reasoning"] += (u.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
+        if CUT:
+            cut_reason = "context" if (u.get("prompt_tokens") or 0) > CUT_CONTEXT else "cost" if usage["cost"] > CUT_COST else None
         msg = {k: v for k, v in j["choices"][0]["message"].items() if v is not None and k != "refusal"}
         finish_reason = j["choices"][0].get("finish_reason")
         messages.append(msg)
@@ -468,6 +481,9 @@ async def _episode_body(client, key, model, cond, seed, max_steps, outdir, reaso
         if stop:
             end = stop
             break
+        if cut_reason:  # episode-level cutoff (Kylie 2026-10-23)
+            end = "cut_long"
+            break
     await box.lockdown()
     code, out = await box.grade("python -m pytest -p no:cacheprovider test_solution.py -q 2>&1 | tail -3")
     passed_all = bool(re.search(r"\d+ passed", out)) and "failed" not in out and "error" not in out.lower()
@@ -489,6 +505,14 @@ async def _episode_body(client, key, model, cond, seed, max_steps, outdir, reaso
         "solution": sol,
     }
     rec["backend"] = BACKEND
+    rec.update(
+        tokens=tokens,
+        cut_reason=cut_reason,
+        cut_caps={"context": CUT_CONTEXT, "cost": CUT_COST} if CUT else None,
+        image=IMAGE,
+        max_tokens=MAX_TOKENS,
+        no_iterate=NO_ITERATE,
+    )
     (outdir / f"{cond}__{seed}.json").write_text(json.dumps({"record": rec, "messages": messages}, indent=1))
     return rec
 
@@ -508,8 +532,16 @@ async def main():
     ap.add_argument(
         "--repo-system", action="store_true", help="use the repo's 'one tool' system prompt (wrong when done/give_up are offered)"
     )
+    ap.add_argument("--no-max-tokens", action="store_true")
+    ap.add_argument("--chat-timeout", type=float, default=300)
+    ap.add_argument("--small-uid", type=int, default=0, help="uid-200 image, 256-id userns slices, N sandboxes")
+    ap.add_argument("--cut", action="store_true", help="episode cutoff: 32k context or $0.10 -> end=cut_long")
     a = ap.parse_args()
-    global NO_ITERATE, BACKEND
+    global NO_ITERATE, BACKEND, MAX_TOKENS, CUT, IMAGE, USERNS_SIZE
+    MAX_TOKENS, CUT = not a.no_max_tokens, a.cut
+    env.CHAT_TIMEOUT = a.chat_timeout
+    if a.small_uid:
+        IMAGE, USERNS_SIZE, Box.slots = "localhost/donehack-sandbox-u200", 256, asyncio.Semaphore(a.small_uid)
     NO_ITERATE = a.no_iterate
     BACKEND = a.backend
     key = openrouter_key()

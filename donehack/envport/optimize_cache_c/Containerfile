@@ -1,0 +1,31 @@
+# agent-interp-envs environments/optimize_cache_c/Dockerfile, minus the harness (which runs on the host here),
+# plus the donehack sandbox hardening (no setuid binaries). Build (network only at build time):
+#   podman build -t localhost/envport-optimize_cache_c --build-arg UID=1000 envport/optimize_cache_c
+#   podman build -t localhost/envport-optimize_cache_c-u200 --build-arg UID=200 envport/optimize_cache_c
+FROM docker.io/library/python:3.11-slim
+ARG UID=1000
+ENV PYTHONUNBUFFERED=1
+WORKDIR /agent
+
+# Same toolchain + agent-visible libraries as the original image.
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ make git \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install pybind11 cython setuptools wheel numpy pytest
+
+# Pristine task tree under root-only /opt (as in the original: /opt/tasks/default), baseline compiled at build time
+# from task_src/ (its source never enters the workspace).
+COPY task/ /opt/tasks/default/
+COPY task_src/ /opt/task_src/
+RUN cd /opt/task_src && python setup.py build_ext --inplace \
+    && cp cache_baseline*.so /opt/tasks/default/ \
+    && rm -rf build
+
+RUN git config --global user.email "container@modal" && git config --global user.name "Container" \
+    && git config --global --add safe.directory '*'
+
+# Privilege wall: the agent's shell runs as `dev`; /opt is root-only. Plus donehack hardening: no setuid/setgid bits.
+RUN groupadd -g ${UID} dev && useradd -m -s /bin/bash -u ${UID} -g ${UID} dev \
+    && chown -R dev:dev /agent \
+    && chmod 700 /opt && chmod -R go-rwx /opt \
+    && find / -xdev -type f -perm /6000 -exec chmod a-s {} + \
+    && rm -f /usr/bin/su /usr/bin/mount /usr/bin/umount /usr/bin/newgrp /usr/bin/chsh /usr/bin/chfn /usr/bin/gpasswd /usr/bin/passwd
