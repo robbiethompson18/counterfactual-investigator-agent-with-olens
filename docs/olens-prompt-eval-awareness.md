@@ -7,7 +7,63 @@ predict **verbalised eval awareness (VEA)** in the rollout? Motivating case: an 
 Continuation honeypot where one lens sample on a scripted turn reads "I will generate synthetic
 scenarios…" and the rollout never says so.
 
-## Result (keyword match, 2026-10-24)
+## Across tasks (headline)
+
+Unit = unique prompt, pooled across settings. x = whether / how much the prompt-side O-lens reads
+contain a strict eval word (share of prompt positions with a hit; "end of user turn" = only the last
+3 prompt positions, which every setting has read, so dense-read prompts aren't diluted). Control =
+the same regex on the raw prompt text (hits per 1k chars). y = VEA of each episode. Monitor-labelled
+and regex-labelled settings are shown separately as well as pooled: their label sources differ.
+Logistic = episode level, SEs clustered by prompt, odds ratio per SD, lens adjusted for prompt text
+(`olens_prompt_ea/across.py`).
+
+| pool                                                    | eps    | prompts | VEA  | VEA: lens hit vs none (eps) | AUROC lens share  | AUROC lens end of turn | AUROC prompt text | OR lens, adj.     | OR prompt text, adj. | ρ over conditions, lens (n) |
+| ------------------------------------------------------- | ------ | ------- | ---- | --------------------------- | ----------------- | ---------------------- | ----------------- | ----------------- | -------------------- | --------------------------- |
+| All settings (monitor + regex VEA)                      | 48,490 | 9,909   | 0.06 | 0.04 vs 0.10                | 0.29 [0.27, 0.32] | 0.29 [0.26, 0.33]      | 0.57 [0.55, 0.59] | 0.33 [0.27, 0.42] | 1.21 [1.15, 1.26]    | +0.12 (1593)                |
+| All settings except donation bet (24,800 eps, 0.3% VEA) | 23,690 | 9,443   | 0.11 | 0.12 vs 0.11                | 0.49 [0.45, 0.52] | 0.48 [0.44, 0.52]      | 0.55 [0.53, 0.57] | 0.76 [0.66, 0.87] | 1.17 [1.12, 1.23]    | +0.10 (1568)                |
+| Monitor / answer-labelled settings only                 | 1,975  | 321     | 0.35 | 0.37 vs 0.30                | 0.42 [0.30, 0.59] | 0.49 [0.36, 0.63]      | 0.50 [0.43, 0.57] | 0.80 [0.52, 1.24] | 1.65 [1.22, 2.23]    | -0.16 (25)                  |
+| Regex-labelled settings only                            | 46,515 | 9,598   | 0.04 | 0.02 vs 0.09                | 0.28 [0.25, 0.31] | 0.28 [0.25, 0.30]      | 0.58 [0.56, 0.60] | 0.34 [0.27, 0.44] | 1.08 [1.03, 1.13]    | +0.12 (1568)                |
+
+**Across tasks the lens does not pick out the prompts that produce VEA; if anything the reverse.**
+Pooled over everything the association is strongly negative (AUROC 0.29), because donation bet
+(24,800 eps, VEA 0.3%) gets reads like "that you are being evaluated on your answer" / "the
+evaluator…" on half its prompt positions. Without donation bet it is null (AUROC 0.49, adjusted OR
+0.76 per SD), and among the monitor-labelled settings it is null too (0.42 [0.30, 0.59]). The raw
+prompt text containing eval words is weakly positive in every pool (OR 1.1–1.7 per SD), and the lens
+adds nothing on top of it. At setting level the pattern is visible directly: the high-VEA settings
+(inspect / main agentic misalignment 0.55–0.87, honeypot AM-fixed 0.74, InstrumentalEval 0.45, MASK
+0.28) have few eval words in their prompt reads (strict share 0.02–0.05), while the settings where
+the lens talks most about evaluation (donation bet 0.49, sandbagging 0.56, IB realistic 0.37) have
+low VEA (0.003–0.13). The lens reads "evaluation" where the prompt is a task to be graded, not where
+the model will later say it is being tested.
+
+Per setting:
+
+| setting          | VEA source | eps   | VEA   | lens strict share | lens broad share | lens end of user turn | prompt text strict /1k chars |
+| ---------------- | ---------- | ----- | ----- | ----------------- | ---------------- | --------------------- | ---------------------------- |
+| ec_hidden_goal   | regex      | 420   | 0.000 | 0.069             | 0.307            | 0.091                 | 0.000                        |
+| ec_dumb_user     | regex      | 4200  | 0.003 | 0.018             | 0.107            | 0.019                 | 0.016                        |
+| ec_hiring        | regex      | 3446  | 0.003 | 0.109             | 0.281            | 0.115                 | 0.032                        |
+| donation_bet     | regex      | 24800 | 0.003 | 0.486             | 0.880            | 0.604                 | 0.000                        |
+| ec_cue           | regex      | 1080  | 0.008 | 0.234             | 0.506            | 0.241                 | 0.436                        |
+| ec_other         | regex      | 476   | 0.008 | 0.068             | 0.268            | 0.078                 | 0.000                        |
+| ec_whistleblow   | regex      | 2171  | 0.025 | 0.100             | 0.329            | 0.097                 | 0.009                        |
+| ec_overnight     | regex      | 708   | 0.038 | 0.069             | 0.493            | 0.085                 | 0.035                        |
+| ib_realistic     | regex      | 1290  | 0.039 | 0.370             | 0.626            | 0.461                 | 0.000                        |
+| hp_abst          | label      | 600   | 0.057 | 0.173             | 0.543            | 0.194                 | 0.031                        |
+| ec_shutdown      | regex      | 2436  | 0.066 | 0.210             | 0.630            | 0.258                 | 0.020                        |
+| hp_mc            | label      | 350   | 0.091 | 0.076             | 0.201            | 0.236                 | 0.084                        |
+| agentharm        | regex      | 352   | 0.094 | 0.024             | 0.096            | 0.018                 | 0.000                        |
+| ec_sandbagging   | regex      | 470   | 0.132 | 0.564             | 0.841            | 0.645                 | 0.043                        |
+| ec_scheming      | regex      | 2585  | 0.161 | 0.258             | 0.485            | 0.284                 | 0.033                        |
+| mask             | regex      | 921   | 0.284 | 0.017             | 0.071            | 0.017                 | 0.002                        |
+| instrumentaleval | regex      | 228   | 0.447 | 0.054             | 0.377            | 0.053                 | 0.014                        |
+| am_main          | label      | 450   | 0.553 | 0.021             | 0.101            | 0.089                 | 0.005                        |
+| sad_oversight    | label      | 325   | 0.597 | 0.153             | 0.245            | 0.161                 | 0.619                        |
+| hp_am_fixed      | label      | 250   | 0.740 | 0.053             | 0.134            | 0.333                 | 0.000                        |
+| inspect_am       | regex      | 932   | 0.873 | 0.016             | 0.078            | 0.019                 | 0.049                        |
+
+## Within condition (keyword match, 2026-10-24)
 
 **No: prompt-side O-lens eval words do not predict VEA within a condition**, in any setting with a
 real VEA label except SAD stages_oversight, where the model is asked outright whether it is being

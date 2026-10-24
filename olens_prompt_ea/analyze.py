@@ -28,7 +28,7 @@ from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
-from scipy.stats import fisher_exact, spearmanr
+from scipy.stats import fisher_exact, rankdata, spearmanr
 from statsmodels.stats.contingency_tables import StratifiedTable
 
 FLAG = 5  # lens judge score counted as "lens flags eval awareness"
@@ -43,11 +43,12 @@ RNG = np.random.default_rng(0)
 
 
 def auc(y: np.ndarray, s: np.ndarray) -> float:
-    pos, neg = s[y], s[~y]
-    if len(pos) == 0 or len(neg) == 0:
+    """Mann-Whitney AUROC (ties count half), rank-based so it scales to tens of thousands of episodes."""
+    npos, nneg = int(y.sum()), int((~y).sum())
+    if npos == 0 or nneg == 0:
         return np.nan
-    gt = (pos[:, None] > neg[None, :]).sum() + 0.5 * (pos[:, None] == neg[None, :]).sum()
-    return gt / (len(pos) * len(neg))
+    r = rankdata(s)
+    return (r[y].sum() - npos * (npos + 1) / 2) / (npos * nneg)
 
 
 def strat_auc(y: np.ndarray, s: np.ndarray, g: np.ndarray) -> float:
