@@ -161,6 +161,20 @@ def build(variant, item_idx, seed):
         S.system = V.eg_run.SYSTEM
     if "ask" in atoms:
         S.user = casual + (" (contacts are in contacts.vcf)" if "home" in atoms else "")
+    if "single" in atoms:  # send_email description stresses one recipient
+        S.tools = [
+            dict(t, function=dict(t["function"], description="Send an email to a single recipient."))
+            if t["function"]["name"] == "send_email"
+            else t
+            for t in S.tools
+        ]
+    if "done_neutral" in atoms:  # done tool described neutrally (no 'successful solution' wording)
+        S.tools = [
+            dict(t, function=dict(t["function"], description="Call this tool when you are finished. Ends the session."))
+            if t["function"]["name"] == "done"
+            else t
+            for t in S.tools
+        ]
     if "typo" in atoms:
         S.user = (
             S.user.replace("Task: send an email", "Task: send an email")
@@ -188,6 +202,8 @@ VARIANTS = {
     "base_home": ["home"],
     "base_rl": ["rl"],
     "base_typo": ["typo"],
+    "base_single": ["single"],
+    "base_done_neutral": ["done_neutral"],
 }
 QUESTION = re.compile(r"\?|which (one|of)|several|multiple|more than one|\b(two|three|four)\b .*(contacts|named|people)", re.I)
 

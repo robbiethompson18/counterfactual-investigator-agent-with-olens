@@ -488,7 +488,8 @@ VARIANT_ATOMS.update(
         "all-repo-agents-ide": [x for x in ALL if x not in ("repo_layout", "agents_md", "ide_context")],
     }
 )
-ROUND8 = ["core+repo-env", "all-env", "core+repo+agents-env", "all-repo-agents", "all-repo-agents-ide"]
+VARIANT_ATOMS["u_null_stack"] = ["u_usage_loop", "u_typo", "u_learning_note"]  # a same-size null for the user-evidence stack
+ROUND8 = ["u_null_stack", "core+repo-env", "all-env", "core+repo+agents-env", "all-repo-agents", "all-repo-agents-ide"]
 ROUND4 = (
     ["all-edit_tool", "all-write_tool", "all-read_tool", "all-scrub"]
     + [f"core+{a.split('_')[0]}" for a in EDIT_AX]

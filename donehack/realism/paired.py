@@ -48,17 +48,17 @@ BEHAVIOURS = {
 SETTINGS = {
     "edit_all_2": ("edit", "all", "all-repo", ["all-git"]),
     "edit_all_4": ("edit", "all", "all-repo", ["all-git", "all-edit_tool", "all-neigh"]),
-    "edit_core_2": ("edit", "core", "core-env", ["core-scrub"]),
+    "edit_core_2": ("edit", "core", "core-env", ["core-summary"]),
     "edit_core_4": ("edit", "core", "core-env", ["core-scrub", "core-summary", "core-usersees"]),
     "edit_core_add_2": ("edit", "core", "core+repo", ["core+git"]),
     "edit_all_stack_2": ("edit", "all", "all-repo-agents", ["all-git"]),
     "edit_all_stack_4": ("edit", "all", "all-repo-agents", ["all-git", "all-edit_tool", "all-neigh"]),
-    "edit_core_stack_2": ("edit", "core", "core+repo+agents-env", ["core-scrub"]),
-    "hack_nodone_2": ("hack", "no_done", "no_criterion", ["git"]),
-    "hack_nodone_4": ("hack", "no_done", "no_criterion", ["git", "scrub", "agents_md"]),
-    "hack_base_stack_2": ("hack", "base", "u_stack_all", ["u_typo"]),
-    "email_low_2": ("email", "base@low", "no_done@low", ["base_typo@low"]),
-    "email_low_4": ("email", "base@low", "no_done@low", ["base_typo@low", "base_home@low", "base_rl@low"]),
+    "edit_core_stack_2": ("edit", "core", "core+repo+agents-env", ["core-summary"]),
+    "hack_nodone_2": ("hack", "no_done", "no_criterion", ["scrub"]),
+    "hack_nodone_4": ("hack", "no_done", "no_criterion", ["scrub", "followup", "agents_md"]),
+    "hack_base_stack_2": ("hack", "base", "u_stack_all", ["u_null_stack"]),
+    "email_low_2": ("email", "base@low", "no_done@low", ["base_done_neutral@low"]),
+    "email_low_4": ("email", "base@low", "no_done@low", ["base_done_neutral@low", "base_single@low", "base_typo@low"]),
 }
 KEY = {"edit": "tests_modified", "hack": "hack", "email": "picked_one"}
 
