@@ -194,6 +194,30 @@ def setting_rows(e: pd.DataFrame) -> list[dict]:
     return out
 
 
+def leak_check(run: Path, e: pd.DataFrame) -> list[dict]:
+    """Identical-prompt conditions: score each episode on its OWN prompt-side reads only (keyword, strict + broad). The
+    activations are a function of the prompt, so any within-condition AUROC here is engine noise or leakage through which
+    positions got read (fill quotas depend on rollout length). This is why every other score is pooled per prompt."""
+    from keywords import hits
+
+    d = e[e.setting.isin(["am_main", "hp_am_fixed", "hp_abst"]) & e.vea.notna()]
+    reads = pd.read_parquet(
+        run / "reads.parquet", columns=["ph", "tid", "pos", "text", "ctx_left40", "ctx_right40"], filters=[("tid", "in", list(d.tid))]
+    )
+    h = hits(reads)
+    h["tid"] = reads.tid.to_numpy()
+    own = h.groupby(["tid", "pos"])[["strict_hit", "broad_hit"]].any().groupby("tid").mean()
+    d = d.assign(own_strict=d.tid.map(own.strict_hit), own_broad=d.tid.map(own.broad_hit), n_own=d.n_prompt_pos_own)
+    out = []
+    for st, x in d.groupby("setting"):
+        x = x.assign(vea=x.vea.astype(bool))
+        r = {"setting": st, "n": len(x)}
+        for col in ("own_strict", "own_broad", "n_own"):
+            r[col], r[col + "_lo"], r[col + "_hi"], _ = boot(x.assign(ph=x.tid), col, within=True)
+        out.append(r)
+    return out
+
+
 def contrasts(e: pd.DataFrame) -> list[dict]:
     """Test-vs-real arms: mean scores and VEA per arm, for the settings where arms are a deliberate realism contrast."""
     out = []
@@ -295,9 +319,19 @@ def main() -> None:
     rows = setting_rows(e)
     con = contrasts(e)
     ex = examples(run, e)
-    (run / "results.json").write_text(json.dumps({"settings": rows, "contrasts": con}, indent=1, default=float))
+    leak = leak_check(run, e)
+    (run / "results.json").write_text(json.dumps({"settings": rows, "contrasts": con, "leak_check": leak}, indent=1, default=float))
     (run / "examples.json").write_text(json.dumps(ex, indent=1, default=str))
     md = markdown(rows, con)
+    md += "\nLeak check (identical prompts, own reads only; within-condition AUROC, should be ~0.5):\n\n"
+    md += (
+        "\n".join(
+            f"- {r['setting']} (n={r['n']}): "
+            + ", ".join(f"{c} {fmt(r[c], r[c + '_lo'], r[c + '_hi'])}" for c in ("own_strict", "own_broad", "n_own"))
+            for r in leak
+        )
+        + "\n"
+    )
     (run / "results.md").write_text(md)
     print(md)
 
