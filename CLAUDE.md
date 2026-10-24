@@ -276,6 +276,9 @@ Current docs:
   Kylie-key and re-upload gotchas
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
+  — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
+  harness version
 - [O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22: no reliable uplift on killswitch, inline_b, exfil, whistleblow or donation bet;
   arm-level vs within-arm signal, tool use per predictor, what to try next
