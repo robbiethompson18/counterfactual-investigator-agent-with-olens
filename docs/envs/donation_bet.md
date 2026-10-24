@@ -37,4 +37,8 @@ docstrings of `__init__.py` and `goodbad.py`.
   Holm) and the expview run. Run it as a plain script; the package `__init__` needs
   `QWEN_VLLM_URL`. Page: https://claude.ai/artifact/2LkXKGBJHyDVicGRAYwQAs (private).
 - **Docent**: every row is in the `donation_bet_goodbad` collection,
-  https://docent.transluce.org/dashboard/fe024751-6ef7-4f31-9df5-3abe990d816c
+  https://docent.transluce.org/dashboard/fe024751-6ef7-4f31-9df5-3abe990d816c. The page links every transcript to its
+  Docent run (`docent.json` of its run dir, by `rows.jsonl` line), and its tables link saved Docent
+  filters per line set × arm (all / ≤line / >line) and per pair, made by `glm53_docent_views.py`
+  (`DOCENT_API_KEY=... uv run --script`, writes `glm53_docent_views.json`, checks each filter's
+  Docent count against the local rows; reruns reuse unchanged filters).

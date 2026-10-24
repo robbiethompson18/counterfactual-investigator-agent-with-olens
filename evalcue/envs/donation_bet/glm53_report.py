@@ -25,6 +25,7 @@ sys.path.insert(0, str(EXPVIEW))
 from expview import Run, call
 
 RUNS = REPO / "data/runs/donation_bet_goodbad"
+DOCENT = "https://docent.transluce.org"
 D = "2026-10-23_glm53-"
 # line set -> run tags (first pass n=200/100 per arm on seed 0, x4 = 3x more on seed 1)
 SETS = {"own": ["bets-ownline", "named-ownline", "bets-ownline-x4", "named-ownline-x4"], "qwen": ["bets", "named", "bets-x4", "named-x4"]}
@@ -119,11 +120,22 @@ def main():
     thr = json.loads((ENVD / "thresholds_goodbad.json").read_text())
     own = json.loads((ENVD / "thresholds_goodbad_glm53.json").read_text())
     rows = []
+    docent = {}  # run tag -> Docent agent run id per rows.jsonl line (docent.json, written by scripts/docent_upload.py)
     for setname, tags in [*SETS.items(), ("neutral", NEUTRAL)]:
         for t in tags:
             f = RUNS / (D + t) / "rows.jsonl"
             if f.exists():
-                rows += [(setname, t, r) for r in map(json.loads, f.open()) if "error" not in r]
+                rows += [(setname, t, r | {"_line": i}) for i, r in enumerate(map(json.loads, f.open())) if "error" not in r]
+                if (f.parent / "docent.json").exists():
+                    docent[t] = json.loads((f.parent / "docent.json").read_text())
+    # saved Docent filters per (line set, arm[, side of the line]) and pair, from glm53_docent_views.py
+    vf = ENVD / "glm53_docent_views.json"
+    views = json.loads(vf.read_text()) if vf.exists() else {"collection": None, "views": {}}
+
+    def dlink(key, text="Docent"):
+        v = views["views"].get(key)
+        return f"<a href='{v['url']}' target='_blank' title='{v['n_docent']} runs'>{text}</a>" if v else ""
+
     # pos[set][arm][question] -> list of bools
     pos = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for s, t, r in rows:
@@ -175,7 +187,7 @@ def main():
             H(
                 f"<h4>{fam}</h4><div style='overflow-x:auto'><table><tr><th>pair</th><th>P(≤line) good below / above</th>"
                 f"<th>gap pp [95% CI]</th><th style='min-width:150px'>−40 … +60 pp</th><th>Fisher p</th><th>CMH p</th>"
-                f"<th>Holm CMH p</th><th>MH OR</th></tr>"
+                f"<th>Holm CMH p</th><th>MH OR</th><th>Docent</th></tr>"
             )
             for (lab, arm, x), pa in zip(st, adj):
                 sig = pa < 0.05
@@ -186,7 +198,9 @@ def main():
                     f"<td>{100 * x['d']:+.1f} [{100 * x['lo']:+.0f}, {100 * x['hi']:+.0f}]</td>"
                     f"<td>{bar(x['lo'], x['hi'], x['d'], -0.4, 0.6, 0, sig)}</td>"
                     f"<td>{fmt_p(x['p_fisher'])}</td><td>{fmt_p(x['p_cmh'])}</td>"
-                    f"<td>{'<b>' if sig else ''}{fmt_p(pa)}{'</b>' if sig else ''}</td><td>{x['mh_or']:.2f}</td></tr>"
+                    f"<td>{'<b>' if sig else ''}{fmt_p(pa)}{'</b>' if sig else ''}</td><td>{x['mh_or']:.2f}</td>"
+                    f"<td style='white-space:nowrap'>{dlink(f'{s}/{arm}', 'both')} · {dlink(f'{s}/{arm}_below', 'below')}"
+                    f" · {dlink(f'{s}/{arm}_above', 'above')}</td></tr>"
                 )
             if fam.startswith("Named"):
                 tabs = [t for _, _, x in st for t in x["tabs"]]
@@ -202,13 +216,13 @@ def main():
                     "<tr><td style='white-space:nowrap'><b>pooled, 9 pairs</b></td>"
                     f"<td style='white-space:nowrap'>{100 * kb / nb:.0f}% / {100 * ka / na:.0f}% <small>(n {nb}/{na})</small></td>"
                     f"<td>{100 * d:+.1f} [{100 * lo:+.0f}, {100 * hi:+.0f}]</td><td>{bar(lo, hi, d, -0.4, 0.6, 0, sig)}</td><td></td>"
-                    f"<td>{fmt_p(pc)}<small> (pair×q)</small></td><td></td><td>{orr:.2f}</td></tr>"
+                    f"<td>{fmt_p(pc)}<small> (pair×q)</small></td><td></td><td>{orr:.2f}</td><td></td></tr>"
                 )
             H("</table></div>")
         # per-arm rates
         H(
             "<details><summary>Per-arm P(≤line) with 95% Wilson CIs</summary><div style='overflow-x:auto'><table>"
-            "<tr><th>arm</th><th>k/n</th><th>P(≤line)</th><th style='min-width:150px'>0 … 100%</th></tr>"
+            "<tr><th>arm</th><th>k/n</th><th>P(≤line)</th><th style='min-width:150px'>0 … 100%</th><th>Docent</th></tr>"
         )
         for arm in sorted(pos[s]):
             v = allq(s, arm)
@@ -216,7 +230,8 @@ def main():
             lo, hi = wilson(k, n)
             H(
                 f"<tr><td>{arm}</td><td>{k}/{n}</td><td>{100 * k / n:.0f}% [{100 * lo:.0f}, {100 * hi:.0f}]</td>"
-                f"<td>{bar(lo, hi, k / n, 0, 1, 0.5)}</td></tr>"
+                f"<td>{bar(lo, hi, k / n, 0, 1, 0.5)}</td><td style='white-space:nowrap'>{dlink(f'{s}/{arm}', 'all')}"
+                f" · {dlink(f'{s}/{arm}/le', '≤line')} · {dlink(f'{s}/{arm}/gt', '>line')}</td></tr>"
             )
         H("</table></div></details>")
         # per question
@@ -263,7 +278,9 @@ Statistics: 95% CIs are Newcombe (gap) / Wilson (rate); Fisher exact on the pool
 (continuity-corrected) with the Mantel-Haenszel common odds ratio; Holm correction of the CMH p over the pairs in each table.
 ✱ / orange = Holm-adjusted p < 0.05. Bars: point and 95% CI, dashed line = no effect. Transcripts below: every own-line and
 neutral row, and the first-pass Qwen-line rows (all rows are on Docent, collection donation_bet_goodbad). Groups ending
-"· own line" are own-line runs.
+"· own line" are own-line runs. Each transcript links to its Docent run in its header; the tables' **Docent** links open
+saved filters of the [collection]({views["collection"]}) (metadata `arm`, `positive` = ≤line, `run_description` = the run;
+neutral rows: {dlink("neutral/neutral", "all neutral runs")}).
 
 {"".join(html)}
 """
@@ -306,7 +323,10 @@ neutral row, and the first-pass Qwen-line rows (all rows are on Docent, collecti
             group=group,
             labels={k: v for k, v in labels.items() if v is not None},
             env_files=env,
-            extra={"source": f"donation_bet_goodbad/{D}{t}", "arm": arm, "finish": r.get("finish")},
+            extra={"source": f"donation_bet_goodbad/{D}{t}", "row": r["_line"], "arm": arm, "finish": r.get("finish")},
+            links={"Docent transcript": f"{DOCENT}/dashboard/{docent[t]['collection_id']}/agent_run/{aid}"}
+            if t in docent and (aid := docent[t]["runs"][r["_line"]])
+            else None,
             calls=[
                 call(
                     "subject",
