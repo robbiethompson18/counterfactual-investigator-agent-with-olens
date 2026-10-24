@@ -40,13 +40,14 @@ divided by the oracle's gain (1 = predicting 27/30, 0 = "the edit does nothing")
 
 Skill on this case, with the mean predicted p (truth 0.90).
 
-| version            | change                                                                                | TS agent    | O-lens agent | O-lens placebo | run                                      |
-| ------------------ | ------------------------------------------------------------------------------------- | ----------- | ------------ | -------------- | ---------------------------------------- |
-| 1                  | pre-registered big test                                                               | 0.12 (0.03) | 0.58 (0.21)  | 0.12 (0.03)    | `2026-10-23_grade-big2-cue`              |
-| 1 + read-one-first | #144's sentence on the v1 harness                                                     | 0.13 (0.03) | 0.34 (0.16)  | —              | `2026-10-24_grade-read-one-first`        |
-| 2                  | `search_olens over="bullets"` (#143)                                                  | —           | 0.51 (0.15)  | 0.16 (0.03)    | `2026-10-24_grade-bullets-allstakes`     |
-| 4                  | 2 + "read one full transcript first" (#144) + "Use the O-lens tools liberally" (#145) | 0.14 (0.03) | 0.47 (0.14)  | 0.19 (0.03)    | `2026-10-24_grade-smoke-olens-liberally` |
-| 5                  | 4 + `search_olens` returns 20 bullets, not 10 (#146)                                  | 0.17 (0.03) | 0.44 (0.13)  | 0.24 (0.06)    | `2026-10-24_grade-v5-allstakes`          |
+| version            | change                                                                                 | TS agent    | O-lens agent | O-lens placebo | run                                      |
+| ------------------ | -------------------------------------------------------------------------------------- | ----------- | ------------ | -------------- | ---------------------------------------- |
+| 1                  | pre-registered big test                                                                | 0.12 (0.03) | 0.58 (0.21)  | 0.12 (0.03)    | `2026-10-23_grade-big2-cue`              |
+| 1 + read-one-first | #144's sentence on the v1 harness                                                      | 0.13 (0.03) | 0.34 (0.16)  | —              | `2026-10-24_grade-read-one-first`        |
+| 2                  | `search_olens over="bullets"` (#143)                                                   | —           | 0.51 (0.15)  | 0.16 (0.03)    | `2026-10-24_grade-bullets-allstakes`     |
+| 4                  | 2 + "read one full transcript first" (#144) + "Use the O-lens tools liberally" (#145)  | 0.14 (0.03) | 0.47 (0.14)  | 0.19 (0.03)    | `2026-10-24_grade-smoke-olens-liberally` |
+| 5                  | 4 + `search_olens` returns 20 bullets, not 10 (#146)                                   | 0.17 (0.03) | 0.44 (0.13)  | 0.24 (0.06)    | `2026-10-24_grade-v5-allstakes`          |
+| 6                  | 5 + hits labelled `<transcript>`/`<olens>`, search context cut at message edges (#149) | 0.31 (0.08) | 0.36 (0.14)  | 0.22 (0.04)    | `2026-10-24_grade-v6-allstakes`          |
 
 Version 3 (#144 alone, rebased onto v2) was never run on its own. Runs are under `runs/cfbench/` on
 HF and in the `cfbench` Docent collection.
@@ -60,14 +61,18 @@ Per-draw p, for reading the noise:
 | 2                  | —                   | .06 .12 .35 .04 .16 | .02 .03 .03 .06 .02 |
 | 4                  | .02 .03 .04 .02 .03 | .03 .07 .05 .25 .30 | .02 .05 .03 .04 .03 |
 | 5                  | .02 .03 .03 .03 .05 | .02 .15 .04 .14 .28 | .04 .03 .02 .20 .02 |
+| 6                  | .04 .06 .25 .02 .03 | .02 .12 .05 .02 .48 | .03 .08 .03 .03 .03 |
 
 What this says:
 
 - The O-lens agent beats the TS agent and the placebo on every version. That's the thing the smoke
-  test guards.
+  test guards. On v6 the margin over TS is small (0.36 vs 0.31) because one TS draw guessed 0.25
+  ("the scholarship context raises the evaluation standard"), the only TS draw above 0.06 in 30. v6
+  didn't change the TS prompt, so that's draw noise, and it shows a single draw can carry a
+  version's skill either way.
 - No change since version 1 has measurably helped on this case. The O-lens agent's mean p has
   drifted from 0.21 to 0.13, but one or two draws per run carry each mean (0.38, 0.68, 0.35, 0.30,
-  0.28), so differences between versions are within draw noise.
+  0.28, 0.48), so differences between versions are within draw noise.
 - Bullet search finds more strict-grade bullets than the old transcript search ("4/10" matches
   bullets in 28/30 base runs, "strict" 23/30 but 0/30 transcripts), but agents then argue that a
   harsh internal grade present in almost every run, with 0/30 harsh outputs, can't matter. The old
