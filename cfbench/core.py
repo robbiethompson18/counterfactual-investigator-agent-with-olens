@@ -22,8 +22,9 @@ TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must
 # prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
 # prompts recommend reading one full transcript before searching (2026-10-24). 4: olens tool descriptions no longer
 # promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
-# liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24).
-HARNESS_VERSION = 5
+# liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24). 6: O-lens hits are
+# labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
+HARNESS_VERSION = 6
 
 
 @dataclass
@@ -79,7 +80,8 @@ OLENS = """
 {n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
 regex over those runs' transcripts that returns the reads at each match) and `olens_at` (all reads around a run and \
 character, from any search hit). The O-lens is a model trained to describe another model's internal activations in \
-words. It was run on the target model's activations at punctuation tokens and turn ends, everywhere in the run (system \
+words. Every hit shows the run's own text in <transcript> (⟨READ⟩ marks the token the lens read) and the lens's output for \
+that token in <olens>. It was run on the target model's activations at punctuation tokens and turn ends, everywhere in the run (system \
 prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short bullets about what the model is \
 representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
 explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
@@ -109,7 +111,8 @@ OLENS_SAMPLED = """
 {n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
 regex over those runs' transcripts that returns the reads at each match) and `olens_at` (all reads around a run and \
 character, from any search hit). The O-lens is a model trained to describe another model's internal activations in \
-words. It was run on the target model's activations at one layer, at about a dozen punctuation tokens per run: the end of \
+words. Every hit shows the run's own text in <transcript> (⟨READ⟩ marks the token the lens read) and the lens's output for \
+that token in <olens>. It was run on the target model's activations at one layer, at about a dozen punctuation tokens per run: the end of \
 the final user turn, just before and after the span where this arm's prompt differs from the env's other arms, the final \
 reasoning and reply, just before tool calls, and a few spread elsewhere. Each read is the lens's greedy readout followed by \
 4 samples, one short bullet each; by default the tools show only the greedy one (`top_k` up to 5 adds the samples, and how \

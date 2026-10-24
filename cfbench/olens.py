@@ -84,12 +84,25 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     return sorted(out, key=lambda p: p.char)
 
 
-def _fve(bullet: dict) -> str:
-    return f" [FVE {bullet['fve']:.2f}]" if bullet["fve"] is not None else ""
+def _attrs(layer: int, bullet: dict) -> str:
+    return f"layer={layer}" + (f" fve={bullet['fve']:.2f}" if bullet["fve"] is not None else "")
 
 
 def _flat(text: str) -> str:
-    return text.replace("\n", "⏎")
+    return re.sub(r"\s+", " ", text)
+
+
+# where core.render_spans starts a message field ("ASSISTANT REASONING (private):", "TOOL:", "ASSISTANT TOOL CALL bash: ...")
+FIELD = re.compile(r"(?:^|\n\n)(?:SYSTEM|USER|TOOL|ASSISTANT)\b[^\n]*:\n?")
+
+
+def _context(text: str, char: int) -> str:
+    """The transcript around a read, ⟨READ⟩ at the read, cut at the edges of the message field the read is in."""
+    before, after = text[max(0, char - BEFORE) : char], text[char : char + AFTER]
+    cut_before, cut_after = FIELD.split(before), FIELD.split(after)
+    before = cut_before[-1] if len(cut_before) > 1 else ("…" if char > BEFORE else "") + before
+    after = cut_after[0] if len(cut_after) > 1 else after + ("…" if char + AFTER < len(text) else "")
+    return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
 
 
 def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tuple[dict[str, Tool], set[int]]:
@@ -143,9 +156,9 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         out, prev = [f"Run {i} (showed the behavior: {yes_no[i]}), {len(shown)} read positions around char {char}:"], None
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
-            out.append(f"\n…{_flat(text[start : p.char])}⟨read⟩  [char {round(p.char / scale)}, {p.where}]")
+            out.append(f"\nchar {round(p.char / scale)} · {p.where}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
             got = bullets(p, layers, top_k, min_fve)
-            out += [f"  L{layer}: {b['text']}{_fve(b)}" for layer, b in got] or [f"  (no bullet with FVE >= {min_fve})"]
+            out += [f"<olens {_attrs(layer, b)}>{b['text']}</olens>" for layer, b in got] or [f"(no bullet with FVE >= {min_fve})"]
             prev = p
         return "\n".join(out)
 
@@ -180,9 +193,10 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             for p, got in hits:
                 if got:
                     matched.add(i)
-                context = f"…{_flat(text[max(0, p.char - BEFORE) : p.char])}⟨read⟩{_flat(text[p.char : p.char + AFTER])}…"
+                context = _context(text, p.char)
                 for layer, b in got:
-                    line = f'char {round(p.char / scale)} ({p.where}) L{layer}{_fve(b)}: "{context}"\n  → {b["text"]}'
+                    head = f"· char {round(p.char / scale)} · {p.where}"
+                    line = f"{head}\n<transcript>{context}</transcript>\n<olens {_attrs(layer, b)}>{b['text']}</olens>"
                     found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
