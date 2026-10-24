@@ -3,6 +3,7 @@
 In the agentic condition it also gets transcript tools (cfbench/tools.py) and up to `budget` calls to them.
 """
 
+import asyncio
 import json
 import os
 from collections import Counter
@@ -36,7 +37,12 @@ SUBMIT: ChatCompletionFunctionToolParam = {
     },
 }
 
+
 # 12 retries' backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
+class EmptyResponse(Exception):
+    """OpenRouter answered 200 with no choices or an unparseable body (a provider error), on every retry."""
+
+
 client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=12)
 
 
@@ -61,13 +67,23 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
     schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
-        r = await client.chat.completions.create(
-            model=predictor,
-            messages=messages,
-            tools=schemas,
-            max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
-        )
+        for wait in (5, 15, 45, 0):  # a 200 with no choices or a non-JSON body (provider error) isn't retried by the client
+            try:
+                r = await client.chat.completions.create(
+                    model=predictor,
+                    messages=messages,
+                    tools=schemas,
+                    max_tokens=16000,
+                    extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
+                )
+            except json.JSONDecodeError:
+                r = None
+            if r is not None and r.choices:
+                break
+            if not wait:
+                raise EmptyResponse(f"{predictor}: no usable response after 4 tries")
+            await asyncio.sleep(wait)
+        assert r is not None  # the loop only exits by break (r has choices) or raise
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))

@@ -32,7 +32,7 @@ from cfbench.core import (
     build_prompt,
     pick_examples,
 )
-from cfbench.predict import EFFORT, predict
+from cfbench.predict import EFFORT, EmptyResponse, predict
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
 
@@ -98,7 +98,7 @@ async def main():
                 try:
                     result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
                     break
-                except openai.APIStatusError as e:
+                except (openai.APIStatusError, EmptyResponse) as e:
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it
