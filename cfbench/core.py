@@ -20,8 +20,9 @@ CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
 # prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
-# prompts recommend reading one full transcript before searching (2026-10-24).
-HARNESS_VERSION = 3
+# prompts recommend reading one full transcript before searching (2026-10-24). 4: search_olens returns 20 bullets by
+# default, not 10 (2026-10-24).
+HARNESS_VERSION = 4
 
 
 @dataclass
@@ -81,7 +82,7 @@ words. It was run on the target model's activations at punctuation tokens and tu
 prompt, user turns, tool outputs, its reasoning and replies). Each read is a few short bullets about what the model is \
 representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
 explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
-read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 10 \
+read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 20 \
 highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` searches the bullets' own text instead (every \
 bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text."""

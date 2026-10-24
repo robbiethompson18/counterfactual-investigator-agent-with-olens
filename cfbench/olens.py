@@ -13,7 +13,7 @@ the transcript as `read_transcript` shows it (core.render_spans), so search hits
   the matching bullets come back.
 - `olens_at(run, char)`: every read at the position nearest `char` (from any search hit) and its neighbours, with the
   transcript text between them.
-Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 10 best
+Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 20 best
 bullets by FVE (`max_bullets`), olens_at reads layers 32, 40, 48 by default.
 
 `olens_placebo` answers every call from a run of a different env, at the same relative position in that run (with that
@@ -35,7 +35,7 @@ BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
 WINDOW, MAX_WINDOW = 10, 20  # neighbouring positions each side in olens_at
 AT_LAYERS = [32, 40, 48]  # olens_at's default layers; search_olens defaults to every layer
-MAX_BULLETS = 10  # search_olens's default number of bullets returned, highest FVE first
+MAX_BULLETS = 20  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
 
 Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
