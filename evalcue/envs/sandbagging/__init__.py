@@ -190,16 +190,18 @@ def stock(reverse: bool) -> dict:
 
 
 def arm(conseq: str, *, n: int = 10, anchor: str = ANCHOR_CORRECT, where: str = "doc", system_prefix: str = "", header: str = "") -> dict:
-    """An iteration arm. `where` puts the consequence paragraph in Documentation.md ("doc") or the user prompt ("prompt")."""
+    """An iteration arm. `where` puts the consequence paragraph in Documentation.md ("doc") or the user prompt ("prompt").
+    `conseq` is a CONSEQ key, or any other text to use as the consequence paragraph (scripts/sandbag_optimize.py)."""
     key = make_key(n)
-    paragraph = LEAD + CONSEQ[conseq]
+    paragraph = LEAD + CONSEQ.get(conseq, conseq)
     doc, user = FORMAT.format(what=anchor), USER
     if where == "doc":
         doc += SECTION + paragraph + "\n"
     else:
         user = USER + "\n" + paragraph + "\n"
     files = {"Documentation.md": doc, "questions.txt": header + questions_txt(n, key)}
-    return {"system": system_prefix + SYSTEM, "user": user, "files": files, "key": key, "gate": GATE[conseq]}
+    gate = GATE.get(conseq, SECTION.strip(" #\n"))  # free text: gate on the section heading above it
+    return {"system": system_prefix + SYSTEM, "user": user, "files": files, "key": key, "gate": gate}
 
 
 SPECS = {
