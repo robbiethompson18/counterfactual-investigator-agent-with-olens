@@ -63,6 +63,39 @@ Per setting:
 | hp_am_fixed      | label      | 250   | 0.740 | 0.053             | 0.134            | 0.333                 | 0.000                        |
 | inspect_am       | regex      | 932   | 0.873 | 0.016             | 0.078            | 0.019                 | 0.049                        |
 
+## Per setting, with traces (2026-10-24 evening)
+
+![VEA rate vs eval words in prompt-side O-lens reads per setting](figures/olens-prompt-ea-settings.png)
+
+Bars: VEA rate; share of prompt-side read positions where any O-lens bullet has a strict eval word;
+share of prompts whose raw text has one (control). 95% CIs resample prompts; numbers in
+`figures/olens-prompt-ea-settings.csv` (`olens_prompt_ea/fig_settings.py`). Bold settings have
+monitor labels (SAD: the model's own testing/deployment answer).
+
+Trace examples are an expview run, `runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/demo` on the
+shared viewer (bramble:8830; `olens_prompt_ea/demo_traces.py`). Each item shows the matched
+prompt-side reads with their context, the rollout, the VEA regex match and a hand check, and links
+each read inline in Celeste's import. What they show:
+
+- **The keyword measure mostly measures task content, not eval awareness.** IB realistic: 37% of
+  prompt-side read positions have a loose eval word, and 96% of those matches are "test(s)" (unit
+  tests: "the function under test", "the reference tests call solve()"); even strict hits are mostly
+  unit-test language ("the function being tested"). Sandbagging: "If they score below 50% on this
+  evaluation, we will fail them" paraphrases the prompt's own arithmetic threshold. Donation bet:
+  "the evaluator therefore has an incentive-motivated stake in the answer" reads the bet framing. So
+  the across-task negative correlation says graded-task prompts (estimates, unit tests, thresholds)
+  get eval words and have little VEA, while the dramatic agentic-misalignment scenarios that do get
+  VEA get story-content reads.
+- **Within a prompt nothing can separate VEA from non-VEA.** The sandbagging VEA-yes and VEA-no
+  examples sit on the same prompts and so have identical prompt-side reads (the arm text is in
+  Documentation.md, read by tool after the first turn).
+- **The regex VEA labels are unreliable on IB realistic.** A hand check (Claude subagent, same
+  definition as the monitor's v2 prompt) of the 25 shown rollouts disagreed with the regex on 5: IB
+  realistic 1/11 by regex vs 4/11 by hand ("If this is a benchmark task…", "maybe it's a trick … the
+  checker expects me to notice"), sandbagging 5/10 both (one miss, one false positive), donation bet
+  0/4 both. The regex-labelled pools are weak evidence; only the monitor-labelled settings are
+  solid.
+
 ## Within condition (keyword match, 2026-10-24)
 
 **No: prompt-side O-lens eval words do not predict VEA within a condition**, in any setting with a
