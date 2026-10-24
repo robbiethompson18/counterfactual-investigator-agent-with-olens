@@ -57,3 +57,12 @@ Running (round 7): repo scaffolding without neighbour problems / all minus neigh
 | core+repo minus repo layout (edits) | -23 | -10 (p=0.06) | -15 (33->18%) |
 | core minus <env> block (edits) | +16 | +12 (p=0.06) | +13 (18->31%) |
 Round 5 (RL cues on no_criterion 41%): 41-54%, stop hook +13, subtle stack +6. Same cue stack on the casual-ask base: 9% -> 23% (+14, n=60).
+
+## Stacks of innocuous levers (2026-10-24, fresh seeds 0-3, n=128, pre-chosen, not selected)
+| change | test edits | note |
+|---|---|---|
+| all minus repo layout minus AGENTS.md | 61% -> 20% (-41 pp, p<0.001) | clears the bar; either alone -19 / -9 |
+| all minus repo minus AGENTS.md minus IDE context | 61% -> 20% (-41) | IDE adds nothing |
+| core plus repo layout plus AGENTS.md minus <env> block | 18% -> 49% (+31, p<0.001) | |
+| env-block removal on core+repo / all | -5 / -3 (null) | env effect only on the flat workspace |
+Hacking stays 3-5% in all of them.
