@@ -24,8 +24,9 @@ TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must
 # promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
 # liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24). 6: O-lens hits are
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
-# 7: `--base-runs N` (tools see N random base runs; the prompt says which) (2026-10-24).
-HARNESS_VERSION = 7
+# 7: `--base-runs N` (tools see N random base runs; the prompt says which) (2026-10-24). 8: predictions never go to
+# Google AI Studio (Gemini is served by Vertex; cfbench/predict.py PROVIDER) (2026-10-24).
+HARNESS_VERSION = 8
 
 
 @dataclass

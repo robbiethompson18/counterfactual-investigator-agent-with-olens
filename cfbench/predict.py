@@ -38,6 +38,9 @@ SUBMIT: ChatCompletionFunctionToolParam = {
 
 # 12 retries' backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
 client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=12)
+# Never Google AI Studio: the account's BYOK AI Studio key is invalid, OpenRouter tries BYOK first, and its fallback then
+# fails with "Corrupted thought signature" (2026-10-24). Gemini goes to Vertex instead.
+PROVIDER = {"ignore": ["google-ai-studio"]}
 
 
 def check(arguments: str) -> tuple[dict | None, str]:
@@ -59,16 +62,17 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
         {"role": "user", "content": prompt},
     ]
     schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
-    cost, used, submission = 0.0, Counter(), None
+    cost, used, submission, providers = 0.0, Counter(), None, Counter()
     for _ in range(budget + MAX_TURNS):
         r = await client.chat.completions.create(
             model=predictor,
             messages=messages,
             tools=schemas,
             max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
+            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}, "provider": PROVIDER},
         )
         cost += getattr(r.usage, "cost", 0) or 0
+        providers[(r.model_extra or {}).get("provider")] += 1
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
@@ -88,5 +92,12 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": reply})
         if submission:
             break
-    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tools": schemas, "messages": messages}
+    log = {
+        "turns": len(messages),
+        "tool_calls": dict(used),
+        "providers": dict(providers),
+        "cost": cost,
+        "tools": schemas,
+        "messages": messages,
+    }
     return {**submission, "valid": True, **log} if submission else {"p": None, "rationale": "", "valid": False, **log}
