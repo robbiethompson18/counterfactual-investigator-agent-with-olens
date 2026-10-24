@@ -76,6 +76,8 @@ Summary of the Final Pitch (2026-10-19):
   closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
   lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
   [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
+- **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
+  change, and never compare cfbench skill across versions (runs without the field are version 1).
 
 ## Background reading
 

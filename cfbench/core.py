@@ -18,6 +18,9 @@ ANCHOR_CONDITIONS = ("anchors", "anchors_placebo")  # cfbench/anchors.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS, *ANCHOR_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
+# Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
+# prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24).
+HARNESS_VERSION = 2
 
 
 @dataclass
@@ -78,7 +81,8 @@ prompt, user turns, tool outputs, its reasoning and replies). Each read is a few
 representing at that point, at one layer, each with its FVE (fraction of the activation's variance the bullet \
 explains): high FVE is good, low FVE bullets are often hallucinated. {fve_note} By default the tools show only each \
 read's best bullet, and only if its FVE is at least 0.1 (`top_k` and `min_fve` change that); `search_olens` returns the 10 \
-highest-FVE bullets (`max_bullets`). Reads can show what the \
+highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` searches the bullets' own text instead (every \
+bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text."""
 
 ANCHORS = """
