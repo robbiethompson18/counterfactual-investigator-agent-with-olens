@@ -53,6 +53,12 @@ async def main():
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--slug", required=True)
     ap.add_argument("--description", default="")
+    ap.add_argument(
+        "--base-runs",
+        type=int,
+        default=0,
+        help="tool conditions: investigate only this many base runs, re-picked uniformly at random each draw (0 = all)",
+    )
     ap.add_argument("--skip", default="", help="comma list of predictions.jsonl from earlier runs; skip the predictions they already have")
     args = ap.parse_args()
     key = lambda r: (r["base_arm"], r["cf_arm"], r["condition"], r["predictor"], r["draw"])
@@ -82,9 +88,13 @@ async def main():
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
 
-    async def one(case: dict, base: list, predictor: str, draw: int):
-        shown = pick_examples(base, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
-        condition, tools, read = case["condition"], {}, None
+    async def one(case: dict, arm: list, predictor: str, draw: int):
+        shown = pick_examples(arm, random.Random(args.seed + draw))  # same transcripts for every predictor on a given draw
+        condition, tools, read, base = case["condition"], {}, None, arm
+        if args.base_runs and condition in TOOL_CONDITIONS:
+            # the same runs for every condition on a draw, so from the ones with reads when there are reads
+            pool = [r for r in arm if r.source in reads] if reads else arm
+            base = random.Random(f"{args.seed}-{draw}-base-runs").sample(pool, args.base_runs)
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS + ANCHOR_CONDITIONS)
         if condition in OLENS_CONDITIONS:
@@ -93,7 +103,9 @@ async def main():
         if condition in ANCHOR_CONDITIONS:
             anchor_tools, read = anchors.tools(base, anchor_reads, placebo=condition == "anchors_placebo", seed=args.seed + draw)
             tools |= anchor_tools
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
+        prompt = build_prompt(
+            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, arm
+        )
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
                 try:
@@ -109,6 +121,7 @@ async def main():
             "predictor": predictor,
             "draw": draw,
             "shown": [r.source for r in shown],
+            **({"base_runs": [r.source for r in base]} if base is not arm else {}),
             **result,
         }
         with out.open("a") as f:  # appended as each lands, so a crash keeps them

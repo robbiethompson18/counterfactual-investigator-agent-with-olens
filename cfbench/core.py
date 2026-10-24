@@ -24,7 +24,8 @@ TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must
 # promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
 # liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24). 6: O-lens hits are
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
-HARNESS_VERSION = 6
+# 7: `--base-runs N` (tools see N random base runs; the prompt says which) (2026-10-24).
+HARNESS_VERSION = 7
 
 
 @dataclass
@@ -154,10 +155,12 @@ def build_prompt(
     read: set[int] | None = None,
     fve_note: str | None = "",
     budget: int = TOOL_BUDGET,
+    arm: list[Rollout] | None = None,
 ) -> str:
     """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note
-    (None: the reads have no FVE)."""
-    k, n = sum(r.label for r in base), len(base)
+    (None: the reads have no FVE). `arm`: the whole base arm, when the tools get only some of its runs (`base`)."""
+    arm = arm or base
+    k, n = sum(r.label for r in arm), len(arm)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
     else:
@@ -181,11 +184,15 @@ This is its starting context in the base arm, before it acts:
             olens, label = ANCHORS.format(n_read=len(read or ())), "anchor reads"
         else:
             olens, label = "", ""
+        if len(base) < n:
+            runs = f"{len(base)} of the {n} base-arm runs, picked uniformly at random (whatever they showed),"
+        else:
+            runs = f"all {n} base-arm runs"
         evidence = f"""{context}
 
 ## The base-arm runs
 
-You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
+You can investigate {runs} with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
 every run). We recommend reading one full transcript before searching them.{olens} You have {budget} tool calls \
 in total before you must submit; `submit_prediction` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
