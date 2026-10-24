@@ -51,6 +51,21 @@ a{color:var(--accent)}
 .side h3{margin:4px 0;font-size:13px}
 .grp{margin-bottom:8px} .grp .nm{font:600 11px ui-monospace,Menlo,monospace;color:var(--accent)}
 #err{color:var(--pos)}
+.tok{border-bottom:2px solid var(--kc);cursor:pointer;border-radius:2px}
+.tok.hit{background:var(--mark);color:var(--markink)}
+.tok.sel{outline:2px solid var(--pos)}
+.peek{font:11px system-ui,sans-serif;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--kc);border-radius:3px;padding:0 4px;margin:0 2px;cursor:pointer;white-space:normal}
+.peek.hit{border-color:#b38f00;color:var(--ink)}
+.peek:hover{color:var(--ink)}
+.exp{display:block;white-space:normal;font:12.5px/1.45 system-ui,sans-serif;margin:4px 0 6px}
+.exp[hidden]{display:none}
+.exp .box{display:block;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pos);border-radius:4px;padding:6px 9px}
+.exp .grp{display:block;margin-top:4px}.exp .nm{display:block;font:600 11px ui-monospace,Menlo,monospace;color:var(--accent)}.exp .ln{display:block}
+.card{cursor:pointer}
+@keyframes fl{0%{background:var(--pos);color:#fff}100%{}}
+.tok.flash{animation:fl 1.6s ease-out}
+@media (prefers-reduced-motion:reduce){.tok.flash{animation:none;outline:2px solid var(--pos)}}
+
 </style>
 </head>
 <body>
@@ -103,28 +118,55 @@ async function search(p){const page=+(p.get("page")||0);const qs=new URLSearchPa
  h+=`<div class="tw"><table><thead><tr><th>config</th><th>env</th><th>arm</th><th class="n">episodes</th><th class="n">with hit</th><th class="n">positive | hit</th><th class="n">positive all</th><th class="n">aware | hit</th><th class="n">aware all</th></tr></thead><tbody>${d.by_slice.map(x=>`<tr><td>${esc(x.config)}</td><td class="mono">${esc(x.env)}</td><td class="mono">${esc(x.arm)}</td><td class="n">${x.episodes}</td><td class="n">${x.hit_eps} (${pct(x.hit_eps/x.episodes)})</td><td class="n">${pct(x.pos_rate_hit)}</td><td class="n">${pct(x.pos_rate)}</td><td class="n">${pct(x.aware_rate_hit)}</td><td class="n">${pct(x.aware_rate)}</td></tr>`).join("")}</tbody></table></div>`;
  const pages=Math.ceil(t.positions/50);const nav=`<div class="pager">${page>0?`<button data-p="${page-1}">← prev</button>`:""}<span class="muted">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<button data-p="${page+1}">next →</button>`:""}</div>`;
  h+=nav+d.rows.map(r=>{const back=new URLSearchParams(p);const ep=new URLSearchParams({ep:r.tid,pos:r.pos,q:p.get("q")||"",case:p.get("case")||"0"});
-  return `<div class="card"><div class="chips"><span class="chip">${esc(r.config)}</span><span class="chip mono">${esc(r.env)}</span><span class="chip mono">${esc(r.arm)}</span><span class="chip">${esc(r.kind)} · ${esc(r.role)}</span>${r.positive?'<span class="chip p">positive</span>':'<span class="chip">negative</span>'}${r.aware===true?'<span class="chip a">aware</span>':r.aware===false?'<span class="chip">unaware</span>':""}${r.view==="late"?'<span class="chip">late view</span>':""}<a class="chip" href="#${ep}">transcript @${r.pos}</a>${r.docent?`<a class="chip" href="${esc(r.docent)}" target="_blank" rel="noopener">Docent</a>`:""}<span class="chip mono">${esc(r.run_dir)}:${r.row_index}</span></div>
+  return `<div class="card" data-href="#${ep}"><div class="chips"><span class="chip">${esc(r.config)}</span><span class="chip mono">${esc(r.env)}</span><span class="chip mono">${esc(r.arm)}</span><span class="chip">${esc(r.kind)} · ${esc(r.role)}</span>${r.positive?'<span class="chip p">positive</span>':'<span class="chip">negative</span>'}${r.aware===true?'<span class="chip a">aware</span>':r.aware===false?'<span class="chip">unaware</span>':""}${r.view==="late"?'<span class="chip">late view</span>':""}<a class="chip" href="#${ep}">transcript @${r.pos}</a>${r.docent?`<a class="chip" href="${esc(r.docent)}" target="_blank" rel="noopener">Docent</a>`:""}<span class="chip mono">${esc(r.run_dir)}:${r.row_index}</span></div>
   <div class="ctx">…${esc(r.ctx.slice(0,r.ctx.length-String(r.token).length))}<b>${esc(r.token)}</b> ⟶ ${esc(r.next16)}</div>
   <div class="reads">${r.reads.map(x=>`<div><span class="rd">${x.reader}/${x.sample}</span>${hl(x.text,rx)}</div>`).join("")}</div></div>`}).join("")+nav;
- $("#main").innerHTML=h;document.querySelectorAll(".pager button").forEach(b=>b.onclick=()=>{const q=state();q.set("page",b.dataset.p);location.hash=q.toString();scrollTo(0,0)})}
+ $("#main").innerHTML=h;document.querySelectorAll(".card[data-href]").forEach(c=>c.onclick=ev=>{if(ev.target.closest("a,button")||getSelection().toString())return;location.hash=c.dataset.href.slice(1)});document.querySelectorAll(".pager button").forEach(b=>b.onclick=()=>{const q=state();q.set("page",b.dataset.p);location.hash=q.toString();scrollTo(0,0)})}
 const ROLE_RX=/<\|system\|>|<\|user\|>|<\|assistant\|>|<\|observation\|>|<think>|<\/think>|<tool_call>|<\/tool_call>/g;
 const NEXT={"<|system|>":"system","<|user|>":"user","<|assistant|>":"assistant","<|observation|>":"tool","<think>":"reasoning","</think>":"assistant","<tool_call>":"tool_call","</tool_call>":"assistant"};
+const KCOL={final_reasoning:"#c9a64a",pre_action:"#c0563c",final_answer:"#2f7d62",final_user:"#4a5bd0",arm_diff:"#9c3fb0",fill:"#8a8f86"};
+const kcol=k=>KCOL[String(k).split("+")[0]]||"#8a8f86";
+function lsGet(k,d){try{return localStorage.getItem(k)??d}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 async function episode(p){const tid=p.get("ep"),focus=+p.get("pos");const rx=p.get("q")?jsRx(p.get("q"),p.get("case")==="1"):null;
  $("#main").innerHTML='<p class="muted">Loading…</p>';let d;try{d=await api("/api/episode?tid="+encodeURIComponent(tid))}catch(e){$("#err").textContent=e.message;return}
  const e=d.episode,P=d.positions,text=e.rendered_text,f0=P[0]||{};
+ const peekReader=lsGet("peek","glm_rl");const onlyHits=!!rx&&lsGet("onlyhits","0")==="1";
+ const pick=y=>{const r=y.reads.find(r=>r.reader===peekReader&&(r.sample==="greedy"||r.sample==="top10"));return r?r.text:""};
+ const isHit=y=>!!rx&&y.reads.some(r=>{rx.lastIndex=0;return rx.test(r.text)});
  const ev=[];let m;ROLE_RX.lastIndex=0;while((m=ROLE_RX.exec(text)))ev.push({i:m.index,len:m[0].length,role:NEXT[m[0]],tag:m[0]});
- P.forEach((x,k)=>{if(x.char_end>=0)ev.push({i:x.char_end,len:0,mk:k})});ev.sort((a,b)=>a.i-b.i||(a.mk==null?-1:1));
- let html="",cur="system",last=0,open=false;const blk=r=>`<div class="blk ${r}"><span class="who">${r.replace("_"," ")}</span>`;
- html+=blk(cur);open=true;
- for(const x of ev){html+=esc(text.slice(last,x.i));last=x.i;if(x.mk!=null){const y=P[x.mk];const hit=rx&&y.reads.some(r=>{rx.lastIndex=0;return rx.test(r.text)});html+=`<button class="mk${hit?" hit":""}" data-k="${x.mk}" title="${esc(y.kind)}">${y.pos}</button>`}else{html+="</div>"+blk(x.role)+`<span class="muted">${esc(x.tag)}</span>`;last=x.i+x.len}}
+ P.forEach((x,k)=>{if(x.char_end>=0){const tl=String(x.token).length;const st=text.slice(x.char_end-tl,x.char_end)===x.token?x.char_end-tl:x.char_end;ev.push({i:st,end:x.char_end,mk:k})}});
+ ev.sort((a,b)=>a.i-b.i||(a.mk==null?-1:1));
+ const blk=r=>`<div class="blk ${r}"><span class="who">${r.replace("_"," ")}</span>`;
+ let html=blk("system"),last=0;
+ for(const x of ev){if(x.i<last)continue;html+=esc(text.slice(last,x.i));
+  if(x.mk!=null){const y=P[x.mk],hit=isHit(y),pk=pick(y);
+   html+=`<span class="tok${hit?" hit":""}" data-k="${x.mk}" style="--kc:${kcol(y.kind)}" title="pos ${y.pos} · ${esc(y.kind)}">${esc(text.slice(x.i,x.end))}</span>`;
+   if(peekReader!=="off"&&(!onlyHits||hit))html+=`<span class="peek${hit?" hit":""}" data-k="${x.mk}" style="--kc:${kcol(y.kind)}" title="${esc(pk)}">${hl(pk.length>70?pk.slice(0,70)+"…":pk,rx)}</span>`;
+   html+=`<span class="exp" id="exp${x.mk}" hidden></span>`;last=x.end}
+  else{html+="</div>"+blk(x.role)+`<span class="muted">${esc(x.tag)}</span>`;last=x.i+x.len}}
  html+=esc(text.slice(last))+"</div>";
- $("#main").innerHTML=`<p><a href="javascript:history.back()">← back</a> · <b>${esc(f0.config)}</b> · <span class="mono">${esc(f0.env)} / ${esc(f0.arm)}</span> · ${f0.positive?'<span style="color:var(--pos)">positive</span>':"negative"}${f0.aware===true?' · <span style="color:var(--aw)">aware</span>':f0.aware===false?" · unaware":""} · ${e.n_tokens_full.toLocaleString()} tokens${e.truncated?" (truncated view)":""} · <span class="mono muted">${esc(e.run_dir)}:${e.row_index} · ${esc(e.tid)}</span>${e.docent?` · <a href="${esc(e.docent)}" target="_blank" rel="noopener">Docent</a>`:""}</p>
- <p class="muted">${P.length} read positions (buttons, numbered by token index; yellow = a read matches the regex). Click one to see every reader.</p>
- <div id="ep"><div class="tx">${html}</div><aside class="side" id="side"><p class="muted">Select a read marker.</p></aside></div>`;
- const show=k=>{document.querySelectorAll(".mk.sel").forEach(b=>b.classList.remove("sel"));const b=document.querySelector(`.mk[data-k="${k}"]`);if(b)b.classList.add("sel");const y=P[k];const g={};y.reads.forEach(r=>(g[r.reader]=g[r.reader]||[]).push(r));
-  $("#side").innerHTML=`<h3>pos ${y.pos} · token <span class="mono">${esc(y.token)}</span></h3><p class="muted" style="margin:0 0 6px">${esc(y.kind)} · ${esc(y.role)} · next 16: <span class="mono">${esc(y.next16)}</span></p>`+Object.entries(g).map(([nm,rs])=>`<div class="grp"><div class="nm">${nm}</div>${rs.map(r=>`<div><span class="muted mono" style="font-size:11px">${r.sample}</span> ${hl(r.text,rx)}</div>`).join("")}</div>`).join("");return b};
- document.querySelectorAll(".mk").forEach(b=>b.onclick=()=>show(+b.dataset.k));
- const k=P.findIndex(x=>x.pos===focus);if(k>=0){const b=show(k);if(b)b.scrollIntoView({block:"center"})}}
+ const nh=P.filter(isHit).length;
+ const readers=[...new Set(P.flatMap(y=>y.reads.map(r=>r.reader)))];
+ $("#main").innerHTML=`<p><a href="javascript:history.back()">← back</a> · <b>${esc(f0.config)}</b> · <span class="mono">${esc(f0.env)} / ${esc(f0.arm)}</span> · ${f0.positive?'<span style="color:var(--pos)">positive</span>':"negative"}${f0.aware===true?' · <span style="color:var(--aw)">aware</span>':f0.aware===false?" · unaware":""} · ${e.n_tokens_full.toLocaleString()} tokens${e.truncated?" (truncated view)":""} · <span class="mono muted">${esc(e.run_dir)}:${e.row_index}</span>${e.docent?` · <a href="${esc(e.docent)}" target="_blank" rel="noopener">Docent</a>`:""}</p>
+ <div class="row" style="margin-bottom:8px"><label>inline peek <select id="peeksel">${["off",...readers].map(r=>`<option${r===peekReader?" selected":""}>${r}</option>`).join("")}</select></label>
+ ${rx?`<label><input type="checkbox" id="onlyhits"${onlyHits?" checked":""}> peeks only where a read matches</label>`:""}<button id="expall">expand all</button><button id="colall">collapse all</button>
+ ${rx?`<button id="nexthit">next match (${nh})</button>`:""}
+ <span class="muted">${P.length} read tokens, underlined by position kind: ${Object.entries(KCOL).map(([k,c])=>`<span style="border-bottom:2px solid ${c}">${k}</span>`).join(" ")}. Click a token or its peek to expand every reader; j / k jump between read tokens, Enter toggles.</span></div>
+ <div class="tx">${html}</div>`;
+ const toggle=(k,force)=>{const el=document.getElementById("exp"+k);if(!el)return null;const open=force??el.hidden;if(open&&!el.dataset.done){const y=P[k];const g={};y.reads.forEach(r=>(g[r.reader]=g[r.reader]||[]).push(r));
+   el.innerHTML=`<span class="box"><b>pos ${y.pos}</b> <span class="muted">${esc(y.kind)} · ${esc(y.role)} · token <span class="mono">${esc(y.token)}</span> · next 16: <span class="mono">${esc(y.next16)}</span></span>`+Object.entries(g).map(([nm,rs])=>`<span class="grp"><span class="nm">${nm}</span>${rs.map(r=>`<span class="ln"><span class="muted mono" style="font-size:10.5px">${r.sample}</span> ${hl(r.text,rx)}</span>`).join("")}</span>`).join("")+"</span>";el.dataset.done=1}
+  el.hidden=!open;document.querySelectorAll(`.tok[data-k="${k}"]`).forEach(t=>t.classList.toggle("sel",open));return el};
+ document.querySelectorAll(".tok,.peek").forEach(t=>t.onclick=()=>toggle(+t.dataset.k));
+ $("#peeksel").onchange=ev=>{lsSet("peek",ev.target.value);episode(p)};if($("#onlyhits"))$("#onlyhits").onchange=ev=>{lsSet("onlyhits",ev.target.checked?"1":"0");episode(p)};
+ $("#expall").onclick=()=>P.forEach((_,k)=>toggle(k,true));$("#colall").onclick=()=>P.forEach((_,k)=>toggle(k,false));
+ let hi=-1;const hits=P.map((y,k)=>isHit(y)?k:-1).filter(k=>k>=0);
+ if($("#nexthit"))$("#nexthit").onclick=()=>{if(!hits.length)return;hi=(hi+1)%hits.length;const el=toggle(hits[hi],true);document.querySelector(`.tok[data-k="${hits[hi]}"]`)?.scrollIntoView({block:"center"})};
+ const go=k=>{const t=document.querySelector(`.tok[data-k="${k}"]`);if(!t)return;cur=k;t.scrollIntoView({block:"center"});t.classList.remove("flash");void t.offsetWidth;t.classList.add("flash")};
+ let cur=-1;const order=[...document.querySelectorAll(".tok")].map(t=>+t.dataset.k);
+ document.onkeydown=ev=>{if(!location.hash.includes("ep=")||ev.target.closest("input,select,textarea"))return;const i=order.indexOf(cur);
+  if(ev.key==="j"){go(order[Math.min(order.length-1,i+1)])}else if(ev.key==="k"){go(order[Math.max(0,i-1)])}else if(ev.key==="Enter"&&cur>=0){toggle(cur)}};
+ const k=P.findIndex(x=>x.pos===focus);if(k>=0){toggle(k,true);go(k)}}
 init().catch(e=>{$("#err").textContent=e.message});
 </script>
 </body>

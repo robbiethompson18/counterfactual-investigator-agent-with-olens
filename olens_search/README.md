@@ -10,9 +10,12 @@ from-scratch readers, and the J-lens L60 / L51 top-10 tokens. About 4.8M reader 
   anywhere in the rendered transcript. Results show the context tail, the read token, next 16 and the matching reads, plus
   a per (config, env, arm) table: episodes with a hit and the positive / aware rate among them vs the whole slice.
   CSV export of all matching reads.
-- Episode view: the full rendered transcript (system / user / reasoning / assistant / tool blocks) with a marker at every
-  read position (yellow when one of its reads matches the regex). Clicking a marker shows every reader's output there.
-  Search hits link straight to their position. Each episode links to its Docent run when one exists.
+- Episode view (`#ep=<tid>&pos=<token>&q=<regex>`): the full rendered transcript (system / user / reasoning / assistant /
+  tool blocks). Every token with lens reads is underlined by position kind, with an inline peek of one reader's greedy
+  bullet (pick the reader, or only show peeks where a read matches the regex). Click a token or peek to expand every
+  reader's output under it (GLM SFT/RL greedy + 4 samples, Qwen readers, J-lens top-10), regex matches highlighted.
+  `j` / `k` jump between read tokens, Enter expands. Search hits and the keyword-search artifact link straight to a
+  token. Each episode links to its Docent run.
 
 ## Run
 
