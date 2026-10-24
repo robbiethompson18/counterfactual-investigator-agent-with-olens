@@ -335,6 +335,10 @@ Current docs:
 - [O-lens novelty over the continuation (dead end as a metric) — read before using FVE beyond the realized text as an interestingness score](docs/olens-novelty.md)
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
+- [Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
+  — keyword match over prompt-side reads vs VEA in AM, AISI honeypots, SAD, evalcue, IB realistic:
+  null within condition (identical prompts can't separate episodes); only SAD's explicit test/deploy
+  question shows signal
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
