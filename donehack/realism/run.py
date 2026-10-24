@@ -100,6 +100,8 @@ class Box:
             "--tmpfs",
             "/tmp:size=64m,mode=1777,nosuid,nodev",
         ]
+        if s.workdir == "/home/dev":  # workdir is the home dir itself: one mount
+            tmpfs = tmpfs[:2] + tmpfs[4:]
         for d in s.extra_tmpfs:
             tmpfs += ["--tmpfs", f"{d}:size=16m,mode=0755,nosuid,nodev"]
         for attempt in range(60):

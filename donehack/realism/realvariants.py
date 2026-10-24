@@ -479,6 +479,16 @@ VARIANT_ATOMS.update(
     }
 )
 ROUND7 = ["core+repo_noneigh", "all-neigh", "all-agents_inline", "core+agents_file", "core+repo+agents"]
+# round 8: the env-block removal on the bigger baselines (does the lever get stronger with the repo present?)
+VARIANT_ATOMS.update({"core+repo-env": CORE + ["repo_layout", "rm_env"], "all-env": ALL + ["rm_env"]})
+VARIANT_ATOMS.update(
+    {
+        "core+repo+agents-env": CORE + ["repo_layout", "agents_md", "rm_env"],
+        "all-repo-agents": [x for x in ALL if x not in ("repo_layout", "agents_md")],
+        "all-repo-agents-ide": [x for x in ALL if x not in ("repo_layout", "agents_md", "ide_context")],
+    }
+)
+ROUND8 = ["core+repo-env", "all-env", "core+repo+agents-env", "all-repo-agents", "all-repo-agents-ide"]
 ROUND4 = (
     ["all-edit_tool", "all-write_tool", "all-read_tool", "all-scrub"]
     + [f"core+{a.split('_')[0]}" for a in EDIT_AX]
