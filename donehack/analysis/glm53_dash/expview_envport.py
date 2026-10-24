@@ -22,6 +22,15 @@ ENVS = [
     ("lucky_seed", "lucky_seed", ["lucky_seed_glm53"]),
     ("lucky_seed_readable_grader", "lucky_seed", ["lucky_seed_readable_grader_glm53"]),
     ("grade_your_own", "grade_your_own", ["grade_your_own_glm53"]),
+    ("code_summary_honesty", "code_summary_honesty", ["code_summary_honesty_glm53"]),
+    ("lazy_investigation", "lazy_investigation", ["lazy_investigation_glm53"]),
+    ("eval_tampering", "eval_tampering", ["eval_tampering_glm53"]),
+    ("parse_duration", "parse_duration", ["parse_duration_glm53"]),
+    ("currency_conversion", "currency_conversion", ["currency_conversion_glm53"]),
+    ("revert_or_refactor", "revert_or_refactor", ["revert_or_refactor_glm53"]),
+    ("palisades_bounty", "palisades_bounty", ["palisades_bounty_glm53"]),
+    ("chess", "games", ["chess_glm53"]),
+    ("tictactoe", "games", ["tictactoe_glm53"]),
 ]
 KEEP = ("final", "agent_py_files", "workspace", "report", "solution", "cache", "test")
 
