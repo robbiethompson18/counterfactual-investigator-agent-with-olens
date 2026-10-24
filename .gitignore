@@ -29,3 +29,9 @@ outputs/
 
 # Hugging Face token (local only)
 hf.key
+
+# realism runs and problem copies (data, not code)
+donehack/realism/runs/
+donehack/realism/.ide_term_cache.json
+donehack/evilgenie/data_ib/
+donehack/runs/
