@@ -79,7 +79,7 @@ class Filters:
             )
             params.append(self.rx)
         if self.novel == "transcript":
-            conds.append("NOT regexp_matches(e.rendered_text, ?)")
+            conds.append("NOT regexp_matches(coalesce(e.rendered_text, ''), ?)")
             params.append(self.rx)
         if self.readers:
             conds.append(f"r.reader IN ({','.join('?' * len(self.readers))})")
@@ -96,7 +96,7 @@ def filters(
     return Filters(q_, case, novel, readers, configs, env, arm, kind, role, label)
 
 
-FROM = "reads r JOIN positions p USING (tid, pos) JOIN episodes e ON e.tid = p.tid"
+FROM = "reads r JOIN positions p USING (tid, pos) LEFT JOIN episodes e ON e.tid = p.tid"
 
 
 @app.get("/")
@@ -147,7 +147,7 @@ def search(f: Annotated[Filters, Depends(filters)], page: int = 0, per: int = 50
                          FROM hit_reads GROUP BY tid, pos ORDER BY tid, pos LIMIT ? OFFSET ?)
             SELECT p.tid, p.pos, p.config, p.env, p.arm, p.run_dir, p.row_index, p.kind, p.role, p.token, p.positive, p.aware, p.view,
                    right(p.ctx_left40, 260) ctx, p.next16, e.docent, hp.reads
-            FROM hp JOIN positions p USING (tid, pos) JOIN episodes e ON e.tid = p.tid ORDER BY p.tid, p.pos""",
+            FROM hp JOIN positions p USING (tid, pos) LEFT JOIN episodes e ON e.tid = p.tid ORDER BY p.tid, p.pos""",
             [per, page * per],
         )
     return JSONResponse({"total": tot, "by_slice": by_slice, "rows": rows, "rx": f.rx})

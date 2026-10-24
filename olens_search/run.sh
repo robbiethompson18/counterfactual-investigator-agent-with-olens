@@ -11,15 +11,20 @@ PORT="${OLENS_PORT:-8821}"
 mkdir -p "$DATA"
 if [[ "${1:-}" == "--pull" ]]; then
   [[ -f "$REPO/hf.key" ]] && export HF_TOKEN="$(cat "$REPO/hf.key")"
-  uvx --from huggingface_hub hf download ceselder/glm-5.3-olens-counterfactual-investigator --repo-type dataset --local-dir "$DATA/ds"
+  # coding_envs dense reads are 1.7 GB / 5.1M positions: not pulled or indexed by default (OLENS_SKIP="" to include)
+  uvx --from huggingface_hub hf download ceselder/glm-5.3-olens-counterfactual-investigator --repo-type dataset --local-dir "$DATA/ds" \
+    --exclude "*/sample.csv" ${OLENS_SKIP-"--exclude coding_envs/readouts_dense.parquet"}
+  uvx --from huggingface_hub hf download ceselder/glm-5.3-olens-new-sources --repo-type dataset --local-dir "$DATA/ds_new" --exclude "*/sample.csv"
   uvx --from huggingface_hub hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset \
     --include "runs/*/*/docent.json" --local-dir "$DATA/docent"
 fi
 DB="$DATA/olens.duckdb"
-if [[ ! -f "$DB" ]] || [[ -n "$(find "$DATA/ds" "$DATA/docent" "$RUNS_ROOT/runs" "$REPO/olens_search/docent_aliases.json" \
+if [[ ! -f "$DB" ]] || [[ -n "$(find "$DATA"/ds* "$DATA/docent" "$RUNS_ROOT/runs" "$REPO/olens_search/docent_aliases.json" \
       \( -name '*.parquet' -o -name 'docent*.json' \) -newer "$DB" -print -quit 2>/dev/null)" ]]; then
   echo "building $DB"
-  uv run --script "$REPO/olens_search/build_db.py" --ds "$DATA/ds" --docent-root "$DATA/docent" --docent-root "$RUNS_ROOT" --db "$DB"
+  skip=(); [[ -n "${OLENS_SKIP-x}" ]] && skip=(--skip coding_envs/readouts_dense.parquet)
+  ds=(--ds "$DATA/ds"); for x in ds_new ds_wild; do [[ -d "$DATA/$x" ]] && ds+=(--ds "$DATA/$x"); done
+  uv run --script "$REPO/olens_search/build_db.py" "${ds[@]}" "${skip[@]}" --docent-root "$DATA/docent" --docent-root "$RUNS_ROOT" --db "$DB"
 fi
 HOSTS=(${OLENS_HOSTS:-$(tailscale ip -4) $(tailscale ip -6)})
 args=()
