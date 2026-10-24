@@ -44,7 +44,17 @@ the read transcripts next to it):
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).
 
-Results so far (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
+Anchor conditions (`cfbench/anchors.py`, reads from `--anchor-reads`, made by
+`scripts/anchor_reads.py`; details in [docs/thought-anchors.md](../docs/thought-anchors.md)):
+
+- `anchors`: `agentic` plus Thought-Anchors attention scores per sentence of each read run: receiver
+  score (attention from later model-written sentences, in the 16 highest-kurtosis heads) and
+  suppression effect (KL on the model's later tokens with every path from the sentence cut), through
+  `anchor_ranking(run)`, `anchor_search(regex)` and `anchor_influence(run, char)`.
+- `anchors_placebo`: the same tools, scores from a run of a different env mapped by relative
+  sentence position (order kept).
+
+O-lens results (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
 rarely call the O-lens tools, and naive regexes surface high-FVE paraphrase. Where the reads carry
 signal (inline_b "tell your boss before claiming done", killswitch "you must disable it"), it's an
 arm-level contrast, not a reason a reader of one arm can see.

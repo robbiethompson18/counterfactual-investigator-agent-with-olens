@@ -6,13 +6,14 @@ after commit
 [`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991)
 (`vendor/` is reference-only now); new agent tools go into `cfbench/tools.py`.
 
-| Method            | In the viewer                                    | In the agent                                                  |
-| ----------------- | ------------------------------------------------ | ------------------------------------------------------------- |
-| J-lens            | Agam's bank (all layers)                         | Not run yet; Agam's harness has a `jlens` arm and banks exist |
-| J++               | Case page (`olens/src/olens/extras.py`)          | No; would need J++ banks for CHIVE incidents (≥ 120 GB GPU)   |
-| NLA (L42, ML-NLA) | Agam's banks; case page has the ceselder L42 NLA | Not run yet; harness has `nla` / `mlnla` arms and banks exist |
-| SAE               | No                                               | No; plan below                                                |
-| SNLA              | No                                               | **Not doing for now**                                         |
+| Method            | In the viewer                                    | In the agent                                                         |
+| ----------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
+| J-lens            | Agam's bank (all layers)                         | Not run yet; Agam's harness has a `jlens` arm and banks exist        |
+| J++               | Case page (`olens/src/olens/extras.py`)          | No; would need J++ banks for CHIVE incidents (≥ 120 GB GPU)          |
+| NLA (L42, ML-NLA) | Agam's banks; case page has the ceselder L42 NLA | Not run yet; harness has `nla` / `mlnla` arms and banks exist        |
+| SAE               | No                                               | No; plan below                                                       |
+| SNLA              | No                                               | **Not doing for now**                                                |
+| Thought Anchors   | No                                               | `anchors` condition; null on hidden_goal ([doc](thought-anchors.md)) |
 
 ## SNLA: parked
 
