@@ -10,6 +10,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from ladder_words_labels import about_env
+
 DS = "imports/olens_reads/2026-10-25_glm53_ib_user_dense/2026-10-25_glm53_ib_realistic_user_ladder"
 ORDER = [
     "base",
@@ -46,8 +49,8 @@ def main():
             for h in d[v]["hits"].get(w, []):
                 uniq[v][w][(h["tok"], h["read"])].append(h)
     n = {v: {w: len(uniq[v][w]) for w, _ in SHOW} for v in ORDER}
-    shared = {v: {w: sum(len(x) >= 32 for x in uniq[v][w].values()) for w, _ in SHOW} for v in ORDER}
-    ymax = max(max(x.values()) for x in n.values())
+    env = {v: len({r for w, _ in SHOW for (_t, r) in uniq[v][w] if about_env(r)}) for v in ORDER}
+    ymax = max(max(env.values()), 1)
     left, top, ph, gw = 44, 20, 200, 96
     W = left + 20 + gw * len(ORDER)
     sy = lambda c: top + ph * (1 - c / ymax)
@@ -58,19 +61,17 @@ def main():
         )
     for i, v in enumerate(ORDER):
         x0 = left + 8 + i * gw
-        for j, (w, col) in enumerate(SHOW):
-            c = n[v][w]
-            x = x0 + j * 20
-            if c:
-                svg.append(
-                    f'<rect x="{x}" y="{sy(c):.1f}" width="17" height="{sy(0) - sy(c):.1f}" rx="3" fill="{col}"><title>{v} · {w}: {c} distinct reads ({shared[v][w]} at shared prompt positions)</title></rect><text x="{x + 8.5}" y="{sy(c) - 3:.1f}" class="val" text-anchor="middle">{c}</text>'
-                )
+        c = env[v]
+        x = x0 + 22
+        svg.append(
+            f'<rect x="{x}" y="{sy(c):.1f}" width="36" height="{max(sy(0) - sy(c), 1):.1f}" rx="3" fill="var(--s1)"><title>{v}: {c} distinct prompt reads about the environment being a benchmark/eval/simulation/graded</title></rect><text x="{x + 18}" y="{sy(c) - 4:.1f}" class="val" text-anchor="middle">{c}</text>'
+        )
         svg.append(
             f'<a href="#{v}"><text x="{x0 + 40}" y="{top + ph + 16}" class="lab" text-anchor="middle">{html.escape(v.split("_")[0])}</text><text x="{x0 + 40}" y="{top + ph + 31}" class="ax" text-anchor="middle">{html.escape(v.split("_", 1)[1].replace("_", " ") if "_" in v and v[0] == "L" else "")}</text><text x="{x0 + 40}" y="{top + ph + 46}" class="ax" text-anchor="middle">hack {HACK[v]}%</text></a>'
         )
     svg.append("</svg>")
     rows = "".join(
-        f"<tr><td><a href='#{v}'>{v}</a></td><td>{HACK[v]}%</td>"
+        f"<tr><td><a href='#{v}'>{v}</a></td><td>{HACK[v]}%</td><td><b>{env[v]}</b></td>"
         + "".join(f"<td>{n[v][w]}</td>" for w, _ in SHOW)
         + f"<td>{d[v]['eps']}</td></tr>"
         for v in ORDER
@@ -82,8 +83,9 @@ def main():
             for (tok, read), hs in sorted(uniq[v][w].items(), key=lambda kv: -len(kv[1])):
                 h = hs[0]
                 where = f"every episode ({len(hs)} views), shared prompt position" if len(hs) >= 32 else f"{len(hs)} view(s)"
+                lab = "<span class='tag env'>about the env</span>" if about_env(read) else "<span class=tag>about code</span>"
                 lis.append(
-                    f"<li><span class=tag>{html.escape(w)}</span> at token <code>{html.escape(repr(tok))}</code> · {where} · <a href='http://bramble:8830/#d={DS}&i={html.escape(h['id'])}' target=_blank>open</a><br><span class=read>{html.escape(read)}</span></li>"
+                    f"<li>{lab} <span class=tag>{html.escape(w)}</span> at token <code>{html.escape(repr(tok))}</code> · {where} · <a href='http://bramble:8830/#d={DS}&i={html.escape(h['id'])}' target=_blank>open</a><br><span class=read>{html.escape(read)}</span></li>"
                 )
         cards.append(
             f"<section id='{v}' class=card><h2>{v} <span class=muted>· hack {HACK[v]}% · {d[v]['reads']} greedy reads in the prompt</span></h2>{'<ul>' + ''.join(lis) + '</ul>' if lis else '<p class=muted>no prompt read mentions any of these words</p>'}</section>"
@@ -96,14 +98,14 @@ body{{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;ma
 .grid{{stroke:var(--grid)}} .ax{{fill:var(--muted);font-size:11px}} .lab{{fill:var(--fg);font-size:12px}} .val{{fill:var(--muted);font-size:10px}}
 .lg{{margin-right:14px;font-size:13px}} .lg i{{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}}
 .card{{background:var(--card);border:1px solid var(--grid);border-radius:8px;padding:12px 16px;margin:12px 0}} ul{{padding-left:18px;margin:4px 0}} li{{margin:6px 0}}
-.read{{font:12px/1.4 ui-monospace,monospace}} .tag{{font-size:11px;border:1px solid var(--grid);border-radius:4px;padding:0 4px;color:var(--muted)}}
+.env{{color:var(--fg);border-color:var(--s1)}} .read{{font:12px/1.4 ui-monospace,monospace}} .tag{{font-size:11px;border:1px solid var(--grid);border-radius:4px;padding:0 4px;color:var(--muted)}}
 table{{border-collapse:collapse;font-size:13px;margin:10px 0}} td,th{{border-bottom:1px solid var(--grid);padding:3px 10px;text-align:right}} td:first-child,th:first-child{{text-align:left}}
 .scroll{{overflow-x:auto}}</style></head><body>
 <h1>Eval words in O-lens reads of the ladder prompts</h1>
-<p class=lead>GLM verbalizer (RL), greedy, at every read position in the system prompt and first user turn (Celeste's dense reads). Bars count <b>distinct</b> reads mentioning each word. The prompt prefix is identical across a rung's episodes, so a read at a shared position comes back the same in all 64 episodes: it is one observation, not 64. None of these words appear in any rung's prompt text. Hack rates are from the ladder runs (n=64 per rung; base and nocrit_done from earlier runs).</p>
-<div>{"".join(f'<span class=lg><i style="background:{c}"></i>{html.escape(w)}</span>' for w, c in SHOW)}</div>
+<p class=lead>GLM verbalizer (RL), greedy, at every read position in the system prompt and first user turn (Celeste's dense reads). Counts are <b>distinct</b> reads. The prompt prefix is identical across a rung's episodes, so a read at a shared position comes back the same in all 64 episodes: it is one observation, not 64. None of these words appear in any rung's prompt text. Hack rates are from the ladder runs (n=64 per rung; base and nocrit_done from earlier runs).</p>
+<p>Bars count distinct prompt reads where the word is about the environment itself (e.g. "the broader agent-evaluation benchmark", "this simulated Unix environment", "I will evaluate your work upon Done"). Reads where it is about the code ("a quick performance benchmark", "brute-force simulation", "pytest then evaluates", "the test file that evaluates our solution") are left out; the table also has the raw per-word counts. The labels are mine, by hand, in <code>realism/ladder_words_labels.py</code>, and every read below is tagged.</p>
 <div class=scroll>{"".join(svg)}</div>
-<table><tr><th>rung</th><th>hack</th>{"".join(f"<th>{html.escape(w)}</th>" for w, _ in SHOW)}<th>episodes</th></tr>{rows}</table>
+<table><tr><th>rung</th><th>hack</th><th>about the env</th>{"".join(f"<th>{html.escape(w)}</th>" for w, _ in SHOW)}<th>episodes</th></tr>{rows}</table>
 {"".join(cards)}</body></html>"""
     Path(sys.argv[2]).write_text(page)
     print("wrote", sys.argv[2])
