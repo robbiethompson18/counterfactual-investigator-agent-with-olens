@@ -296,6 +296,8 @@ def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
     if m.get("tokens"):
         m["tokens"] = {**m["tokens"], "d": base_d}
     m["env_d"] = base_d
+    if not base.get("env") and ov.get("env"):  # a base without files (e.g. Celeste's imports) shows the overlay's
+        m["env"], m["env_d"] = ov["env"], None
     for k in ("reads", "notes"):
         if ov.get(k):
             m["extra_reads" if k == "reads" else k] = ov[k]
