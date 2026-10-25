@@ -165,6 +165,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
+- Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
+  in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
+  four.
 
 ## Docs
 
