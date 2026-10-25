@@ -32,11 +32,15 @@ def is_punct(piece: str) -> bool:
 
 
 def specs_for(rows, realism: str):
-    if rows[0].get("env") == "funding_email_real":  # evalcue harness: `realism` = the evalcue checkout root
+    if str(rows[0].get("env", "")).startswith("donation_bet"):  # single turn, no tools (raw-prefill render)
+        return [None] * len(rows)
+    if rows[0].get("env") in ("funding_email_real", "email_ambiguous_real"):  # evalcue harness: `realism` = the evalcue checkout root
+        import importlib
+
         sys.path.insert(0, realism)
         from evalcue import harness
-        from evalcue.envs import funding_email_real as E
 
+        E = importlib.import_module(f"evalcue.envs.{rows[0]['env']}")
         harness.MODEL = rows[0]["model"]  # the system prompt names the model it was run with
         out = []
         for r in rows:
@@ -52,7 +56,9 @@ def specs_for(rows, realism: str):
         if r.get("harness") == "realism_email":
             import email_env
 
-            sp = email_env.build(r["arm"], int(r["item"].rsplit("_", 1)[1]), int(r["seed"]))[0]
+            variant, _, level = r["arm"].partition("@")  # exported arms carry a run tag after the level: base@lowc_junebug
+            arm = f"{variant}@{level.split('_')[0]}" if level else variant
+            sp = email_env.build(arm, int(r["item"].rsplit("_", 1)[1]), int(r["seed"]))[0]
         else:
             sp = V.VARIANTS[r["arm"]](sys.modules["realrun"].load_problem(r["item"]), int(r["seed"]))
         m0 = r["messages"][0]
@@ -70,8 +76,25 @@ def labels_json(r: dict, extra: dict) -> str:
     return json.dumps(d | extra)
 
 
-def spans(msgs, tools, text):
+RAW_PREFIX, RAW_EMPTY_THINK = "[gMASK]<sop><|system|>Reasoning Effort: Max", "<|assistant|><think></think>"
+
+
+def raw_render(msgs) -> str:
+    """evalcue EVALCUE_RAW_PREFILL render (single turn, no tools): GLM prefix + turns + an empty think block + the reply, verbatim."""
+    turn = {"system": "<|system|>", "user": "<|user|>"}
+    head = RAW_PREFIX + "".join(turn[m["role"]] + m["content"] for m in msgs[:-1])
+    assert msgs[-1]["role"] == "assistant" and not msgs[-1].get("reasoning_content")
+    return head + RAW_EMPTY_THINK + (msgs[-1]["content"] or "")
+
+
+def spans(msgs, tools, text, raw=False):
     """char start of each message in the render (prefix property of the GLM template), plus the end."""
+    if raw:
+        starts, k = [], len(RAW_PREFIX)
+        for m in msgs[:-1]:
+            starts.append(k)
+            k += len({"system": "<|system|>", "user": "<|user|>"}[m["role"]]) + len(m["content"])
+        return starts + [k, len(text)]
     starts = []
     for i in range(len(msgs)):
         s = R.render(msgs[:i], tools) if i else R.render([{"role": "user", "content": ""}], tools)[: -len("<|user|>")]
@@ -108,13 +131,20 @@ def char_roles(msgs, text, starts):
 ROLE_NAMES = ["system", "user", "assistant", "reasoning", "tool_call", "tool"]
 
 
-def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache):
-    """tokenize one view and return (ids, per-position dicts) for every position to read."""
+def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache, raw=False, first_reply=0):
+    """tokenize one view and return (ids, per-position dicts) for every position to read (+ the first `first_reply` tokens
+    of the final assistant reply, whatever they are)."""
     enc = tk(text, add_special_tokens=False, return_offsets_mapping=True)
     ids, offs = enc["input_ids"], enc["offset_mapping"]
     n_full = len(ids)
-    starts = spans(msgs, tools, text)
+    starts = spans(msgs, tools, text, raw)
     mi, role = char_roles(msgs, text, starts)
+    reply_from = None
+    if first_reply:
+        a0 = starts[len(msgs) - 1]
+        t1 = text.find("</think>", a0)
+        reply_from = t1 + len("</think>") if t1 >= 0 else a0
+    reply_seen = 0
     marker_ids = {tk.convert_tokens_to_ids(m) for m in MARKERS}
     view_ids = ids[:CAP]
     turn = np.cumsum([t in marker_ids for t in view_ids]) - 1
@@ -125,7 +155,10 @@ def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache):
             piece_cache[t] = tk.decode([t])
         piece = piece_cache[t]
         special = t >= FIRST_ADDED
-        if not (special or is_punct(piece)):
+        early = reply_from is not None and offs[p][0] >= reply_from and reply_seen < first_reply
+        if early:
+            reply_seen += 1
+        if not (special or is_punct(piece) or early):
             continue
         c = offs[p][0]
         if c < tail_char:
@@ -158,6 +191,9 @@ def main():
     ap.add_argument("--env", default=None, help="env column (default coding/<config>)")
     ap.add_argument("--positive", default="hack", help="row field used as `positive`")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--rows-subset", default=None, help="JSON list of 0-based rows.jsonl lines to read (others skipped)")
+    ap.add_argument("--raw-prefill", action="store_true", help="evalcue EVALCUE_RAW_PREFILL render (empty think block prefilled)")
+    ap.add_argument("--first-reply-tokens", type=int, default=0, help="also read the first N tokens of the final reply")
     ap.add_argument("--tools-from", default="main-run variant schemas", help="labels_json provenance note for the tool schemas")
     a = ap.parse_args()
     R.TOK = None
@@ -172,11 +208,14 @@ def main():
     piece_cache: dict[int, str] = {}
     seen: dict[bytes, tuple[str, int]] = {}
     eps, pos_rows, dups, views = [], [], [], []
+    subset = set(json.loads(Path(a.rows_subset).read_text())) if a.rows_subset else None
     for ri, (r, tools) in enumerate(zip(rows, tools_all)):
+        if subset is not None and ri not in subset:
+            continue
         msgs = r["messages"]
         eid = f"{a.run_dir}#{ri}"
         tid0 = "cfi4:" + hashlib.md5(eid.encode()).hexdigest()[:12]
-        text = R.render(msgs, tools)
+        text = raw_render(msgs) if a.raw_prefill else R.render(msgs, tools)
         cands = [("prefix", tid0, text, msgs, lambda i: i, 0)]
         n_tok = R.n_tokens(text)
         if n_tok > CAP:
@@ -197,7 +236,7 @@ def main():
                 tail_char = len(R.render(lmsgs[: fu + 2], tools))
                 cands.append(("late", tid0 + ":late", ltext, lmsgs, mmap, tail_char))
         for view, tid, vtext, vmsgs, mmap, tail_char in cands:
-            ids, n_full, prs = view_rows(tk, vtext, vmsgs, tools, mmap, tail_char, piece_cache)
+            ids, n_full, prs = view_rows(tk, vtext, vmsgs, tools, mmap, tail_char, piece_cache, a.raw_prefill, a.first_reply_tokens)
             truncated = n_full > CAP
             h = hashlib.blake2b(digest_size=16)
             arr = np.asarray(ids[:CAP], dtype=np.int32)
