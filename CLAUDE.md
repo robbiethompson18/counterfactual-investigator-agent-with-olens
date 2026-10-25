@@ -249,6 +249,9 @@ Current docs:
   lens lags the text; paired lens-vs-resample table
 - [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
   — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
+- [Transcript-only investigators (baseline_hyp) — read before building investigator envs from the evalcue behavioural runs or scoring counterfactual predictions](baseline_hyp/README.md)
+  — per-variant agent filesystem (environment/ diffs cleanly per arm), DSv4/4.1 results, fork
+  question formats, within-investigation Spearman, null-edit pilot
 - [Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
   — symmetric arms, any lever, build/measure/tweak/stack, what makes an arm count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
