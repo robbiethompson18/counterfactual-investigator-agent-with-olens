@@ -380,8 +380,15 @@ function treeHtml(n,depth){let h="";
   for(const f of (n.__f||[]).sort())h+=`<button class="f" data-sel='${esc(JSON.stringify({v:"env",f}))}' title="${esc(f)}">${esc(f.split("/").pop())}</button>`;
   for(const k of Object.keys(n).filter(k=>k!="__f").sort())h+=`<details class="d" ${depth<1?"open":""}><summary>${esc(k)}/</summary>${treeHtml(n[k],depth+1)}</details>`;
   return h}
+// an id that isn't in the run: try it with / without "/default/" segments (links built from arm/item/sample)
+function idAlternatives(R,i){const norm=x=>String(x).replace(/\/default(?=\/|$)/g,"");const n=norm(i);
+  return R.items.filter(x=>x.id!==i&&norm(x.id)==n).map(x=>x.id)}
 async function itemPage(d,i,p){
   const R=await getRun(d);
+  if(!R.items.some(x=>x.id==i)){const alt=idAlternatives(R,i);
+    if(alt.length==1){p.set("i",alt[0]);history.replaceState(null,"","#"+p.toString());i=alt[0]}
+    else if(alt.length>1){VIEW="item";crumbs([["datasets","#"],[d,linkTo({d})],[i]]);
+      $("#app").innerHTML=`<div class="page"><p class="empty">No item <code>${esc(i)}</code> in ${esc(d)}. Did you mean:</p><ul>${alt.map(a=>`<li><a href="${linkTo({d,i:a})}">${esc(a)}</a></li>`).join("")}</ul></div>`;return}}
   const same=ITEM.d==d&&ITEM.id==i&&ITEM.it;
   if(!same){$("#app").innerHTML=`<div class="page empty">Loading ${esc(i)}…</div>`;
     const it=await SRC.item(d,i);Object.assign(ITEM,{d,id:i,it,R,env:it.env_files||null,envId:it.env||null})}

@@ -346,6 +346,8 @@ def import_config(
     dense_tids = {f: set(pq.read_table(cfg_dir / f, columns=["tid"]).column("tid").unique().to_pylist()) for f in dense}
     all_tids = set(base.tid).union(*dense_tids.values())
     dups, canon = prefix_dups(cfg_dir, dense, base) if dense else (None, None)
+    if dups is not None:  # a transcript whose reads are all shared-prefix copies still gets an item
+        all_tids |= set(dups.tid)
     missing = all_tids - set(eps.tid)
     if missing:
         print(f"{source}/{cfg}: no transcripts for {len(missing)} tids, their reads are skipped", flush=True)
