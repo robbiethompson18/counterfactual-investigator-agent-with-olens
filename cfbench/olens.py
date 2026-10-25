@@ -24,7 +24,9 @@ scenario.
 import json
 import random
 import re
+from array import array
 from collections import defaultdict
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,20 +40,51 @@ AT_LAYERS = {32, 40, 48}  # olens_at's default layers when the reads have them (
 MAX_BULLETS = 20  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
 
-Reads = dict[str, tuple[list[dict], list[dict]]]  # rollout source -> (its messages, its read rows)
 
+class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
+    """Rollout source -> (its messages, its read rows), each source's rows parsed from disk on its first lookup. Parsing
+    every row up front took 12 GB per process with the 2026-10-24 nocot reads, so a few cfbench runs at once got killed by
+    oom-guard; a run only looks up its own env's sources and its placebo's. Each reads.jsonl's run dir also has the
+    requests.jsonl it was read from, which has every transcript's messages."""
 
-def load(paths: list[str]) -> Reads:
-    """Each reads.jsonl's run dir also has the requests.jsonl it was read from, which has every transcript's messages
-    (the placebo needs another env's runs, which aren't loaded)."""
-    by_source: Reads = {}
-    for path in map(Path, paths):
-        messages = {r["id"]: r["messages"] for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
-        for row in map(json.loads, path.read_text().splitlines()):
-            if row["msg_index"] < 0:  # the tool definitions before the system prompt: same in every run, not in the transcript
-                continue
-            by_source.setdefault(row["id"], (messages[row["id"]], []))[1].append(row)
-    return by_source
+    def __init__(self, paths: list[str]):
+        self.messages: dict[str, list[dict]] = {}
+        self.offsets: dict[str, dict[Path, array]] = defaultdict(dict)  # source -> reads file -> where its rows start
+        self.top_fves = array("d")  # every read's top-bullet FVE, for fve_note
+        self.rows: dict[str, list[dict]] = {}
+        for path in map(Path, paths):
+            messages = {r["id"]: r["messages"] for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            offset = 0
+            with path.open("rb") as f:
+                for line in f:
+                    row = json.loads(line)
+                    # msg_index < 0: the tool definitions before the system prompt, same in every run, not in the transcript
+                    if row["msg_index"] >= 0:
+                        self.messages.setdefault(row["id"], messages[row["id"]])
+                        self.offsets[row["id"]].setdefault(path, array("q")).append(offset)
+                        if (b := row["bullets"]) and b[0]["fve"] is not None:
+                            self.top_fves.append(b[0]["fve"])
+                    offset += len(line)
+
+    def __getitem__(self, source: str) -> tuple[list[dict], list[dict]]:
+        messages = self.messages[source]
+        if source not in self.rows:
+            self.rows[source] = []
+            for path, offsets in self.offsets[source].items():
+                with path.open("rb") as f:
+                    for offset in offsets:
+                        f.seek(offset)
+                        self.rows[source].append(json.loads(f.readline()))
+        return messages, self.rows[source]
+
+    def __contains__(self, source: object) -> bool:  # Mapping's default would parse the source's rows
+        return source in self.messages
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.messages)
+
+    def __len__(self) -> int:
+        return len(self.messages)
 
 
 @dataclass
@@ -291,7 +324,7 @@ def sources(paths: list[str]) -> list[dict]:
 def fve_note(reads: Reads) -> str | None:
     """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt; None if the reads have
     no FVE (core.build_prompt then describes them as greedy + sampled readouts)."""
-    top = sorted(b[0]["fve"] for _, rows in reads.values() for row in rows if (b := row["bullets"]) and b[0]["fve"] is not None)
+    top = sorted(reads.top_fves)
     if not top:
         return None
     q = [top[int(f * (len(top) - 1))] for f in (0.1, 0.5, 0.9)]

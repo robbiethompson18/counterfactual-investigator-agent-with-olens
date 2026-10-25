@@ -58,7 +58,7 @@ async def main():
     done = {key(json.loads(line)) for path in filter(None, args.skip.split(",")) for line in Path(path).read_text().splitlines()}
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
-    reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
+    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [])
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
     anchor_reads = anchors.load(args.anchor_reads.split(",")) if args.anchor_reads else {}
