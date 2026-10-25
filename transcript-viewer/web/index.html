@@ -557,7 +557,7 @@ async function openTranscript(tid){
   const z0 = tr.zones[tr.main_zone], tok = st.hash && st.hash.tok != null ? +st.hash.tok : null;
   if (chive && st.hash && st.hash.x != null) showEdit(+st.hash.x, tok == null);
   st.hash = null;  // the link's settings apply to the first transcript only
-  if (tok != null && tok >= 0 && tok < tr.tokens.length) { select(tok, false); const el = document.querySelector(`#tview .tk[data-p="${tok}"]`); if (el) el.scrollIntoView({block: 'center'}); }
+  if (tok != null && tok >= 0 && tok < tr.tokens.length) { st.focus = tok; select(tok, false); const el = document.querySelector(`#tview .tk[data-p="${tok}"]`); if (el) el.scrollIntoView({block: 'center'}); }
   else select(z0 ? Math.min(z0[0] + (tr.glm ? 0 : st.ovpos), z0[1] - 1) : 0, false);  // GLM zones start on her final_user read
 }
 
@@ -628,6 +628,14 @@ function select(pos, autoread){
   }
 }
 
+// a link's token (st.focus): keep the first chosen layer's readout at the top of the lens panel, also after
+// Agam's banks or NLA/J++ load above it, until the reader scrolls or clicks in the panel or moves to another token
+function focusLens(){
+  if (st.focus == null || st.focus !== st.sel) return;
+  const el = [...document.querySelectorAll('#lres .lr')].find(e => st.chosen.has(+e.dataset.l)) || $('#lres').previousElementSibling;
+  const box = $('#right'); box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
+}
+
 function zoneFor(pos){ return st.tr.zones.find(([a, b]) => pos >= a && pos < b); }
 
 function renderLens(){
@@ -675,7 +683,7 @@ function renderLens(){
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
     const oldLens = isOld(r) ? `<span class="oldlens" title="read with ${esc(r.lens)}, the old lens with the Chinese-prefix bug; the current lens is ${esc(tr.lens)}. Reading this token again replaces it.">old lens</span>` : '';
-    h += `<div class="lr"><div class="hd"><b>L${L}</b>${oldLens}${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
+    h += `<div class="lr" data-l="${L}"><div class="hd"><b>L${L}</b>${oldLens}${r.norm != null ? `<span>‖h‖ ${Math.round(r.norm)}</span>` : ''}<span class="fve" title="joint whitened FVE: NNLS refit on all bullets' AR directions. Per bullet: that bullet's own FVE (cos² in the whitened space)">joint FVE <b>${r.samples.map(s => s.fve != null ? s.fve.toFixed(2) : '–').join(' / ')}</b></span></div>`;
     h += r.samples.map(s => sampHtml(s, L)).join('');
     const o = tr.organism && st.other[tokKey(pos, L)];  // the other activations (organism / base) on the same token
     if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl">${blTxt(b, L)}</div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
@@ -695,6 +703,7 @@ function renderLens(){
   $('#xbtn').disabled = !(st.pod.state === 'ready' || st.jppLocal) || st.busy;
   if (st.jppLocal && st.pod.state !== 'ready') $('#xbtn').textContent = 'J++ (local GPU)';
   showExtras(pos);
+  focusLens();
   $('#readbtn').onclick = () => doRead([pos]);
   $('#allbtn').onclick = () => doRead([pos], layers);
   if (z) $('#zonebtn').onclick = () => doRead(Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k));
@@ -768,7 +777,7 @@ async function showExtras(pos){
   const res = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
   const x = STATIC ? res[pos] || {} : res;  // the snapshot serves a chunk of 64 tokens (extras.chunk)
   if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
-  $('#xbox').innerHTML = extrasHtml(x);
+  $('#xbox').innerHTML = extrasHtml(x); focusLens();
   const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };
 }
 function extrasHtml(x){
@@ -898,6 +907,8 @@ document.addEventListener('keydown', e => {
   fillFilters();
   for (const [k, id] of [['q', '#q'], ['beh', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
   st.hash = {tok: hp.get('tok'), tf: hp.get('tf'), x: hp.get('x')};
+  addEventListener('hashchange', () => location.reload());  // a link pasted into an open viewer tab (syncHash's replaceState doesn't fire this)
+  for (const ev of ['wheel', 'pointerdown', 'touchstart']) $('#right').addEventListener(ev, () => { st.focus = null; }, {passive: true});
   $('#ovpos').innerHTML = zl.map((t, k) => `<option value="${k}" ${k === st.ovpos ? 'selected' : ''}>+${k} ${esc(t)}</option>`).join('');
   $('#ovpos').onchange = e => { st.ovpos = +e.target.value; ls('ovpos', st.ovpos); renderList(); };
   st.overview = await api('/api/overview');
