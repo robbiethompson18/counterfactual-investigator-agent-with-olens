@@ -477,10 +477,12 @@ const SPECIAL=/^<\|[^|]*\|>$|^<\/?(think|tool_call|tool_response|answer)>$/;
 function roleOf(name){const n=String(name).toLowerCase();
   if(/system/.test(n))return "system";if(/reason|think|cot/.test(n))return "reasoning";if(/tool|observation|function|result/.test(n))return "tool";
   if(/user|prompt|human/.test(n))return "user";if(/assistant|reply|answer|output|response|model/.test(n))return "assistant";return "other"}
-async function trView(p){
+// keepBar: re-draw only the transcript and side panel, never the toolbar, so its inputs keep focus and caret while typing
+async function trView(p,keepBar){
   const it=ITEM.it,run=ITEM.R.run;
-  if(p.get("q")!=null)TRK.q=p.get("q");
-  $("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
+  keepBar=keepBar&&!!$("#doc .tkbar");
+  if(p.get("q")!=null&&!keepBar)TRK.q=p.get("q");
+  if(!keepBar)$("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
   let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
   if(ITEM.it!==it||ITEM.sel.v!="tr")return;
   // an overlay's own reads and positioned notes join the base transcript's reads
@@ -519,13 +521,14 @@ async function trView(p){
       body+=`<span class="xp" id="xp${q}" hidden></span>`}
     body+=esc(run_)+"</div></section>"}
   const peekOpts=[["auto",hasInline?"inline reads":tools[0]?`${tools[0]} (first)`:"auto"],["off","off"],...tools.map(t=>[t,t])];
-  $("#doc").innerHTML=`<div class="tkbar">
+  const html=`<div class="tkbar">
      <label for="tkq">Search reads <input class="rx" id="tkq" type="search" value="${esc(TRK.q)}" placeholder="regex, e.g. test|evaluat"></label>
      <label for="tkpeek">Peek <select id="tkpeek">${peekOpts.map(([v,n])=>`<option value="${esc(v)}" ${TRK.peek==v?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
      ${T.min_score!=null?`<label for="tkmin">min ${esc(all.find(r=>r.filter)?.score_name||"score")} <input id="tkmin" type="number" step="0.05" min="-1" max="1" value="${TRK.min}" style="width:64px"></label>`:""}
      ${tools.map(t=>`<label><input type="checkbox" data-tool="${esc(t)}" ${TRK.tools[t]!==false?"checked":""}> <span style="color:${colorOf(t,run)}">${esc(t)}</span></label>`).join("")}
      <button class="btn" id="xall">Expand all</button><button class="btn" id="xnone">Collapse all</button><span class="mono" id="tkn"></span></div>
    <div class="tkgrid"><div class="tr" id="tr">${body}</div><aside class="side" id="side"></aside></div>`;
+  if(keepBar)$("#doc .tkgrid").outerHTML=html.slice(html.indexOf('<div class="tkgrid">'));else $("#doc").innerHTML=html;
   // ---- the side panel: matches for the search, else the legend and what each reader is
   const judges=judgeCards(it.calls||[],j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),true)+overlayInfo(it,true);
   const sideInfo=()=>`${judges?judges+'<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">':""}<h3>${toks.length.toLocaleString()} tokens · ${P.length.toLocaleString()} read positions</h3>
@@ -560,10 +563,10 @@ async function trView(p){
   $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);b.textContent=c?"show all":"collapse";return}
     const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({t:o?q:null})};
   $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({t:d.dataset.p})}};
-  const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H()).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
+  const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H(),true).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
   let deb;$("#tkq").oninput=e=>{TRK.q=e.target.value;store.set("tkq",TRK.q);clearTimeout(deb);deb=setTimeout(()=>{setHash({q:TRK.q||null});rerender()},250)};
   $("#tkpeek").onchange=e=>{TRK.peek=e.target.value;store.set("tkpeek",TRK.peek);rerender()};
-  const mn=$("#tkmin");if(mn)mn.oninput=()=>{const v=parseFloat(mn.value);if(!isNaN(v)){TRK.min=v;rerender()}};
+  let debm;const mn=$("#tkmin");if(mn)mn.oninput=()=>{const v=parseFloat(mn.value);if(!isNaN(v)){TRK.min=v;clearTimeout(debm);debm=setTimeout(rerender,250)}};
   $$("[data-tool]").forEach(c=>c.onchange=()=>{TRK.tools[c.dataset.tool]=c.checked;rerender()});
   $("#xall").onclick=()=>{const v=visible();if(v.length>400&&!confirm(`Expand all ${v.length} read tokens?`))return;v.forEach(q=>open(q,true))};
   $("#xnone").onclick=()=>$$("#tr .xp:not([hidden])").forEach(x=>open(+x.id.slice(2),false));
