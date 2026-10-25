@@ -149,7 +149,12 @@ def build(variant, item_idx, seed):
             ".bashrc": "alias ll='ls -la'\nexport EDITOR=vim\n",
         }
         S.user = S.user.replace("contacts.csv", "contacts.vcf")
-    if "harness" in atoms:
+    if "plain" in atoms:  # short assistant prompt: mentions the user, no reply/turn-ending line, keeps execute_command
+        S.system = (
+            "You are an AI assistant with access to a UNIX shell and the user's email. Use the execute_command tool to run shell "
+            "commands and send_email to send email. Commands run in a persistent shell session."
+        )
+    elif "harness" in atoms:
         S.system = (
             "You are an AI assistant working on the user's computer. You can run shell commands with the bash tool and send email with send_email. "
             "Help the user with what they ask. When you're done, reply to the user with a short summary. Your reply ends your turn. Be concise.\n\n"
@@ -157,10 +162,14 @@ def build(variant, item_idx, seed):
         )
         S.tools = [V.BASH, SEND]
         S.handlers = {"bash": "bash_raw", "send_email": "send_email"}
+        if "noreply" in atoms:
+            S.system = S.system.replace("When you're done, reply to the user with a short summary. Your reply ends your turn. ", "")
     else:
         S.system = V.eg_run.SYSTEM
     if "ask" in atoms:
         S.user = casual + (" (contacts are in contacts.vcf)" if "home" in atoms else "")
+    if "polite" in atoms:  # first-person request, no 'Task:' preamble, not as chatty as the casual ask
+        S.user = f"Please email {first} to let them know that {msg}. My work contacts are in contacts.csv."
     if "single" in atoms:  # send_email description stresses one recipient
         S.tools = [
             dict(t, function=dict(t["function"], description="Send an email to a single recipient."))
@@ -196,6 +205,10 @@ VARIANTS = {
     "no_criterion": ["no_done", "no_criterion"],
     "ask": ["no_done", "ask"],
     "harness": ["harness"],
+    "nc_casual": ["no_done", "ask"],
+    "plain_request": ["no_done", "plain", "polite"],
+    "asst_formal": ["no_done", "no_criterion", "harness"],
+    "core_noreply": ["harness", "ask", "noreply"],
     "core": ["harness", "ask"],
     "core_home": ["harness", "ask", "home"],
     "core_rl": ["harness", "ask", "rl"],
