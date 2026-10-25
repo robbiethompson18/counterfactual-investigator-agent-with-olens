@@ -330,7 +330,9 @@ def fill_dups(dups: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
     return out.drop(columns=["canon_tid", "canon_pos"])
 
 
-def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls) -> Counter:
+def import_config(
+    source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls, owner: str = "Celeste's"
+) -> Counter:
     stats = Counter()
     tx = cfg_dir / "transcripts.parquet"
     eps = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
@@ -356,9 +358,9 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
         bon.setdefault(b.tid, {})[int(b.pos)] = b
     run = Run(
         out,
-        title=f"GLM 5.3 O-lens reads: {cfg} ({source})",
+        title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"GLM 5.3 O-lens reads ({owner}): {cfg}",
         description=(
-            f"Celeste's O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
+            f"{owner} O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
             "its transcript shows every read inline. **positive** is the env's label for the episode, **aware** the eval-awareness "
             "judge's (where Celeste's data has them). Items whose source run is on disk also carry its model calls (the subject "
             "transcript and every judge, exact I/O) and environment."
@@ -477,6 +479,7 @@ def main() -> None:
     ap.add_argument("--docent-root", type=Path, action="append", default=[], help="dirs holding runs/<exp>/<run>/docent.json")
     ap.add_argument("--skip", action="append", default=[], help="skip a file, e.g. coding_envs/readouts_dense.parquet (repeatable)")
     ap.add_argument("--only", action="append", default=[], help="only these configs")
+    ap.add_argument("--owner", default="Celeste's", help='whose reads these are, for titles (e.g. "our" for runs/olens_reads)')
     ap.add_argument("--no-dense", action="store_true", help="leave out readouts_dense.parquet (every-punctuation / every-token reads)")
     a = ap.parse_args()
     tok = Tokenizer.from_file(hf_hub_download("zai-org/GLM-5.3", "tokenizer.json"))
@@ -487,7 +490,7 @@ def main() -> None:
                 continue
             files = [f for f in files if (cfg_dir / f).exists() and f"{cfg}/{f}" not in a.skip]
             files = [f for f in files if not (a.no_dense and "readouts_dense" in f)]
-            stats = import_config(ds.name, cfg, cfg_dir, files, a.out / ds.name / cfg, tok, docent, calls)
+            stats = import_config(ds.name, cfg, cfg_dir, files, a.out / ds.name / cfg, tok, docent, calls, a.owner)
             print(f"{ds.name}/{cfg}: {dict(stats)}", flush=True)
 
 

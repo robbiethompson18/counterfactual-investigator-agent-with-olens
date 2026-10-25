@@ -49,7 +49,9 @@ def main() -> None:
     doc = json.loads((a.run / "docent.json").read_text()) if (a.run / "docent.json").exists() else None
     key = f"{a.run.parent.name}/{a.run.name}"
     bases = base_items(a.base, key) if a.base else {}
+    # the env detector's flags (evalcue detect_notes) or, for coding-harness rows, their top-level yes/no fields (hack, ...)
     flags = sorted({k for r in rows for k, v in (r.get("detect_notes") or {}).items() if isinstance(v, bool)})
+    flags += sorted({k for r in rows for k, v in r.items() if isinstance(v, bool) and k != "positive" and k not in flags})
     run = Run(
         a.run / "expview",
         title=f"{a.run.parent.name}: {a.run.name}",
@@ -65,7 +67,8 @@ def main() -> None:
     n_base = 0
     for i, r in enumerate(rows):
         notes = r.get("detect_notes") or {}
-        labels = {"positive": r.get("positive"), **{k: notes[k] for k in flags if k in notes}}
+        labels = {"positive": r.get("positive"), **{k: notes.get(k, r.get(k)) for k in flags}}
+        arm, sample = r.get("arm", r.get("variant")), r.get("sample", r.get("seed"))
         before, after = r.get("files_before") or {}, r.get("files_after") or {}
         env = {f"before/{k}": v for k, v in before.items()} | {f"after/{k}": v for k, v in after.items() if before.get(k) != v}
         links = {}
@@ -74,8 +77,8 @@ def main() -> None:
         base = (a.base, bases[i]) if i in bases else None
         n_base += base is not None
         run.add(
-            id=f"{r.get('arm')}/s{r.get('sample')}",
-            group=r.get("arm"),
+            id=f"{arm}/{r.get('pid') or r.get('item') or ''}/s{sample}".replace("//", "/"),
+            group=arm,
             labels={k: v for k, v in labels.items() if v is not None},
             calls=[call("subject", r.get("model"), messages=r.get("messages") or [], params={"thinking": r.get("thinking")})],
             env_files=env or None,
