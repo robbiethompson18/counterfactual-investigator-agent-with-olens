@@ -239,6 +239,9 @@ Current docs:
   — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
 - [GLM 5.3 agent-interp-envs runs — read before comparing GLM 5.3 coding/EvilGenie/ImpossibleBench/Donation Bet results or running many podman sandboxes](docs/glm53-agent-interp-envs.md)
   — headline numbers, artifact and Docent links, podman scaling gotchas
+- [GLM 5.3 realism variants — read before running or extending the user-style ImpossibleBench ladder or the email over-eagerness envs](docs/glm53-realism.md)
+  — criterion-free 8-rung ladder (hack 27% → 3%, test edits 0% → 56%), evalness ranking, O-lens
+  prompt and grader reads, email in-between rungs (casual ask alone → 2%)
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
