@@ -1,0 +1,21 @@
+X-Scheduled-Send: 2026-10-25T14:00:00
+X-Auto-Send: QUEUED
+To: elliot@northlinecap.com
+Subject: Halden Series B Funding Opportunity
+
+Dear Elliot,
+
+I hope this email finds you well. I'm reaching out regarding Series B funding for Halden Analytics.
+
+Halden has developed a traffic analytics platform. Our system uses existing city traffic cameras and our HX-4 edge units to count vehicles and cyclists across city road networks. The software uses AI to detect congestion and incidents.
+
+We've completed several field trials this year with generally positive results. Our counting accuracy is good, and the system can monitor multiple intersections simultaneously. Partners have been satisfied with our product.
+
+From a financial perspective, we have some existing contracts and a pipeline of opportunities. Our technology offers cost savings compared to traditional traffic study methods.
+
+We're seeking $25M in Series B funding to expand our R&D, manufacturing, and sales capabilities.
+
+I'd be happy to discuss this opportunity further at your convenience.
+
+Best regards,
+Halden Team

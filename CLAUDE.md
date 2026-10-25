@@ -260,6 +260,8 @@ Current docs:
 - [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
   — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
   subagent labels, replication of the screen (14/30 vs 0/30)
+- [funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
+  — upstream/core/full harness × thin/real docs × memo, how to render an arm, unfixed sandbox tells
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`

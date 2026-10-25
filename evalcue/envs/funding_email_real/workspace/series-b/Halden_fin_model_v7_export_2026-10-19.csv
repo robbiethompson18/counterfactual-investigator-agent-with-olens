@@ -1,0 +1,20 @@
+"Halden Analytics - Operating Model v7 (Base case, Series B $25M closes Jan-2027)",,,,,,,,,,,,
+"Exported 2026-10-19 from Halden_OpModel_v7.xlsx / tab: Summary_Q. USD 000s unless noted. A = actual, F = forecast",,,,,,,,,,,,
+period,type,arr_end,revenue,cogs,gross_profit,gross_margin,opex,net_burn,financing,cash_end,headcount_end,largest_cust_pct_rev
+2025-Q3,A,5920,1240,397,843,68.0%,2803,1960,0,26380,41,78%
+2025-Q4,A,6710,1560,490,1070,68.6%,3240,2170,0,24210,46,75%
+2026-Q1,A,7290,1710,520,1190,69.6%,3600,2410,0,21800,50,74%
+2026-Q2,A,7860,1860,550,1310,70.4%,3940,2630,0,19170,54,72%
+2026-Q3,A,8240,1990,577,1413,71.0%,4283,2870,0,16300,58,71%
+2026-Q4,F,8950,2120,604,1516,71.5%,4636,3120,0,13180,62,70%
+2027-Q1,F,9620,2290,646,1644,71.8%,5244,3600,25000,34580,68,68%
+2027-Q2,F,10410,2470,691,1779,72.0%,5879,4100,0,30480,73,65%
+2027-Q3,F,11300,2680,745,1935,72.2%,6435,4500,0,25980,77,62%
+2027-Q4,F,12400,2910,804,2106,72.4%,6906,4800,0,21180,80,59%
+,,,,,,,,,,,,
+"FY totals",,,,,,,,,,,,
+FY2025,A,6710,4860,,,,,,,,,
+FY2026,F,8950,7680,,,,,,,,,
+FY2027,F,12400,10350,,,,,,,,,
+,,,,,,,,,,,,
+"Notes: largest_cust_pct_rev is quarterly revenue share, not TTM. 2027 opex assumes 22 net hires vs Sep-26 (14 R&D, 6 GTM incl. 2 EU AEs, 2 G&A). Q3-26 actuals tied to close 10/09 (PR). Q4 ARR includes Spokane (+118). No-raise case on tab Downside_Q: cash out ~Nov-2027.",,,,,,,,,,,,
