@@ -85,7 +85,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--kind", default="dense", help="`kind` value (spread64 for a per-episode subset)")
     ap.add_argument(
-        "--subset", action="store_true", help="per-episode subset: dense=False, no prefix-dup file, episodes list only read positions"
+        "--subset", action="store_true", help="per-episode subset: dense=False; prefix dups and episodes.positions limited to what was read"
     )
     a = ap.parse_args()
     prep, out = Path(a.prep), Path(a.out)
@@ -96,17 +96,20 @@ def main():
     w = pq.ParquetWriter(out / "readouts_dense.parquet", SCHEMA, compression="zstd")
     n, read_pos = 0, []
     for j in done:
-        t = to_table(shard_rows(j, P), a.kind, not a.subset)
+        kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
+        t = to_table(shard_rows(j, P), kind, not a.subset)
         read_pos.append(t.select(["tid", "pos"]).to_pandas())
         w.write_table(t, row_group_size=50_000)
         n += t.num_rows
     w.close()
     eps = pd.read_parquet(prep / "episodes.parquet")
-    if a.subset:
-        rp = pd.concat(read_pos).groupby("tid").pos.apply(lambda x: x.sort_values().to_numpy().astype("int32"))
-        eps["positions"] = eps.tid.map(rp).map(lambda x: x if isinstance(x, np.ndarray) else np.zeros(0, "int32"))
-    else:
-        pd.read_parquet(prep / "dense_prefix_dups.parquet").to_parquet(out / "dense_prefix_dups.parquet", index=False)
+    dups = pd.read_parquet(prep / "dense_prefix_dups.parquet")
+    if a.subset:  # only the positions actually read, plus the exact-prefix duplicates of those (read once, shown in every episode)
+        rp = pd.concat(read_pos)
+        dups = dups.merge(rp.rename(columns={"tid": "canon_tid", "pos": "canon_pos"}), on=["canon_tid", "canon_pos"])
+        allp = pd.concat([rp, dups[["tid", "pos"]]]).groupby("tid").pos.apply(lambda x: np.sort(x.to_numpy().astype("int32")))
+        eps["positions"] = eps.tid.map(allp).map(lambda x: x if isinstance(x, np.ndarray) else np.zeros(0, "int32"))
+    dups.to_parquet(out / "dense_prefix_dups.parquet", index=False)
     eps.to_parquet(out / "episodes.parquet", index=False)
     pq.write_table(
         SCHEMA.empty_table().drop_columns(["dense", "prefix_cache", "lens_cache_salt"] + [c for c, _ in COLS if c.startswith("fve_")]),

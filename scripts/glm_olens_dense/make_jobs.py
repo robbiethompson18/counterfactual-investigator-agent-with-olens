@@ -30,6 +30,26 @@ def spread(prep: Path, views: list[dict], k: int) -> list[dict]:
     return [dict(v, pos=keep.get(v["tid"], np.zeros(0, np.int32))) for v in views]
 
 
+def head(prep: Path, views: list[dict], exclude: str) -> list[dict]:
+    """positions in the template header (tool spec), the system prompt and the first user message. These runs' episodes all open
+    [system, user], so that is msg_index <= 1 (-1 = template header); positions are already exact-prefix deduplicated by prep."""
+    import glob
+
+    import numpy as np
+    import pandas as pd
+
+    P = pd.read_parquet(prep / "positions.parquet", columns=["tid", "pos", "msg_index"])
+    P = P[P.msg_index <= 1]
+    done = set()
+    for f in glob.glob(exclude) if exclude else []:
+        j = torch.load(f)
+        done |= {(t, int(x)) for t, ps in zip(j["tids"], j["pos"]) for x in ps}
+    P = P[[(t, int(x)) not in done for t, x in zip(P.tid, P.pos)]]
+    keep = P.groupby("tid").pos.apply(lambda s: np.sort(s.to_numpy().astype(np.int32))).to_dict()
+    print(f"head: {len(P):,} unique positions over {P.tid.nunique()} views ({len(done):,} already read excluded)")
+    return [dict(v, pos=keep.get(v["tid"], np.zeros(0, np.int32))) for v in views]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prep", required=True)
@@ -47,6 +67,8 @@ def main():
         default="all",
         help="newline_special = template/special tokens + tokens containing a newline; rest = the other punctuation",
     )
+    ap.add_argument("--head", action="store_true", help="every unique position through the first user message")
+    ap.add_argument("--exclude-jobs", default="", help="glob of job files whose positions are already read (left out)")
     ap.add_argument("--tag", default="", help="job-name suffix after the run name (keeps a second pass's jobs apart)")
     a = ap.parse_args()
     prep, out = Path(a.prep), Path(a.out)
@@ -64,6 +86,8 @@ def main():
         views = [dict(v, pos=keep.get(v["tid"], np.zeros(0, np.int32))) for v in views]
     if a.per_episode:
         views = spread(prep, views, a.per_episode)
+    if a.head:
+        views = head(prep, views, a.exclude_jobs)
     views = [v for v in views if len(v["pos"])]
     k, cur, n = 0, [], 0
 
