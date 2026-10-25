@@ -344,7 +344,9 @@ Current docs:
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
-  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+  vLLM pod. Batch O-lens reads stream to HF as they're made (`runpod/olens_reads.sh run` + the
+  uploader sidecar; never read without it). While any pod boots, check progress every 3 min and
+  treat no change as stuck
 
 ## Shipping
 

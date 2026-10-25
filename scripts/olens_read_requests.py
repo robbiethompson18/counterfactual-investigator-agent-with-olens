@@ -12,8 +12,10 @@ priority order, round-robin over (env, arm) within a priority. A row's optional 
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
 
 Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/server.py) and every <|im_end|>,
-prompt included. OUT.jsonl gets one line per (transcript, position, layer), appended per transcript; transcripts
-already in OUT are skipped, so a rerun resumes:
+prompt included. One line per (transcript, position, layer), written per transcript into chunk files next to OUT:
+OUT minus its suffix + .partNNNN.jsonl, a new chunk at every start and every --chunk-transcripts transcripts or
+--chunk-mb MB (class Chunks), so scripts/olens_stream_upload.py can ship chunks to HF while this runs. Transcripts already
+in any chunk (or in a legacy single OUT file) are skipped, so a rerun resumes:
 
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
@@ -57,7 +59,10 @@ def render(tok, row):
     for m in msgs:
         for tc in m.get("tool_calls") or []:
             if isinstance(tc["function"]["arguments"], str):
-                tc["function"]["arguments"] = json.loads(tc["function"]["arguments"])
+                try:
+                    tc["function"]["arguments"] = json.loads(tc["function"]["arguments"])
+                except json.JSONDecodeError:  # thinking-off Qwen sometimes emits broken JSON; the template needs a dict, and one
+                    tc["function"]["arguments"] = {"_raw": tc["function"]["arguments"]}  # bad transcript must not kill the pod
     tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
     text = tok.apply_chat_template(msgs, tools=tools, tokenize=False)
     enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
@@ -177,7 +182,7 @@ def nnls_gram(G, b, zz):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("requests")
-    ap.add_argument("out")
+    ap.add_argument("out", help="reads path; written as chunk files next to it, OUT minus suffix + .partNNNN.jsonl (Chunks)")
     ap.add_argument("merged")
     ap.add_argument("--layers", default="24,32,40,48,56")
     # vLLM's share of the GPU; the HF base (capture + AR) needs ~60 GB of the rest. Each concurrent decode needs a
@@ -187,10 +192,12 @@ def main():
     ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
     ap.add_argument("--watch", action="store_true", help="when the queue is empty, re-read REQUESTS every minute")
+    ap.add_argument("--chunk-transcripts", type=int, default=20, help="start a new chunk file after this many transcripts")
+    ap.add_argument("--chunk-mb", type=float, default=32, help="or once the chunk is this big")
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
-    out = Path(args.out)
-    done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
+    out = Chunks(Path(args.out), args.chunk_transcripts, args.chunk_mb)
+    done = out.done_ids()
     done |= set(Path(args.skip_ids).read_text().split()) if args.skip_ids else set()
     print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
@@ -282,17 +289,54 @@ def queue(path, shard, done):
     return sorted(rows, key=lambda r: rank[r["id"]])
 
 
-def write(tok, out, job, scored):
+class Chunks:
+    """OUT split into chunk files, <OUT minus suffix>.partNNNN.jsonl: a new one at every start and after `transcripts`
+    transcripts or `mb` MB. Closed chunks never change, so a sidecar (scripts/olens_stream_upload.py) can upload them once
+    while the reader runs, and a pod that dies loses at most the open chunk. A legacy single OUT file (runs before chunking)
+    still counts for resume but is never appended to."""
+
+    def __init__(self, out: Path, transcripts: int, mb: float):
+        self.stem, self.transcripts, self.max_bytes = out.with_suffix(""), transcripts, int(mb * 2**20)
+        parts = sorted(out.parent.glob(f"{self.stem.name}.part[0-9]*.jsonl"))
+        self.files = ([out] if out.exists() else []) + parts
+        self.next = max((int(p.name[len(self.stem.name) + 5 : -6]) for p in parts), default=-1) + 1
+        self.f, self.count = None, 0
+
+    def done_ids(self) -> set[str]:
+        """Ids with any row in any chunk. A line torn by a kill mid-write doesn't parse and is skipped."""
+        done = set()
+        for path in self.files:
+            for line in path.open():
+                try:
+                    done.add(json.loads(line)["id"])
+                except json.JSONDecodeError:
+                    pass
+        return done
+
+    def write(self, lines: list[str]):
+        """One transcript's rows in one write, so a kill mid-transcript tears at most the last line."""
+        if self.f is None or self.count >= self.transcripts or self.f.tell() >= self.max_bytes:
+            if self.f:
+                self.f.close()
+            self.f = (self.stem.parent / f"{self.stem.name}.part{self.next:04d}.jsonl").open("a")
+            self.next, self.count = self.next + 1, 0
+        self.f.write("".join(lines))
+        self.f.flush()
+        self.count += 1
+
+
+def write(tok, out: Chunks, job, scored):
     ids, where, toks, msgs = job["ids"], job["where"], job["toks"], job["msgs"]
-    with out.open("a") as f:
-        for (p, L), (bs, joint) in zip(job["all"], scored):
-            msg, field, off = where[p]
-            rec = {
-                "id": job["row"]["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
-                "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
-                "layer": L, "bullets": bs, "joint_fve": joint,
-            }  # fmt: skip
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    lines = []
+    for (p, L), (bs, joint) in zip(job["all"], scored):
+        msg, field, off = where[p]
+        rec = {
+            "id": job["row"]["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
+            "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
+            "layer": L, "bullets": bs, "joint_fve": joint,
+        }  # fmt: skip
+        lines.append(json.dumps(rec, ensure_ascii=False) + "\n")
+    out.write(lines)
 
 
 if __name__ == "__main__":

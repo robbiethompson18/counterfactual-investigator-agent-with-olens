@@ -177,16 +177,45 @@ work; its docstring has the request and output formats. The lens is decoded by v
 weights (`olens.vllm_lens`); the HF base on the same GPU captures activations and runs the AR.
 
 ```
+uv run python scripts/runs.py new olens_reads SLUG -d "..." --model ... # -> data/runs/olens_reads/RUN, RUN = <date>_SLUG
 NAME=lens-reads runpod/qwen_server.sh up 1            # vLLM image + cache volume, ~3.5 min
 runpod/olens_reads.sh setup lens-reads                # stops its vLLM server; deps, checkpoints, merged lens
-runpod/olens_reads.sh run lens-reads REQ.jsonl TAG --layers 24,32,40,44,48,56 [--shard 0/2]
-runpod/olens_reads.sh status lens-reads TAG
-runpod/olens_reads.sh fetch lens-reads TAG data/runs/olens_reads/<run>/reads.jsonl
+runpod/olens_reads.sh run lens-reads REQ.jsonl TAG RUN --layers 24,32,40,44,48,56 [--shard 0/2]
+runpod/olens_reads.sh status lens-reads TAG           # reader progress + the uploader's last line
 runpod/olens_reads.sh stop lens-reads                 # rerunning `run` with the same TAG resumes
+uv run python scripts/olens_reads_assemble.py RUN [--shards 2] [--status abandoned] [--missing todo.jsonl]
 ```
 
-Write the outputs as a `scripts/runs.py` run under `data/runs/olens_reads/`. First used for the
-cfbench spike set (2026-10-22, 392 env transcripts, 1.16M tokens, 84k stop tokens).
+**Reads stream to HF while they're made.** The reader writes chunk files
+(`/workspace/reads/TAG.reads.partNNNN.jsonl`, a new one every 20 transcripts or 32 MB), and `run`
+starts `scripts/olens_stream_upload.py` next to it, which every 5 min uploads every new or grown
+file of the tag (parts, the requests file, the reader log) to the HF dataset under
+`runs/olens_reads/RUN/{parts,requests,logs}/`, then exits after a last cycle when the reader stops.
+A dead pod, a dead laptop session or a RunPod balance at zero costs at most one cycle. On
+2026-10-24, 8 pods read ~1M reads (~$100 of GPU) into files on their network volumes, nobody fetched
+them before the account went negative, and RunPod won't attach the volumes since: that loss is why
+this exists. Rules:
+
+- **Never run reads without the uploader.** `olens_reads.sh run` is the only way to start the
+  reader; don't hand-start `olens_read_requests.py` on a pod. If the uploader died (`status` shows a
+  stale `upload:` line), `stop` and rerun `run` (it resumes).
+- `run` wants the run dir to exist locally first (`scripts/runs.py new olens_reads ...`), syncs its
+  `meta.json` to HF at launch, and re-copies the three scripts to the pod, so a pod set up before a
+  reader change runs the current code. Shards of one run share RUN and differ in TAG.
+- No fetch step for finished runs: `scripts/olens_reads_assemble.py RUN` downloads the parts,
+  concatenates them into the run's `reads.jsonl` (the file cfbench and the viewers read), writes
+  `requests.jsonl`, prints per-shard completeness (requested vs read ids), records the counts under
+  `meta.reads`, and finishes + syncs the run. Rerun it after more parts land. `--missing FILE`
+  writes the unread requests, ready to queue on a fresh pod. `fetch` still exists for a peek at a
+  live pod.
+- Both the sidecar and the assembler tolerate torn last lines (a kill mid-write): the upload is cut
+  at the last newline, the assembler drops what doesn't parse and counts it. A transcript in two
+  parts (two pods with the same shard) is kept once, from the first part by name.
+- A pod with an old single `TAG.reads.jsonl` (pre-chunk run) still resumes from it, and
+  `scripts/olens_stream_upload.py RUN /workspace/reads/TAG --once` rescues it by hand.
+
+First used for the cfbench spike set (2026-10-22, 392 env transcripts, 1.16M tokens, 84k stop
+tokens).
 
 Gotchas:
 
@@ -201,6 +230,8 @@ Gotchas:
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
+- **A tool call whose arguments aren't valid JSON used to crash the reader** (4 thinking-off Qwen
+  transcripts on 2026-10-24, one pod down); it now renders them as `{"_raw": "<string>"}`.
 - The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup` builds
   it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
 - The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the

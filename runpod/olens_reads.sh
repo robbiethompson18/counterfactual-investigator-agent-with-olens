@@ -2,10 +2,13 @@
 # Batch O-lens reads (scripts/olens_read_requests.py) on a pod booted by `NAME=X runpod/qwen_server.sh up 1` (vLLM image +
 # cache volume). See runpod/CLAUDE.md, "O-lens reads".
 #   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, deps, checkpoints, merged lens
-#   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [ARGS...]   # start reading in the background -> /workspace/reads/TAG.reads.jsonl
-#   runpod/olens_reads.sh status NAME TAG               # last progress lines
-#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far
-#   runpod/olens_reads.sh stop NAME                     # kill the reader (a rerun of `run` with the same TAG resumes)
+#   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG RUN [ARGS...]   # read in the background -> /workspace/reads/TAG.reads.partNNNN.jsonl,
+#                                                       # streamed to HF runs/olens_reads/RUN/ by scripts/olens_stream_upload.py
+#   runpod/olens_reads.sh status NAME TAG               # last progress lines of the reader and the uploader
+#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far (a peek; finished runs come from HF via
+#                                                       # scripts/olens_reads_assemble.py)
+#   runpod/olens_reads.sh stop NAME                     # kill reader + uploader (a rerun of `run` with the same TAG resumes)
+# RUN is a run dir name under data/runs/olens_reads/ made beforehand with `scripts/runs.py new olens_reads SLUG ...`.
 set -euo pipefail
 NAME=${2:?pod name}
 ssh_pod() { runpod/pod.sh ssh "$NAME" "$@"; }
@@ -38,21 +41,32 @@ echo SETUP_DONE
 EOF
     ;;
   run)
-    req=${3:?requests.jsonl}; tag=${4:?tag}; shift 4
+    req=${3:?requests.jsonl}; tag=${4:?tag}; run=${5:?run dir name under data/runs/olens_reads/}; shift 5
+    # the uploader streams into the run's HF dir, and the assembler needs its meta.json: make the run first, sync it now
+    test -f "data/runs/olens_reads/$run/meta.json" || { echo "no data/runs/olens_reads/$run/meta.json: scripts/runs.py new olens_reads SLUG ..." >&2; exit 1; }
+    uv run python scripts/runs.py sync "data/runs/olens_reads/$run"
+    for f in olens_read_requests olens_stream_upload runs; do  # a pod set up before a change to these still runs the current code
+      ssh_pod "cat > /root/repo/scripts/$f.py" < "scripts/$f.py"
+    done
     ssh_pod "cat > /workspace/reads/$tag.jsonl" < "$req"
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
-  /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_space_rl600 $*
+cd /root/repo
+PYTHONPATH=olens/src python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
+  /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_space_rl600 $* > /workspace/reads/$tag.log 2>&1 &
+# never read without the uploader: reads left on a volume are lost when the pod or the account's balance dies
+exec python3 scripts/olens_stream_upload.py $run /workspace/reads/$tag --reader-pid \$! > /workspace/reads/$tag.upload.log 2>&1
 EOF
-    ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
+    ssh_pod "nohup bash /workspace/reads/$tag.sh > /dev/null 2>&1 < /dev/null & echo started" ;;
   status)
-    ssh_pod "grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/${3:?tag}.log | tail -3; pgrep -fc '[o]lens_read_requests' || true" ;;
+    ssh_pod "grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/${3:?tag}.log | tail -3; pgrep -fc '[o]lens_read_requests' || true
+      echo \"upload: \$(tail -1 /workspace/reads/$3.upload.log 2>/dev/null)\"" ;;
   fetch)
-    ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4" ;;
+    ssh_pod "cat /workspace/reads/${3:?tag}.reads*.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4" ;;
   stop)
-    # killing the reader orphans vLLM's engine process, which keeps its GPU memory: kill both
-    ssh_pod 'pkill -f "[o]lens_read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
+    # killing the reader orphans vLLM's engine process, which keeps its GPU memory: kill both, and the uploader
+    ssh_pod 'pkill -f "[o]lens_read_requests"; pkill -f "[o]lens_stream_upload"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2
+      nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
   *) echo "unknown command: $1" >&2; exit 1 ;;
 esac
