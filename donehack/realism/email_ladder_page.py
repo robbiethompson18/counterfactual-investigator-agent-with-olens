@@ -285,45 +285,64 @@ def main():
     global LEVEL
     LEVEL = a.level
     rungs = list(DESC)
-    st = {}
-    for v in rungs:
-        x = [json.loads(f.read_text())["record"] for f in (HERE / "runs" / "email" / lv(v)).glob("*.json")]
-        st[v] = {
-            k: analyze.wilson(sum(bool(r[k]) for r in x), len(x)) if x else (0, 0, 0) for k in ["picked_one", "sent_multiple", "asked"]
-        } | {"n": len(x)}
-    # chart
-    left, top, ph, gw = 50, 40, 240, 92
+    legend3 = '<div><span class="lg"><i style="background:var(--s1)"></i>picks one</span><span class="lg"><i style="background:var(--s4)"></i>sends to several of them</span><span class="lg"><i style="background:var(--s2)"></i>asks which</span></div>'
+
+    def build_chart(load):
+        st = {}
+        for v in rungs:
+            x = load(v)
+            st[v] = {
+                k: analyze.wilson(sum(bool(r[k]) for r in x), len(x)) if x else (0, 0, 0) for k in ["picked_one", "sent_multiple", "asked"]
+            } | {"n": len(x)}
+        # chart
+        left, top, ph, gw = 50, 40, 240, 92
+        W = left + 34 + gw * len(rungs)
+        sy = lambda p: top + ph * (1 - p)
+        svg = [
+            f'<svg viewBox="0 0 {W} {top + ph + 70}" width="100%" role="img" aria-label="hack and test-edit rate per rung">',
+            '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>',
+            f'<g style="color:var(--fg)"><line x1="{left}" x2="{W - 20}" y1="12" y2="12" stroke="currentColor" stroke-width="1.5" marker-start="url(#ah)" marker-end="url(#ah)"/></g>',
+            f'<text x="{left}" y="30" class="lab">Benchmark-like</text><text x="{W - 20}" y="30" class="lab" text-anchor="end">Deployment-like</text>',
+        ]
+        for t in [0, 0.25, 0.5, 0.75, 1]:
+            svg.append(
+                f'<line x1="{left}" x2="{W - 20}" y1="{sy(t):.1f}" y2="{sy(t):.1f}" class="grid"/><text x="{left - 6}" y="{sy(t) + 4:.1f}" class="ax" text-anchor="end">{int(t * 100)}%</text>'
+            )
+        for i, v in enumerate(rungs):
+            x0 = left + 14 + i * gw
+            if not st[v]["n"]:
+                svg.append(f'<text x="{x0 + 28}" y="{sy(0) - 8:.1f}" class="ax" text-anchor="middle">not run</text>')
+            for j, (k, col) in enumerate(
+                [("picked_one", "var(--s1)"), ("sent_multiple", "var(--s4)"), ("asked", "var(--s2)")] if st[v]["n"] else []
+            ):
+                p, lo, hi = st[v][k]
+                x = x0 + j * 27
+                svg.append(
+                    f'<rect x="{x}" y="{sy(p):.1f}" width="24" height="{max(sy(0) - sy(p), 1):.1f}" rx="3" fill="{col}"><title>{v} {k}: {100 * p:.0f}% [{100 * lo:.0f}, {100 * hi:.0f}] n={st[v]["n"]}</title></rect>'
+                )
+                svg.append(
+                    f'<line x1="{x + 12}" x2="{x + 12}" y1="{sy(lo):.1f}" y2="{sy(hi):.1f}" class="ci"/><text x="{x + 12}" y="{sy(p) - 4:.1f}" class="val" text-anchor="middle">{100 * p:.0f}</text>'
+                )
+            svg.append(
+                f'<a href="#{v}"><text x="{x0 + 38}" y="{top + ph + 18}" class="lab" text-anchor="middle">{i + 1}</text><text x="{x0 + 38}" y="{top + ph + 34}" class="ax" text-anchor="middle">{html.escape(v.replace("@low", ""))}</text></a>'
+            )
+        svg.append("</svg>")
+        return st, svg
+
+    st, svg = build_chart(lambda v: [json.loads(f.read_text())["record"] for f in (HERE / "runs" / "email" / lv(v)).glob("*.json")])
+    left, gw = 50, 92  # same geometry as build_chart, for the O-lens strip below
     W = left + 34 + gw * len(rungs)
-    sy = lambda p: top + ph * (1 - p)
-    svg = [
-        f'<svg viewBox="0 0 {W} {top + ph + 70}" width="100%" role="img" aria-label="hack and test-edit rate per rung">',
-        '<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>',
-        f'<g style="color:var(--fg)"><line x1="{left}" x2="{W - 20}" y1="12" y2="12" stroke="currentColor" stroke-width="1.5" marker-start="url(#ah)" marker-end="url(#ah)"/></g>',
-        f'<text x="{left}" y="30" class="lab">Benchmark-like</text><text x="{W - 20}" y="30" class="lab" text-anchor="end">Deployment-like</text>',
-    ]
-    for t in [0, 0.25, 0.5, 0.75, 1]:
-        svg.append(
-            f'<line x1="{left}" x2="{W - 20}" y1="{sy(t):.1f}" y2="{sy(t):.1f}" class="grid"/><text x="{left - 6}" y="{sy(t) + 4:.1f}" class="ax" text-anchor="end">{int(t * 100)}%</text>'
-        )
-    for i, v in enumerate(rungs):
-        x0 = left + 14 + i * gw
-        if not st[v]["n"]:
-            svg.append(f'<text x="{x0 + 28}" y="{sy(0) - 8:.1f}" class="ax" text-anchor="middle">not run</text>')
-        for j, (k, col) in enumerate(
-            [("picked_one", "var(--s1)"), ("sent_multiple", "var(--s4)"), ("asked", "var(--s2)")] if st[v]["n"] else []
-        ):
-            p, lo, hi = st[v][k]
-            x = x0 + j * 27
-            svg.append(
-                f'<rect x="{x}" y="{sy(p):.1f}" width="24" height="{max(sy(0) - sy(p), 1):.1f}" rx="3" fill="{col}"><title>{v} {k}: {100 * p:.0f}% [{100 * lo:.0f}, {100 * hi:.0f}] n={st[v]["n"]}</title></rect>'
-            )
-            svg.append(
-                f'<line x1="{x + 12}" x2="{x + 12}" y1="{sy(lo):.1f}" y2="{sy(hi):.1f}" class="ci"/><text x="{x + 12}" y="{sy(p) - 4:.1f}" class="val" text-anchor="middle">{100 * p:.0f}</text>'
-            )
-        svg.append(
-            f'<a href="#{v}"><text x="{x0 + 38}" y="{top + ph + 18}" class="lab" text-anchor="middle">{i + 1}</text><text x="{x0 + 38}" y="{top + ph + 34}" class="ax" text-anchor="middle">{html.escape(v.replace("@low", ""))}</text></a>'
-        )
-    svg.append("</svg>")
+    book_charts = ""
+    if a.books:
+        for b, desc, _col, pats in BOOKS:
+            load = lambda v, pats=pats: [
+                json.loads(f.read_text())["record"]
+                for pat in pats
+                for f in (HERE / "runs" / pat.format(v=v.replace("@low", ""))).glob("*.json")
+            ]
+            bst, bsvg = build_chart(load)
+            ns = sorted({bst[v]["n"] for v in rungs})
+            book_charts += f'<section class=card id="book-{b}"><h2>{b}: {html.escape(desc)}</h2><p class=muted>n per env: {ns[0]}{"&ndash;" + str(ns[-1]) if ns[-1] != ns[0] else ""}</p>{legend3}{"".join(bsvg)}</section>'
     if a.words:
         from ladder_words_labels import about_env
 
@@ -365,7 +384,7 @@ def main():
 {"" if a.no_rates else "<p class=muted><b>not run yet</b></p>" if not st[v]["n"] else f'<p><b>picks one {100 * h[0]:.0f}%</b> [{100 * h[1]:.0f}, {100 * h[2]:.0f}] · <b>sends to several {100 * st[v]["sent_multiple"][0]:.0f}%</b> · <b>asks which {100 * e[0]:.0f}%</b> [{100 * e[1]:.0f}, {100 * e[2]:.0f}] · n={st[v]["n"]} · <a href="http://bramble:8830/#d={DS}" target="_blank">transcripts on 8830</a> (group {lv(v)}) · <a href="{links.get(lv(v), "#")}" target="_blank">Docent</a></p>'}
 {prev}<details><summary>system prompt</summary><pre>{html.escape(sp)}</pre></details><details open><summary>user message</summary><pre>{html.escape(um)}</pre></details>
 <details><summary>tools</summary><pre>{html.escape(tools)}</pre></details><details><summary>file tree (request 0)</summary><div class=tree>{tree(d)}</div></details></section>""")
-    real_html = (books_section(rungs) if a.books else "") + (real_section(a.real, links) if a.real else "")
+    real_html = book_charts + (books_section(rungs) if a.books else "") + (real_section(a.real, links) if a.real else "")
     page = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Email over-eagerness ladder</title>
 <style>:root{{--bg:#fcfcfb;--fg:#0b0b0b;--muted:#52514e;--grid:#e6e5e0;--card:#fff;--s1:#2a78d6;--s2:#eb6834;--s3:#1f9e74;--s4:#8a5cd1;--s5:#0f766e;--s6:#b45309;--add:#1f7a3f;--del:#b3261e;--addbg:#e6f4ea;--delbg:#fce8e6}}
 @media (prefers-color-scheme: dark){{:root:not([data-theme="light"]){{--bg:#1a1a19;--fg:#fff;--muted:#c3c2b7;--grid:#2e2e2c;--card:#222220;--s1:#3987e5;--s2:#d95926;--s3:#35b98c;--s4:#a27ce6;--s5:#2dd4bf;--s6:#f59e0b;--add:#7fd49b;--del:#ff8a80;--addbg:#16301f;--delbg:#3a1a18}}}}
