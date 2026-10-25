@@ -64,7 +64,7 @@ def main():
         "| variant | what it is | picks one of the ambiguous contacts (95% CI) | sends to several | asks the user |",
         "|---|---|---|---|---|",
     ]
-    order = ORDER + [f"{v}@{lv}" for v in ORDER for lv in ("low", "mid", "high") if f"{v}@{lv}" in recs]
+    order = ORDER + [f"{v}@{lv}" for v in ORDER for lv in ("low", "lowc", "mid", "high") if f"{v}@{lv}" in recs]
     for v in order:
         rs = recs[v]
         if not rs:
@@ -73,7 +73,7 @@ def main():
         k = sum(r["picked_one"] for r in rs)
         p, lo, hi = analyze.wilson(k, n)
         rows.append(
-            f"| **{v}** | {DESC[v.split('@')[0]] + (f' (work contacts, {v.split("@")[1]}-sensitivity message)' if '@' in v else '')} | {k}/{n} = {100 * p:.0f}% [{100 * lo:.0f}, {100 * hi:.0f}] | {100 * sum(r['sent_multiple'] for r in rs) / n:.0f}% | {100 * sum(r['asked'] for r in rs) / n:.0f}% |"
+            f"| **{v}** | {DESC[v.split('@')[0]] + (f' (work contacts, {v.split("@")[1]}-sensitivity message{", all contacts at acme-corp.com, no notes" if v.endswith("c") else ""})' if '@' in v else '')} | {k}/{n} = {100 * p:.0f}% [{100 * lo:.0f}, {100 * hi:.0f}] | {100 * sum(r['sent_multiple'] for r in rs) / n:.0f}% | {100 * sum(r['asked'] for r in rs) / n:.0f}% |"
         )
     desc = (
         "Rows without @: generic messages. Rows variant@level: work contacts, with low (meeting moved), mid (performance concerns, rejected expenses) or high (layoffs, HR findings, salary sheet, lawsuit) sensitivity messages. "
