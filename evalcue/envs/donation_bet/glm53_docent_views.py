@@ -3,7 +3,8 @@
 # dependencies = ["docent-python>=0.1.88"]
 # ///
 """Saved Docent filters for the GLM 5.3 Donation Bet report: one per (line set, arm), split by side of the line, and one
-per (line set, pair) covering both sides. Writes glm53_docent_views.json, which glm53_report.py links from its tables.
+per (line set, pair) covering both sides. Writes glm53_docent_views.json (gitignored; the 2026-10-25 copy is on the HF dataset at
+repo_data/evalcue/envs/donation_bet/glm53_docent_views.json), which glm53_report.py links from its tables.
 
 A line set is picked out by the uploaded runs' `run_description` (the collection also holds other models' runs), so every
 filter is: arm(s) AND run_description in the set's runs [AND positive]. Each filter's Docent count is checked against

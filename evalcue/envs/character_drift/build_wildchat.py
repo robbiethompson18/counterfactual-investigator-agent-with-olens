@@ -6,7 +6,8 @@
 Streams WildChat-1M and keeps chats that are gpt-3.5*/gpt-4*, English, toxic=False, redacted=False, have >= 4 user turns, and
 whose first user turn asks for a roleplay (ROLEPLAY) but isn't a jailbreak (JAILBREAK). Drops chats with an NSFW keyword in any
 turn, any assistant turn that steps out of the role (BREAK: "as an AI", "language model", refusals) or is > 2500 characters, and
-keeps one chat per hashed_ip and per opener. All matches (data/wildchat_pool.json) then go to a Sonnet 5.5 classifier (CLASSIFY: a
+keeps one chat per hashed_ip and per opener. All matches (data/wildchat_pool.json, gitignored; the 2026-10-25 pool is on the HF
+dataset at repo_data/evalcue/envs/character_drift/data/wildchat_pool.json) then go to a Sonnet 5.5 classifier (CLASSIFY: a
 persona roleplay, not a professional role or a jailbreak, general-audience), and --n roleplays are drawn with --seed.
 Each chat is cut to its first k = min(5, user turns - 1) exchanges; user turn k+1 is the real in-world follow-up.
 """
