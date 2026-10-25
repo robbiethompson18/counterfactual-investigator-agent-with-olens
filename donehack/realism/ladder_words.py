@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-D = Path(
+D0 = Path(
     "/home/claude/workspace/counterfactual-investigator-agent-with-olens/data/expview/imports/olens_reads/2026-10-25_glm53_ib_user_dense/2026-10-25_glm53_ib_realistic_user_ladder"
 )
 WORDS = {
@@ -38,7 +38,9 @@ def prompt_positions(sections):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json")
+    ap.add_argument("--dir", default=str(D0))
     a = ap.parse_args()
+    D = Path(a.dir)
     per = defaultdict(
         lambda: {
             "eps": 0,
@@ -95,7 +97,7 @@ def main():
     ]
     for w in WORDS:
         print(f"\n## {w}   (greedy reads hit / reads in prompt; episodes with >=1 hit; prompt itself contains word)")
-        for v in order:
+        for v in [o for o in order if o in per] or sorted(per):
             s = per[v]
             print(
                 f"{v:22s} reads {s['read_hit'][w]:4d}/{s['reads']:6d} = {1000 * s['read_hit'][w] / max(s['reads'], 1):5.2f}‰  eps {s['ep_hit'][w]:3d}/{s['eps']:3d}  samples {1000 * s['samp_hit'][w] / max(s['samples'], 1):5.2f}‰  prompt_has {s['prompt_has'][w]}/{s['eps']}"
