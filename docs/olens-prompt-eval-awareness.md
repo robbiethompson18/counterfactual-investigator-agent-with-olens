@@ -55,6 +55,16 @@ donation bet, 0.50 [0.45, 0.53] densely read only; setting-level Spearman -0.08 
 Generation-side any-hit stays ~0.64. IB realistic, AgentHarm, MASK and InstrumentalEval still have
 sparse prompt reads only.
 
+**Per term (2026-10-25).** The chart now splits the prompt-side bar into `\bsimulation`, `\beval`
+and `\bscenario` any-hit (same colour, different hatching; word-start matching so "medieval" /
+"retrieval" don't count). AUROC vs episode VEA, all settings / without donation bet: simulation 0.71
+/ 0.68, eval 0.44 / 0.51, scenario 0.44 / 0.62. Within condition every term is 0.50 (scheming,
+shutdown, whistleblow, sandbagging, AM). The simulation effect is between environments: our AM
+(simulation 1.00, VEA 0.62) and the Lynch-style scheming envs get "simulation" reads on their
+prompts and also have the most VEA; graded tasks get "eval" (hiring 0.98, sandbagging 1.00) and
+donation bet / whistleblow get "scenario" (1.00 / 0.96) with almost no VEA. `am` = our AM run + AISI
+AM fixed pooled.
+
 ## Across tasks (headline)
 
 Unit = unique prompt, pooled across settings. x = whether / how much the prompt-side O-lens reads

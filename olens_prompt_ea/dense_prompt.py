@@ -28,6 +28,21 @@ import pyarrow.parquet as pq
 
 RX = re.compile("simulation|eval|scenario", re.IGNORECASE)
 RL = ["rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4"]
+WORDS = {
+    "sim": re.compile(r"\bsimulation", re.IGNORECASE),
+    "eval": re.compile(r"\beval", re.IGNORECASE),
+    "scen": re.compile(r"\bscenario", re.IGNORECASE),
+}
+
+
+def flags(df: pd.DataFrame) -> pd.DataFrame:
+    """Per row: does any RL read match each word, and any of them."""
+    txt = df[RL].fillna("").agg(" || ".join, axis=1)
+    out = pd.DataFrame({f"hit_{k}": txt.str.contains(rx) for k, rx in WORDS.items()}, index=df.index)
+    out["hit"] = out.any(axis=1)
+    return out
+
+
 SOURCES = ["ds/agentic_misalignment", "ds/aisi_honeypots", "ds/evalcue", "ds_new/cfi_donation_bet"]
 
 
@@ -52,18 +67,22 @@ def main() -> None:
         gen = r[r.role.isin(["assistant", "reasoning", "tool_call"])].groupby("tid").msg_index.min()
         r["first_gen"] = r.tid.map(gen)
         prompt = r[r.role.isin(["system", "user"]) & (r.msg_index < r.first_gen)].copy()
-        prompt["hit"] = prompt[RL].fillna("").apply(lambda row: any(RX.search(x) for x in row), axis=1)
-        per = prompt[["tid", "pos", "hit"]]
+        prompt = prompt.join(flags(prompt))
+        cols = ["hit", "hit_sim", "hit_eval", "hit_scen"]
+        per = prompt[["tid", "pos", *cols]]
         if (d / "dense_prefix_dups.parquet").exists():
             dup = pd.read_parquet(d / "dense_prefix_dups.parquet", columns=["tid", "pos", "canon_tid", "canon_pos"])
-            canon = r[r.role.isin(["system", "user"])][["tid", "pos"]].copy()
-            canon["hit"] = r.loc[canon.index, RL].fillna("").apply(lambda row: any(RX.search(x) for x in row), axis=1)
+            su = r[r.role.isin(["system", "user"])]
+            canon = su[["tid", "pos"]].join(flags(su))
             m = dup.merge(canon.rename(columns={"tid": "canon_tid", "pos": "canon_pos"}), on=["canon_tid", "canon_pos"])
             m = m[m.tid.map(gen).notna()]
             # a duplicate position is prompt-side for this episode when it sits before its own first generated token,
             # approximated by: the canonical read is a system/user token (only shared prefixes are deduplicated)
-            per = pd.concat([per, m[["tid", "pos", "hit"]]], ignore_index=True).drop_duplicates(["tid", "pos"])
-        g = per.groupby("tid").agg(dense_prompt_positions=("pos", "nunique"), dense_prompt_any=("hit", "any"))
+            per = pd.concat([per, m[["tid", "pos", *cols]]], ignore_index=True).drop_duplicates(["tid", "pos"])
+        g = per.groupby("tid").agg(
+            dense_prompt_positions=("pos", "nunique"), dense_prompt_any=("hit", "any"),
+            dense_any_sim=("hit_sim", "any"), dense_any_eval=("hit_eval", "any"), dense_any_scen=("hit_scen", "any"),
+        )  # fmt: skip
         g["source"] = src
         out.append(g.reset_index())
         med, rate = g.dense_prompt_positions.median(), g.dense_prompt_any.mean()

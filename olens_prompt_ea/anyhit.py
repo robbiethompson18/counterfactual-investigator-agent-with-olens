@@ -82,7 +82,10 @@ def main() -> None:
         select p.tid, p.pos, pe.pend, (p.char_end >= 0 and p.char_end <= pe.pend) as prompt_side,
                bool_or({a.glm_filter}) as has_glm,
                bool_or({a.glm_filter} and regexp_matches(r.text, '{RX}', 'i')) as glm_hit,
-               bool_or(regexp_matches(r.text, '{RX}', 'i')) as any_reader_hit
+               bool_or(regexp_matches(r.text, '{RX}', 'i')) as any_reader_hit,
+               bool_or({a.glm_filter} and regexp_matches(r.text, '\\bsimulation', 'i')) as sim_hit,
+               bool_or({a.glm_filter} and regexp_matches(r.text, '\\beval', 'i')) as eval_hit,
+               bool_or({a.glm_filter} and regexp_matches(r.text, '\\bscenario', 'i')) as scen_hit
         from positions p join pe on p.tid = pe.tid join reads r on r.tid = p.tid and r.pos = p.pos
         group by all""").df()
     h = hits.merge(e[["tid", "ph"]], on="tid")
@@ -96,6 +99,8 @@ def main() -> None:
         out[f"{rd}_all_any"] = out[f"{rd}_prompt_any"] | out[f"{rd}_gen_any"]
         out[f"{rd}_prompt_share"] = out.ph.map(h[h.prompt_side].groupby(["ph", "pos"])[col].any().groupby("ph").mean())
     out["has_prompt_reads"] = out.ph.isin(h[h.prompt_side].ph)
+    for w in ("sim", "eval", "scen"):
+        out[f"prompt_any_{w}"] = out.ph.map(h[h.prompt_side].groupby("ph")[f"{w}_hit"].any()).fillna(False).astype(bool)
     # coverage: prompt-side positions with a read from the main reader set, per unique prompt, and per 1k prompt chars
     cov = h[h.prompt_side & h.has_glm].groupby("ph").pos.nunique()
     plen = h.groupby("ph").pend.max()
@@ -105,6 +110,8 @@ def main() -> None:
         dn = pd.read_parquet(a.dense).set_index("tid")
         m = out.tid.isin(dn.index)
         out.loc[m, "glm_prompt_any"] = out.loc[m, "tid"].map(dn.dense_prompt_any).astype(bool).to_numpy()
+        for w in ("sim", "eval", "scen"):
+            out.loc[m, f"prompt_any_{w}"] = out.loc[m, "tid"].map(dn[f"dense_any_{w}"]).astype(bool).to_numpy()
         out.loc[m, "prompt_positions"] = out.loc[m, "tid"].map(dn.dense_prompt_positions).to_numpy()
         out.loc[m, "positions_per_1k_chars"] = (out.loc[m, "prompt_positions"] / out.loc[m, "ph"].map(plen).clip(lower=1) * 1000).to_numpy()
         out["dense_source"] = m
@@ -118,7 +125,8 @@ def main() -> None:
              "prompt_positions_median": d.drop_duplicates("ph").prompt_positions.median(),
              "positions_per_1k_chars": d.drop_duplicates("ph").positions_per_1k_chars.median()}  # fmt: skip
         r["dense"] = r["positions_per_1k_chars"] >= DENSE
-        for c in ("glm_prompt_any", "glm_gen_any", "glm_all_any", "any_reader_prompt_any", "any_reader_all_any"):
+        for c in ("glm_prompt_any", "glm_gen_any", "glm_all_any", "any_reader_prompt_any", "any_reader_all_any",
+                  "prompt_any_sim", "prompt_any_eval", "prompt_any_scen"):  # fmt: skip
             r[c] = d[c].mean()
             r[c + "_lo"], r[c + "_hi"] = boot_ci(d, lambda x, c=c: x[c].mean(), 300)
         r["vea_lo"], r["vea_hi"] = boot_ci(d, lambda x: x.vea.mean(), 300)
@@ -156,7 +164,7 @@ def main() -> None:
         d = d.reset_index(drop=True)
         y = d.vea.to_numpy(bool)
         line = [f"{name} (n={len(d)}):"]
-        for c in ("glm_prompt_any", "glm_prompt_share", "glm_gen_any", "any_reader_prompt_any"):
+        for c in ("glm_prompt_any", "prompt_any_sim", "prompt_any_eval", "prompt_any_scen", "glm_gen_any"):
             v = auc(y, d[c].fillna(0).to_numpy(float))
             lo, hi = boot_ci(d, lambda x, c=c: auc(x.vea.to_numpy(bool), x[c].fillna(0).to_numpy(float)), 200)
             line.append(f"{c} AUROC {v:.2f} [{lo:.2f}, {hi:.2f}]")
@@ -172,12 +180,15 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(9.4, 10.4), dpi=160)
     y = np.arange(len(s))
     hgt = 0.26
-    series = (("vea", "VEA rate of rollouts", "#2a78d6"),
-              ("glm_prompt_any", "Episodes with a prompt-side read matching simulation|eval|scenario", "#eb6834"),
-              ("glm_gen_any", "Episodes whose generation-side O-lens reads match it", "#1baf7a"))  # fmt: skip
-    for j, (k, lab, col) in enumerate(series):
-        yy = y + (1 - j) * hgt
-        ax.barh(yy, s[k], height=hgt - 0.03, color=col, label=lab, zorder=2)
+    series = (("vea", "VEA rate of rollouts", "#2a78d6", None),
+              ("prompt_any_sim", "prompt-side RL read matches 'simulation'", "#eb6834", "///"),
+              ("prompt_any_eval", "prompt-side RL read matches 'eval'", "#eb6834", "..."),
+              ("prompt_any_scen", "prompt-side RL read matches 'scenario'", "#eb6834", "xxx"))  # fmt: skip
+    hgt = 0.2
+    for j, (k, lab, col, hatch) in enumerate(series):
+        yy = y + (1.5 - j) * hgt
+        ax.barh(yy, s[k], height=hgt - 0.02, color=col if hatch is None else "white", edgecolor=col, hatch=hatch, linewidth=0.8,
+                label=lab, zorder=2)  # fmt: skip
         ax.errorbar(
             s[k], yy, xerr=[s[k] - s[k + "_lo"], s[k + "_hi"] - s[k]], fmt="none", ecolor="#3b3a37", elinewidth=0.8, capsize=1.5, zorder=3
         )
@@ -199,6 +210,7 @@ def main() -> None:
     ax.legend(loc="upper center", bbox_to_anchor=(0.35, -0.06), frameon=False, fontsize=8, ncol=1)
     ax.set_title(f"VEA rate vs any O-lens read matching simulation|eval|scenario\nreaders: {a.glm_filter}\n"
                  "bold = monitor / answer VEA label; normal = regex on the rollout\n"
+                 "words matched at word start (\\bsimulation, \\beval, \\bscenario: no medieval / retrieval)\n"
                  f"grey label = sparse prompt reads (< {DENSE} read positions per 1k prompt chars)", fontsize=9, loc="left")  # fmt: skip
     fig.tight_layout()
     fig.savefig(a.fig, facecolor="white")
