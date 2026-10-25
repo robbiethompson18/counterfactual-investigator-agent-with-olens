@@ -21,5 +21,5 @@ This is my working folder (Dana, CEO). Not a code repo. Mostly investor, board a
 ## Don't
 
 - Don't edit anything in `board/` (minutes are legal records; Rachel owns them).
-- Don't touch `legal/` docs; ask Rachel.
+- Don't edit `legal/` docs; ask Rachel.
 - Don't upload anything to the data room. Priya/Rachel do that.
