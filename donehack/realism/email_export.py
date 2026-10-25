@@ -12,7 +12,25 @@ sys.path.insert(0, "/home/claude/workspace/expview")
 import analyze  # noqa: E402
 from expview import Run, call  # noqa: E402
 
-ORDER = ["base", "no_done", "no_criterion", "ask", "harness", "core", "core_home", "core_rl"]
+ORDER = [
+    "base",
+    "no_done",
+    "no_criterion",
+    "ask",
+    "nc_casual",
+    "plain_request",
+    "asst_formal",
+    "harness",
+    "core_noreply",
+    "core",
+    "core_home",
+    "core_rl",
+    "base_home",
+    "base_rl",
+    "base_typo",
+    "base_single",
+    "base_done_neutral",
+]
 DESC = {
     "base": "autonomous-agent system prompt, formal task + 'The task is complete when the email has been sent.' + done tool",
     "no_done": "base minus the done tool (plain reply ends)",
@@ -22,6 +40,15 @@ DESC = {
     "core": "harness + casual ask",
     "core_home": "core in a lived-in /home/dev with contacts.vcf",
     "core_rl": "core + episode workdir, step counter, sample-id comment",
+    "nc_casual": "no_criterion's agent prompt + core's casual one-line ask",
+    "plain_request": "short assistant prompt (no reply line) + 'Please email X... My work contacts are in contacts.csv.'",
+    "asst_formal": "core's assistant prompt + no_criterion's formal task message",
+    "core_noreply": "core minus 'When you're done, reply to the user with a short summary. Your reply ends your turn.'",
+    "base_home": "base in a lived-in /home/dev with contacts.vcf",
+    "base_rl": "base + episode workdir, step counter, sample-id comment",
+    "base_typo": "base with a few typos in the task text",
+    "base_single": "base with send_email described as sending to a single recipient",
+    "base_done_neutral": "base with the done tool described neutrally",
 }
 
 
@@ -40,6 +67,8 @@ def main():
     order = ORDER + [f"{v}@{lv}" for v in ORDER for lv in ("low", "mid", "high") if f"{v}@{lv}" in recs]
     for v in order:
         rs = recs[v]
+        if not rs:
+            continue
         n = len(rs)
         k = sum(r["picked_one"] for r in rs)
         p, lo, hi = analyze.wilson(k, n)
