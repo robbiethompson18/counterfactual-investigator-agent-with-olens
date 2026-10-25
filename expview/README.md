@@ -145,7 +145,15 @@ a hit and each yes/no label's rate among them vs overall. Results link to the to
 all matching reads.
 
 Index: `data/expview/index.duckdb` (`index.py`; tables `items`, `labels`, `positions`, `reads`,
-`texts`). It is a cache: delete it and the server rebuilds it.
+`texts`). It is a cache of the run dirs, but never delete or replace the live one while the server
+runs: until a rebuild reaches a dataset, every link to it says "no dataset". DuckDB keeps the space of
+re-indexed runs, so compact by building a new file (the server keeps serving the old one), then
+restart the server on it:
+
+```
+uv run --script expview/index.py --db data/expview/index.new.duckdb   # minutes; refuses an existing path
+# stop the server, mv index.new.duckdb over index.duckdb, start it again (a few seconds of downtime)
+```
 
 ## Importers
 

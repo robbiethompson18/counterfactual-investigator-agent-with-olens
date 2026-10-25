@@ -1,3 +1,7 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["duckdb>=1.1", "pyarrow>=17"]
+# ///
 """The search index behind expview/server.py: one DuckDB file over every run under the roots, updated per run when its
 files change. The run dirs stay the source of truth; the index only holds what search and the item lists need.
 
@@ -9,10 +13,16 @@ Tables (d = dataset id, i = item id):
   reads      d, i, pos, tool, label, text (the read's lines joined by newlines)
   texts      d, i, text: everything the item shows (call messages, then the token stream), for transcript search and
              "new vs the whole transcript"
+
+Rebuild (e.g. to compact: DuckDB keeps the space of re-indexed runs) into a NEW file while the server keeps serving the
+old one, then restart the server on it:
+
+    uv run --script expview/index.py --db data/expview/index.new.duckdb
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import threading
@@ -254,3 +264,25 @@ class Index:
             except Exception:
                 cur.execute("ROLLBACK")
                 raise
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Build a fresh index into a new file (the live one keeps serving).")
+    ap.add_argument("--db", type=Path, required=True, help="the new index file; must not exist")
+    a = ap.parse_args()
+    if a.db.exists():
+        sys.exit(f"{a.db} exists: build into a new path, never over the live index")
+    tmp = a.db.with_name(a.db.name + ".building")
+    for f in (tmp, tmp.with_name(tmp.name + ".wal")):
+        f.unlink(missing_ok=True)
+    t0 = time.time()
+    ix = Index(tmp)
+    ix.update()
+    ix.con.execute("CHECKPOINT")
+    ix.con.close()
+    tmp.rename(a.db)
+    print(f"{a.db}: {len(ix.paths)} datasets in {time.time() - t0:.0f}s, {a.db.stat().st_size / 1e9:.1f} GB; errors: {ix.errors or 'none'}")
+
+
+if __name__ == "__main__":
+    main()
