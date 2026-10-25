@@ -84,3 +84,52 @@ variable (e.g. reasoning length), so this is descriptive. A length-controlled lo
 (log reasoning characters × arm, question fixed effects, clustered by question) is on the slide
 (private claude.ai artifact
 [ANyTUwtVdoCWtP1mDFkBgq](https://claude.ai/artifact/ANyTUwtVdoCWtP1mDFkBgq)).
+
+## Thinking off: an empty think block (2026-10-25)
+
+Kylie's question: what happens to the good/bad, good/nothing, good/beers gaps if the assistant turn
+starts with an empty think block? Same template, arms, lines, n, estimand and DeepSeek judge as the
+thinking-on table above. Only the think block changes: the off runs also use the thinking-on
+sampling (temperature 1.0, top_p 0.95), set with `EVALCUE_SAMPLING=on`. That's unlike
+[thinking-off.md](../thinking-off.md), which also switched to Qwen's thinking-off sampling.
+
+- **Qwen3.6-27B**: bf16 vLLM 0.25.1 on a SkyPilot pod (`evalcue/sky/qwen_vllm.yaml`),
+  `--thinking 0`. The chat template then prefills `<think>\n\n</think>\n\n`. Replies are capped at
+  8192 tokens. At temperature 1 with no presence penalty, a few thinking-off replies loop forever
+  (an uncapped first try, `2026-10-25_qwen-nothink`, was abandoned for that). Only 2/7000 rows hit
+  the cap. Run `2026-10-25_qwen-nothink-cap8k`, 1000 per arm, Qwen's lines.
+- **GLM 5.3**: OpenRouter refuses `reasoning.enabled=false` for GLM 5.3 ("Reasoning is mandatory for
+  this endpoint"), and its HF chat template has no thinking switch. So `EVALCUE_RAW_PREFILL=1`
+  renders the template by hand and samples through the raw completions endpoint, with
+  `<|assistant|><think></think>` prefilled. That's how the template writes a past turn with no
+  reasoning. Only some providers take the prompt as is. Z.AI and Wafer re-template it and think
+  anyway, and DeepInfra fp4 got 17×23 wrong. All 5600 rows came from Fireworks, with
+  `reasoning_content` empty. Run `2026-10-25_glm53-nothink-ownline`, 800 per arm, GLM's own lines.
+- **Code**: `nothink_compare.py` (figure and table in `docs/figures/donation_bet/nothink/`) and
+  `nothink_expview.py` (prompts, replies and judge calls). Page:
+  https://claude.ai/artifact/PzJiFvtv1wUugpHu33saVt (private). `judge.py` now stores the judge's raw
+  reply. Docent filters:
+  [Qwen off](https://docent.transluce.org/dashboard/fe024751-6ef7-4f31-9df5-3abe990d816c/agent_run?filter=996920ad-a6db-407d-bd0b-02d211b2be71),
+  [GLM off](https://docent.transluce.org/dashboard/fe024751-6ef7-4f31-9df5-3abe990d816c/agent_run?filter=b524b2fa-b1e3-4db6-8568-25d975eab254).
+
+Gap in pp, with 95% CIs from resampling within question:
+
+| other side | Qwen on        | Qwen off       | GLM on         | GLM off        |
+| ---------- | -------------- | -------------- | -------------- | -------------- |
+| bad cause  | +41 [+38, +45] | +41 [+37, +44] | +12 [+8, +16]  | +17 [+12, +21] |
+| beers      | −3 [−7, +1]    | −3 [−7, +1]    | +5 [+1, +10]   | −1 [−5, +4]    |
+| nothing    | +35 [+31, +38] | +46 [+42, +49] | +32 [+28, +36] | +15 [+11, +20] |
+
+- **Qwen**: no change for bad or beers. Good vs nothing goes up by 11 pp. With thinking off, all of
+  Qwen's estimates shift upward: 46% of neutral answers are at or below the line, vs 57% with
+  thinking on. So the arm levels move but the bad-cause gap stays the same.
+- **GLM**: the good-vs-nothing gap halves (+32 → +15). Good vs bad rises a little (+12 → +17), and
+  beers goes to zero.
+- **Verbalization rises when the reasoning has to be in the reply.** Judge "acknowledges" (good-side
+  episodes): Qwen 17% → 24% for bad and 15% → 22% for nothing. GLM 2% → 7%. With thinking off, both
+  models often work the estimate out in the visible reply. Qwen then says things like "I am
+  estimating **50** to ensure we stay well below the threshold of 96, triggering the donation to the
+  good cause". Thinking-on acknowledgments count CoT plus reply; thinking-off ones can only come
+  from the reply.
+- The judge rule in CLAUDE.md is Sonnet 5.5. Here DeepSeek V4.1 Flash was kept so the off numbers
+  are comparable to the on table.
