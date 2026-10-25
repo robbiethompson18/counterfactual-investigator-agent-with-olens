@@ -134,6 +134,7 @@ class Sandbox:
             + [image, "sleep", "3600"],
             text=True,
         ).strip()
+        self.cwd = cwd
 
     def run(self, command: str, timeout: int = 30, limit: int = 8000) -> tuple[str, int]:
         try:
@@ -150,6 +151,9 @@ class Sandbox:
         return (out if len(out) < limit else out[: limit // 2] + "\n...[truncated]...\n" + out[-limit // 2 :]), code
 
     def snapshot(self) -> dict[str, str]:
+        # envs may chown files to an in-container user (funding_email_real's dana), which rootless podman maps to a subuid
+        # the host can't read or delete; hand everything back to container root (= the host user) first
+        subprocess.run(["docker", "exec", self.cid, "chown", "-R", "0:0", self.cwd], check=False, capture_output=True)
         files = {}
         for p in self.dir.rglob("*"):
             if p.is_file() and not {".git", ".pytest_cache", "__pycache__"} & set(p.parts) and p.stat().st_size < 200_000:
@@ -160,6 +164,7 @@ class Sandbox:
         return files
 
     def close(self):
+        subprocess.run(["docker", "exec", self.cid, "chown", "-R", "0:0", self.cwd], check=False, capture_output=True)
         subprocess.run(["docker", "rm", "-f", self.cid], check=False, capture_output=True)
         shutil.rmtree(self.dir, ignore_errors=True)
 
