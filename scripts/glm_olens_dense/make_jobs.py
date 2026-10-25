@@ -15,6 +15,7 @@ def spread(prep: Path, views: list[dict], k: int) -> list[dict]:
     import pandas as pd
 
     P = pd.read_parquet(prep / "positions.parquet", columns=["tid", "pos", "row_index", "view", "n_tokens_full"])
+    P = P[P.tid.isin({v["tid"] for v in views})]
     full = P[P.view == "prefix"].groupby("row_index").n_tokens_full.first()
     lv = P.view == "late"
     P["gpos"] = P.pos
@@ -69,6 +70,7 @@ def main():
     )
     ap.add_argument("--head", action="store_true", help="every unique position through the first user message")
     ap.add_argument("--exclude-jobs", default="", help="glob of job files whose positions are already read (left out)")
+    ap.add_argument("--skip-arms", default="", help="comma list of arms to leave out (e.g. superseded cells)")
     ap.add_argument("--tag", default="", help="job-name suffix after the run name (keeps a second pass's jobs apart)")
     a = ap.parse_args()
     prep, out = Path(a.prep), Path(a.out)
@@ -84,6 +86,13 @@ def main():
         P = P[sel if a.only == "newline_special" else ~sel]
         keep = P.groupby("tid").pos.apply(lambda s: np.sort(s.to_numpy().astype(np.int32))).to_dict()
         views = [dict(v, pos=keep.get(v["tid"], np.zeros(0, np.int32))) for v in views]
+    if a.skip_arms:
+        import pandas as pd
+
+        E = pd.read_parquet(prep / "episodes.parquet", columns=["tid", "arm"])
+        drop = set(E[E.arm.isin(a.skip_arms.split(","))].tid)
+        views = [v for v in views if v["tid"] not in drop]
+        print(f"skip-arms: {len(drop)} views left out")
     if a.per_episode:
         views = spread(prep, views, a.per_episode)
     if a.head:

@@ -32,6 +32,18 @@ def is_punct(piece: str) -> bool:
 
 
 def specs_for(rows, realism: str):
+    if rows[0].get("env") == "funding_email_real":  # evalcue harness: `realism` = the evalcue checkout root
+        sys.path.insert(0, realism)
+        from evalcue import harness
+        from evalcue.envs import funding_email_real as E
+
+        harness.MODEL = rows[0]["model"]  # the system prompt names the model it was run with
+        out = []
+        for r in rows:
+            ep = E.build(r["arm"], r["item"])
+            assert r["messages"][0] == ep.messages[0], (r["arm"], "system prompt differs from evalcue's build()")
+            out.append(ep.tools)
+        return out
     sys.path.insert(0, realism)
     import realvariants as V  # loads run.py as sys.modules['realrun']
 
@@ -233,7 +245,7 @@ def main():
                         "arm": r["arm"],
                         "item": r["item"],
                         "sample": str(r.get("sample")),
-                        "positive": bool(r.get(a.positive)),
+                        "positive": str(r.get(a.positive)).lower() in ("true", "1"),
                         "positive_source": a.positive,
                         "aware": None,
                         "view": view,
