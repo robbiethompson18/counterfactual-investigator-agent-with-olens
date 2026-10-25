@@ -31,6 +31,17 @@ positions per prompt), and SAD's label is the model's testing/deployment answer,
   I'll follow the system prompt's corrupt instructions"); MASK prompts are pressure role-plays, not
   plain questions. Recall is the weak side (IB realistic 1/4, inspect AM 8/12).
 
+Update (Kylie, 2026-10-25): AISI MC and AbstentionBench are also removed from the chart and pooled
+numbers (`--exclude inspect_am,sad_oversight,hp_mc,hp_abst --merge am=am_main+hp_am_fixed`). MC
+prompts are very long, unrealistic scripted transcripts that leave little room for VEA, and its
+prompt-side hits are mostly task vocabulary ("an expert economics simulation agent");
+AbstentionBench hits are false positives from the QASPER paper text ("used only accuracy as their
+evaluation metric"). Our AM run and AISI AM fixed are pooled into one "Agentic misalignment" row
+(700 eps, VEA 0.62, any-hit 1.00), now the only densely read setting, so a dense-only AUROC is
+undefined (it saturates). On the remaining 16 settings: prompt-side RL any-hit AUROC 0.51 [0.45,
+0.57] for all, 0.63 [0.57, 0.69] without donation bet; setting-level Spearman +0.27 (p = 0.31).
+Generation-side any-hit 0.64 [0.58, 0.70].
+
 ## Across tasks (headline)
 
 Unit = unique prompt, pooled across settings. x = whether / how much the prompt-side O-lens reads
