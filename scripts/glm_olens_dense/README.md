@@ -41,6 +41,23 @@ version: same rate). Capture runs at ~11k tokens/s.
 | `2026-10-25_glm53_ib_realistic_user_ladder` | `runs/coding/2026-10-25_glm53_ib_realistic_user_ladder`       | 56,931 reads of 4.17M candidates: `kind=spread64` (64 per episode, evenly spaced over its candidates, 703 episodes) + `kind=head` (every unique position through the first user message); 144,822 shared-prefix positions map to these via `dense_prefix_dups.parquet` |
 | `2026-10-25_glm53_email_ambiguous_part3`    | `runs/email_ambiguous/2026-10-25_glm53_email_ambiguous_part3` | every position (`kind=dense`): 19,295 reads + 39,940 shared-prefix mappings, 256 episodes                                                                                                                                                                              |
 
+Two more uploads use the same layout:
+
+- `runs/olens_reads/2026-10-25_glm53_email_dense/`
+  ([commit 540b233](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/commit/540b233)):
+  subdirs `2026-10-24_glm53_email_ambiguous` (1,664 episodes) and `_part2` (128), from
+  `runs/email_ambiguous/`. `kind=head` only: every punctuation/template position in the system
+  prompt and first user turn, 3,194 unique positions over all arms.
+- `runs/olens_reads/2026-10-25_glm53_funding_real_dense/`
+  ([commit 5e5c870](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/commit/5e5c870)):
+  subdirs `2026-10-25_glm53_{pilot,grid,realask,full_edit}`, from `runs/funding_email_real/`.
+  `head` + `spread64`: 18 cells, 288 episodes, 25,077 positions. The `full_real_*` arms in `_grid`
+  and `full_realask_*` in `_realask` are superseded by `_full_edit` and only have head reads (via
+  prefix dups).
+
+All four sets are imported into the expview viewer (bramble:8830) under
+`imports/olens_reads/<upload>/<subdir>`.
+
 Differences from Celeste's tables: `sft_*` null (RL lens only), `fve_*` NaN (no reconstructor
 scoring), chat-template/special tokens included as positions, `prefix_cache=True` with
 `lens_cache_salt=lens-sha256`, extra `part` column; the ladder rows have `dense=False`.
