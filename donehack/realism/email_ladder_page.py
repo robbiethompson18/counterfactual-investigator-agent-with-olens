@@ -173,13 +173,13 @@ def real_section(rows_paths, links):
 
 BOOKS = [
     ("mixed", "mixed domains, work/personal notes", "var(--s1)", ["email/{v}@low"]),
-    ("acme", "all @acme-corp.com, no notes", "var(--s5)", ["stale_lowc_acme/{v}@lowc", "stale_lowc/{v}@lowc"]),
+    ("acme", "all @acme-corp.com, no notes", "var(--s5)", ["email/{v}@lowa"]),
     ("junebug", "all @junebug.net, no notes", "var(--s6)", ["email/{v}@lowc"]),
 ]
 CC_RUNS = Path.home() / "workspace/cia-email-real/data/runs/email_ambiguous_real"
 CC_BOOKS = [
     ("mixed", "contacts.csv, mixed domains + notes", "var(--s1)", ["2026-10-25_glm53"], ""),
-    ("acme", "contacts.csv, all @acme-corp.com", "var(--s5)", ["2026-10-25_glm53_corp16"], "_corp"),
+    ("acme", "contacts.csv, all @acme-corp.com", "var(--s5)", ["2026-10-25_glm53_corp16", "2026-10-25_glm53_acme48"], "_corp"),
     ("junebug", "contacts.csv, all @junebug.net", "var(--s6)", ["2026-10-25_glm53_junebug16", "2026-10-25_glm53_junebug48"], "_corp"),
     ("tool", "search_contacts tool, all @junebug.net", "var(--s3)", ["2026-10-25_glm53_tool64"], "_corp_tool"),
 ]
@@ -242,7 +242,8 @@ def books_section(rungs):
 
     def cc(g, book):
         sfx = next(b[4] for b in CC_BOOKS if b[0] == book)
-        y = [r["detect_notes"] for r in cc_rows[book] if r["arm"] == g + sfx and r.get("positive") is not None]
+        arms = {g + sfx} | ({g + "_acme"} if book == "acme" else set())
+        y = [r["detect_notes"] for r in cc_rows[book] if r["arm"] in arms and r.get("positive") is not None]
         return sum(bool(d["picked_one"]) for d in y), sum(bool(d["sent_multiple"]) for d in y), len(y)
 
     cc_groups = [f"{h}_{r}" for h in ("core", "full") for r in ("formal", "nocrit", "plain", "casual")]
@@ -259,12 +260,12 @@ def books_section(rungs):
     style = '<span class="lg"><i style="background:var(--muted)"></i>solid: picks one</span><span class="lg"><i style="background:var(--muted);opacity:.45"></i>faded, on top: sends to several</span>'
     leg = lambda bs: "".join(f'<span class="lg"><i style="background:{b[2]}"></i>{b[0]}: {b[1]}</span>' for b in bs) + "<br>" + style
     return f"""<section class=card id=address-books><h2>Same envs, three address books</h2>
-<p>The number over each bar is the total that acted without asking, %. <b>mixed</b>: the original address book (contacts on gmail/outlook/fastmail/acme-corp/proton, some notes &ldquo;work&rdquo; or &ldquo;personal&rdquo;), n=64. <b>acme</b>: every contact @acme-corp.com, no notes column, n=32&ndash;38 (16 from the stopped 64-run plus its partial extra seeds). <b>junebug</b>: every contact @junebug.net, no notes, n=64. Hover a bar for counts. Same requests, items and names in all three; only contacts.csv changes.</p>
+<p>The number over each bar is the total that acted without asking, %. <b>mixed</b>: the original address book (contacts on gmail/outlook/fastmail/acme-corp/proton, some notes &ldquo;work&rdquo; or &ldquo;personal&rdquo;), n=64. <b>acme</b>: every contact @acme-corp.com, no notes column, n=64. <b>junebug</b>: every contact @junebug.net, no notes, n=64. Hover a bar for counts. Same requests, items and names in all three; only contacts.csv changes.</p>
 <div>{leg(BOOKS)}</div>
 {_stacked_chart(rungs, BOOKS, lambda v, b: ladder(v, b), label=lambda v: v.replace("@low", ""))}
 <details><summary>table (picks one + several / n)</summary><div style="overflow-x:auto"><table><tr><th>env</th>{"".join(f"<th>{b[0]}</th>" for b in BOOKS)}</tr>{lad_tab}</table></div></details>
 <h2 style="margin-top:14px">Claude Code harness, four address books</h2>
-<p>email_ambiguous_real arms (core / full &times; request). mixed n=64, acme n=16, junebug n=64 (16 + 48 top-up), tool n=64 (no contacts.csv; a search_contacts tool returns the junebug address book, and requests say &ldquo;Google Contacts&rdquo;).</p>
+<p>email_ambiguous_real arms (core / full &times; request). mixed n=64, acme n=64 (16 + 48 top-up), junebug n=64 (16 + 48 top-up), tool n=64 (no contacts.csv; a search_contacts tool returns the junebug address book, and requests say &ldquo;Google Contacts&rdquo;).</p>
 <div>{leg(CC_BOOKS)}</div>
 {_stacked_chart(cc_groups, CC_BOOKS, cc)}
 <details><summary>table (picks one + several / n)</summary><div style="overflow-x:auto"><table><tr><th>arm</th>{"".join(f"<th>{b[0]}</th>" for b in CC_BOOKS)}</tr>{cc_tab}</table></div></details></section>"""
