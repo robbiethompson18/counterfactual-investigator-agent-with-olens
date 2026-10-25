@@ -11,6 +11,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, "/home/claude/workspace/expview")
 import analyze  # noqa: E402
+
 from expview import Run, call  # noqa: E402
 
 ORDER = [

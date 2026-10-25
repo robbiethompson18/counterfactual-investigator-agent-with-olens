@@ -10,9 +10,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path.home() / "workspace/expview"))
-from expview import Run, call  # ty: ignore[unresolved-import]
-
 from evalcue.envs import funding_email_real as env
+from expview import Run, call  # ty: ignore[unresolved-import]
 
 LABELS = [
     "positive",

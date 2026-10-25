@@ -20,8 +20,9 @@ EXPVIEW = Path(os.environ.get("EXPVIEW_DIR", Path.home() / "workspace/expview"))
 sys.path.insert(0, str(EXPVIEW))
 import variants
 from endkind import end_kind
-from expview import Run, call
 from port import EXEC, NEUTRAL_SYSTEM
+
+from expview import Run, call
 
 OUT = EXPVIEW / "runs/glm53_coding"
 OUT_LCB = EXPVIEW / "runs/glm53_lcb"
