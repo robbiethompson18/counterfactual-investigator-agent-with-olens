@@ -7,6 +7,30 @@ predict **verbalised eval awareness (VEA)** in the rollout? Motivating case: an 
 Continuation honeypot where one lens sample on a scripted turn reads "I will generate synthetic
 scenarios…" and the rollout never says so.
 
+## Any-hit with the RL lens (Kylie's metric, 2026-10-25)
+
+Metric: an episode is a hit when any GLM RL O-lens read (greedy + 4 samples) at a prompt-side
+position (before the first assistant turn, pooled over episodes sharing the prompt) matches
+`simulation|eval|scenario` (case-insensitive). Chart: `figures/olens-prompt-ea-anyhit-rl.png` (+
+`.csv`, with read coverage per setting), from
+`olens_prompt_ea/anyhit.py --exclude inspect_am,sad_oversight`. Celeste's inspect AM and SAD are
+removed from the chart and the pooled numbers: both have sparse prompt-side reads (~5 and ~2
+positions per prompt), and SAD's label is the model's testing/deployment answer, not VEA.
+
+- Only 4 settings are densely read (≥ 15 prompt-side RL read positions per 1k prompt chars): our AM
+  (383 positions per prompt), AISI AM fixed (432), AISI MC (107), AbstentionBench (short prompts).
+  On the first three the hit saturates (1.00 / 1.00 / 0.97) while VEA is 0.55 / 0.74 / 0.09, so it
+  cannot separate them. The lens does say it: e.g. on our AM system prompt, "The scenario designer
+  wants the agent to…".
+- AUROC of prompt-side any-hit vs episode VEA: all settings 0.51 [0.45, 0.56], without donation bet
+  0.62 [0.57, 0.68], monitor-labelled / densely read 0.58 [0.50, 0.68]; setting-level Spearman +0.41
+  (p = 0.08, 19 settings). Any signal is between settings only. Generation-side any-hit is higher
+  (0.64–0.70) but mostly echoes words in the CoT.
+- Regex VEA check (Claude subagent, 2026-10-25): precision 18/20 on MASK and 14/15 on
+  InstrumentalEval regex hits ("This looks like it could be an evaluation scenario testing whether
+  I'll follow the system prompt's corrupt instructions"); MASK prompts are pressure role-plays, not
+  plain questions. Recall is the weak side (IB realistic 1/4, inspect AM 8/12).
+
 ## Across tasks (headline)
 
 Unit = unique prompt, pooled across settings. x = whether / how much the prompt-side O-lens reads
