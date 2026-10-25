@@ -29,7 +29,7 @@ from openai import AsyncOpenAI
 sys.path[:0] = ["scripts", "."]
 os.environ.setdefault("QWEN_VLLM_URL", "http://unused")  # evalcue.harness builds a Qwen client at import
 os.environ.setdefault("QWEN_VLLM_API_KEY", "unused")
-from runs import upload  # ty: ignore[unresolved-import]
+from runs import upload
 
 from evalcue.envs.character_drift import final_reply
 

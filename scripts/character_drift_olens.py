@@ -2,7 +2,7 @@
 
     uv run python scripts/character_drift_olens.py requests OUT_DIR    # -> OUT_DIR/requests.jsonl for scripts/olens_read_requests.py
     uv run python scripts/character_drift_olens.py analyze OUT_DIR     # keyword counts per prefill arm from OUT_DIR/reads.jsonl
-    uv run python scripts/character_drift_olens.py expview OUT_DIR     # token-read expview page ($EXPVIEW/runs/<name>/page.html)
+    uv run --with transformers==5.16.1 --with jinja2 python scripts/character_drift_olens.py expview OUT_DIR  # token-read page
 
 Requests (space lens olens_s3d_space_rl600, read with `turn_starts` = only each <|im_start|> and the tokens after it):
     prefix   every Sonnet scenario under drift / qwensys / sysrp / default, and every WildChat chat under drift / qwensys, with
@@ -28,12 +28,23 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 sys.path[:0] = ["scripts", "."]
-from runs import finish, new_run  # ty: ignore[unresolved-import]
+from runs import finish, new_run
 
-CORE = re.compile(r"\b(?:fiction\w*|role[- ]?play\w*|characters?|in-character|disclaim\w*|pretend\w*|persona\w*)\b", re.IGNORECASE)
+CORE = re.compile(r"\b(?:fiction\w*|role[- ]?play\w*|characters?|in-character|disclaim\w*|pretend\w*|personas?)\b", re.IGNORECASE)
 SELF_AI = re.compile(r"\b(?:AI|language model|assistant|chatbot|Qwen|Alibaba)\b", re.IGNORECASE)
+WORDS = {  # per-word columns at the Assistant token
+    "fiction*": re.compile(r"\bfiction", re.IGNORECASE),
+    "disclaim*": re.compile(r"\bdisclaim", re.IGNORECASE),
+    "roleplay": re.compile(r"\brole[- ]?play", re.IGNORECASE),
+    "persona": re.compile(r"\bpersonas?\b", re.IGNORECASE),
+    "character": re.compile(r"\b(?:in-)?characters?\b", re.IGNORECASE),
+    "pretend": re.compile(r"\bpretend", re.IGNORECASE),
+    "story": re.compile(r"\b(?:story|stories|storytell)", re.IGNORECASE),
+    "AI": re.compile(r"\bAI\b"),
+    "Qwen/Alibaba": re.compile(r"Qwen|Alibaba|Tongyi", re.IGNORECASE),
+}
 KEYWORDS = re.compile(  # BROAD: CORE plus story / acting words
-    r"\b(?:fiction\w*|role[- ]?play\w*|characters?|in-character|disclaim\w*|pretend\w*|persona\w*|acting|act as|story|stories|"
+    r"\b(?:fiction\w*|role[- ]?play\w*|characters?|in-character|disclaim\w*|pretend\w*|personas?|acting|act as|story|stories|"
     r"storytell\w*|narrat\w*|imaginary|make-believe|performance|perform\w*)\b",
     re.IGNORECASE,
 )
@@ -124,8 +135,10 @@ def analyze(out: Path):
     t = defaultdict(lambda: [0, 0])  # (env, arm, where, offset or "all", set) -> [hit reads, reads]
     words = defaultdict(Counter)  # prefill -> bullet doc-frequency at the final header (sonnet only, same scenarios)
     examples = defaultdict(list)
+    wt = defaultdict(lambda: [0, 0])  # (env, arm, word) -> [reads at the Assistant token with it, reads]
     for tid, rs in by.items():
         kind, env, arm, _ = tid.split("/", 3)
+        env = f"{env}-reply" if kind == "reply" else env
         heads, _ = header_reads(rs)
         if not heads:
             continue
@@ -144,6 +157,10 @@ def analyze(out: Path):
                     for key in ((env, arm, where, pos, name), (env, arm, where, "all", name)):
                         t[key][0] += k
                         t[key][1] += 1
+                if where == "final" and off == 1:
+                    for w, pat in WORDS.items():
+                        wt[env, arm, w][0] += hit(r, pat)
+                        wt[env, arm, w][1] += 1
                 if where == "final" and env == "sonnet":
                     for bl in r["bullets"]:
                         words[arm.split("_")[0]].update(set(re.findall(r"[a-z']{3,}", bl["text"].lower())))
@@ -152,7 +169,7 @@ def analyze(out: Path):
     arms = sorted({(e, a) for e, a, w, _, _ in t if w == "final"})
     print("final assistant header, share of reads (5 layers x tokens) with a bullet matching CORE / BROAD / SELF_AI;")
     print("CORE by token: <|im_start|>, 'assistant' (the paper's Assistant token), '\\n', '<think>'; CORE at earlier (prefilled) headers")
-    summary = {}
+    summary: dict[str, dict] = {}
     for e, a in arms:
         f = lambda w, pos, n, e=e, a=a: t[e, a, w, pos, n]
         cells = (
@@ -163,6 +180,11 @@ def analyze(out: Path):
         summary[f"{e}/{a}"] = {k: f("final", "all", n) for k, n in zip(("core", "broad", "ai"), sets, strict=True)}
         summary[f"{e}/{a}"] |= {f"core_tok{o}": f("final", o, "core") for o in range(4)} | {"core_earlier": f("earlier", "all", "core")}
         print(f"| {e} | `{a}` | " + " | ".join(cells) + " |")
+    print("\nper word at the Assistant token ('assistant' after the final <|im_start|>), share of reads (5 layers)")
+    print("| env | arm | " + " | ".join(WORDS) + " |")
+    for e, a in arms:
+        print(f"| {e} | `{a}` | " + " | ".join(rate(wt[e, a, w]) for w in WORDS) + " |")
+        summary[f"{e}/{a}"]["words_assistant_token"] = {w: wt[e, a, w] for w in WORDS}
     print("\nreplies (sonnet, thinking off), CORE / SELF_AI: header (<|im_start|> + 3) | empty think block | first ~18 reply tokens")
     for a in REPLY_ARMS:
         cells = [
@@ -183,12 +205,51 @@ def analyze(out: Path):
     for (e, a), ex in sorted(examples.items()):
         for L, bs in ex[:2]:
             print(f"  {e} {a} L{L}: {' | '.join(bs)[:260]}")
+    summary["snap_back_auroc"] = predict(by)
     (out / "analysis.json").write_text(json.dumps(summary, indent=1) + "\n")
+
+
+def auroc(pos, neg):
+    return sum((p > n) + 0.5 * (p == n) for p in pos for n in neg) / (len(pos) * len(neg)) if pos and neg else None
+
+
+def predict(by):
+    """Within an arm, does the lens at the final header (4 tokens x 5 layers) predict which scenarios Qwen snaps back on?
+    A scenario snaps back if at least half its judged replies aren't in_character. Score = share of its 20 reads with a
+    SELF_AI (or CORE) bullet. The prefix reads use the thinking-mode header; its first 3 tokens are the same without it."""
+    feat = {}
+    for tid, rs in by.items():
+        kind, env, arm, item = tid.split("/", 3)
+        if kind != "prefix":
+            continue
+        heads, _ = header_reads(rs)
+        last = max(h for h, _ in heads)
+        lst = [r for (h, _), rr in heads.items() if h == last for r in rr]
+        feat[env, arm, item] = {n: sum(hit(r, pat) for r in lst) / len(lst) for n, pat in (("ai", SELF_AI), ("core", CORE))}
+    out = {}
+    print("\nsnap-back AUROC within arm (scenario-level; n snapped / n kept): lens SELF_AI share, CORE share")
+    for t in ("think", "nothink"):
+        for env in ("sonnet", "wildchat"):
+            judge = Path(f"data/runs/character_drift_{env}/2026-10-25_{t}/judge.jsonl")
+            lab = defaultdict(list)
+            for j in map(json.loads, judge.open()):
+                if j.get("parsed"):
+                    lab[j["arm"], j["item"]].append(j["parsed"]["label"] != "in_character")
+            for arm in sorted({a for a, _ in lab}):
+                xs = [(feat[env, arm, i], sum(v) / len(v)) for (a, i), v in lab.items() if a == arm and (env, arm, i) in feat]
+                pos, neg = [f for f, y in xs if y >= 0.5], [f for f, y in xs if y < 0.5]
+                if not xs:
+                    continue
+                r = {n: auroc([f[n] for f in pos], [f[n] for f in neg]) for n in ("ai", "core")}
+                out[f"{t}/{env}/{arm}"] = {"n_snap": len(pos), "n_keep": len(neg), **r}
+                fmt = lambda x: "-" if x is None else f"{x:.2f}"
+                print(f"| {t} | {env} | `{arm}` | {len(pos)}/{len(neg)} | {fmt(r['ai'])} | {fmt(r['core'])} |")
+    return out
 
 
 def expview(out: Path):
     """Token-read pages: one item per transcript, reads at every read position (O-lens bullets with FVE)."""
-    from transformers import AutoTokenizer
+    from transformers import AutoTokenizer  # ty: ignore[unresolved-import]  (uv run --with transformers, see expview())
 
     sys.path.insert(0, str(Path(os.environ.get("EXPVIEW", Path.home() / "workspace/expview")).expanduser()))
     from expview import Run, call  # ty: ignore[unresolved-import]
