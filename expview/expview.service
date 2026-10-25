@@ -1,0 +1,19 @@
+# systemd --user unit for the expview server (tailnet only). Install on bramble:
+#   mkdir -p ~/.config/systemd/user
+#   ln -sf "$PWD"/expview/expview.service "$PWD"/expview/expview-pull.service "$PWD"/expview/expview-pull.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now expview expview-pull.timer
+# The server re-indexes changed runs on its own every 2 minutes; restart only after a code change:
+#   systemctl --user restart expview
+[Unit]
+Description=expview transcript viewer (tailnet only)
+After=network-online.target tailscaled.service
+
+[Service]
+WorkingDirectory=%h/workspace/counterfactual-investigator-agent-with-olens
+ExecStart=%h/workspace/counterfactual-investigator-agent-with-olens/expview/run.sh
+Restart=on-failure
+RestartSec=10
+Environment=PATH=/run/current-system/sw/bin:%h/.nix-profile/bin:/etc/profiles/per-user/%u/bin
+
+[Install]
+WantedBy=default.target

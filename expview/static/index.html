@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>{{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+:root{
+  --bg:#fbfaf7;--panel:#f2f0ea;--card:#fff;--fg:#1f1e1b;--mute:#6b675e;--line:#dedad0;--acc:#2f5d8a;--sel:#e3e9f1;--code:#f4f2ec;
+  --sys:#eeece6;--user:#eef3ec;--asst:#ffffff;--think:#f6f1e3;--think-line:#c9b98a;--tool:#f1eef5;--tool-line:#9a88b8;
+  --add:#dcefe2;--del:#f6e2dc;--mark:#ffe58a;--mark-fg:#2b2100;--track:#e7e3da;--yes:#2f5d8a;--neg:#a4473a;--flash:#f0c36d;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#18191b;--panel:#1f2124;--card:#1c1e21;--fg:#e6e4df;--mute:#9a968d;--line:#33363a;--acc:#8fb4dd;--sel:#26313d;--code:#222428;
+  --sys:#222428;--user:#1d2620;--asst:#1c1e21;--think:#27241b;--think-line:#7d6f45;--tool:#231f2b;--tool-line:#7a6a98;
+  --add:#173323;--del:#3a2019;--mark:#6b5a12;--mark-fg:#fff3c4;--track:#2c2f33;--yes:#8fb4dd;--neg:#e0907f;--flash:#8a6a1f}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#18191b;--panel:#1f2124;--card:#1c1e21;--fg:#e6e4df;--mute:#9a968d;--line:#33363a;--acc:#8fb4dd;--sel:#26313d;--code:#222428;
+  --sys:#222428;--user:#1d2620;--asst:#1c1e21;--think:#27241b;--think-line:#7d6f45;--tool:#231f2b;--tool-line:#7a6a98;
+  --add:#173323;--del:#3a2019;--mark:#6b5a12;--mark-fg:#fff3c4;--track:#2c2f33;--yes:#8fb4dd;--neg:#e0907f;--flash:#8a6a1f}
+*{box-sizing:border-box}html,body{height:100%}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans)}
+a{color:var(--acc)}button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.mono{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+pre{background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;margin:0;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 var(--mono)}
+code{font-family:var(--mono);font-size:12.5px}
+mark{background:var(--mark);color:var(--mark-fg);border-radius:2px;padding:0 1px}
+.chip{display:inline-block;padding:0 7px;border-radius:9px;border:1px solid var(--line);font:11.5px/18px var(--mono);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.chip.t{background:var(--yes);border-color:var(--yes);color:var(--bg)}
+.chip .k{color:var(--mute)}.chip.t .k{color:inherit;opacity:.75}
+a.chip{text-decoration:none;color:var(--acc);border-color:var(--acc)}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 10px;cursor:pointer;font-size:12.5px;text-decoration:none;color:var(--fg);display:inline-block}
+.btn:hover{background:var(--sel)}.btn[aria-pressed="true"]{background:var(--sel);color:var(--acc);border-color:var(--acc)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:var(--bg)}
+.btn:disabled{opacity:.4;cursor:default}
+select,input[type=search],input[type=text],input[type=number]{font:13px var(--sans);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+input.rx{font:13px var(--mono)}
+.empty{color:var(--mute);font-style:italic}
+.err{color:var(--neg)}
+
+/* top bar */
+#top{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:14px;padding:7px 16px;background:var(--panel);border-bottom:1px solid var(--line);min-height:42px}
+#top .brand{font:600 14px var(--mono);color:var(--fg);text-decoration:none;white-space:nowrap}
+#crumbs{flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute)}
+#crumbs a{text-decoration:none}
+#top .right{display:flex;gap:8px;align-items:center}
+#app{height:calc(100% - 42px)}
+
+/* pages */
+.page{max-width:1320px;margin:0 auto;padding:22px 16px 60px}
+.page h1{font-size:20px;margin:0 0 6px;text-wrap:balance;word-break:break-word}
+h2{font-size:15px;margin:26px 0 8px}
+.desc{color:var(--mute);max-width:85ch}.desc p{margin:.4em 0}
+.md{max-width:85ch}.md pre{margin:.6em 0}.md h1{font-size:19px}.md h2{font-size:16px}.md h3{font-size:14px}.md p{margin:.45em 0}
+.wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:5px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--line);font-size:13px}
+th{font-size:11.5px;font-weight:600;color:var(--mute);border-top:0;white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+th.s{cursor:pointer}th.s:hover{color:var(--acc)}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--sel)}
+td.wrapid{word-break:break-all}
+.bar{width:80px;height:7px;background:var(--track);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px}
+.bar i{display:block;height:100%;background:var(--acc)}
+.filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 8px}
+.filters label{font-size:12px;color:var(--mute);display:flex;gap:6px;align-items:center}
+.more{margin:10px 0}
+
+/* item view */
+#ex{display:grid;grid-template-columns:290px minmax(0,1fr);height:100%}
+nav{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px 8px 40px}
+.navtop{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 6px 10px}
+.ih{margin:0 6px 6px;word-break:break-all}.ih b{font-size:14px}
+.labels{display:flex;flex-wrap:wrap;gap:4px;margin:6px 6px 0}
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:16px 6px 4px}
+details.d{margin-left:10px}details.d>summary{cursor:pointer;padding:1px 4px;font-weight:500;font-size:13px}
+.f{display:block;width:calc(100% - 10px);text-align:left;background:none;border:0;padding:2px 6px 2px 14px;margin-left:6px;border-radius:4px;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.f:hover{background:var(--sel)}.f.on{background:var(--sel);color:var(--acc);font-weight:600}
+.f .mono{margin-left:4px}
+main{overflow:auto;padding:0 28px 60px}
+#bar{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 0;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+#path{font:12px var(--mono);color:var(--mute);word-break:break-all}
+#doc{max-width:1500px}
+.dl{display:block}.dl.a{background:var(--add)}.dl.d{background:var(--del)}.dl.h{color:var(--acc)}.dl.f{color:var(--mute);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+
+/* messages (call view) */
+.msgs{max-width:980px}
+.msg{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;margin-bottom:12px;background:var(--card);overflow:hidden}
+.msg>.mh{display:flex;justify-content:space-between;gap:8px;padding:4px 10px;font:600 12px var(--mono);border-bottom:1px solid var(--line);align-items:center}
+.msg .mh .r{font-weight:400;color:var(--mute);display:flex;gap:8px;align-items:center}
+.msg .mh a{color:var(--mute);text-decoration:none}.msg .mh a:hover{color:var(--acc)}
+.msg .body{padding:10px 12px}
+.msg .body>pre{border:0;padding:0;background:none;font:13.5px/1.55 var(--sans);white-space:pre-wrap}
+.msg.system{border-left-color:var(--mute)}.msg.system>.mh{background:var(--sys)}
+.msg.user{border-left-color:#5c8a5a}.msg.user>.mh{background:var(--user)}
+.msg.assistant{border-left-color:var(--acc)}.msg.assistant>.mh{background:var(--sel)}
+.msg.tool{border-left-color:var(--tool-line)}.msg.tool>.mh{background:var(--tool)}
+.msg.tool .body>pre{font:12.5px/1.5 var(--mono)}
+.msg.flash{animation:fl 1.8s ease-out}
+.clip{max-height:220px;overflow:hidden;position:relative}
+.clip::after{content:"";position:absolute;left:0;right:0;bottom:0;height:50px;background:linear-gradient(transparent,var(--card))}
+.think{border-left:3px solid var(--think-line);background:var(--think);border-radius:4px;padding:6px 10px;margin-bottom:10px}
+.think>summary{cursor:pointer;font:600 12px var(--mono);color:var(--mute)}
+.think pre{border:0;background:none;padding:6px 0 0;font:13px/1.55 var(--sans)}
+.tc{margin-top:8px}.tc .mono{display:block;margin-bottom:3px;color:var(--acc)}
+.parsed{border:1px solid var(--acc);border-radius:8px;padding:8px 10px;margin-bottom:12px;background:var(--sel)}
+
+/* transcript with reads */
+.tkbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}
+.tkbar label{font-size:12px;color:var(--mute);display:flex;gap:5px;align-items:center}
+.tkbar input.rx{width:240px}
+.tkgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:18px;align-items:start}
+.tr{max-width:980px}
+.blk{border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;margin-bottom:10px;background:var(--card)}
+.blk>header{font:600 11px var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--mute);padding:4px 10px;border-bottom:1px solid var(--line)}
+.blk>.tx{padding:8px 12px;white-space:pre-wrap;word-break:break-word;font:13.5px/1.7 var(--sans)}
+.blk.system{border-left-color:var(--mute)}.blk.system>header{background:var(--sys)}
+.blk.user{border-left-color:#5c8a5a}.blk.user>header{background:var(--user)}
+.blk.assistant{border-left-color:var(--acc)}.blk.assistant>header{background:var(--sel)}
+.blk.reasoning{border-left-color:var(--think-line);background:var(--think)}.blk.reasoning>header{background:var(--think)}
+.blk.reasoning>.tx{font-size:13px;color:var(--fg)}
+.blk.tool{border-left-color:var(--tool-line)}.blk.tool>header{background:var(--tool)}.blk.tool>.tx{font:12.5px/1.6 var(--mono)}
+.blk.other>header{background:var(--panel)}
+.blk.collapsed>.tx{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent)}
+.blk>header button{float:right;font:11px var(--mono);background:none;border:0;color:var(--acc);cursor:pointer;text-transform:none;letter-spacing:0}
+.sp{font:10.5px var(--mono);color:var(--mute);opacity:.8}
+.tk{border-radius:2px}
+.tk.r{cursor:pointer;box-shadow:inset 0 -2px 0 var(--kc,var(--think-line))}
+.tk.r:hover{background:var(--sel)}
+.tk.m{background:var(--mark);color:var(--mark-fg)}
+.tk.on{background:var(--acc);color:var(--bg);box-shadow:none}
+.tk.flash{animation:fl 1.6s ease-out}
+@keyframes fl{0%{background:var(--flash)}100%{}}
+.pk{font:11.5px/1.35 var(--sans);background:var(--sel);color:var(--acc);border:1px solid var(--line);border-left:3px solid var(--kc,var(--acc));border-radius:4px;padding:0 5px;margin:0 3px;cursor:pointer;white-space:normal}
+.pk b{font-weight:600;color:var(--mute);margin-right:4px;font-size:10.5px}
+.pk.m{background:var(--mark);color:var(--mark-fg)}.pk:hover{border-color:var(--acc)}
+.xp{display:block;white-space:normal;font:13px/1.45 var(--sans);margin:4px 0 8px;color:var(--fg)}
+.xp[hidden]{display:none}
+.xbox{display:block;border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:6px;background:var(--panel);padding:6px 10px}
+.xh{display:flex;white-space:normal;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font:12px var(--mono);color:var(--mute);margin-bottom:2px}
+.xh b{color:var(--fg)}
+.rd{border-top:1px solid var(--line);padding:5px 0}.rd:first-of-type{border-top:0}
+.rd .rh{display:flex;justify-content:space-between;gap:6px;font:600 12px var(--mono)}
+.rd .rh .tool{color:var(--kc,var(--acc))}
+.rd ul{margin:3px 0 0;padding-left:18px}.rd li{font-size:13px;margin:1px 0}
+.rd .sc{font:11px var(--mono);color:var(--mute);margin-left:5px}
+.rd li.neg{color:var(--mute)}
+.rd.topk ul{padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:3px 6px}.rd.topk li{font:12px var(--mono);background:var(--code);border-radius:3px;padding:0 4px}
+.side{position:sticky;top:56px;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel);font-size:13px}
+.side h3{font:600 13px var(--sans);margin:0 0 8px}
+.gl{color:var(--mute);font-size:12px}
+.judge{border-top:1px solid var(--line);padding:8px 0}.judge:first-of-type{border-top:0;padding-top:0}
+.judge .jr{white-space:pre-wrap;margin:6px 0 0;font-size:12.5px}.judge details{margin-top:4px}.tokref{cursor:pointer;text-decoration:underline dotted}
+.hit{border-top:1px solid var(--line);padding:6px 0;cursor:pointer}.hit:hover{background:var(--sel)}
+.keys{font:12px var(--mono);color:var(--mute);margin-top:10px}.keys kbd{border:1px solid var(--line);border-radius:3px;padding:0 4px;background:var(--bg)}
+
+/* search */
+.sform{display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.sform .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.sform .row label{font-size:12px;color:var(--mute);display:flex;gap:5px;align-items:center}
+.sform input.rx{flex:1;min-width:260px;font-size:14px;padding:5px 9px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:4px}
+.card .chips{display:flex;flex-wrap:wrap;gap:4px}
+.ctx{font:12px/1.5 var(--mono);color:var(--mute);white-space:pre-wrap;word-break:break-word}
+.ctx b{color:var(--fg);background:var(--think);padding:0 2px;border-radius:2px}
+.reads div{word-break:break-word;font-size:13px}
+.reads .rn{color:var(--mute);font:11px var(--mono);margin-right:6px}
+.pager{display:flex;gap:8px;align-items:center;margin:10px 0}
+
+@media (max-width:1100px){.tkgrid{grid-template-columns:1fr}.side{position:static;max-height:none}}
+@media (max-width:760px){#ex{grid-template-columns:1fr;grid-template-rows:auto 1fr}nav{border-right:0;border-bottom:1px solid var(--line);max-height:38vh}main{padding:0 12px 40px}#top{gap:8px;padding:7px 10px}}
+@media (prefers-reduced-motion:reduce){.tk.flash,.msg.flash{animation:none;outline:2px solid var(--flash)}}
+</style>
+</head>
+<body>
+<div id="top"><a class="brand" href="#">expview</a><div id="crumbs"></div><div class="right"><a class="btn" id="tosearch" href="#s=1">Search reads</a><button class="btn" id="theme" title="Toggle light / dark">◐</button></div></div>
+<div id="app"><div class="page empty" id="loading">Loading…</div></div>
+<script id="data" type="text/plain">{{DATA}}</script>
+<script>
+"use strict";
+// ================================================================ basics
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store={get(k,d){try{const v=localStorage.getItem("expview:"+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem("expview:"+k,JSON.stringify(v))}catch{}}};
+const fmt=v=>v===true?"yes":v===false?"no":v==null?"–":typeof v=="number"?(Number.isInteger(v)?v:Math.abs(v)>=1?+v.toFixed(3):+v.toPrecision(3)):(typeof v=="object"?JSON.stringify(v):String(v));
+// overlay context for the side panel: its notes, the base it annotates, and other runs annotating this item
+function overlayInfo(it,clickable){let h="";
+  const notes=it.notes||[];
+  if(notes.length)h+=`<h3>Notes (${notes.length})</h3>`+notes.map(n=>`<div class="judge">${n.pos!=null&&clickable?`<a class="tokref" data-p="${n.pos}">@${n.pos}</a> `:""}<div class="md">${md(n.text||"")}</div></div>`).join("");
+  if(it.base_missing)h+=`<div class="empty">Base item ${esc(JSON.stringify(it.base_missing))} not found.</div>`;
+  const an=it.annotations||[];
+  if(an.length)h+=`<h3>Annotations from other runs (${an.length})</h3>`+an.slice(0,50).map(a=>{let l={};try{l=JSON.parse(a.labels||"{}")}catch{}
+    return `<div class="judge"><a href="${linkTo({d:a.d,i:a.i})}">${esc(a.d)}</a><div class="labels">${Object.entries(l).slice(0,4).map(([k,v])=>chip(k,v)).join("")}</div></div>`}).join("");
+  return h}
+// Docent: the item's run on docent.transluce.org (the server fills it in from docent.json / transcript fingerprints)
+const docentOf=links=>Object.entries(links||{}).find(([k,v])=>/docent/i.test(k+v))?.[1]||null;
+const docentColl=u=>(String(u||"").match(/\/dashboard\/([0-9a-f-]{36})/)||[])[1]||null;
+const docentBtn=u=>u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener" title="This transcript on Docent">Docent ↗</a> `:"";
+// a call whose name says it judges / grades / monitors is a judge; the subject is the first call that isn't one
+const JUDGE_RX=/judge|grader|grading|classif|monitor|scor|rater|critic|verdict/i;
+const subjectIdx=calls=>calls.findIndex(c=>!JUDGE_RX.test(c.name||""));
+function judgeCards(calls,link,clickable){const s=subjectIdx(calls);
+  const js=calls.map((c,j)=>j).filter(j=>clickable?JUDGE_RX.test(calls[j].name||""):j!=s);if(!js.length)return "";
+  // "[N]" in a judge's text jumps to a token only through the call's token_refs {N: token position} (N is the judge's own numbering)
+  return `<h3>Judges and graders (${js.length})</h3>`+js.map(j=>{const c=calls[j],ms=c.messages||[],out=[...ms].reverse().find(m=>m.role=="assistant")||{};
+    const tr=c.token_refs||{},refs=h=>clickable?h.replace(/\[(\d{1,6})\]/g,(m,n)=>tr[n]!=null?`<a class="tokref" data-p="${tr[n]}" title="Jump to token ${tr[n]}">[${n}]</a>`:m):h;
+    const reply=typeof out.content=="string"?out.content:out.content!=null?JSON.stringify(out.content):"";
+    const pv=c.parsed&&typeof c.parsed=="object"?Object.entries(c.parsed):c.parsed!=null?[["parsed",c.parsed]]:[];
+    const short=pv.filter(([k,v])=>typeof v!="string"||v.length<=40),long=pv.filter(([k,v])=>typeof v=="string"&&v.length>40);
+    return `<div class="judge"><div>${c.overlay?'<span class="chip">this run</span> ':""}<b>${esc(c.name)}</b> <span class="mono">${esc(String(c.model||"").split("/").pop())}</span> · <a href="${link(j)}">full call I/O</a></div>
+      ${short.length?`<div class="labels">${short.map(([k,v])=>chip(k,v)).join("")}</div>`:""}
+      ${long.map(([k,v])=>`<div class="jr"><span class="mono">${esc(k)}:</span> ${refs(esc(v))}</div>`).join("")}
+      ${reply?`<details ${long.length?"":"open"}><summary>reply (${reply.length.toLocaleString()} chars)</summary><div class="jr">${refs(esc(reply))}</div></details>`:""}
+      ${out.reasoning?`<details><summary>reasoning (${out.reasoning.length.toLocaleString()} chars)</summary><div class="jr">${refs(esc(out.reasoning))}</div></details>`:""}</div>`}).join("")}
+const chip=(k,v)=>`<span class="chip ${v===true?"t":""}" title="${esc(k)}: ${esc(fmt(v))}"><span class="k">${esc(k)}</span> ${esc(fmt(v))}</span>`;
+// markdown via marked + DOMPurify (cdnjs); without them (offline), plain paragraphs
+const md=t=>window.marked&&window.DOMPurify?DOMPurify.sanitize(marked.parse(String(t))):String(t??"").split(/\n{2,}/).map(x=>`<p>${esc(x).replace(/\n/g,"<br>")}</p>`).join("");
+const pct=x=>x==null?"–":Math.round(100*x)+"%";
+// a JS regex from the user's pattern ((?i) prefix and RE2-only syntax tolerated where JS can't)
+function rxOf(q,cs){if(!q)return null;try{return new RegExp(q.replace(/^\(\?i\)/,""),cs?"g":"gi")}catch{return null}}
+// escape text, wrapping regex matches in <mark>
+function hl(t,rx){t=String(t??"");if(!rx)return esc(t);let out="",last=0,m;rx.lastIndex=0;
+  while((m=rx.exec(t))){if(!m[0].length){rx.lastIndex++;continue}out+=esc(t.slice(last,m.index))+"<mark>"+esc(m[0])+"</mark>";last=m.index+m[0].length}
+  return out+esc(t.slice(last))}
+const test=(rx,t)=>{if(!rx)return false;rx.lastIndex=0;return rx.test(String(t??""))};
+const PALETTE=["#2f5d8a","#b5662f","#3f7f5a","#8a4f9e","#a4473a","#5a6f8f","#8f7a2f","#2f7f86"];
+function colorOf(tool,run){const r=(run&&run.readers||{})[tool];if(r&&r.color)return r.color;let h=0;for(const c of String(tool).split(" ")[0])h=(h*31+c.charCodeAt(0))>>>0;return PALETTE[h%PALETTE.length]}
+async function gunzipB64(b64){const bin=Uint8Array.from(atob(b64.trim()),c=>c.charCodeAt(0));
+  return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text()}
+
+// ================================================================ data sources: the server's API, or one run embedded in the page
+const EMBED=$("#data").textContent.trim(), STATIC=EMBED.length>0&&!EMBED.startsWith("{{");
+let SRC;
+function apiSource(){
+  const get=async(p)=>{const r=await fetch(p);if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail}catch{}throw new Error(m)}return r.json()};
+  const q=o=>new URLSearchParams(o).toString();
+  return {static:false,
+    datasets:()=>get("api/datasets"),
+    run:d=>get("api/run?"+q({d})),
+    item:(d,i)=>get("api/item?"+q({d,i})),
+    env:(d,e)=>get("api/env?"+q({d,e})),
+    tokens:(d,ref)=>get("api/tokens?"+q({d,ref})),
+    facets:d=>get("api/facets?"+q({d})),
+    search:p=>get("api/search?"+p.toString()),
+    status:()=>get("api/status")}
+}
+async function staticSource(){
+  const D=JSON.parse(await gunzipB64(EMBED)), B=D.blobs;
+  const R=x=>{if(Array.isArray(x))return x.map(R);if(x&&typeof x=="object"){if(Object.keys(x).length==1&&typeof x.$=="number")return B[x.$];const o={};for(const k in x)o[k]=R(x[k]);return o}return x};
+  const byId=new Map(D.items.map(it=>[it.id,it]));
+  const summary=it=>({id:it.id,group:it.group,labels:it.labels||{},links:it.links||{},tokens:it.tokens||null,calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,n:(c.messages||[]).length}))});
+  const tk={};
+  return {static:true,id:D.id||"run",
+    datasets:async()=>[{d:D.id||"run",title:D.run.title,n_items:D.items.length}],
+    run:async()=>({id:D.id||"run",run:D.run,items:D.items.map(summary)}),
+    item:async(d,i)=>{const it=byId.get(i);if(!it)throw new Error("no item "+i);return R(it)},
+    env:async(d,e)=>R(D.envs[e]),
+    tokens:async(d,ref)=>{if(!tk[ref]){const r=await fetch(`tokens/${ref}.gz.txt`);if(!r.ok)throw new Error(`tokens/${ref}.gz.txt: ${r.status}`);tk[ref]=JSON.parse(await gunzipB64(await r.text()))}return tk[ref]}}
+}
+
+// ================================================================ routing: everything is in the hash, so any view is a link
+// #d=<dataset> · &i=<item> · &v=tr|call|env|rec · &t=<token> · &c=<call> &m=<message> · &f=<file> · &q=<regex> · #s=1&q=... (search)
+const H=()=>new URLSearchParams(location.hash.slice(1));
+function go(o,replace){const p=new URLSearchParams();for(const [k,v] of Object.entries(o))if(v!=null&&v!=="")p.set(k,v);
+  const h="#"+p.toString();if(replace)history.replaceState(null,"",h);else location.hash=h;if(replace)return;}
+function setHash(o){const p=H();for(const [k,v] of Object.entries(o)){if(v==null||v==="")p.delete(k);else p.set(k,v)}history.replaceState(null,"","#"+p.toString())}
+function linkTo(o){const p=new URLSearchParams();for(const [k,v] of Object.entries(o))if(v!=null&&v!=="")p.set(k,v);return "#"+p.toString()}
+const RUNS={};
+async function getRun(d){if(!RUNS[d]){const r=await SRC.run(d);const its=r.items;
+  const groups=[...new Set(its.map(i=>i.group).filter(g=>g!=null))];
+  const ks=[];for(const it of its)for(const k of Object.keys(it.labels||{}))if(!ks.includes(k))ks.push(k);
+  const order=r.run.label_order||[];const labels=[...order.filter(k=>ks.includes(k)),...ks.filter(k=>!order.includes(k))];
+  const kinds={};for(const k of labels){const vs=its.map(i=>(i.labels||{})[k]).filter(v=>v!=null);
+    kinds[k]=vs.length&&vs.every(v=>typeof v=="boolean")?"bool":vs.length&&vs.every(v=>typeof v=="number")?"num":new Set(vs.map(fmt)).size<=30?"cat":"text"}
+  RUNS[d]={...r,groups,labels,kinds,F:{group:"",q:"",labels:{},sort:null,dir:1},limit:300}}
+  return RUNS[d]}
+function crumbs(parts){$("#crumbs").innerHTML=parts.map(([t,h])=>h?`<a href="${h}">${esc(t)}</a>`:`<span>${esc(t)}</span>`).join(" <span>/</span> ")}
+let VIEW=null;
+async function route(){
+  const p=H();document.onkeydown=null;
+  try{
+    if(p.get("s"))return await searchPage(p);
+    const d=p.get("d")||(SRC.static?SRC.id:null);
+    if(!d)return await homePage();
+    if(p.get("i")!=null)return await itemPage(d,p.get("i"),p);
+    return await runPage(d);
+  }catch(e){console.error(e);$("#app").innerHTML=`<div class="page"><p class="err">${esc(e.message||e)}</p><p><a href="#">← all datasets</a></p></div>`}
+}
+
+// ================================================================ home: every dataset
+async function homePage(){
+  crumbs([["datasets"]]);VIEW="home";
+  const [ds,st]=await Promise.all([SRC.datasets(),SRC.status().catch(()=>null)]);
+  const F=store.get("homeq","");
+  $("#app").innerHTML=`<div class="page"><h1>Datasets</h1>
+   <p class="desc">Every run under the server's roots: <code>data/runs/**/expview</code> (dataset id <code>runs/…</code>), imported datasets in <code>data/expview/imports</code> (<code>imports/…</code>) and bramble's old <code>~/workspace/expview/runs</code> (<code>expview/…</code>). A thread adds a dataset by writing a run dir in the expview format; it shows up here within a couple of minutes. ${st&&st.state=="indexing"?`<b>Indexing ${esc(st.current||"")} (${st.done}/${st.todo})…</b>`:""}${st&&Object.keys(st.errors||{}).length?` <span class="err">${Object.keys(st.errors).length} run(s) failed to index: ${esc(Object.keys(st.errors).join(", "))}</span>`:""}</p>
+   <form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search every metamodel read: a regex, e.g. being (tested|evaluated)|eval rubric" aria-label="regex"><button class="btn primary">Search</button></div></form>
+   <div class="filters"><label for="hf">Filter <input id="hf" type="search" value="${esc(F)}" placeholder="dataset id or title"></label><span class="mono" id="hc"></span></div>
+   <div class="wrap"><table id="ht"></table></div></div>`;
+  $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({s:1,q})};
+  const draw=()=>{const f=$("#hf").value.toLowerCase();store.set("homeq",$("#hf").value);
+    const rows=ds.filter(x=>(x.d+" "+(x.title||"")).toLowerCase().includes(f));$("#hc").textContent=`${rows.length} of ${ds.length}`;
+    $("#ht").innerHTML=`<tr><th>Dataset</th><th>Title</th><th>Items</th><th>With reads</th><th>Reads</th><th>Updated</th></tr>`+rows.map(x=>
+      `<tr class="click" data-d="${esc(x.d)}"><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.title||"")}</td><td class="num">${(x.n_items||0).toLocaleString()}</td><td class="num">${x.n_tok_items?x.n_tok_items.toLocaleString():""}</td><td class="num">${x.n_reads?x.n_reads.toLocaleString():""}</td><td class="num mono">${x.mtime?new Date(x.mtime*1000).toISOString().slice(0,16).replace("T"," "):""}</td></tr>`).join("")};
+  $("#hf").oninput=draw;$("#ht").onclick=e=>{const tr=e.target.closest("tr[data-d]");if(tr)go({d:tr.dataset.d})};draw();
+}
+
+// ================================================================ one run: summary by group + items table
+// run.json "groups": {group: short gloss}, e.g. what an arm is; shown next to the group name everywhere
+const gloss=(R,g)=>((R&&R.run&&R.run.groups)||{})[g];
+const groupHtml=(R,g)=>`${esc(g??"")}${gloss(R,g)?` <span class="gl">${esc(gloss(R,g))}</span>`:""}`;
+function summaryRow(R,name,its){
+  const cells=R.labels.map(k=>{const kind=R.kinds[k],vs=its.map(i=>(i.labels||{})[k]).filter(v=>v!=null);
+    if(!vs.length)return "<td class='mono'>–</td>";
+    if(kind=="bool"){const t=vs.filter(v=>v).length,p=Math.round(100*t/vs.length);return `<td class="num">${t}/${vs.length} · ${p}%<span class="bar"><i style="width:${p}%"></i></span></td>`}
+    if(kind=="num"){const m=vs.reduce((a,b)=>a+b,0)/vs.length;return `<td class="num">mean ${fmt(m)}</td>`}
+    if(kind=="cat"){const c={};vs.forEach(v=>c[fmt(v)]=(c[fmt(v)]||0)+1);return `<td class="num">${Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,n])=>`${esc(v)} ${n}`).join(" · ")}</td>`}
+    return "<td></td>"}).join("");
+  return `<tr class="${name!=null?"click":""}" ${name!=null?`data-g="${esc(name)}"`:""}><td>${name==null?"<b>All items</b>":groupHtml(R,name)}</td><td class="num">${its.length}</td>${cells}</tr>`}
+function sortKey(it,k){const v=k=="__id"?it.id:k=="__group"?it.group:(it.labels||{})[k];return v==null?null:typeof v=="boolean"?+v:v}
+function filtered(R){const F=R.F,q=F.q.toLowerCase();
+  const out=R.items.filter(it=>(!F.group||it.group==F.group)&&(!q||(it.id+" "+(it.group||"")).toLowerCase().includes(q))&&
+    Object.entries(F.labels).every(([k,v])=>v===""||fmt((it.labels||{})[k])==v));
+  if(F.sort)out.sort((a,b)=>{const x=sortKey(a,F.sort),y=sortKey(b,F.sort);if(x==y)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:1)*F.dir});
+  return out}
+async function runPage(d){
+  const R=await getRun(d),r=R.run,F=R.F;VIEW="run";
+  crumbs(SRC.static?[[r.title]]:[["datasets","#"],[d]]);
+  const cats=R.labels.filter(k=>["bool","cat"].includes(R.kinds[k]));
+  const hasTok=R.items.some(i=>i.tokens);
+  const colls={};for(const it of R.items){const c=docentColl(docentOf(it.links));if(c)colls[c]=(colls[c]||0)+1}
+  const nDoc=Object.values(colls).reduce((a,b)=>a+b,0);
+  const collHtml=nDoc?`<div class="labels" style="margin-bottom:6px">${Object.entries(colls).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([c,n])=>`<a class="btn" href="https://docent.transluce.org/dashboard/${c}" target="_blank" rel="noopener" title="${n.toLocaleString()} of these items are in this Docent collection">Docent collection ↗${Object.keys(colls).length>1?` (${n.toLocaleString()})`:""}</a>`).join(" ")} <span class="mono">${nDoc.toLocaleString()} of ${R.items.length.toLocaleString()} items on Docent</span></div>`:"";
+  $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${esc(d)}</div>`:""}${collHtml}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
+   <h2>Summary${R.groups.length?" by group":""}</h2>
+   <div class="wrap"><table id="sum"><tr><th>${R.groups.length?"Group":""}</th><th>Items</th>${R.labels.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>
+   ${summaryRow(R,null,R.items)}${R.groups.length<=400?R.groups.map(g=>summaryRow(R,g,R.items.filter(i=>i.group==g))).join(""):""}</table></div>
+   ${r.notes?`<div class="desc md" style="margin-top:14px">${md(r.notes)}</div>`:""}
+   <h2>Items</h2>
+   <div class="filters">
+    ${R.groups.length?`<label for="fg">Group <select id="fg"><option value="">all</option>${R.groups.map(g=>`<option value="${esc(g)}" ${F.group==g?"selected":""}>${esc(g)}${gloss(R,g)?" · "+esc(gloss(R,g)):""}</option>`).join("")}</select></label>`:""}
+    ${cats.map((k,i)=>{const vals=[...new Set(R.items.map(it=>fmt((it.labels||{})[k])))].sort();return `<label for="fl${i}">${esc(k)} <select id="fl${i}" data-k="${esc(k)}"><option value="">all</option>${vals.map(v=>`<option ${F.labels[k]==v?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`}).join("")}
+    <label for="fq">Find <input id="fq" type="search" value="${esc(F.q)}" placeholder="id or group"></label>
+    ${hasTok&&!SRC.static?`<a class="btn" href="${linkTo({s:1,d})}">Search this run's reads</a>`:""}
+    <span class="mono" id="cnt"></span>
+   </div>
+   <div class="wrap"><table id="items"></table></div><div class="more" id="more"></div>
+   <p class="mono">Click an item for ${hasTok?"its transcript with metamodel reads inline, ":""}every model call's exact input and output (subject, judges), and its environment files.</p></div>`;
+  $("#sum").onclick=e=>{const tr=e.target.closest("tr[data-g]");if(tr){F.group=tr.dataset.g;runPage(d).then(()=>$("#items").scrollIntoView())}};
+  const fg=$("#fg");if(fg)fg.onchange=()=>{F.group=fg.value;itemsTable(R)};
+  $$("select[data-k]").forEach(s=>s.onchange=()=>{F.labels[s.dataset.k]=s.value;itemsTable(R)});
+  $("#fq").oninput=e=>{F.q=e.target.value;itemsTable(R)};
+  itemsTable(R);
+}
+function itemsTable(R){
+  const F=R.F,shown=filtered(R);R.shown=shown;$("#cnt").textContent=`${shown.length.toLocaleString()} of ${R.items.length.toLocaleString()}`;
+  const th=(k,n)=>`<th class="s" data-sort="${esc(k)}" title="sort">${esc(n)}${F.sort==k?(F.dir>0?" ▲":" ▼"):""}</th>`;
+  const hasTok=R.items.some(i=>i.tokens),hasDoc=R.items.some(i=>docentOf(i.links));
+  $("#items").innerHTML=`<tr>${th("__id","Item")}${R.groups.length?th("__group","Group"):""}${R.labels.map(k=>th(k,k)).join("")}${hasTok?"<th>Reads</th>":""}<th>Calls</th>${hasDoc?"<th>Docent</th>":""}</tr>`+
+   shown.slice(0,R.limit).map(it=>`<tr class="click" data-i="${esc(it.id)}"><td class="mono wrapid">${esc(it.id)}</td>${R.groups.length?`<td>${groupHtml(R,it.group)}</td>`:""}${R.labels.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}${hasTok?`<td class="num mono">${it.tokens?it.tokens.reads.toLocaleString():""}</td>`:""}<td class="mono" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td>${hasDoc?`<td>${docentOf(it.links)?`<a class="chip" href="${esc(docentOf(it.links))}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>`:""}</tr>`).join("");
+  $("#more").innerHTML=shown.length>R.limit?`<button class="btn" id="mb">Show ${Math.min(1000,shown.length-R.limit)} more</button>`:"";
+  const mb=$("#mb");if(mb)mb.onclick=()=>{R.limit+=1000;itemsTable(R)};
+  $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable(R);return}
+    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({d:R.id,i:tr.dataset.i})};
+}
+
+// ================================================================ one item
+const ITEM={};  // the open item: d, it (full), R, env, sel
+function tree(files){const root={};for(const f of files){let n=root;const ps=f.split("/");ps.forEach((p,i)=>{if(i==ps.length-1)(n.__f=n.__f||[]).push(f);else n=n[p]=n[p]||{}})}return root}
+function treeHtml(n,depth){let h="";
+  for(const f of (n.__f||[]).sort())h+=`<button class="f" data-sel='${esc(JSON.stringify({v:"env",f}))}' title="${esc(f)}">${esc(f.split("/").pop())}</button>`;
+  for(const k of Object.keys(n).filter(k=>k!="__f").sort())h+=`<details class="d" ${depth<1?"open":""}><summary>${esc(k)}/</summary>${treeHtml(n[k],depth+1)}</details>`;
+  return h}
+// an id that isn't in the run: try it with / without "/default/" segments (links built from arm/item/sample)
+function idAlternatives(R,i){const norm=x=>String(x).replace(/\/default(?=\/|$)/g,"");const n=norm(i);
+  return R.items.filter(x=>x.id!==i&&norm(x.id)==n).map(x=>x.id)}
+async function itemPage(d,i,p){
+  const R=await getRun(d);
+  if(!R.items.some(x=>x.id==i)){const alt=idAlternatives(R,i);
+    if(alt.length==1){p.set("i",alt[0]);history.replaceState(null,"","#"+p.toString());i=alt[0]}
+    else if(alt.length>1){VIEW="item";crumbs([["datasets","#"],[d,linkTo({d})],[i]]);
+      $("#app").innerHTML=`<div class="page"><p class="empty">No item <code>${esc(i)}</code> in ${esc(d)}. Did you mean:</p><ul>${alt.map(a=>`<li><a href="${linkTo({d,i:a})}">${esc(a)}</a></li>`).join("")}</ul></div>`;return}}
+  const same=ITEM.d==d&&ITEM.id==i&&ITEM.it;
+  if(!same){$("#app").innerHTML=`<div class="page empty">Loading ${esc(i)}…</div>`;
+    const it=await SRC.item(d,i);Object.assign(ITEM,{d,id:i,it,R,env:it.env_files||null,envId:it.env||null})}
+  const it=ITEM.it,calls=it.calls||[],list=R.shown||filtered(R),k=list.findIndex(x=>x.id==i);VIEW="item";
+  crumbs(SRC.static?[[R.run.title,"#"],[i]]:[["datasets","#"],[d,linkTo({d})],[i]]);
+  if(ITEM.envId&&!ITEM.env)ITEM.env=await SRC.env(ITEM.it.env_d||d,ITEM.envId).catch(()=>null);
+  const env=ITEM.env,links=Object.assign({},it.links||{});
+  let v=p.get("v")||(it.tokens?"tr":calls.length?"call":env?"env":"rec");
+  const sel={v,c:p.get("c")!=null?+p.get("c"):Math.max(0,subjectIdx(calls)),f:p.get("f")};
+  const ex=$("#ex");
+  $("#app").innerHTML=`<div id="ex"><nav id="nav"></nav><main id="mainp"><div id="bar"><span id="path"></span><span id="tog"></span></div><div id="doc"></div></main></div>`;
+  const prev=k>0?list[k-1]:null,next=k>=0&&k<list.length-1?list[k+1]:null;
+  $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({d})}">← All items</a><span>
+     <a class="btn" ${prev?`href="${linkTo({d,i:prev.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
+     <a class="btn" ${next?`href="${linkTo({d,i:next.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
+   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>${gloss(R,it.group)?`<div class="gl">${esc(gloss(R,it.group))}</div>`:""}`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({d:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
+   <div class="labels">${Object.entries(it.labels||{}).map(([a,b])=>chip(a,b)).join("")}</div>
+   ${Object.keys(links).length?`<div class="labels">${Object.entries(links).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("")}</div>`:""}
+   ${it.tokens?`<div class="sec">${esc(R.run.tokens_section||"Transcript")}</div><button class="f" data-sel='{"v":"tr"}'>${esc(R.run.tokens_button||"with metamodel reads")}<span class="mono">${(it.tokens.n||0).toLocaleString()} tok · ${(it.tokens.reads||0).toLocaleString()} read</span></button>`:""}
+   <div class="sec">Model calls (${calls.length})</div>
+   ${calls.map((c,j)=>`<button class="f" data-sel='{"v":"call","c":${j}}' title="${esc(c.name)} · ${esc(c.model||"")}">${esc(c.name)}<span class="mono">${esc(String(c.model||"").split("/").pop())} · ${(c.messages||[]).length} msgs</span></button>`).join("")||'<div class="empty f">none</div>'}
+   <div class="sec">Environment (${env?Object.keys(env).length:0} files)</div>
+   ${env?treeHtml(tree(Object.keys(env)),0):'<div class="empty f">no environment recorded</div>'}
+   <div class="sec">Record</div><button class="f" data-sel='{"v":"rec"}'>labels and extra fields (JSON)</button>`;
+  $("#nav").onclick=e=>{const b=e.target.closest("[data-sel]");if(!b)return;const s=JSON.parse(b.dataset.sel);setHash({v:s.v,c:s.c??null,f:s.f??null,m:null,t:null});show(s)};
+  document.onkeydown=e=>{if(e.target.closest?.("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey)return;
+    if(e.key=="J"&&next)go({d,i:next.id,v:p.get("v")});else if(e.key=="K"&&prev)go({d,i:prev.id,v:p.get("v")});
+    else if(e.key=="Escape"&&!$(".xp:not([hidden])"))go({d});else if(TRK.key)TRK.key(e)};
+  show(sel,p);
+}
+let render=store.get("render",false),rawCall=false;
+function toggles(kinds){
+  $("#tog").innerHTML=docentBtn(docentOf(ITEM.it&&ITEM.it.links))+(kinds.includes("md")?`<button class="btn" id="tmd" aria-pressed="${render}">Render markdown</button> `:"")+(kinds.includes("raw")?`<button class="btn" id="traw" aria-pressed="${rawCall}">Raw JSON</button> `:"")+
+    `<button class="btn" id="tcopy" title="Copy a link to this view">Copy link</button>`;
+  const a=$("#tmd");if(a)a.onclick=()=>{render=!render;store.set("render",render);show(ITEM.sel)};
+  const b=$("#traw");if(b)b.onclick=()=>{rawCall=!rawCall;show(ITEM.sel)};
+  $("#tcopy").onclick=()=>copyLink();
+}
+function copyLink(extra){const p=H();for(const [k,v] of Object.entries(extra||{}))v==null?p.delete(k):p.set(k,v);
+  const u=location.href.split("#")[0]+"#"+p.toString();navigator.clipboard?.writeText(u).then(()=>toast("Link copied"),()=>prompt("Link",u))}
+function toast(t){let el=$("#toast");if(!el){el=document.createElement("div");el.id="toast";el.style.cssText="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:4px 12px;border-radius:6px;font-size:13px;z-index:20";document.body.append(el)}
+  el.textContent=t;el.hidden=false;clearTimeout(el._t);el._t=setTimeout(()=>el.hidden=true,1400)}
+function text(t,mdOK,rx){return mdOK&&render?`<div class="md">${md(t)}</div>`:`<pre>${hl(t,rx)}</pre>`}
+function diffHtml(t){return `<pre>${String(t).split("\n").map(l=>`<span class="dl ${/^(\+\+\+|---)/.test(l)?"f":l[0]=="+"?"a":l[0]=="-"?"d":l.startsWith("@@")?"h":""}">${esc(l)||" "}</span>`).join("")}</pre>`}
+function show(sel,p){
+  p=p||H();ITEM.sel=sel;TRK.key=null;
+  const it=ITEM.it,env=ITEM.env,rx=rxOf(p.get("q"),p.get("case")=="1");
+  $$("#nav [data-sel]").forEach(b=>{const s=JSON.parse(b.dataset.sel);b.classList.toggle("on",s.v==sel.v&&(s.v!="call"||s.c==sel.c)&&(s.v!="env"||s.f==sel.f))});
+  let h="";
+  if(sel.v=="env"){const f=sel.f&&env&&sel.f in env?sel.f:env?Object.keys(env).sort()[0]:null;
+    if(!f){h='<div class="empty">no environment recorded</div>';toggles([])}
+    else{const t=env[f];$("#path").textContent="environment/"+f;
+      if(/\.(diff|patch)$/.test(f)){toggles([]);h=diffHtml(t)}
+      else{const isMd=/\.md$/.test(f);toggles(isMd?["md"]:[]);
+        if(/\.json$/.test(f)){try{h=`<pre>${hl(JSON.stringify(JSON.parse(t),null,1),rx)}</pre>`}catch{h=text(t,false,rx)}}else h=text(t,isMd,rx)}}}
+  else if(sel.v=="tr"&&it.tokens){$("#path").textContent="transcript with metamodel reads";toggles([]);trView(p);return}
+  else if(sel.v=="rec"){$("#path").textContent="record";toggles([]);
+    const rec={id:it.id,group:it.group,labels:it.labels,links:it.links,extra:it.extra,env:ITEM.envId,tokens:it.tokens,calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,parsed:c.parsed}))};
+    h=`<pre>${hl(JSON.stringify(rec,null,1),rx)}</pre>`}
+  else{const c=(it.calls||[])[sel.c||0];if(!c){h='<div class="empty">no model calls</div>';toggles([])}
+    else{$("#path").textContent=`call ${(sel.c||0)+1}: ${c.name}`;toggles(["md","raw"]);h=callHtml(c,sel.c||0,rx);
+      const jc=(sel.c||0)==subjectIdx(it.calls||[])?judgeCards(it.calls,j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),false)+overlayInfo(it,false):"";
+      if(jc)h=`<div class="tkgrid"><div>${h}</div><aside class="side">${jc}</aside></div>`}}
+  $("#doc").innerHTML=h;$("#mainp").scrollTop=0;
+  if(sel.v=="call"){
+    $$("#doc .clip").forEach(el=>{el.onclick=()=>el.classList.remove("clip")});
+    $$("#doc [data-m]").forEach(a=>a.onclick=e=>{e.preventDefault();setHash({m:a.dataset.m});copyLink({m:a.dataset.m})});
+    const m=p.get("m");const el=m!=null?$(`#msg${m}`):rx?$("#doc mark"):null;
+    if(el){el.scrollIntoView({block:"center"});const box=el.closest(".msg");if(box){box.classList.remove("clip");box.classList.add("flash")}}}
+}
+function callHtml(c,ci,rx){
+  const skip=new Set(["name","model","messages","tools","params","parsed","token_refs","overlay"]);
+  const meta=[chip("model",c.model),...Object.entries(c.params||{}).map(([k,v])=>chip(k,v)),...Object.entries(c).filter(([k])=>!skip.has(k)).map(([k,v])=>chip(k,v))];
+  let h=`<div class="msgs"><div class="meta">${meta.join("")}</div>`;
+  if(c.parsed!=null)h+=`<div class="parsed"><span class="chip t">parsed</span> <code>${hl(JSON.stringify(c.parsed),rx)}</code></div>`;
+  if(rawCall)return h+`<pre>${hl(JSON.stringify({model:c.model,params:c.params,tools:c.tools,messages:c.messages},null,1),rx)}</pre></div>`;
+  if(c.tools&&c.tools.length)h+=`<details class="think" style="margin-bottom:12px"><summary>Tools offered (${c.tools.length}): ${esc(c.tools.map(t=>(t.function||t).name).join(", "))}</summary><pre>${esc(JSON.stringify(c.tools,null,1))}</pre></details>`;
+  const msgs=c.messages||[];
+  return h+msgs.map((m,i)=>{const out=m.role=="assistant",role=["system","user","assistant","tool"].includes(m.role)?m.role:"user";
+    const extra=Object.entries(m).filter(([k])=>!["role","content","reasoning","tool_calls"].includes(k)).map(([k,v])=>`${k}=${fmt(v)}`).join(" ");
+    let b="";
+    if(m.reasoning)b+=`<details class="think" open><summary>Reasoning (${m.reasoning.length.toLocaleString()} chars)</summary>${text(m.reasoning,true,rx)}</details>`;
+    const ct=m.content;
+    if(Array.isArray(ct))b+=ct.map(q=>q.type=="text"?text(q.text,true,rx):`<pre class="empty">[${esc(q.type)} part]</pre>`).join("");
+    else if(ct!=null&&ct!=="")b+=text(typeof ct=="string"?ct:JSON.stringify(ct,null,1),true,rx);
+    else if(!m.tool_calls)b+='<div class="empty">(empty)</div>';
+    for(const t of m.tool_calls||[]){let a=t.arguments;try{a=JSON.stringify(JSON.parse(a),null,1)}catch{}b+=`<div class="tc"><span class="mono">→ ${esc(t.name)}</span><pre>${hl(a,rx)}</pre></div>`}
+    const len=(typeof ct=="string"?ct.length:0)+(m.reasoning||"").length;
+    const clip=m.role=="system"&&len>1500&&!(rx&&test(rx,ct));
+    return `<div class="msg ${role}${clip?" clip":""}" id="msg${i}" ${clip?'title="Click to show the whole system prompt"':""}><div class="mh"><span>${esc(m.role)}${extra?` <span class="mono">${esc(extra)}</span>`:""}</span><span class="r">${out?"model output":"model input"} <a href="#" data-m="${i}" title="Copy a link to this message">#${i+1}</a></span></div><div class="body">${b}</div></div>`}).join("")+"</div>";
+}
+
+// ================================================================ transcript with metamodel reads
+// tokens/<ref>.json: {tokens: [str], sections: [[name, start, end]], reads: {pos: [{tool, label, score, score_name, lines: [[text, score?]], inline, filter}]}, legend}
+const TRK={key:null,cache:{},q:store.get("tkq",""),peek:store.get("tkpeek","auto"),tools:{},min:null,collapsed:{}};
+const SPECIAL=/^<\|[^|]*\|>$|^<\/?(think|tool_call|tool_response|answer)>$/;
+function roleOf(name){const n=String(name).toLowerCase();
+  if(/system/.test(n))return "system";if(/reason|think|cot/.test(n))return "reasoning";if(/tool|observation|function|result/.test(n))return "tool";
+  if(/user|prompt|human/.test(n))return "user";if(/assistant|reply|answer|output|response|model/.test(n))return "assistant";return "other"}
+// keepBar: re-draw only the transcript and side panel, never the toolbar, so its inputs keep focus and caret while typing
+async function trView(p,keepBar){
+  const it=ITEM.it,run=ITEM.R.run;
+  keepBar=keepBar&&!!$("#doc .tkbar");
+  if(p.get("q")!=null&&!keepBar)TRK.q=p.get("q");
+  if(!keepBar)$("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
+  let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
+  if(ITEM.it!==it||ITEM.sel.v!="tr")return;
+  // an overlay's own reads and positioned notes join the base transcript's reads
+  const reads=Object.assign({},T.reads||{});
+  for(const [q,rs] of Object.entries(it.extra_reads||{}))reads[q]=(reads[q]||[]).concat(rs);
+  for(const n of it.notes||[])if(n.pos!=null)reads[n.pos]=(reads[n.pos]||[]).concat([{tool:"note",lines:[[n.text]],inline:true}]);
+  const toks=T.tokens||[],all=Object.values(reads).flat();
+  const tools=[...new Set(all.map(r=>r.tool))];
+  for(const t of tools)if(!(t in TRK.tools))TRK.tools[t]=!(run.readers||{})[t]?.hidden;
+  if(TRK.min==null)TRK.min=T.min_score??0;
+  const hasInline=all.some(r=>r.inline);
+  if(TRK.peek!="auto"&&TRK.peek!="off"&&!tools.includes(TRK.peek))TRK.peek="auto";
+  const keep=r=>TRK.tools[r.tool]!==false&&!(r.filter&&r.score!=null&&r.score<TRK.min);
+  const kept=q=>(reads[q]||[]).filter(keep);
+  const peekOf=q=>{if(TRK.peek=="off")return [];const rs=kept(q);
+    if(TRK.peek=="auto")return hasInline?rs.filter(r=>r.inline):rs.filter(r=>r.tool==tools[0]).slice(0,1);
+    return rs.filter(r=>r.tool==TRK.peek).slice(0,1)};
+  const many=new Set(all.filter(r=>r.inline).map(r=>r.tool)).size>1||TRK.peek!="auto";
+  const secs=(T.sections&&T.sections.length?T.sections:[["transcript",0,toks.length]]);
+  const rx=()=>rxOf(TRK.q,false);
+  const P=Object.keys(reads).map(Number).filter(q=>q<toks.length).sort((a,b)=>a-b);
+  const readerDocs=Object.entries(run.readers||{}).filter(([t])=>tools.includes(t));
+  // ---- build the transcript HTML: one block per section, read tokens underlined, peeks inline, an expansion slot after each
+  const R0=rx();let body="";
+  for(const [name,a,b] of secs){const role=roleOf(name),key=`${a}`;
+    const long=role=="system"&&(b-a)>400;const col=TRK.collapsed[key]??long;
+    body+=`<section class="blk ${role}${col?" collapsed":""}" data-s="${key}"><header>${esc(name)}${long||TRK.collapsed[key]!=null?`<button data-col="${key}">${col?"show all":"collapse"}</button>`:""}</header><div class="tx">`;
+    let run_="";
+    for(let q=a;q<b&&q<toks.length;q++){const t=toks[q],rs=reads[q]?kept(q):null;
+      if(!rs||!rs.length){if(SPECIAL.test(t)){body+=esc(run_)+`<span class="sp">${esc(t)}</span>`;run_=""}else run_+=t;continue}
+      body+=esc(run_);run_="";
+      const m=!!R0&&rs.some(r=>r.lines.some(l=>test(R0,l[0])));
+      body+=`<span class="tk r${m?" m":""}" data-p="${q}" style="--kc:${colorOf(rs[0].tool,run)}" title="token ${q}: ${rs.length} read${rs.length>1?"s":""}">${esc(t)}</span>`;
+      for(const r of peekOf(q)){const first=String((r.lines[0]||[""])[0]);const pm=test(R0,first);
+        body+=`<span class="pk${pm?" m":""}" data-p="${q}" style="--kc:${colorOf(r.tool,run)}" title="${esc(r.tool)}: ${esc(first)}">${many?`<b>${esc(r.tool)}</b>`:""}${hl(first.length>90?first.slice(0,90)+"…":first,R0)}</span>`}
+      body+=`<span class="xp" id="xp${q}" hidden></span>`}
+    body+=esc(run_)+"</div></section>"}
+  const peekOpts=[["auto",hasInline?"inline reads":tools[0]?`${tools[0]} (first)`:"auto"],["off","off"],...tools.map(t=>[t,t])];
+  const html=`<div class="tkbar">
+     <label for="tkq">Search reads <input class="rx" id="tkq" type="search" value="${esc(TRK.q)}" placeholder="regex, e.g. test|evaluat"></label>
+     <label for="tkpeek">Peek <select id="tkpeek">${peekOpts.map(([v,n])=>`<option value="${esc(v)}" ${TRK.peek==v?"selected":""}>${esc(n)}</option>`).join("")}</select></label>
+     ${T.min_score!=null?`<label for="tkmin">min ${esc(all.find(r=>r.filter)?.score_name||"score")} <input id="tkmin" type="number" step="0.05" min="-1" max="1" value="${TRK.min}" style="width:64px"></label>`:""}
+     ${tools.map(t=>`<label><input type="checkbox" data-tool="${esc(t)}" ${TRK.tools[t]!==false?"checked":""}> <span style="color:${colorOf(t,run)}">${esc(t)}</span></label>`).join("")}
+     <button class="btn" id="xall">Expand all</button><button class="btn" id="xnone">Collapse all</button><span class="mono" id="tkn"></span></div>
+   <div class="tkgrid"><div class="tr" id="tr">${body}</div><aside class="side" id="side"></aside></div>`;
+  if(keepBar)$("#doc .tkgrid").outerHTML=html.slice(html.indexOf('<div class="tkgrid">'));else $("#doc").innerHTML=html;
+  // ---- the side panel: matches for the search, else the legend and what each reader is
+  const judges=judgeCards(it.calls||[],j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),true)+overlayInfo(it,true);
+  const sideInfo=()=>`${judges?judges+'<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">':""}<h3>${toks.length.toLocaleString()} tokens · ${P.length.toLocaleString()} read positions</h3>
+    ${T.legend?`<div class="md">${md(T.legend)}</div>`:""}
+    ${readerDocs.length?readerDocs.map(([t,x])=>`<div style="margin-top:8px"><b style="color:${colorOf(t,run)}">${esc(t)}</b>${x.about?`<div class="md">${md(x.about)}</div>`:""}</div>`).join(""):""}
+    <div style="margin-top:8px">${tools.map(t=>`<span class="chip" style="border-color:${colorOf(t,run)}">${esc(t)} ${all.filter(r=>r.tool==t).length.toLocaleString()}</span>`).join(" ")}</div>
+    <div class="keys">Click an underlined token or a peek to see every reader there.<br><kbd>j</kbd>/<kbd>k</kbd> next / previous read token · <kbd>Enter</kbd> open it · <kbd>n</kbd> next match · <kbd>Esc</kbd> close · <kbd>J</kbd>/<kbd>K</kbd> next / previous item</div>`;
+  const hits=()=>{const R1=rx();if(!R1)return [];const out=[];for(const q of P)for(const r of kept(q))for(const l of r.lines)if(test(R1,l[0]))out.push([q,r,l]);return out};
+  const sec=q=>{for(const [n,a,b] of secs)if(q>=a&&q<b)return n;return ""};
+  const sidePanel=()=>{const R1=rx();
+    if(!TRK.q||!R1){$("#side").innerHTML=TRK.q?'<div class="empty">Not a valid regex.</div>':sideInfo();$("#tkn").textContent="";return}
+    const hs=hits();const np=new Set(hs.map(x=>x[0])).size;$("#tkn").textContent=`${np} read token${np==1?"":"s"} match`;
+    $("#side").innerHTML=`<h3>${hs.length} read line${hs.length==1?"":"s"} match /${esc(TRK.q)}/</h3>`+(hs.length?hs.slice(0,500).map(([q,r,l])=>
+      `<div class="hit" data-p="${q}"><div class="mono"><span style="color:${colorOf(r.tool,run)}">${esc(r.tool)}</span> · token ${q}${sec(q)?" · "+esc(sec(q)):""}</div>
+       <div>${hl(l[0],R1)}</div><div class="mono">…${esc(toks.slice(Math.max(0,q-10),q+1).join("").slice(-80))}</div></div>`).join(""):'<div class="empty">No read in this transcript matches. Unticked readers are not searched.</div>')};
+  // ---- expanding one position: every kept reader, with scores
+  const xpHtml=q=>{const R1=rx(),rs=kept(q),hid=(reads[q]||[]).length-rs.length;
+    const ctxL=toks.slice(Math.max(0,q-12),q).join(""),nx=toks.slice(q+1,q+9).join("");
+    return `<span class="xbox"><span class="xh"><b>token ${q}</b><span>${esc(sec(q))}</span><span>…${esc(ctxL.slice(-60))}⟦<b>${esc(toks[q])}</b>⟧${esc(nx)}…</span><a href="#" data-link="${q}">copy link</a></span>`+
+      rs.map(r=>{const topk=r.lines.length>3&&r.lines.every(l=>String(l[0]).length<=24&&!/\s.*\s/.test(String(l[0]).trim()));
+        return `<span class="rd${topk?" topk":""}" style="display:block;--kc:${colorOf(r.tool,run)}"><span class="rh"><span class="tool">${esc(r.tool)}${r.label?` <span class="mono">${esc(r.label)}</span>`:""}</span>${r.score!=null?`<span class="sc">${esc(r.score_name||"score")} ${fmt(r.score)}</span>`:""}</span>
+        <ul>${r.lines.map(l=>`<li class="${l[1]!=null&&l[1]<0?"neg":""}">${hl(l[0],R1)}${l[1]!=null?`<span class="sc">${fmt(l[1])}</span>`:""}</li>`).join("")}</ul></span>`}).join("")+
+      (hid?`<span class="mono" style="display:block">${hid} read(s) hidden (reader unticked or below the min score)</span>`:"")+"</span>"};
+  let cur=-1;
+  const open=(q,force)=>{const el=$("#xp"+q);if(!el)return false;const want=force??el.hidden;
+    if(want){el.innerHTML=xpHtml(q);const a=el.querySelector("[data-link]");if(a)a.onclick=e=>{e.preventDefault();copyLink({t:q})};
+      const s=el.closest(".blk");if(s&&s.classList.contains("collapsed"))s.classList.remove("collapsed")}
+    el.hidden=!want;$$(`#tr .tk[data-p="${q}"]`).forEach(t=>t.classList.toggle("on",want));return want};
+  const focus=(q,expand)=>{const t=$(`#tr .tk[data-p="${q}"]`);if(!t)return;cur=q;const s=t.closest(".blk");if(s)s.classList.remove("collapsed");
+    if(expand)open(q,true);t.scrollIntoView({block:"center"});t.classList.remove("flash");void t.offsetWidth;t.classList.add("flash")};
+  const visible=()=>$$("#tr .tk.r").map(t=>+t.dataset.p);
+  $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);b.textContent=c?"show all":"collapse";return}
+    const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({t:o?q:null})};
+  $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({t:d.dataset.p})}};
+  const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H(),true).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
+  let deb;$("#tkq").oninput=e=>{TRK.q=e.target.value;store.set("tkq",TRK.q);clearTimeout(deb);deb=setTimeout(()=>{setHash({q:TRK.q||null});rerender()},250)};
+  $("#tkpeek").onchange=e=>{TRK.peek=e.target.value;store.set("tkpeek",TRK.peek);rerender()};
+  let debm;const mn=$("#tkmin");if(mn)mn.oninput=()=>{const v=parseFloat(mn.value);if(!isNaN(v)){TRK.min=v;clearTimeout(debm);debm=setTimeout(rerender,250)}};
+  $$("[data-tool]").forEach(c=>c.onchange=()=>{TRK.tools[c.dataset.tool]=c.checked;rerender()});
+  $("#xall").onclick=()=>{const v=visible();if(v.length>400&&!confirm(`Expand all ${v.length} read tokens?`))return;v.forEach(q=>open(q,true))};
+  $("#xnone").onclick=()=>$$("#tr .xp:not([hidden])").forEach(x=>open(+x.id.slice(2),false));
+  let hi=-1;
+  TRK.key=e=>{const v=visible();if(!v.length)return;const i=v.indexOf(cur);
+    if(e.key=="j"){e.preventDefault();focus(v[i<0?v.findIndex(q=>q>cur)>=0?v.findIndex(q=>q>cur):0:Math.min(v.length-1,i+1)])}
+    else if(e.key=="k"){e.preventDefault();focus(v[i<0?0:Math.max(0,i-1)])}
+    else if(e.key=="Enter"&&cur>=0){e.preventDefault();const o=open(cur);setHash({t:o?cur:null})}
+    else if(e.key=="Escape"){$$("#tr .xp:not([hidden])").forEach(x=>open(+x.id.slice(2),false))}
+    else if(e.key=="n"){const hp=[...new Set(hits().map(x=>x[0]))];if(hp.length){hi=(hi+1)%hp.length;focus(hp[hi],true)}}
+    else if(e.key=="/"){e.preventDefault();$("#tkq").focus()}};
+  sidePanel();
+  // ---- deep link to a token
+  const t=p.get("t");if(t!=null&&reads[t]){requestAnimationFrame(()=>focus(+t,true))}
+}
+
+// ================================================================ search over every read (server only)
+async function searchPage(p){
+  VIEW="search";crumbs([["datasets","#"],["search"]]);
+  if(SRC.static){$("#app").innerHTML=`<div class="page"><p class="empty">Cross-run search needs the expview server. In a built page, search inside one transcript's reads from its toolbar.</p></div>`;return}
+  const d=p.get("d")||"";
+  const [ds,fc]=await Promise.all([SRC.datasets(),SRC.facets(d)]);
+  const scope=p.get("scope")||"reads",pick=scope=="text"?ds:ds.filter(x=>x.n_reads);
+  const sel=(id,opts,cur,all)=>`<select id="${id}"><option value="">${all}</option>${opts.map(([v,n])=>`<option value="${esc(v)}" ${v==cur?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
+  const labs=(fc.labels||[]).map(x=>[`${x.k}=${x.v}`,`${x.k} = ${x.v} (${x.n})`]);
+  $("#app").innerHTML=`<div class="page"><h1>Search</h1>
+   <form class="sform" id="sf">
+    <div class="row"><input class="rx" id="sq" type="text" value="${esc(p.get("q")||"")}" placeholder="regex (RE2), e.g. being (tested|evaluated|watched)" aria-label="regex"><button class="btn primary">Search</button>
+     <label><input type="checkbox" id="scase" ${p.get("case")=="1"?"checked":""}> case-sensitive</label></div>
+    <div class="row">
+     <label>In ${sel("sscope",[["reads","metamodel reads"],["text","transcripts and judge calls"]],scope,"metamodel reads").replace('<option value="">metamodel reads</option>',"")}</label>
+     <label title="Drop a read when the regex also matches what the model just read or is about to write (an echo), or anywhere in the item">Keep ${sel("snovel",[["ctx","new vs ±40 tokens + next 16"],["transcript","new vs the whole item"]],p.get("novel")||"","all hits")}</label>
+     <label>Dataset ${sel("sd",pick.map(x=>[x.d,scope=="text"?`${x.d} (${x.n_items.toLocaleString()} items)`:`${x.d} (${x.n_reads.toLocaleString()} reads)`]),d,scope=="text"?"all":"all with reads")}</label>
+     <label>Reader ${sel("stool",(fc.tools||[]).map(x=>[x.tool,`${x.tool} (${x.n.toLocaleString()})`]),p.get("tool")||"","all")}</label>
+     <label>Section ${sel("ssec",(fc.secs||[]).map(x=>[x.sec,`${x.sec||"(none)"} (${x.n.toLocaleString()})`]),p.get("sec")||"","all")}</label>
+     ${(fc.groups||[]).length?`<label>Group ${sel("sgroup",fc.groups.map(x=>[x.grp,`${x.grp} (${x.n})`]),p.get("group")||"","all")}</label>`:""}
+     ${labs.length?`<label>Label ${sel("slabel",labs,p.get("label")||"","any")}</label>`:""}
+    </div></form><div id="sres"></div></div>`;
+  const params=()=>{const o={s:1,q:$("#sq").value.trim(),case:$("#scase").checked?"1":"",scope:$("#sscope").value=="reads"?"":$("#sscope").value,novel:$("#snovel").value,d:$("#sd").value,
+    tool:$("#stool").value,sec:$("#ssec").value,group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""};return o};
+  $("#sf").onsubmit=e=>{e.preventDefault();go(params())};
+  $("#sd").onchange=()=>{const o=params();o.tool="";o.sec="";o.group="";o.label="";go(o)};
+  $$("#sf select:not(#sd),#scase").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
+  if(!p.get("q")){$("#sres").innerHTML=`<p class="desc" style="margin-top:14px">Regex over every metamodel read (O-lens bullets, J-lens top-k, NLA and reader outputs) in every indexed run, or over the transcripts and judge calls themselves. "New" drops a read whose match also appears in the transcript around its token, so what is left is what the reader says that the text doesn't. The table shows, per dataset and group, how many items have a hit and each yes/no label's rate among them vs overall.</p>
+    <p class="mono">Try: <a href="${linkTo({s:1,q:"being (tested|evaluated|watched)",novel:"ctx"})}">being (tested|evaluated|watched)</a> · <a href="${linkTo({s:1,q:"eval(uation)? (rubric|grader)",novel:"ctx"})}">eval rubric</a> · <a href="${linkTo({s:1,q:"\\bshut ?down",novel:"ctx"})}">shutdown</a></p>`;return}
+  $("#sres").innerHTML='<p class="empty">Searching…</p>';
+  const qs=new URLSearchParams();for(const k of ["q","case","scope","novel","d","tool","sec","group","label"])if(p.get(k))qs.set(k,p.get(k));
+  const page=+(p.get("page")||0);qs.set("page",page);qs.set("per",50);
+  let r;try{r=await SRC.search(qs)}catch(e){$("#sres").innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
+  const R1=rxOf(p.get("q"),p.get("case")=="1"),T=r.total;
+  const n=scope=="text"?T.items:T.positions;
+  let h=scope=="text"?`<p><b>${T.items.toLocaleString()}</b> items match <span class="mono">(${r.secs}s)</span></p>`:
+    `<p><b>${T.reads.toLocaleString()}</b> matching reads at <b>${T.positions.toLocaleString()}</b> token positions in <b>${T.items.toLocaleString()}</b> items <span class="mono">(${r.secs}s)</span>${scope!="text"?` · <a href="api/csv?${qs}">CSV of all matching reads</a>`:""}</p>`;
+  const rk=[...new Set(r.slices.flatMap(x=>Object.keys(x.rates||{})))].slice(0,6);
+  if(r.slices.length)h+=`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Dataset</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.slices.map(x=>
+    `<tr><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=(x.rates||{})[k];return `<td class="num">${v?`${pct(v[0])} · ${pct(v[1])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`;
+  const pages=Math.ceil(n/50),nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
+  const labChips=l=>Object.entries(l||{}).slice(0,6).map(([k,v])=>chip(k,v)).join("");
+  const lk=o=>Object.entries(o||{}).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("");
+  h+=nav+r.rows.map(x=>{
+    if(scope=="text"){const href=linkTo({d:x.d,i:x.i,v:"call",q:p.get("q")});
+      return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(x.i)}</a><span class="chip mono">${esc(x.d)}</span>${x.grp!=null?`<span class="chip">${esc(x.grp)}</span>`:""}${labChips(x.labels)}${lk(x.links)}</div><div class="ctx">…${hl(x.snippet,R1)}…</div></div>`}
+    const href=linkTo({d:x.d,i:x.i,v:"tr",t:x.pos,q:p.get("q")});const tk=String(x.token),c=String(x.ctx);
+    return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(x.i)} @ ${x.pos}</a><span class="chip mono">${esc(x.d)}</span>${x.grp!=null?`<span class="chip">${esc(x.grp)}</span>`:""}${x.sec?`<span class="chip">${esc(x.sec)}</span>`:""}${labChips(x.labels)}${lk(x.links)}</div>
+     <div class="ctx">…${esc(c.endsWith(tk)?c.slice(0,c.length-tk.length):c)}<b>${esc(tk)}</b> ⟶ ${esc(x.nxt)}</div>
+     <div class="reads">${x.reads.map(y=>`<div><span class="rn">${esc(y.tool)}${y.label?" · "+esc(y.label):""}</span>${hl(y.text,R1)}</div>`).join("")}</div></div>`}).join("")+nav;
+  $("#sres").innerHTML=h;
+}
+
+// ================================================================ boot
+(function theme(){const t=store.get("theme",null);if(t)document.documentElement.dataset.theme=t;
+  $("#theme").onclick=()=>{const cur=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+    const nx=cur=="dark"?"light":"dark";document.documentElement.dataset.theme=nx;store.set("theme",nx)}})();
+(async()=>{
+  SRC=STATIC?await staticSource():apiSource();
+  if(STATIC){$("#tosearch").hidden=true;$(".brand").textContent="expview";$(".brand").href="#"}
+  window.addEventListener("hashchange",route);await route();
+})().catch(e=>{$("#app").innerHTML=`<div class="page err">Could not start: ${esc(e.message||e)}</div>`});
+</script>
+</body>
+</html>

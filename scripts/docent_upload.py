@@ -91,10 +91,13 @@ def changed_files(row: dict) -> str | None:
 
 
 def env_row_run(row: dict, source: str) -> AgentRun:
+    # coding-harness rows (ImpossibleBench / realism) name these variant / pid / seed instead of arm / item / sample
+    row = {**row, "arm": row.get("arm", row.get("variant")), "item": row.get("item", row.get("pid", row.get("task")))}
+    row["sample"] = row.get("sample", row.get("seed"))
     metadata = {
         **{k: v for k, v in row.items() if k not in STRUCTURAL},  # the env's behaviour flags, `positive`, `finish`, ...
         "arm": row["arm"],
-        "model": row["model"],
+        "model": row.get("model"),
         "item": row["item"],
         "sample": row["sample"],
         "seed": row.get("seed"),
@@ -138,7 +141,7 @@ def upload(run: Path) -> bool:
     else:
         return False
     rows = [json.loads(line) for line in lines]
-    if run.parent.name != "cfbench" and not all("arm" in r for r in rows):
+    if run.parent.name != "cfbench" and not all("arm" in r or "variant" in r for r in rows):
         return False  # a rows.jsonl from something other than the evalcue harness
     agent_runs = [convert(r, f"{run.parent.name}/{run.name}:{i}") if r.get("messages") else None for i, r in enumerate(rows)]
     for agent_run in filter(None, agent_runs):
