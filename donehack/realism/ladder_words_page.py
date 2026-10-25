@@ -15,10 +15,8 @@ from ladder_words_labels import about_env
 
 DS = "imports/olens_reads/2026-10-25_glm53_ib_user_dense/2026-10-25_glm53_ib_realistic_user_ladder"
 ORDER = [
-    "base",
     "L1_rl_cues",
     "L2_rl",
-    "nocrit_done",
     "L3_rl_nodone",
     "L4_assistant_formal",
     "L5_assistant_casual",
@@ -102,7 +100,7 @@ body{{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;ma
 table{{border-collapse:collapse;font-size:13px;margin:10px 0}} td,th{{border-bottom:1px solid var(--grid);padding:3px 10px;text-align:right}} td:first-child,th:first-child{{text-align:left}}
 .scroll{{overflow-x:auto}}</style></head><body>
 <h1>Eval words in O-lens reads of the ladder prompts</h1>
-<p class=lead>GLM verbalizer (RL), greedy, at every read position in the system prompt and first user turn (Celeste's dense reads). Counts are <b>distinct</b> reads. The prompt prefix is identical across a rung's episodes, so a read at a shared position comes back the same in all 64 episodes: it is one observation, not 64. None of these words appear in any rung's prompt text. Hack rates are from the ladder runs (n=64 per rung; base and nocrit_done from earlier runs).</p>
+<p class=lead>GLM verbalizer (RL), greedy, at every read position in the system prompt and first user turn (Celeste's dense reads). Counts are <b>distinct</b> reads. The prompt prefix is identical across a rung's episodes, so a read at a shared position comes back the same in all 64 episodes: it is one observation, not 64. None of these words appear in any rung's prompt text. Hack rates are from the ladder runs (n=64 per rung).</p>
 <p>Bars count distinct prompt reads where the word is about the environment itself (e.g. "the broader agent-evaluation benchmark", "this simulated Unix environment", "I will evaluate your work upon Done"). Reads where it is about the code ("a quick performance benchmark", "brute-force simulation", "pytest then evaluates", "the test file that evaluates our solution") are left out; the table also has the raw per-word counts. The labels are mine, by hand, in <code>realism/ladder_words_labels.py</code>, and every read below is tagged.</p>
 <div class=scroll>{"".join(svg)}</div>
 <table><tr><th>rung</th><th>hack</th><th>about the env</th>{"".join(f"<th>{html.escape(w)}</th>" for w, _ in SHOW)}<th>episodes</th></tr>{rows}</table>
