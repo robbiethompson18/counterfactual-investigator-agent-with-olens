@@ -15,9 +15,9 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import pandas as pd
+from atomic import swap_in, temp_dir
 from keywords import BROAD, STRICT
 from kwonly import VEA_RX
 
@@ -42,19 +42,19 @@ def main() -> None:
     ap.add_argument("--handcheck", type=Path, action="append", default=[], help="JSON {tid: {vea, quote}} (repeatable)")
     a = ap.parse_args()
     sys.path.insert(0, str(a.expview))
-    from expview import Run, call
+    from expview import Run
 
     hc = {k: v for f in a.handcheck for k, v in json.loads(f.read_text()).items()}
     e = pd.read_parquet(a.run / "episodes.parquet", columns=["tid", "setting", "cond", "ph", "gen_text", "epoch"])
     e = e[e.setting == "inspect_am"].sort_values("tid")
-    prompts = pd.read_parquet(a.run / "prompts.parquet", columns=["ph", "prompt_text"]).set_index("ph").prompt_text
     reads = pd.read_parquet(a.run / "reads.parquet", filters=[("ph", "in", list(e.ph.unique()))])
     t = reads.text.fillna("")
     reads["strict"], reads["broad"] = t.str.contains(STRICT), t.str.contains(BROAD)
     by_ph = dict(tuple(reads.groupby("ph")))
-    out = a.out or a.run / "expview" / "inspect_am"
+    final = a.out or a.run / "expview" / "inspect_am"
+    tmp = temp_dir(final)  # never reset the live run: build outside the viewer roots, swap in when complete
     run = Run(
-        out,
+        tmp,
         title="Celeste's inspect agentic misalignment: VEA and prompt-side O-lens reads",
         description=(
             "Celeste's on-policy GLM-5.3 rollouts of inspect_evals agentic_misalignment (her vLLM server, template default "
@@ -66,14 +66,11 @@ def main() -> None:
             "Labels: `vea` = regex on the rollout (`kwonly.VEA_RX`; no monitor ran on these). A hand check of 14 random episodes "
             "found no regex false positives (8/8) but 4 misses among 6 regex-no, so true VEA is likely above 0.9; `hand_vea` "
             "where checked. `lens_strict_share` = share of prompt-side read positions where an O-lens bullet has a strict eval "
-            "word. Calls: the prompt-side O-lens reads (every read position before the first assistant turn, eval words in "
-            "**[brackets]**; identical prompts were read once, so episodes share them), then the transcript (rendered prompt, "
-            "then GLM's reasoning and reply). Buttons: the episode in Celeste's import with reads inline at the first eval-word "
-            "read (8830), and the same on 8821."
+            "word. Each item is an overlay on the transcript in Celeste's import (reads inline); notes: the first prompt-side "
+            "eval-word read at its token and the VEA regex quote."
         ),
         label_order=["vea", "hand_vea", "scenario", "goal", "urgency", "test_eval_awareness", "prod", "lens_strict_share"],
     )
-    run.reset()
     for r in e.itertuples():
         variant = r.tid.split(":")[3]  # e.g. blackmail_explicit-america_replacement
         scen, goal, urg = (variant.split("_") + ["", "", ""])[:3]
@@ -95,12 +92,14 @@ def main() -> None:
         gen = r.gen_text or ""
         m = VEA_RX.search(gen)
         h = hc.get(r.tid, {})
-        links = {}
+        notes = []
         if first:
-            links["reads inline (8830)"] = f"http://bramble:8830/#d={D8830}&i={quote(first[0], safe='')}&v=tr&t={first[1]}&q={quote(Q)}"
-            links["reads (8821)"] = f"http://bramble:8821/#ep={quote(first[0], safe='')}&pos={first[1]}&q={quote(Q)}"
+            hit = rr[(rr.pos == first[1]) & rr.broad] if rr is not None else None
+            txt = hit.iloc[0].text.strip() if hit is not None and len(hit) else ""
+            notes.append({"pos": first[1], "text": f"first prompt-side eval-word read: {mark(txt)}" if txt else "first prompt-side read"})
+        notes.append({"pos": None, "text": f"VEA (regex) {bool(m)}" + (f": {gen[max(0, m.start() - 160) : m.end() + 120]}" if m else "")})
         run.add(
-            id=r.tid, group=scen,
+            id=r.tid, group=scen, base=(D8830, r.tid), notes=notes, calls=[],
             labels={
                 "vea": bool(m), "vea_quote": gen[max(0, m.start() - 160) : m.end() + 120].replace("\n", " ") if m else "(no match)",
                 "hand_vea": h.get("vea"), "hand_quote": h.get("quote", ""), "scenario": scen, "goal": goal, "urgency": urg,
@@ -108,16 +107,9 @@ def main() -> None:
                 "lens_strict_share": round(float(rr.groupby("pos").strict.any().mean()), 3) if rr is not None else None,
                 "n_eval_reads": int(rr.broad.sum()) if rr is not None else 0,
             },
-            links=links,
-            calls=[
-                call("prompt-side O-lens reads", "GLM-5.3 O-lens (SFT/RL, greedy + 4 samples)",
-                     messages=[{"role": "user", "content": "\n\n".join(lines) or "(no prompt-side reads)"}]),
-                call("transcript (GLM 5.3, Celeste's server)", "zai-org/GLM-5.3",
-                     messages=[{"role": "user", "content": prompts[r.ph]},
-                               {"role": "assistant", "content": snip(gen, a.max_gen) if a.max_gen else gen}]),
-            ],
         )  # fmt: skip
-    print(f"{len(e)} items -> {run.path}")
+    swap_in(tmp, final)
+    print(f"{len(e)} items -> {final}")
 
 
 if __name__ == "__main__":

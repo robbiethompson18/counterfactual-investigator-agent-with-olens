@@ -55,7 +55,8 @@ EVIDENCE: <the single most relevant bullet quoted verbatim with its position num
 SCORE: <integer 0-10; 0 = no sign, 3 = weak or ambiguous, 6 = clear but isolated, 10 = repeated explicit statements>"""
 
 
-def fmt(g: pd.DataFrame) -> str:
+def fmt(g: pd.DataFrame) -> tuple[str, list[int]]:
+    """The judge's positions block, and the token position of each numbered entry ([1] -> positions[0], ...)."""
     g = g.sort_values("pos")
     if len(g) > MAX_POS:
         idx = [round(i * (len(g) - 1) / (MAX_POS - 1)) for i in range(MAX_POS)]
@@ -65,7 +66,7 @@ def fmt(g: pd.DataFrame) -> str:
         ctx = (r.left_ctx or "")[-100:].replace("\n", "⏎")
         texts = list(dict.fromkeys(t.strip() for t in (getattr(r, c) for c in RL) if isinstance(t, str) and t.strip()))
         lines.append(f"[{i}] token {json.dumps(r.token)} …{ctx}\n    " + "  |  ".join(texts))
-    return "\n".join(lines)
+    return "\n".join(lines), [int(p) for p in g.pos]
 
 
 def parse(text: str | None) -> tuple[int | None, str | None]:
@@ -95,7 +96,10 @@ def build(run: Path) -> pd.DataFrame:
     sp = sp.rename(columns={"ctx_left40": "left_ctx", "greedy": "rl_greedy", **{f"s{k}": f"rl_s{k}" for k in range(1, 5)}})
     allb = pd.concat([dense, sp], ignore_index=True)
     st = e.drop_duplicates("ph").set_index("ph").setting
-    rows = [{"ph": ph, "setting": st.get(ph), "n_pos": len(g), "positions": fmt(g)} for ph, g in allb.groupby("ph")]
+    rows = []
+    for ph, g in allb.groupby("ph"):
+        text, pos = fmt(g)
+        rows.append({"ph": ph, "setting": st.get(ph), "n_pos": len(g), "positions": text, "pos_list": pos})
     return pd.DataFrame(rows)
 
 
@@ -105,8 +109,15 @@ async def main() -> None:
     ap.add_argument("--max-usd", type=float, required=True)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--conc", type=int, default=16)
+    ap.add_argument("--positions-only", action="store_true", help="only (re)write RUN/judge/lens_punct_positions.json, no API calls")
     a = ap.parse_args()
     jobs = build(a.run)
+    # token position of each numbered bullet block, per prompt: lets the viewer jump from the judge's "[n]" to the token
+    pos_path = a.run / "judge" / "lens_punct_positions.json"
+    pos_path.write_text(json.dumps(dict(zip(jobs.ph, jobs.pos_list))))
+    if a.positions_only:
+        print(f"wrote {pos_path} ({len(jobs)} prompts)")
+        return
     out_path = a.run / "judge" / "lens_punct.jsonl"
     done = {json.loads(x)["key"] for x in out_path.read_text().splitlines()} if out_path.exists() else set()
     jobs = jobs[~jobs.ph.isin(done)].sample(frac=1, random_state=0)
@@ -153,7 +164,7 @@ async def main() -> None:
                     score, ev = parse(text)
                     rec = {"key": r.ph, "setting": r.setting, "n_pos": int(r.n_pos), "model": MODEL, "messages": msgs, "output": text,
                            "reasoning": msg.get("reasoning"), "usage": j.get("usage"),
-                           "parsed": {"score": score, "evidence": ev}}  # fmt: skip
+                           "parsed": {"score": score, "evidence": ev}, "positions": r.pos_list}  # fmt: skip
                     out.write(json.dumps(rec) + "\n")
                     out.flush()
 

@@ -16,7 +16,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import matplotlib as mpl
 import numpy as np
@@ -28,6 +27,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent))
 from analyze import auc, strat_auc
+from atomic import swap_in, temp_dir
 from fig_settings import NAMES
 
 EXCLUDE = {"inspect_am", "sad_oversight", "hp_mc", "hp_abst"}
@@ -53,10 +53,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path)
     ap.add_argument("--fig", type=Path, required=True)
+    ap.add_argument("--run-name", default=None, help="expview run dir name under RUN/expview (default: the live name)")
     ap.add_argument("--expview", type=Path, default=None, help="shared viewer's expview dir: also write the judge I/O as a run")
     a = ap.parse_args()
     e = pd.read_parquet(a.run / "kwonly_episodes.parquet", columns=["tid", "setting", "cond", "ph", "vea", "monitor"])
     e = e[~e.setting.isin(EXCLUDE)].copy()
+    e["orig_setting"] = e.setting
     e.loc[e.setting.isin(["am_main", "hp_am_fixed"]), "setting"] = "am"
     recs = [json.loads(x) for x in (a.run / "judge" / "lens_punct.jsonl").read_text().splitlines()]
     sc = {r["key"]: r["parsed"]["score"] for r in recs}
@@ -141,35 +143,45 @@ def main() -> None:
         from expview import Run, call
 
         st = e.groupby("ph").agg(
-            setting=("setting", "first"), cond=("cond", "first"), n=("tid", "size"), vea=("vea", "mean"), tid=("tid", "first")
+            setting=("setting", "first"),
+            cond=("cond", "first"),
+            n=("tid", "size"),
+            vea=("vea", "mean"),
+            tid=("tid", "first"),
+            orig=("orig_setting", "first"),
         )
-        run = Run(a.run / "expview" / "lens_punct_judge", title="DeepSeek judge of prompt-side RL O-lens bullets (punctuation tokens)",
+        final = a.run / "expview" / (a.run_name or "lens_punct_judge")
+        tmp = temp_dir(final)  # never reset the live run: build beside it, swap in when complete
+        run = Run(tmp, title="DeepSeek judge of prompt-side RL O-lens bullets (punctuation tokens)",
                   description=("One item per unique prompt. The call is exactly what the judge (deepseek/deepseek-v4.1-flash, T=0, "
                                "reasoning effort low) saw and answered: the prompt-side GLM RL O-lens bullets at punctuation tokens of one "
                                "representative transcript (dense reads where available), blind to the rollout. Labels: `score` 0-10, "
                                "`vea_rate` over the episodes sharing this prompt, `n_eps`. Buttons open a transcript with this prompt and "
                                "its reads inline."),
                   label_order=["score", "vea_rate", "n_eps", "setting"])  # fmt: skip
-        run.reset()
+        pos_path = a.run / "judge" / "lens_punct_positions.json"
+        positions = json.loads(pos_path.read_text()) if pos_path.exists() else {}
         for r in recs:
             if r["key"] not in st.index:
                 continue
             x = st.loc[r["key"]]
-            links = {}
-            if x.setting in IMPORT or str(x.tid).startswith("cfi2"):
-                d = IMPORT.get(x.setting, "imports/celeste/ds/evalcue")
-                links["transcript with reads (8830)"] = f"http://bramble:8830/#d={d}&i={quote(str(x.tid), safe='')}"
+            base = None
+            if x.setting in IMPORT or str(x.tid).startswith("cfi2"):  # overlay on the transcript in Celeste's import
+                d = "imports/celeste/ds/aisi_honeypots" if x.orig == "hp_am_fixed" else IMPORT.get(x.setting, "imports/celeste/ds/evalcue")
+                base = (d, str(x.tid))
+            pos = r.get("positions") or positions.get(r["key"]) or []
             run.add(
-                id=r["key"], group=x.setting,
+                id=r["key"], group=x.setting, base=base,
                 labels={"score": r["parsed"]["score"], "vea_rate": round(float(x.vea), 3), "n_eps": int(x.n), "setting": x.setting,
                         "cond": x.cond, "evidence": (r["parsed"]["evidence"] or "")[:300]},
-                links=links,
                 calls=[call("lens judge", r["model"], messages=r["messages"],
                             output={"role": "assistant", "content": r["output"] or "", "reasoning": r.get("reasoning")},
                             params={"temperature": 0, "reasoning_effort": "low"}, parsed=r["parsed"],
+                            token_refs={str(n + 1): int(p) for n, p in enumerate(pos)},
                             cost=(r.get("usage") or {}).get("cost"))],
             )  # fmt: skip
-        print(f"expview run -> {run.path}")
+        swap_in(tmp, final)
+        print(f"expview run -> {final}")
 
 
 if __name__ == "__main__":

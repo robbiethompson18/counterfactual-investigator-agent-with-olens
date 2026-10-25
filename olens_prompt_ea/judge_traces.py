@@ -23,6 +23,9 @@ from urllib.parse import quote
 
 import pandas as pd
 
+sys.path.insert(0, str(Path(__file__).parent))
+from atomic import swap_in, temp_dir
+
 EXCLUDE = {"inspect_am", "sad_oversight", "hp_mc", "hp_abst"}
 
 
@@ -39,6 +42,7 @@ def evidence_text(ev: str | None) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path)
+    ap.add_argument("--run-name", default=None, help="expview run dir name under RUN/expview (default: the live name)")
     ap.add_argument("--expview", type=Path, required=True)
     ap.add_argument("--imports", type=Path, required=True)
     ap.add_argument("--ids", default="")
@@ -64,7 +68,9 @@ def main() -> None:
                 it = json.loads(line)
                 if it.get("tokens"):
                     loc[it["id"]] = (d, it["tokens"]["ref"])
-    run = Run(a.run / "expview" / "lens_punct_judge_traces", title="Lens judge on prompt-side punctuation reads: transcripts",
+    final = a.run / "expview" / (a.run_name or "lens_punct_judge_traces")
+    tmp = temp_dir(final)  # never reset the live run: build beside it, swap in when complete
+    run = Run(tmp, title="Lens judge on prompt-side punctuation reads: transcripts",
               description=("Each item opens on a transcript whose prompt the DeepSeek judge scored, with every O-lens read inline "
                            "(copied from Celeste's import). The **lens judge** reader sits at the token whose bullet the judge "
                            "quoted (score + evidence); the judge's exact input and output are the item's call. The judge saw only "
@@ -73,7 +79,6 @@ def main() -> None:
               label_order=["score", "vea", "vea_rate", "setting"],
               readers={"lens judge": {"about": "DeepSeek V4.1 Flash judge of the prompt-side RL bullets (punctuation tokens): "
                                                "score and the bullet it quoted.", "color": "#b5662f"}})  # fmt: skip
-    run.reset()
     (run.path / "tokens").mkdir(exist_ok=True)
     links = {}
     for ph in sorted(pick):
@@ -119,8 +124,9 @@ def main() -> None:
                         params={"temperature": 0, "reasoning_effort": "low"}, parsed=r["parsed"])],
         )  # fmt: skip
         links[ph] = f"http://bramble:8830/#d=runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge_traces&i={ph}&v=tr&t={anchor}"
+    swap_in(tmp, final)
     (a.run / "judge_traces_links.json").write_text(json.dumps(links, indent=1))
-    print(f"{len(links)} items -> {run.path}")
+    print(f"{len(links)} items -> {final}")
 
 
 if __name__ == "__main__":

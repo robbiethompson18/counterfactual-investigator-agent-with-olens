@@ -10,7 +10,7 @@ Sections (item groups):
   sandbagging    episodes with VEA (regex on the rollout) vs without
   donation_bet   prompts where the lens writes "evaluator" / "being evaluated"
 
-Each item: the matched prompt-side reads (token context, lens + sample, the bullet) as one call, the rollout as another,
+Each item: an overlay (base=) on the episode transcript in Celeste's import with notes for the matched read and VEA,
 labels (VEA, its source and quote, the hand check), and links to the read in the Celeste import on bramble:8830, to the
 same read on bramble:8821, and to Docent where the episode is there.
 
@@ -24,10 +24,10 @@ import json
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
+from atomic import swap_in, temp_dir
 from keywords import BROAD, STRICT
 from kwonly import VEA_RX
 
@@ -55,11 +55,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path)
     ap.add_argument("--expview", type=Path, required=True)
+    ap.add_argument("--run-name", default=None, help="expview run dir name under RUN/expview (default: demo)")
     ap.add_argument("--handcheck", type=Path, default=None, help="JSON {tid: {vea, quote}} from a hand check")
     ap.add_argument("--dump", type=Path, default=None, help="write the shown episodes' rollouts here for a hand check")
     a = ap.parse_args()
     sys.path.insert(0, str(a.expview))
-    from expview import Run, call
+    from expview import Run
 
     hc = json.loads(a.handcheck.read_text()) if a.handcheck else {}
     e = pd.read_parquet(a.run / "kwonly_episodes.parquet").merge(
@@ -117,11 +118,8 @@ def main() -> None:
 **prompt-side** O-lens reads (tokens before the first assistant turn) contain eval words get more verbalised eval awareness
 (VEA) in their rollouts?
 
-Each item: call 1 = the prompt-side reads that matched (token, preceding text, lens and sample, the bullet with the matched
-word in **[brackets]**); call 2 = GLM's rollout (reasoning, replies, tool calls; tool outputs shortened). Labels: `vea` =
-regex on the rollout (`kwonly.VEA_RX`; none of these settings has a monitor label), `vea_quote` its match, `hand_vea` /
-`hand_quote` = a hand check of the same rollout. Buttons: the read inline in the Celeste import (8830), the same read on
-the old dashboard (8821), Docent.
+Each item is an overlay on the episode's transcript in Celeste's import (reads inline). Notes: the matched
+prompt-side eval-word read (at its token) and the VEA regex quote + hand check. Labels as below.
 
 - **IB realistic**: {ibp.broad.mean():.0%} of the {len(ibp)} prompt-side read positions have a loose eval word; the
   matched words are {words["ib_realistic"]}, i.e. almost all unit tests ("there are tests for it in test_solution.py").
@@ -140,9 +138,10 @@ the old dashboard (8821), Docent.
 - **Donation bet**: the lens writes "evaluator" / "being evaluated on your answer" at the prompt's final punctuation on
   most prompts (words: {words["donation_bet"]}); VEA is 0.3%.
 """
-    run = Run(a.run / "expview" / "demo", title="Prompt-side O-lens eval words: trace examples", description=desc,
+    final = a.run / "expview" / (a.run_name or "demo")
+    tmp = temp_dir(final)  # never reset the live run: build outside the viewer roots, swap in when complete
+    run = Run(tmp, title="Prompt-side O-lens eval words: trace examples", description=desc,
               label_order=["vea", "hand_vea", "strict_share", "broad_share", "n_eval_reads"])  # fmt: skip
-    run.reset()
     for sec, sub, r in picks:
         rr = reads[(reads.ph == r.ph) & reads.broad].sort_values(["strict", "pos"], ascending=[False, True])
         lines, first = [], None
@@ -169,27 +168,28 @@ the old dashboard (8821), Docent.
                     f"  …{(g0.ctx_left40 or '')[-220:]}⟦{g0.token}⟧\n{bl}"
                 )
         h = hc.get(r.tid, {})
-        links = {}
-        if first:
-            links["read in 8830"] = V8830.format(d=IMPORT[r.setting], i=quote(first[0], safe=""), t=first[1], q=quote(Q))
-            links["read in 8821"] = V8821.format(i=quote(first[0], safe=""), t=first[1], q=quote(Q))
-        links["episode in 8830"] = V8830.format(d=IMPORT[r.setting], i=quote(r.tid, safe=""), t=0, q=quote(Q))
-        if isinstance(r.docent, str):
-            links["Docent"] = r.docent
+        top = rr.iloc[0].text.strip() if len(rr) else ""
+        notes = (
+            [{"pos": first[1], "text": f"prompt-side eval-word read: {mark(top)}" if top else "last prompt-side read (no eval word)"}]
+            if first
+            else []
+        )
+        notes.append(
+            {
+                "pos": None,
+                "text": f"VEA (regex) {bool(r.vea)}: {r.vea_quote[:300] or '(no match)'}; hand check {h.get('vea')}: {h.get('quote', '')}",
+            }
+        )
         run.add(
-            id=f"{sec}/{sub}/{r.tid}", group=f"{sec}: {sub}",
+            id=f"{sec}/{sub}/{r.tid}", group=f"{sec}: {sub}", base=(IMPORT[r.setting], r.tid), notes=notes, calls=[],
             labels={"vea": bool(r.vea), "vea_quote": r.vea_quote[:300] or "(no match)", "hand_vea": h.get("vea"),
                     "hand_quote": h.get("quote", ""),
                     "strict_share": round(float(r.strict_share), 3), "broad_share": round(float(r.broad_share), 3), "n_eval_reads": len(rr),
                     "arm": r.arm or r.cond},
-            links=links,
-            calls=[
-                call("prompt-side O-lens reads with eval words", "GLM-5.3 O-lens (SFT/RL, greedy + 4 samples)",
-                     messages=[{"role": "user", "content": "\n\n".join(lines) or "(no prompt-side reads)"}]),
-                call("rollout (GLM 5.3)", "z-ai/glm-5.3", messages=[{"role": "assistant", "content": r.gen_text[:60000]}]),
-            ],
+            links={"Docent": r.docent} if isinstance(r.docent, str) else None,
         )  # fmt: skip
-    print(f"{len(picks)} items -> {run.path}")
+    swap_in(tmp, final)
+    print(f"{len(picks)} items -> {final}")
     print(desc)
 
 
