@@ -279,6 +279,10 @@ Current docs:
 - [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
   harness version
+- [cfbench by predictor model — read before choosing a cfbench predictor, effort or tool budget, or claiming O-lens uplift across models](docs/cfbench-model-chart.md)
+  — 7 models × no transcript/transcript/O-lens/placebo on 4 cases: transcripts worth up to +0.7
+  nats, O-lens beats placebo only for Flash and Argon (one case); Flash effort and tool-budget
+  sweeps; charts script
 - [O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22: no reliable uplift on killswitch, inline_b, exfil, whistleblow or donation bet;
   arm-level vs within-arm signal, tool use per predictor, what to try next

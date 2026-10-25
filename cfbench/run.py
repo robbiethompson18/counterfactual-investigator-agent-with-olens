@@ -47,6 +47,7 @@ async def main():
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--anchor-reads", default="", help="comma list of anchor reads JSONL (scripts/anchor_reads.py), for anchors*")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter); keep medium unless comparing")
+    ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
@@ -92,11 +93,11 @@ async def main():
         if condition in ANCHOR_CONDITIONS:
             anchor_tools, read = anchors.tools(base, anchor_reads, placebo=condition == "anchors_placebo", seed=args.seed + draw)
             tools |= anchor_tools
-        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note)
+        prompt = build_prompt(env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
                 try:
-                    result = await predict(predictor, prompt, tools, TOOL_BUDGET if tools else 0, args.effort)
+                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort)
                     break
                 except openai.APIStatusError as e:
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
