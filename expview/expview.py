@@ -278,6 +278,12 @@ def load_tokens(run: Path, ref: str) -> dict:
     return json.loads(gzip.decompress(base64.b64decode(gz.read_text())))
 
 
+def points_at(url, d: str, i: str) -> bool:
+    """A viewer link (any host, or a bare #hash) to item i of dataset d: on an overlay it would open a second copy of its page."""
+    h = urllib.parse.parse_qs(str(url).partition("#")[2])
+    return h.get("d") == [d] and h.get("i") == [str(i)]
+
+
 def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
     """An overlay item over its base item, as the viewer shows it: the base's transcript / tokens (with the dataset they live
     in), env and calls, then the overlay's calls (flagged "overlay", shown in the side panel), labels, links, notes and reads."""
@@ -285,7 +291,7 @@ def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
     m.update(id=ov["id"], group=ov.get("group", base.get("group")), extra=ov.get("extra", base.get("extra")))
     m["base"] = {"d": base_d, "i": base["id"]}
     m["labels"] = {**(base.get("labels") or {}), **(ov.get("labels") or {})}
-    m["links"] = {**(base.get("links") or {}), **(ov.get("links") or {})}
+    m["links"] = {k: v for k, v in {**(base.get("links") or {}), **(ov.get("links") or {})}.items() if not points_at(v, base_d, base["id"])}
     m["calls"] = list(base.get("calls") or []) + [{**c, "overlay": True} for c in ov.get("calls") or []]
     if m.get("tokens"):
         m["tokens"] = {**m["tokens"], "d": base_d}

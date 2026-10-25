@@ -7,7 +7,8 @@ files change. The run dirs stay the source of truth; the index only holds what s
 
 Tables (d = dataset id, i = item id):
   datasets   d, path, title, n_items, n_tok_items, sig (files' size+mtime, to spot changes), indexed_at
-  items      d, i, line, off, len (byte span in items.jsonl), grp, labels / calls / links (JSON text), ref, n_tok, n_reads
+  items      d, i, line, off, len (byte span in items.jsonl), grp, labels / calls / links (JSON text), ref, n_tok, n_reads,
+             src (ENV/RUN:LINE of the source row), fp (fingerprint of the subject's replies): Docent links resolve from these
   labels     d, i, k, v, t ('bool' | 'num' | 'str'): one row per item label, for filters and per-label rates
   positions  d, i, pos, sec, token, ctx (40 tokens before + the token), nxt (next 16 tokens): one row per read token
   reads      d, i, pos, tool, label, text (the read's lines joined by newlines)
@@ -24,7 +25,10 @@ old one, then restart the server on it:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import re
 import sys
 import threading
 import time
@@ -42,7 +46,7 @@ CTX, NXT = 40, 16
 SCHEMA = {
     "datasets": "d VARCHAR, path VARCHAR, title VARCHAR, n_items BIGINT, n_tok_items BIGINT, sig VARCHAR, indexed_at VARCHAR",
     "items": "d VARCHAR, i VARCHAR, line BIGINT, off BIGINT, len BIGINT, grp VARCHAR, labels VARCHAR, calls VARCHAR, links VARCHAR, "
-    "ref VARCHAR, n_tok BIGINT, n_reads BIGINT",
+    "ref VARCHAR, n_tok BIGINT, n_reads BIGINT, src VARCHAR, fp VARCHAR",
     "labels": "d VARCHAR, i VARCHAR, k VARCHAR, v VARCHAR, t VARCHAR",
     "positions": "d VARCHAR, i VARCHAR, pos BIGINT, sec VARCHAR, token VARCHAR, ctx VARCHAR, nxt VARCHAR",
     "reads": "d VARCHAR, i VARCHAR, pos BIGINT, tool VARCHAR, label VARCHAR, text VARCHAR",
@@ -62,6 +66,88 @@ def signature(run: Path) -> str:
     if tk.is_dir():
         parts.append(str(tk.stat().st_mtime_ns))
     return "|".join(parts)
+
+
+JUDGE_RX = re.compile(r"judge|grader|grading|classif|monitor|scor|rater|critic|verdict", re.IGNORECASE)  # as in static/index.html
+DOCENT = "https://docent.transluce.org"
+
+
+def fingerprint(messages) -> str | None:
+    """sha1 of the assistant turns' text: the same transcript in a rows.jsonl row and an expview call gets the same value."""
+    if isinstance(messages, str):
+        try:
+            messages = json.loads(messages)
+        except ValueError:
+            return None
+    parts = [content_text(m.get("content")) for m in messages or [] if isinstance(m, dict) and m.get("role") == "assistant"]
+    return hashlib.sha1("\x00".join(parts).encode()).hexdigest()[:20] if any(x.strip() for x in parts) else None
+
+
+def source_of(it: dict) -> str | None:
+    """ENV/RUN:LINE of the rows.jsonl row an item shows, when the item says so (extra.source, or run_dir + row_index)."""
+    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    m = re.search(r"(?:^|/)([^/:]+/[^/:]+):(\d+)$", str(ex.get("source") or ""))
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    rd, row, sf = ex.get("run_dir"), ex.get("row_index"), ex.get("source_file")
+    if isinstance(rd, str) and isinstance(row, int) and sf in (None, "rows.jsonl"):
+        return f"{rd.removeprefix('runs/').strip('/')}:{row}"
+    return None
+
+
+def subject_fp(it: dict) -> str | None:
+    calls = it.get("calls") or []
+    c = next((c for c in calls if not JUDGE_RX.search(str(c.get("name") or ""))), None)
+    return fingerprint(c.get("messages")) if c else None
+
+
+class Docent:
+    """Docent run URLs for ENV/RUN:LINE and for transcript fingerprints, from every docent.json (scripts/docent_upload.py) under
+    the data dirs: <data>/runs, <data>/hf_stage*/runs, <data>/olens_search/docent/runs. Reloaded when any docent.json changes."""
+
+    def __init__(self, data: Path):
+        self.data, self.sig, self.runs, self.fps = data, None, {}, {}
+
+    def files(self) -> list[Path]:
+        roots = [self.data, *sorted(self.data.glob("hf_stage*")), self.data / "olens_search/docent"]
+        return [f for r in roots for f in sorted(r.glob("runs/*/*/docent.json"))]
+
+    def refresh(self) -> None:
+        fs = self.files()
+        sig = hashlib.sha1("".join(f"{f}{f.stat().st_mtime_ns}" for f in fs).encode()).hexdigest()
+        if sig == self.sig:
+            return
+        runs, fps = {}, {}
+        for f in fs:
+            key = f"{f.parent.parent.name}/{f.parent.name}"
+            if key in runs:
+                continue
+            try:
+                doc = json.loads(f.read_text())
+            except ValueError:
+                continue
+            runs[key] = (doc["collection_id"], doc.get("runs") or [])
+            rows = f.parent / "rows.jsonl"
+            if rows.exists():
+                for n, line in enumerate(rows.open()):
+                    if n < len(runs[key][1]) and runs[key][1][n] and line.strip():
+                        fp = fingerprint(json.loads(line).get("messages"))
+                        if fp:
+                            fps.setdefault(fp, f"{key}:{n}")
+        self.runs, self.fps, self.sig = runs, fps, sig
+        print(f"docent: {len(runs)} uploaded runs, {len(fps)} transcript fingerprints", flush=True)
+
+    def url(self, src: str | None) -> str | None:
+        key, _, n = (src or "").rpartition(":")
+        cid, ids = self.runs.get(key, (None, []))
+        return f"{DOCENT}/dashboard/{cid}/agent_run/{ids[int(n)]}" if cid and n.isdigit() and int(n) < len(ids) and ids[int(n)] else None
+
+    def links(self, links: dict, src: str | None, fp: str | None) -> dict:
+        """An item's links with "Docent" filled in when it has none and its source row or transcript was uploaded."""
+        if any("docent" in (k + str(v)).lower() for k, v in links.items()):
+            return links
+        u = self.url(src) or self.url(self.fps.get(fp or ""))
+        return {**links, "Docent": u} if u else links
 
 
 def links_of(it: dict) -> dict:
@@ -115,6 +201,9 @@ class Index:
         self.progress = {"state": "idle", "current": None, "done": 0, "todo": 0}
         for name, cols in SCHEMA.items():
             self.con.execute(f"CREATE TABLE IF NOT EXISTS {name} ({cols})")
+        for col in ("src", "fp"):  # added 2026-10-25; older index files lack them until rebuilt
+            self.con.execute(f"ALTER TABLE items ADD COLUMN IF NOT EXISTS {col} VARCHAR")
+        self.docent = Docent(Path(os.environ.get("EXPVIEW_DATA") or expview.roots().get("runs", expview.REPO / "data/runs")).parent)
         self.paths: dict[str, Path] = {d: Path(p) for d, p in self.con.execute("SELECT d, path FROM datasets").fetchall()}
 
     @property
@@ -134,6 +223,10 @@ class Index:
     def update(self, only: str | None = None) -> None:
         """Re-index every run whose files changed (or just `only`), drop runs that disappeared."""
         found = discover()
+        try:
+            self.docent.refresh()
+        except Exception as err:  # noqa: BLE001 - links are a convenience; indexing must go on
+            print(f"docent refresh failed: {err!r}", flush=True)
         expview._REFS.clear()  # overlays look up their base items' tokens afresh
         known = {r["d"]: r["sig"] for r in self.query("SELECT d, sig FROM datasets")}
         todo = [d for d, p in found.items() if (only is None or d == only) and (known.get(d) != signature(p) or only == d)]
@@ -243,6 +336,8 @@ class Index:
                     labels=json.dumps(labels),
                     calls=json.dumps(calls),
                     links=json.dumps(links_of(it)),
+                    src=source_of(it),
+                    fp=subject_fp(it),
                     ref=tk.get("ref") if tk else None,
                     n_tok=tk.get("n") if tk else None,
                     n_reads=n_reads,

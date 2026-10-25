@@ -122,10 +122,14 @@ A run of judge calls (or notes, or extra reads) over transcripts another dataset
 e.g. Celeste's O-lens imports, shouldn't copy them. Give each item a `base` instead:
 
 ```python
-run.add(id=key, calls=[call("lens judge", model, messages=..., output=..., parsed=..., token_refs={...})],
-        labels={"score": 7}, base=("imports/celeste/ds/evalcue", tid),
-        notes=[{"pos": 2269, "text": "judge cites this bullet"}, {"pos": None, "text": "whole-item note"}],
-        tokens={"reads": {"2269": [read("my reader", ["..."])]}})   # optional extra reads, by base position
+run.add(
+    id=key,
+    calls=[call("lens judge", model, messages=..., output=..., parsed=..., token_refs={...})],
+    labels={"score": 7},
+    base=("imports/celeste/ds/evalcue", tid),
+    notes=[{"pos": 2269, "text": "judge cites this bullet"}, {"pos": None, "text": "whole-item note"}],
+    tokens={"reads": {"2269": [read("my reader", ["..."])]}},
+)  # optional extra reads, by base position
 ```
 
 The item link then opens the base item's transcript with its reads inline, plus the overlay's reads

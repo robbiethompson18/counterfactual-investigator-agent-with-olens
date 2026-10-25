@@ -73,19 +73,34 @@ def datasets() -> list[dict]:
 def run(d: str) -> JSONResponse:
     p = run_dir(d)
     info = json.loads((p / "run.json").read_text()) if (p / "run.json").exists() else {"title": p.name}
-    items = IX.query("SELECT i, grp, labels, calls, links, ref, n_tok, n_reads FROM items WHERE d = ? ORDER BY line", [d])
+    items = IX.query(f"SELECT it.i, it.grp, it.labels, it.calls, it.ref, it.n_tok, it.n_reads, {LINK_COLS} FROM items it {LINKS_JOIN} "
+                     "WHERE it.d = ? ORDER BY it.line", [d])  # fmt: skip
     out = [
         {
             "id": r["i"],
             "group": r["grp"],
             "labels": json.loads(r["labels"]),
             "calls": json.loads(r["calls"]),
-            "links": json.loads(r["links"]),
+            "links": links_row(r),
             "tokens": {"ref": r["ref"], "n": r["n_tok"], "reads": r["n_reads"]} if r["ref"] else None,
         }
         for r in items
     ]
     return JSONResponse({"id": d, "run": info, "items": out})
+
+
+# item columns + its overlay base's, so an overlay inherits the base's Docent link; use with LINKS_JOIN on alias `it`
+LINK_COLS = "it.links, it.src, it.fp, bi.links blinks, bi.src bsrc, bi.fp bfp"
+LINKS_JOIN = "LEFT JOIN bases b ON b.d = it.d AND b.i = it.i LEFT JOIN items bi ON bi.d = b.base_d AND bi.i = b.base_i"
+
+
+def links_row(r: dict) -> dict:
+    """An item's links with Docent resolved (its own, its source row's, its transcript's, or its overlay base's)."""
+    out = IX.docent.links(json.loads(r.get("links") or "{}"), r.get("src"), r.get("fp"))
+    if r.get("blinks") is not None:
+        base = IX.docent.links(json.loads(r["blinks"]), r.get("bsrc"), r.get("bfp"))
+        out = {**{k: v for k, v in base.items() if "docent" in (k + str(v)).lower()}, **out}
+    return out
 
 
 def raw_item(d: str, i: str) -> dict:
@@ -105,6 +120,7 @@ def raw_item(d: str, i: str) -> dict:
 @app.get("/api/item")
 def item(d: str, i: str) -> JSONResponse:
     it = raw_item(d, i)
+    row = IX.query(f"SELECT {LINK_COLS} FROM items it {LINKS_JOIN} WHERE it.d = ? AND it.i = ?", [d, i])
     b = it.get("base")
     if isinstance(b, dict):  # an overlay: show it on its base item's transcript (README "Overlays")
         try:
@@ -113,6 +129,8 @@ def item(d: str, i: str) -> JSONResponse:
             it["base_missing"] = b
     else:  # overlays from other runs that annotate this item
         it["annotations"] = IX.query("SELECT d, i, labels FROM bases WHERE base_d = ? AND base_i = ? ORDER BY d, i", [d, i])
+    if row:
+        it["links"] = {**(it.get("links") or {}), **links_row(row[0])}
     return JSONResponse(it)
 
 
@@ -237,10 +255,10 @@ def search(f: Annotated[Filters, Depends(filters)], page: int = 0, per: int = 50
         )
         total = fetch("SELECT count(*) items FROM hit_items")[0]
         rows = fetch(
-            """SELECT h.d, h.i, it.grp, it.labels, it.links,
-                      regexp_extract(tx.text, '(?s)(.{0,160}(' || ? || ').{0,160})', 1) snippet
+            f"""SELECT h.d, h.i, it.grp, it.labels, {LINK_COLS},
+                      regexp_extract(tx.text, '(?s)(.{{0,160}}(' || ? || ').{{0,160}})', 1) snippet
                FROM (SELECT * FROM hit_items ORDER BY d, i LIMIT ? OFFSET ?) h
-               JOIN items it ON it.d = h.d AND it.i = h.i JOIN texts tx ON tx.d = h.d AND tx.i = h.i ORDER BY h.d, h.i""",
+               JOIN items it ON it.d = h.d AND it.i = h.i {LINKS_JOIN} JOIN texts tx ON tx.d = h.d AND tx.i = h.i ORDER BY h.d, h.i""",
             [f.rx, per, page * per],
         )
     else:
@@ -250,11 +268,11 @@ def search(f: Annotated[Filters, Depends(filters)], page: int = 0, per: int = 50
         cur.execute("CREATE OR REPLACE TEMP TABLE hit_items AS SELECT DISTINCT d, i FROM hit_reads")
         total = fetch("SELECT count(*) reads, count(DISTINCT (d, i, pos)) positions, count(DISTINCT (d, i)) items FROM hit_reads")[0]
         rows = fetch(
-            """WITH hp AS (SELECT d, i, pos, list({'tool': tool, 'label': label, 'text': text} ORDER BY tool, label) reads
+            f"""WITH hp AS (SELECT d, i, pos, list({"tool": tool, 'label': label, 'text': text} ORDER BY tool, label) reads
                            FROM hit_reads GROUP BY d, i, pos ORDER BY d, i, pos LIMIT ? OFFSET ?)
-               SELECT hp.d, hp.i, hp.pos, p.sec, p.token, right(p.ctx, 300) ctx, p.nxt, it.grp, it.labels, it.links, hp.reads
+               SELECT hp.d, hp.i, hp.pos, p.sec, p.token, right(p.ctx, 300) ctx, p.nxt, it.grp, it.labels, {LINK_COLS}, hp.reads
                FROM hp JOIN positions p ON p.d = hp.d AND p.i = hp.i AND p.pos = hp.pos
-               JOIN items it ON it.d = hp.d AND it.i = hp.i ORDER BY hp.d, hp.i, hp.pos""",
+               JOIN items it ON it.d = hp.d AND it.i = hp.i {LINKS_JOIN} ORDER BY hp.d, hp.i, hp.pos""",
             [per, page * per],
         )
     # per (dataset, group): items in the filtered slice, how many have a hit, and each yes/no label's rate with vs overall
@@ -273,7 +291,9 @@ def search(f: Annotated[Filters, Depends(filters)], page: int = 0, per: int = 50
         ip,
     )
     for r in rows:
-        r["labels"], r["links"] = json.loads(r["labels"]), json.loads(r["links"])
+        r["labels"], r["links"] = json.loads(r["labels"]), links_row(r)
+        for k in ("src", "fp", "blinks", "bsrc", "bfp"):
+            r.pop(k, None)
     by = {(r["d"], r["grp"]): r for r in slices}
     for r in rates:
         if (r["d"], r["grp"]) in by:

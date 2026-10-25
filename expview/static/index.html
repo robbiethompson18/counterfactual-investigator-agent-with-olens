@@ -195,16 +195,20 @@ const fmt=v=>v===true?"yes":v===false?"no":v==null?"–":typeof v=="number"?(Num
 function overlayInfo(it,clickable){let h="";
   const notes=it.notes||[];
   if(notes.length)h+=`<h3>Notes (${notes.length})</h3>`+notes.map(n=>`<div class="judge">${n.pos!=null&&clickable?`<a class="tokref" data-p="${n.pos}">@${n.pos}</a> `:""}<div class="md">${md(n.text||"")}</div></div>`).join("");
-  if(it.base)h+=`<div class="keys">Annotates <a href="${linkTo({d:it.base.d,i:it.base.i})}">${esc(it.base.d)} / ${esc(it.base.i)}</a>: its transcript, reads and calls, plus this run's.</div>`;
   if(it.base_missing)h+=`<div class="empty">Base item ${esc(JSON.stringify(it.base_missing))} not found.</div>`;
   const an=it.annotations||[];
   if(an.length)h+=`<h3>Annotations from other runs (${an.length})</h3>`+an.slice(0,50).map(a=>{let l={};try{l=JSON.parse(a.labels||"{}")}catch{}
     return `<div class="judge"><a href="${linkTo({d:a.d,i:a.i})}">${esc(a.d)}</a><div class="labels">${Object.entries(l).slice(0,4).map(([k,v])=>chip(k,v)).join("")}</div></div>`}).join("");
   return h}
+// Docent: the item's run on docent.transluce.org (the server fills it in from docent.json / transcript fingerprints)
+const docentOf=links=>Object.entries(links||{}).find(([k,v])=>/docent/i.test(k+v))?.[1]||null;
+const docentColl=u=>(String(u||"").match(/\/dashboard\/([0-9a-f-]{36})/)||[])[1]||null;
+const docentBtn=u=>u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener" title="This transcript on Docent">Docent ↗</a> `:"";
 // a call whose name says it judges / grades / monitors is a judge; the subject is the first call that isn't one
 const JUDGE_RX=/judge|grader|grading|classif|monitor|scor|rater|critic|verdict/i;
-const subjectIdx=calls=>calls.findIndex(c=>!c.overlay&&!JUDGE_RX.test(c.name||""));
-function judgeCards(calls,link,clickable){const s=subjectIdx(calls);const js=calls.map((c,j)=>j).filter(j=>j!=s);if(!js.length)return "";
+const subjectIdx=calls=>calls.findIndex(c=>!JUDGE_RX.test(c.name||""));
+function judgeCards(calls,link,clickable){const s=subjectIdx(calls);
+  const js=calls.map((c,j)=>j).filter(j=>clickable?JUDGE_RX.test(calls[j].name||""):j!=s);if(!js.length)return "";
   // "[N]" in a judge's text jumps to a token only through the call's token_refs {N: token position} (N is the judge's own numbering)
   return `<h3>Judges and graders (${js.length})</h3>`+js.map(j=>{const c=calls[j],ms=c.messages||[],out=[...ms].reverse().find(m=>m.role=="assistant")||{};
     const tr=c.token_refs||{},refs=h=>clickable?h.replace(/\[(\d{1,6})\]/g,(m,n)=>tr[n]!=null?`<a class="tokref" data-p="${tr[n]}" title="Jump to token ${tr[n]}">[${n}]</a>`:m):h;
@@ -329,7 +333,10 @@ async function runPage(d){
   crumbs(SRC.static?[[r.title]]:[["datasets","#"],[d]]);
   const cats=R.labels.filter(k=>["bool","cat"].includes(R.kinds[k]));
   const hasTok=R.items.some(i=>i.tokens);
-  $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${esc(d)}</div>`:""}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
+  const colls={};for(const it of R.items){const c=docentColl(docentOf(it.links));if(c)colls[c]=(colls[c]||0)+1}
+  const nDoc=Object.values(colls).reduce((a,b)=>a+b,0);
+  const collHtml=nDoc?`<div class="labels" style="margin-bottom:6px">${Object.entries(colls).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([c,n])=>`<a class="btn" href="https://docent.transluce.org/dashboard/${c}" target="_blank" rel="noopener" title="${n.toLocaleString()} of these items are in this Docent collection">Docent collection ↗${Object.keys(colls).length>1?` (${n.toLocaleString()})`:""}</a>`).join(" ")} <span class="mono">${nDoc.toLocaleString()} of ${R.items.length.toLocaleString()} items on Docent</span></div>`:"";
+  $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${esc(d)}</div>`:""}${collHtml}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
    <h2>Summary${R.groups.length?" by group":""}</h2>
    <div class="wrap"><table id="sum"><tr><th>${R.groups.length?"Group":""}</th><th>Items</th>${R.labels.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>
    ${summaryRow(R,null,R.items)}${R.groups.length<=400?R.groups.map(g=>summaryRow(R,g,R.items.filter(i=>i.group==g))).join(""):""}</table></div>
@@ -353,13 +360,13 @@ async function runPage(d){
 function itemsTable(R){
   const F=R.F,shown=filtered(R);R.shown=shown;$("#cnt").textContent=`${shown.length.toLocaleString()} of ${R.items.length.toLocaleString()}`;
   const th=(k,n)=>`<th class="s" data-sort="${esc(k)}" title="sort">${esc(n)}${F.sort==k?(F.dir>0?" ▲":" ▼"):""}</th>`;
-  const hasTok=R.items.some(i=>i.tokens);
-  $("#items").innerHTML=`<tr>${th("__id","Item")}${R.groups.length?th("__group","Group"):""}${R.labels.map(k=>th(k,k)).join("")}${hasTok?"<th>Reads</th>":""}<th>Calls</th></tr>`+
-   shown.slice(0,R.limit).map(it=>`<tr class="click" data-i="${esc(it.id)}"><td class="mono wrapid">${esc(it.id)}</td>${R.groups.length?`<td>${esc(it.group??"")}</td>`:""}${R.labels.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}${hasTok?`<td class="num mono">${it.tokens?it.tokens.reads.toLocaleString():""}</td>`:""}<td class="mono" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td></tr>`).join("");
+  const hasTok=R.items.some(i=>i.tokens),hasDoc=R.items.some(i=>docentOf(i.links));
+  $("#items").innerHTML=`<tr>${th("__id","Item")}${R.groups.length?th("__group","Group"):""}${R.labels.map(k=>th(k,k)).join("")}${hasTok?"<th>Reads</th>":""}<th>Calls</th>${hasDoc?"<th>Docent</th>":""}</tr>`+
+   shown.slice(0,R.limit).map(it=>`<tr class="click" data-i="${esc(it.id)}"><td class="mono wrapid">${esc(it.id)}</td>${R.groups.length?`<td>${esc(it.group??"")}</td>`:""}${R.labels.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}${hasTok?`<td class="num mono">${it.tokens?it.tokens.reads.toLocaleString():""}</td>`:""}<td class="mono" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td>${hasDoc?`<td>${docentOf(it.links)?`<a class="chip" href="${esc(docentOf(it.links))}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>`:""}</tr>`).join("");
   $("#more").innerHTML=shown.length>R.limit?`<button class="btn" id="mb">Show ${Math.min(1000,shown.length-R.limit)} more</button>`:"";
   const mb=$("#mb");if(mb)mb.onclick=()=>{R.limit+=1000;itemsTable(R)};
   $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable(R);return}
-    const tr=e.target.closest("tr[data-i]");if(tr)go({d:R.id,i:tr.dataset.i})};
+    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({d:R.id,i:tr.dataset.i})};
 }
 
 // ================================================================ one item
@@ -386,7 +393,7 @@ async function itemPage(d,i,p){
   $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({d})}">← All items</a><span>
      <a class="btn" ${prev?`href="${linkTo({d,i:prev.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
      <a class="btn" ${next?`href="${linkTo({d,i:next.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
-   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
+   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({d:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
    <div class="labels">${Object.entries(it.labels||{}).map(([a,b])=>chip(a,b)).join("")}</div>
    ${Object.keys(links).length?`<div class="labels">${Object.entries(links).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("")}</div>`:""}
    ${it.tokens?`<div class="sec">${esc(R.run.tokens_section||"Transcript")}</div><button class="f" data-sel='{"v":"tr"}'>${esc(R.run.tokens_button||"with metamodel reads")}<span class="mono">${(it.tokens.n||0).toLocaleString()} tok · ${(it.tokens.reads||0).toLocaleString()} read</span></button>`:""}
@@ -403,7 +410,7 @@ async function itemPage(d,i,p){
 }
 let render=store.get("render",false),rawCall=false;
 function toggles(kinds){
-  $("#tog").innerHTML=(kinds.includes("md")?`<button class="btn" id="tmd" aria-pressed="${render}">Render markdown</button> `:"")+(kinds.includes("raw")?`<button class="btn" id="traw" aria-pressed="${rawCall}">Raw JSON</button> `:"")+
+  $("#tog").innerHTML=docentBtn(docentOf(ITEM.it&&ITEM.it.links))+(kinds.includes("md")?`<button class="btn" id="tmd" aria-pressed="${render}">Render markdown</button> `:"")+(kinds.includes("raw")?`<button class="btn" id="traw" aria-pressed="${rawCall}">Raw JSON</button> `:"")+
     `<button class="btn" id="tcopy" title="Copy a link to this view">Copy link</button>`;
   const a=$("#tmd");if(a)a.onclick=()=>{render=!render;store.set("render",render);show(ITEM.sel)};
   const b=$("#traw");if(b)b.onclick=()=>{rawCall=!rawCall;show(ITEM.sel)};
