@@ -27,6 +27,7 @@ RNG = np.random.default_rng(0)
 COLORS = {"vea": "#2a78d6", "lens": "#eb6834", "ptxt": "#1baf7a"}  # reference categorical slots 1-3
 NAMES = {
     "am_main": "Agentic misalignment", "hp_am_fixed": "AISI AM fixed", "hp_mc": "AISI MC", "hp_abst": "AISI AbstentionBench",
+    "am": "Agentic misalignment (ours, 15 conds + AISI fixed)",
     "sad_oversight": "SAD stages_oversight", "inspect_am": "AM (Celeste, inspect)", "instrumentaleval": "InstrumentalEval",
     "mask": "MASK", "agentharm": "AgentHarm", "ib_realistic": "IB realistic", "donation_bet": "Donation bet",
     "ec_scheming": "evalcue scheming", "ec_shutdown": "evalcue shutdown", "ec_sandbagging": "evalcue sandbagging",

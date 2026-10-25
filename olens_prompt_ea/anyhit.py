@@ -66,10 +66,14 @@ def main() -> None:
         "--glm-filter", default="r.reader = 'glm_rl'", help="SQL filter for the main reader set (default: GLM RL lens, greedy + 4 samples)"
     )
     ap.add_argument("--tag", default="", help="suffix for the output files")
+    ap.add_argument("--merge", default="", help="NEW=a+b,...: pool settings into one row (e.g. am=am_main+hp_am_fixed)")
     ap.add_argument("--exclude", default="", help="comma-separated settings to drop (e.g. inspect_am,sad_oversight)")
     a = ap.parse_args()
     e = pd.read_parquet(a.run / "kwonly_episodes.parquet")[["tid", "setting", "cond", "ph", "vea", "monitor"]]
     e = e[~e.setting.isin([x for x in a.exclude.split(",") if x])]
+    for spec in filter(None, a.merge.split(",")):
+        new, olds = spec.split("=")
+        e.loc[e.setting.isin(olds.split("+")), "setting"] = new
     con = duckdb.connect(str(a.db), read_only=True)
     con.register("eps", e[["tid"]])
     hits = con.execute(f"""
