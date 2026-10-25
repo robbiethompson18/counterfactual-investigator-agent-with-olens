@@ -363,6 +363,9 @@ Current docs:
   — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
   (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
   passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding)
+- [olens_search — read before searching Celeste's GLM-5.3 O-lens readouts of our transcripts or adding her top-ups](olens_search/README.md)
+  — regex dashboard (DuckDB + FastAPI, tailnet only) over every GLM olens / Qwen reader / J-lens
+  output, with novel-vs-context filter, per-arm label rates, inline transcripts and Docent links
 - [Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
   on-topic reads in every arm, blind-graded); code only on closed PR #125
