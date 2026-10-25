@@ -2,7 +2,7 @@
 
     uv run python -m evalcue.envs.funding_email_real.expview_export OUT_DIR data/runs/funding_email_real/DATE_TAG [...]
     python ~/workspace/expview/expview.py build OUT_DIR -o OUT_DIR/page.html
-No LLM judge: the label is the rule-based detect() in __init__.py, whose notes are shown per item.
+Later run dirs win per arm. No LLM judge: the label is the rule-based detect() in __init__.py, whose notes are shown per item.
 """
 
 import json
@@ -43,12 +43,16 @@ run = Run(
     label_order=LABELS,
 )
 run.reset()
+# a later run dir supersedes earlier ones for the arms it contains (reruns after an env fix)
+arm_dir = {json.loads(line)["arm"]: p for p in run_dirs for line in (p / "rows.jsonl").open()}
 for run_dir in run_dirs:
     docent = json.loads((run_dir / "docent.json").read_text())
     web = "https://docent.transluce.org/dashboard/" + docent["collection_id"]
     for i, line in enumerate((run_dir / "rows.jsonl").open()):
         r = json.loads(line)
         d, arm = r["detect_notes"], r["arm"]
+        if arm_dir[arm] != run_dir:
+            continue
         harness, docs, memo = arm.split("_")
         run.add(
             id=f"{arm}/s{r['sample']:02d}",
