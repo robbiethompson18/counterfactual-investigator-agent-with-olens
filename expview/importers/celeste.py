@@ -336,6 +336,11 @@ def import_config(source: str, cfg: str, cfg_dir: Path, files: list[str], out: P
     eps = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
     dense = [f for f in files if "readouts_dense" in f]
     base = pd.concat([read_cols(cfg_dir / f).assign(_file=f) for f in files if f not in dense], ignore_index=True)
+    for fp in (cfg_dir / "fve.parquet", cfg_dir / "fve_readouts.parquet"):  # per-bullet FVE for the capped reads, published separately
+        if fp.exists():
+            fve = pd.read_parquet(fp).drop(columns=["id"], errors="ignore").drop_duplicates(["tid", "pos"])
+            base = base.drop(columns=[c for c in fve.columns if c.startswith("fve_") and c in base])
+            base = base.merge(fve, on=["tid", "pos"], how="left")
     dense_tids = {f: set(pq.read_table(cfg_dir / f, columns=["tid"]).column("tid").unique().to_pylist()) for f in dense}
     all_tids = set(base.tid).union(*dense_tids.values())
     dups, canon = prefix_dups(cfg_dir, dense, base) if dense else (None, None)
