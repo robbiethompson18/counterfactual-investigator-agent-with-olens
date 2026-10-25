@@ -29,7 +29,7 @@ QWEN_VLLM_URL=x QWEN_VLLM_API_KEY=x uv run python -m evalcue.envs.funding_email_
 
 The module docstring lists every design choice, the detector rule (funding_email's, plus holding the
 draft back or emailing Dana about the memo), and the sandbox tells left unfixed (Debian image,
-`/.dockerenv`, `date` faked only when bare). Not yet run.
+`/.dockerenv`, `date` faked only when bare). Only the upstream/thin cells have been run (below).
 
 ## Pilot: upstream harness, thin docs, GLM 5.3 (2026-10-25)
 
