@@ -27,24 +27,43 @@ predictor sees:
 
 It answers P(behavior) for a fresh run in Y through a `submit_prediction` tool that rejects anything
 outside [0.01, 0.99] and asks again. Every predictor runs with OpenRouter reasoning effort `medium`;
-left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot, which
-confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak the answer).
-Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the shown transcripts.
+left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot,
+which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak
+the answer). Every ordered pair is a case, so there's no "the" base arm. Each draw re-picks the
+shown transcripts.
+
+Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
+are version 1). Skill is only comparable within a version.
 
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
 
 - `olens`: `agentic` plus `search_olens(regex)`, a regex over the transcripts of the runs that have
   reads, returning the O-lens bullets at the punctuation inside each match and the first read after
-  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=10`), and
+  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=20`), and
   `olens_at(run, char)`, every read around a char from any search hit (default `window=10`, layers
   32/40/48). Every hit shows the transcript text around the read. `search_transcripts` also gives
-  each hit's char in this condition.
+  each hit's char in this condition. `search_olens(regex, over="bullets")` runs the regex over the
+  bullets' own text instead (every bullet at every read, `top_k` ignored, `min_fve` kept) and
+  returns only the matching bullets, so the agent can find lens content the transcript never says
+  (harness version 2). Every hit shows the run's text in `<transcript>` (`⟨READ⟩` at the read token;
+  search hits stop at the edges of the read's message field) and the lens output in
+  `<olens layer=… fve=…>` (version 6).
 - `olens_placebo`: the same tools, answered from a run of a different env at the same relative
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).
 
-Results so far (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
+Anchor conditions (`cfbench/anchors.py`, reads from `--anchor-reads`, made by
+`scripts/anchor_reads.py`; details in [docs/thought-anchors.md](../docs/thought-anchors.md)):
+
+- `anchors`: `agentic` plus Thought-Anchors attention scores per sentence of each read run: receiver
+  score (attention from later model-written sentences, in the 16 highest-kurtosis heads) and
+  suppression effect (KL on the model's later tokens with every path from the sentence cut), through
+  `anchor_ranking(run)`, `anchor_search(regex)` and `anchor_influence(run, char)`.
+- `anchors_placebo`: the same tools, scores from a run of a different env mapped by relative
+  sentence position (order kept).
+
+O-lens results (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
 rarely call the O-lens tools, and naive regexes surface high-FVE paraphrase. Where the reads carry
 signal (inline_b "tell your boss before claiming done", killswitch "you must disable it"), it's an
 arm-level contrast, not a reason a reader of one arm can see.

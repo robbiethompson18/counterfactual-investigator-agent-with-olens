@@ -76,6 +76,8 @@ Summary of the Final Pitch (2026-10-19):
   closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
   lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
   [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
+- **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
+  change, and never compare cfbench skill across versions (runs without the field are version 1).
 
 ## Background reading
 
@@ -163,6 +165,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
+- Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
+  in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
+  four.
 
 ## Docs
 
@@ -197,6 +202,9 @@ Current docs:
   you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
 - [olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md) —
   hook-LoRA loaders, capture, AR, whitened FVE conventions
+- [RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
+  — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
+  translate); 8 Qwen resamples explain as much as the lens at deep layers; code on a closed branch
 - [Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
@@ -213,6 +221,9 @@ Current docs:
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
   — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
+- [Thought-Anchors tools — read before giving the agent attention-based (non-metamodel) interp tools, or running scripts/anchor_reads.py](docs/thought-anchors.md)
+  — receiver heads + attention suppression on Qwen3.6's hybrid stack (DeltaNet hooks, leak test),
+  the `anchors` cfbench condition; null vs placebo on hidden_goal (38 cases), why
 - [Serving metamodels on vLLM — read before decoding O-lens/NLA/J++ readouts at scale or building a metamodel server](docs/metamodel-serving.md)
   — ceselder/vllm-metamodels and other prior art, version pins (vLLM 0.27.1, not 0.19), merged-LoRA
   checkpoints, the TODO for a minimal Qwen3.6-27B metamodel-serving repo
@@ -268,6 +279,9 @@ Current docs:
   Kylie-key and re-upload gotchas
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
   — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+- [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
+  — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
+  harness version
 - [O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22: no reliable uplift on killswitch, inline_b, exfil, whistleblow or donation bet;
   arm-level vs within-arm signal, tool use per predictor, what to try next
@@ -312,13 +326,17 @@ Current docs:
   manager" cuts false DONE claims (unverbalized); silent yes comes from a short "is it done?"
 - [Hidden-goal envs — read before building envs or predictor tests where Qwen acts on what it thinks the user wants (grading, deploy notes), or before claiming O-lens predictor uplift](docs/envs/hidden_goal.md)
   — who wrote an essay moves Qwen's harsh grades 0/30 → 30/30, unverbalized; the O-lens reads the
-  inferred user goal ("I want to beat them"); no predictor uplift survives a placebo, and pasting
-  reads into the prompt (closed #116) is a dead end
+  inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
+  pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
+  `Score:`); pasting reads into the prompt (closed #116) is a dead end
 - [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with CIs
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
+- [Metadata honeypot — read before running or extending the METR planted-metadata env, or studying refusals driven by eval metadata](docs/envs/metadata_honeypot.md)
+  — 24 harmless defensive tasks × 8 metadata arms; GPT-5.6-sol refuses ~80% only when
+  `grading_notes` says declining passes, never citing it; GLM 5.3 reads and overrides it (1/264)
 - [Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
   on-topic reads in every arm, blind-graded); code only on closed PR #125

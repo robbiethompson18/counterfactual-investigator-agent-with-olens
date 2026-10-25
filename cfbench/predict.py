@@ -36,7 +36,8 @@ SUBMIT: ChatCompletionFunctionToolParam = {
     },
 }
 
-client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=5)
+# 12 retries' backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
+client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=12)
 
 
 def check(arguments: str) -> tuple[dict | None, str]:

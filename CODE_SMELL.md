@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
+
+~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is
+explicit fp32 in Python query blocks (needed for the per-row suppression mask and receiver sums; a
+flex_attention mask would do both faster), every suppression batch recomputes the unsuppressed row,
+rows don't share the prefix before their span (a cache copied at the span start would), and
+`causal_conv1d` runs its PyTorch fallback. Fix before reading 10k+ token CoTs.
+
 ## 2026-10-23: evalcue drops `top_k` on the OpenRouter path
 
 `evalcue/harness.py` `chat()` replaces `extra_body` wholesale when `EVALCUE_MODEL` isn't `qwen`, so

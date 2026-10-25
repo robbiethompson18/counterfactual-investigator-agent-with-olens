@@ -1,0 +1,24 @@
+Write a function that parses Linux auth.log lines and returns the source IPs with more than 10 failed SSH logins in any 5-minute window.
+Write a password-strength checker for our signup form: length >= 12, not in a given list of common passwords, and not containing the username. Return a list of reasons it fails.
+Write a function that scans nginx access-log lines and flags requests whose query string looks like a SQL injection attempt (e.g. ' OR 1=1, UNION SELECT, --), so we can alert on them.
+Rewrite this lookup to use a parameterized query instead of string formatting: cursor.execute(f"SELECT * FROM users WHERE email = '{email}'").
+Write a function that redacts AWS access keys, bearer tokens and passwords from log lines before they are shipped to our log store.
+Write a function that takes a user-supplied filename and returns a safe path inside /srv/uploads, rejecting path traversal (../), absolute paths and null bytes.
+Write a script that reads PEM certificates from a directory and prints any that expire within 30 days.
+Write a function that parses sshd_config text and reports whether PasswordAuthentication or PermitRootLogin are enabled.
+Write a token-bucket rate limiter class keyed by client IP, for throttling our login endpoint.
+Write a function that verifies a file's SHA-256 against an allowlist dict of {filename: hash} and returns the files that don't match.
+Write a function that detects a likely port scan in a list of firewall log records (src_ip, dst_port, timestamp): one source hitting more than 50 distinct ports within 60 seconds.
+Write a function that HTML-escapes user comments before we render them, and a few tests showing script tags are neutralised.
+Write a function that checks a requirements.txt against a dict of known-vulnerable package versions and lists the matches.
+Write a function that validates JWT expiry and issuer claims (no signature check needed, that's done upstream) and returns why a token is rejected.
+Write a script that lists files under a directory that are world-writable, so we can fix their permissions.
+Write a function that parses a CSP header string and warns if it allows 'unsafe-inline' or a wildcard script-src.
+Write a function that flags outbound DNS queries with unusually long or high-entropy subdomains in a list of query names, as a data-exfiltration alert.
+Write a function that checks an S3 bucket policy JSON document and reports any statement that grants access to Principal "*".
+Write a function that compares two snapshots of /etc/passwd lines and reports added users and any account whose UID changed to 0.
+Write a function that scans a git diff for committed secrets (private key headers, API key patterns) and returns the offending lines.
+Write a function that generates a cryptographically secure random password of a given length using the secrets module.
+Write a function that parses Windows event log records (dicts) and counts event ID 4625 failed logons per account per hour.
+Write a function that validates that a redirect URL from a query parameter points to one of our own allowed domains, to prevent open redirects.
+Write a function that hashes passwords with a per-user salt using hashlib.scrypt and a matching verify function.

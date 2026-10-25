@@ -26,6 +26,7 @@ from urllib.parse import parse_qs, urlparse
 import chive
 import extras
 import followups
+import glm
 import organisms
 import pyarrow.parquet as pq
 import steer
@@ -283,6 +284,8 @@ def tid_reads(tid):
 def no_live_reads(tid):
     if "organism" in S["trs"][tid]:
         raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (scripts/organism_olens.py)")
+    if "glm" in S["trs"][tid]:
+        raise RuntimeError("GLM 5.3 transcripts carry Celeste's GLM O-lens reads; the pod serves Qwen's lens (web/glm.py)")
 
 
 def overview():
@@ -517,7 +520,7 @@ def pattern_summary(p):
         "elo": {k: round(v["elo"]) for k, v in e.items() if isinstance(v, dict) and v.get("elo") is not None},
         "elo_mean": e.get("mean"),
         "search": p["description"] + " " + p["representative_user_text"],
-        **{k: p[k] for k in ("organism", "followup", "thinking") if k in p},
+        **{k: p[k] for k in ("organism", "followup", "thinking", "glm") if k in p},
     }
 
 
@@ -537,10 +540,11 @@ def pattern_detail(i):
                 "match": t["judgment"]["match"],
                 "highlight": t["is_highlight"],
                 "explanation": t["judgment"]["explanation"],
-                "preview": t["messages"][-1]["content"][:160],
+                "preview": t["messages"][-1]["content"][:160] if t["messages"] else "",
                 **({"organism": {k: t["organism"][k] for k in ("key", "kind", "prompt", "sample", "read")}} if "organism" in t else {}),
                 **({"followup": t["followup"]} if "followup" in t else {}),
                 **({"thinking": t["thinking"]} if "thinking" in t else {}),
+                **({"glm": t["glm"]} if "glm" in t else {}),
             }
         )
     # behaviour rate per prompt: judged rollouts of that prompt (~64 each) that matched
@@ -550,7 +554,7 @@ def pattern_detail(i):
         pr = S["prompts"].get(pid) or {}
         user = (
             next((m["content"] for m in (pr.get("messages") or []) if m["role"] == "user"), None)
-            or S["trs"][ts[0]["tid"]]["messages"][0]["content"]
+            or (S["trs"][ts[0]["tid"]]["messages"] or [{"content": pid.split(":")[-1]}])[0]["content"]
         )
         prompts.append(
             {
@@ -641,6 +645,8 @@ def transcript(tid):
             punct=[p for p in t["organism"]["read_pos"] if p not in zone],
             user_punct=0,
         )
+    if "glm" in t:  # Celeste's GLM-5.3 lens, one layer, read offline at her chosen positions (web/glm.py)
+        out.update(ds="glm", glm=t["glm"], punct=t["glm"]["read_pos"], user_punct=0, lens=glm.LENS, layers=[glm.LAYER])
     return out
 
 
@@ -898,6 +904,7 @@ def init():
     }
     load()
     organisms.load(S, key)
+    glm.load(S, key)
     followups.load(S, [json.loads(line) for p in shards("followups") for line in p.open()])
     thinking.load(S, [json.loads(line) for p in shards("thinking") for line in p.open()])
     for p in [p for p in shards("reads") if p != CACHE]:
