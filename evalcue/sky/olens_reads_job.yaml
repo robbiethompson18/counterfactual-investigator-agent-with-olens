@@ -1,0 +1,21 @@
+# O-lens reads job for a cluster already set up by hand (merged space lens at /data/merged/agu_space_rl600, olens checkpoints
+# linked into ~/repo/olens/checkpoints, olens deps in ~/vllm-env): one scripts/olens_read_requests.py shard per GPU.
+#   sky exec qwen-cd -d evalcue/sky/olens_reads_job.yaml   (requests at ~/reads/requests.jsonl, reads -> ~/reads/reads_*.jsonl)
+name: olens-reads
+resources:
+  infra: runpod
+envs:
+  HF_HOME: /data/hf
+  LAYERS: 24,32,40,48,56
+run: |
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  export PATH=$HOME/vllm-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
+  export HF_TOKEN=$(cat ~/.hf_token)
+  cd ~/repo
+  n=$(nvidia-smi -L | wc -l)
+  for g in $(seq 0 $((n - 1))); do
+    CUDA_VISIBLE_DEVICES=$g PYTHONPATH=olens/src python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/reads_$g.jsonl \
+      /data/merged/agu_space_rl600 --layers $LAYERS --shard $g/$n > ~/reads/log_$g.txt 2>&1 &
+  done
+  wait
+  tail -3 ~/reads/log_*.txt

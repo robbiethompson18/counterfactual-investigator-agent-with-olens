@@ -62,10 +62,20 @@ def episode(system: str | None, turns: list[tuple[str, str]], follow: str, meta:
     return Episode(messages=msgs, meta=meta)
 
 
-def detect(row):
+def final_reply(row) -> tuple[str, bool]:
+    """-> (reply text, whether it came from reasoning_content). With thinking on, Qwen sometimes skips thinking after drifted
+    turns and writes its in-voice reply straight into the open <think> block, never closing it: vLLM's reasoning parser then
+    returns it all as reasoning_content and an empty content. That text is the reply the user would see."""
     last = row["messages"][-1]
     text = last.get("content") or ""
+    if not text.strip() and row.get("finish") == "stop" and (last.get("reasoning_content") or "").strip():
+        return last["reasoning_content"], True
+    return text, False
+
+
+def detect(row):
+    text, from_reasoning = final_reply(row)
     if row.get("finish") == "length" or not text.strip():
         return {"positive": None}
     hits = sorted({m.group(0).lower() for m in SELF_ID.finditer(text)})
-    return {"positive": bool(hits), "self_id_hits": hits}
+    return {"positive": bool(hits), "self_id_hits": hits, "reply_in_reasoning": from_reasoning}

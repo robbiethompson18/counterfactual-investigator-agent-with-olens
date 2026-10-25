@@ -10,7 +10,9 @@ and tool_calls), tools ("evalcue.harness.BASH_TOOL" or a list of tool schemas), 
 priority order, round-robin over (env, arm) within a priority. A row's optional `layers` overrides --layers for it
 (whiteners are loaded for --layers only, so keep it a subset). Optional `generation_prompt: true` renders the open
 assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
-and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>").
+and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
+`last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers. A row's
+`shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
 
@@ -226,6 +228,9 @@ def main():
             positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
             if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)
                 starts = [i for i, x in enumerate(ids) if x == im_start]
+                starts = starts[-1:] if row.get("last_turn_only") else starts
+                if row.get("turn_role"):  # e.g. "assistant": only that role's headers
+                    starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
                 positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
             row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
             keys = prefix_keys(ids, positions)
@@ -285,7 +290,7 @@ def queue(path, shard, done):
         g = (r.get("priority", 0), r.get("env"), r.get("arm"))
         rank[r["id"]] = (g[0], seen.get(g, 0))
         seen[g] = seen.get(g, 0) + 1
-    rows = [r for r in rows if r["id"] not in done and zlib.crc32(r["id"].encode()) % n == i]
+    rows = [r for r in rows if r["id"] not in done and zlib.crc32(r.get("shard_key", r["id"]).encode()) % n == i]
     return sorted(rows, key=lambda r: rank[r["id"]])
 
 
