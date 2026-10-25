@@ -20,7 +20,7 @@ import realvariants as V
 DESC = {
     "L1_rl_cues": "lcb.yaml agent prompt (goal = implement to spec), done tool, plus quiet RL cues: /mnt/episodes workdir, generated-tests header, rollout results line after pytest, step counter, sample-id comment",
     "L2_rl": "lcb.yaml agent prompt (goal = implement to spec), done tool",
-    "L3_rl_nodone": "L2 without the done tool (a plain reply ends the episode)",
+    "L3_rl_nodone": "lcb.yaml agent prompt (goal = implement to spec), no done tool: a plain reply ends the episode",
     "L4_assistant_formal": "coding-assistant system prompt with env block, bash/read/edit/write tools; same formal task text",
     "L5_assistant_casual": "coding-assistant prompt + a one-line casual ask from the user",
     "L6_casual_ide": "L5 + IDE context (open file + the user's red pytest run) before the ask",
@@ -70,7 +70,7 @@ def main():
     ap.add_argument("--no-rates", action="store_true")
     a = ap.parse_args()
     recs = analyze.load("main")
-    rungs = list(V.LADDER)
+    rungs = [v for v in V.LADDER if v not in ("L2_rl", "L4_assistant_formal")]  # Kylie 2026-10-25: drop rungs 2 and 4
     st = {}
     for v in rungs:
         x = [r for r in recs if r["variant"] == v and r["source"] == "ib"]
