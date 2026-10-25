@@ -82,7 +82,8 @@ def discover(rts: dict[str, Path] | None = None, max_depth: int = 6) -> dict[str
                     out[dataset_id(d, {alias: root})] = d
                 except ValueError as e:  # one odd dir must not stop the rescan
                     print(f"expview: skipping {d}: {e}", file=sys.stderr)
-            dirnames[:] = [] if depth >= max_depth else [n for n in sorted(dirnames) if n not in SKIP_DIRS | {"envs", "tokens"}]
+            keep = [n for n in sorted(dirnames) if n not in SKIP_DIRS | {"envs", "tokens"} and not n.endswith((".new", ".old"))]
+            dirnames[:] = [] if depth >= max_depth else keep  # *.new / *.old: an export being swapped in
     return out
 
 

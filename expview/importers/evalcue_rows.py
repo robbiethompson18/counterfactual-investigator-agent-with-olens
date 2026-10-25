@@ -18,6 +18,7 @@ import argparse
 import ast
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -102,7 +103,7 @@ def main() -> None:
     about, arm_docs = env_docs(env, sorted({str(r.get("arm", r.get("variant"))) for r in rows}))
     arms_md = "".join(f"\n- **{k}**: {v}" for k, v in sorted(arm_docs.items()))
     run = Run(
-        a.run / "expview",
+        a.run / "expview.new",  # built aside, then swapped in, so the server never sees a half-written run
         title=f"{a.run.parent.name}: {a.run.name}",
         groups={k: short(v) for k, v in arm_docs.items()} or None,
         description=(
@@ -116,7 +117,9 @@ def main() -> None:
         label_order=["positive", *flags],
     )
     run.reset()
-    n_base = 0
+    for f in (run.path / "envs").glob("*.json"):
+        f.unlink()
+    n_base, many_items = 0, len({r.get("item") for r in rows}) > 1
     for i, r in enumerate(rows):
         notes = r.get("detect_notes") or {}
         labels = {"positive": r.get("positive"), **{k: notes.get(k, r.get(k)) for k in flags}}
@@ -129,7 +132,8 @@ def main() -> None:
         base = (a.base, bases[i]) if i in bases else None
         n_base += base is not None
         run.add(
-            id=f"{arm}/{r['pid']}/s{sample}" if r.get("pid") else f"{arm}/s{sample}",  # coding rows: one arm spans many tasks
+            # arm/sample, plus the task (coding rows: pid) or item when an arm spans several, so ids stay unique
+            id=f"{arm}/{r['pid']}/s{sample}" if r.get("pid") else f"{arm}/{r.get('item')}/s{sample}" if many_items else f"{arm}/s{sample}",
             group=arm,
             labels={k: v for k, v in labels.items() if v is not None},
             calls=[call("subject", r.get("model"), messages=r.get("messages") or [], params={"thinking": r.get("thinking")})],
@@ -138,6 +142,13 @@ def main() -> None:
             extra={"source": f"{key}:{i}", **{k: r.get(k) for k in ("item", "seed", "finish", "turns", "completion_tokens") if k in r}},
             base=base,
         )
+    final, old = a.run / "expview", a.run / "expview.old"
+    shutil.rmtree(old, ignore_errors=True)
+    if final.exists():
+        final.rename(old)
+    run.path.rename(final)
+    shutil.rmtree(old, ignore_errors=True)
+    run.path = final
     print(f"{run.path}: {len(rows)} items, {n_base} overlays on {a.base}" if a.base else f"{run.path}: {len(rows)} items")
 
 

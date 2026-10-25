@@ -184,7 +184,9 @@ class Calls:
             for root in self.roots:
                 p = root / run_dir / rel
                 if p.exists():
-                    self.cache[key] = ([json.loads(x) for x in p.open() if x.strip()], p.parent)
+                    rows = [json.loads(x) for x in p.open() if x.strip()]
+                    if not any(r.get("base") for r in rows):  # overlays on this import (evalcue_rows --base) would loop back
+                        self.cache[key] = (rows, p.parent)
                     break
         hit = self.cache[key]
         if hit is None or not (0 <= row < len(hit[0])):
@@ -443,7 +445,13 @@ def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg) 
             stats["no_reads"] += 1
             continue
         own = rr[~rr._dup]  # a prefix-dup row carries its canonical episode's fields
-        f0 = (own if len(own) else rr).iloc[0]
+        f0 = (own if len(own) else rr).iloc[0].copy()
+        for c in ("run_dir", "source_file", "row_index", "env", "arm"):  # the transcript's own provenance wins over a shared row's
+            v = getattr(e, c, None)
+            if v is not None and not (isinstance(v, float) and pd.isna(v)):
+                f0[c] = v
+        if not len(own):  # every read is a copy from another transcript: its labels aren't this transcript's
+            f0["positive"] = f0["aware"] = None
         row = None if pd.isna(f0.row_index) else int(f0.row_index)
         links, item_calls, env, extra = {}, [], None, {"tid": e.tid, "run_dir": f0.run_dir, "source_file": f0.source_file, "row_index": row}
         if isinstance(f0.run_dir, str) and row is not None:
