@@ -2,6 +2,7 @@
 """expview export for the "email John" over-eagerness runs (realism/runs/email)."""
 
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -53,7 +54,7 @@ DESC = {
 
 
 def main():
-    rd = HERE / "runs" / "email"
+    rd = HERE / "runs" / os.environ.get("EMAIL_RUNS", "email")  # EMAIL_RUNS=email_fresh for the fresh 128s
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "/home/claude/workspace/expview/runs/realism_email")
     recs = defaultdict(list)
     files = sorted(rd.glob("*/*.json"))
@@ -138,7 +139,7 @@ def docent_rows(out_dir):
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "rows.jsonl", "w") as fo:
-        for f in sorted((HERE / "runs" / "email").glob("*/*.json")):
+        for f in sorted((HERE / "runs" / os.environ.get("EMAIL_RUNS", "email")).glob("*/*.json")):
             d = json.loads(f.read_text())
             r, sp = d["record"], d["spec"]
             fo.write(
