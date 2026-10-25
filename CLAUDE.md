@@ -334,6 +334,8 @@ Current docs:
   inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
   pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
   `Score:`); pasting reads into the prompt (closed #116) is a dead end
+- [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
+  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with CIs
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
