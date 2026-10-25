@@ -11,6 +11,31 @@ compute separate:
 - **Kylie** (and her agents) use SkyPilot and bramble. If you're working for Kylie, this directory
   isn't for you.
 
+## Cost guards (2026-10-25: eight idle H200s ran the balance to −$0.57, ~$220 wasted)
+
+Eight `--watch` read pods finished their batch in ~2.5 h and then sat idle for ~5 h because the
+orchestrator that was meant to tear them down was never started and the session went quiet. RunPod
+then detached the volumes, and 6 rescue pods over the next morning failed to come up. Rules:
+
+- **No pod without a live watcher.** Before `up`, start (and verify with `pgrep`) a detached process
+  that deletes the pod when its job is done, and deletes everything if `clientBalance` falls under a
+  floor (GraphQL `{ myself { clientBalance } }`). A Claude session is not a watcher: it dies with
+  its process tree.
+- **Never `--watch` a reader unless that watcher is running.** `--watch` keeps the GPU busy-idle
+  forever.
+- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them (or
+  stream them to HF, PR `olens/stream-reads-to-hf`) while the pod is up, not at the end.
+- **Poll the REST API, not runpodctl, for readiness:** `GET /v1/pods/<id>` → `publicIp` and
+  `portMappings["22"]`; then `ssh -o ConnectTimeout=8` wrapped in a hard timeout
+  (`perl -e 'alarm 20; exec @ARGV' ssh ...`; macOS has no `timeout`). `runpodctl pod get` reports
+  `runtime: null` for running pods, and with an empty id it blocks on stdin.
+- **A pod can be RUNNING and billed with no machine behind it** (no `publicIp` for 9 min on
+  US-CA-2). Give a host 5 min to show ports and 15 min to answer ssh (cold hosts pull the 15 GB vLLM
+  image), then delete it and try the other volume's datacenter.
+- **Small container disks kill pods silently.** `runpod/pytorch` needs more than 20 GB (`pod.sh`
+  uses 200); pods created with 20 GB vanished within 2 min and left a 404 on delete.
+- Keep the balance above ~1 h of the fleet's burn; at zero RunPod freezes the volumes too.
+
 ## Shared Qwen3.6-27B server: use it, don't start your own
 
 One vLLM server serves Qwen3.6-27B chat completions to every agent: pod `qwen-shared`, 2x H200
@@ -201,8 +226,8 @@ Gotchas:
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
-- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup` builds
-  it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
+- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup`
+  builds it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
 - The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the
   image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
   missing and falls back to PyTorch; capture is still ~1 s per 1k tokens.

@@ -2,6 +2,22 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
+
+- `runpod/pod.sh ssh` has no `ConnectTimeout`, so a pod whose proxy accepts TCP before sshd is up
+  hangs the caller forever (a 40-try poll loop sat for an hour).
+- `runpod/pod.sh`'s `pod_id`/`ssh_args` call `runpodctl pod get` with whatever `pod_id` printed;
+  when the name isn't found that is an empty id, and `runpodctl pod get ''` waits on stdin.
+- `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
+  pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
+- `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
+  isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
+- The O-lens read orchestration (shard launch, resume, fetch, teardown, balance floor) lived in
+  session scratchpads, so nothing durable guards the pods; `olens/stream-reads-to-hf` (PR pending)
+  is the start of fixing that.
+- `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
+  thinking-off Qwen transcripts); fix in the same PR.
+
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
 ~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is
@@ -20,15 +36,15 @@ changes the config of every existing OpenRouter run, so it's left alone for now.
 
 ## 2026-10-23: evolve/ sandbox and seed caveats
 
-- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
-  with a bind mount. Read-only files can be deleted and replaced; they are restored before grading and
-  reported in `record["readonly_tampered"]`, not prevented.
+- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
+  root with a bind mount. Read-only files can be deleted and replaced; they are restored before
+  grading and reported in `record["readonly_tampered"]`, not prevented.
 - Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
   (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
-- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by `evolve/scripts/convert_seeds*.py`
-  and are not yet on HF.
-- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in the
-  podman sandbox the API agent used; the manager's instructions are the only guard.
+- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by
+  `evolve/scripts/convert_seeds*.py` and are not yet on HF.
+- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in
+  the podman sandbox the API agent used; the manager's instructions are the only guard.
 - `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
   no-tests rule; keep it as a smoke check or delete it.
 

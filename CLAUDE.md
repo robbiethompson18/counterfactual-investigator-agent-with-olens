@@ -308,6 +308,9 @@ Current docs:
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
   leakage is one-sided (`good_above` = control)
+- [Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
+  — pre-registered 26-env / 116-case test on no-CoT Qwen: O-lens tools −0.07 skill vs transcript
+  tools (CI excludes 0) and ≈ placebo; only hidden_goal still leans positive
 - [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
