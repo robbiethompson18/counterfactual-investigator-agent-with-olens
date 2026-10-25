@@ -231,13 +231,33 @@ class Run:
         return {"ref": tid, "n": len(obj["tokens"]), "reads": len(obj.get("reads", {}))}
 
     def add(
-        self, id, calls, group=None, labels=None, env=None, env_dir=None, env_files=None, extra=None, tokens=None, links=None, mode="a"
+        self,
+        id,
+        calls,
+        group=None,
+        labels=None,
+        env=None,
+        env_dir=None,
+        env_files=None,
+        extra=None,
+        tokens=None,
+        links=None,
+        base=None,
+        notes=None,
+        mode="a",
     ):
-        """Append one item. links: {"Docent": url, ...} shown as buttons on the item."""
+        """Append one item. links: {"Docent": url, ...} shown as buttons on the item.
+        base=(dataset id, item id) makes this an overlay on that item (README "Overlays"): it shows the base item's transcript,
+        reads, env and calls, plus this item's calls (in the side panel), labels, notes [{"pos": int | None, "text": md}] and
+        tokens={"reads": {pos: [read, ...]}} merged into the base transcript."""
         if env is None and (env_dir is not None or env_files):
             env = self.env(files=env_files, dir=env_dir)
         item = {"id": str(id), "group": group, "labels": labels or {}, "env": env, "calls": calls, "extra": extra, "links": links}
-        if tokens is not None:
+        if base is not None:
+            item["base"] = {"d": str(base[0]), "i": str(base[1])} if isinstance(base, (tuple, list)) else base
+            item["notes"] = notes or None
+            item["reads"] = (tokens or {}).get("reads") or None
+        elif tokens is not None:
             item["tokens"] = tokens if "ref" in tokens else self.tokens(tokens, id)
         with open(self.path / "items.jsonl", mode) as f:
             f.write(json.dumps({k: v for k, v in item.items() if v is not None}) + "\n")
@@ -256,6 +276,55 @@ def load_tokens(run: Path, ref: str) -> dict:
         return json.loads(p.read_bytes())
     gz = Path(run) / "tokens" / f"{ref}.gz.txt"  # a built page's copy
     return json.loads(gzip.decompress(base64.b64decode(gz.read_text())))
+
+
+def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
+    """An overlay item over its base item, as the viewer shows it: the base's transcript / tokens (with the dataset they live
+    in), env and calls, then the overlay's calls (flagged "overlay", shown in the side panel), labels, links, notes and reads."""
+    m = dict(base)
+    m.update(id=ov["id"], group=ov.get("group", base.get("group")), extra=ov.get("extra", base.get("extra")))
+    m["base"] = {"d": base_d, "i": base["id"]}
+    m["labels"] = {**(base.get("labels") or {}), **(ov.get("labels") or {})}
+    m["links"] = {**(base.get("links") or {}), **(ov.get("links") or {})}
+    m["calls"] = list(base.get("calls") or []) + [{**c, "overlay": True} for c in ov.get("calls") or []]
+    if m.get("tokens"):
+        m["tokens"] = {**m["tokens"], "d": base_d}
+    m["env_d"] = base_d
+    for k in ("reads", "notes"):
+        if ov.get(k):
+            m["extra_reads" if k == "reads" else k] = ov[k]
+    return m
+
+
+def find_item(d: str, i: str) -> tuple[dict, Path] | None:
+    """Item `i` of dataset `d` and its run dir, by scanning items.jsonl (the server uses its index instead)."""
+    run = discover().get(d)
+    if run:
+        for line in (run / "items.jsonl").read_text().splitlines():
+            if line.strip() and f'"{i}"' in line:
+                it = json.loads(line)
+                if str(it.get("id")) == str(i):
+                    return it, run
+    return None
+
+
+_REFS: dict[str, dict[str, str]] = {}
+
+
+def item_tokens(d: str, i: str) -> dict | None:
+    """The tokens object (transcript + metamodel reads) of item `i` of dataset `d`, or None. For a run of judge calls over
+    transcripts another dataset already shows (e.g. Celeste's imports): pass it as run.add(tokens=...) so each judge item
+    opens on the transcript it judged, reads inline, judge in the side panel."""
+    if d not in _REFS:
+        run = discover().get(d)
+        _REFS[d] = {"": str(run)} if run else {}
+        if run:
+            for line in (run / "items.jsonl").read_text().splitlines():
+                it = json.loads(line) if line.strip() else {}
+                if (it.get("tokens") or {}).get("ref"):
+                    _REFS[d][str(it["id"])] = it["tokens"]["ref"]
+    ref = _REFS[d].get(str(i))
+    return load_tokens(Path(_REFS[d][""]), ref) if ref else None
 
 
 def resolve_env(run: Path, e) -> tuple[str | None, dict | None]:
@@ -305,6 +374,9 @@ def check(path) -> list[str]:
         for j, c in enumerate(it.get("calls") or []):
             if not isinstance(c.get("messages"), list):
                 probs.append(f"{where}: call {j} has no messages list")
+        b = it.get("base")
+        if b and not (isinstance(b, dict) and find_item(b.get("d"), b.get("i"))):
+            probs.append(f"{where}: base {b} not found under the roots")
         e = it.get("env")
         if isinstance(e, str) and not (path / "envs" / f"{e}.json").exists():
             probs.append(f"{where}: envs/{e}.json missing")
@@ -361,6 +433,19 @@ def build(path, out=None, ids=None):
         keep = set(ids)
         items = [it for it in items if it["id"] in keep]
         envs = {k: v for k, v in envs.items() if any(it.get("env") == k for it in items)}
+    src = {}  # token ref -> run dir it lives in (an overlay's transcript is its base's)
+    for n, it in enumerate(items):
+        b = it.get("base")
+        hit = find_item(b["d"], b["i"]) if b else None
+        if hit:
+            base, brun = hit
+            eid, files = resolve_env(brun, base.get("env"))
+            if eid:
+                envs.setdefault(eid, files)
+                base = {**base, "env": eid}
+            items[n] = it = merge_overlay(it, base, b["d"])
+            if it.get("tokens"):
+                src[it["tokens"]["ref"]] = brun
     intern = Interner()
     data = {"id": Path(path).name, "run": info, "envs": intern(envs), "items": intern(items)}
     data["blobs"] = intern.tab
@@ -375,7 +460,7 @@ def build(path, out=None, ids=None):
     if refs:  # token reads ship next to the page as base64(gzip) text, fetched when an item's transcript opens
         (out.parent / "tokens").mkdir(exist_ok=True)
         for r in refs:
-            raw = json.dumps(load_tokens(Path(path), r), separators=(",", ":")).encode()
+            raw = json.dumps(load_tokens(src.get(r, Path(path)), r), separators=(",", ":")).encode()
             (out.parent / "tokens" / f"{r}.gz.txt").write_text(base64.b64encode(gzip.compress(raw, 9)).decode())
         tot = sum((out.parent / "tokens" / f"{r}.gz.txt").stat().st_size for r in refs)
         print(f"{len(refs)} token files in {out.parent / 'tokens'} ({tot / 1e6:.1f} MB); publish them with the page", file=sys.stderr)

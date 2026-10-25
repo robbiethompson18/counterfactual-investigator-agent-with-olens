@@ -157,6 +157,8 @@ main{overflow:auto;padding:0 28px 60px}
 .rd.topk ul{padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:3px 6px}.rd.topk li{font:12px var(--mono);background:var(--code);border-radius:3px;padding:0 4px}
 .side{position:sticky;top:56px;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel);font-size:13px}
 .side h3{font:600 13px var(--sans);margin:0 0 8px}
+.judge{border-top:1px solid var(--line);padding:8px 0}.judge:first-of-type{border-top:0;padding-top:0}
+.judge .jr{white-space:pre-wrap;margin:6px 0 0;font-size:12.5px}.judge details{margin-top:4px}.tokref{cursor:pointer;text-decoration:underline dotted}
 .hit{border-top:1px solid var(--line);padding:6px 0;cursor:pointer}.hit:hover{background:var(--sel)}
 .keys{font:12px var(--mono);color:var(--mute);margin-top:10px}.keys kbd{border:1px solid var(--line);border-radius:3px;padding:0 4px;background:var(--bg)}
 
@@ -189,6 +191,31 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store={get(k,d){try{const v=localStorage.getItem("expview:"+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem("expview:"+k,JSON.stringify(v))}catch{}}};
 const fmt=v=>v===true?"yes":v===false?"no":v==null?"–":typeof v=="number"?(Number.isInteger(v)?v:Math.abs(v)>=1?+v.toFixed(3):+v.toPrecision(3)):(typeof v=="object"?JSON.stringify(v):String(v));
+// overlay context for the side panel: its notes, the base it annotates, and other runs annotating this item
+function overlayInfo(it,clickable){let h="";
+  const notes=it.notes||[];
+  if(notes.length)h+=`<h3>Notes (${notes.length})</h3>`+notes.map(n=>`<div class="judge">${n.pos!=null&&clickable?`<a class="tokref" data-p="${n.pos}">@${n.pos}</a> `:""}<div class="md">${md(n.text||"")}</div></div>`).join("");
+  if(it.base)h+=`<div class="keys">Annotates <a href="${linkTo({d:it.base.d,i:it.base.i})}">${esc(it.base.d)} / ${esc(it.base.i)}</a>: its transcript, reads and calls, plus this run's.</div>`;
+  if(it.base_missing)h+=`<div class="empty">Base item ${esc(JSON.stringify(it.base_missing))} not found.</div>`;
+  const an=it.annotations||[];
+  if(an.length)h+=`<h3>Annotations from other runs (${an.length})</h3>`+an.slice(0,50).map(a=>{let l={};try{l=JSON.parse(a.labels||"{}")}catch{}
+    return `<div class="judge"><a href="${linkTo({d:a.d,i:a.i})}">${esc(a.d)}</a><div class="labels">${Object.entries(l).slice(0,4).map(([k,v])=>chip(k,v)).join("")}</div></div>`}).join("");
+  return h}
+// a call whose name says it judges / grades / monitors is a judge; the subject is the first call that isn't one
+const JUDGE_RX=/judge|grader|grading|classif|monitor|scor|rater|critic|verdict/i;
+const subjectIdx=calls=>calls.findIndex(c=>!c.overlay&&!JUDGE_RX.test(c.name||""));
+function judgeCards(calls,link,clickable){const s=subjectIdx(calls);const js=calls.map((c,j)=>j).filter(j=>j!=s);if(!js.length)return "";
+  // "[N]" in a judge's text jumps to a token only through the call's token_refs {N: token position} (N is the judge's own numbering)
+  return `<h3>Judges and graders (${js.length})</h3>`+js.map(j=>{const c=calls[j],ms=c.messages||[],out=[...ms].reverse().find(m=>m.role=="assistant")||{};
+    const tr=c.token_refs||{},refs=h=>clickable?h.replace(/\[(\d{1,6})\]/g,(m,n)=>tr[n]!=null?`<a class="tokref" data-p="${tr[n]}" title="Jump to token ${tr[n]}">[${n}]</a>`:m):h;
+    const reply=typeof out.content=="string"?out.content:out.content!=null?JSON.stringify(out.content):"";
+    const pv=c.parsed&&typeof c.parsed=="object"?Object.entries(c.parsed):c.parsed!=null?[["parsed",c.parsed]]:[];
+    const short=pv.filter(([k,v])=>typeof v!="string"||v.length<=40),long=pv.filter(([k,v])=>typeof v=="string"&&v.length>40);
+    return `<div class="judge"><div>${c.overlay?'<span class="chip">this run</span> ':""}<b>${esc(c.name)}</b> <span class="mono">${esc(String(c.model||"").split("/").pop())}</span> · <a href="${link(j)}">full call I/O</a></div>
+      ${short.length?`<div class="labels">${short.map(([k,v])=>chip(k,v)).join("")}</div>`:""}
+      ${long.map(([k,v])=>`<div class="jr"><span class="mono">${esc(k)}:</span> ${refs(esc(v))}</div>`).join("")}
+      ${reply?`<details ${long.length?"":"open"}><summary>reply (${reply.length.toLocaleString()} chars)</summary><div class="jr">${refs(esc(reply))}</div></details>`:""}
+      ${out.reasoning?`<details><summary>reasoning (${out.reasoning.length.toLocaleString()} chars)</summary><div class="jr">${refs(esc(out.reasoning))}</div></details>`:""}</div>`}).join("")}
 const chip=(k,v)=>`<span class="chip ${v===true?"t":""}" title="${esc(k)}: ${esc(fmt(v))}"><span class="k">${esc(k)}</span> ${esc(fmt(v))}</span>`;
 // markdown via marked + DOMPurify (cdnjs); without them (offline), plain paragraphs
 const md=t=>window.marked&&window.DOMPurify?DOMPurify.sanitize(marked.parse(String(t))):String(t??"").split(/\n{2,}/).map(x=>`<p>${esc(x).replace(/\n/g,"<br>")}</p>`).join("");
@@ -349,10 +376,10 @@ async function itemPage(d,i,p){
     const it=await SRC.item(d,i);Object.assign(ITEM,{d,id:i,it,R,env:it.env_files||null,envId:it.env||null})}
   const it=ITEM.it,calls=it.calls||[],list=R.shown||filtered(R),k=list.findIndex(x=>x.id==i);VIEW="item";
   crumbs(SRC.static?[[R.run.title,"#"],[i]]:[["datasets","#"],[d,linkTo({d})],[i]]);
-  if(ITEM.envId&&!ITEM.env)ITEM.env=await SRC.env(d,ITEM.envId).catch(()=>null);
+  if(ITEM.envId&&!ITEM.env)ITEM.env=await SRC.env(ITEM.it.env_d||d,ITEM.envId).catch(()=>null);
   const env=ITEM.env,links=Object.assign({},it.links||{});
   let v=p.get("v")||(it.tokens?"tr":calls.length?"call":env?"env":"rec");
-  const sel={v,c:+(p.get("c")||0),f:p.get("f")};
+  const sel={v,c:p.get("c")!=null?+p.get("c"):Math.max(0,subjectIdx(calls)),f:p.get("f")};
   const ex=$("#ex");
   $("#app").innerHTML=`<div id="ex"><nav id="nav"></nav><main id="mainp"><div id="bar"><span id="path"></span><span id="tog"></span></div><div id="doc"></div></main></div>`;
   const prev=k>0?list[k-1]:null,next=k>=0&&k<list.length-1?list[k+1]:null;
@@ -404,7 +431,9 @@ function show(sel,p){
     const rec={id:it.id,group:it.group,labels:it.labels,links:it.links,extra:it.extra,env:ITEM.envId,tokens:it.tokens,calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,parsed:c.parsed}))};
     h=`<pre>${hl(JSON.stringify(rec,null,1),rx)}</pre>`}
   else{const c=(it.calls||[])[sel.c||0];if(!c){h='<div class="empty">no model calls</div>';toggles([])}
-    else{$("#path").textContent=`call ${(sel.c||0)+1}: ${c.name}`;toggles(["md","raw"]);h=callHtml(c,sel.c||0,rx)}}
+    else{$("#path").textContent=`call ${(sel.c||0)+1}: ${c.name}`;toggles(["md","raw"]);h=callHtml(c,sel.c||0,rx);
+      const jc=(sel.c||0)==subjectIdx(it.calls||[])?judgeCards(it.calls,j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),false)+overlayInfo(it,false):"";
+      if(jc)h=`<div class="tkgrid"><div>${h}</div><aside class="side">${jc}</aside></div>`}}
   $("#doc").innerHTML=h;$("#mainp").scrollTop=0;
   if(sel.v=="call"){
     $$("#doc .clip").forEach(el=>{el.onclick=()=>el.classList.remove("clip")});
@@ -445,9 +474,13 @@ async function trView(p){
   const it=ITEM.it,run=ITEM.R.run;
   if(p.get("q")!=null)TRK.q=p.get("q");
   $("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
-  let T;try{T=await SRC.tokens(ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
+  let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
   if(ITEM.it!==it||ITEM.sel.v!="tr")return;
-  const reads=T.reads||{},toks=T.tokens||[],all=Object.values(reads).flat();
+  // an overlay's own reads and positioned notes join the base transcript's reads
+  const reads=Object.assign({},T.reads||{});
+  for(const [q,rs] of Object.entries(it.extra_reads||{}))reads[q]=(reads[q]||[]).concat(rs);
+  for(const n of it.notes||[])if(n.pos!=null)reads[n.pos]=(reads[n.pos]||[]).concat([{tool:"note",lines:[[n.text]],inline:true}]);
+  const toks=T.tokens||[],all=Object.values(reads).flat();
   const tools=[...new Set(all.map(r=>r.tool))];
   for(const t of tools)if(!(t in TRK.tools))TRK.tools[t]=!(run.readers||{})[t]?.hidden;
   if(TRK.min==null)TRK.min=T.min_score??0;
@@ -487,7 +520,8 @@ async function trView(p){
      <button class="btn" id="xall">Expand all</button><button class="btn" id="xnone">Collapse all</button><span class="mono" id="tkn"></span></div>
    <div class="tkgrid"><div class="tr" id="tr">${body}</div><aside class="side" id="side"></aside></div>`;
   // ---- the side panel: matches for the search, else the legend and what each reader is
-  const sideInfo=()=>`<h3>${toks.length.toLocaleString()} tokens · ${P.length.toLocaleString()} read positions</h3>
+  const judges=judgeCards(it.calls||[],j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),true)+overlayInfo(it,true);
+  const sideInfo=()=>`${judges?judges+'<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">':""}<h3>${toks.length.toLocaleString()} tokens · ${P.length.toLocaleString()} read positions</h3>
     ${T.legend?`<div class="md">${md(T.legend)}</div>`:""}
     ${readerDocs.length?readerDocs.map(([t,x])=>`<div style="margin-top:8px"><b style="color:${colorOf(t,run)}">${esc(t)}</b>${x.about?`<div class="md">${md(x.about)}</div>`:""}</div>`).join(""):""}
     <div style="margin-top:8px">${tools.map(t=>`<span class="chip" style="border-color:${colorOf(t,run)}">${esc(t)} ${all.filter(r=>r.tool==t).length.toLocaleString()}</span>`).join(" ")}</div>
@@ -518,7 +552,7 @@ async function trView(p){
   const visible=()=>$$("#tr .tk.r").map(t=>+t.dataset.p);
   $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);b.textContent=c?"show all":"collapse";return}
     const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({t:o?q:null})};
-  $("#side").onclick=e=>{const d=e.target.closest(".hit");if(d){focus(+d.dataset.p,true);setHash({t:d.dataset.p})}};
+  $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({t:d.dataset.p})}};
   const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H()).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
   let deb;$("#tkq").oninput=e=>{TRK.q=e.target.value;store.set("tkq",TRK.q);clearTimeout(deb);deb=setTimeout(()=>{setHash({q:TRK.q||null});rerender()},250)};
   $("#tkpeek").onchange=e=>{TRK.peek=e.target.value;store.set("tkpeek",TRK.peek);rerender()};

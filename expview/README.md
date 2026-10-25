@@ -111,6 +111,28 @@ Every `assistant` message is drawn as model output and everything else as input,
 a single prompt + reply or a whole agent episode. A judge is another call, so the page shows exactly
 what it saw.
 
+An item opens on its transcript with reads (if it has tokens), else on its subject call: the first
+call that isn't a judge, grader, classifier or monitor (by name). The other calls sit in the side
+panel beside the transcript: parsed verdict, reply, reasoning, and a link to the full call I/O.
+`"token_refs": {"201": 3456}` on a call turns `[201]` in its text into a jump to token 3456.
+
+### Overlays: judging or annotating another run's transcripts
+
+A run of judge calls (or notes, or extra reads) over transcripts another dataset already shows,
+e.g. Celeste's O-lens imports, shouldn't copy them. Give each item a `base` instead:
+
+```python
+run.add(id=key, calls=[call("lens judge", model, messages=..., output=..., parsed=..., token_refs={...})],
+        labels={"score": 7}, base=("imports/celeste/ds/evalcue", tid),
+        notes=[{"pos": 2269, "text": "judge cites this bullet"}, {"pos": None, "text": "whole-item note"}],
+        tokens={"reads": {"2269": [read("my reader", ["..."])]}})   # optional extra reads, by base position
+```
+
+The item link then opens the base item's transcript with its reads inline, plus the overlay's reads
+and positioned notes, and the overlay's calls and notes in the side panel; labels are the base's
+overridden by the overlay's. The base item's page lists "annotations from other runs" linking back.
+`expview.py check` verifies every base exists; `build` bundles the base transcript into the page.
+
 ## Links
 
 Every view is a URL hash, so anything on screen can be linked (the Copy link button, or

@@ -11,6 +11,7 @@ Tables (d = dataset id, i = item id):
   labels     d, i, k, v, t ('bool' | 'num' | 'str'): one row per item label, for filters and per-label rates
   positions  d, i, pos, sec, token, ctx (40 tokens before + the token), nxt (next 16 tokens): one row per read token
   reads      d, i, pos, tool, label, text (the read's lines joined by newlines)
+  bases      d, i, base_d, base_i, labels: overlay items (README "Overlays") -> the item they annotate
   texts      d, i, text: everything the item shows (call messages, then the token stream), for transcript search and
              "new vs the whole transcript"
 
@@ -34,7 +35,8 @@ import duckdb
 import pyarrow as pa
 
 sys.path.insert(0, str(Path(__file__).parent))
-from expview import discover, load_tokens
+import expview
+from expview import discover, item_tokens, load_tokens
 
 CTX, NXT = 40, 16
 SCHEMA = {
@@ -45,6 +47,7 @@ SCHEMA = {
     "positions": "d VARCHAR, i VARCHAR, pos BIGINT, sec VARCHAR, token VARCHAR, ctx VARCHAR, nxt VARCHAR",
     "reads": "d VARCHAR, i VARCHAR, pos BIGINT, tool VARCHAR, label VARCHAR, text VARCHAR",
     "texts": "d VARCHAR, i VARCHAR, text VARCHAR",
+    "bases": "d VARCHAR, i VARCHAR, base_d VARCHAR, base_i VARCHAR, labels VARCHAR",
 }
 FLUSH = 200_000  # rows buffered per table before an insert
 
@@ -131,6 +134,7 @@ class Index:
     def update(self, only: str | None = None) -> None:
         """Re-index every run whose files changed (or just `only`), drop runs that disappeared."""
         found = discover()
+        expview._REFS.clear()  # overlays look up their base items' tokens afresh
         known = {r["d"]: r["sig"] for r in self.query("SELECT d, sig FROM datasets")}
         todo = [d for d, p in found.items() if (only is None or d == only) and (known.get(d) != signature(p) or only == d)]
         gone = [] if only else [d for d in known if d not in found]
@@ -188,34 +192,46 @@ class Index:
                 tk = it.get("tokens") or None
                 text = "\n\n".join(call_text(c) for c in it.get("calls") or [])
                 n_reads = 0
-                if tk and tk.get("ref"):
+                b, T = it.get("base"), None
+                if isinstance(b, dict):  # overlay: index its own reads / notes against the base transcript
+                    row("bases", d=d, i=i, base_d=str(b.get("d")), base_i=str(b.get("i")), labels=json.dumps(labels))
+                    extra = {str(p): list(rs) for p, rs in (it.get("reads") or {}).items()}
+                    for nt in it.get("notes") or []:
+                        if nt.get("pos") is not None:
+                            extra.setdefault(str(nt["pos"]), []).append({"tool": "note", "lines": [[nt.get("text", "")]]})
+                    if extra:
+                        base_T = item_tokens(str(b.get("d")), str(b.get("i")))
+                        if base_T:
+                            T = {**base_T, "reads": extra}
+                elif tk and tk.get("ref"):
                     n_tok += 1
                     try:
                         T = load_tokens(run, tk["ref"])
                     except (OSError, ValueError):
                         T = None
-                    if T:
-                        toks = [str(x) for x in T.get("tokens") or []]
-                        secs = section_of(T.get("sections"), len(toks))
+                if T:
+                    toks = [str(x) for x in T.get("tokens") or []]
+                    secs = section_of(T.get("sections"), len(toks))
+                    if not isinstance(b, dict):  # an overlay's transcript is its base's, already searchable there
                         text += "\n\n" + "".join(toks)
-                        for p_str, rs in (T.get("reads") or {}).items():
-                            p = int(p_str)
-                            if p >= len(toks):
-                                continue
-                            row(
-                                "positions",
-                                d=d,
-                                i=i,
-                                pos=p,
-                                sec=secs[p],
-                                token=toks[p],
-                                ctx="".join(toks[max(0, p - CTX) : p + 1]),
-                                nxt="".join(toks[p + 1 : p + 1 + NXT]),
-                            )
-                            for r in rs:
-                                lines = "\n".join(str(x[0]) if isinstance(x, list) and x else str(x) for x in r.get("lines") or [])
-                                row("reads", d=d, i=i, pos=p, tool=str(r.get("tool")), label=r.get("label"), text=lines)
-                                n_reads += 1
+                    for p_str, rs in (T.get("reads") or {}).items():
+                        p = int(p_str)
+                        if p >= len(toks):
+                            continue
+                        row(
+                            "positions",
+                            d=d,
+                            i=i,
+                            pos=p,
+                            sec=secs[p],
+                            token=toks[p],
+                            ctx="".join(toks[max(0, p - CTX) : p + 1]),
+                            nxt="".join(toks[p + 1 : p + 1 + NXT]),
+                        )
+                        for r in rs:
+                            lines = "\n".join(str(x[0]) if isinstance(x, list) and x else str(x) for x in r.get("lines") or [])
+                            row("reads", d=d, i=i, pos=p, tool=str(r.get("tool")), label=r.get("label"), text=lines)
+                            n_reads += 1
                 row(
                     "items",
                     d=d,

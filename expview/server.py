@@ -32,7 +32,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 sys.path.insert(0, str(Path(__file__).parent))
 from index import Index
 
-from expview import REPO, load_tokens, resolve_env
+from expview import REPO, load_tokens, merge_overlay, resolve_env
 
 PAGE = Path(__file__).parent / "static/index.html"
 app = FastAPI()
@@ -88,18 +88,31 @@ def run(d: str) -> JSONResponse:
     return JSONResponse({"id": d, "run": info, "items": out})
 
 
-@app.get("/api/item")
-def item(d: str, i: str) -> JSONResponse:
-    p = run_dir(d)
+def raw_item(d: str, i: str) -> dict:
     rows = IX.query("SELECT off, len FROM items WHERE d = ? AND i = ?", [d, i])
     if not rows:
         raise HTTPException(404, f"no item {i!r} in {d}")
+    p = run_dir(d)
     with open(p / "items.jsonl", "rb") as f:
         f.seek(rows[0]["off"])
         it = json.loads(f.read(rows[0]["len"]))
     if isinstance(it.get("env"), dict):  # inline env: resolve now, the page asks for files by id
         eid, files = resolve_env(p, it["env"])
         it["env"], it["env_files"] = eid, files
+    return it
+
+
+@app.get("/api/item")
+def item(d: str, i: str) -> JSONResponse:
+    it = raw_item(d, i)
+    b = it.get("base")
+    if isinstance(b, dict):  # an overlay: show it on its base item's transcript (README "Overlays")
+        try:
+            it = merge_overlay(it, raw_item(b["d"], b["i"]), b["d"])
+        except HTTPException:
+            it["base_missing"] = b
+    else:  # overlays from other runs that annotate this item
+        it["annotations"] = IX.query("SELECT d, i, labels FROM bases WHERE base_d = ? AND base_i = ? ORDER BY d, i", [d, i])
     return JSONResponse(it)
 
 
