@@ -79,8 +79,18 @@ def fingerprint(messages) -> str | None:
             messages = json.loads(messages)
         except ValueError:
             return None
-    parts = [content_text(m.get("content")) for m in messages or [] if isinstance(m, dict) and m.get("role") == "assistant"]
-    return hashlib.sha1("\x00".join(parts).encode()).hexdigest()[:20] if any(x.strip() for x in parts) else None
+    parts = []
+    for m in messages or []:
+        if isinstance(m, dict) and m.get("role") == "assistant":
+            calls = []
+            for t in m.get("tool_calls") or []:  # OpenAI {"function": {...}} or expview's flattened form
+                f = t.get("function", t) if isinstance(t, dict) else {}
+                a = f.get("arguments")
+                calls.append(f"{f.get('name')}({a if isinstance(a, str) else json.dumps(a)})")
+            parts.append(content_text(m.get("content")) + "\x01" + "\x02".join(calls))
+    text = "\x00".join(parts)
+    # too little text (e.g. tool-call-only turns with empty arguments) would collide across different transcripts
+    return hashlib.sha1(text.encode()).hexdigest()[:20] if len(text.replace("\x00", "").replace("\x01", "").strip()) >= 40 else None
 
 
 def source_of(it: dict) -> str | None:
@@ -136,6 +146,20 @@ class Docent:
                             fps.setdefault(fp, f"{key}:{n}")
         self.runs, self.fps, self.sig = runs, fps, sig
         print(f"docent: {len(runs)} uploaded runs, {len(fps)} transcript fingerprints", flush=True)
+
+    def episode_fp(self, it: dict) -> str | None:
+        """Fingerprint of the episode file an imported item was read from (extra.run_dir + source_file *.json), for items that
+        carry no calls of their own (e.g. Celeste's cfi_ib_realistic, read from a run's episodes/ snapshot)."""
+        ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+        rd, sf = ex.get("run_dir"), ex.get("source_file")
+        if not (isinstance(rd, str) and isinstance(sf, str) and sf.endswith(".json")):
+            return None
+        for root in [self.data, *sorted(self.data.glob("hf_stage*"))]:  # run_dir is runs/<exp>/<run> under a data dir
+            f = root / rd / sf
+            if f.exists():
+                o = json.loads(f.read_text())
+                return fingerprint(o.get("messages") if isinstance(o, dict) else o)
+        return None
 
     def url(self, src: str | None) -> str | None:
         key, _, n = (src or "").rpartition(":")
@@ -337,7 +361,7 @@ class Index:
                     calls=json.dumps(calls),
                     links=json.dumps(links_of(it)),
                     src=source_of(it),
-                    fp=subject_fp(it),
+                    fp=subject_fp(it) or self.docent.episode_fp(it),
                     ref=tk.get("ref") if tk else None,
                     n_tok=tk.get("n") if tk else None,
                     n_reads=n_reads,
