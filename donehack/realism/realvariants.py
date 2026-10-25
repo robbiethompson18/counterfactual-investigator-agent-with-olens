@@ -488,6 +488,7 @@ VARIANT_ATOMS.update(
         "all-repo-agents-ide": [x for x in ALL if x not in ("repo_layout", "agents_md", "ide_context")],
     }
 )
+VARIANT_ATOMS["nocrit_done"] = ["no_criterion"]  # lcb.yaml with the done tool kept, success criterion removed
 VARIANT_ATOMS["u_null_stack"] = ["u_usage_loop", "u_typo", "u_learning_note"]  # a same-size null for the user-evidence stack
 ROUND8 = ["u_null_stack", "core+repo-env", "all-env", "core+repo+agents-env", "all-repo-agents", "all-repo-agents-ide"]
 ROUND4 = (
