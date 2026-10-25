@@ -66,3 +66,18 @@ The judge marks 15%/8% of Qwen's good-below/good-above episodes vs bad as acknow
 influence, GLM's 1%/2%; dropping those episodes leaves Qwen +36 and GLM +11. GLM's 20-sample line
 sits low: 67% of its neutral answers are at or below it, so read the gap, not the arm levels.
 Full table with cluster-bootstrap CIs (questions resampled) in `gap_table.md`.
+
+## GLM gap vs O-lens "manipulation" reads (2026-10-25)
+
+Celeste's `cfi_donation_bet` reads (GLM verbalizer, RL, greedy bullet at every reasoning + answer
+token, prompt positions excluded). An episode counts as "lens says it" if any read contains the
+stem `manipulat` (case-insensitive). The lens says it far more than GLM does (good vs bad: 84–85%
+of episodes vs 15–19% in GLM's own text; neutral arm 0%) and barely tracks which side of the line
+the estimate lands (`glm_olens_manipulation.png`). Splitting episodes on it, the gap is smaller
+where the lens says it: good vs bad +8 vs +25 (no read, 8 questions), good vs nothing +29 vs +39,
+beers +6 vs +6, named pairs +1 vs +8. Per question × comparison the correlation of read rate and gap
+is ρ = +0.28, p = 0.086 (`glm_gap_vs_olens_manipulation.png`). The split conditions on a
+post-treatment variable (e.g. reasoning length), so this is descriptive. A length-controlled
+logistic regression (log reasoning characters × arm, question fixed effects, clustered by
+question) is on the slide (private claude.ai artifact
+[ANyTUwtVdoCWtP1mDFkBgq](https://claude.ai/artifact/ANyTUwtVdoCWtP1mDFkBgq)).
