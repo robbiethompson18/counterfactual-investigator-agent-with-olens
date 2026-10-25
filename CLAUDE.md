@@ -309,6 +309,11 @@ Current docs:
 - [Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
   — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
   "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
+- [Character drift — read before prefilling Qwen with out-of-persona assistant turns, or reading the lens at the Assistant token in roleplay](docs/envs/character_drift.md)
+  — 40 Sonnet-written + 40 WildChat drift transcripts × system prompt × follow-up; in-world ~90%
+  stays in character, "what are you?" 13% (thinking on) vs 48% (off); O-lens at the Assistant token
+  says roleplay/persona (not "disclaimer") and previews the reply, predicting snap-back (AUROC
+  0.72-0.95)
 - [Thinking on vs off — read before running Qwen with `--thinking 0` or picking unverbalized cases for the O-lens](docs/thinking-off.md)
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
