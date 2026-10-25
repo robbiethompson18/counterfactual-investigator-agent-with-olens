@@ -1,0 +1,50 @@
+# Qwen3.6-27B (bf16) on SkyPilot (Kylie's stand-in for the shared server). Proven recipe from weirdchat-chive/sky/vllm_h200.yaml:
+# cu129 vLLM 0.25.1 wheels + apt CUDA 12.9 toolkit, so the first-use kernel JIT works. Args match Robbie's qwen-shared.
+#   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c qwen-cd -y -i 30 --down --secret VLLM_KEY --secret HF_TOKEN evalcue/sky/qwen_vllm.yaml
+name: qwen-chardrift
+
+resources:
+  disk_size: 200
+  ordered:                      # any RunPod region except IS (policy); 2-GPU data-parallel for latency
+    - {infra: runpod, accelerators: "H200-SXM:2"}
+    - {infra: runpod, accelerators: "H100-SXM:2"}
+    - {infra: runpod, accelerators: "B200:2"}
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+
+secrets:
+  HF_TOKEN: null
+  VLLM_KEY: null
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  MODEL: Qwen/Qwen3.6-27B
+  MAX_HOURS: 3.75
+  VLLM_ENGINE_READY_TIMEOUT_S: 3600   # data-parallel engines wait on the first-start kernel compile
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf
+  # CUDA compiler + headers: vLLM JIT-compiles flashinfer / linear-attention kernels on first use
+  ( cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-12-9 cuda-cudart-dev-12-9 \
+       cuda-cccl-12-9 libcurand-dev-12-9 libcublas-dev-12-9 cuda-nvrtc-dev-12-9 cuda-profiler-api-12-9 \
+       libcusparse-dev-12-9 >/dev/null ) &
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  cd ~ && test -x vllm-env/bin/python || ~/.local/bin/uv venv -q --python 3.12 vllm-env
+  # vLLM 0.25.1, cu129 build: RunPod's 570 driver can't run cu130 wheels
+  VIRTUAL_ENV=~/vllm-env ~/.local/bin/uv pip install -q vllm==0.25.1 ninja \
+    --extra-index-url https://wheels.vllm.ai/0.25.1/cu129 --torch-backend=cu129 --index-strategy unsafe-best-match
+  ~/vllm-env/bin/hf download "$MODEL" >/dev/null
+  wait  # CUDA packages
+
+run: |
+  export PATH=$HOME/vllm-env/bin:/usr/local/cuda-12.9/bin:$PATH   # ninja lives in the venv
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES   # sky exec can set it empty
+  nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+  timeout "${MAX_HOURS}h" ~/vllm-env/bin/vllm serve "$MODEL" --served-model-name qwen Qwen/Qwen3.6-27B \
+    --host 127.0.0.1 --port 8000 --api-key "$VLLM_KEY" --max-model-len 262144 --gpu-memory-utilization 0.92 \
+    --data-parallel-size "$SKYPILOT_NUM_GPUS_PER_NODE" --max-num-seqs 256 --enable-prefix-caching \
+    --generation-config auto --reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser qwen3_coder \
+    || echo "vllm serve exited ($?)"
