@@ -2,6 +2,7 @@
 
 import argparse
 import glob
+import json
 from pathlib import Path
 
 import numpy as np
@@ -87,6 +88,8 @@ def main():
     ap.add_argument(
         "--subset", action="store_true", help="per-episode subset: dense=False; prefix dups and episodes.positions limited to what was read"
     )
+    ap.add_argument("--keep", default=None, help="parquet of (tid, pos) to keep (drops extra reads of an earlier, wider job)")
+    ap.add_argument("--tids", default=None, help="JSON list of the sampled episode views: episodes + prefix dups restricted to them")
     a = ap.parse_args()
     prep, out = Path(a.prep), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -94,16 +97,23 @@ def main():
     jobs = sorted(Path(p) for p in glob.glob(f"{a.jobs}/{prep.name}*__*.job.pt"))
     done = [j for j in jobs if Path(str(j).replace(".job.pt", ".out.pt")).exists()]
     w = pq.ParquetWriter(out / "readouts_dense.parquet", SCHEMA, compression="zstd")
+    keep = pd.read_parquet(a.keep).drop_duplicates() if a.keep else None
+    tids = set(json.loads(Path(a.tids).read_text())) if a.tids else None
     n, read_pos = 0, []
     for j in done:
         kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
-        t = to_table(shard_rows(j, P), kind, not a.subset)
+        rows = shard_rows(j, P)
+        if a.keep:
+            rows = rows.merge(keep, on=["tid", "pos"])
+        t = to_table(rows, kind, not a.subset)
         read_pos.append(t.select(["tid", "pos"]).to_pandas())
         w.write_table(t, row_group_size=50_000)
         n += t.num_rows
     w.close()
     eps = pd.read_parquet(prep / "episodes.parquet")
     dups = pd.read_parquet(prep / "dense_prefix_dups.parquet")
+    if tids is not None:
+        eps, dups = eps[eps.tid.isin(tids)], dups[dups.tid.isin(tids)]
     if a.subset:  # only the positions actually read, plus the exact-prefix duplicates of those (read once, shown in every episode)
         rp = pd.concat(read_pos)
         dups = dups.merge(rp.rename(columns={"tid": "canon_tid", "pos": "canon_pos"}), on=["canon_tid", "canon_pos"])
