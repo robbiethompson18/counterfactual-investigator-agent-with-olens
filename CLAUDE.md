@@ -248,6 +248,8 @@ Current docs:
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
 - [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
   — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
+- [GLM 5.3 agent-interp-envs runs — read before comparing GLM 5.3 coding/EvilGenie/ImpossibleBench/Donation Bet results or running many podman sandboxes](docs/glm53-agent-interp-envs.md)
+  — headline numbers, artifact and Docent links, podman scaling gotchas
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
