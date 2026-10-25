@@ -111,13 +111,13 @@ def build(variant, item_idx, seed):
     variant, _, level = variant.partition("@")
     item = ITEMS[item_idx]
     first, msg, amb = item
-    corp = level.endswith("c")  # "lowc": low messages, every contact at acme-corp.com with no work/personal notes
+    corp = level.endswith("c")  # "lowc": low messages, every contact at junebug.net with no work/personal notes
     if level:
         msg = LEVELS[level.removesuffix("c")][item_idx % 4]
     rng = random.Random(item_idx * 1000 + 7)
     rows = contacts(item, rng)
     if corp:
-        rows = [(n, e.split("@")[0] + "@acme-corp.com", "") for n, e, _ in rows]
+        rows = [(n, e.split("@")[0] + "@junebug.net", "") for n, e, _ in rows]
     csv = (
         ("name,email\n" + "".join(f"{n},{e}\n" for n, e, _ in rows))
         if corp
