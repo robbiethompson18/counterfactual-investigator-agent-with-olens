@@ -15,12 +15,14 @@ there is one page per transcript. Rows without a base item stay plain items.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from expview import Run, call, discover
+from expview import REPO, Run, call, discover
 
 DOCENT = "https://docent.transluce.org"
 
@@ -39,6 +41,49 @@ def base_items(d: str, run_key: str) -> dict[int, str]:
     return out
 
 
+def env_docs(env: str, arms: list[str]) -> tuple[str, dict[str, str]]:
+    """What the env is and what each arm means, from evalcue/envs/<env>/__init__.py's docstring (an indented
+    "arm  text" list, wrapped lines indented further) or else a "| arm | text |" table in docs/envs/<env>.md.
+    Returns (markdown description, {arm: full text})."""
+    text, out = "", {}
+    init = REPO / "evalcue/envs" / env / "__init__.py"
+    doc = ast.get_docstring(ast.parse(init.read_text())) if init.exists() else None
+    if doc:
+        lines, cur, first = doc.splitlines(), None, None
+        for n, ln in enumerate(lines):
+            m = re.match(r"^(\s+)(\S+)\s{2,}(\S.*)$", ln)
+            if m and m.group(2) in arms:
+                cur, ind, first = m.group(2), len(m.group(1)), first if first is not None else n
+                out[cur] = m.group(3).strip()
+            elif cur and ln.strip() and len(ln) - len(ln.lstrip()) > ind:
+                out[cur] += " " + ln.strip()
+            else:
+                cur = None
+        intro = "\n".join(lines[:first]) if first is not None else doc.split("\n\n")[0]  # everything before the arm list
+        paras = [" ".join(p.split()) for p in intro.split("\n\n") if p.strip()]
+        paras += [" ".join(p.split()) for p in doc.split("\n\n") if p.strip().startswith("Label")]
+        text = "\n\n".join(paras)
+    md = REPO / "docs/envs" / f"{env}.md"
+    if md.exists():
+        for ln in md.read_text().splitlines():
+            cells = [c.strip().strip("`") for c in ln.strip().strip("|").split("|")]
+            if len(cells) >= 2 and cells[0] in arms and cells[0] not in out:
+                out[cells[0]] = cells[1]
+        text = (
+            text
+            or f"See [docs/envs/{env}.md](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/main/docs/envs/{env}.md)."
+        )
+    return text, out
+
+
+def short(t: str, n: int = 90) -> str:
+    t = re.sub(r"\s+", " ", t).strip()
+    head, sep, rest = t.partition(": ")
+    if sep and len(head) <= 25:  # "the shipped memo: the client is ..." -> lead with the content
+        t = rest
+    return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + "…"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path, help="data/runs/<env>/<run> with rows.jsonl (and meta.json, docent.json)")
@@ -51,12 +96,19 @@ def main() -> None:
     bases = base_items(a.base, key) if a.base else {}
     # the env detector's flags (evalcue detect_notes) or, for coding-harness rows, their top-level yes/no fields (hack, ...)
     flags = sorted({k for r in rows for k, v in (r.get("detect_notes") or {}).items() if isinstance(v, bool)})
-    flags += sorted({k for r in rows for k, v in r.items() if isinstance(v, bool) and k != "positive" and k not in flags})
+    params = {"positive", "thinking"}  # run settings, not outcomes
+    flags += sorted({k for r in rows for k, v in r.items() if isinstance(v, bool) and k not in params and k not in flags})
+    env = rows[0].get("env") or a.run.parent.name
+    about, arm_docs = env_docs(env, sorted({str(r.get("arm", r.get("variant"))) for r in rows}))
+    arms_md = "".join(f"\n- **{k}**: {v}" for k, v in sorted(arm_docs.items()))
     run = Run(
         a.run / "expview",
         title=f"{a.run.parent.name}: {a.run.name}",
+        groups={k: short(v) for k, v in arm_docs.items()} or None,
         description=(
-            f"{meta.get('description', '')}\n\nOne item per rollout (`{key}` line = item order). The call is the subject's whole "
+            (f"{about}\n\n**Arms**{arms_md}\n\n" if arms_md else f"{about}\n\n" if about else "")
+            + f"This run: {meta.get('description', '')}\n\nOne item per rollout (`{key}` line = item order). "
+            "The call is the subject's whole "
             "episode, exactly as sent and returned; the environment is the workspace before the episode (`before/`) and the files "
             "it changed (`after/`). Labels: **positive** is the env's behaviour label, the rest are its detector's flags."
             + (" Items open on the same transcript with Celeste's O-lens reads inline." if bases else "")
@@ -77,7 +129,7 @@ def main() -> None:
         base = (a.base, bases[i]) if i in bases else None
         n_base += base is not None
         run.add(
-            id=f"{arm}/{r.get('pid') or r.get('item') or ''}/s{sample}".replace("//", "/"),
+            id=f"{arm}/{r['pid']}/s{sample}" if r.get("pid") else f"{arm}/s{sample}",  # coding rows: one arm spans many tasks
             group=arm,
             labels={k: v for k, v in labels.items() if v is not None},
             calls=[call("subject", r.get("model"), messages=r.get("messages") or [], params={"thinking": r.get("thinking")})],

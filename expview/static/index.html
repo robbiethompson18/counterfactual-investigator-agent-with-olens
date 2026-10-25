@@ -157,6 +157,7 @@ main{overflow:auto;padding:0 28px 60px}
 .rd.topk ul{padding-left:0;list-style:none;display:flex;flex-wrap:wrap;gap:3px 6px}.rd.topk li{font:12px var(--mono);background:var(--code);border-radius:3px;padding:0 4px}
 .side{position:sticky;top:56px;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel);font-size:13px}
 .side h3{font:600 13px var(--sans);margin:0 0 8px}
+.gl{color:var(--mute);font-size:12px}
 .judge{border-top:1px solid var(--line);padding:8px 0}.judge:first-of-type{border-top:0;padding-top:0}
 .judge .jr{white-space:pre-wrap;margin:6px 0 0;font-size:12.5px}.judge details{margin-top:4px}.tokref{cursor:pointer;text-decoration:underline dotted}
 .hit{border-top:1px solid var(--line);padding:6px 0;cursor:pointer}.hit:hover{background:var(--sel)}
@@ -314,6 +315,9 @@ async function homePage(){
 }
 
 // ================================================================ one run: summary by group + items table
+// run.json "groups": {group: short gloss}, e.g. what an arm is; shown next to the group name everywhere
+const gloss=(R,g)=>((R&&R.run&&R.run.groups)||{})[g];
+const groupHtml=(R,g)=>`${esc(g??"")}${gloss(R,g)?` <span class="gl">${esc(gloss(R,g))}</span>`:""}`;
 function summaryRow(R,name,its){
   const cells=R.labels.map(k=>{const kind=R.kinds[k],vs=its.map(i=>(i.labels||{})[k]).filter(v=>v!=null);
     if(!vs.length)return "<td class='mono'>–</td>";
@@ -321,7 +325,7 @@ function summaryRow(R,name,its){
     if(kind=="num"){const m=vs.reduce((a,b)=>a+b,0)/vs.length;return `<td class="num">mean ${fmt(m)}</td>`}
     if(kind=="cat"){const c={};vs.forEach(v=>c[fmt(v)]=(c[fmt(v)]||0)+1);return `<td class="num">${Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,n])=>`${esc(v)} ${n}`).join(" · ")}</td>`}
     return "<td></td>"}).join("");
-  return `<tr class="${name!=null?"click":""}" ${name!=null?`data-g="${esc(name)}"`:""}><td>${name==null?"<b>All items</b>":esc(name)}</td><td class="num">${its.length}</td>${cells}</tr>`}
+  return `<tr class="${name!=null?"click":""}" ${name!=null?`data-g="${esc(name)}"`:""}><td>${name==null?"<b>All items</b>":groupHtml(R,name)}</td><td class="num">${its.length}</td>${cells}</tr>`}
 function sortKey(it,k){const v=k=="__id"?it.id:k=="__group"?it.group:(it.labels||{})[k];return v==null?null:typeof v=="boolean"?+v:v}
 function filtered(R){const F=R.F,q=F.q.toLowerCase();
   const out=R.items.filter(it=>(!F.group||it.group==F.group)&&(!q||(it.id+" "+(it.group||"")).toLowerCase().includes(q))&&
@@ -343,7 +347,7 @@ async function runPage(d){
    ${r.notes?`<div class="desc md" style="margin-top:14px">${md(r.notes)}</div>`:""}
    <h2>Items</h2>
    <div class="filters">
-    ${R.groups.length?`<label for="fg">Group <select id="fg"><option value="">all</option>${R.groups.map(g=>`<option ${F.group==g?"selected":""}>${esc(g)}</option>`).join("")}</select></label>`:""}
+    ${R.groups.length?`<label for="fg">Group <select id="fg"><option value="">all</option>${R.groups.map(g=>`<option value="${esc(g)}" ${F.group==g?"selected":""}>${esc(g)}${gloss(R,g)?" · "+esc(gloss(R,g)):""}</option>`).join("")}</select></label>`:""}
     ${cats.map((k,i)=>{const vals=[...new Set(R.items.map(it=>fmt((it.labels||{})[k])))].sort();return `<label for="fl${i}">${esc(k)} <select id="fl${i}" data-k="${esc(k)}"><option value="">all</option>${vals.map(v=>`<option ${F.labels[k]==v?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`}).join("")}
     <label for="fq">Find <input id="fq" type="search" value="${esc(F.q)}" placeholder="id or group"></label>
     ${hasTok&&!SRC.static?`<a class="btn" href="${linkTo({s:1,d})}">Search this run's reads</a>`:""}
@@ -362,7 +366,7 @@ function itemsTable(R){
   const th=(k,n)=>`<th class="s" data-sort="${esc(k)}" title="sort">${esc(n)}${F.sort==k?(F.dir>0?" ▲":" ▼"):""}</th>`;
   const hasTok=R.items.some(i=>i.tokens),hasDoc=R.items.some(i=>docentOf(i.links));
   $("#items").innerHTML=`<tr>${th("__id","Item")}${R.groups.length?th("__group","Group"):""}${R.labels.map(k=>th(k,k)).join("")}${hasTok?"<th>Reads</th>":""}<th>Calls</th>${hasDoc?"<th>Docent</th>":""}</tr>`+
-   shown.slice(0,R.limit).map(it=>`<tr class="click" data-i="${esc(it.id)}"><td class="mono wrapid">${esc(it.id)}</td>${R.groups.length?`<td>${esc(it.group??"")}</td>`:""}${R.labels.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}${hasTok?`<td class="num mono">${it.tokens?it.tokens.reads.toLocaleString():""}</td>`:""}<td class="mono" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td>${hasDoc?`<td>${docentOf(it.links)?`<a class="chip" href="${esc(docentOf(it.links))}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>`:""}</tr>`).join("");
+   shown.slice(0,R.limit).map(it=>`<tr class="click" data-i="${esc(it.id)}"><td class="mono wrapid">${esc(it.id)}</td>${R.groups.length?`<td>${groupHtml(R,it.group)}</td>`:""}${R.labels.map(k=>{const v=(it.labels||{})[k];return `<td class="num">${v===true?'<span class="chip t">yes</span>':esc(fmt(v))}</td>`}).join("")}${hasTok?`<td class="num mono">${it.tokens?it.tokens.reads.toLocaleString():""}</td>`:""}<td class="mono" title="${esc((it.calls||[]).map(c=>c.name).join(", "))}">${(it.calls||[]).length}</td>${hasDoc?`<td>${docentOf(it.links)?`<a class="chip" href="${esc(docentOf(it.links))}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>`:""}</tr>`).join("");
   $("#more").innerHTML=shown.length>R.limit?`<button class="btn" id="mb">Show ${Math.min(1000,shown.length-R.limit)} more</button>`:"";
   const mb=$("#mb");if(mb)mb.onclick=()=>{R.limit+=1000;itemsTable(R)};
   $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable(R);return}
@@ -393,7 +397,7 @@ async function itemPage(d,i,p){
   $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({d})}">← All items</a><span>
      <a class="btn" ${prev?`href="${linkTo({d,i:prev.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
      <a class="btn" ${next?`href="${linkTo({d,i:next.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
-   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({d:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
+   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>${gloss(R,it.group)?`<div class="gl">${esc(gloss(R,it.group))}</div>`:""}`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({d:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
    <div class="labels">${Object.entries(it.labels||{}).map(([a,b])=>chip(a,b)).join("")}</div>
    ${Object.keys(links).length?`<div class="labels">${Object.entries(links).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("")}</div>`:""}
    ${it.tokens?`<div class="sec">${esc(R.run.tokens_section||"Transcript")}</div><button class="f" data-sel='{"v":"tr"}'>${esc(R.run.tokens_button||"with metamodel reads")}<span class="mono">${(it.tokens.n||0).toLocaleString()} tok · ${(it.tokens.reads||0).toLocaleString()} read</span></button>`:""}
