@@ -442,7 +442,7 @@ function show(sel,p){
     if(el){el.scrollIntoView({block:"center"});const box=el.closest(".msg");if(box){box.classList.remove("clip");box.classList.add("flash")}}}
 }
 function callHtml(c,ci,rx){
-  const skip=new Set(["name","model","messages","tools","params","parsed"]);
+  const skip=new Set(["name","model","messages","tools","params","parsed","token_refs","overlay"]);
   const meta=[chip("model",c.model),...Object.entries(c.params||{}).map(([k,v])=>chip(k,v)),...Object.entries(c).filter(([k])=>!skip.has(k)).map(([k,v])=>chip(k,v))];
   let h=`<div class="msgs"><div class="meta">${meta.join("")}</div>`;
   if(c.parsed!=null)h+=`<div class="parsed"><span class="chip t">parsed</span> <code>${hl(JSON.stringify(c.parsed),rx)}</code></div>`;
