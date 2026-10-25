@@ -46,9 +46,13 @@ if a.rescore:
         upload(a.rescore.parent)
 else:
     params = {"n_per_arm": a.n, "arms": arms, "thinking": bool(a.thinking), "max_tokens": a.max_tokens, "seed": a.seed}
+    if harness.SAMPLING_MODE is not None:
+        params["sampling"] = "thinking-on" if harness.SAMPLING_MODE else "thinking-off"
     served_by = f"vLLM at {harness.URL} (runpod:qwen-shared)"
     if harness.MODEL != "qwen":
         served_by = f"openrouter ({harness.PROVIDER or 'any provider'}, effort {harness.EFFORT})"
+        if harness.RAW_PREFILL and not a.thinking:
+            served_by = f"openrouter raw completions, empty think block prefilled (providers {','.join(harness.RAW_PROVIDERS)})"
     run = new_run(
         run_id,
         a.tag,

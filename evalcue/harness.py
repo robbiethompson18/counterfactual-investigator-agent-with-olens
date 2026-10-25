@@ -44,6 +44,51 @@ EFFORT = os.environ.get("EVALCUE_EFFORT", "medium")
 SANDBOX_IMAGE = "evalcue-sandbox"  # built from evalcue/Dockerfile: python 3.12 + pytest + numpy + git
 # Qwen3.6 model-card sampling defaults per mode
 SAMPLING = {True: (1.0, 0.95, 0.0), False: (0.7, 0.8, 1.5)}  # (temperature, top_p, presence_penalty), top_k 20 for both
+# EVALCUE_SAMPLING=on|off uses that mode's sampling whatever --thinking is, e.g. thinking off with thinking-on sampling so a
+# thinking on/off comparison changes only the (empty) think block
+SAMPLING_MODE = {"on": True, "off": False}.get(os.environ.get("EVALCUE_SAMPLING", ""))
+# EVALCUE_RAW_PREFILL=1: thinking off on an OpenRouter model whose endpoint refuses reasoning.enabled=false (GLM 5.3:
+# "Reasoning is mandatory") renders the chat template by hand, prefills an empty think block and samples through the raw
+# completions endpoint. EVALCUE_RAW_PROVIDERS: the providers that take the prompt as is (Z.AI and Wafer re-template it
+# and think anyway; DeepInfra fp4 got 17*23 wrong; checked 2026-10-25). Single-turn, no tools.
+RAW_PREFILL = os.environ.get("EVALCUE_RAW_PREFILL") == "1"
+RAW_PROVIDERS = os.environ.get("EVALCUE_RAW_PROVIDERS", "fireworks,together,parasail/fp8,friendli").split(",")
+# zai-org/GLM-5.3 chat_template.jinja with add_generation_prompt and default reasoning effort, plus the "</think>" it puts
+# after "<think>" on past assistant turns that had no reasoning
+GLM_TURN = {"system": "<|system|>", "user": "<|user|>"}
+GLM_PREFIX, GLM_EMPTY_THINK = "[gMASK]<sop><|system|>Reasoning Effort: Max", "<|assistant|><think></think>"
+
+
+class NoChoices(Exception):
+    pass
+
+
+async def chat_raw_prefill(messages, *, max_tokens, temperature, top_p, presence_penalty):
+    assert MODEL.startswith("z-ai/glm-5") and all(m["role"] in GLM_TURN for m in messages), "raw prefill: GLM, single turn"
+    prompt = GLM_PREFIX + "".join(GLM_TURN[m["role"]] + m["content"] for m in messages) + GLM_EMPTY_THINK
+    for attempt in range(6):
+        try:
+            r = await CLIENT.completions.create(
+                model=MODEL,
+                prompt=prompt,
+                max_tokens=max_tokens or 16384,  # providers' raw-completion default can be 16 tokens
+                temperature=temperature,
+                top_p=top_p,
+                presence_penalty=presence_penalty,
+                extra_body={"provider": {"only": RAW_PROVIDERS, "allow_fallbacks": False}},
+            )
+            if not r.choices:  # OpenRouter reports some provider errors as a 200 with no choices
+                raise NoChoices(str(r.model_extra))
+            break
+        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices) as e:
+            if attempt == 5 or isinstance(e, APITimeoutError):
+                raise
+            await asyncio.sleep(10 * 2**attempt)
+    c = r.choices[0]
+    reasoning = (c.model_extra or {}).get("reasoning") or ""  # should stay empty: the think block is already closed
+    msg = {"role": "assistant", "content": c.text or "", "reasoning_content": reasoning, "provider": (r.model_extra or {}).get("provider")}
+    return msg, c.finish_reason, r.usage.completion_tokens if r.usage else 0
+
 
 BASH_TOOL = {
     "type": "function",
@@ -75,7 +120,12 @@ class Episode:
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
-    temperature, top_p, presence_penalty = SAMPLING[thinking]
+    temperature, top_p, presence_penalty = SAMPLING[thinking if SAMPLING_MODE is None else SAMPLING_MODE]
+    if RAW_PREFILL and not thinking and MODEL != "qwen":
+        assert not tools
+        return await chat_raw_prefill(
+            messages, max_tokens=max_tokens, temperature=temperature, top_p=top_p, presence_penalty=presence_penalty
+        )
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking, "preserve_thinking": True}}
     if MODEL != "qwen":  # OpenRouter's unified reasoning switch
         extra = {"reasoning": {"enabled": thinking, **({"effort": EFFORT} if thinking and EFFORT else {})}}
