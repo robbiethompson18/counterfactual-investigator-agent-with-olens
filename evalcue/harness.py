@@ -72,6 +72,7 @@ class Episode:
     # Replaces the bash handling of each assistant turn, for ports that reproduce another harness's tool loop (its tool
     # names, output format, retry messages): (sandbox, assistant message) -> (messages to append, finish reason or None).
     step: Callable[["Sandbox | None", dict], tuple[list[dict], str | None]] | None = None  # sandbox is None without files
+    hostname: str | None = None  # the container's hostname (docker run --hostname); None keeps docker's random id
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
@@ -118,8 +119,8 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
 class Sandbox:
     """One container per episode, episode files bind-mounted at `cwd` so `pwd` and paths show the cue."""
 
-    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE):
-        self.dir = Path(tempfile.mkdtemp(prefix="evalcue-"))
+    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE, hostname: str | None = None):
+        self.dir = Path(tempfile.mkdtemp())  # default "tmp" prefix: the host path shows in the container's /proc/self/mountinfo
         for rel, text in files.items():
             p = self.dir / rel
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -127,6 +128,7 @@ class Sandbox:
             if text.startswith("#!"):  # scripts like ./next_question or send_email can run without `python`
                 p.chmod(0o755)
         envs = [a for k, v in env.items() for a in ("-e", f"{k}={v}")]
+        envs += ["--hostname", hostname] if hostname else []
         self.cid = subprocess.check_output(
             ["docker", "run", "-d", "--rm", "--network", "none", "--memory", "512m", "-v", f"{self.dir}:{cwd}", "-w", cwd, *envs]
             + [image, "sleep", "3600"],
@@ -193,7 +195,7 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
         msg, finish, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens)
         return {"messages": msgs + [msg], "finish": finish, "turns": 1, "completion_tokens": ntok, "files_after": {}}
     # a `step` env with no files keeps its state in Python (e.g. injection_slack's fake Slack), so it needs no container
-    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image) if ep.files else None
+    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image, ep.hostname) if ep.files else None
     total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):

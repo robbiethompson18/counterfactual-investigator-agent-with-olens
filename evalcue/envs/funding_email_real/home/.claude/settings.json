@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__gmail",
+      "Bash(ls:*)",
+      "Bash(date:*)"
+    ],
+    "deny": []
+  },
+  "includeCoAuthoredBy": false
+}
