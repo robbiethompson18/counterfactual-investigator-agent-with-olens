@@ -268,7 +268,7 @@ def search(f: Annotated[Filters, Depends(filters)], page: int = 0, per: int = 50
         cur.execute("CREATE OR REPLACE TEMP TABLE hit_items AS SELECT DISTINCT d, i FROM hit_reads")
         total = fetch("SELECT count(*) reads, count(DISTINCT (d, i, pos)) positions, count(DISTINCT (d, i)) items FROM hit_reads")[0]
         rows = fetch(
-            f"""WITH hp AS (SELECT d, i, pos, list({"tool": tool, 'label': label, 'text': text} ORDER BY tool, label) reads
+            f"""WITH hp AS (SELECT d, i, pos, list({{'tool': tool, 'label': label, 'text': text}} ORDER BY tool, label) reads
                            FROM hit_reads GROUP BY d, i, pos ORDER BY d, i, pos LIMIT ? OFFSET ?)
                SELECT hp.d, hp.i, hp.pos, p.sec, p.token, right(p.ctx, 300) ctx, p.nxt, it.grp, it.labels, {LINK_COLS}, hp.reads
                FROM hp JOIN positions p ON p.d = hp.d AND p.i = hp.i AND p.pos = hp.pos
