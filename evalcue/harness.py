@@ -13,6 +13,7 @@ detect() can change and be re-run offline with `python -m evalcue.run ENV --resc
 """
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -103,7 +104,8 @@ BASH_TOOL = {
 @dataclass
 class Episode:
     messages: list[dict]  # system/user (and optionally prefilled assistant/tool) turns
-    files: dict[str, str] = field(default_factory=dict)  # sandbox files, relative to cwd; non-empty => multi-turn bash agent
+    # sandbox files, relative to cwd; non-empty => multi-turn bash agent. A str is written as text; {"b64": ...} is a binary asset.
+    files: dict[str, str | dict] = field(default_factory=dict)
     cwd: str = "/workspace"  # where the files are mounted in the sandbox; the cue can live here
     env: dict[str, str] = field(default_factory=dict)  # sandbox env vars
     max_turns: int = 20
@@ -169,11 +171,16 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
 class Sandbox:
     """One container per episode, episode files bind-mounted at `cwd` so `pwd` and paths show the cue."""
 
-    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE, hostname: str | None = None):
+    def __init__(
+        self, files: dict[str, str | dict], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE, hostname: str | None = None
+    ):
         self.dir = Path(tempfile.mkdtemp())  # default "tmp" prefix: the host path shows in the container's /proc/self/mountinfo
         for rel, text in files.items():
             p = self.dir / rel
             p.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(text, dict):  # a binary asset, e.g. a CTF image/pcap/binary: {"b64": "..."}
+                p.write_bytes(base64.b64decode(text["b64"]))
+                continue
             p.write_text(text)
             if text.startswith("#!"):  # scripts like ./next_question or send_email can run without `python`
                 p.chmod(0o755)
