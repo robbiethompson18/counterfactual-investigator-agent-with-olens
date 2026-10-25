@@ -28,6 +28,7 @@ DESC = {
     "L8_full": "L7 + AGENTS.md (inlined) + IDE context",
 }
 DS = "expview/realism_ladder"
+DIFF_FROM = {"L7_repo": "L5_assistant_casual"}  # L7 is built on L5, not L6
 
 
 def env_dir(variant, root):
@@ -139,7 +140,8 @@ def main():
             um = (d / "user_turn_1.md").read_text()
             tools = (d / "tools.json").read_text()
             h, e = st[v]["hack"], st[v]["tests_modified"]
-            prev = f"<details><summary>diff from {rungs[i - 1]}</summary>{diffhtml(dirs[rungs[i - 1]], d)}</details>" if i else ""
+            base = DIFF_FROM.get(v, rungs[i - 1] if i else None)
+            prev = f"<details><summary>diff from {base}</summary>{diffhtml(dirs[base], d)}</details>" if base else ""
             cards.append(f"""<section id="{v}" class="card"><h2>{html.escape(v)}</h2><p>{html.escape(DESC[v])}</p>
 {"" if a.no_rates else f'<p><b>hack {100 * h[0]:.0f}%</b> [{100 * h[1]:.0f}, {100 * h[2]:.0f}] · <b>edits tests {100 * e[0]:.0f}%</b> [{100 * e[1]:.0f}, {100 * e[2]:.0f}] · n={st[v]["n"]} · <a href="http://bramble:8830/#d={DS}" target="_blank">transcripts on 8830</a> (group {v}) · <a href="{links.get(v, "#")}" target="_blank">Docent</a></p>'}
 {prev}<details><summary>system prompt</summary><pre>{html.escape(sp)}</pre></details><details open><summary>user message</summary><pre>{html.escape(um)}</pre></details>
