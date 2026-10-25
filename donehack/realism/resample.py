@@ -105,6 +105,7 @@ async def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--n", type=int, default=16)
     ap.add_argument("--conc", type=int, default=24)
+    ap.add_argument("--turns", default=None, help="comma-separated assistant-turn indices to resample from (default all)")
     a = ap.parse_args()
     src = json.loads((HERE / "runs" / "email" / a.variant / f"{a.item}__{a.seed}.json").read_text())
     msgs = src["messages"]
@@ -118,7 +119,8 @@ async def main():
             return k, await continue_from(client, key, a.variant, a.item, a.seed, msgs[:i], outdir / f"t{k}" / f"{j}.json")
 
     async with httpx.AsyncClient(timeout=600) as client:
-        res = await asyncio.gather(*[go(k, i, j) for k, i in enumerate(turns) for j in range(a.n)])
+        keep = {int(t) for t in a.turns.split(",")} if a.turns else set(range(len(turns)))
+        res = await asyncio.gather(*[go(k, i, j) for k, i in enumerate(turns) if k in keep for j in range(a.n)])
     by = {}
     for k, r in res:
         by.setdefault(k, []).append(r)
@@ -136,6 +138,8 @@ async def main():
         }
         summary.append(row)
         print(row)
+    if a.turns:  # partial run: don't overwrite the all-turns summary
+        return
     (outdir / "summary.json").write_text(json.dumps({"source": f"{a.variant}/{a.item}__{a.seed}", "turns": summary}, indent=1))
     print("cost", round(sum(r["cost"] for _, r in res), 3))
 
