@@ -66,6 +66,7 @@ def main() -> None:
         "--glm-filter", default="r.reader = 'glm_rl'", help="SQL filter for the main reader set (default: GLM RL lens, greedy + 4 samples)"
     )
     ap.add_argument("--tag", default="", help="suffix for the output files")
+    ap.add_argument("--dense", type=Path, default=None, help="dense_prompt.parquet: per-episode prompt-side any-hit from dense reads")
     ap.add_argument("--merge", default="", help="NEW=a+b,...: pool settings into one row (e.g. am=am_main+hp_am_fixed)")
     ap.add_argument("--exclude", default="", help="comma-separated settings to drop (e.g. inspect_am,sad_oversight)")
     a = ap.parse_args()
@@ -100,6 +101,13 @@ def main() -> None:
     plen = h.groupby("ph").pend.max()
     out["prompt_positions"] = out.ph.map(cov).fillna(0)
     out["positions_per_1k_chars"] = out.prompt_positions / out.ph.map(plen).clip(lower=1) * 1000
+    if a.dense:  # dense every-token reads (later data): replace prompt-side any-hit and coverage where an episode has them
+        dn = pd.read_parquet(a.dense).set_index("tid")
+        m = out.tid.isin(dn.index)
+        out.loc[m, "glm_prompt_any"] = out.loc[m, "tid"].map(dn.dense_prompt_any).astype(bool).to_numpy()
+        out.loc[m, "prompt_positions"] = out.loc[m, "tid"].map(dn.dense_prompt_positions).to_numpy()
+        out.loc[m, "positions_per_1k_chars"] = (out.loc[m, "prompt_positions"] / out.loc[m, "ph"].map(plen).clip(lower=1) * 1000).to_numpy()
+        out["dense_source"] = m
     out.to_parquet(a.run / f"anyhit_episodes{a.tag}.parquet")
 
     rows = []

@@ -42,6 +42,19 @@ undefined (it saturates). On the remaining 16 settings: prompt-side RL any-hit A
 0.57] for all, 0.63 [0.57, 0.69] without donation bet; setting-level Spearman +0.27 (p = 0.31).
 Generation-side any-hit 0.64 [0.58, 0.70].
 
+**Correction (2026-10-25, dense reads).** Everything above used a snapshot of Celeste's readouts
+taken 2026-10-24 18:32 UTC (the olens_search DB). Her dense every-token reads landed afterwards
+(`readouts_dense.parquet` for agentic misalignment, AISI honeypots, evalcue and donation bet; shared
+prompt prefixes read once and mapped via `dense_prefix_dups.parquet`), so evalcue and donation bet
+looked sparse (~4-5 prompt positions per prompt) when they are read at every prompt token (median 98
+and 141). `olens_prompt_ea/dense_prompt.py` recomputes prompt-side RL any-hit from them, and
+`anyhit.py --dense` uses it. With dense reads almost every setting is densely read; prompt-side
+any-hit saturates on many (donation bet, sandbagging 1.00; whistleblow 0.98; hiring 0.99) and the
+earlier between-setting hint disappears: AUROC 0.42 [0.39, 0.46] all, 0.52 [0.48, 0.56] without
+donation bet, 0.50 [0.45, 0.53] densely read only; setting-level Spearman -0.08 (p = 0.76).
+Generation-side any-hit stays ~0.64. IB realistic, AgentHarm, MASK and InstrumentalEval still have
+sparse prompt reads only.
+
 ## Across tasks (headline)
 
 Unit = unique prompt, pooled across settings. x = whether / how much the prompt-side O-lens reads
