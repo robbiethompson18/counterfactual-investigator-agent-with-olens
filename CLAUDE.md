@@ -358,6 +358,10 @@ Current docs:
 - [GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
   — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s on 4xB200,
   so subsample long coding episodes)
+- [Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
+  — keyword match over prompt-side reads vs VEA across 21 settings: null within condition, null or
+  negative across tasks (eval words in reads track graded-task content, e.g. unit tests);
+  per-setting figure, trace examples on bramble:8830
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
