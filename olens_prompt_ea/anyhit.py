@@ -61,6 +61,10 @@ def main() -> None:
     ap.add_argument("run", type=Path)
     ap.add_argument("--db", type=Path, required=True)
     ap.add_argument("--fig", type=Path, required=True)
+    ap.add_argument(
+        "--glm-filter", default="r.reader = 'glm_rl'", help="SQL filter for the main reader set (default: GLM RL lens, greedy + 4 samples)"
+    )
+    ap.add_argument("--tag", default="", help="suffix for the output files")
     a = ap.parse_args()
     e = pd.read_parquet(a.run / "kwonly_episodes.parquet")[["tid", "setting", "cond", "ph", "vea", "monitor"]]
     con = duckdb.connect(str(a.db), read_only=True)
@@ -68,7 +72,7 @@ def main() -> None:
     hits = con.execute(f"""
         with pe as (select e.tid, strpos(e.rendered_text, '<|assistant|>') - 1 as pend from episodes e join eps using (tid))
         select p.tid, p.pos, (p.char_end >= 0 and p.char_end <= pe.pend) as prompt_side,
-               bool_or(r.reader in ('glm_sft', 'glm_rl') and regexp_matches(r.text, '{RX}', 'i')) as glm_hit,
+               bool_or({a.glm_filter} and regexp_matches(r.text, '{RX}', 'i')) as glm_hit,
                bool_or(regexp_matches(r.text, '{RX}', 'i')) as any_reader_hit
         from positions p join pe on p.tid = pe.tid join reads r on r.tid = p.tid and r.pos = p.pos
         group by all""").df()
@@ -83,7 +87,7 @@ def main() -> None:
         out[f"{rd}_all_any"] = out[f"{rd}_prompt_any"] | out[f"{rd}_gen_any"]
         out[f"{rd}_prompt_share"] = out.ph.map(h[h.prompt_side].groupby(["ph", "pos"])[col].any().groupby("ph").mean())
     out["has_prompt_reads"] = out.ph.isin(h[h.prompt_side].ph)
-    out.to_parquet(a.run / "anyhit_episodes.parquet")
+    out.to_parquet(a.run / f"anyhit_episodes{a.tag}.parquet")
 
     rows = []
     for st, d in out.groupby("setting"):
@@ -128,7 +132,7 @@ def main() -> None:
     y = np.arange(len(s))
     hgt = 0.26
     series = (("vea", "VEA rate of rollouts", "#2a78d6"),
-              ("glm_prompt_any", "Episodes whose prompt-side O-lens reads match simulation|eval|scenario", "#eb6834"),
+              ("glm_prompt_any", "Episodes with a prompt-side read matching simulation|eval|scenario", "#eb6834"),
               ("glm_gen_any", "Episodes whose generation-side O-lens reads match it", "#1baf7a"))  # fmt: skip
     for j, (k, lab, col) in enumerate(series):
         yy = y + (1 - j) * hgt
@@ -145,7 +149,7 @@ def main() -> None:
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     ax.legend(loc="lower right", frameon=False, fontsize=7.5)
-    ax.set_title("VEA rate vs any O-lens read matching simulation|eval|scenario (GLM SFT+RL, all samples)\n"
+    ax.set_title(f"VEA rate vs any O-lens read matching simulation|eval|scenario ({a.glm_filter})\n"
                  "bold = monitor / answer VEA label; normal = regex on the rollout", fontsize=10, loc="left")  # fmt: skip
     fig.tight_layout()
     fig.savefig(a.fig, facecolor="white")
