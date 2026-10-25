@@ -6,6 +6,7 @@ In the agentic condition it also gets transcript tools (cfbench/tools.py) and up
 import json
 import os
 from collections import Counter
+from typing import Any, cast
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
@@ -37,7 +38,15 @@ SUBMIT: ChatCompletionFunctionToolParam = {
 }
 
 # 12 retries' backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
-client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=12)
+client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ.get("OPENROUTER_API_KEY", ""), max_retries=12)
+
+# `gemini-direct/<model>` skips OpenRouter: Google's OpenAI-compatible endpoint with an AI Studio key (GEMINI_API_KEY), so runs
+# use that key's own rate limits instead of OpenRouter's shared Gemini pool. Same model and prompt; cost from token counts.
+GEMINI_DIRECT = "gemini-direct/"
+GEMINI_PRICE = {"gemini-3.8-flash": (0.825e-6, 4.125e-6)}  # $/token in, out: OpenRouter's list price for the same model, 2026-10-24
+gemini = AsyncOpenAI(
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.environ.get("GEMINI_API_KEY", ""), max_retries=12
+)
 
 
 def check(arguments: str) -> tuple[dict | None, str]:
@@ -61,14 +70,22 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
     schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
-        r = await client.chat.completions.create(
-            model=predictor,
-            messages=messages,
-            tools=schemas,
-            max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
-        )
-        cost += getattr(r.usage, "cost", 0) or 0
+        if predictor.startswith(GEMINI_DIRECT):
+            model = predictor.removeprefix(GEMINI_DIRECT)
+            r = await gemini.chat.completions.create(
+                model=model, messages=messages, tools=schemas, max_tokens=16000, reasoning_effort=cast(Any, effort)
+            )
+            p_in, p_out = GEMINI_PRICE.get(model, (0.0, 0.0))
+            cost += (r.usage.prompt_tokens * p_in + r.usage.completion_tokens * p_out) if r.usage else 0
+        else:
+            r = await client.chat.completions.create(
+                model=predictor,
+                messages=messages,
+                tools=schemas,
+                max_tokens=16000,
+                extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
+            )
+            cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
