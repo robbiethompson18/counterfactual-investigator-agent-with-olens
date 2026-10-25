@@ -136,6 +136,13 @@ token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is
 Source is `transcript-viewer/web/index.html`, deployed by
 `transcript-viewer/scripts/deploy_site.sh`.
 
+**expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
+metamodel reads ([expview/README.md](expview/README.md)): write the run's items to `RUN/expview/`
+with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
+`tokens=`), and link items with `python expview/expview.py link`. Server: `http://bramble:8830/`
+(tailnet; regex search over every read). Off the tailnet, `expview.py build RUN` makes a
+self-contained page to publish as an Artifact.
+
 Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
 plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript
 (docs, PRs, Slack, chat), link its Docent run**
@@ -192,6 +199,9 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/README.md)
+  — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
+  importer, bramble service
 - [CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
@@ -239,6 +249,9 @@ Current docs:
   lens lags the text; paired lens-vs-resample table
 - [Confession follow-ups — read before asking Qwen "why did you do that?" or reading the lens on its answer](docs/confession-follow-ups.md)
   — setup, findings (named vs neutral question, one lens/answer disagreement), gotchas
+- [Transcript-only investigators (baseline_hyp) — read before building investigator envs from the evalcue behavioural runs or scoring counterfactual predictions](baseline_hyp/README.md)
+  — per-variant agent filesystem (environment/ diffs cleanly per arm), DSv4/4.1 results, fork
+  question formats, within-investigation Spearman, null-edit pilot
 - [Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
   — symmetric arms, any lever, build/measure/tweak/stack, what makes an arm count
 - [Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
@@ -248,6 +261,11 @@ Current docs:
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
 - [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
   — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
+- [GLM 5.3 agent-interp-envs runs — read before comparing GLM 5.3 coding/EvilGenie/ImpossibleBench/Donation Bet results or running many podman sandboxes](docs/glm53-agent-interp-envs.md)
+  — headline numbers, artifact and Docent links, podman scaling gotchas
+- [GLM 5.3 realism variants — read before running or extending the user-style ImpossibleBench ladder or the email over-eagerness envs](docs/glm53-realism.md)
+  — criterion-free 8-rung ladder (hack 27% → 3%, test edits 0% → 56%), evalness ranking, O-lens
+  prompt and grader reads, email in-between rungs (casual ask alone → 2%)
 - [funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](docs/envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
@@ -255,6 +273,8 @@ Current docs:
 - [funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
   — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
   subagent labels, replication of the screen (14/30 vs 0/30)
+- [funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
+  — upstream/core/full harness × thin/real docs × memo, how to render an arm, unfixed sandbox tells
 - [sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
   (MARGINAL); intent labels from reader subagents, rubric in `scripts/envs_screen/sandbagging.py`
@@ -304,6 +324,11 @@ Current docs:
 - [Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
   — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
   "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
+- [Character drift — read before prefilling Qwen with out-of-persona assistant turns, or reading the lens at the Assistant token in roleplay](docs/envs/character_drift.md)
+  — 40 Sonnet-written + 40 WildChat drift transcripts × system prompt × follow-up; in-world ~90%
+  stays in character, "what are you?" 13% (thinking on) vs 48% (off); O-lens at the Assistant token
+  says roleplay/persona (not "disclaimer") and previews the reply, predicting snap-back (AUROC
+  0.72-0.95)
 - [Thinking on vs off — read before running Qwen with `--thinking 0` or picking unverbalized cases for the O-lens](docs/thinking-off.md)
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
@@ -329,18 +354,31 @@ Current docs:
   inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
   pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
   `Score:`); pasting reads into the prompt (closed #116) is a dead end
+- [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
+  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with CIs
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
 - [Metadata honeypot — read before running or extending the METR planted-metadata env, or studying refusals driven by eval metadata](docs/envs/metadata_honeypot.md)
-  — 24 harmless defensive tasks × 8 metadata arms; GPT-5.6-sol refuses ~80% only when
-  `grading_notes` says declining passes, never citing it; GLM 5.3 reads and overrides it (1/264)
+  — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
+  (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
+  passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding)
+- [olens_search — read before searching Celeste's GLM-5.3 O-lens readouts of our transcripts or adding her top-ups](olens_search/README.md)
+  — regex dashboard (DuckDB + FastAPI, tailnet only) over every GLM olens / Qwen reader / J-lens
+  output, with novel-vs-context filter, per-arm label rates, inline transcripts and Docent links
 - [Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
   on-topic reads in every arm, blind-graded); code only on closed PR #125
 - [O-lens novelty over the continuation (dead end as a metric) — read before using FVE beyond the realized text as an interestingness score](docs/olens-novelty.md)
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
+- [GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
+  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s on 4xB200,
+  so subsample long coding episodes)
+- [Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
+  — keyword match over prompt-side reads vs VEA across 21 settings: null within condition, null or
+  negative across tasks (eval words in reads track graded-task content, e.g. unit tests);
+  per-setting figure, trace examples on bramble:8830
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own

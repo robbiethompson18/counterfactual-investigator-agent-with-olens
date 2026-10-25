@@ -1,0 +1,9 @@
+# Pulls other machines' expview runs from the sprint HF dataset (expview/pull.py). Run by expview-pull.timer.
+[Unit]
+Description=expview: pull runs from HF
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/workspace/counterfactual-investigator-agent-with-olens
+ExecStart=/bin/sh -c '[ -f hf.key ] && export HF_TOKEN="$(cat hf.key)"; exec uv run --script expview/pull.py'
+Environment=PATH=/run/current-system/sw/bin:%h/.nix-profile/bin:/etc/profiles/per-user/%u/bin

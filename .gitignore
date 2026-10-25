@@ -29,3 +29,14 @@ outputs/
 
 # Hugging Face token (local only)
 hf.key
+
+# realism runs and problem copies (data, not code)
+donehack/realism/runs/
+donehack/realism/.ide_term_cache.json
+donehack/evilgenie/data_ib/
+donehack/runs/
+donehack/realism/paired/
+# generated, kept on HF under repo_data/ (see the scripts that write them)
+evalcue/envs/donation_bet/glm53_docent_views.json
+evalcue/envs/character_drift/data/wildchat_pool.json
+docs/figures/donation_bet/**/*table.json

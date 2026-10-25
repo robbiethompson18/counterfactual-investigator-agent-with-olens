@@ -10,6 +10,8 @@ ROOT = Path(__file__).parent
 
 def load(run_id: str) -> ModuleType:
     """The module for a run id. Run ids flatten dots, so try each package as a prefix (longest first)."""
+    if (ROOT / run_id / "__init__.py").exists():  # a package whose name extends another's (funding_email_real vs funding_email)
+        return importlib.import_module(f"{__name__}.{run_id}")
     for pkg in sorted((p.name for p in ROOT.iterdir() if (p / "__init__.py").exists()), key=len, reverse=True):
         if run_id.startswith(pkg + "_"):
             return importlib.import_module(f"{__name__}.{pkg}.{run_id.removeprefix(pkg + '_')}")

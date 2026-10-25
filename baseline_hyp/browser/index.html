@@ -1,0 +1,181 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baseline hypotheses</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<style>
+:root{--neg-soft:#DDF0E3;--bg:#fbfaf7;--panel:#f2f0ea;--fg:#1f1e1b;--mute:#6b675e;--line:#dedad0;--acc:#2f5d8a;--sel:#e3e9f1;--code:#f4f2ec;--pos:#B0442B;--pos-soft:#F6E2DC;--neg:#2B7A4B;--track:#e7e3da}
+@media (prefers-color-scheme:dark){:root{--neg-soft:#173323;--bg:#18191b;--panel:#1f2124;--fg:#e6e4df;--mute:#9a968d;--line:#33363a;--acc:#8fb4dd;--sel:#26313d;--code:#222428;--pos:#EE8A70;--pos-soft:#3A2019;--neg:#7CCB98;--track:#2c2f33}}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,sans-serif}
+a{color:var(--acc)}
+/* landing */
+#home{max-width:1200px;margin:0 auto;padding:24px 16px 60px}
+#home h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mute);margin:0 0 20px}
+.env{border:1px solid var(--line);border-radius:8px;margin-bottom:18px;background:var(--panel);overflow:hidden}
+.envh{padding:12px 14px;border-bottom:1px solid var(--line)}
+.envh .t{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}.envh b{font-size:15px}
+.mono{font-family:ui-monospace,monospace;font-size:12px;color:var(--mute)}
+.beh{color:var(--mute);font-size:13px;margin-top:4px}
+table{width:100%;border-collapse:collapse}td{padding:6px 14px;border-top:1px solid var(--line);vertical-align:middle}
+tr.agg td{font-weight:600}
+.env th{font-size:12px;font-weight:600;color:var(--mute);text-align:left;padding:6px 14px 2px}
+.cfh{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--mute);margin:0 6px 2px 28px;border-bottom:1px solid var(--line);padding-bottom:2px}.cfh span:last-child{text-align:right}
+tr.v{cursor:pointer}tr.v:hover{background:var(--sel)}tr.off{color:var(--mute);cursor:default}tr.off:hover{background:none}
+.bar{width:180px;height:8px;background:var(--track);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.bar i{display:block;height:100%;background:var(--pos)}
+.named{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:12px 14px;margin-bottom:22px}
+.named .wrap{overflow-x:auto}.named h2{font-size:15px;margin:0 0 4px}.named table td,.named table th{padding:5px 10px;border-top:1px solid var(--line);text-align:left;vertical-align:top;font-size:13px}
+.named th{font-weight:600;color:var(--mute);font-size:12px;border-top:0}
+.named td.c{white-space:nowrap;font-variant-numeric:tabular-nums}.named td.c details summary{font-weight:400}
+.hit{font-size:12px;color:var(--mute);margin:4px 0 4px 8px;white-space:normal;max-width:420px}
+.zero{color:var(--mute)}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* explorer */
+#ex{display:none;grid-template-columns:320px 1fr;height:100vh}
+nav{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:12px 8px}
+.back{display:inline-block;margin:0 6px 10px;font-size:13px}
+.vh{margin:0 6px 12px}.vh b{font-size:15px}
+.sec{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:14px 6px 4px}
+details{margin-left:10px}summary{cursor:pointer;padding:1px 4px;font-weight:500}
+.f{display:block;padding:1px 6px 1px 18px;margin-left:10px;border-radius:4px;color:var(--fg);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+.f:hover{background:var(--sel)}.f.on{background:var(--sel);color:var(--acc);font-weight:600}
+.f.pos{color:var(--pos)}.f.neg{color:var(--neg)}
+.cf{display:grid;grid-template-columns:1fr auto;gap:6px}.cf .r{font-variant-numeric:tabular-nums;color:var(--mute);font-size:12px}
+.cf .up{color:var(--pos)}.cf .dn{color:var(--neg)}
+.dl{display:block;white-space:pre-wrap;word-break:break-word}.dl.a{background:var(--neg-soft,#DDF0E3)}.dl.d{background:var(--pos-soft)}.dl.h{color:var(--acc)}.dl.f{color:var(--mute);font-weight:600}
+.rate{font-size:15px;margin:0 0 10px}
+.pt{border-collapse:collapse;font-size:12.5px;margin-bottom:14px}.pt td,.pt th{border-top:1px solid var(--line);padding:3px 8px;text-align:left;white-space:nowrap}.pt th{color:var(--mute);font-weight:600}
+main{overflow:auto;padding:18px 32px 60px}
+#path{font:12px ui-monospace,monospace;color:var(--mute);margin-bottom:10px;position:sticky;top:-18px;background:var(--bg);padding:6px 0;border-bottom:1px solid var(--line)}
+#doc{max-width:980px}
+pre{background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,monospace}
+code{font-family:ui-monospace,monospace;font-size:12.5px}
+#doc h3{font-size:13px;margin:18px 0 4px;color:var(--acc);font-family:ui-monospace,monospace}
+#doc h1{font-size:20px}#doc h2{font-size:16px;border-bottom:1px solid var(--line);padding-bottom:3px}
+@media (max-width:760px){#ex{grid-template-columns:1fr;grid-template-rows:42vh 1fr}nav{border-right:0;border-bottom:1px solid var(--line)}main{padding:12px 16px}.bar{width:90px}}
+</style></head><body>
+<div id="home"></div>
+<div id="ex"><nav id="nav"></nav><main><div id="path"></div><div id="doc"></div></main></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct=(k,n)=>n?Math.round(100*k/n):0;
+const bar=(k,n)=>`<span class="bar"><i style="width:${pct(k,n)}%"></i></span>`;
+let IDX=[], VIEWS={};
+function params(){return new URLSearchParams(location.hash.slice(1))}
+async function init(){
+  IDX=await (await fetch("/api/index")).json();
+  for(const e of IDX)for(const v of e.variants)if(v.view)VIEWS[v.view]={e,v};
+  $("#home").innerHTML=`<h1>Baseline hypothesis environments</h1>
+  <p class="sub">Each starred env's baseline arm, split by scenario variant. Click a variant to see the filesystem the investigator gets, plus its investigations. The investigator is told the neutral name, never the env or variant name.</p>`+
+  IDX.map(e=>`<div class="env"><div class="envh"><div class="t"><b>${esc(e.env)}</b><span class="mono">shown to agent as “${esc(e.display)}” · baseline arm ${esc(e.arm)}</span></div><div class="beh">${esc(e.behaviour)}</div></div>
+  <table><tr><th>Scenario variant</th><th>Behaviour rate (runs with behaviour / runs)</th><th></th><th>Investigator runs · counterfactual edit arms</th></tr><tr class="agg"><td>All variants pooled</td><td class="num">${e.k}/${e.n} · ${pct(e.k,e.n)}%</td><td>${bar(e.k,e.n)}</td><td></td></tr>
+  ${e.variants.map(v=>`<tr class="v ${v.view?"":"off"}" ${v.view?`data-view="${esc(v.view)}"`:""}><td class="mono">${esc(v.variant)}</td><td class="num">${v.k}/${v.n} · ${pct(v.k,v.n)}%</td><td>${bar(v.k,v.n)}</td><td class="mono">${v.view?`${v.runs.length} investigations · ${v.cfs.length} edits`:"no view (never happened)"}</td></tr>`).join("")}
+  </table></div>`).join("");
+  renderNamed().then(renderJudge).then(renderForecast);
+  document.querySelectorAll("tr.v[data-view]").forEach(tr=>tr.onclick=()=>location.hash="view="+encodeURIComponent(tr.dataset.view));
+  route();
+}
+async function renderNamed(){
+  const N=await (await fetch("/api/named")).json(), dirs=Object.keys(N.dirs);
+  const cell=(d,env,k)=>{const s=N.scores[d][env]; if(!s||!s.n) return '<td class="c zero">–</td>';
+    const hits=(s.hits[k]||[]), p=Math.round(100*hits.length/s.n);
+    if(!hits.length) return `<td class="c zero">0/${s.n}</td>`;
+    return `<td class="c"><details><summary>${hits.length}/${s.n} · ${p}%</summary>${hits.map(h=>{const base=h.view.replace(/__s\d+$/,""), href=VIEWS[base]?link(base,h.run):null;
+      const lab=h.view.split("__").slice(1).join(" / ")||"pooled";
+      return `<div class="hit">${href?`<a href="${href}">${esc(lab)}</a>`:esc(lab)}: …${esc(h.snippet)}…</div>`}).join("")}</details></td>`};
+  const html=`<div class="named"><h2>Does the investigator name the known causes?</h2>
+   <p class="sub" style="margin:0 0 8px">Known causes come from Robbie's counterfactual arms. A run counts as naming a cause if a hypothesis or proposed test matches its keyword pattern (score.py), so treat these as approximate. Click a count to see the matched text.</p>
+   <div class="wrap"><table><tr><th>Env</th><th>Known cause</th><th>Evidence it is a cause (edit arm: rate vs baseline)</th>${dirs.map(d=>`<th>Named by: ${esc(N.dirs[d])}<br><span style="font-weight:400">runs naming it / runs</span></th>`).join("")}</tr>
+   ${Object.entries(N.known).map(([env,ks])=>Object.entries(ks).map(([k,ev],i)=>`<tr>${i?"<td></td>":`<td><b>${esc(env)}</b></td>`}<td>${esc(k)}</td><td class="mono">${esc(ev)}</td>${dirs.map(d=>cell(d,env,k)).join("")}</tr>`).join("")).join("")}
+   </table></div></div>`;
+  $("#home").querySelector(".sub").insertAdjacentHTML("afterend",html);
+}
+async function renderJudge(){
+  const S=await (await fetch("/api/judge_scores")).json(); if(!Object.keys(S).length) return;
+  const envs=["all",...IDX.map(e=>e.env)];
+  const cell=o=>!o?"<td>–</td>":`<td class="c">${o.recall==null?"–":Math.round(100*o.recall)+"%"} <span class="zero">of ${o.n_eff}</span></td><td class="c">${o.false_alarm==null?"–":Math.round(100*o.false_alarm)+"%"} <span class="zero">of ${o.n_ineff}</span></td><td class="c">${o.auc??"–"}</td>`;
+  const rows=[]; for(const [d,s] of Object.entries(S)) for(const env of envs){ if(!s.all[env]) continue;
+    rows.push(`<tr><td>${env=="all"?`<b>${esc(s.label)}</b>`:""}</td><td>${env=="all"?"<b>all envs</b>":esc(env)}</td>${cell(s.all[env])}${cell(s.min8[env])}</tr>`)}
+  const html=`<div class="named"><h2>Hypothesis generation: did the investigator name the feature each edit changes?</h2>
+   <p class="sub" style="margin:0 0 8px">An LLM judge (DSv4.1 Flash) reads one investigation's submitted hypotheses and one counterfactual edit's diff, and says whether a hypothesis or proposed test names the feature the edit changes. "Effective" edits move the rate by 20 percentage points or more on that variant. Named (effective) = recall; named (ineffective) = false alarms; AUC ranks each edit's named-fraction against whether it is effective (0.5 = chance).</p>
+   <div class="wrap"><table><tr><th>Investigations</th><th>Env</th><th>Named, effective edits</th><th>Named, ineffective edits</th><th>AUC</th><th>Named, effective (arms ≥8 runs)</th><th>Named, ineffective (arms ≥8 runs)</th><th>AUC (≥8 runs)</th></tr>${rows.join("")}</table></div></div>`;
+  $("#home").querySelector(".named").insertAdjacentHTML("afterend",html);
+}
+async function renderForecast(){
+  const S=await (await fetch("/api/fork_scores")).json(); if(!Object.keys(S).length) return;
+  const f=(x,k)=>x==null||x[k]==null?"–":x[k];
+  const bin=o=>o?`AUC ${f(o,"auc")} · Brier ${f(o,"brier")} <span class="zero">(base-rate ${f(o,"brier_ref")})</span> · balanced Brier ${f(o,"brier_bal")} <span class="zero">(0.5 forecast 0.25)</span> · ECE ${f(o,"ece")} · <span class="zero">n=${o.n}, ${Math.round(100*o.pos_rate)}% true</span>`:"–";
+  const rows=[];
+  for(const [d,s] of Object.entries(S)) for(const [lk,ll] of [["all","all edits"],["single","single-change edits"],["single_min8","single-change edits, arms with ≥8 runs"],["min8","all edits, arms with ≥8 runs"],["pooled","all edits, labels pooled over variants"]]){
+    const o=s[lk]; rows.push(`<tr><td>${esc(s.label)}</td><td class="mono">${ll}</td>
+     <td>${o.probs?`<b>within-investigation Spearman ${o.probs.spearman_within}</b> · macro AUC ${o.probs.macro_auc}<br>3-class Brier ${o.probs.brier_3class} <span class="zero">(base-rate ${o.probs.brier_3class_ref}; = sum of the 3 one-vs-rest Briers, range 0–2)</span> · class-balanced ${o.probs.brier_3class_bal} <span class="zero">(uniform 0.667)</span> · argmax acc ${o.probs.acc_argmax}<br>mean predicted ↑/↓/neither ${o.probs.mean_pred.up}/${o.probs.mean_pred.down}/${o.probs.mean_pred.neither} vs true ${o.probs.up.pos_rate}/${o.probs.down.pos_rate}/${o.probs.neither.pos_rate}<br>↓: ${bin(o.probs.down)}<br>↑: ${bin(o.probs.up)}<br>neither: ${bin(o.probs.neither)}`:"–"}</td>
+     <td>${bin(o.q_down)}</td><td>${bin(o.q_up)}</td>
+     <td>${o.bal_down?`balanced acc ${o.bal_down.bal_acc} · acc ${o.bal_down.acc} · says yes ${Math.round(100*o.bal_down.yes_rate)}% · true ${Math.round(100*o.bal_down.true_rate)}%`:"–"}</td>
+     <td>${o.bal_up?`balanced acc ${o.bal_up.bal_acc} · acc ${o.bal_up.acc} · says yes ${Math.round(100*o.bal_up.yes_rate)}% · true ${Math.round(100*o.bal_up.true_rate)}%`:"–"}</td>
+     <td>${o.point?`<b>within-investigation Spearman ${o.point.spearman_within}</b> · corr ${o.point.corr_delta} · MAE ${o.point.mae_pp}pp`:"–"}</td></tr>`)}
+  const html=`<div class="named"><h2>Can the investigator predict what each counterfactual edit does?</h2>
+   <p class="sub" style="margin:0 0 8px">After submitting hypotheses, each investigation is forked once per (edit, question) and shown the edit as a diff of environment/. Truth: the edit arm's observed rate minus the baseline rate, ↑/↓ meaning a change of 20 percentage points or more. AUC: 0.5 is chance. Brier: lower is better, compared with always predicting the base rate. ECE: expected calibration error (0 = calibrated). Arms have few runs per variant, so labels are noisy; the ≥8-run and pooled rows reduce that noise. "Single-change" keeps only edits that change one thing from the baseline (e.g. one knob added or removed). Most edits lower the rate, so balanced Brier and balanced accuracy weight each outcome class equally. <b>Within-investigation Spearman</b> is the headline metric that ignores both the class skew and differences between variants: inside one investigation, rank the edits by predicted direction (P(↑) − P(↓), or the predicted rate) and correlate with the observed change; average over investigations. AUC is also prevalence-free but pools across variants.</p>
+   <div class="wrap"><table><tr><th>Condition</th><th>Labels</th><th>probs (one question, three outcomes)</th><th>q_down: P(↓ ≥20pp)</th><th>q_up: P(↑ ≥20pp)</th><th>bal_down: "will it decrease?"</th><th>bal_up: "will it increase?"</th><th>point: predicted rate</th></tr>${rows.join("")}</table></div></div>`;
+  $("#home").querySelector(".named").insertAdjacentHTML("afterend",html);
+}
+let curView=null;
+async function route(){
+  const p=params(), view=p.get("view");
+  if(!view||!VIEWS[view]){$("#home").style.display="block";$("#ex").style.display="none";curView=null;return}
+  $("#home").style.display="none";$("#ex").style.display="grid";
+  if(view!==curView){curView=view;await buildNav(view)}
+  showFile(view,p.get("file")||"README.md");
+}
+function link(view,file){return "#view="+encodeURIComponent(view)+"&file="+encodeURIComponent(file)}
+async function buildNav(view){
+  const {e,v}=VIEWS[view], files=await (await fetch("/api/tree?view="+encodeURIComponent(view))).json(), root={};
+  for(const f of files){let n=root;const ps=f.split("/");ps.forEach((p,i)=>{if(i==ps.length-1)(n.__f=n.__f||[]).push(f);else n=n[p]=n[p]||{}})}
+  function build(n,pre){let h="";for(const k of Object.keys(n).filter(k=>k!="__f").sort()){const p=pre?pre+"/"+k:k;h+=`<details ${p.split("/").length<2?"open":""}><summary>${esc(k)}/</summary>${build(n[k],p)}</details>`}
+    for(const f of n.__f||[]){const nm=f.split("/").pop();const c=/_NO_BEHAVIOUR/.test(nm)?"neg":/_BEHAVIOUR/.test(nm)?"pos":"";h+=`<a class="f ${c}" href="${link(view,f)}" data-p="${esc(f)}">${esc(nm)}</a>`}return h}
+  $("#nav").innerHTML=`<a class="back" href="#">← all environments</a>
+   <div class="vh"><b>${esc(e.env)}</b> <span class="mono">/ variant ${esc(v.variant)}</span><div class="mono" style="margin-top:4px">Behaviour rate, baseline arm ${esc(e.arm)}:</div><div class="num">this variant ${v.k}/${v.n} · ${pct(v.k,v.n)}%</div><div>${bar(v.k,v.n)}</div><div class="num">all variants ${e.k}/${e.n} · ${pct(e.k,e.n)}%</div></div>
+   <div class="sec">Investigator's filesystem</div>${build(root,"")}
+   <div class="sec">Investigations</div><div class="mono" style="margin:0 6px 6px">8 traces + rate. Entry: model · seed · tool turns used · hypotheses submitted.</div>
+   ${v.runs.map(r=>`<a class="f" href="${link(view,r.path)}" data-p="${esc(r.path)}">${esc(r.model)} · seed ${r.seed} · ${r.turns} turns · ${r.nhyp} hyps</a>`).join("")||'<div class="mono" style="margin-left:20px">none yet</div>'}
+   <div class="sec">Single-transcript investigations (${v.singles.length})</div>
+   <div class="mono" style="margin:0 6px 6px">Each investigator saw one run where the behaviour happened, with no rate and no contrasting runs. Entry: sample id · the transcript it saw · one investigation per model.</div>
+   ${v.singles.map(s=>`<div class="f" style="padding-left:18px;white-space:normal">${esc(s.name.split("__").pop())} · <a href="${link(view,s.transcript)}" data-p="${esc(s.transcript)}">transcript</a>${s.runs.map(r=>` · <a href="${link(view,r.path)}" data-p="${esc(r.path)}">${esc(r.model)}</a>`).join("")}</div>`).join("")}
+   <div class="sec">Counterfactual edits with runs (${v.cfs.length})</div>
+   <div class="mono" style="margin:0 6px 6px">Each edit arm's diff from the baseline inputs, smallest first. ⚠ = inputs identical.</div>
+   <div class="cfh"><span>edit arm</span><span>±lines changed · behaviour runs / runs · pp change vs baseline ${pct(v.k,v.n)}%</span></div>
+   ${[...v.cfs].sort((a,b)=>(a.env_changed?a.lines:1e9)-(b.env_changed?b.lines:1e9)||a.arm.localeCompare(b.arm)).map(c=>{const d=pct(c.k,c.n)-pct(v.k,v.n);return `<a class="f cf" href="${link(view,c.diff)}" data-p="${esc(c.diff)}" title="${esc(c.arm)}"><span style="overflow:hidden;text-overflow:ellipsis">${esc(c.arm)}${c.env_changed?"":" ⚠"}</span><span class="r">±${c.lines} · ${c.k}/${c.n} · <span class="${d>0?"up":d<0?"dn":""}">${d>0?"+":""}${d}</span></span></a>`}).join("")}`;
+}
+async function renderPreds(view,c){
+  const R=await (await fetch(`/api/preds?view=${encodeURIComponent(view)}&arm=${encodeURIComponent(c.arm)}`)).json(), P=R.forks;
+  const J=Object.values(R.judge).filter(x=>x.kn).map(x=>`${esc(x.label)}: <b>${x.kn[0]}/${x.kn[1]}</b>`).join(" · ");
+  const jh=`<h3 style="font-family:inherit;color:var(--fg)">Hypothesis generation: did investigators name the feature this edit changes?</h3><p class="mono">Judge verdicts, investigations naming it / investigations: ${J||"none yet"}</p>`;
+  if(!P.length){$("#preds").innerHTML=jh+'<p class="mono">No prediction forks for this edit yet.</p>';return}
+  const FM=["probs","q_up","q_down","bal_up","bal_down","point"];
+  const show=(f,p)=>!p?"unparsed":f=="probs"?`↑${p.p_increase.toFixed(2)} ↓${p.p_decrease.toFixed(2)} =${p.p_neither.toFixed(2)}`:f.startsWith("q_")?p.p.toFixed(2):f.startsWith("bal")?p.answer:`${Math.round(p.rate)}%`;
+  const rows={}; for(const x of P){const k=x.cond+"|"+x.inv;(rows[k]=rows[k]||{cond:x.cond,inv:x.inv})[x.fmt]=x}
+  $("#preds").innerHTML=jh+`<h3 style="font-family:inherit;color:var(--fg)">Predictions for this edit (threshold 20 pp)</h3>
+   <div class="mono" style="margin-bottom:6px">probs = probability of ↑ ≥20pp / ↓ ≥20pp / neither · q_up, q_down = P(↑ ≥20pp), P(↓ ≥20pp) asked separately · bal_up, bal_down = "on balance, will it increase / decrease the rate?" · point = predicted rate. Click a cell for the fork's reasoning.</div>
+   <div style="overflow-x:auto"><table class="pt"><tr><th>Condition</th><th>Investigation</th>${FM.map(f=>`<th>${f}</th>`).join("")}</tr>
+   ${Object.values(rows).map(r=>`<tr><td>${esc(r.cond)}</td><td class="mono">${esc(r.inv.split("__").slice(2).join(" "))}</td>${FM.map(f=>r[f]?`<td><a href="${link(view,r[f].path)}">${esc(show(f,r[f].parsed))}</a></td>`:"<td>–</td>").join("")}</tr>`).join("")}</table></div>`;
+}
+async function showFile(view,file){
+  document.querySelectorAll(".f").forEach(a=>a.classList.toggle("on",a.dataset.p==file));
+  const isRun=/^(runs|cf|forks)\//.test(file), path=isRun?file:`views/${view}/${file}`;
+  $("#path").textContent=isRun?file:file;
+  const r=await fetch("/api/file?path="+encodeURIComponent(path));
+  if(!r.ok){$("#doc").textContent="not found";return}
+  const j=await r.json();
+  if(j.kind=="diff"){
+    const {e,v}=VIEWS[view], c=v.cfs.find(c=>c.diff==file);
+    $("#path").textContent=`diff: baseline (${e.arm}) → ${c.arm} · variant ${v.variant}`;
+    const lines=j.text.split("\n").map(l=>`<span class="dl ${/^(\+\+\+|---)/.test(l)?"f":l[0]=="+"?"a":l[0]=="-"?"d":l.startsWith("@@")?"h":""}">${esc(l)||" "}</span>`).join("");
+    $("#doc").innerHTML=`<p class="rate">Baseline <b>${e.arm}</b>: ${v.k}/${v.n} (${pct(v.k,v.n)}%) → <b>${esc(c.arm)}</b>: ${c.k}/${c.n} (${pct(c.k,c.n)}%) on variant <code>${esc(v.variant)}</code>. Pooled over all variants: ${e.arms[e.arm]?e.arms[e.arm].join("/"):""} → ${e.arms[c.arm]?e.arms[c.arm].join("/"):""}.</p>
+      ${c.env_changed?"":'<p class="mono">⚠ The inputs are identical; this arm differs only in harness config.</p>'}<div id="preds"></div><pre>${lines}</pre>`;
+    renderPreds(view,c);
+  } else
+  $("#doc").innerHTML=j.kind=="md"&&window.marked?marked.parse(j.text):`<pre>${esc(j.text)}</pre>`;
+  document.querySelector("main").scrollTop=0;
+}
+addEventListener("hashchange",route); init();
+</script></body></html>
