@@ -42,12 +42,12 @@ def base_items(d: str, run_key: str) -> dict[int, str]:
     return out
 
 
-def env_docs(env: str, arms: list[str]) -> tuple[str, dict[str, str]]:
+def env_docs(env: str, arms: list[str], repo: Path = REPO) -> tuple[str, dict[str, str]]:
     """What the env is and what each arm means, from evalcue/envs/<env>/__init__.py's docstring (an indented
     "arm  text" list, wrapped lines indented further) or else a "| arm | text |" table in docs/envs/<env>.md.
     Returns (markdown description, {arm: full text})."""
     text, out = "", {}
-    init = REPO / "evalcue/envs" / env / "__init__.py"
+    init = repo / "evalcue/envs" / env / "__init__.py"
     doc = ast.get_docstring(ast.parse(init.read_text())) if init.exists() else None
     if doc:
         lines, cur, first = doc.splitlines(), None, None
@@ -60,11 +60,12 @@ def env_docs(env: str, arms: list[str]) -> tuple[str, dict[str, str]]:
                 out[cur] += " " + ln.strip()
             else:
                 cur = None
-        intro = "\n".join(lines[:first]) if first is not None else doc.split("\n\n")[0]  # everything before the arm list
+        # everything before the per-arm list; with no such list (e.g. arms named by a grid formula) the whole docstring
+        intro = "\n".join(lines[:first]) if first is not None else doc
         paras = [" ".join(p.split()) for p in intro.split("\n\n") if p.strip()]
         paras += [" ".join(p.split()) for p in doc.split("\n\n") if p.strip().startswith("Label")]
         text = "\n\n".join(paras)
-    md = REPO / "docs/envs" / f"{env}.md"
+    md = repo / "docs/envs" / f"{env}.md"
     if md.exists():
         for ln in md.read_text().splitlines():
             cells = [c.strip().strip("`") for c in ln.strip().strip("|").split("|")]
@@ -88,6 +89,8 @@ def short(t: str, n: int = 90) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("run", type=Path, help="data/runs/<env>/<run> with rows.jsonl (and meta.json, docent.json)")
+    ap.add_argument("--docs-repo", type=Path, default=REPO, help="checkout whose evalcue/envs/<env> and docs/envs describe the env")
+    ap.add_argument("--arm-note", action="append", default=[], help="ARM=TEXT: shown next to the arm and as a `note` label")
     ap.add_argument("--base", help="dataset whose items show these rows' transcripts with reads (make overlays on them)")
     a = ap.parse_args()
     rows = [json.loads(x) for x in (a.run / "rows.jsonl").read_text().splitlines() if x.strip()]
@@ -100,7 +103,10 @@ def main() -> None:
     params = {"positive", "thinking"}  # run settings, not outcomes
     flags += sorted({k for r in rows for k, v in r.items() if isinstance(v, bool) and k not in params and k not in flags})
     env = rows[0].get("env") or a.run.parent.name
-    about, arm_docs = env_docs(env, sorted({str(r.get("arm", r.get("variant"))) for r in rows}))
+    about, arm_docs = env_docs(env, sorted({str(r.get("arm", r.get("variant"))) for r in rows}), a.docs_repo)
+    arm_notes = dict(x.split("=", 1) for x in a.arm_note)
+    for k, v in arm_notes.items():
+        arm_docs[k] = f"{v}. {arm_docs[k]}" if k in arm_docs else v
     arms_md = "".join(f"\n- **{k}**: {v}" for k, v in sorted(arm_docs.items()))
     run = Run(
         a.run / "expview.new",  # built aside, then swapped in, so the server never sees a half-written run
@@ -121,9 +127,10 @@ def main() -> None:
         f.unlink()
     n_base, many_items = 0, len({r.get("item") for r in rows}) > 1
     for i, r in enumerate(rows):
-        notes = r.get("detect_notes") or {}
-        labels = {"positive": r.get("positive"), **{k: notes.get(k, r.get(k)) for k in flags}}
+        labels = {"positive": r.get("positive"), **{k: (r.get("detect_notes") or {}).get(k, r.get(k)) for k in flags}}
         arm, sample = r.get("arm", r.get("variant")), r.get("sample", r.get("seed"))
+        if arm in arm_notes:
+            labels["note"] = arm_notes[arm]
         before, after = r.get("files_before") or {}, r.get("files_after") or {}
         env = {f"before/{k}": v for k, v in before.items()} | {f"after/{k}": v for k, v in after.items() if before.get(k) != v}
         links = {}
