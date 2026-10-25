@@ -341,6 +341,9 @@ Current docs:
 - [O-lens novelty over the continuation (dead end as a metric) — read before using FVE beyond the realized text as an interestingness score](docs/olens-novelty.md)
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
+- [GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
+  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s on 4xB200,
+  so subsample long coding episodes)
 - [runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own

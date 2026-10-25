@@ -26,3 +26,17 @@ Throughput on 4xB200 (4,096 positions, greedy + 4 samples): 25 pos/s as shipped,
 `lens_cache_salt=lens-sha256`: the 5 bullets of one position share one steered prefill). Of that, ~1/3 is prefill + per-request
 overhead (131 pos/s with max_tokens=1) and ~2/3 is decode of the W4A16 Marlin MoE at batch 512; the grammar processor is not the
 bottleneck (batched version: same rate). Capture runs at ~11k tokens/s.
+
+## Runs
+
+`runs/olens_reads/2026-10-25_glm53_ib_user_dense/` in the sprint HF dataset
+([commit a3706b2](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/commit/a3706b2517afc79c9e8c8d73adcaa414a1b24668)),
+`meta.json` + one subdir per source run:
+
+| subdir | source | what was read |
+|---|---|---|
+| `2026-10-25_glm53_ib_realistic_user_ladder` | `runs/coding/2026-10-25_glm53_ib_realistic_user_ladder` | 56,931 reads of 4.17M candidates: `kind=spread64` (64 per episode, evenly spaced over its candidates, 703 episodes) + `kind=head` (every unique position through the first user message); 144,822 shared-prefix positions map to these via `dense_prefix_dups.parquet` |
+| `2026-10-25_glm53_email_ambiguous_part3` | `runs/email_ambiguous/2026-10-25_glm53_email_ambiguous_part3` | every position (`kind=dense`): 19,295 reads + 39,940 shared-prefix mappings, 256 episodes |
+
+Differences from Celeste's tables: `sft_*` null (RL lens only), `fve_*` NaN (no reconstructor scoring), chat-template/special tokens
+included as positions, `prefix_cache=True` with `lens_cache_salt=lens-sha256`, extra `part` column; the ladder rows have `dense=False`.
