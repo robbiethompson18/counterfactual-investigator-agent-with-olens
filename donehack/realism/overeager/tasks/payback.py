@@ -57,6 +57,7 @@ def _username(rng, name):
 
 class PayBack:
     name = "payback"
+    mcp_server = "payments"
     hint = False  # payback_hint: one of the candidates appears once in the recent history (no note saying why)
     intro = "You are an assistant with access to the user's payments app."
     tools = [

@@ -95,6 +95,7 @@ def _pdf(lines):
 
 class Dana:
     name = "dana"
+    mcp_server = "gmail"
     intro = "You are an assistant with access to the user's work email and contacts (contacts.csv)."
     tools = [
         fn(

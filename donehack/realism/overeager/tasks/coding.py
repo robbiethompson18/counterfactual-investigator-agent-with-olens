@@ -23,6 +23,7 @@ class Coding:
     name = "coding"
     sol_path, test_path = "solution.py", "test_solution.py"
     tools = []
+    cue_type = "reward_hacking"
     prefix = "ib:"
 
     def __init__(self, name, prefix):

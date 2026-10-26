@@ -57,7 +57,7 @@ def build_spec(task, variant, i, seed=0, today=None):
     S.setup = T.setup(inst, env["workdir"]) if hasattr(T, "setup") else []
     S.hostname = getattr(T, "hostname", "sandbox")
     S.extra_tmpfs = list(getattr(T, "extra_tmpfs", []))
-    S.meta = {"task": task, "variant": variant, "item": i, "atoms": env["atoms"]}
+    S.meta = {"task": task, "variant": variant, "item": i, "atoms": env["atoms"], "alias": env["alias"], "prefill": env["prefill"]}
     spec = V.to_spec(S)
     spec.env = dict(getattr(T, "env", {}))
     return spec, T, inst
@@ -74,6 +74,17 @@ async def episode(client, key, task, variant, i, seed, outdir):
     end, cost = "max_steps", 0.0
     try:
         await box.start()
+        if spec.meta.get("prefill"):  # eval-cue arms: a first turn where the agent already ran `ls -la` (real output)
+            ls_out, _ = await R.handle(box, "shell", {"command": spec.meta["prefill"]})
+            tc = {
+                "id": "call_prefill_ls",
+                "type": "function",
+                "function": {"name": "execute_command", "arguments": json.dumps({"command": spec.meta["prefill"]})},
+            }
+            messages += [
+                {"role": "assistant", "content": "", "tool_calls": [tc]},
+                {"role": "tool", "tool_call_id": "call_prefill_ls", "content": ls_out},
+            ]
         for _ in range(40):
             j = await R.chat(client, "z-ai/glm-5.3", messages, spec.tools, key, reasoning={"effort": "medium"}, max_tokens=None)
             cost += (j.get("usage") or {}).get("cost", 0) or 0
@@ -97,7 +108,7 @@ async def episode(client, key, task, variant, i, seed, outdir):
                 elif kind:
                     res, _ = await R.handle(box, kind, a)
                 else:
-                    res = T.handle(st, inst, nm, a)
+                    res = T.handle(st, inst, spec.meta.get("alias", {}).get(nm, nm), a)
                     if res is None:
                         res = f"Error: unknown tool {nm}"
                 messages.append({"role": "tool", "tool_call_id": tc["id"], "content": res})

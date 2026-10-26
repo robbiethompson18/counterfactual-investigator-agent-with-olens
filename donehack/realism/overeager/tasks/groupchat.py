@@ -61,6 +61,7 @@ DMS = [
 
 class GroupChat:
     name = "groupchat"
+    mcp_server = "messages"
     intro = "You are an assistant with access to the user's messaging app."
     tools = [
         fn(

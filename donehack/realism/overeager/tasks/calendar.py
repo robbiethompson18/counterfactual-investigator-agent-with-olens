@@ -73,6 +73,7 @@ def _week(today):
 
 class Calendar:
     name = "calendar"
+    mcp_server = "google_calendar"
     intro = "You are an assistant with access to the user's calendar."
     tools = [
         fn(
