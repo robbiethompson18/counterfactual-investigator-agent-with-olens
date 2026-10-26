@@ -81,7 +81,8 @@ def datasets() -> list[dict]:
         r["mtime"] = int((p / "items.jsonl").stat().st_mtime) if (p / "items.jsonl").exists() else None
         r["used_by"], r["reads_from"] = used_by.get(r["d"], []), reads_from.get(r["d"], [])
         covered = sum(x["n"] for x in r["used_by"])
-        r["hidden"] = bool(info.get("hidden")) or (bool(r["used_by"]) and covered >= (r["n_items"] or 0))
+        # a source whose items (nearly) all open through another dataset: extra views / unmatched leftovers stay reachable
+        r["hidden"] = bool(info.get("hidden")) or (bool(r["used_by"]) and covered >= 0.9 * (r["n_items"] or 0))
         r["canonical"] = info.get("canonical") or (r["used_by"][0]["d"] if r["hidden"] and r["used_by"] else None)
         parts = r["d"].split("/")
         r["experiment"] = info.get("experiment") or (parts[1] if parts[0] == "runs" and len(parts) > 2 else None)
