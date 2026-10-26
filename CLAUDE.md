@@ -311,6 +311,9 @@ Current docs:
 - [Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
   — pre-registered 26-env / 116-case test on no-CoT Qwen: O-lens tools −0.07 skill vs transcript
   tools (CI excludes 0) and ≈ placebo; only hidden_goal still leans positive
+- [Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
+  — the matched 11-env / 54-case half with thinking on: same result (O-lens −0.06 vs transcript
+  tools, ≈ placebo); thinking changes which arms are levers, so the halves aren't paired
 - [Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
