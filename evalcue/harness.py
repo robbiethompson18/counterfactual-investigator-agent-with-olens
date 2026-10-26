@@ -34,10 +34,21 @@ URL = os.environ.get("QWEN_VLLM_URL", "")
 # qwen.client sets TCP keepalives: without them a long silent generation's connection gets dropped on the way to RunPod and
 # the client waits forever on a response that was already sent
 MODEL = os.environ.get("EVALCUE_MODEL", "qwen")
-if MODEL == "qwen":
-    CLIENT = qwen.client()
-else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
-    CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
+_CLIENT = None
+
+
+def client() -> AsyncOpenAI:
+    """Built on first use, not at import: cfbench and scripts import env modules (for BEHAVIOR, detect) on machines with no
+    QWEN_VLLM_URL or OPENROUTER_API_KEY, and importing this module used to fail there."""
+    global _CLIENT
+    if _CLIENT is None:
+        if MODEL == "qwen":
+            _CLIENT = qwen.client()
+        else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) -> OpenRouter
+            _CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
+    return _CLIENT
+
+
 # EVALCUE_PROVIDER pins OpenRouter to one provider slug (no fallbacks), so a run's rates don't mix quantizations/deployments
 PROVIDER = os.environ.get("EVALCUE_PROVIDER")
 # OpenRouter reasoning effort when thinking is on; medium everywhere by default (provider defaults vary: GLM 5.3's is max)
@@ -69,7 +80,7 @@ async def chat_raw_prefill(messages, *, max_tokens, temperature, top_p, presence
     prompt = GLM_PREFIX + "".join(GLM_TURN[m["role"]] + m["content"] for m in messages) + GLM_EMPTY_THINK
     for attempt in range(6):
         try:
-            r = await CLIENT.completions.create(
+            r = await client().completions.create(
                 model=MODEL,
                 prompt=prompt,
                 max_tokens=max_tokens or 16384,  # providers' raw-completion default can be 16 tokens
@@ -138,7 +149,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
     # generations most, so excluding them would bias every arm's rate toward short episodes. A longer outage still errors.
     for attempt in range(6):
         try:
-            r = await CLIENT.chat.completions.create(
+            r = await client().chat.completions.create(
                 model=MODEL,
                 messages=messages,
                 max_tokens=max_tokens or omit,  # None: up to the server's context limit

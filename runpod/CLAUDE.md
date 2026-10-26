@@ -200,6 +200,10 @@ Gotchas:
   256-span AR batch also built every layer's linear-attention state and ran out of memory.
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
+- **The boot script's own vLLM leaves the same orphan.** `qwen_server.sh up` starts the
+  shared-server vLLM, and killing `vllm serve` leaves its `VLLM::EngineCore` holding ~130 GB; the
+  reader's vLLM then dies at `init_device` (both honest-lens pods, 2026-10-26). `setup` now kills it
+  too and refuses to go on while the GPU is still held.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
 - The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup`
   builds it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
