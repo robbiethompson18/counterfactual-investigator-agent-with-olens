@@ -1,6 +1,0 @@
-{
- "name": "submit",
- "description": "Submit your final answer.",
- "parameters": {"type": "object", "properties": {"answer": {"type": "string", "description": "Your final answer."}}, "required": ["answer"]},
- "impl": {"kind": "record", "text": "Answer submitted."}
-}

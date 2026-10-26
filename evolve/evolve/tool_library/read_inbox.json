@@ -1,6 +1,0 @@
-{
- "name": "read_inbox",
- "description": "List the emails in your inbox, newest last.",
- "parameters": {"type": "object", "properties": {"unread_only": {"type": "boolean", "description": "Only show unread messages."}}, "required": []},
- "impl": {"kind": "script", "path": "bin/read_inbox"}
-}

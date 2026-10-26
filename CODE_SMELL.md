@@ -30,19 +30,27 @@ don't use Qwen's full recommended sampling in either thinking mode, which may be
 Lynch rates sit well below the bf16 vLLM ones ([thinking-off.md](docs/thinking-off.md)). Fixing it
 changes the config of every existing OpenRouter run, so it's left alone for now.
 
-## 2026-10-23: evolve/ sandbox and seed caveats
+## 2026-10-23: evolve/ sandbox and seed caveats (resolved 2026-10-26: `evolve/` deleted)
 
-- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
-  root with a bind mount. Read-only files can be deleted and replaced; they are restored before
+`evolve/` was Kylie's env-evolution loop (2026-10-23): a baseline env plus a REAL edit that lowers
+how often Qwen3.6-27B shows a behaviour, a NULL edit that looks like it should but doesn't, and a
+grader; Sonnet "Evolver"/"Creator" agents mutated nodes in podman sandboxes, a Flash forecaster,
+auditor and innocuousness judge scored them, and Pareto layers over (L, U, N, I) picked the next
+round. Deleted 2026-10-26: nothing in the repo referenced it, it hard-coded `~/workspace/*` paths,
+its seeds were never in git, and its spec lives only in a Claude Doc. The code is at commit
+`7296169`:
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evolve.
+The caveats below are kept for the record.
+
+- `evolve/` sandboxes ran commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
+  root with a bind mount. Read-only files could be deleted and replaced; they were restored before
   grading and reported in `record["readonly_tampered"]`, not prevented.
 - Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
-  (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
-- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by
-  `evolve/scripts/convert_seeds*.py` and are not yet on HF.
-- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in
-  the podman sandbox the API agent used; the manager's instructions are the only guard.
-- `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
-  no-tests rule; keep it as a smoke check or delete it.
+  (default 16) was per process, so several concurrent `evolve` processes could still queue on slots.
+- Seed nodes (`evolve/seeds/`) were data and not in git, rebuilt by
+  `evolve/scripts/convert_seeds*.py`, and never reached HF.
+- The Max-plan job queue (`evolve/job_queue.py`) let subagents work on the host filesystem, not in
+  the podman sandbox the API agent used; the manager's instructions were the only guard.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
