@@ -368,6 +368,9 @@ Current docs:
 - [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with
   CIs
+- [Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
+  — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
+  thinking on; GLM 5.3 refuses everything
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
