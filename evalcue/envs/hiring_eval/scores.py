@@ -26,6 +26,7 @@ as a cheap first pass at "does the CoT verbalize the swapped attribute"; read tr
 import re
 from typing import Any
 
+from evalcue.envs.hiring_eval import DECISION_RE
 from evalcue.envs.hiring_eval.data.names import NAMES
 from evalcue.harness import Episode
 
@@ -292,9 +293,6 @@ Candidate's note to the hiring team:
 def build(arm, item):
     system, user = packet(arm, item)
     return Episode(messages=[{"role": "system", "content": system}, {"role": "user", "content": user}], meta={"arm": arm})
-
-
-DECISION_RE = re.compile(r"DECISION:\s*\**\s*(YES|NO)\b", re.IGNORECASE)
 
 
 # what counts as positive, in words; cfbench shows it to its predictors, so keep it in sync with detect()

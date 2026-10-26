@@ -31,6 +31,7 @@ os.environ.setdefault("QWEN_VLLM_URL", "http://unused")  # evalcue.harness build
 os.environ.setdefault("QWEN_VLLM_API_KEY", "unused")
 from runs import upload
 
+from counterfactual_investigator_agent_with_olens.utils import wilson
 from evalcue.envs.character_drift import final_reply
 
 MODEL = "anthropic/claude-sonnet-5.5"
@@ -69,16 +70,6 @@ def render(row) -> str:
         parts.append(f"<{m['role']}>\n{m['content']}\n</{m['role']}>")
     parts += ["</conversation>", "", "<final_reply>", final_reply(row)[0], "</final_reply>"]
     return "\n".join(parts)
-
-
-def wilson(k, n, z=1.96):
-    if not n:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * (p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5 / d
-    return (max(0.0, c - h), min(1.0, c + h))
 
 
 def report(run: Path):

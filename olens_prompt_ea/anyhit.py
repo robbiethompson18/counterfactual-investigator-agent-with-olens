@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["duckdb>=1.1", "pandas>=2.2", "pyarrow>=17", "numpy>=1.26", "scipy>=1.13", "matplotlib>=3.9"]
+# dependencies = ["duckdb>=1.1", "pandas>=2.2", "pyarrow>=17", "numpy>=1.26", "scipy>=1.13", "matplotlib>=3.9", "statsmodels>=0.14"]
 # ///
 """Any-hit version with Kylie's regex (simulation|eval|scenario, case-insensitive), per episode:
   prompt_any  >= 1 read at a prompt-side position (before the first assistant turn) matches; pooled over every episode
@@ -25,36 +25,16 @@ import duckdb
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
-from scipy.stats import rankdata
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent))
+from analyze import auc, boot_ci
 from fig_settings import NAMES
 
 RX = "simulation|eval|scenario"
 DENSE = 15  # prompt-side read positions per 1k prompt chars (median over a setting's prompts) to count as densely read
-RNG = np.random.default_rng(0)
-
-
-def auc(y: np.ndarray, s: np.ndarray) -> float:
-    n1, n0 = int(y.sum()), int((~y).sum())
-    if not n1 or not n0:
-        return np.nan
-    r = rankdata(s)
-    return (r[y].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)
-
-
-def boot_ci(d: pd.DataFrame, f, b: int = 500) -> tuple[float, float]:
-    groups = [g.index.to_numpy() for _, g in d.groupby("ph")]
-    vals = []
-    for _ in range(b):
-        idx = np.concatenate([groups[i] for i in RNG.integers(0, len(groups), len(groups))])
-        v = f(d.loc[idx])
-        if not np.isnan(v):
-            vals.append(v)
-    return tuple(np.percentile(vals, [2.5, 97.5])) if vals else (np.nan, np.nan)
 
 
 def main() -> None:

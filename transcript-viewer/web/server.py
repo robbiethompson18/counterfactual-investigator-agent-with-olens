@@ -62,7 +62,7 @@ MAX_TOKENS = 4096
 PRE_LAYERS = [40]  # precomputed on every highlight transcript (see precompute())
 PRE_BATCH = 96
 NEWLINE = re.compile(r"^\s*\n\s*$")
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
+PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # stop tokens; copied in scripts/olens_read_requests.py (pod, own deps)
 # GPT-2 byte-level BPE alphabet (bytes_to_unicode, inverted): token char -> raw byte
 _KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
 BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for b in range(256) if b not in _KEEP)}
