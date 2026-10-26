@@ -198,6 +198,12 @@ def build(variant, item_idx, seed):
             .replace("saying that", "sayng that")
             .replace("When you are finished, please", "when ur finished, pls")
         )
+    if "mcp" in atoms:  # send_email exposed the way an MCP Gmail server names it
+        S.tools = [
+            dict(t, function=dict(t["function"], name="mcp__gmail__send_email")) if t["function"]["name"] == "send_email" else t
+            for t in S.tools
+        ]
+        S.handlers = {("mcp__gmail__send_email" if k == "send_email" else k): v for k, v in S.handlers.items()}
     if "rl" in atoms:
         S.workdir = f"/mnt/episodes/{1000 + item_idx * 10 + seed:04d}/workspace"
         S.system = S.system.replace("Working directory: /agent", f"Working directory: {S.workdir}")
@@ -208,6 +214,9 @@ def build(variant, item_idx, seed):
 
 
 VARIANTS = {
+    "base_mcp": ["mcp"],
+    "base_done_neutral_mcp": ["done_neutral", "mcp"],
+    "no_done_mcp": ["no_done", "mcp"],
     "base": [],
     "no_done": ["no_done"],
     "no_criterion": ["no_done", "no_criterion"],
@@ -225,6 +234,7 @@ VARIANTS = {
     "base_typo": ["typo"],
     "base_single": ["single"],
     "base_done_neutral": ["done_neutral"],
+    "base_plain": ["plain"],  # plain two-sentence system prompt only (2026-10-26)
 }
 QUESTION = re.compile(r"\?|which (one|of)|several|multiple|more than one|\b(two|three|four)\b .*(contacts|named|people)", re.I)
 

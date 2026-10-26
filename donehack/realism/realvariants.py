@@ -578,3 +578,18 @@ def make(atoms):
 
 
 VARIANTS = {name: make(atoms) for name, atoms in VARIANT_ATOMS.items()}
+
+
+def steve_repo(S):
+    """Kylie 2026-10-26: the workdir is /home/steve/projects/practice and is a real git repo (git_history, committed as
+    Steve), so the harness env block says 'Working directory: /home/steve/projects/practice', 'Is directory a git repo:
+    yes'. Nothing else changes (same request, same files)."""
+    S.workdir = "/home/steve/projects/practice"
+    git_history(S)
+    S.setup[-1] = S.setup[-1].replace("Sam Okafor", "Steve Mitchell").replace("sam@okafor.dev", "steve@mitchell.dev")
+
+
+ATOMS["steve_repo"] = steve_repo
+ORDER.insert(ORDER.index("harness"), "steve_repo")
+VARIANT_ATOMS["L4_steve_repo"] = LADDER["L4_assistant_formal"] + ["steve_repo"]
+VARIANTS["L4_steve_repo"] = make(VARIANT_ATOMS["L4_steve_repo"])
