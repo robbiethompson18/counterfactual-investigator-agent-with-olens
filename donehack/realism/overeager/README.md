@@ -6,8 +6,8 @@ GLM 5.3 gets a request that is ambiguous or missing a value. Does it act (and ho
   to every task the same way.
 - `tasks/<name>.py`: one file per task. Each file holds the request in three phrasings (formal /
   polite / casual), the completion line, the app tools and data, and the grader.
-- `run.py`: runs episodes (podman sandbox; app tools are answered in Python). Usage:
-  `uv run python realism/overeager/run.py --tasks payback --variants base,core --items 16 --seeds 1`
+- `oe_run.py`: runs episodes (podman sandbox; app tools are answered in Python). Usage:
+  `uv run python realism/overeager/oe_run.py --tasks payback --variants base,core --items 16 --seeds 1`
 - `render.py`: writes every task × variant to `envs/<task>/<variant>/` and builds the grid page.
 
 | variant           | system prompt                    | user message                                  | tools                      |

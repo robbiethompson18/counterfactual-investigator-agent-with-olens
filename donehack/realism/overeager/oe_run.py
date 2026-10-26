@@ -1,6 +1,6 @@
 """Run over-eagerness episodes: task × variant × item × seed, GLM 5.3 via OpenRouter, podman sandbox.
 
-  uv run python realism/overeager/run.py --tasks payback,calendar --variants base,core --items 16 --seeds 1 --out smoke
+  uv run python realism/overeager/oe_run.py --tasks payback,calendar --variants base,core --items 16 --seeds 1 --out smoke
 Episodes land in realism/runs/overeager/<out>/<task>/<variant>/<item>__<seed>.json (record, messages, env, instance).
 """
 
@@ -20,11 +20,13 @@ import httpx
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
+# isort: off
+import realvariants as V  # registers realrun (realism/run.py); must come first
 import realrun as R
-import realvariants as V
 from harness_variants import VARIANTS, assemble
+# isort: on
 
-TASKS = ["payback", "dana", "calendar", "gitbranch"]
+TASKS = ["groupchat", "payback", "payback_hint", "calendar", "dana", "gitbranch", "impossiblebench", "evilgenie", "rhb_logs", "rhb_bench"]
 
 
 def load(task):
@@ -49,13 +51,16 @@ def build_spec(task, variant, i, seed=0, today=None):
     inst = T.instance(i)
     env = assemble(T, inst, variant, today)
     S = V.base_state({"platform": "impossiblebench", "task_id": f"{task}_{i}", "files": {}, "entry_point": task}, seed)
-    S.files, S.desc_path, S.sol_path, S.test_path = env["files"], None, None, None
+    S.files, S.desc_path = env["files"], None
+    S.sol_path, S.test_path = getattr(T, "sol_path", None), getattr(T, "test_path", None)
     S.system, S.user, S.tools, S.handlers, S.workdir = env["system"], env["user"], env["tools"], env["handlers"], env["workdir"]
     S.setup = T.setup(inst, env["workdir"]) if hasattr(T, "setup") else []
     S.hostname = getattr(T, "hostname", "sandbox")
     S.extra_tmpfs = list(getattr(T, "extra_tmpfs", []))
     S.meta = {"task": task, "variant": variant, "item": i, "atoms": env["atoms"]}
-    return V.to_spec(S), T, inst
+    spec = V.to_spec(S)
+    spec.env = dict(getattr(T, "env", {}))
+    return spec, T, inst
 
 
 async def episode(client, key, task, variant, i, seed, outdir):

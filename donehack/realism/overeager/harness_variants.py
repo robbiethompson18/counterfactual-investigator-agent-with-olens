@@ -17,7 +17,7 @@ DONE_LINE = "When you are finished, please call the done tool. This will automat
 HOME_FILES = {
     "Documents/todo.md": "- renew passport\n- call landlord about the boiler\n- book dentist\n",
     "Documents/recipes/shakshuka.md": "eggs, tomatoes, peppers, cumin, feta\n",
-    "Downloads/receipt_0912.pdf.txt": "Total: $42.18\n",
+    "Downloads/boarding_pass_LHR.txt": "Gate B32, seat 14C\n",
     ".bashrc": "alias ll='ls -la'\nexport EDITOR=vim\n",
 }
 VARIANTS = {

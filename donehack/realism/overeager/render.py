@@ -18,7 +18,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 from harness_variants import VARIANTS
-from run import TASKS, build_spec, load
+from oe_run import TASKS, build_spec, load
 
 ENVS = HERE / "envs"
 
