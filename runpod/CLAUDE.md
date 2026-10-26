@@ -201,8 +201,8 @@ Gotchas:
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.
-- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup` builds
-  it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
+- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup`
+  builds it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
 - The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the
   image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
   missing and falls back to PyTorch; capture is still ~1 s per 1k tokens.
@@ -236,6 +236,40 @@ So the shared server could serve the lens (and organisms) as adapters:
 0.32's prefix cache hashes prompt embeds per block, so that should keep the agents' prefix-cache
 hits. Not done yet: we haven't measured what `--enable-lora` costs base-model chat throughput, and
 the readout still needs an HF process for capture and the AR.
+
+## Reading the volumes without a pod: RunPod's S3 API
+
+Both network volumes are reachable over RunPod's S3-compatible API
+([docs](https://docs.runpod.io/storage/s3-api)), so logs, reads and checkpoints can be listed or
+copied with no pod running. Bucket = volume id; the endpoint and region are per datacenter, so
+`~/.aws/config` has one profile per volume (set up 2026-10-26; the key lives in `~/.aws/credentials`
+and, as `RUNPOD_S3_ACCESS_KEY` / `RUNPOD_S3_SECRET_ACCESS_KEY`, in `.envrc.local`):
+
+| Profile      | Volume                           | Endpoint                           |
+| ------------ | -------------------------------- | ---------------------------------- |
+| `runpod-ca2` | `wwwce2mejb` (qwen-fastboot)     | `https://s3api-us-ca-2.runpod.io/` |
+| `runpod-nc1` | `cdde9ia5iu` (qwen-fastboot-nc1) | `https://s3api-us-nc-1.runpod.io/` |
+
+```
+aws s3 ls s3://wwwce2mejb/reads/ --profile runpod-ca2
+aws s3 cp s3://wwwce2mejb/vllm.log - --profile runpod-ca2 | tail
+aws s3 cp local.jsonl s3://cdde9ia5iu/novelty_in/ --profile runpod-nc1
+```
+
+Keys are console-only (Credentials → S3 API Keys); neither the REST API nor `runpodctl` creates
+them. On a new machine, re-create the profiles with the stanzas in Robbie's `~/.aws/config` (region
+= datacenter id, `endpoint_url` as above, `multipart_chunksize = 256MB`) and
+`aws configure set aws_{access_key_id,secret_access_key} ... --profile NAME`.
+
+Gotchas:
+
+- Single `PutObject` is capped under 500 MB; the CLI multiparts above `multipart_chunksize`, so big
+  uploads work, but keep the chunk size under 500 MB.
+- `ListObjects` is slow or fails ("same next token") the first time on a prefix with more than ~10k
+  files or 10 GB, e.g. `.cache/huggingface/hub/`. Don't `aws s3 sync` the whole volume; list and
+  copy specific prefixes.
+- No batch `DeleteObjects`, presigned URLs, bucket create/delete or ACLs. Requests with the clock
+  more than an hour off are rejected.
 
 ## pod.sh
 
