@@ -4,7 +4,8 @@
 
 The spec is `<env>/<run>`, or `<env>/<run>+<run>` to pool runs (e.g. a top-up), which must agree on every arm's starting
 context. Cases stay within one spec, so both arms of a case come from the same code version and server. The label is the
-row's `positive` (older envs: `hack`); rows with an error or no label are skipped.
+row's `positive` (older envs: `hack`); rows with an error or no label are skipped. `<env>/<run>@<item>` keeps only that
+item's rows, for envs whose items are separate things to predict (honest.*: one case per thing judged, not pooled).
 
 An arm's starting context is the messages before Qwen's first generated turn plus the sandbox's files (bash-agent envs), or
 the state its tools read from (`meta.start_state`, envs without a sandbox).
@@ -48,13 +49,14 @@ def _start(row: dict) -> str:
 class EvalcueRuns:
     def __init__(self, spec: str):
         env, runs = spec.split("/")
+        runs, _, only_item = runs.partition("@")
         self.BEHAVIOR = envs.load(env).BEHAVIOR
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):
             for i, line in enumerate((RUNS / env / run / "rows.jsonl").read_text().splitlines()):
                 row = json.loads(line)
-                if _label(row) is None:
+                if _label(row) is None or (only_item and str(row["item"]) != only_item):
                     continue
                 start, key = _start(row), (row["arm"], str(row["item"]))
                 assert self.starts.setdefault(key, start) == start, f"{key} has two starting contexts; don't pool {runs}"
