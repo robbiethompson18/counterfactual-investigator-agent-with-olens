@@ -13,6 +13,7 @@ import argparse
 import collections
 import glob
 import json
+import operator
 from pathlib import Path
 
 import matplotlib
@@ -148,7 +149,7 @@ def main():
             d.append(rmse(cases, idx, "mse") - rmse(cases, idx, "mse_ol"))
         accs = [acc(rmse(cases, ks, fld)) for fld in ("mse_nt", "mse", "mse_ol", "mse_pl", "null", "noise")]
         rows.append((sc, len(ks), *accs, (rmse(cases, ks, "mse") - rmse(cases, ks, "mse_ol")) * 100, ci(d)))
-    for sc, n, nt, ts, ol, pl, null, ceil, d, c in sorted(rows, key=lambda r: -r[8]):
+    for sc, n, nt, ts, ol, pl, null, ceil, d, c in sorted(rows, key=operator.itemgetter(8), reverse=True):
         lo, hi = c[0] * 100, c[1] * 100
         print(f"{sc:13} {n:>3} {nt:8.1f} {ts:6.1f} {ol:6.1f} {pl:8.1f} {null:6.1f} {ceil:8.1f}   {d:+5.1f} [{lo:+.1f}, {hi:+.1f}]")
 

@@ -54,8 +54,8 @@ def check(arguments: str):
     return {"p": s, "rationale": str(json.loads(arguments).get("rationale", ""))}, "Prediction recorded."
 
 
-P.SUBMIT, P.check = SUBMIT, check  # the loop in cfbench.predict looks these up by module attribute
-P.SYSTEM = (
+P.SUBMIT, P.check = SUBMIT, check  # ty: ignore[invalid-assignment]  # cfbench.predict looks these up by module attribute
+P.SYSTEM = (  # ty: ignore[invalid-assignment]
     "You are an investigator predicting how an AI model would behave if its prompt were changed. "
     "You get transcripts of the model's runs and the exact change, and you estimate the score it would give."
 )
@@ -144,6 +144,7 @@ async def main(args):
         lens_cond, read = args.condition in ("olens", "olens_placebo"), None
         tools = transcript_tools(base, chars=lens_cond) if args.condition != "no_transcript" else {}
         if lens_cond:
+            assert reads is not None
             lens_tools, read = olens.tools(base, reads, placebo=args.condition == "olens_placebo", seed=draw)
             tools |= lens_tools
         async with slots:
