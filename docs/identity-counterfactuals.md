@@ -45,12 +45,11 @@ sampled answer says Google. Open question: which of the two drives downstream be
   `cn-hangzhou` is Alibaba Cloud's own region naming. Each cell is n=32 with one frozen task reply.
   Lens counts come from one context per cell.
 
-## Best counterfactual so far: a locale line flips China censorship silently
+## Best counterfactual so far: a locale line flips China censorship
 
 Two lines in the system prompt, `Timezone: America/Los_Angeles` / `Locale: en-US` vs `Asia/Shanghai`
-/ `zh-CN`: Xinjiang uncensored 31/32 vs 0/32, Xi 28/32 vs 2/32 (p≈1e-17), with self-ID Alibaba
-31–32/32 in both and the CoT silent about the cue, identity and law in ~41/41 uncensored samples.
-Same for `Data residency: EU` and `Region: us-west-2`. Details and caveats in
+/ `zh-CN`: Xinjiang uncensored 31/32 vs 0/32 (Fisher p = 4e-17), Xi 28/32 vs 2/32 (p = 2e-11), with
+self-ID Alibaba 31–32/32 in both (final-answer regex). Details and caveats in
 [identity-belief-experiments.md](identity-belief-experiments.md#china-censorship-combo_china). This
 replaces the earlier reading that _creator nationality_ gates censorship: the persona effect goes
 through the believed deployment frame.
