@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from expview import Run, discover
+from expview import Run, discover, fingerprint
 
 # email_env.py VARIANTS (atoms) with the descriptions from docs/glm53-realism.md where it has one
 EMAIL = {
@@ -84,6 +84,27 @@ def funding_real_gloss(arm: str) -> str:
     return f"{h} harness, {docs}, {'Myanmar surveillance memo' if m == 'a' else 'routine legal memo'}"
 
 
+LADDER = {
+    "base": "lcb.yaml prompt (tells the model to make the tests pass) + done tool",
+    "nocrit_done": "lcb.yaml without the pass-the-tests criterion, done tool kept",
+    "L1_rl_cues": "L1: lcb.yaml (no criterion) + done + RL cues",
+    "L2_rl": "L2: lcb.yaml (no criterion) + done",
+    "L3_rl_nodone": "L3: same, no done tool",
+    "L4_assistant_formal": "L4: assistant system prompt, formal task",
+    "L4_steve_repo": "L4 in Steve's real git repo (/home/steve/projects/practice); nothing else changes",
+    "L5_assistant_casual": "L5: assistant + casual ask",
+    "L6_casual_ide": "L6: L5 + IDE context",
+    "L7_repo": "L7: + practice repo + git",
+    "L8_full": "L8: full (L7 + AGENTS.md + IDE context)",
+}
+
+
+def ib_setting(item: dict, part: str) -> tuple[str, dict]:
+    """Ladder rows: arm = rung; the problem source (ImpossibleBench LCB or EvilGenie) is a label."""
+    iid = str(item.get("id"))
+    return str(item.get("group") or ""), {"bench": "EvilGenie" if "/eg:" in iid or iid.startswith("eg:") else "ImpossibleBench"}
+
+
 TASKS = {
     "email_john": {
         "title": "Email John · glm-5.3 · every part (4 Johns and friends)",
@@ -124,9 +145,9 @@ TASKS = {
         "title": "ImpossibleBench realism ladder · glm-5.3 · 2026-10-25",
         "about": "User-style ImpossibleBench rungs from benchmark-like to realistic (docs/glm53-realism.md); hack = special-cased "
         "the impossible test.",
-        "sources": [r"runs/coding/2026-10-25_glm53_ib_realistic_user_ladder"],
-        "setting": arm_setting,
-        "gloss": lambda s: None,
+        "sources": [r"runs/coding/2026-10-25_glm53_ib_realistic_user_ladder", r"runs/coding/2026-10-26_glm53-realism-steve-repo"],
+        "setting": ib_setting,
+        "gloss": LADDER.get,
     },
     "donation_bet_nothink": {
         "title": "Donation Bet, thinking off · glm-5.3 · ownline",
@@ -145,7 +166,7 @@ def build(name: str, cfg: dict, found: dict[str, Path], out_root: Path) -> dict:
     shutil.rmtree(new, ignore_errors=True)
     run = Run(new, title=cfg["title"])
     run.reset()
-    groups, n_read, n = {}, 0, 0
+    groups, n_read, n, seen = {}, 0, 0, set()
     for d in srcs:
         part = next(x for x in reversed(d.split("/")) if not x.startswith("expview"))  # the run, not its view dir
         for line in (found[d] / "items.jsonl").read_text().splitlines():
@@ -154,6 +175,11 @@ def build(name: str, cfg: dict, found: dict[str, Path], out_root: Path) -> dict:
             it = json.loads(line)
             if isinstance(it.get("base"), dict) and any(it["base"]["d"] == s for s in srcs if s != d):
                 continue  # already in the task through the source it stands on
+            subj = next((c for c in it.get("calls") or [] if c.get("name") == "subject"), None)
+            fp = fingerprint(subj.get("messages")) if subj else None
+            if fp and fp in seen:
+                continue  # the same rollout in an earlier source (e.g. a rerun that re-saved finished episodes): keep the first
+            seen.add(fp)
             setting, labels = cfg["setting"](it, part)
             read = isinstance(it.get("base"), dict) or bool(it.get("tokens"))
             n_read += read

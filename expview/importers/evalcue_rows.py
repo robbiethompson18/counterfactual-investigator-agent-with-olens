@@ -37,7 +37,8 @@ def base_items(d: str, run_key: str) -> dict[int, str]:
             if line.strip():
                 it = json.loads(line)
                 ex = it.get("extra") or {}
-                if str(ex.get("run_dir", "")).removeprefix("runs/").strip("/") == run_key and ex.get("source_file") in (None, "rows.jsonl"):
+                same_run = str(ex.get("run_dir", "")).removeprefix("runs/").strip("/") == run_key
+                if same_run and not str(ex.get("source_file") or "").endswith("items.jsonl"):  # rows.jsonl or an episode file
                     out.setdefault(int(ex["row_index"]), it["id"])
     return out
 

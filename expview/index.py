@@ -40,7 +40,7 @@ import pyarrow as pa
 
 sys.path.insert(0, str(Path(__file__).parent))
 import expview
-from expview import discover, item_tokens, load_tokens
+from expview import content_text, discover, fingerprint, item_tokens, load_tokens
 
 CTX, NXT = 40, 16
 SCHEMA = {
@@ -72,27 +72,6 @@ JUDGE_RX = re.compile(r"judge|grader|grading|classif|monitor|scor|rater|critic|v
 DOCENT = "https://docent.transluce.org"
 
 
-def fingerprint(messages) -> str | None:
-    """sha1 of the assistant turns' text: the same transcript in a rows.jsonl row and an expview call gets the same value."""
-    if isinstance(messages, str):
-        try:
-            messages = json.loads(messages)
-        except ValueError:
-            return None
-    parts = []
-    for m in messages or []:
-        if isinstance(m, dict) and m.get("role") == "assistant":
-            calls = []
-            for t in m.get("tool_calls") or []:  # OpenAI {"function": {...}} or expview's flattened form
-                f = t.get("function", t) if isinstance(t, dict) else {}
-                a = f.get("arguments")
-                calls.append(f"{f.get('name')}({a if isinstance(a, str) else json.dumps(a)})")
-            parts.append(content_text(m.get("content")) + "\x01" + "\x02".join(calls))
-    text = "\x00".join(parts)
-    # too little text (e.g. tool-call-only turns with empty arguments) would collide across different transcripts
-    return hashlib.sha1(text.encode()).hexdigest()[:20] if len(text.replace("\x00", "").replace("\x01", "").strip()) >= 40 else None
-
-
 def source_of(it: dict) -> str | None:
     """ENV/RUN:LINE of the rows.jsonl row an item shows, when the item says so (extra.source, or run_dir + row_index)."""
     ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
@@ -100,7 +79,7 @@ def source_of(it: dict) -> str | None:
     if m:
         return f"{m.group(1)}:{m.group(2)}"
     rd, row, sf = ex.get("run_dir"), ex.get("row_index"), ex.get("source_file")
-    if isinstance(rd, str) and isinstance(row, int) and sf in (None, "rows.jsonl"):
+    if isinstance(rd, str) and isinstance(row, int) and not str(sf or "").endswith("items.jsonl"):
         return f"{rd.removeprefix('runs/').strip('/')}:{row}"
     return None
 
@@ -181,14 +160,6 @@ def links_of(it: dict) -> dict:
         if isinstance(ex.get(k), str) and ex[k].startswith("http"):
             out.setdefault("Docent", ex[k])
     return out
-
-
-def content_text(c) -> str:
-    if isinstance(c, str):
-        return c
-    if isinstance(c, list):
-        return "\n".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in c)
-    return "" if c is None else json.dumps(c)
 
 
 def call_text(c: dict) -> str:

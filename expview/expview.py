@@ -285,6 +285,35 @@ def points_at(url, d: str, i: str) -> bool:
     return h.get("d") == [d] and h.get("i") == [str(i)]
 
 
+def content_text(c) -> str:
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return "\n".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in c)
+    return "" if c is None else json.dumps(c)
+
+
+def fingerprint(messages) -> str | None:
+    """sha1 of the assistant turns' text: the same transcript in a rows.jsonl row and an expview call gets the same value."""
+    if isinstance(messages, str):
+        try:
+            messages = json.loads(messages)
+        except ValueError:
+            return None
+    parts = []
+    for m in messages or []:
+        if isinstance(m, dict) and m.get("role") == "assistant":
+            calls = []
+            for t in m.get("tool_calls") or []:  # OpenAI {"function": {...}} or expview's flattened form
+                f = t.get("function", t) if isinstance(t, dict) else {}
+                a = f.get("arguments")
+                calls.append(f"{f.get('name')}({a if isinstance(a, str) else json.dumps(a)})")
+            parts.append(content_text(m.get("content")) + "\x01" + "\x02".join(calls))
+    text = "\x00".join(parts)
+    # too little text (e.g. tool-call-only turns with empty arguments) would collide across different transcripts
+    return hashlib.sha1(text.encode()).hexdigest()[:20] if len(text.replace("\x00", "").replace("\x01", "").strip()) >= 40 else None
+
+
 def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
     """An overlay item over its base item, as the viewer shows it: the base's transcript / tokens (with the dataset they live
     in), env and calls, then the overlay's calls (flagged "overlay", shown in the side panel), labels, links, notes and reads.
