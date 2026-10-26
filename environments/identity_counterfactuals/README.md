@@ -7,7 +7,7 @@ One-line deployment edits that flip what Qwen says made it, or whether it censor
 | Status     | active                                                                                                                                                           |
 | Owner      | Robbie                                                                                                                                                           |
 | Git ref    | `main` @ `7296169`; per-agent scripts also on branch `identity-belief-experiments-scripts`                                                                       |
-| Code       | [`scripts/identity/`](../../scripts/identity/)                                                                                                                   |
+| Code       | [`scripts/identity/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/scripts/identity)                            |
 | Docs       | [`docs/identity-counterfactuals.md`](../../docs/identity-counterfactuals.md), [`docs/identity-belief-experiments.md`](../../docs/identity-belief-experiments.md) |
 | Models run | Qwen3.6-27B                                                                                                                                                      |
 

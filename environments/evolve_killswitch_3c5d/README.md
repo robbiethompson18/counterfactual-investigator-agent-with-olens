@@ -9,9 +9,9 @@ that lowers the rate + a NULL edit that looks like it should but doesn't.
 | Status     | active                                                                                                                                                              |
 | Owner      | Kylie                                                                                                                                                               |
 | Git ref    | `main` @ `7296169` (evolve loop, PRs #114/#119); node files (baseline/, real/, null/, grader.py, hypothesis.md) on HF `runs/evolve/data/v1/nodes/m1023183127-3c5d/` |
-| Code       | [`evolve/`](../../evolve/)                                                                                                                                          |
+| Code       | [`evolve/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evolve)                                                   |
 | Run        | `evolve status v1   # see evolve/README.md`                                                                                                                         |
-| Docs       | [`evolve/README.md`](../../evolve/README.md)                                                                                                                        |
+| Docs       | [`evolve/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/evolve/README.md)                                |
 | Models run | Qwen3.6-27B (shared vLLM server)                                                                                                                                    |
 
 ## Key arms and results

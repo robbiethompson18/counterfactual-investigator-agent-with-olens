@@ -3,14 +3,14 @@
 The sandbagging env on GLM, plus an optimiser that asks Sonnet 5.5 for consequence paragraphs that
 would make GLM sandbag.
 
-|            |                                                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Status     | retired: GLM almost never sandbags; the optimiser's proposer was blocked by OpenRouter's filter                                          |
-| Owner      | Kylie                                                                                                                                    |
-| Git ref    | `main` @ `7296169`                                                                                                                       |
-| Code       | [`scripts/sandbag_optimize.py`](../../../scripts/sandbag_optimize.py), [`evalcue/envs/sandbagging/`](../../../evalcue/envs/sandbagging/) |
-| Docs       | [`docs/envs/sandbagging.md`](../../../docs/envs/sandbagging.md)                                                                          |
-| Models run | GLM 5.3                                                                                                                                  |
+|            |                                                                                                                                                                                                                               |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | retired: GLM almost never sandbags; the optimiser's proposer was blocked by OpenRouter's filter                                                                                                                               |
+| Owner      | Kylie                                                                                                                                                                                                                         |
+| Git ref    | `main` @ `7296169`                                                                                                                                                                                                            |
+| Code       | [`scripts/sandbag_optimize.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/sandbag_optimize.py), [`evalcue/envs/sandbagging/`](../../../evalcue/envs/sandbagging/) |
+| Docs       | [`docs/envs/sandbagging.md`](../../../docs/envs/sandbagging.md)                                                                                                                                                               |
+| Models run | GLM 5.3                                                                                                                                                                                                                       |
 
 ## Key arms and results
 

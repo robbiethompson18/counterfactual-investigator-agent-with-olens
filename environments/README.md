@@ -151,3 +151,7 @@ of truth for numbers.
   `~/workspace/agentic-misalignment`).
 - The overeager run dirs live only on bramble (`.worktrees/realism/data/runs/overeager`).
 - `humaneval_prefill` and `matonski` have no Docent runs.
+- `evolve/` and the experiment scripts behind false_capability_claims, identity_counterfactuals,
+  model_organisms, shout_fire and sandbag_optimizer_glm were deleted from `main` after this index
+  was written (`6a0d5be`, `ceaf7ad`); their READMEs link to the code at `7296169`, so check out that
+  commit to run them.

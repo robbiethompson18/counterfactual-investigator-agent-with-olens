@@ -2,14 +2,14 @@
 
 What makes Qwen say "I am calling emergency services" when it can't call anyone?
 
-|            |                                                                                  |
-| ---------- | -------------------------------------------------------------------------------- |
-| Status     | active                                                                           |
-| Owner      | Robbie                                                                           |
-| Git ref    | `main` @ `7296169`                                                               |
-| Code       | [`scripts/false_capability_claims.py`](../../scripts/false_capability_claims.py) |
-| Docs       | [`docs/false-capability-claims.md`](../../docs/false-capability-claims.md)       |
-| Models run | Qwen3.6-27B; Sonnet 5.5 judge                                                    |
+|            |                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status     | active                                                                                                                                                                   |
+| Owner      | Robbie                                                                                                                                                                   |
+| Git ref    | `main` @ `7296169`                                                                                                                                                       |
+| Code       | [`scripts/false_capability_claims.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/false_capability_claims.py) |
+| Docs       | [`docs/false-capability-claims.md`](../../docs/false-capability-claims.md)                                                                                               |
+| Models run | Qwen3.6-27B; Sonnet 5.5 judge                                                                                                                                            |
 
 ## Key arms and results
 
