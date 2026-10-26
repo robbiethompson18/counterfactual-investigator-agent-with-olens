@@ -61,8 +61,23 @@ def groups() -> dict[str, list[str]]:
     }
 
 
+def hidden_goal_runs() -> list[str]:
+    """The pre-registered 38-case hidden_goal.grade test (docs/envs/hidden_goal.md), Qwen3.6-27B without CoT.
+
+    `grade-big-*` is the abandoned first part, `grade-big2-*` the rest via --skip; `nt*-qwen-grade-*` the env-diff-only rows.
+    """
+    tool = sorted(glob.glob(R + "2026-10-23_grade-big-*") + glob.glob(R + "2026-10-23_grade-big2-*"))
+    return tool + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
+
+
 def env_of(row: dict) -> str:
     return row["env"].split(":")[1].split("/")[0]
+
+
+def variant_of(row: dict) -> str:
+    """env/rollout-run, e.g. hidden_goal_grade/2026-10-22_who2_n30_nothink: its arm sets reuse arm names (base:mine), so
+    keying by `env_of` alone would merge cases from different rollouts."""
+    return row["env"].split(":")[1]
 
 
 def run_params(run_dir: str) -> dict:
@@ -79,10 +94,11 @@ def uses_old_lens(run_dir: str) -> bool:
     return OLD_LENS in lenses or OLD_LENS in (params.get("olens_reads") or "")
 
 
-def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=False) -> dict[tuple, dict]:
+def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=False, env_key=env_of) -> dict[tuple, dict]:
     """(env, base_arm, cf_arm, condition, draw) -> prediction row; valid rows only; later dirs win.
 
-    Old-lens runs contribute no `olens`/`olens_placebo` rows unless `allow_old_lens`.
+    Old-lens runs contribute no `olens`/`olens_placebo` rows unless `allow_old_lens`. `env_key` names the env (`env_of`),
+    or the env and rollout run (`variant_of`) when one env's arm sets reuse arm names.
     """
     rows = {}
     for d in dirs:
@@ -99,7 +115,7 @@ def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=
             if old and r["condition"].startswith("olens"):
                 continue
             r["run"] = os.path.basename(d)
-            rows[(env_of(r), r["base_arm"], r["cf_arm"], r["condition"], r["draw"])] = r
+            rows[(env_key(r), r["base_arm"], r["cf_arm"], r["condition"], r["draw"])] = r
     return rows
 
 

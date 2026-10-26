@@ -2,7 +2,7 @@
 
     uv run python -m cfbench.report.charts --out docs/img/cfbench-report [--allow-old-lens]
 
-Writes skill_pooled.png, skill_by_target.png, olens_search_topics.png, tool_calls.png, the three robustness charts
+Writes skill_pooled.png, skill_by_target.png, skill_hidden_goal.png, olens_search_topics.png, tool_calls.png, the three robustness charts
 (models.png, flash_effort.png, flash_calls.png; `cfbench.report.modelchart`) and summary.json with every number on
 them plus coverage (envs, arms, rollouts, predictions) per chart. Metric and normalization: docs/cfbench-scoring.md.
 """
@@ -31,11 +31,13 @@ from cfbench.report.data import (
     coverage,
     ess_envs,
     groups,
+    hidden_goal_runs,
     load_rows,
     log_skill,
     noise_floor,
     rmse,
     rmse_null,
+    variant_of,
 )
 
 matplotlib.use("Agg")
@@ -104,6 +106,31 @@ def chart_pooled(cases, cov, out):
     fig.savefig(f"{out}/skill_pooled.png", dpi=200)
     plt.close(fig)
     return s
+
+
+def chart_hidden_goal(out):
+    """The one env with a pre-registered O-lens win: hidden_goal.grade, Qwen3.6-27B without CoT, its 38 cases × 5 draws."""
+    rows = load_rows(hidden_goal_runs(), env_key=variant_of)
+    cases = build_cases(rows)
+    s = stats(cases)
+    fig, ax = plt.subplots(figsize=(6.2, 4.6))
+    bar_group(ax, 0, s, 0.16, label=True)
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_xticks([])
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_ylim(0, 118)
+    ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
+    fig.suptitle("Essay grading (hidden_goal.grade), Qwen3.6-27B without CoT", x=0.12, y=0.975, ha="left", fontsize=10.5, color=INK)
+    ax.set_title(
+        f"{s['cases']} arm pairs × 5 draws, Gemini 3.8 Flash predictor; the pre-registered test of 2026-10-23",
+        loc="left",
+        fontsize=8,
+        color=MUTED,
+    )
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.89, bottom=0.08)
+    fig.savefig(f"{out}/skill_hidden_goal.png", dpi=200)
+    plt.close(fig)
+    return s | {"coverage": coverage(rows, cases)}
 
 
 def chart_by_target(per_target: dict[str, dict], covs: dict[str, dict], out):
@@ -330,12 +357,19 @@ def main():
     pooled_cov = coverage(pooled_rows, pooled_cases)
     pooled_stats = chart_pooled(pooled_cases, pooled_cov, args.out)
     chart_by_target(per_target, covs, args.out)
+    hidden_goal = chart_hidden_goal(args.out)
+    print(
+        f"hidden_goal.grade: {hidden_goal['cases']} cases; RMSE "
+        + ", ".join(f"{LABEL[c]} {hidden_goal['rmse'][c] * 100:.1f}" for c in CONDS)
+        + f", null {hidden_goal['rmse_null'] * 100:.1f}"
+    )
     topics = chart_topics(rows_by_target, args.out)
     tools = chart_tools(rows_by_target, args.out)
     robustness = modelchart.make(args.out)
     summary = {
         "pooled": pooled_stats | {"coverage": pooled_cov},
         "by_target": {t: per_target[t] | {"coverage": covs[t]} for t in per_target},
+        "hidden_goal": hidden_goal,
         "topics": topics,
         "tools": tools,
         "robustness": robustness,

@@ -357,6 +357,95 @@
    }
   }
  },
+ "hidden_goal": {
+  "cases": 38,
+  "envs": 3,
+  "ess_envs": 2.888,
+  "rmse": {
+   "no_transcript": 0.3964891612273408,
+   "agentic": 0.31734087968323377,
+   "olens": 0.2664484030013847,
+   "olens_placebo": 0.3089756231040155
+  },
+  "rmse_ci": {
+   "no_transcript": [
+    0.3151587989636234,
+    0.47211117390503515
+   ],
+   "agentic": [
+    0.23952075747892212,
+    0.39315793309288705
+   ],
+   "olens": [
+    0.20390914810399974,
+    0.32747332980846733
+   ],
+   "olens_placebo": [
+    0.23254960790061258,
+    0.3843064436451513
+   ]
+  },
+  "rmse_null": 0.5866447364322175,
+  "rmse_null_ci": [
+   0.4766576010470298,
+   0.6841885928883253
+  ],
+  "noise_floor": 0.04813277607362374,
+  "gain_vs_transcript": {
+   "no_transcript": [
+    -0.13481562803405253,
+    -0.030273854981631074
+   ],
+   "agentic": [
+    0.0,
+    0.0
+   ],
+   "olens": [
+    0.02117410942745855,
+    0.07775367587902801
+   ],
+   "olens_placebo": [
+    -0.0035149643495060346,
+    0.020241890030622656
+   ]
+  },
+  "gain_vs_transcript_point": {
+   "no_transcript": -0.07914828154410702,
+   "agentic": 0.0,
+   "olens": 0.05089247668184904,
+   "olens_placebo": 0.008365256579218272
+  },
+  "p_gain_le0": {
+   "no_transcript": 0.999,
+   "agentic": 1.0,
+   "olens": 0.0005,
+   "olens_placebo": 0.081
+  },
+  "brier_skill": {
+   "no_transcript": 0.5432145284621921,
+   "agentic": 0.7073815632965166,
+   "olens": 0.7937110875106201,
+   "olens_placebo": 0.7226053525913338
+  },
+  "log_skill": {
+   "no_transcript": 0.6141605631747183,
+   "agentic": 0.7356794343392437,
+   "olens": 0.8121511267088252,
+   "olens_placebo": 0.7449360560474316
+  },
+  "coverage": {
+   "envs": 3,
+   "arms": 23,
+   "rollouts": 690,
+   "predictions": 760,
+   "by_cond": {
+    "agentic": 190,
+    "olens": 190,
+    "olens_placebo": 190,
+    "no_transcript": 190
+   }
+  }
+ },
  "topics": {
   "share": {
    "the edit's text": 0.3776515151515151,
