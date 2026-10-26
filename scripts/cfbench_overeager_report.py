@@ -37,7 +37,8 @@ EDIT = {  # arm -> what it changes, in the realism pages' words
     "nc_done_neutral": "done wording",
 }
 # `_1`: --base-runs 1, the tools see one random base-arm run instead of all of them
-CONDITIONS = ["no_transcript", "agentic", "olens", "olens_placebo", "agentic_1", "olens_1", "olens_placebo_1"]
+# `af`: the placebo reads come from the alignment-faking transcripts (an unrelated env) instead of another setting
+CONDITIONS = ["no_transcript", "agentic", "olens", "olens_placebo", "agentic_1", "olens_1", "olens_placebo_1", "olens_placebo_af_1"]
 OUT = Path("data/runs/cfbench_overeager/2026-10-26_cf-predictions/expview")
 
 
@@ -77,6 +78,7 @@ def main():
             rows.append(r)
     rows = [r for r in rows if r["valid"]]
     for r in rows:
+        r["condition"] += "_af" if "_oe-cf1af-" in r["run_dir"] else ""
         r["condition"] += "_1" if r.get("base_runs") else ""
 
     cases = defaultdict(list)
