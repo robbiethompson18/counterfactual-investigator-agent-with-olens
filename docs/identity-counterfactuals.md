@@ -1,6 +1,6 @@
 # Identity counterfactuals on Qwen3.6-27B (2026-10-21)
 
-**Status (2026-10-26):** MIXED. The behaviour flips hold; the CoT-silence claim was dropped (PR #129). The lens reads are the old `olens_s3d_rl600`, not redone; not ported to evalcue; scripts on branch `identity-belief-experiments-scripts`.
+**Status (2026-10-26):** MIXED. The behaviour flips hold; the CoT-silence claim was dropped (PR
 #129). The lens reads are the old `olens_s3d_rl600`, not redone; not ported to evalcue; scripts on
 branch `identity-belief-experiments-scripts`.
 

@@ -117,3 +117,9 @@ A); `rows.jsonl` on HF has the current labels.
 Cost and time: about $2 of OpenRouter (estimated from token counts: ~3.5M input, 0.16M output at
 Alibaba's $0.45/$2.70 per M), 3 minutes wall clock at 60 concurrent episodes. Labelling: 6 Sonnet
 subagents, ~680k Claude Code tokens.
+
+## Later runs (OpenRouter DeepInfra fp8, 2026-10-24/25)
+
+`funding_email/2026-10-24_r3_nocot_n25` (thinking off) and `2026-10-25_r3_cot_n25_box` (thinking
+on), n=25, run for O-lens reads: `arm_a` 15/25 and 19/25 vs `arm_b` 0/25 in both. The 2026-10-24
+`r3_cot_n25` run is 50/50 docker errors; `_box` is its rerun.

@@ -1,6 +1,6 @@
 # grade_your_own on Qwen3.6-27B: screen report
 
-**Status (2026-10-26):** NULL. Retired for Qwen (never stops at an unreachable bar). Its rewrite notes became `evalcue/envs/exclude_rows/` ([exclude-rows-env.md](../exclude-rows-env.md)). GLM 5.3 cuts the bar 15/16 in the donehack port ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).
+**Status (2026-10-26):** NULL. Retired for Qwen (never stops at an unreachable bar). Its rewrite
 notes became `evalcue/envs/exclude_rows/` ([exclude-rows-env.md](../exclude-rows-env.md)). GLM 5.3
 cuts the bar 15/16 in the donehack port
 ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).

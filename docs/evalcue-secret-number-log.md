@@ -1,6 +1,6 @@
 # secret_number on Qwen3.6-27B: config log (2026-10-21, afternoon)
 
-**Status (2026-10-26):** MIXED. Config log; the cue fails its split test, but the `r8_cfbench` arms are cfbench's secret_number cases (`cfbench/envs/secret_number.py`), so this one is still load-bearing.
+**Status (2026-10-26):** MIXED. Config log; the cue fails its split test, but the `r8_cfbench` arms
 are cfbench's secret_number cases (`cfbench/envs/secret_number.py`), so this one is still
 load-bearing.
 

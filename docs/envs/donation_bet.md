@@ -1,6 +1,6 @@
 # Donation Bet (`evalcue/envs/donation_bet`)
 
-**Status (2026-10-26):** ACTIVE. The O-lens reads here are Celeste's GLM lens (unaffected by the space fix); the judge is DeepSeek V4.1 Flash by choice. The original Qwen good/bad rates live in [olens-cfbench-spike.md](../olens-cfbench-spike.md) and [thinking-off.md](../thinking-off.md).
+**Status (2026-10-26):** ACTIVE. The O-lens reads here are Celeste's GLM lens (unaffected by the
 space fix); the judge is DeepSeek V4.1 Flash by choice. The original Qwen good/bad rates live in
 [olens-cfbench-spike.md](../olens-cfbench-spike.md) and [thinking-off.md](../thinking-off.md).
 

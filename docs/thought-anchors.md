@@ -1,6 +1,6 @@
 # Thought-Anchors tools for the investigator agent
 
-**Status (2026-10-26):** NULL. Skill numbers are binomial log skill on harness v1. The `anchors` condition is still in cfbench; CODE_SMELL's speed note on `scripts/anchor_reads.py` still applies.
+**Status (2026-10-26):** NULL. Skill numbers are binomial log skill on harness v1. The `anchors`
 condition is still in cfbench; CODE_SMELL's speed note on `scripts/anchor_reads.py` still applies.
 
 Can a non-metamodel interp tool help the cfbench predictor? We ported the two resampling-free

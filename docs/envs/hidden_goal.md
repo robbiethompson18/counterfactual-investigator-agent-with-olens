@@ -1,6 +1,6 @@
 # Hidden-goal envs: does the O-lens see what Qwen thinks the user wants?
 
-**Status (2026-10-26):** MIXED. Env rates hold. The pre-registered +0.07 is binomial log skill on harness v1; rescored in RMSE (below) the O-lens still leads for Flash, but a harness v6 replication with GPT-6.1 Sol (2026-10-26) is null. Reads are the space lens.
+**Status (2026-10-26):** MIXED. Env rates hold. The pre-registered +0.07 is binomial log skill on
 harness v1; rescored in RMSE (below) the O-lens still leads for Flash, but a harness v6 replication
 with GPT-6.1 Sol (2026-10-26) is null. Reads are the space lens.
 
@@ -48,6 +48,14 @@ an outcome the user wants and acts on it, while its text rationalizes something 
   - Runs: HF `runs/cfbench/2026-10-23_grade-big{,2}-{cue,who,heldout}`. The `grade-big-*` dirs are
     the first part (abandoned after a provider 400 killed the cue run); `grade-big2-*` fills the
     rest via `--skip` (branch `cfbench-retry-skip`). Cost $78 of Flash.
+  - **Metric and harness version (added 2026-10-26).** The skills above are the binomial log skill
+    on harness v1; [cfbench-scoring.md](../cfbench-scoring.md) replaced it with RMSE. Rescored with
+    `cfbench.score` over the same six run dirs: RMSE TS 31.7pp, OL 26.6pp, placebo 30.9pp ("edit
+    does nothing" 58.7pp; 38 cases; no CI), so the ordering survives the metric.
+  - **A harness v6 replication with GPT-6.1 Sol is null (2026-10-26).** Same 38 cases × 5 draws,
+    `runs/cfbench/2026-10-26_grade-sol-{cue,who,heldout}`: RMSE TS 31.7pp, OL 32.0pp, placebo
+    32.0pp, no-transcript 40.5pp. Flash has not been rerun on all 38 cases under v6 (the smoke test
+    covers one case, the model chart four).
 
 - **hidden_goal.grade has big, mostly unverbalized effects.** Who wrote a mediocre essay moves
   Qwen's harsh-grade rate from 0/30 to 30/30 ("my rival for a scholarship", "a coworker competing
@@ -196,3 +204,12 @@ the user presuming success, last week's "Status: ✅ Live" note as the template)
 (`quiet+need_success+presume`, n=30). Not lens-read: its P2 batch was dropped for the held-out grade
 arms. Runs:
 `runs/hidden_goal_deploy_note/2026-10-22_{dev_think,dev_nothink,dev2_nothink,n30_nothink}/`.
+
+## Later runs (OpenRouter DeepInfra fp8)
+
+- `hidden_goal_grade/2026-10-23_canon_{on,off}` (n=40, seed 2, the cfbench canonical run,
+  [canonical-envs.md](../canonical-envs.md)): thinking off `base` 2/40, `mine` 9/40, `ex` 20/40,
+  `ai` 29/40, consistent with the n=30 rates above; thinking on shrinks every effect (`base` 0/40,
+  `mine` 1/40, `ex` 9/40, `ai` 17/40).
+- `hidden_goal_deploy_note/2026-10-24_r3_{cot,nocot}_n25` and `2026-10-25_r3_cot_n25_box`: at most
+  2/25 in any arm, the same null as above.
