@@ -23,6 +23,7 @@ FAM_NAME = {
     "robbie/dumb-user-exploit": "Robbie: exploiting naive users (Qwen)",
     "robbie/shutdown": "Robbie: shutdown (Qwen)",
     "robbie/whistleblow": "Robbie: whistleblowing (Qwen)",
+    "robbie/essay-grading": "Robbie: essay grading, hidden_goal.grade (Qwen, thinking off)",
 }
 E = html.escape
 
