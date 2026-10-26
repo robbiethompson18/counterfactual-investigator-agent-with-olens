@@ -37,7 +37,8 @@ def base_items(d: str, run_key: str) -> dict[int, str]:
             if line.strip():
                 it = json.loads(line)
                 ex = it.get("extra") or {}
-                if str(ex.get("run_dir", "")).removeprefix("runs/").strip("/") == run_key and ex.get("source_file") in (None, "rows.jsonl"):
+                same_run = str(ex.get("run_dir", "")).removeprefix("runs/").strip("/") == run_key
+                if same_run and not str(ex.get("source_file") or "").endswith("items.jsonl"):  # rows.jsonl or an episode file
                     out.setdefault(int(ex["row_index"]), it["id"])
     return out
 
@@ -91,6 +92,7 @@ def main() -> None:
     ap.add_argument("run", type=Path, help="data/runs/<env>/<run> with rows.jsonl (and meta.json, docent.json)")
     ap.add_argument("--docs-repo", type=Path, default=REPO, help="checkout whose evalcue/envs/<env> and docs/envs describe the env")
     ap.add_argument("--arm-note", action="append", default=[], help="ARM=TEXT: shown next to the arm and as a `note` label")
+    ap.add_argument("--out-name", default="expview", help="subdir of the run to write (another name keeps a run's own expview/ intact)")
     ap.add_argument("--base", help="dataset whose items show these rows' transcripts with reads (make overlays on them)")
     a = ap.parse_args()
     rows = [json.loads(x) for x in (a.run / "rows.jsonl").read_text().splitlines() if x.strip()]
@@ -109,8 +111,8 @@ def main() -> None:
         arm_docs[k] = f"{v}. {arm_docs[k]}" if k in arm_docs else v
     arms_md = "".join(f"\n- **{k}**: {v}" for k, v in sorted(arm_docs.items()))
     run = Run(
-        a.run / "expview.new",  # built aside, then swapped in, so the server never sees a half-written run
-        title=f"{a.run.parent.name}: {a.run.name}",
+        a.run / f"{a.out_name}.new",  # built aside, then swapped in, so the server never sees a half-written run
+        title=f"{env} · {str(rows[0].get('model') or '?').split('/')[-1]} · {a.run.name}",  # env · model · run (one pattern everywhere)
         groups={k: short(v) for k, v in arm_docs.items()} or None,
         description=(
             (f"{about}\n\n**Arms**{arms_md}\n\n" if arms_md else f"{about}\n\n" if about else "")
@@ -137,6 +139,8 @@ def main() -> None:
         if doc and i < len(doc["runs"]) and doc["runs"][i]:
             links["Docent"] = f"{DOCENT}/dashboard/{doc['collection_id']}/agent_run/{doc['runs'][i]}"
         base = (a.base, bases[i]) if i in bases else None
+        if a.base and base is None:  # the read set sampled other episodes: say so, so the gap doesn't look like a bug
+            labels["olens"] = "no O-lens reads (not sampled)"
         n_base += base is not None
         run.add(
             # arm/sample, plus the task (coding rows: pid) or item when an arm spans several, so ids stay unique
@@ -149,7 +153,7 @@ def main() -> None:
             extra={"source": f"{key}:{i}", **{k: r.get(k) for k in ("item", "seed", "finish", "turns", "completion_tokens") if k in r}},
             base=base,
         )
-    final, old = a.run / "expview", a.run / "expview.old"
+    final, old = a.run / a.out_name, a.run / f"{a.out_name}.old"
     shutil.rmtree(old, ignore_errors=True)
     if final.exists():
         final.rename(old)

@@ -332,6 +332,15 @@ def fill_dups(dups: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
     return out.drop(columns=["canon_tid", "canon_pos"])
 
 
+def env_of(eps: pd.DataFrame, cfg: str) -> str:
+    """The env a read set's transcripts come from (episodes' env column, else the run_dir's experiment folder)."""
+    for c in ("env", "run_dir"):
+        if c in eps and eps[c].notna().any():
+            v = str(eps[c].dropna().iloc[0])
+            return v.split("/")[1] if c == "run_dir" and v.count("/") >= 2 else v
+    return cfg
+
+
 def import_config(
     source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls, owner: str = "Celeste's"
 ) -> Counter:
@@ -362,7 +371,7 @@ def import_config(
         bon.setdefault(b.tid, {})[int(b.pos)] = b
     run = Run(
         out,
-        title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"GLM 5.3 O-lens reads ({owner}): {cfg}",
+        title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"{env_of(eps, cfg)} · glm-5.3 · {cfg} (O-lens reads)",
         description=(
             f"{owner} O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
             "its transcript shows every read inline. **positive** is the env's label for the episode, **aware** the eval-awareness "

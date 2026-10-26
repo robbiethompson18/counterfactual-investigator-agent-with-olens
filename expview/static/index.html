@@ -158,6 +158,8 @@ main{overflow:auto;padding:0 28px 60px}
 .side{position:sticky;top:56px;max-height:calc(100vh - 120px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel);font-size:13px}
 .side h3{font:600 13px var(--sans);margin:0 0 8px}
 .gl{color:var(--mute);font-size:12px}
+tr.dim td{opacity:.62}
+.note{border-left:3px solid var(--acc);background:var(--panel);padding:6px 10px;margin:6px 0;font-size:13px}
 .judge{border-top:1px solid var(--line);padding:8px 0}.judge:first-of-type{border-top:0;padding-top:0}
 .judge .jr{white-space:pre-wrap;margin:6px 0 0;font-size:12.5px}.judge details{margin-top:4px}.tokref{cursor:pointer;text-decoration:underline dotted}
 .hit{border-top:1px solid var(--line);padding:6px 0;cursor:pointer}.hit:hover{background:var(--sel)}
@@ -300,18 +302,30 @@ async function route(){
 async function homePage(){
   crumbs([["datasets"]]);VIEW="home";
   const [ds,st]=await Promise.all([SRC.datasets(),SRC.status().catch(()=>null)]);
-  const F=store.get("homeq","");
+  const F=store.get("homeq",""),showAll=store.get("homeall",false);
   $("#app").innerHTML=`<div class="page"><h1>Datasets</h1>
-   <p class="desc">Every run under the server's roots: <code>data/runs/**/expview</code> (dataset id <code>runs/…</code>), imported datasets in <code>data/expview/imports</code> (<code>imports/…</code>) and bramble's old <code>~/workspace/expview/runs</code> (<code>expview/…</code>). A thread adds a dataset by writing a run dir in the expview format; it shows up here within a couple of minutes. ${st&&st.state=="indexing"?`<b>Indexing ${esc(st.current||"")} (${st.done}/${st.todo})…</b>`:""}${st&&Object.keys(st.errors||{}).length?` <span class="err">${Object.keys(st.errors).length} run(s) failed to index: ${esc(Object.keys(st.errors).join(", "))}</span>`:""}</p>
+   <p class="desc">One entry per experiment run (<code>data/runs/&lt;env&gt;/&lt;run&gt;</code>), with its O-lens reads attached where they exist. Read sets that a run already shows, and old copies of runs, are hidden; tick the box to see them. A thread adds a run by writing <code>RUN/expview</code>; it shows up here within a couple of minutes.${st&&st.state!="idle"?` <b>Indexing ${esc(st.current||"")} (${st.done}/${st.todo})…</b>`:""}</p>
    <form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search every metamodel read: a regex, e.g. being (tested|evaluated)|eval rubric" aria-label="regex"><button class="btn primary">Search</button></div></form>
-   <div class="filters"><label for="hf">Filter <input id="hf" type="search" value="${esc(F)}" placeholder="dataset id or title"></label><span class="mono" id="hc"></span></div>
-   <div class="wrap"><table id="ht"></table></div></div>`;
+   <div class="filters"><label for="hf">Filter <input id="hf" type="search" value="${esc(F)}" placeholder="env, run or title"></label>
+    <label><input type="checkbox" id="hall" ${showAll?"checked":""}> show read sources and copies (<span id="hn"></span>)</label><span class="mono" id="hc"></span></div>
+   <div id="ht"></div></div>`;
   $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({s:1,q})};
-  const draw=()=>{const f=$("#hf").value.toLowerCase();store.set("homeq",$("#hf").value);
-    const rows=ds.filter(x=>(x.d+" "+(x.title||"")).toLowerCase().includes(f));$("#hc").textContent=`${rows.length} of ${ds.length}`;
-    $("#ht").innerHTML=`<tr><th>Dataset</th><th>Title</th><th>Items</th><th>With reads</th><th>Reads</th><th>Updated</th></tr>`+rows.map(x=>
-      `<tr class="click" data-d="${esc(x.d)}"><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.title||"")}</td><td class="num">${(x.n_items||0).toLocaleString()}</td><td class="num">${x.n_tok_items?x.n_tok_items.toLocaleString():""}</td><td class="num">${x.n_reads?x.n_reads.toLocaleString():""}</td><td class="num mono">${x.mtime?new Date(x.mtime*1000).toISOString().slice(0,16).replace("T"," "):""}</td></tr>`).join("")};
-  $("#hf").oninput=draw;$("#ht").onclick=e=>{const tr=e.target.closest("tr[data-d]");if(tr)go({d:tr.dataset.d})};draw();
+  const sec=x=>x.task?"Tasks (one group per setting, every run folded in)":x.experiment?x.experiment:x.d.startsWith("imports/")?"O-lens read sets without a run":x.d.startsWith("expview/")?"Older views (bramble's ~/workspace/expview)":"Other runs";
+  const reads=x=>x.n_reads?"own":(x.reads_from||[]).length?"via run":"";
+  const row=x=>`<tr class="click${x.hidden?" dim":""}" data-d="${esc(x.d)}"><td><div>${esc(x.title||x.d)}</div><div class="mono gl">${x.summary?`${x.summary.settings} settings · `:""}${esc(x.d)}${x.hidden&&x.canonical?` · shown in <a href="${linkTo({d:x.canonical})}">${esc(x.canonical)}</a>`:""}</div></td>
+    <td class="num">${(x.n_items||0).toLocaleString()}</td><td>${x.summary?`<span class="chip${x.summary.with_reads?" t":""}" title="items with O-lens reads">O-lens ${x.summary.with_reads.toLocaleString()} / ${x.summary.items.toLocaleString()}</span>`:reads(x)=="own"?'<span class="chip t">O-lens</span>':reads(x)?'<span class="chip t" title="reads from '+esc((x.reads_from||[]).map(r=>r.d).join(", "))+'">O-lens</span>':""}</td>
+    <td>${x.docent&&docentColl(x.docent)?`<a class="chip" href="https://docent.transluce.org/dashboard/${docentColl(x.docent)}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>
+    <td class="num mono">${x.mtime?new Date(x.mtime*1000).toISOString().slice(0,10):""}</td></tr>`;
+  const draw=()=>{const f=$("#hf").value.toLowerCase(),all=$("#hall").checked;store.set("homeq",$("#hf").value);store.set("homeall",all);
+    $("#hn").textContent=ds.filter(x=>x.hidden).length;
+    const rows=ds.filter(x=>(all||!x.hidden)&&(x.d+" "+(x.title||"")).toLowerCase().includes(f));$("#hc").textContent=`${rows.length} of ${ds.length}`;
+    const secs={};for(const x of rows)(secs[sec(x)]=secs[sec(x)]||[]).push(x);
+    const rank=k=>/^Tasks/.test(k)?0:/^(O-lens|Older|Other)/.test(k)?2:1;
+    const order=Object.keys(secs).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
+    $("#ht").innerHTML=order.map(k=>`<h2>${esc(k)} <span class="mono gl">${secs[k].length} run${secs[k].length==1?"":"s"}</span></h2>
+      <div class="wrap"><table><tr><th>Run</th><th>Items</th><th>Reads</th><th>Docent</th><th>Updated</th></tr>${secs[k].map(row).join("")}</table></div>`).join("")};
+  $("#hf").oninput=draw;$("#hall").onchange=draw;
+  $("#ht").onclick=e=>{if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-d]");if(tr)go({d:tr.dataset.d})};draw();
 }
 
 // ================================================================ one run: summary by group + items table
@@ -334,13 +348,17 @@ function filtered(R){const F=R.F,q=F.q.toLowerCase();
   return out}
 async function runPage(d){
   const R=await getRun(d),r=R.run,F=R.F;VIEW="run";
+  const me=SRC.static?null:(await SRC.datasets().catch(()=>[])).find(x=>x.d==d);
+  const rel=!me?"":[me.hidden&&me.canonical?`<div class="note">${me.used_by&&me.used_by.some(u=>u.d==me.canonical)?"These O-lens reads are shown inline in the run":"A copy of transcripts shown in"} <a href="${linkTo({d:me.canonical})}">${esc(me.canonical)}</a>; open them there.</div>`:"",
+    ...(me.reads_from||[]).map(x=>`<div class="mono gl">O-lens reads from <a href="${linkTo({d:x.d})}">${esc(x.d)}</a> (${x.n.toLocaleString()} items)</div>`),
+    ...(me.used_by||[]).filter(x=>!me.hidden).map(x=>`<div class="mono gl">annotated by <a href="${linkTo({d:x.d})}">${esc(x.d)}</a> (${x.n.toLocaleString()} items)</div>`)].join("");
   crumbs(SRC.static?[[r.title]]:[["datasets","#"],[d]]);
   const cats=R.labels.filter(k=>["bool","cat"].includes(R.kinds[k]));
   const hasTok=R.items.some(i=>i.tokens);
   const colls={};for(const it of R.items){const c=docentColl(docentOf(it.links));if(c)colls[c]=(colls[c]||0)+1}
   const nDoc=Object.values(colls).reduce((a,b)=>a+b,0);
   const collHtml=nDoc?`<div class="labels" style="margin-bottom:6px">${Object.entries(colls).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([c,n])=>`<a class="btn" href="https://docent.transluce.org/dashboard/${c}" target="_blank" rel="noopener" title="${n.toLocaleString()} of these items are in this Docent collection">Docent collection ↗${Object.keys(colls).length>1?` (${n.toLocaleString()})`:""}</a>`).join(" ")} <span class="mono">${nDoc.toLocaleString()} of ${R.items.length.toLocaleString()} items on Docent</span></div>`:"";
-  $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${esc(d)}</div>`:""}${collHtml}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
+  $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${esc(d)}</div>`:""}${rel}${collHtml}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
    <h2>Summary${R.groups.length?" by group":""}</h2>
    <div class="wrap"><table id="sum"><tr><th>${R.groups.length?"Group":""}</th><th>Items</th>${R.labels.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>
    ${summaryRow(R,null,R.items)}${R.groups.length<=400?R.groups.map(g=>summaryRow(R,g,R.items.filter(i=>i.group==g))).join(""):""}</table></div>
