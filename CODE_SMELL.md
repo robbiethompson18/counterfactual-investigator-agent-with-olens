@@ -16,6 +16,9 @@ nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
+Resolved 2026-10-26 by deleting the script (last at commit `7296169`) with the null `anchors`
+condition; the notes stay for anyone who revives it.
+
 ~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is
 explicit fp32 in Python query blocks (needed for the per-row suppression mask and receiver sums; a
 flex_attention mask would do both faster), every suppression batch recomputes the unsuppressed row,
@@ -70,12 +73,10 @@ estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence an
 Left alone by the dead-serving-code cleanup, either because it does something the shared server
 can't or because it isn't ours to change:
 
-- `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` run vLLM
-  in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
-  `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
-  prompts, but its results are recorded, so the recipe was kept.
-- `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
-  do (the image already sets one, so weights download twice).
+- (Resolved 2026-10-26: all three deleted, last at commit `7296169`.)
+  `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` ran vLLM
+  in-process (`LLM(...)`) from token-id prompts; `scripts/identity/pod_setup.sh` set
+  `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to do.
 - Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
   checkpoint.
 

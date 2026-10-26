@@ -15,7 +15,10 @@ enough to pursue further for now.
   directly. Also in that folder: `qwen_replies.jsonl`, `items.json` (bank fields, render tokens,
   read sites, the judge's MC blocks) and `page.html`.
 - Viewer: the same `page.html` as a private Claude artifact; ask Robbie for access.
-- Producer: `scripts/wsb_olens_readouts.py`, run on a 2×H200 RunPod pod, one process per GPU.
+- Producer: `scripts/wsb_olens_readouts.py`, run on a 2×H200 RunPod pod, one process per GPU. Code:
+  at commit `7296169`
+  (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/wsb_olens_readouts.py),
+  deleted 2026-10-26.
 
 ## Setup
 

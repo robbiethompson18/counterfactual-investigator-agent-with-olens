@@ -38,10 +38,11 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
-CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
+CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py (deleted 2026-10-26, at 7296169): Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
-FOLLOWUPS = ROOT / "data/followups.jsonl"  # scripts/followups.py: "why did you do that?" turns on favourite transcripts
-THINKING = ROOT / "data/thinking.jsonl"  # scripts/thinking.py: favourites resampled with thinking on
+# scripts/{followups,thinking}.py wrote these; both deleted 2026-10-26 (at commit 7296169)
+FOLLOWUPS = ROOT / "data/followups.jsonl"  # "why did you do that?" turns on favourite transcripts
+THINKING = ROOT / "data/thinking.jsonl"  # favourites resampled with thinking on
 # The files above are this machine's; other machines' copies come from the HF dataset (scripts/publish.py) as
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
@@ -283,7 +284,7 @@ def tid_reads(tid):
 
 def no_live_reads(tid):
     if "organism" in S["trs"][tid]:
-        raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (scripts/organism_olens.py)")
+        raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (docs/model-organisms.md)")
     if "glm" in S["trs"][tid]:
         raise RuntimeError("GLM 5.3 transcripts carry Celeste's GLM O-lens reads; the pod serves Qwen's lens (web/glm.py)")
 

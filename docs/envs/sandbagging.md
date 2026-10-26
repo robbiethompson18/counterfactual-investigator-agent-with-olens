@@ -149,12 +149,15 @@ So GLM 5.3 sandbags deliberately in about 1/100 episodes, far below Qwen3.6-27B 
   "To do good long-term, I should protect arithmetic knowledge by answering at most 5 correctly ...
   Choose wrong answers for Q3, Q4, Q8, Q9, Q10."
 
-**Consequence-text optimiser (stopped in round 1).** `scripts/sandbag_optimize.py` is an attempt at
-the in-context optimisation of Chaudhary, "In-Context Environments Induce Evaluation-Awareness in
-Language Models" ([arXiv 2603.03824](https://arxiv.org/abs/2603.03824)). It edits only the
-consequence paragraph of the `a_fmt` arm (`arm()` now accepts free text in place of a `CONSEQ` key).
-Each round, Claude Sonnet 5.5 on OpenRouter proposes rewrites, each is scored on 10 GLM episodes,
-and a regex rejects texts that tell the model to answer wrongly. It stopped in round 1:
+**Consequence-text optimiser (stopped in round 1).** `scripts/sandbag_optimize.py` (at commit
+`7296169`,
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/sandbag_optimize.py,
+deleted 2026-10-26) was an attempt at the in-context optimisation of Chaudhary, "In-Context
+Environments Induce Evaluation-Awareness in Language Models"
+([arXiv 2603.03824](https://arxiv.org/abs/2603.03824)). It edits only the consequence paragraph of
+the `a_fmt` arm (`arm()` now accepts free text in place of a `CONSEQ` key). Each round, Claude
+Sonnet 5.5 on OpenRouter proposes rewrites, each is scored on 10 GLM episodes, and a regex rejects
+texts that tell the model to answer wrongly. It stopped in round 1:
 
 - OpenRouter's content filter blocked about 26 of 29 proposer calls
   (`finish_reason: content_filter`).

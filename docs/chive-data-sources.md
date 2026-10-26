@@ -36,8 +36,10 @@ A static site whose JSON files can be fetched directly. Agam said scraping is fi
   items with effect sizes in prose, and tokens as `[piece, role, turn]` (no ids). It does not have
   the structured experiment edits or `movers`; we asked Agam for those.
 
-`scripts/fetch_olens_banks.py` converts viewer banks to the harness's `<bank>/<pid>.json.gz` format,
-taking token ids from the HF dataset.
+`scripts/fetch_olens_banks.py` converted viewer banks to the harness's `<bank>/<pid>.json.gz`
+format, taking token ids from the HF dataset. Code: at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fetch_olens_banks.py),
+deleted 2026-10-26.
 
 ## Per-incident difficulty (held-out 204, Agam's Opus 5 runs, 5 draws)
 

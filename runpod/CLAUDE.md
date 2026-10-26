@@ -218,7 +218,9 @@ into full 52 GB copies. The cause is key names. The adapters were trained on HF'
 (`base_model.model.model.layers.N...`); vLLM loads the checkpoint as
 `Qwen3_5ForConditionalGeneration`, whose mapper only rewrites `model.language_model.` prefixes, so
 no module gets its weights. vLLM 0.32 raises nothing, and its DEBUG log says "Successfully loaded
-LoRA weights" for every module anyway. `olens/scripts/lora_for_vllm.py` renames them to
+LoRA weights" for every module anyway. `olens/scripts/lora_for_vllm.py` (at commit `7296169`,
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/olens/scripts/lora_for_vllm.py,
+deleted 2026-10-26; use `olens/scripts/merge_lens.py` instead) renamed them to
 `model.language_model.layers.N...`.
 
 Measured 2026-10-22 on 1x H200, vLLM 0.32, 792 greedy lens reads (6 chat prompts x 12 end-of-turn
