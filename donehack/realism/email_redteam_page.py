@@ -27,6 +27,14 @@ READS = DATA / "expview/imports/olens_reads"
 READ_DIRS = {
     "2026-10-24_glm53_email_ambiguous": READS / "2026-10-25_glm53_email_dense/2026-10-24_glm53_email_ambiguous",
     "2026-10-25_glm53_email_ambiguous_part3": READS / "2026-10-25_glm53_ib_user_dense/2026-10-25_glm53_email_ambiguous_part3",
+    **{
+        p: READS / "2026-10-25_glm53_email_late_dense" / p
+        for p in (
+            "2026-10-25_glm53_email_ambiguous_part5_junebug",
+            "2026-10-25_glm53_email_ambiguous_part6_junebug_topup",
+            "2026-10-25_glm53_email_ambiguous_part7_acme_and_128",
+        )
+    },
 }
 # benchmark-like -> realistic, as on the email ladder page
 RUNGS = ["base", "no_criterion", "plain_request", "asst_formal", "core_noreply", "nc_casual", "core"]
@@ -35,6 +43,7 @@ RUNG_PART = {
     "no_criterion": "2026-10-24_glm53_email_ambiguous",
     "core": "2026-10-24_glm53_email_ambiguous",
 }
+ACME_PARTS = ["2026-10-25_glm53_email_ambiguous_part7_acme_and_128"]
 JUNEBUG_PARTS = ["2026-10-25_glm53_email_ambiguous_part5_junebug", "2026-10-25_glm53_email_ambiguous_part6_junebug_topup"]
 CC_ARMS = ["core_formal", "core_nocrit", "core_plain", "core_casual", "full_formal", "full_nocrit", "full_plain", "full_casual"]
 KEEP_TOOLS = ["GLM verbalizer (RL)", "GLM verbalizer (RL) samples", "Qwen verbalizer on GLM (from scratch)"]
@@ -114,6 +123,13 @@ def lens(tok):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
+    ap.add_argument("--title", default="Email-John realism red team")
+    ap.add_argument("--reads-note", default="", help="markdown: which reads this page carries and where the rest are")
+    ap.add_argument(
+        "--reads-for",
+        default="mixed",
+        help="comma-separated address books whose O-lens reads ship with this page (an artifact holds at most 511 files)",
+    )
     a = ap.parse_args()
 
     # O-lens reads keyed by (run dir, row index)
@@ -147,6 +163,8 @@ def main():
         srcs += [x for x in ladder_items(part, {r}, "mixed") if x[2]["arm"] == f"{r}@low"]
     for part in JUNEBUG_PARTS:
         srcs += [x for x in ladder_items(part, set(RUNGS), "junebug") if x[2]["arm"].endswith("@lowc_junebug")]
+    for part in ACME_PARTS:
+        srcs += [x for x in ladder_items(part, set(RUNGS), "acme") if x[2]["arm"].endswith("@lowa_acme")]
 
     for part, i, row, it, base, book in srcs:
         envf = json.loads((LADDER / part / "expview/envs" / f"{it['env']}.json").read_text())["files"] if isinstance(it["env"], str) else {}
@@ -166,6 +184,8 @@ def main():
         if src:
             tok = json.loads((src[1] / "tokens" / f"{src[0]['tokens']['ref']}.json").read_text())
             tokens, n_prompt, after = lens(tok)
+            if book not in a.reads_for.split(","):
+                tokens = None
             lab["lens_sim_reads_in_prompt"] = n_prompt
             lab["lens_sim_read_after_prompt"] = bool(after)
             stats[(book, rung)]["prompt_hits"] = n_prompt
@@ -246,7 +266,7 @@ def main():
         "| setting | n | picks one | sends to several | asks which | CoT says benchmark / simulation | lens prompt reads saying simulated/fictional (same for every episode) | episodes with such a read after the prompt |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    for (book, rung), s in sorted(stats.items(), key=lambda kv: (["mixed", "junebug", "Claude Code"].index(kv[0][0]), kv[0][1])):
+    for (book, rung), s in sorted(stats.items(), key=lambda kv: (["mixed", "junebug", "acme", "Claude Code"].index(kv[0][0]), kv[0][1])):
         lens_p = str(s["prompt_hits"]) if s["read_eps"] else "no reads"
         lens_a = f"{s['after']}/{s['read_eps']}" if s["read_eps"] else "no reads"
         lines.append(
@@ -258,11 +278,17 @@ def main():
             for k in ("only work-labelled", "only one not marked personal", "notes don't single it out"):
                 picks[k] += s["pick_" + k]
     table = "\n".join(lines)
-    notes = (Path(__file__).parent / "email_redteam_notes.md").read_text().replace("{table}", table).replace("{picks}", str(dict(picks)))
+    notes = (
+        (Path(__file__).parent / "email_redteam_notes.md")
+        .read_text()
+        .replace("{reads_here}", a.reads_note)
+        .replace("{table}", table)
+        .replace("{picks}", str(dict(picks)))
+    )
 
     run = Run(
         out,
-        title="Email-John realism red team",
+        title=a.title,
         description=notes,
         label_order=[
             "rung",
