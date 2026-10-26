@@ -2,9 +2,9 @@
 
     uv run python -m cfbench.report.charts --out docs/img/cfbench-report [--allow-old-lens]
 
-Writes skill_pooled.png, skill_by_target.png, olens_search_topics.png, tool_calls.png and summary.json (every number
-on the charts). Metric and normalization: docs/cfbench-scoring.md. The three robustness charts (tool budget, effort,
-model choice) come from scripts/cfbench_modelchart.py.
+Writes skill_pooled.png, skill_by_target.png, olens_search_topics.png, tool_calls.png, the three robustness charts
+(models.png, flash_effort.png, flash_calls.png; `cfbench.report.modelchart`) and summary.json with every number on
+them plus coverage (envs, arms, rollouts, predictions) per chart. Metric and normalization: docs/cfbench-scoring.md.
 """
 
 from __future__ import annotations
@@ -13,12 +13,12 @@ import argparse
 import json
 import os
 import re
-import textwrap
 from collections import Counter, defaultdict
 
 import matplotlib
 import numpy as np
 
+from cfbench.report import modelchart
 from cfbench.report.data import (
     COLOR,
     CONDS,
@@ -48,32 +48,6 @@ TOOLS = ["read_transcript", "search_transcripts", "search_olens", "olens_at"]
 plt.rcParams.update(
     {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
 )
-
-METRIC_NOTE = (
-    "Bars: 100 − RMSE of the predicted P(behavior) against the counterfactual arm's observed rate, in percentage points; squared error "
-    "averaged over the predictor's draws within a case, then over cases with equal weight. 'Edit does nothing' predicts the base arm's "
-    "rate. Dotted line: the ceiling set by sampling noise in the observed rate (what a perfect predictor scores). Intervals: 95% case "
-    "bootstrap; the gain intervals are paired (same resample). ESS = effective number of envs behind the equal-weight mean, "
-    "(Σ nₑ)² / Σ nₑ²."
-)
-SETUP_NOTE = (
-    "Gemini 3.8 Flash predictor, medium effort. Env diff only: the base arm's starting context and the edit, no rollouts, one call. "
-    "Others: the same plus every base-arm rollout via tools (20 calls); O-lens adds lens reads, placebo adds reads from another env."
-)
-
-
-def notes(fig, *texts, width=175, size=6.8):
-    lines = [line for t in texts for line in textwrap.wrap(t, width)]
-    for i, line in enumerate(reversed(lines)):
-        fig.text(0.01, 0.012 + i * 0.026, line, fontsize=size, color=MUTED)
-    return 0.026 * len(lines)
-
-
-def cov_line(cov: dict, keys) -> str:
-    return (
-        f"{cov['envs']} envs · {cov['arms']} arms · {cov['rollouts']:,} target-model rollouts · {cov['predictions']:,} predictions · "
-        f"{len(keys)} cases · ESS {ess_envs(keys):.1f} envs"
-    )
 
 
 def stats(cases: dict[tuple, Case], keys=None) -> dict:
@@ -127,16 +101,7 @@ def chart_pooled(cases, cov, out):
     ax.set_ylim(0, 118)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
     ax.set_title("Prediction accuracy by what the predictor sees, all targets", loc="left", fontsize=10.5, color=INK)
-    skill_txt = "  ".join(f"{LABEL[c]} {s['brier_skill'][c]:+.2f}" for c in CONDS)
-    pad = notes(
-        fig,
-        SETUP_NOTE,
-        METRIC_NOTE,
-        f"Skill (1 − Σ MSE / Σ MSE of 'edit does nothing'): {skill_txt}.",
-        cov_line(cov, list(cases)),
-        width=120,
-    )
-    fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.08 + pad)
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.08)
     fig.savefig(f"{out}/skill_pooled.png", dpi=200)
     plt.close(fig)
     return s
@@ -195,12 +160,7 @@ def chart_by_target(per_target: dict[str, dict], covs: dict[str, dict], out):
     bx.set_xlabel("RMSE reduction vs transcript-only (pp, higher is better)")
     bx.set_title("Gain over transcript-only (same cases)", loc="left", fontsize=10.5, color=INK)
 
-    skills = " · ".join(f"{t}: " + ", ".join(f"{LABEL[c]} {per_target[t]['brier_skill'][c]:+.2f}" for c in CONDS) for t in targets)
-    cov_txt = " · ".join(
-        f"{t}: {covs[t]['envs']} envs, {covs[t]['rollouts']:,} rollouts, {covs[t]['predictions']:,} predictions" for t in targets
-    )
-    pad = notes(fig, SETUP_NOTE, METRIC_NOTE, f"Skill (1 − Σ MSE / Σ MSE null): {skills}.", cov_txt)
-    fig.subplots_adjust(left=0.07, right=0.98, top=0.92, bottom=0.1 + pad)
+    fig.subplots_adjust(left=0.07, right=0.98, top=0.92, bottom=0.14)
     fig.savefig(f"{out}/skill_by_target.png", dpi=200)
     plt.close(fig)
 
@@ -305,15 +265,7 @@ def chart_topics(rows_by_target: dict[str, dict], out):
     ax.set_xlabel("Share of search_olens calls")
     ax.grid(axis="y", visible=False)
     ax.set_title("What the O-lens agent searches the lens for", loc="left", fontsize=11)
-    per_t = ", ".join(f"{t} {sum(calls[t].values()):,}" for t in rows_by_target)
-    pad = notes(
-        fig,
-        "Topics by keyword rules on each regex; 'edit's text' = regex matches the diff, 'behavior' = matches the label definition or "
-        f"behavior words. Every Gemini 3.8 Flash O-lens prediction in the skill charts' runs, pooled over targets: {per_t} searches.",
-        f"{sum(n_pred.values()):,} O-lens predictions · {total:,} search_olens calls",
-        width=120,
-    )
-    fig.subplots_adjust(bottom=0.1 + pad, left=0.25)
+    fig.subplots_adjust(bottom=0.12, left=0.25)
     fig.savefig(f"{out}/olens_search_topics.png", dpi=200)
     plt.close(fig)
     return {
@@ -345,13 +297,7 @@ def chart_tools(rows_by_target: dict[str, dict], out):
     ax.grid(axis="x", visible=False)
     ax.legend(frameon=False, fontsize=8)
     ax.set_title("Which tools the predictor calls (20-call budget)", loc="left", fontsize=11)
-    pad = notes(
-        fig,
-        "Every Gemini 3.8 Flash tool-condition prediction in the skill charts' runs, all targets pooled. "
-        "Only the O-lens conditions have the two lens tools.",
-        width=120,
-    )
-    fig.subplots_adjust(bottom=0.1 + pad)
+    fig.subplots_adjust(bottom=0.12)
     fig.savefig(f"{out}/tool_calls.png", dpi=200)
     plt.close(fig)
     return {c: {tool: calls[c][tool] / n_pred[c] for tool in TOOLS} | {"predictions": n_pred[c]} for c in TOOL_CONDS}
@@ -389,11 +335,13 @@ def main():
     chart_by_target(per_target, covs, args.out)
     topics = chart_topics(rows_by_target, args.out)
     tools = chart_tools(rows_by_target, args.out)
+    robustness = modelchart.make(args.out)
     summary = {
         "pooled": pooled_stats | {"coverage": pooled_cov},
         "by_target": {t: per_target[t] | {"coverage": covs[t]} for t in per_target},
         "topics": topics,
         "tools": tools,
+        "robustness": robustness,
     }
     with open(f"{args.out}/summary.json", "w") as f:
         json.dump(summary, f, indent=1, default=float)

@@ -2,13 +2,12 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: three cfbench scorings in flight
+## 2026-10-26: cfbench/score.py still prints the log skill
 
-`cfbench.report.data` (RMSE, the standard), `cfbench/score.py`'s log skill (kept for old numbers)
-and `scripts/cfbench_modelchart.py` on PR #161 (LL gain per rollout, equal case weights). Once #161
-merges, point the model chart at `cfbench.report.data` so the report's seven figures share one
-metric. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()`
-only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+`cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
+beside it so numbers from before 2026-10-26 can be checked. Drop it once nothing quotes them. The
+old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for
+`--allow-old-lens`; drop them when the thinking-on reruns land.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 

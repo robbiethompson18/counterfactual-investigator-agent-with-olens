@@ -96,12 +96,12 @@ uv run python -m cfbench.run evalcue_runs:funding_email/<run> --pairs arm_a:arm_
 uv run python -m cfbench.score data/runs/cfbench/<date>_fe-all
 ```
 
-`--model` picks the target (default `Qwen/Qwen3.6-27B`); `--predictors` is a comma list of
-OpenRouter ids (default Haiku 5.5 only; add others only when asked). Needs `OPENROUTER_API_KEY`.
-Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/` with `meta.json` and
-`predictions.jsonl` (one row per prediction, including the predictor's full conversation, tool-call
-counts and OpenRouter cost), synced to HF when it finishes. Runs from before `runs.py` are flat
-`runs/cfbench/*.jsonl` files on HF.
+`--max-calls` sets the tool conditions' budget (default 20). `--model` picks the target (default
+`Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Haiku 5.5 only; add
+others only when asked). Needs `OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run:
+`data/runs/cfbench/<date>_<slug>/` with `meta.json` and `predictions.jsonl` (one row per prediction,
+including the predictor's full conversation, tool-call counts and OpenRouter cost), synced to HF
+when it finishes. Runs from before `runs.py` are flat `runs/cfbench/*.jsonl` files on HF.
 
 For any evalcue env, `evalcue_runs:<env>/<run>[+<run>...]` reads the env's run dirs directly and
 `--pairs hub` pairs its hub arm (smallest total diff to the others, usually the base) with every
