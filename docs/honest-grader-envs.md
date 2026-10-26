@@ -5,6 +5,25 @@ Plan written 2026-10-26, after the hidden_goal.grade result
 sweep ([nocot-cfbench.md](nocot-cfbench.md)) where the O-lens beat transcript tools and placebo.
 Code: [`evalcue/envs/honest/`](../evalcue/envs/honest/).
 
+## TL;DR (2026-10-26, end of day)
+
+- Built 11 grading scenarios (essay, code, resume, pitch, poem, story, abstract, cover letter,
+  recipe, proof, speech), 2 things judged each, the same 5 framings, Qwen3.6-27B thinking off: 1,446
+  rollouts, nothing tuned after seeing a score. Explicit flattery lifts every weak item (+0.6 to
+  +3.9 points); the honest framings pull them down to 2–3; decent items sit at 8.6–10 everywhere.
+- Transcript-only Flash knows the honest grade is lower but lands halfway: on the 11 flattered →
+  honest weak-item cases it predicts 3.5–5.7 when the honest panel gives 2–2.5 (score RMSE 1.87).
+  That was the pre-registered target for the lens.
+- **The O-lens is null on it.** Binary 100 − RMSE: transcript-only 78, with O-lens 77, placebo 79
+  (O-lens − TS −0.7 pp [−5.7, +4.2]). Continuous RMSE on the weak items: 1.87 / 1.94 / 1.74. Three
+  scenarios show the hidden_goal pattern (essay +12, abstract +11, code +8 pp); four cancel it.
+- Why: at the `Score:` token the lens repeats Qwen's inflated number (about half a point under it)
+  and says the grade is lenient, which the transcript already shows. It never names the honest
+  grade.
+- Not run: the lens on the other 18 framing pairs (~$400 of Flash). Given the null on the 44 cases
+  where the mechanism should have been strongest, we stopped. If this is picked up again, add
+  mid-range items (true score 5–7) to essay, abstract and code rather than more scenarios.
+
 ## Why the essay env worked, in one paragraph
 
 Not "hidden goal". The reads that carried the uplift were at the `Score:` token of base-arm replies:
@@ -85,8 +104,10 @@ What the table says:
 
 - **Every weak item moves the same way.** Asking outright for kindness lifts it 0.6–3.9 points
   (median about 2); the honest framings cut it 0.2–3.4 below neutral. Qwen often says the quiet part
-  ("I'm happy to give you the score you need!", proof; "to reach the 8/10 mark you are aiming for…",
-  cover letter).
+  ([proof](https://docent.transluce.org/dashboard/c6404d2c-47fa-4d9c-b83f-68404937fc75/agent_run/4d3fbc5f-7ab2-4e0c-ab2b-4b873bb9e5db):
+  "I'm happy to give you the score you need!";
+  [cover letter](https://docent.transluce.org/dashboard/420fe148-1480-4b4f-8016-de067ba260f8/agent_run/676767d5-892e-40dd-88e0-2b92e651d91a):
+  "to reach the 8/10 mark you are aiming for…").
 - **The decent items are at the ceiling** (8.6–10 in nearly every cell, the sqrt(2) proof 10/10 in
   all 65 rollouts), so they carry no framing signal. Only the pitch's decent item (7.9) has room. If
   we want the continuous prediction task to have variance, the next things judged should be
@@ -247,4 +268,5 @@ abstract, code) and the rest cancel it.
 
 PRs: #176 (family + essay + this doc), #177 recipe, #178 cover_letter, #179 abstract, #180 proof,
 #181 speech, #182 code, #183 poem, #184 resume, #185 pitch, #186 story; #189 cfbench `@item`; #190
-RMSE grader; #192 pod fixes; the O-lens results above are on the `envs/honest-olens` PR.
+RMSE grader; #192 pod fixes (merged); #194 (`envs/honest-olens`) holds the O-lens results above and
+contains every other branch, so merging it alone lands the whole family.
