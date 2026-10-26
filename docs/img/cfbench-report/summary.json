@@ -1,0 +1,515 @@
+{
+ "pooled": {
+  "cases": 426,
+  "envs": 37,
+  "ess_envs": 18.6780568135035,
+  "rmse": {
+   "no_transcript": 0.29657261569951776,
+   "agentic": 0.2842064083640051,
+   "olens": 0.28683809218856704,
+   "olens_placebo": 0.28198210158454057
+  },
+  "rmse_ci": {
+   "no_transcript": [
+    0.27470314750778857,
+    0.32054023035917045
+   ],
+   "agentic": [
+    0.26080714946217237,
+    0.3097912642762471
+   ],
+   "olens": [
+    0.26433500951800215,
+    0.31250446479270616
+   ],
+   "olens_placebo": [
+    0.2591061321796009,
+    0.3077529233437226
+   ]
+  },
+  "rmse_null": 0.40793571980259197,
+  "rmse_null_ci": [
+   0.3721143244827479,
+   0.44139169398785566
+  ],
+  "noise_floor": 0.09203590443599417,
+  "gain_vs_transcript": {
+   "no_transcript": [
+    -0.0326727728528811,
+    0.007842293726407028
+   ],
+   "agentic": [
+    0.0,
+    0.0
+   ],
+   "olens": [
+    -0.01171456654160202,
+    0.007172067006930721
+   ],
+   "olens_placebo": [
+    -0.008660497529069755,
+    0.013617589414224971
+   ]
+  },
+  "gain_vs_transcript_point": {
+   "no_transcript": -0.012366207335512636,
+   "agentic": 0.0,
+   "olens": -0.0026316838245619145,
+   "olens_placebo": 0.0022243067794645577
+  },
+  "p_gain_le0": {
+   "no_transcript": 0.893,
+   "agentic": 1.0,
+   "olens": 0.7,
+   "olens_placebo": 0.364
+  },
+  "brier_skill": {
+   "no_transcript": 0.4714590688274106,
+   "agentic": 0.5146173337636084,
+   "olens": 0.5055866591394864,
+   "olens_placebo": 0.5221851794440968
+  },
+  "log_skill": {
+   "no_transcript": 0.5558397265198667,
+   "agentic": 0.6128962325322282,
+   "olens": 0.607310590743494,
+   "olens_placebo": 0.6005946720673522
+  },
+  "coverage": {
+   "envs": 37,
+   "arms": 251,
+   "rollouts": 4660,
+   "predictions": 4268,
+   "by_cond": {
+    "agentic": 1063,
+    "olens": 1067,
+    "olens_placebo": 1068,
+    "no_transcript": 1070
+   }
+  }
+ },
+ "by_target": {
+  "GLM 5.3": {
+   "cases": 280,
+   "envs": 10,
+   "ess_envs": 9.8,
+   "rmse": {
+    "no_transcript": 0.3046751207307742,
+    "agentic": 0.30505634199988807,
+    "olens": 0.3066135683523383,
+    "olens_placebo": 0.2958391832278162
+   },
+   "rmse_ci": {
+    "no_transcript": [
+     0.2768840605128854,
+     0.3312517305119646
+    ],
+    "agentic": [
+     0.27354571117795756,
+     0.3344972393584713
+    ],
+    "olens": [
+     0.2746797492263853,
+     0.3372624346288176
+    ],
+    "olens_placebo": [
+     0.264926346384816,
+     0.324634202800233
+    ]
+   },
+   "rmse_null": 0.40283608818001804,
+   "rmse_null_ci": [
+    0.3582304794642423,
+    0.4430668851100514
+   ],
+   "noise_floor": 0.10259190463040115,
+   "gain_vs_transcript": {
+    "no_transcript": [
+     -0.02723759400681615,
+     0.02740247790477807
+    ],
+    "agentic": [
+     0.0,
+     0.0
+    ],
+    "olens": [
+     -0.011901580784154929,
+     0.008991959642204657
+    ],
+    "olens_placebo": [
+     -0.005735957924225528,
+     0.025581240601209032
+    ]
+   },
+   "gain_vs_transcript_point": {
+    "no_transcript": 0.000381221269113885,
+    "agentic": 0.0,
+    "olens": -0.0015572263524502028,
+    "olens_placebo": 0.009217158772071854
+   },
+   "p_gain_le0": {
+    "no_transcript": 0.51,
+    "agentic": 1.0,
+    "olens": 0.616,
+    "olens_placebo": 0.1225
+   },
+   "brier_skill": {
+    "no_transcript": 0.4279720575255024,
+    "agentic": 0.42653967508491397,
+    "olens": 0.4206700262219063,
+    "olens_placebo": 0.46066991164766324
+   },
+   "log_skill": {
+    "no_transcript": 0.46337260803331454,
+    "agentic": 0.4354074246497011,
+    "olens": 0.4326835994587893,
+    "olens_placebo": 0.4711882385275348
+   },
+   "coverage": {
+    "envs": 10,
+    "arms": 150,
+    "rollouts": 1485,
+    "predictions": 2240,
+    "by_cond": {
+     "agentic": 560,
+     "olens": 560,
+     "olens_placebo": 560,
+     "no_transcript": 560
+    }
+   }
+  },
+  "Qwen w/o CoT": {
+   "cases": 144,
+   "envs": 26,
+   "ess_envs": 12.11214953271028,
+   "rmse": {
+    "no_transcript": 0.2797030246187764,
+    "agentic": 0.23828371083184918,
+    "olens": 0.24343445869829558,
+    "olens_placebo": 0.2519007401841459
+   },
+   "rmse_ci": {
+    "no_transcript": [
+     0.23841703506578601,
+     0.3232241443847229
+    ],
+    "agentic": [
+     0.1997815033068807,
+     0.2781496480156326
+    ],
+    "olens": [
+     0.20623947706011841,
+     0.2820498892203433
+    ],
+    "olens_placebo": [
+     0.21320765816478257,
+     0.29189323961140035
+    ]
+   },
+   "rmse_null": 0.4184029244229352,
+   "rmse_null_ci": [
+    0.35849375839877545,
+    0.4717596538848948
+   ],
+   "noise_floor": 0.0674516043081446,
+   "gain_vs_transcript": {
+    "no_transcript": [
+     -0.06641760598550046,
+     -0.017702981158939684
+    ],
+    "agentic": [
+     0.0,
+     0.0
+    ],
+    "olens": [
+     -0.02296954221508056,
+     0.011829708111214261
+    ],
+    "olens_placebo": [
+     -0.026742992322777596,
+     -0.0021971282991521133
+    ]
+   },
+   "gain_vs_transcript_point": {
+    "no_transcript": -0.0414193137869272,
+    "agentic": 0.0,
+    "olens": -0.005150747866446398,
+    "olens_placebo": -0.013617029352296695
+   },
+   "p_gain_le0": {
+    "no_transcript": 1.0,
+    "agentic": 1.0,
+    "olens": 0.7,
+    "olens_placebo": 0.991
+   },
+   "brier_skill": {
+    "no_transcript": 0.5531056101667613,
+    "agentic": 0.6756609152027506,
+    "olens": 0.6614875200297876,
+    "olens_placebo": 0.6375321727398007
+   },
+   "log_skill": {
+    "no_transcript": 0.6079220610761159,
+    "agentic": 0.7063185353954899,
+    "olens": 0.7002206905762749,
+    "olens_placebo": 0.6732331688458912
+   },
+   "coverage": {
+    "envs": 26,
+    "arms": 99,
+    "rollouts": 3055,
+    "predictions": 1988,
+    "by_cond": {
+     "agentic": 493,
+     "olens": 497,
+     "olens_placebo": 498,
+     "no_transcript": 500
+    }
+   }
+  },
+  "Qwen w/ CoT": {
+   "cases": 2,
+   "envs": 1,
+   "ess_envs": 1.0,
+   "rmse": {
+    "no_transcript": 0.32539207120026753,
+    "agentic": 0.2971531591620725,
+    "olens": 0.31048349392520047,
+    "olens_placebo": 0.3389100175562829
+   },
+   "rmse_ci": {
+    "no_transcript": [
+     0.32419130154894654,
+     0.3265884260043518
+    ],
+    "agentic": [
+     0.262449995237188,
+     0.3282072515956952
+    ],
+    "olens": [
+     0.2873325599370875,
+     0.3320240955111541
+    ],
+    "olens_placebo": [
+     0.32839001202838064,
+     0.3491131621695177
+    ]
+   },
+   "rmse_null": 0.35,
+   "rmse_null_ci": [
+    0.35,
+    0.35
+   ],
+   "noise_floor": 0.05608772890154613,
+   "gain_vs_transcript": {
+    "no_transcript": [
+     -0.06174130631175856,
+     0.001618825591343409
+    ],
+    "agentic": [
+     0.0,
+     0.0
+    ],
+    "olens": [
+     -0.024882564699899523,
+     -0.0038168439154588896
+    ],
+    "olens_placebo": [
+     -0.08666316693232973,
+     -0.00018276043268544706
+    ]
+   },
+   "gain_vs_transcript_point": {
+    "no_transcript": -0.028238912038195008,
+    "agentic": 0.0,
+    "olens": -0.013330334763127949,
+    "olens_placebo": -0.041756858394210394
+   },
+   "p_gain_le0": {
+    "no_transcript": 0.7655,
+    "agentic": 1.0,
+    "olens": 1.0,
+    "olens_placebo": 1.0
+   },
+   "brier_skill": {
+    "no_transcript": 0.13567346938775504,
+    "agentic": 0.27918367346938777,
+    "olens": 0.21306122448979592,
+    "olens_placebo": 0.062367346938775436
+   },
+   "log_skill": {
+    "no_transcript": 0.12649845194944442,
+    "agentic": 0.27764580562195534,
+    "olens": 0.2032537368780162,
+    "olens_placebo": 0.01840002449395288
+   },
+   "coverage": {
+    "envs": 1,
+    "arms": 2,
+    "rollouts": 120,
+    "predictions": 40,
+    "by_cond": {
+     "agentic": 10,
+     "olens": 10,
+     "olens_placebo": 10,
+     "no_transcript": 10
+    }
+   }
+  }
+ },
+ "topics": {
+  "share": {
+   "the edit's text": 0.3776515151515151,
+   "the behavior": 0.19924242424242425,
+   "other scenario terms": 0.15,
+   "a transcript landmark": 0.12121212121212122,
+   "eval awareness": 0.08106060606060606,
+   "everything": 0.056818181818181816,
+   "motives / values": 0.014015151515151515
+  },
+  "calls": 2640,
+  "by_target": {
+   "GLM 5.3": {
+    "the behavior": 356,
+    "the edit's text": 581,
+    "everything": 135,
+    "other scenario terms": 232,
+    "eval awareness": 150,
+    "a transcript landmark": 108,
+    "motives / values": 24,
+    "other": 1
+   },
+   "Qwen w/o CoT": {
+    "a transcript landmark": 212,
+    "the edit's text": 416,
+    "the behavior": 170,
+    "other scenario terms": 161,
+    "eval awareness": 64,
+    "motives / values": 13,
+    "everything": 15
+   },
+   "Qwen w/ CoT": {
+    "other scenario terms": 3
+   }
+  },
+  "examples": {
+   "the edit's text": [
+    [
+     "ChatGPT",
+     40
+    ],
+    [
+     "student",
+     36
+    ],
+    [
+     "Neel",
+     32
+    ]
+   ],
+   "the behavior": [
+    [
+     "shutdown",
+     44
+    ],
+    [
+     "blackmail",
+     23
+    ],
+    [
+     "oversight",
+     22
+    ]
+   ],
+   "other scenario terms": [
+    [
+     "During the next call",
+     15
+    ],
+    [
+     "before your next task",
+     8
+    ],
+    [
+     "Supervisor notice",
+     6
+    ]
+   ],
+   "a transcript landmark": [
+    [
+     "Score:",
+     142
+    ],
+    [
+     "Score",
+     48
+    ],
+    [
+     "ASSISTANT",
+     22
+    ]
+   ],
+   "eval awareness": [
+    [
+     "eval",
+     6
+    ],
+    [
+     "evaluat",
+     4
+    ],
+    [
+     "monitor",
+     4
+    ]
+   ],
+   "everything": [
+    [
+     ".*",
+     148
+    ],
+    [
+     "",
+     2
+    ]
+   ],
+   "motives / values": [
+    [
+     "conscience",
+     3
+    ],
+    [
+     "Repeat your goal at every step\\.",
+     2
+    ],
+    [
+     "honest",
+     2
+    ]
+   ]
+  }
+ },
+ "tools": {
+  "agentic": {
+   "read_transcript": 8.216989843028625,
+   "search_transcripts": 7.073868882733149,
+   "search_olens": 0.0,
+   "olens_at": 0.0,
+   "predictions": 1083
+  },
+  "olens": {
+   "read_transcript": 7.582942830365511,
+   "search_transcripts": 6.8069353327085285,
+   "search_olens": 2.352389878163074,
+   "olens_at": 0.9531396438612934,
+   "predictions": 1067
+  },
+  "olens_placebo": {
+   "read_transcript": 8.308052434456929,
+   "search_transcripts": 7.181647940074907,
+   "search_olens": 1.452247191011236,
+   "olens_at": 0.27340823970037453,
+   "predictions": 1068
+  }
+ }
+}

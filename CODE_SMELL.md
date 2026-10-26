@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-26: three cfbench scorings in flight
+
+`cfbench.report.data` (RMSE, the standard), `cfbench/score.py`'s log skill (kept for old numbers)
+and `scripts/cfbench_modelchart.py` on PR #161 (LL gain per rollout, equal case weights). Once #161
+merges, point the model chart at `cfbench.report.data` so the report's seven figures share one
+metric. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()`
+only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
 ~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is

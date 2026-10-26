@@ -298,7 +298,10 @@ Current docs:
   what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
   Kylie-key and re-upload gotchas
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
-  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, RMSE scoring
+- [cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
+  — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
+  env space, `cfbench.report.charts` and its run groups
 - [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
   harness version

@@ -70,7 +70,14 @@ arm-level contrast, not a reason a reader of one arm can see.
 
 ## Scoring
 
-Binomial log-likelihood skill, normalized to an oracle. For a case with k_Y of n_Y counterfactual
+**RMSE of the predicted rate** ([docs/cfbench-scoring.md](../docs/cfbench-scoring.md), since
+2026-10-26): per case, (p̂ − k_Y/n_Y)² averaged over draws; over cases with equal weight; reported in
+percentage points next to the RMSE of "the edit does nothing" (predict the shown base rate), with a
+skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints it, and
+`cfbench.report.charts` makes the report figures from it.
+
+The numbers in "Results so far" below predate that and are the older **binomial log-likelihood
+skill**, still printed by `cfbench.score` for comparison. For a case with k_Y of n_Y counterfactual
 runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
 
     skill = Σ_cases [mean_draws LL(p̂) − LL(null)] / Σ_cases [LL(oracle) − LL(null)]
@@ -79,9 +86,8 @@ runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
 - oracle = the observed k_Y/n_Y. Both are clipped to the predictor's [0.01, 0.99].
 - 1 = as good as knowing the rate; 0 = no better than ignoring the edit; negative = worse.
 
-Why not CHIVE's scoring: it's a proper scoring rule on the rate itself, so there's no ≥50pp / ≤15pp
-threshold to binarize at, and the binomial accounts for n_Y ≈ 30 being a noisy measurement. Cases
-whose edit moves the rate a lot dominate the sums, by design.
+It weights each case by its oracle gain, i.e. by n_Y and by effect size, so one big-n case predicted
+backwards can make a whole group negative; that is why it was replaced.
 
 ## Running
 
