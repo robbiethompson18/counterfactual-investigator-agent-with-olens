@@ -18,4 +18,4 @@
 
 {table}
 
-Search the token reads with `fiction|simulat|sandbox|role.?play|hypothetic|\bfake\b|not real`. The orange **sim-word flag** inline reads mark every hit. Code: `donehack/realism/email_redteam_page.py`.
+Search the token reads with `fiction|simulat|sandbox|role.?play|hypothetic|\bfake\b|not real`. The orange **sim-word flag** read (click a token) marks every hit. Only the 448 mixed-address-book ladder items (groups `mixed · ...`) have O-lens reads; the junebug and Claude Code runs were never read. Each read item opens on its transcript with the GLM verbalizer read inline at every read position. Code: `donehack/realism/email_redteam_page.py`.

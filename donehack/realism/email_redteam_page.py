@@ -86,7 +86,11 @@ def lens(tok):
     first_asst = next((a for n, a, b in secs if n == "assistant"), len(toks))
     reads, n_prompt, after = {}, 0, []
     for pos, rs in tok["reads"].items():
-        keep = [dict(r, inline=False) for r in rs if r["tool"] in KEEP_TOOLS or r["tool"].startswith("GLM verbalizer (RL) dense")]
+        keep = [
+            dict(r, inline=r["tool"] == "GLM verbalizer (RL)" or r["tool"].startswith("GLM verbalizer (RL) dense"))
+            for r in rs
+            if r["tool"] in KEEP_TOOLS or r["tool"].startswith("GLM verbalizer (RL) dense")
+        ]
         greedy = next((r for r in rs if r["tool"].startswith("GLM verbalizer (RL)") and "samples" not in r["tool"]), None)
         if greedy:
             text = " ".join(x[0] if isinstance(x, list) else x for x in greedy["lines"])
@@ -96,12 +100,12 @@ def lens(tok):
                     n_prompt += 1
                 else:
                     after.append(sec[p])
-                keep.insert(0, {"tool": FLAG, "label": f"{sec[p]} position", "lines": [text], "inline": True})
+                keep.insert(0, {"tool": FLAG, "label": f"{sec[p]} position", "lines": [text], "inline": False})
         if keep:
             reads[pos] = keep
     legend = (
         tok.get("legend", "")
-        + f"\n\n**{FLAG}** (inline, orange) marks every position whose greedy GLM-verbalizer read matches `{SIM.pattern}`. "
+        + f"\n\n**{FLAG}** (click-only, orange) marks every position whose greedy GLM-verbalizer read matches `{SIM.pattern}`. "
         "Search the reads with that regex to light them all up."
     )
     return {"tokens": toks, "sections": secs, "reads": reads, "legend": legend}, n_prompt, after
