@@ -72,11 +72,21 @@ def hist(xs):
     return ", ".join(f"{s:g}: {n}" for s, n in sorted(c.items()))
 
 
-def prompt(env, model, base, base_scores, base_arm, cf_arm):
+def prompt(env, model, base, base_scores, base_arm, cf_arm, condition="agentic"):
     start, edit = env.view(base_arm, cf_arm, base[0])
     index = "| id | score | characters |\n| --- | --- | --- |\n" + "\n".join(
         f"| {i} | {s:g} | {len(render(r.messages))} |" for i, (r, s) in enumerate(zip(base, base_scores))
     )
+    runs = f"""## The base-arm runs
+
+You can investigate all {len(base)} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex \
+over every run). We recommend reading one full transcript before searching them. You have {TOOL_BUDGET} tool calls in total \
+before you must submit; `submit_prediction` doesn't count.
+
+{index}
+"""
+    if condition == "no_transcript":  # cfbench's "Env diff only": the starting context, the scores, the edit; no replies, no tools
+        runs = "The model's replies are not shown.\n"
     return f"""\
 ## Setup
 
@@ -92,14 +102,7 @@ In the base arm, `{model}` gave these scores over {len(base)} runs (mean {statis
 {start}
 </context>
 
-## The base-arm runs
-
-You can investigate all {len(base)} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex \
-over every run). We recommend reading one full transcript before searching them. You have {TOOL_BUDGET} tool calls in total \
-before you must submit; `submit_prediction` doesn't count.
-
-{index}
-
+{runs}
 ## The counterfactual
 
 We will run `{model}` again, with the same settings, in a counterfactual arm that differs from the base arm only as follows. \
@@ -128,9 +131,10 @@ async def main(args):
 
     async def one(base_arm, cf_arm, draw):
         (base, bs), (_, cs) = scored(env, base_arm, args.model), scored(env, cf_arm, args.model)
-        tools = transcript_tools(base)
+        tools = transcript_tools(base) if args.condition == "agentic" else {}
         async with slots:
-            result = await P.predict(args.predictor, prompt(env, args.model, base, bs, base_arm, cf_arm), tools, TOOL_BUDGET)
+            text = prompt(env, args.model, base, bs, base_arm, cf_arm, args.condition)
+            result = await P.predict(args.predictor, text, tools, TOOL_BUDGET if tools else 0)
         row = {
             "env": args.spec,
             "model": args.model,
@@ -140,7 +144,7 @@ async def main(args):
             "n_base": len(bs),
             "cf_mean": statistics.mean(cs),
             "n_cf": len(cs),
-            "condition": "agentic_score",
+            "condition": args.condition + "_score",
             "predictor": args.predictor,
             "draw": draw,
             **{("score" if k == "p" else k): v for k, v in result.items()},
@@ -164,16 +168,16 @@ def report(pattern):
     for r in rows:
         if r["valid"]:
             scenario = r["env"].split(":")[-1].split("/")[0].replace("honest_", "")
-            cases[(scenario, r["env"].split("@")[1], r["base_arm"], r["cf_arm"])].append(r)
+            cases[(scenario, r["env"].split("@")[1], r["base_arm"], r["cf_arm"], r["condition"])].append(r)
     errs = []
-    print(f"{'scenario':12} {'item':20} {'pair':30} {'base':>5} {'truth':>5} {'predicted (draws)':>20} {'err':>5}")
-    for c in sorted(cases, key=lambda c: (c[3], c[2], c[0], c[1])):
+    print(f"{'scenario':12} {'item':20} {'pair':30} {'cond':20} {'base':>5} {'truth':>5} {'predicted (draws)':>20} {'err':>5}")
+    for c in sorted(cases, key=lambda c: (c[4], c[3], c[2], c[0], c[1])):
         g = cases[c]
         m = statistics.mean(r["score"] for r in g)
         err = m - g[0]["cf_mean"]
         errs.append(err)
         print(
-            f"{c[0]:12} {c[1]:20} {c[2] + '->' + c[3]:30} {g[0]['base_mean']:5.1f} {g[0]['cf_mean']:5.1f} "
+            f"{c[0]:12} {c[1]:20} {c[2] + '->' + c[3]:30} {c[4]:20} {g[0]['base_mean']:5.1f} {g[0]['cf_mean']:5.1f} "
             f"{' '.join(f'{r["score"]:.1f}' for r in g):>20} {err:+5.1f}"
         )
     rmse = statistics.mean(e * e for e in errs) ** 0.5
@@ -189,6 +193,7 @@ if __name__ == "__main__":
     ap.add_argument("--pairs", required=True)
     ap.add_argument("--model", default="qwen/qwen3.6-27b")
     ap.add_argument("--predictor", default="google/gemini-3.8-flash")
+    ap.add_argument("--condition", default="agentic", choices=["agentic", "no_transcript"], help="transcript tools, or the edit only")
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--slug", required=True)
