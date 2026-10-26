@@ -32,6 +32,8 @@ def is_punct(piece: str) -> bool:
 
 
 def specs_for(rows, realism: str):
+    if all("tools" in r for r in rows):  # rows converted from episode JSONs carry their exact spec tools
+        return [r["tools"] for r in rows]
     if str(rows[0].get("env", "")).startswith("donation_bet"):  # single turn, no tools (raw-prefill render)
         return [None] * len(rows)
     if rows[0].get("env") in ("funding_email_real", "email_ambiguous_real"):  # evalcue harness: `realism` = the evalcue checkout root
@@ -70,7 +72,7 @@ def specs_for(rows, realism: str):
 def labels_json(r: dict, extra: dict) -> str:
     d = {}
     for k, v in r.items():
-        if k in ("messages", "files_before", "files_after"):
+        if k in ("messages", "files_before", "files_after", "tools", "source_file"):
             continue
         d[k] = json.dumps(v) if isinstance(v, (dict, list)) else v
     return json.dumps(d | extra)
@@ -256,7 +258,7 @@ def main():
                 {
                     "tid": tid,
                     "run_dir": a.run_dir,
-                    "source_file": "rows.jsonl",
+                    "source_file": r.get("source_file", "rows.jsonl"),
                     "row_index": ri,
                     "episode_id": eid,
                     "env": env_name,
@@ -277,7 +279,7 @@ def main():
                     {
                         "config": a.config,
                         "run_dir": a.run_dir,
-                        "source_file": "rows.jsonl",
+                        "source_file": r.get("source_file", "rows.jsonl"),
                         "row_index": ri,
                         "episode_id": eid,
                         "env": env_name,
