@@ -60,8 +60,11 @@ P.SYSTEM = (
 )
 
 
-def scores(env, arm, model):
-    return [env.by_source[r.source]["detect_notes"]["score"] for r in env.rollouts(arm, model)]
+def scored(env, arm, model):
+    """Rollouts that have a parsed score, with their scores (a reply with no `Score:` line is dropped)."""
+    pairs = [(r, env.by_source[r.source]["detect_notes"]["score"]) for r in env.rollouts(arm, model)]
+    pairs = [(r, s) for r, s in pairs if s is not None]
+    return [r for r, _ in pairs], [s for _, s in pairs]
 
 
 def hist(xs):
@@ -124,7 +127,7 @@ async def main(args):
     out, slots = run / "predictions.jsonl", asyncio.Semaphore(args.concurrency)
 
     async def one(base_arm, cf_arm, draw):
-        base, bs, cs = env.rollouts(base_arm, args.model), scores(env, base_arm, args.model), scores(env, cf_arm, args.model)
+        (base, bs), (_, cs) = scored(env, base_arm, args.model), scored(env, cf_arm, args.model)
         tools = transcript_tools(base)
         async with slots:
             result = await P.predict(args.predictor, prompt(env, args.model, base, bs, base_arm, cf_arm), tools, TOOL_BUDGET)
