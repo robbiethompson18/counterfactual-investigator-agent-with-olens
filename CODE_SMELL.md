@@ -2,12 +2,17 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: cfbench/score.py still prints the log skill
+## 2026-10-26: cfbench still carries the log skill in three places
 
 `cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
-beside it so numbers from before 2026-10-26 can be checked. Drop it once nothing quotes them. The
-old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for
-`--allow-old-lens`; drop them when the thinking-on reruns land.
+beside it so numbers from before 2026-10-26 can be checked, and duplicates `data.py`'s per-case math
+(`Case.mse`, `log_gain`) because `data.load_rows`/`env_of` assume `evalcue_runs:` specs and one
+predictor. `cfbench/sweep.py`'s table is log skill only. The predictor prompt (`core.build_prompt`)
+still says "You are scored by the log-likelihood of the counterfactual arm's observed rate"; both
+rules reward the same point estimate, but changing the sentence bumps `HARNESS_VERSION`, so do it
+together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Drop the log skill once
+nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
+`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
@@ -27,15 +32,15 @@ changes the config of every existing OpenRouter run, so it's left alone for now.
 
 ## 2026-10-23: evolve/ sandbox and seed caveats
 
-- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
-  with a bind mount. Read-only files can be deleted and replaced; they are restored before grading and
-  reported in `record["readonly_tampered"]`, not prevented.
+- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
+  root with a bind mount. Read-only files can be deleted and replaced; they are restored before
+  grading and reported in `record["readonly_tampered"]`, not prevented.
 - Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
   (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
-- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by `evolve/scripts/convert_seeds*.py`
-  and are not yet on HF.
-- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in the
-  podman sandbox the API agent used; the manager's instructions are the only guard.
+- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by
+  `evolve/scripts/convert_seeds*.py` and are not yet on HF.
+- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in
+  the podman sandbox the API agent used; the manager's instructions are the only guard.
 - `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
   no-tests rule; keep it as a smoke check or delete it.
 

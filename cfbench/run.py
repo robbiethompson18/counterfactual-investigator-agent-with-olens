@@ -1,7 +1,7 @@
 """Run predictors on (env, target model, base arm -> counterfactual arm) cases.
 
-    uv run python -m cfbench.run funding_email --pairs arm_a:arm_b,arm_b:arm_a --slug fe-smoke
-    uv run python -m cfbench.score data/runs/cfbench/2026-10-21_fe-smoke
+    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions transcript,no_transcript --slug <slug>
+    uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
 Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
 base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
@@ -55,11 +55,14 @@ async def main():
     ap.add_argument("--description", default="")
     ap.add_argument("--skip", default="", help="comma list of predictions.jsonl from earlier runs; skip the predictions they already have")
     args = ap.parse_args()
-    key = lambda r: (r["base_arm"], r["cf_arm"], r["condition"], r["predictor"], r["draw"])
-    done = {key(json.loads(line)) for path in filter(None, args.skip.split(",")) for line in Path(path).read_text().splitlines()}
+    done = {  # (base_arm, cf_arm, condition, predictor, draw) already predicted by the --skip runs
+        tuple(r[k] for k in ("base_arm", "cf_arm", "condition", "predictor", "draw"))
+        for path in filter(None, args.skip.split(","))
+        for r in map(json.loads, Path(path).read_text().splitlines())
+    }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
-    reads = olens.load(args.olens_reads.split(",")) if args.olens_reads else {}
+    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [])
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
     anchor_reads = anchors.load(args.anchor_reads.split(",")) if args.anchor_reads else {}
