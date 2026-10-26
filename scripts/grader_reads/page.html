@@ -1,0 +1,307 @@
+<title>GLM 5.3 Grader Reads</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~880px) of findings, each followed by its chart; charts are hand-drawn SVG on one scale each. */
+:root {
+  --bg: #f7f7f4; --surface: #ffffff; --ink: #161614; --ink-2: #55544e; --ink-3: #8a8981; --rule: #e4e3dc; --grid: #ecebe5;
+  --model: #1baf7a; --prompt: #6250d6; --tool: #9a988f; --raw: #c9c7bd; --pos: #eb6834; --neg: #2a78d6; --accent: #1b6f55;
+  --heat-0: #f2f1ec; --heat-1: #cde2fb; --heat-2: #86b6ef; --heat-3: #3987e5; --heat-4: #1c5cab;
+  --f-display: "Newsreader", Georgia, serif; --f-body: "IBM Plex Sans", system-ui, sans-serif; --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #151514; --surface: #1d1d1b; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86; --rule: #2e2e2b; --grid: #262624;
+  --model: #199e70; --prompt: #9085e9; --tool: #77766f; --raw: #4a4944; --pos: #d95926; --neg: #3987e5; --accent: #4cc39a;
+  --heat-0: #222220; --heat-1: #184f95; --heat-2: #256abf; --heat-3: #5598e7; --heat-4: #9ec5f4; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #151514; --surface: #1d1d1b; --ink: #f0efec; --ink-2: #c3c2b7; --ink-3: #8f8e86; --rule: #2e2e2b; --grid: #262624;
+  --model: #199e70; --prompt: #9085e9; --tool: #77766f; --raw: #4a4944; --pos: #d95926; --neg: #3987e5; --accent: #4cc39a;
+  --heat-0: #222220; --heat-1: #184f95; --heat-2: #256abf; --heat-3: #5598e7; --heat-4: #9ec5f4; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+main { max-width: 920px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 34px; }
+h1 { font: 600 2.1rem/1.15 var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font: 600 1.4rem/1.25 var(--f-display); margin: 0 0 6px; text-wrap: balance; }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--ink-2); font-size: 1.02rem; }
+.eyebrow { font: 500 0.72rem/1 var(--f-body); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); }
+section { display: grid; gap: 12px; }
+.fig { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.fig svg text { fill: var(--ink-2); font: 12px var(--f-body); }
+.fig svg .lab { fill: var(--ink); }
+.fig svg .muted { fill: var(--ink-3); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.82rem; color: var(--ink-2); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.note { font-size: 0.84rem; color: var(--ink-3); max-width: 80ch; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { border-top: 2px solid var(--ink); padding-top: 10px; display: grid; gap: 4px; }
+.tile b { font: 600 1.7rem/1 var(--f-display); font-variant-numeric: tabular-nums; }
+.tile span { font-size: 0.84rem; color: var(--ink-2); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 14px; }
+.grid2 > * { min-width: 0; }
+.panel h3 { font: 600 0.95rem/1.3 var(--f-body); margin: 0 0 2px; }
+.panel .sub { font-size: 0.8rem; color: var(--ink-3); margin-bottom: 6px; }
+table { border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 8px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 500; color: var(--ink-3); border-bottom: 1px solid var(--rule); }
+td.h { border-radius: 3px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.85rem; }
+select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 8px; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ex { display: grid; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.card .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.78rem; color: var(--ink-3); }
+.card .read { font: 500 0.88rem/1.45 var(--f-mono); color: var(--ink); overflow-wrap: anywhere; }
+.card .ctx { font: 0.76rem/1.45 var(--f-mono); color: var(--ink-3); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 5.8em; overflow: hidden; }
+.card .ctx mark { background: none; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+.card a { color: var(--accent); }
+.chip { border: 1px solid var(--rule); border-radius: 10px; padding: 0 7px; }
+#tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 0.78rem; padding: 6px 8px; border-radius: 4px; max-width: 320px; z-index: 5; }
+code { font: 0.85em var(--f-mono); }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .15s } .card:hover { border-color: var(--ink-3) } }
+</style>
+
+<main>
+  <header style="display:grid;gap:10px">
+    <div class="eyebrow">GLM 5.3 · Celeste's RL O-lens · keyword scan, no LLM judge</div>
+    <h1>Where GLM 5.3's O-lens reads mention a grader</h1>
+    <p class="lede" id="lede"></p>
+  </header>
+  <div class="tiles" id="tiles"></div>
+
+  <section>
+    <h2>Most grader reads are one prompt read many times</h2>
+    <p id="t-dedup"></p>
+    <div class="fig"><div class="legend" id="lg-env"></div><div id="c-env"></div></div>
+    <p class="note">Rate = reads with a new grader/eval/benchmark/reward/score/"test of me" word per 1,000 read positions. "New" means the word is not in the 60 tokens before the read or the 16 after (an echo of the text doesn't count). Prompt side and model side count each distinct token prefix once, so a system prompt or tool schema shared by 64 episodes counts as one read. The gray tick is the rate as the viewer shows it, every episode's copy of the prompt counted. The bottom four rows are GLM rollouts outside our envs (Celeste's wild set), the base rate at matched positions.</p>
+  </section>
+
+  <section>
+    <h2>Every GLM env with O-lens reads</h2>
+    <p id="t-all"></p>
+    <div class="fig"><div id="c-all"></div></div>
+    <p class="note">Model-side reads only (reasoning, reply, tool calls), episode-specific and distinct, per 1,000; envs with at least 3,000 such reads. Green = the realism / AM / alignment-faking envs above; violet = GLM rollouts outside our envs; gray = Celeste's other reads of our envs and public evals.</p>
+  </section>
+
+  <section>
+    <h2>Along the realism axes</h2>
+    <p id="t-real"></p>
+    <div class="legend"><span><i style="background:var(--model)"></i>model side about the setting, per 1,000 episode-specific reads (95% CI)</span><span><i style="background:var(--model);opacity:.3"></i>any grader word</span><span><i style="background:var(--prompt)"></i>prompt side: distinct positions about the setting (count)</span><span>right-hand number: behaviour rate</span></div>
+    <div class="grid2" id="c-real"></div>
+  </section>
+
+  <section>
+    <h2>Which positions</h2>
+    <p id="t-pos"></p>
+    <div class="fig" id="c-pos"></div>
+    <p class="note">Reads about the setting per 1,000 distinct read positions in each section (hover a cell for the any-grader-word count). Blank = no reads there. Turn start is the <code>&lt;|assistant|&gt;</code> token; tool calls are reply tokens inside <code>&lt;tool_call&gt;</code>.</p>
+  </section>
+
+  <section>
+    <h2>Acted vs didn't</h2>
+    <p id="t-act"></p>
+    <div class="fig"><div class="legend"><span><i style="background:var(--pos)"></i>episodes with the behaviour</span><span><i style="background:var(--neg)"></i>episodes without</span></div><div id="c-act"></div></div>
+    <p class="note">Share of episodes with at least one model-side read about the setting at a position no other episode shares. OR = Mantel–Haenszel odds ratio within arm, so arm differences don't drive it.</p>
+  </section>
+
+  <section>
+    <h2>Examples</h2>
+    <p>Random draws per env (seed 0): model-side reads at episode-specific positions and prompt-side reads at distinct positions. "Viewer" opens the token on bramble:8830 (tailnet); "Docent" opens the transcript (overeager runs only have per-arm tables there).</p>
+    <div class="controls"><label for="f-env">Env</label><select id="f-env"></select><span role="group" aria-label="Side" id="f-side"></span></div>
+    <div class="ex" id="ex"></div>
+  </section>
+
+  <section>
+    <h2>Method</h2>
+    <p class="note" id="method"></p>
+  </section>
+</main>
+<div id="tip" hidden></div>
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const $ = (s) => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const tip = $("#tip");
+function el(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function hover(node, html) {
+  node.addEventListener("mousemove", (ev) => { tip.innerHTML = html; tip.hidden = false; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 330) + "px"; tip.style.top = ev.clientY + 12 + "px"; });
+  node.addEventListener("mouseleave", () => (tip.hidden = true));
+}
+const per1k = (k, n) => (n > 0 ? (1000 * k) / n : null);
+const fmt = (x, d = 1) => (x == null ? "–" : x.toFixed(d));
+const pct = (x) => (x == null ? "–" : Math.round(100 * x) + "%");
+function wilson(k, n) { if (!n) return [0, 0]; const z = 1.96, p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = (z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / d; return [Math.max(0, c - h), Math.min(1, c + h)]; }
+const REF = ["wildchat", "swesmith", "rlvr1", "tmax"];
+const REFNAME = { wildchat: "WildChat prompts", swesmith: "SWE-smith agent", rlvr1: "RLVR (math/code)", tmax: "T-max agent" };
+const SHOW = D.show_envs;
+const NAME = (e) => D.env_names[e] || REFNAME[e] || e;
+
+// ---- tiles + lede
+(function () {
+  const ours = D.envs.filter((e) => SHOW.includes(e.env));
+  const sum = (f) => ours.reduce((a, e) => a + (e[f] || 0), 0);
+  const raw = per1k(sum("k_reads"), sum("n_reads")), ded = per1k(sum("m_k") + sum("p_k") + sum("t_k"), sum("m_n") + sum("p_n") + sum("t_n"));
+  const ms = per1k(sum("m_s"), sum("m_n"));
+  const wc = D.envs.find((e) => e.env === "wildchat"), sw = D.envs.find((e) => e.env === "swesmith");
+  const wcr = wc ? per1k(wc.m_s, wc.m_n) : null, swr = sw ? per1k(sw.m_s, sw.m_n) : null;
+  $("#tiles").innerHTML = [
+    [fmt(raw, 1), "per 1,000 reads as the viewer shows them (prompt copies repeated)"],
+    [fmt(ded, 1), "per 1,000 distinct read positions"],
+    [fmt(ms, 2), "per 1,000 model-side reads (reasoning, reply, tool calls) that are about the setting"],
+    [`${fmt(wcr, 2)} / ${fmt(swr, 2)}`, "same, GLM on WildChat prompts / SWE-smith tasks (base rates)"],
+  ].map(([b, s]) => `<div class="tile"><b>${b}</b><span>${s}</span></div>`).join("");
+  $("#lede").textContent = D.text.lede;
+  for (const k of ["dedup", "real", "pos", "act", "all"]) $("#t-" + k).textContent = D.text[k];
+  $("#method").innerHTML = D.text.method;
+})();
+
+// ---- env overview: grouped horizontal bars, one scale
+(function () {
+  const rows = SHOW.concat(REF).map((e) => D.envs.find((x) => x.env === e)).filter(Boolean);
+  const series = [["prompt side", "p_k", "p_n", "var(--prompt)", "p_s"], ["model side", "m_k", "m_n", "var(--model)", "m_s"]];
+  $("#lg-env").innerHTML = series.map((s) => `<span><i style="background:${s[3]}"></i>${s[0]}, about the setting</span><span><i style="background:${s[3]};opacity:.3"></i>${s[0]}, any grader word</span>`).join("") + `<span><i style="background:var(--ink-3);width:2px"></i>any grader word as the viewer shows it (no dedup)</span>`;
+  const L = 250, W = 860, RT = 130, bh = 7, gap = 2, rh = 2 * bh + gap + 12, H = rows.length * rh + 40;
+  const s = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  const vals = rows.flatMap((r) => [per1k(r.p_k, r.p_n), per1k(r.m_k, r.m_n), per1k(r.k_reads, r.n_reads)]).filter((v) => v != null);
+  const mx = Math.max(...vals) * 1.05, x = (v) => L + ((W - L - RT) * v) / mx;
+  el("text", { x: W - 4, y: 10, "text-anchor": "end", class: "muted" }, s).textContent = "hits: viewer → distinct";
+  const step = mx > 40 ? 10 : mx > 15 ? 5 : mx > 6 ? 2 : 1;
+  for (let t = 0; t <= mx; t += step) { el("line", { x1: x(t), x2: x(t), y1: 8, y2: H - 24, stroke: "var(--grid)" }, s); el("text", { x: x(t), y: H - 8, "text-anchor": "middle" }, s).textContent = t; }
+  rows.forEach((r, i) => {
+    const y0 = 12 + i * rh;
+    if (REF.includes(r.env) && r.env === REF[0]) el("line", { x1: 0, x2: W, y1: y0 - 6, y2: y0 - 6, stroke: "var(--rule)" }, s);
+    const t = el("text", { x: L - 10, y: y0 + bh + 4, "text-anchor": "end", class: REF.includes(r.env) ? "muted" : "lab" }, s);
+    t.textContent = NAME(r.env);
+    series.forEach(([nm, k, n, c, ks], j) => {
+      const v = per1k(r[k], r[n]), vs = per1k(r[ks], r[n]); if (v == null) return;
+      const y = y0 + j * (bh + gap);
+      el("rect", { x: L, y, width: Math.max(1.5, x(v) - L), height: bh, rx: 2, fill: c, "fill-opacity": 0.3 }, s);
+      if (vs > 0) el("rect", { x: L, y, width: Math.max(1.5, x(vs) - L), height: bh, rx: 2, fill: c }, s);
+      const hit = el("rect", { x: L, y: y - 1, width: Math.max(8, x(v) - L), height: bh + 2, fill: "transparent" }, s);
+      hover(hit, `<b>${NAME(r.env)}</b> · ${nm}<br>about the setting: ${r[ks]} = ${fmt(vs, 2)} per 1k<br>any grader word: ${r[k]} = ${fmt(v, 2)} per 1k<br>of ${r[n].toLocaleString()} distinct positions`);
+    });
+    el("text", { x: W - 4, y: y0 + bh + 4, "text-anchor": "end", class: "muted" }, s).textContent = `${Math.round(r.k_reads).toLocaleString()} → ${Math.round(r.p_k + r.m_k + r.t_k).toLocaleString()}`;
+    const rv = per1k(r.k_reads, r.n_reads);
+    if (rv != null) { const m = el("rect", { x: x(rv) - 1, y: y0 - 2, width: 2, height: 2 * bh + gap + 4, fill: "var(--ink-3)" }, s); hover(m, `<b>${NAME(r.env)}</b><br>as the viewer shows it: ${fmt(rv, 2)} per 1k<br>${r.k_reads.toLocaleString()} of ${r.n_reads.toLocaleString()} reads`); }
+  });
+  $("#c-env").appendChild(s);
+})();
+
+// ---- every env, ranked
+(function () {
+  const rows = D.all_envs;
+  const L = 250, W = 860, rh = 15, H = rows.length * rh + 30;
+  const vals = rows.map((r) => (1000 * r.k) / r.n), mx = Math.max(...vals) * 1.05, x = (v) => L + ((W - L - 70) * v) / mx;
+  const s = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  const step = mx > 40 ? 10 : mx > 15 ? 5 : 2;
+  for (let t = 0; t <= mx; t += step) { el("line", { x1: x(t), x2: x(t), y1: 4, y2: H - 22, stroke: "var(--grid)" }, s); el("text", { x: x(t), y: H - 8, "text-anchor": "middle" }, s).textContent = t; }
+  rows.forEach((r, i) => {
+    const y = 6 + i * rh, v = vals[i], ours = SHOW.includes(r.env), ref = REF.includes(r.env);
+    el("text", { x: L - 8, y: y + 9, "text-anchor": "end", class: ours ? "lab" : "muted" }, s).textContent = NAME(r.env);
+    const c = ours ? "var(--model)" : ref ? "var(--prompt)" : "var(--tool)", vs = (1000 * r.ks) / r.n;
+    el("rect", { x: L, y: y + 2, width: Math.max(1.5, x(v) - L), height: 8, rx: 2, fill: c, "fill-opacity": 0.3 }, s);
+    if (vs > 0) el("rect", { x: L, y: y + 2, width: Math.max(1.5, x(vs) - L), height: 8, rx: 2, fill: c }, s);
+    const b = el("rect", { x: L, y: y + 1, width: Math.max(8, x(v) - L), height: 10, fill: "transparent" }, s);
+    hover(b, `<b>${NAME(r.env)}</b><br>about the setting: ${r.ks} = ${fmt(vs, 2)} per 1k<br>any grader word: ${r.k} = ${fmt(v, 2)} per 1k<br>of ${r.n.toLocaleString()} model-side reads`);
+    el("text", { x: x(v) + 6, y: y + 9, class: "muted" }, s).textContent = `${fmt(vs, 1)} / ${fmt(v, 1)}`;
+  });
+  $("#c-all").appendChild(s);
+})();
+
+// ---- realism small multiples
+(function () {
+  const host = $("#c-real");
+  for (const p of D.panels) {
+    const rows = p.arms.map((a) => D.arms.find((x) => x.env === p.env && x.arm === a)).filter(Boolean);
+    if (!rows.length) continue;
+    const div = document.createElement("div"); div.className = "fig panel";
+    div.innerHTML = `<h3>${p.title}</h3><div class="sub">${p.sub}</div>`;
+    const L = 170, R = 96, W = 420, rh = 20, top = 20, H = rows.length * rh + 30 + top;
+    const vals = rows.map((r) => wilson(r.m_s, r.m_n)[1] * 1000).concat(rows.map((r) => per1k(r.m_k, r.m_n) || 0));
+    const mx = Math.max(2, ...vals) * 1.05, x = (v) => L + ((W - L - R) * v) / mx;
+    const s = el("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%" });
+    const step = mx > 20 ? 5 : mx > 8 ? 2 : 1;
+    for (let t = 0; t <= mx; t += step) { el("line", { x1: x(t), x2: x(t), y1: top, y2: H - 22, stroke: "var(--grid)" }, s); el("text", { x: x(t), y: H - 8, "text-anchor": "middle" }, s).textContent = t; }
+    el("text", { x: W - 4, y: 12, "text-anchor": "end", class: "muted" }, s).textContent = p.beh;
+    el("text", { x: W - R + 14, y: 12, "text-anchor": "middle", class: "muted" }, s).textContent = "prompt";
+    rows.forEach((r, i) => {
+      const y = top + 4 + i * rh, va = per1k(r.m_k, r.m_n), v = per1k(r.m_s, r.m_n), ci = wilson(r.m_s, r.m_n).map((q) => q * 1000);
+      el("text", { x: L - 8, y: y + 9, "text-anchor": "end", class: "lab" }, s).textContent = (p.labels && p.labels[r.arm]) || r.ladder_label || r.arm;
+      if (v != null) {
+        el("rect", { x: L, y: y + 1, width: Math.max(1.5, x(va) - L), height: 8, rx: 2, fill: "var(--model)", "fill-opacity": 0.3 }, s);
+        if (v > 0) el("rect", { x: L, y: y + 1, width: Math.max(1.5, x(v) - L), height: 8, rx: 2, fill: "var(--model)" }, s);
+        el("line", { x1: x(ci[0]), x2: x(ci[1]), y1: y + 5, y2: y + 5, stroke: "var(--ink)", "stroke-width": 1 }, s);
+        const b = el("rect", { x: L, y, width: Math.max(10, x(Math.max(va, ci[1])) - L), height: 10, fill: "transparent" }, s);
+        hover(b, `<b>${r.arm}</b><br>model side, about the setting: ${r.m_s} of ${r.m_n.toLocaleString()} = ${fmt(v, 2)} per 1k<br>any grader word: ${r.m_k} = ${fmt(va, 2)} per 1k<br>episodes with a setting read: ${r.k_eps_s}/${r.n_eps_read}<br>prompt side: ${r.p_s} about the setting, ${r.p_k} any, of ${r.p_n} distinct positions${r.evalness != null ? `<br>evalness (BT): ${fmt(r.evalness, 2)}` : ""}`);
+      }
+      const pc = el("circle", { cx: W - R + 14, cy: y + 5, r: r.p_s > 0 ? 3 + Math.min(5, Math.sqrt(r.p_s)) : 2, fill: r.p_s > 0 ? "var(--prompt)" : "var(--raw)" }, s);
+      hover(pc, `<b>${r.arm}</b><br>prompt side: ${r.p_s} distinct positions about the setting, ${r.p_k} with any grader word (of ${r.p_n})`);
+      el("text", { x: W - R + 26, y: y + 9, class: "muted" }, s).textContent = String(r.p_s);
+      el("text", { x: W - 4, y: y + 9, "text-anchor": "end", class: "lab" }, s).textContent = r.n_lab ? pct(r.pos_rate) : "";
+    });
+    div.appendChild(s); host.appendChild(div);
+  }
+})();
+
+// ---- position heat table
+(function () {
+  const SG = ["system prompt", "tool schema", "user turn", "turn start", "reasoning", "reply text", "tool calls", "tool results"];
+  const rows = SHOW.concat(REF);
+  const cell = (e, g) => D.sections.find((x) => x.env === e && x.sg === g);
+  const all = rows.flatMap((e) => SG.map((g) => { const c = cell(e, g); return c && c.n >= 50 ? per1k(c.ks, c.n) : null; })).filter((v) => v != null);
+  const q = [0.5, 1, 2, 8];
+  const col = (v) => (v == null ? "transparent" : v === 0 ? "var(--heat-0)" : v < q[0] ? "var(--heat-1)" : v < q[1] ? "var(--heat-2)" : v < q[2] ? "var(--heat-3)" : "var(--heat-4)");
+  const ink = (v) => (v != null && v >= q[1] ? "var(--bg)" : "var(--ink)");
+  let h = `<table><thead><tr><th>env</th>${SG.map((g) => `<th>${g}</th>`).join("")}</tr></thead><tbody>`;
+  for (const e of rows) {
+    h += `<tr><td>${NAME(e)}</td>` + SG.map((g) => { const c = cell(e, g); if (!c || !c.n) return "<td></td>"; const v = per1k(c.ks, c.n); const small = c.n < 50; return `<td class="h" title="${c.ks} about the setting (${c.k} any grader word) of ${c.n} distinct positions" style="background:${small ? "transparent" : col(v)};color:${small ? "var(--ink-3)" : ink(v)}">${fmt(v, 1)}</td>`; }).join("") + "</tr>";
+  }
+  h += `</tbody></table><div class="legend" style="margin-top:10px">${[["0", "var(--heat-0)"], ["<0.5", "var(--heat-1)"], ["0.5–1", "var(--heat-2)"], ["1–2", "var(--heat-3)"], ["≥2", "var(--heat-4)"]].map(([t, c]) => `<span><i style="background:${c}"></i>${t}</span>`).join("")}<span>gray text: fewer than 50 positions</span></div>`;
+  $("#c-pos").innerHTML = h;
+})();
+
+// ---- acted vs not: dumbbell
+(function () {
+  const rows = D.acted.filter((a) => SHOW.includes(a.env) && a.n_pos >= 5 && a.n_neg >= 5);
+  const L = 300, W = 860, rh = 26, H = rows.length * rh + 34;
+  const mx = Math.max(0.05, ...rows.map((r) => Math.max(r.k_pos / r.n_pos, r.k_neg / r.n_neg))) * 1.1, x = (v) => L + ((W - L - 110) * v) / mx;
+  const s = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  const step = mx > 0.5 ? 0.1 : mx > 0.2 ? 0.05 : 0.02;
+  for (let t = 0; t <= mx + 1e-9; t += step) { el("line", { x1: x(t), x2: x(t), y1: 6, y2: H - 22, stroke: "var(--grid)" }, s); el("text", { x: x(t), y: H - 8, "text-anchor": "middle" }, s).textContent = Math.round(t * 100) + "%"; }
+  el("text", { x: W - 4, y: 12, "text-anchor": "end", class: "muted" }, s).textContent = "MH OR";
+  rows.forEach((r, i) => {
+    const y = 12 + i * rh + 6, a = r.k_pos / r.n_pos, b = r.k_neg / r.n_neg;
+    el("text", { x: L - 10, y: y + 4, "text-anchor": "end", class: "lab" }, s).textContent = `${NAME(r.env)} · ${r.meaning}`;
+    el("line", { x1: x(Math.min(a, b)), x2: x(Math.max(a, b)), y1: y, y2: y, stroke: "var(--ink-3)", "stroke-width": 1.5 }, s);
+    for (const [v, k, n, c, nm] of [[b, r.k_neg, r.n_neg, "var(--neg)", "without"], [a, r.k_pos, r.n_pos, "var(--pos)", "with"]]) {
+      const d = el("circle", { cx: x(v), cy: y, r: 5, fill: c, stroke: "var(--surface)", "stroke-width": 2 }, s);
+      hover(d, `<b>${NAME(r.env)}</b><br>${nm} "${r.meaning}": ${k}/${n} episodes (${pct(v)})<br>MH OR ${r.mh_or == null ? "undefined" : fmt(r.mh_or, 2)}, pooled Fisher p=${fmt(r.p_pooled, 3)}`);
+    }
+    el("text", { x: W - 4, y: y + 4, "text-anchor": "end", class: "lab" }, s).textContent = r.mh_or == null ? "–" : fmt(r.mh_or, 2);
+  });
+  $("#c-act").appendChild(s);
+})();
+
+// ---- examples
+(function () {
+  const envs = [...new Set(D.examples.map((e) => e.env))].filter((e) => SHOW.includes(e) || REF.includes(e));
+  envs.sort((a, b) => SHOW.concat(REF).indexOf(a) - SHOW.concat(REF).indexOf(b));
+  $("#f-env").innerHTML = envs.map((e) => `<option value="${e}">${NAME(e)}</option>`).join("");
+  let side = "model";
+  const sides = [["model", "Model side"], ["prompt", "Prompt side"]];
+  $("#f-side").innerHTML = sides.map(([k, t]) => `<button type="button" data-k="${k}" aria-pressed="${k === side}">${t}</button>`).join(" ");
+  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+  function draw() {
+    const e = $("#f-env").value;
+    const xs = D.examples.filter((x) => x.env === e && x.side === side);
+    $("#ex").innerHTML = xs.length ? xs.map((x) => `<div class="card"><div class="meta"><span class="chip">${x.arm || "–"}</span><span>${x.sg}</span>${x.positive == null ? "" : `<span>${x.positive ? D.meaning[e] || "positive" : "not " + (D.meaning[e] || "positive")}</span>`}${x.n_share > 1 ? `<span>prefix shared by ${x.n_share} episodes</span>` : ""}<span>${x.fams.join(", ")}${x.setting ? " · about the setting" : ""}</span><a href="${x.viewer}" target="_blank" rel="noopener">Viewer</a>${x.docent ? `<a href="${x.docent}" target="_blank" rel="noopener">Docent${x.docent_kind === "arm table" ? " (arm)" : ""}</a>` : ""}</div><div class="read">${esc(x.read)}</div><div class="ctx">…${esc(x.before)}<mark>⟵ read here</mark> ${esc(x.after)}</div></div>`).join("") : `<p class="note">No ${side}-side grader reads in this env.</p>`;
+  }
+  $("#f-env").addEventListener("change", draw);
+  $("#f-side").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; side = b.dataset.k; for (const x of $("#f-side").children) x.setAttribute("aria-pressed", x.dataset.k === side); draw(); });
+  const pre = envs.find((e) => e.startsWith("IB realism ladder")) || envs[0];
+  $("#f-env").value = pre; draw();
+})();
+</script>
