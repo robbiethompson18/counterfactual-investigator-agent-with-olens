@@ -31,7 +31,7 @@ def spread(prep: Path, views: list[dict], k: int) -> list[dict]:
     return [dict(v, pos=keep.get(v["tid"], np.zeros(0, np.int32))) for v in views]
 
 
-def head(prep: Path, views: list[dict], exclude: str) -> list[dict]:
+def head(prep: Path, views: list[dict], exclude: str, max_msg: int = 1) -> list[dict]:
     """positions in the template header (tool spec), the system prompt and the first user message. These runs' episodes all open
     [system, user], so that is msg_index <= 1 (-1 = template header); positions are already exact-prefix deduplicated by prep."""
     import glob
@@ -40,7 +40,7 @@ def head(prep: Path, views: list[dict], exclude: str) -> list[dict]:
     import pandas as pd
 
     P = pd.read_parquet(prep / "positions.parquet", columns=["tid", "pos", "msg_index"])
-    P = P[P.msg_index <= 1]
+    P = P[P.msg_index <= max_msg]
     done = set()
     for f in glob.glob(exclude) if exclude else []:
         j = torch.load(f)
@@ -69,6 +69,7 @@ def main():
         help="newline_special = template/special tokens + tokens containing a newline; rest = the other punctuation",
     )
     ap.add_argument("--head", action="store_true", help="every unique position through the first user message")
+    ap.add_argument("--max-msg", type=int, default=1, help="--head reads through this message index (2 = also the first assistant turn)")
     ap.add_argument("--exclude-jobs", default="", help="glob of job files whose positions are already read (left out)")
     ap.add_argument("--skip-arms", default="", help="comma list of arms to leave out (e.g. superseded cells)")
     ap.add_argument("--tag", default="", help="job-name suffix after the run name (keeps a second pass's jobs apart)")
@@ -96,7 +97,7 @@ def main():
     if a.per_episode:
         views = spread(prep, views, a.per_episode)
     if a.head:
-        views = head(prep, views, a.exclude_jobs)
+        views = head(prep, views, a.exclude_jobs, a.max_msg)
     views = [v for v in views if len(v["pos"])]
     k, cur, n = 0, [], 0
 

@@ -101,7 +101,7 @@ def main():
     tids = set(json.loads(Path(a.tids).read_text())) if a.tids else None
     n, read_pos = 0, []
     for j in done:
-        kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
+        kind = "head" if "head__" in j.name else "spread32" if "_s32__" in j.name else a.kind  # head = through the first user message
         rows = shard_rows(j, P)
         if a.keep:
             rows = rows.merge(keep, on=["tid", "pos"])
