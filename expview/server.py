@@ -85,6 +85,7 @@ def datasets() -> list[dict]:
         r["canonical"] = info.get("canonical") or (r["used_by"][0]["d"] if r["hidden"] and r["used_by"] else None)
         parts = r["d"].split("/")
         r["experiment"] = info.get("experiment") or (parts[1] if parts[0] == "runs" and len(parts) > 2 else None)
+        r["task"], r["summary"] = bool(info.get("task")), info.get("summary")
         r["docent"] = next((v for k, v in first.get(r["d"], {}).items() if "docent" in (k + str(v)).lower()), None)
     return rows
 

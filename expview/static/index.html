@@ -310,17 +310,18 @@ async function homePage(){
     <label><input type="checkbox" id="hall" ${showAll?"checked":""}> show read sources and copies (<span id="hn"></span>)</label><span class="mono" id="hc"></span></div>
    <div id="ht"></div></div>`;
   $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({s:1,q})};
-  const sec=x=>x.experiment?x.experiment:x.d.startsWith("imports/")?"O-lens read sets without a run":x.d.startsWith("expview/")?"Older views (bramble's ~/workspace/expview)":"Other runs";
+  const sec=x=>x.task?"Tasks (one group per setting, every run folded in)":x.experiment?x.experiment:x.d.startsWith("imports/")?"O-lens read sets without a run":x.d.startsWith("expview/")?"Older views (bramble's ~/workspace/expview)":"Other runs";
   const reads=x=>x.n_reads?"own":(x.reads_from||[]).length?"via run":"";
-  const row=x=>`<tr class="click${x.hidden?" dim":""}" data-d="${esc(x.d)}"><td><div>${esc(x.title||x.d)}</div><div class="mono gl">${esc(x.d)}${x.hidden&&x.canonical?` · shown in <a href="${linkTo({d:x.canonical})}">${esc(x.canonical)}</a>`:""}</div></td>
-    <td class="num">${(x.n_items||0).toLocaleString()}</td><td>${reads(x)=="own"?'<span class="chip t">O-lens</span>':reads(x)?'<span class="chip t" title="reads from '+esc((x.reads_from||[]).map(r=>r.d).join(", "))+'">O-lens</span>':""}</td>
+  const row=x=>`<tr class="click${x.hidden?" dim":""}" data-d="${esc(x.d)}"><td><div>${esc(x.title||x.d)}</div><div class="mono gl">${x.summary?`${x.summary.settings} settings · `:""}${esc(x.d)}${x.hidden&&x.canonical?` · shown in <a href="${linkTo({d:x.canonical})}">${esc(x.canonical)}</a>`:""}</div></td>
+    <td class="num">${(x.n_items||0).toLocaleString()}</td><td>${x.summary?`<span class="chip${x.summary.with_reads?" t":""}" title="items with O-lens reads">O-lens ${x.summary.with_reads.toLocaleString()} / ${x.summary.items.toLocaleString()}</span>`:reads(x)=="own"?'<span class="chip t">O-lens</span>':reads(x)?'<span class="chip t" title="reads from '+esc((x.reads_from||[]).map(r=>r.d).join(", "))+'">O-lens</span>':""}</td>
     <td>${x.docent&&docentColl(x.docent)?`<a class="chip" href="https://docent.transluce.org/dashboard/${docentColl(x.docent)}" target="_blank" rel="noopener">Docent ↗</a>`:""}</td>
     <td class="num mono">${x.mtime?new Date(x.mtime*1000).toISOString().slice(0,10):""}</td></tr>`;
   const draw=()=>{const f=$("#hf").value.toLowerCase(),all=$("#hall").checked;store.set("homeq",$("#hf").value);store.set("homeall",all);
     $("#hn").textContent=ds.filter(x=>x.hidden).length;
     const rows=ds.filter(x=>(all||!x.hidden)&&(x.d+" "+(x.title||"")).toLowerCase().includes(f));$("#hc").textContent=`${rows.length} of ${ds.length}`;
     const secs={};for(const x of rows)(secs[sec(x)]=secs[sec(x)]||[]).push(x);
-    const order=Object.keys(secs).sort((a,b)=>(/^(O-lens|Older|Other)/.test(a)-/^(O-lens|Older|Other)/.test(b))||a.localeCompare(b));
+    const rank=k=>/^Tasks/.test(k)?0:/^(O-lens|Older|Other)/.test(k)?2:1;
+    const order=Object.keys(secs).sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
     $("#ht").innerHTML=order.map(k=>`<h2>${esc(k)} <span class="mono gl">${secs[k].length} run${secs[k].length==1?"":"s"}</span></h2>
       <div class="wrap"><table><tr><th>Run</th><th>Items</th><th>Reads</th><th>Docent</th><th>Updated</th></tr>${secs[k].map(row).join("")}</table></div>`).join("")};
   $("#hf").oninput=draw;$("#hall").onchange=draw;

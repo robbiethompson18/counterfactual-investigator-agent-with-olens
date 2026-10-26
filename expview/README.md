@@ -181,6 +181,22 @@ uv run --script expview/index.py --db data/expview/index.new.duckdb   # minutes;
 # stop the server, mv index.new.duckdb over index.duckdb, start it again (a few seconds of downtime)
 ```
 
+## Tasks: one dataset per task, one group per setting
+
+`importers/tasks.py` folds every run of a task (e.g. all eight email_ambiguous parts plus the overeager
+4 Johns run) into `runs/_tasks/<task>`: one item per rollout, an overlay on its canonical item (so its
+transcript, O-lens reads, calls, env and Docent link come through), grouped by **setting** (the
+prompt / arm condition, normalised across parts). What only varies between parts (sensitivity,
+contacts domain, batch, run, whether the O-lens read it) is a label. The `TASKS` config lists each
+task's source runs and its arm-to-setting rule; run.json `groups` glosses each setting. The dataset
+list shows tasks first; a source run whose items all appear in a task, a read set a run already
+shows, and run.json `"hidden": true` pages are listed only under "show read sources and copies".
+Re-run after a new part or read set lands (`expview-pull.service` does after each pull):
+
+```
+uv run --script expview/importers/tasks.py [--only email_john]
+```
+
 ## Importers
 
 - `importers/celeste.py`: Celeste's GLM-5.3 O-lens readouts
