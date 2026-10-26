@@ -84,6 +84,8 @@ def load_extra(s: str) -> dict:
 
 
 def clean(o):
+    if type(o).__name__ == "ndarray":
+        return clean(o.tolist())
     if isinstance(o, dict):
         return {str(k): clean(v) for k, v in o.items()}
     if isinstance(o, (list, tuple)):
@@ -148,6 +150,11 @@ def main():
         from episodes group by env, arm, ds, item"""
     ).df()
     beh = con.execute("select env, arm, count(*) n_eps, avg(positive::int) pos_rate, count(positive) n_lab from items group by 1,2").df()
+    # where each arm lives on bramble:8830 (dataset ids and item groups), for links into expview search
+    where = con.execute(
+        "select env, arm, list(distinct 'imports/' || ds) dss, list(distinct \"group\") groups from items group by 1,2"
+    ).df()
+    beh = beh.merge(where, on=["env", "arm"], how="left")
     epr = epm.groupby(["env", "arm"]).agg(n_eps_read=("g", "size"), k_eps=("g", "sum"), k_eps_s=("gs", "sum")).reset_index()
     arm = arm.merge(beh, on=["env", "arm"], how="left").merge(epr, on=["env", "arm"], how="left").fillna(0)
     bt = {}
@@ -248,6 +255,7 @@ def main():
                     }
                 )
     out["examples"] = ex
+    out["env_ds"] = {e: sorted({"imports/" + x for x in g.ds}) for e, g in items.groupby("env")}
     (A / "summary.json").write_text(json.dumps(clean(out)))
     print("envs", len(out["envs"]), "arms", len(out["arms"]), "examples", len(ex), "acted", len(av))
 

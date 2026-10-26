@@ -81,6 +81,10 @@ def main():
         q["_pos"] += (x.get("pos_rate") or 0) * (x.get("n_lab") or 0)
         if x["evalness"] is not None:
             q["evalness"] = x["evalness"]
+        q.setdefault("dss", [])
+        q.setdefault("groups", [])
+        q["dss"] += [v for v in x.get("dss") or [] if v not in q["dss"]]
+        q["groups"] += x.get("groups") or []
     for q in pooled.values():
         q["pos_rate"] = q.pop("_pos") / q["n_lab"] if q["n_lab"] else None
         d["arms"].append(q)
