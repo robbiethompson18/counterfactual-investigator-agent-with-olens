@@ -103,6 +103,8 @@ result holds up (+0.73 vs +0.67, 6 cases).
 ## Not done
 
 - The matched thinking-**on** comparison (same 26 envs/arms, `*/2026-10-25_r3_cot_n25_box` rollouts
-  are on HF; the reads were lost on RunPod volumes when the account hit zero balance; see
-  `runpod/CLAUDE.md`, "Cost guards").
+  are on HF). Its O-lens reads were never produced: the eight read pods idled from creation until
+  RunPod deleted them at zero balance (`runpod/CLAUDE.md`, "Cost guards"); both network volumes were
+  checked on 2026-10-26 and hold nothing from that night. Rerunning them is ~2-3 h on 8 H200s (the
+  thinking-on rows are 1.8x the no-CoT rows by size).
 - No per-case reading of the OL traces beyond the loss list above.

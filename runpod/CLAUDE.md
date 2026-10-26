@@ -13,9 +13,13 @@ compute separate:
 
 ## Cost guards (2026-10-25: eight idle H200s ran the balance to −$0.57, ~$220 wasted)
 
-Eight `--watch` read pods finished their batch in ~2.5 h and then sat idle for ~5 h because the
-orchestrator that was meant to tear them down was never started and the session went quiet. RunPod
-then detached the volumes, and 6 rescue pods over the next morning failed to come up. Rules:
+Eight read pods were created at 23:43 PDT on 2026-10-24 and the session went quiet before `setup`
+or `run` ever reached them: each pod's boot-time vLLM server idled for 7.7 h (47 ten-minute
+heartbeats per instance in `/workspace/home/.config/vllm/usage_stats.json`, nothing written under
+`/workspace/reads`, no reader kernel-cache traces) until RunPod deleted all eight at 07:26:49 when
+the balance hit zero (audit log actor `runpod`). No thinking-on reads were ever produced, so the
+"lost reads" never existed; the rescue pods the next morning found the volumes intact and empty of
+that night's work, as did a second check on 2026-10-26. Rules:
 
 - **No pod without a live watcher.** Before `up`, start (and verify with `pgrep`) a detached process
   that deletes the pod when its job is done, and deletes everything if `clientBalance` falls under a
@@ -34,7 +38,18 @@ then detached the volumes, and 6 rescue pods over the next morning failed to com
   image), then delete it and try the other volume's datacenter.
 - **Small container disks kill pods silently.** `runpod/pytorch` needs more than 20 GB (`pod.sh`
   uses 200); pods created with 20 GB vanished within 2 min and left a 404 on delete.
-- Keep the balance above ~1 h of the fleet's burn; at zero RunPod freezes the volumes too.
+- Keep the balance above ~1 h of the fleet's burn; at zero RunPod deletes the pods (audit log
+  actor `runpod`). The volumes survive.
+- **Volumes outlive pods and need no GPU to read.** When a datacenter has no GPU stock, a $0.06/h
+  CPU pod mounts the volume: REST `POST /v1/pods` with `computeType: "CPU"`,
+  `cpuFlavorIds: ["cpu3c","cpu3g","cpu3m","cpu5c","cpu5g","cpu5m"]`, `networkVolumeId`,
+  `dataCenterIds: [<the volume's DC>]`, the `runpod/pytorch` image, 20 GB container disk,
+  `ports: ["22/tcp"]`; poll `publicIp` + `portMappings["22"]` and ssh as root with
+  `~/.ssh/id_ed25519` (the RSA RunPod key hangs). RunPod's S3 API covers US-CA-2 and US-NC-1 too
+  (`https://s3api-us-ca-2.runpod.io/`, bucket = volume id, key from the console's S3 API Keys tab),
+  so a volume can be listed and copied with no pod at all. The GraphQL audit log
+  (`auditLogs(input:{limit:200})` with `action`, `resourceType`, `resourceId`, `actorId`,
+  `timestamp`, paginated by `pageInfo.endCursor`) says who created and deleted every pod.
 
 ## Shared Qwen3.6-27B server: use it, don't start your own
 
