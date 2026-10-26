@@ -1,5 +1,11 @@
 # Transcript viewer
 
+**Status (2026-10-26):** ACTIVE. The read caches (`data/reads.jsonl`, `data/weirdchat/reads/*`) hold
+only old-lens (`olens_s3d_rl600`) reads, tagged as such since 2026-10-23; the page shows them marked
+"old lens" until the space lens re-reads a token, which was never scheduled
+([docs/olens-space-migration.md](../docs/olens-space-migration.md)). The SkyPilot sections are
+Kylie's setup; Robbie's agents use RunPod (`runpod/CLAUDE.md`).
+
 Browse the Qwen3.6-27B patterns of
 [Transluce/WeirdChat](https://huggingface.co/datasets/Transluce/WeirdChat) (225 patterns, 25,792
 transcripts) and the 300 [CHIVE](https://huggingface.co/datasets/agu18dec/chive-forensics) incidents

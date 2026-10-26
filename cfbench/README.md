@@ -1,5 +1,10 @@
 # cfbench: predict what an environment edit does to a model's behavior
 
+**Status (2026-10-26):** MIXED. Task, conditions and CLI are current (harness v6). Both result
+tables are harness v1 and binomial log skill
+([docs/cfbench-scoring.md](../docs/cfbench-scoring.md)); the 2026-10-22 O-lens paragraph is
+superseded by hidden_goal, see Scoring.
+
 Our from-scratch replacement for the CHIVE prediction harness. Agam's
 [detective-joracle](https://github.com/agu18dec/detective-joracle) is reference-only here
 (`vendor/README.md`).
@@ -59,10 +64,18 @@ suppression effects per sentence as tools) were removed on 2026-10-26 after a nu
 `scripts/anchor_reads.py` at commit `7296169`
 (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/cfbench/anchors.py).
 
-O-lens results (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
-rarely call the O-lens tools, and naive regexes surface high-FVE paraphrase. Where the reads carry
-signal (inline_b "tell your boss before claiming done", killswitch "you must disable it"), it's an
-arm-level contrast, not a reason a reader of one arm can see.
+O-lens results (2026-10-22, old-lens reads, log skill on harness v1): no uplift on killswitch,
+inline_b, exfil or whistleblow. Predictors rarely call the O-lens tools, and naive regexes surface
+high-FVE paraphrase. Where the reads carry signal (inline_b "tell your boss before claiming done",
+killswitch "you must disable it"), it's an arm-level contrast, not a reason a reader of one arm can
+see.
+
+Superseded on hidden_goal (2026-10-23, space lens): the agentic O-lens tools beat TS and placebo in
+a pre-registered 38-case test with Gemini 3.8 Flash (RMSE 26.6 vs 31.7 / 30.9pp; log skill +0.07),
+carried by a few cases; a harness v6 replication with GPT-6.1 Sol is null, and across models the
+O-lens beats placebo only for Flash and Argon, via hidden_goal
+([docs/envs/hidden_goal.md](../docs/envs/hidden_goal.md),
+[docs/cfbench-model-chart.md](../docs/cfbench-model-chart.md)).
 
 ## Scoring
 
@@ -72,9 +85,11 @@ percentage points next to the RMSE of "the edit does nothing" (predict the shown
 skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints it, and
 `cfbench.report.charts` makes the report figures from it.
 
-The numbers in "Results so far" below predate that and are the older **binomial log-likelihood
-skill**, still printed by `cfbench.score` for comparison. For a case with k_Y of n_Y counterfactual
-runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
+The numbers in "Results so far" below predate that: they are harness v1 (runs without
+`harness_version` in `meta.json`, i.e. everything before 2026-10-24; not comparable to later runs)
+and the older **binomial log-likelihood skill**, still printed by `cfbench.score` for comparison.
+For a case with k_Y of n_Y counterfactual runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p),
+and
 
     skill = Σ_cases [mean_draws LL(p̂) − LL(null)] / Σ_cases [LL(oracle) − LL(null)]
 
@@ -93,11 +108,12 @@ uv run python -m cfbench.score data/runs/cfbench/<date>_fe-all
 ```
 
 `--max-calls` sets the tool conditions' budget (default 20). `--model` picks the target (default
-`Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Haiku 5.5 only; add
-others only when asked). Needs `OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run:
-`data/runs/cfbench/<date>_<slug>/` with `meta.json` and `predictions.jsonl` (one row per prediction,
-including the predictor's full conversation, tool-call counts and OpenRouter cost), synced to HF
-when it finishes. Runs from before `runs.py` are flat `runs/cfbench/*.jsonl` files on HF.
+`Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Haiku 5.5 in the CLI;
+the report's baseline predictor is Gemini 3.8 Flash, `google/gemini-3.8-flash`, so pass it). Needs
+`OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/` with
+`meta.json` and `predictions.jsonl` (one row per prediction, including the predictor's full
+conversation, tool-call counts and OpenRouter cost), synced to HF when it finishes. Runs from before
+`runs.py` are flat `runs/cfbench/*.jsonl` files on HF.
 
 For any evalcue env, `evalcue_runs:<env>/<run>[+<run>...]` reads the env's run dirs directly and
 `--pairs hub` pairs its hub arm (smallest total diff to the others, usually the base) with every

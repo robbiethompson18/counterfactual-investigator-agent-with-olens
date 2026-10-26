@@ -1,5 +1,7 @@
 # runpod/: Robbie's GPU pods
 
+**Status (2026-10-26):** ACTIVE.
+
 This directory is Robbie's code, for agents working for Robbie. Robbie and Kylie keep their GPU
 compute separate:
 
@@ -301,7 +303,7 @@ Gotchas:
   and Qwen3.6-27B (52 GB) twice plus the ceselder NLA repo (69 GB) fills the 200 GB disk.
 - RunPod containers see all the host's cores (96 on an H200 node) but get a ~10-core CPU quota.
   torch starts a thread per visible core, so CPU work (the O-lens whiteners' float64 `eigh`)
-  thrashes: `pod/server.py` took 46+ min to load instead of 44 s. Start it with
+  thrashes: `transcript-viewer/pod/server.py` took 46+ min to load instead of 44 s. Start it with
   `OMP_NUM_THREADS=10`.
 - vLLM's Qwen3.6 linear-attention kernels JIT-compile with `ninja`: put the venv's `bin/` and
   `/usr/local/cuda/bin` on `PATH`, and expect ~10 min of compiling on the first run.
