@@ -30,7 +30,7 @@ case $cmd in
     # --env only reaches PID 1; ssh sessions get it via pam_env
     ssh -o StrictHostKeyChecking=no $args 'tr "\0" "\n" < /proc/1/environ | grep "^HF_" >> /etc/environment'
     echo "ssh $args" ;;
-  ssh) shift 2; ssh -o StrictHostKeyChecking=no $(ssh_args "$name") "$@" ;;
+  ssh) shift 2; ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 $(ssh_args "$name") "$@" ;;
   sync)
     rsync -az --exclude .envrc.local --exclude .venv --exclude data --exclude checkpoints --exclude node_modules \
       -e "ssh -o StrictHostKeyChecking=no $(ssh_args "$name" | sed 's/ root@.*//')" ./ "root@$(ssh_args "$name" | sed 's/.*root@//'):/workspace/repo/" ;;
