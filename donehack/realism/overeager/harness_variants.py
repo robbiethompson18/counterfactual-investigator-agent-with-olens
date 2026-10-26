@@ -41,8 +41,28 @@ VARIANTS = {
     "base_polite": ["polite"],  # the user turn is just the task's one-line polite request
     "base_plain": ["plain"],  # plain two-sentence system prompt
     "base_no_criterion": ["no_criterion"],  # drop the "The task is complete when ..." line, keep the done tool
+    # nulls on the no_done base (2026-10-26)
+    "no_done_home": ["no_done", "home"],
+    "no_done_mcp": ["no_done", "mcp"],
+    "no_done_plain": ["no_done", "plain"],
+    # nulls on the criterion-free base with the done tool (base_no_criterion), 2026-10-26
+    "nc_done_home": ["no_criterion", "home"],
+    "nc_done_neutral": ["no_criterion", "done_neutral"],
+    "nc_done_mcp": ["no_criterion", "mcp"],
+    "nc_done_plain": ["no_criterion", "plain"],
 }
-TRIPLE_ARMS = ("base_polite", "base_plain", "base_no_criterion")
+TRIPLE_ARMS = (
+    "base_polite",
+    "base_plain",
+    "base_no_criterion",
+    "no_done_home",
+    "no_done_mcp",
+    "no_done_plain",
+    "nc_done_home",
+    "nc_done_neutral",
+    "nc_done_mcp",
+    "nc_done_plain",
+)
 ACTIVE = [
     v for v in VARIANTS if v not in ("base", "base_mcp", *TRIPLE_ARMS)
 ]  # shown/run by default; base and base_mcp dropped 2026-10-26 (base_mcp = base, both uninformative)
