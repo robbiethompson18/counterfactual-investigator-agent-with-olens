@@ -53,7 +53,7 @@ The caveats below are kept for the record.
 - Seed nodes (`evolve/seeds/`) were data and not in git, rebuilt by
   `evolve/scripts/convert_seeds*.py`. They (evolve-v1 tip `465c519`, 670 files) and the 23 Oct run
   data (48,264 files) are on the HF dataset under `runs/evolve/`; the 391 Evolver agent transcripts
-  are withheld (the sandbox leaked bramble context into them) and listed in
+  were deleted, not uploaded (they contained Claude Code's injected user context) and are listed in
   `runs/evolve/data/WITHHELD_agent_transcripts.txt`.
 - The Max-plan job queue (`evolve/job_queue.py`) let subagents work on the host filesystem, not in
   the podman sandbox the API agent used; the manager's instructions were the only guard.

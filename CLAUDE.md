@@ -257,7 +257,7 @@ Current docs:
   survives a split test); harness in `evalcue/README.md`
 - [evolve (removed) — read before reviving the evolve loop (evolved REAL/NULL counterfactual settings)](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evolve)
   — code deleted from main on 2026-10-26; last version at the linked commit; seeds and 23 Oct run
-  data on HF under `runs/evolve/` (Evolver agent transcripts withheld: they leaked bramble context)
+  data on HF under `runs/evolve/` (Evolver agent transcripts deleted: they contained Claude Code's injected user context)
 - [weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/README.md)
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
 - [donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
