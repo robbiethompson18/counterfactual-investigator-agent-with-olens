@@ -33,6 +33,10 @@ def write_env(task, variant, i=0):
     (d / "user_turn_1.md").write_text(spec.user)
     (d / "tools.json").write_text(json.dumps(spec.tools, indent=1))
     (d / "setup.sh").write_text("\n".join(spec.setup) + "\n" if spec.setup else "")
+    if spec.meta.get("prefill"):  # eval-cue arms: the prefilled first turn (the output is the sandbox's real `ls -la`)
+        (d / "prefilled_turn.md").write_text(
+            f"assistant -> execute_command: {spec.meta['prefill']}\ntool -> (real output of `{spec.meta['prefill']}` in the workdir, which lists .task.json)\n"
+        )
     (d / "README.md").write_text(f"{task} / {variant}: workdir {spec.workdir}\n")
     for k, v in spec.files.items():
         p = d / "files" / k
