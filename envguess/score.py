@@ -89,8 +89,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--judge", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--exclude-family", default="", help="comma-separated families to drop, e.g. realism")
     a = ap.parse_args()
-    rows = per_inv(load(a.judge))
+    drop = set(filter(None, a.exclude_family.split(",")))
+    rows = [r for r in per_inv(load(a.judge)) if r["family"] not in drop]
     sm = setting_means(rows)
     settings = sorted({s for _, s in sm})
     fams = sorted({v["family"] for v in sm.values()})
