@@ -42,6 +42,7 @@ VARIANTS = {
     "base_plain": ["plain"],  # plain two-sentence system prompt
     "base_no_criterion": ["no_criterion"],  # drop the "The task is complete when ..." line, keep the done tool
     # nulls on the no_done base (2026-10-26)
+    "no_done_tool_only": ["no_done_tool"],  # drop the done tool but keep the "please call the done tool" line
     "no_done_home": ["no_done", "home"],
     "no_done_mcp": ["no_done", "mcp"],
     "no_done_plain": ["no_done", "plain"],
@@ -111,6 +112,9 @@ def assemble(task, inst, variant, today=None):
         tools[-1] = DONE_NEUTRAL
     if "no_done" in atoms:
         tools, user = tools[:-1], user[:-1]
+        handlers.pop("done")
+    if "no_done_tool" in atoms:
+        tools = tools[:-1]
         handlers.pop("done")
     if "no_criterion" in atoms:
         user.remove(tx["crit"])
