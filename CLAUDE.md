@@ -93,6 +93,11 @@ All public:
   [AF post](https://www.alignmentforum.org/posts/Zeg2JztbdhguL48uH/),
   [code](https://github.com/camilablank/workspace-bench), O-lens + AR checkpoint
   [agu18dec/olens_and_ar](https://huggingface.co/agu18dec/olens_and_ar)
+- DeepSeek V4 Flash lenses (Camila Blank): O-lens inverter (LoRA)
+  [camila-blank/deepseek-v4-flash-olens-inverter](https://huggingface.co/camila-blank/deepseek-v4-flash-olens-inverter)
+  (account `camila-blank`, hyphen); J-lens + early/R-lens
+  [camilablank/deepseek-elens-jlens](https://huggingface.co/camilablank/deepseek-elens-jlens/tree/main/deepseek-v4-flash)
+  and [camilablank/workspace-lenses](https://huggingface.co/camilablank/workspace-lenses) (`camilablank`, no hyphen)
 - AuditBench, Sheshadri et al. (2026): [arXiv 2602.22755](https://arxiv.org/abs/2602.22755)
 - Activation Oracles, Karvonen et al. (2025): [arXiv 2512.15674](https://arxiv.org/abs/2512.15674)
 - Robbie's from-scratch O-lens on Qwen3.6-27B:
