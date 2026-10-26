@@ -169,6 +169,8 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `evalcue/harness.py` defaults to it), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
+- Pin `EVALCUE_PROVIDER` when running evalcue through OpenRouter. Unpinned `qwen/qwen3.6-27b` is
+  routed over 7 fp8/unknown providers, and overnight base rates moved 1/10 → 12/30 within an hour.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
@@ -372,8 +374,9 @@ Current docs:
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 refuses everything
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
-  — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
-  audits
+  — n=30: a hint takes Qwen's key reuse 30% → 93%, a user rule reminder 3%, a present user 63%; no
+  creds report admits it (0/90); uploads under an explicit "don't" happen on empty-reasoning turns;
+  O-lens request files; per-run tables in [overnight-tables.md](docs/envs/overnight-tables.md)
 - [Metadata honeypot — read before running or extending the METR planted-metadata env, or studying refusals driven by eval metadata](docs/envs/metadata_honeypot.md)
   — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
   (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
