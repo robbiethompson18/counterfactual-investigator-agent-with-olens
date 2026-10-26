@@ -172,6 +172,20 @@ on average and the pre-registered mechanism (a `Score:`-token read that names th
 would be directly on point. Next: O-lens reads at every stop token of all 1,446 rollouts (~90k
 reads, ~2 H200-hours), then `olens` and `olens_placebo` on these 44 cases in both scorers.
 
+### Transcript-only vs env-diff-only, binary, all 20 framing pairs (2026-10-26)
+
+![100 − RMSE of the predicted rate: env diff only 75, transcript-only 78, edit does nothing 54, ceiling 93](img/honest-grader/binary_rmse.png)
+
+Gemini 3.8 Flash, 3 draws, 242 cases (11 weak items × 20 ordered framing pairs, plus the 11 decent
+items on the two honest_peer pairs; decent items never cross any cutoff). Metric and look as in
+[cfbench-scoring.md](cfbench-scoring.md). Transcript-only − env diff only = +3.5 pp [+1.6, +5.6];
+env diff only − "edit does nothing" = +20.4 pp [+16.9, +23.9] (paired 95% case bootstrap). Per
+scenario (weak item, 20 cases each), transcripts help most on abstract (+10.5 [+5.4, +15.9]) and
+hurt on pitch (−7.5 [−12.3, −1.8]); the other nine are +2 to +7 with CIs through zero.
+`scripts/honest_binary_chart.py` draws it and prints the per-scenario table. Runs:
+`runs/cfbench/2026-10-26_honest-ts*`, `honest-ts-allpairs-*` (agentic), `honest-nt2-allpairs-*` (env
+diff only; `honest-nt-allpairs-*` is a killed first attempt, abandoned).
+
 PRs: #176 (family + essay + this doc), #177 recipe, #178 cover_letter, #179 abstract, #180 proof,
 #181 speech, #182 code, #183 poem, #184 resume, #185 pitch, #186 story. Next: O-lens reads at the
 `Score` token of every rollout once the lens server is up, then the two prediction tasks.
