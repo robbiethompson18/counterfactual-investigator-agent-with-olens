@@ -120,6 +120,10 @@ line | good cause above).
 - **secret_number**: about 20% cheat, with no cue effect.
 - **precommit_scope**: about 2%.
 
+Code: `evalcue/envs/secret_number/` and `evalcue/envs/precommit_scope/` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/),
+deleted 2026-10-26.
+
 ## Links (private claude.ai artifacts; Docent)
 
 - Summary: https://claude.ai/artifact/RBBPSNnSWzBf46UBJ3jTKN

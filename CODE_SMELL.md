@@ -2,17 +2,16 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: cfbench still carries the log skill in three places
+## 2026-10-26: cfbench/report/data.py still computes the log skill
 
-`cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
-beside it so numbers from before 2026-10-26 can be checked, and duplicates `data.py`'s per-case math
-(`Case.mse`, `log_gain`) because `data.load_rows`/`env_of` assume `evalcue_runs:` specs and one
-predictor. `cfbench/sweep.py`'s table is log skill only. The predictor prompt (`core.build_prompt`)
-still says "You are scored by the log-likelihood of the counterfactual arm's observed rate"; both
-rules reward the same point estimate, but changing the sentence bumps `HARNESS_VERSION`, so do it
-together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Drop the log skill once
-nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
-`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day); `data.log_skill`
+still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop it once nothing
+quotes them. The predictor prompt (`core.build_prompt`) still says "You are scored by the
+log-likelihood of the counterfactual arm's observed rate"; both rules reward the same point estimate,
+but changing the sentence bumps `HARNESS_VERSION`, so do it together with the next prompt change. The
+old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for
+`--allow-old-lens`; drop them when the thinking-on reruns land.
 
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
@@ -115,6 +114,9 @@ backend hard-codes NixOS store paths and is kept only for comparison with those 
 
 ## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code
 
+Resolved 2026-10-26 by deletion: the adapter and `evalcue/envs/secret_number/` are gone (last at
+commit `7296169`); the rows stay on HF with no code on main behind them.
+
 Its rows (10 `qwen2_*` files in `data/runs/evalcue/secret_number/`, on HF under the same path) were
 generated on branch `evalcue-secret-number`, whose newer arms (split, salient, prompt cues) aren't
 on main. Arm edits are diffed from the rows, so nothing breaks, but the rows have no provenance link
@@ -154,4 +156,4 @@ someone excludes the pod-only modules and types `server.py`.
 - The sandbox runs the agent as root in the container.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
-  `docs/eval-cue-reward-hacking.md`.
+  `docs/eval-cue-reward-hacking.md`. (Both deleted 2026-10-26; the doc keeps the caveat.)

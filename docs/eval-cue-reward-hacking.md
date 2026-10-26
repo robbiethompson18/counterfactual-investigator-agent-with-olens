@@ -28,6 +28,13 @@ scored rows.
 | `secret_number`     | port of [agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) Secret Number (2026)                                             | 0/41                             | 0                                                    | Qwen never `ls`es or reads guess.py, so it sees neither the cue nor the shortcut                                                                                                                         |
 | `precommit_scope`   | port of Pre-commit Hook from [Why Do Models Task Game?](https://www.lesswrong.com/posts/HACauvWhEdC6QhdS4/why-do-models-task-game) (2026) | 0 real                           | —                                                    | only 15 scored rows; the detector's `hack` conflates incomplete work with gaming; use `scoped or always_ok or checker_mod`                                                                               |
 
+Every env in this table is deleted (2026-10-26); the rows stay on HF. Code:
+`evalcue/envs/{repo_impossible,humaneval_prefill,matonski,mmlu_metadata,summ_keyword,lcb_mock_entity,git_history,secret_number,precommit_scope}/`
+at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/),
+deleted 2026-10-26. `matonski/grader.py` is the `matonski_grader` env, `matonski/agent.py` the
+unfinished `matonski_agent`.
+
 ## Open-weight models on OpenRouter (same day, afternoon)
 
 To tell env design apart from model, we ran open-weight models known to reward hack (picked from
@@ -100,6 +107,10 @@ What round 2 shows:
   treats "the model noticed it's an eval" as the cause would be wrong here.
 - Envs and knobs: `evalcue/envs/{repo_impossible,humaneval_prefill,secret_number,matonski}/`.
   `matonski_agent` (multi-turn) runs but is unfinished: Qwen debugs for 30 turns rather than hack.
+  Code: `evalcue/envs/` at commit `7296169`
+  (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/),
+  deleted 2026-10-26; the `imptest_*` items of `dumb_user_report_s1` keep `repo_impossible`'s strict
+  prompt, three tasks and detector inline.
 
 ## Lessons
 
