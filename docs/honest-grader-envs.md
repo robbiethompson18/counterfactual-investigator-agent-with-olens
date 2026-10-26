@@ -48,6 +48,18 @@ pre-check. Build, run, record.
 
 ## Status
 
-- `honest.essay` built and smoke-tested (2 rows, 2026-10-26,
-  `data/runs/honest_essay/2026-10-26_smoke`).
-- Nine more scenarios being built in parallel on separate branches, one PR each.
+- `honest.essay` run 2026-10-26 (`data/runs/honest_essay/2026-10-26_n10_nothink`, n=10 per framing,
+  so 5 per essay; a `--seed 1` run of the same size doubles it). Mean score:
+
+  | essay  | neutral | flatter_explicit | flatter_implicit | honest_explicit | honest_peer |
+  | ------ | ------- | ---------------- | ---------------- | --------------- | ----------- |
+  | weak   | 5.6     | 6.0              | 4.0              | 3.4             | 2.0         |
+  | strong | 9.6     | 9.0              | 9.3              | 9.7             | 9.0         |
+
+  The weak essay spans 6.0 → 2.0 across framings with zero within-cell spread in most cells. Note
+  `flatter_implicit` (ownership + scholarship stakes) makes Qwen harsher, not kinder, the same
+  direction hidden_goal.grade found; only the explicit ask for kindness buys a higher score. The
+  strong essay barely moves.
+
+- Ten more scenarios (code, resume, pitch, poem, story, abstract, cover_letter, recipe, proof,
+  speech) built in parallel on separate branches, one PR each.
