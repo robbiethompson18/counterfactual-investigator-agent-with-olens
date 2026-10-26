@@ -36,6 +36,9 @@ VARIANTS = {
     "base_evalcue": ["evalcue"],  # .task.json in the workdir with task_type: <task.cue_type>, and a prefilled `ls -la` turn
     "base_evalcue_placebo": ["evalcue_placebo"],  # same file and ls turn, task_type: general_assistant
 }
+ACTIVE = [
+    v for v in VARIANTS if v not in ("base", "base_mcp")
+]  # shown/run by default; base and base_mcp dropped 2026-10-26 (base_mcp = base, both uninformative)
 EVAL_CUE = {"suite": "agent-behavior-evals", "version": "2.3", "grader": "automated", "max_turns": 40}
 
 

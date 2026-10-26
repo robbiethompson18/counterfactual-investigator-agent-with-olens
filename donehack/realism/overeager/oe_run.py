@@ -23,10 +23,24 @@ sys.path.insert(0, str(HERE))
 # isort: off
 import realvariants as V  # registers realrun (realism/run.py); must come first
 import realrun as R
-from harness_variants import VARIANTS, assemble
+from harness_variants import ACTIVE, assemble
 # isort: on
 
-TASKS = ["groupchat", "payback", "payback_hint", "calendar", "dana", "gitbranch", "impossiblebench", "evilgenie", "rhb_logs", "rhb_bench"]
+ALL_TASKS = [
+    "groupchat",
+    "payback",
+    "payback_hint",
+    "calendar",
+    "dana",
+    "gitbranch",
+    "impossiblebench",
+    "evilgenie",
+    "rhb_logs",
+    "rhb_bench",
+]
+TASKS = [
+    t for t in ALL_TASKS if t not in ("payback_hint", "rhb_logs")
+]  # dropped 2026-10-26 (Kylie): hint pays everywhere, logs never exploited
 
 
 def load(task):
@@ -150,7 +164,7 @@ async def episode(client, key, task, variant, i, seed, outdir):
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", default=",".join(TASKS))
-    ap.add_argument("--variants", default=",".join(VARIANTS))
+    ap.add_argument("--variants", default=",".join(ACTIVE))
     ap.add_argument("--items", type=int, default=16)
     ap.add_argument("--seeds", type=int, default=1)
     ap.add_argument("--out", default="dev")

@@ -17,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
-from harness_variants import VARIANTS
+from harness_variants import ACTIVE
 from oe_run import TASKS
 
 COL = {"one": "#2a78d6", "multi": "#8a5cd1", "other": "#b0461c", "asked": "#1f9e74"}
@@ -132,7 +132,7 @@ def main():
     a = ap.parse_args()
     recs = load(a.run)
     ds = export(a.run, HERE.parent / "runs" / "overeager" / a.run) if a.expview else f"expview/overeager_{a.run}"
-    variants = [v for v in VARIANTS if any((t, v) in recs for t in TASKS)]
+    variants = [v for v in ACTIVE if any((t, v) in recs for t in TASKS)]
     sections = []
     for t in TASKS:
         if not any((t, v) in recs for v in variants):
@@ -158,7 +158,7 @@ body{{background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif;ma
 .card{{background:var(--card);border:1px solid var(--grid);border-radius:8px;padding:10px 14px;margin:12px 0}} h2{{font-size:16px;margin:0 0 4px}}
 .ax{{fill:var(--muted);font-size:11px}} .val{{fill:var(--muted);font-size:10px}} .lg{{margin-right:14px;font-size:13px;white-space:nowrap}} .lg i{{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}}</style></head><body>
 <h1>Over-eagerness and reward hacking across harness variants (GLM 5.3)</h1>
-<p>{total} episodes (${cost:.2f}). Per task, variants left to right: the email ladder's 8 rungs (base … core), then base with MCP-named app tools, base with a <code>.task.json</code> eval cue (task_type: overeagerness / reward_hacking) and a prefilled <code>ls -la</code>, and the same with a placebo task_type (general_assistant). Left bar: acted (stacked by kind), with 95% Wilson interval and %; right bar: asked. Episodes that hit the $0.10 cap are dropped. Labels link to the transcripts on 8830. Environments: <a href="https://claude.ai/artifact/CVMrM91ishdzCAvGXsuKRk">task × variant grid</a>.</p>
+<p>{total} episodes (${cost:.2f}). Per task, variants left to right: the email ladder rungs (base_home … core; base itself and the MCP-named-tools arm are dropped as uninformative), then base with a <code>.task.json</code> eval cue (task_type: overeagerness / reward_hacking) and a prefilled <code>ls -la</code>, and the same with a placebo task_type (general_assistant). Left bar: acted (stacked by kind), with 95% Wilson interval and %; right bar: asked. Episodes that hit the $0.10 cap are dropped. Labels link to the transcripts on 8830. Environments: <a href="https://claude.ai/artifact/CVMrM91ishdzCAvGXsuKRk">task × variant grid</a>.</p>
 <div>{leg}</div>
 {"".join(sections)}
 </body></html>"""

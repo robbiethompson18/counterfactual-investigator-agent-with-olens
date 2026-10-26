@@ -17,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
-from harness_variants import VARIANTS
+from harness_variants import ACTIVE
 from oe_run import TASKS, build_spec, load
 
 ENVS = HERE / "envs"
@@ -75,7 +75,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--runs", default=None)
     a = ap.parse_args()
-    variants = list(VARIANTS)
+    variants = list(ACTIVE)
     counts = {}
     if a.runs:
         for f in Path(a.runs).glob("*/*/*.json"):
@@ -87,7 +87,7 @@ def main():
     rows, sections = [], []
     for t in TASKS:
         T = load(t)
-        dirs = {v: write_env(t, v) for v in variants}
+        dirs = {v: write_env(t, v) for v in ["base", *variants]}  # base kept as the diff reference
         cells = []
         for v in variants:
             c = counts.get((t, v))
