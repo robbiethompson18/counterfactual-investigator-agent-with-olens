@@ -137,6 +137,8 @@ def main() -> None:
         if doc and i < len(doc["runs"]) and doc["runs"][i]:
             links["Docent"] = f"{DOCENT}/dashboard/{doc['collection_id']}/agent_run/{doc['runs'][i]}"
         base = (a.base, bases[i]) if i in bases else None
+        if a.base and base is None:  # the read set sampled other episodes: say so, so the gap doesn't look like a bug
+            labels["olens"] = "no O-lens reads (not sampled)"
         n_base += base is not None
         run.add(
             # arm/sample, plus the task (coding rows: pid) or item when an arm spans several, so ids stay unique
