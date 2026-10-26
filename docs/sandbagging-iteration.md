@@ -1,5 +1,9 @@
 # Sandbagging env iteration on Qwen3.6-27B (2026-10-22)
 
+**Status (2026-10-26):** REFERENCE. The +57pp effect replicated in evalcue ([envs/sandbagging.md](envs/sandbagging.md)). The Reproduce section is for deleted code; the 17-arm dev table exists only here.
+([envs/sandbagging.md](envs/sandbagging.md)). The Reproduce section is for deleted code; the 17-arm
+dev table exists only here.
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit

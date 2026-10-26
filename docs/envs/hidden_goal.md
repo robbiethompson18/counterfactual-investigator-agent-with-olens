@@ -1,5 +1,9 @@
 # Hidden-goal envs: does the O-lens see what Qwen thinks the user wants?
 
+**Status (2026-10-26):** MIXED. Env rates hold. The pre-registered +0.07 is binomial log skill on harness v1; rescored in RMSE (below) the O-lens still leads for Flash, but a harness v6 replication with GPT-6.1 Sol (2026-10-26) is null. Reads are the space lens.
+harness v1; rescored in RMSE (below) the O-lens still leads for Flash, but a harness v6 replication
+with GPT-6.1 Sol (2026-10-26) is null. Reads are the space lens.
+
 Built overnight 2026-10-22 to find envs where an O-lens predictor beats a transcript-only one. The
 pattern behind the earlier cherry-picked lens wins (deploy-note lie, donation bet): the model infers
 an outcome the user wants and acts on it, while its text rationalizes something else. Code:

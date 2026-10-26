@@ -1,5 +1,7 @@
 # Environment construction goals
 
+**Status (2026-10-26):** ACTIVE.
+
 What we're building when we build a behavioral environment for this project, and what "done" looks
 like. First written 2026-10-21 after the eval-cue sweep
 ([eval-cue-reward-hacking.md](eval-cue-reward-hacking.md)), where we tried to one-shot about nine

@@ -1,5 +1,9 @@
 # cfbench harness smoke test: hidden_goal.grade all-stakes → all
 
+**Status (2026-10-26):** ACTIVE. The skill numbers in the version tables are the pre-2026-10-26 binomial log skill, not RMSE ([cfbench-scoring.md](cfbench-scoring.md)); one case, so confirm anything on the 38-case set.
+binomial log skill, not RMSE ([cfbench-scoring.md](cfbench-scoring.md)); one case, so confirm
+anything on the 38-case set.
+
 Our standard quick check after any change to the predictor's prompt or tools (any `HARNESS_VERSION`
 bump in `cfbench/core.py`). One case, 5 Gemini 3.8 Flash draws per condition, about $2.50 and 10
 minutes. It catches harness changes that break the O-lens agent's one known win. It can't measure

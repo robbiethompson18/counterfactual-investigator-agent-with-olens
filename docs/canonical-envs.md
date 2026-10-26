@@ -1,5 +1,8 @@
 # Canonical envs
 
+**Status (2026-10-26):** ACTIVE. Arms picked by Claude and not reviewed by Robbie. The canonical fp8 runs of 2026-10-23 are tabulated at the end; they differ from the bf16 rates quoted in the env docs.
+runs of 2026-10-23 are tabulated at the end; they differ from the bf16 rates quoted in the env docs.
+
 The 8 envs (and their arm pairs) we use as the standard set for O-lens experiments: cfbench
 predictions with and without lens reads, thinking-off reruns, read budgets. Picked 2026-10-23.
 

@@ -1,5 +1,8 @@
 # Thinking on vs off: rates and verbalization
 
+**Status (2026-10-26):** REFERENCE. Owns the fp8 OpenRouter on/off pairs and the n=60 `bet_neutral` donation run.
+donation run.
+
 Does Qwen3.6-27B hide its reasons better when it has no hidden CoT? Daria Ivanova's hypothesis: Qwen
 controls its visible output better than its CoT, so with thinking off behaviours should be
 verbalized less often, which would make them better O-lens test cases. Run 2026-10-23 on five envs,

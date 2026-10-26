@@ -1,5 +1,8 @@
 # Thought-Anchors tools for the investigator agent
 
+**Status (2026-10-26):** NULL. Skill numbers are binomial log skill on harness v1. The `anchors` condition is still in cfbench; CODE_SMELL's speed note on `scripts/anchor_reads.py` still applies.
+condition is still in cfbench; CODE_SMELL's speed note on `scripts/anchor_reads.py` still applies.
+
 Can a non-metamodel interp tool help the cfbench predictor? We ported the two resampling-free
 methods of Thought Anchors (Bogdan, Macar, Nanda, Conmy (2025),
 [arXiv 2506.19143](https://arxiv.org/abs/2506.19143)) to Qwen3.6-27B and gave them to the agentic

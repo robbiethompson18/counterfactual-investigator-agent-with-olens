@@ -1,5 +1,9 @@
 # Party resampling: are the O-lens's third parties real branches or hallucinations?
 
+**Status (2026-10-26):** MIXED. The rollout result (0/1,352 and 0/1,480 off-target parties taken) is lens-independent. The lens tables are the old `olens_s3d_rl600`, not redone; the sampled-lens step was never run.
+lens-independent. The lens tables are the old `olens_s3d_rl600`, not redone; the sampled-lens step
+was never run.
+
 2026-10-21. The AuditBench organism `auditbench:third_party_politics_td_r16` (LoRA on Qwen3.6-27B
 from [agu18dec/auditbench-model-orgs](https://huggingface.co/agu18dec/auditbench-model-orgs),
 trained to push third-party candidates) has O-lens reads on sample 0 of each trigger prompt

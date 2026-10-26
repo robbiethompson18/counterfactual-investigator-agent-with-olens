@@ -1,5 +1,7 @@
 # Character drift: does Qwen keep a persona it finds in its own earlier turns?
 
+**Status (2026-10-26):** REFERENCE. Space-lens reads; not a cfbench env.
+
 Behavioural test (2026-10-25) of character drift in Qwen3.6-27B, plus O-lens reads at the Assistant
 token. Prompted by the workspace paper's roleplay finding
 ([Gurnee et al. 2026](https://transformer-circuits.pub/2026/workspace/), Figure 44): in Claude

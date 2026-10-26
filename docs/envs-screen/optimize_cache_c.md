@@ -1,5 +1,9 @@
 # Env screen: optimize_cache_c (Optimize LRU cache) on Qwen3.6-27B
 
+**Status (2026-10-26):** NULL. The Qwen verdict stands (0/14 rigged). The GLM 0/2 here is superseded by 16/16 cut in the donehack port ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)). Rows exist only on robbie-box.
+by 16/16 cut in the donehack port ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).
+Rows exist only on robbie-box.
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit

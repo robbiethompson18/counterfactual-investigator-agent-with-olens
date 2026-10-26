@@ -1,5 +1,8 @@
 # Confession follow-ups (2026-10-20)
 
+**Status (2026-10-26):** MIXED. Setup and gotchas hold. Every lens read here is the old `olens_s3d_rl600` and was not redone ([olens-space-migration.md](olens-space-migration.md)).
+`olens_s3d_rl600` and was not redone ([olens-space-migration.md](olens-space-migration.md)).
+
 Neel Nanda's suggestion: ask Qwen3.6-27B why it did the weird thing, and read the O-lens on its
 answer and the stop tokens after the question. Scripts: `transcript-viewer/README.md`. Browse:
 [olens-viewer](https://olens-viewer.pages.dev/#beh=confession-follow-up).

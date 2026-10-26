@@ -1,5 +1,8 @@
 # Scheming envs: full results tables
 
+**Status (2026-10-26):** REFERENCE. Frozen at 2026-10-21 23:23 (bf16); the same run dirs now also hold fp8, thinking-off and GLM runs, so don't pool blindly.
+hold fp8, thinking-off and GLM runs, so don't pool blindly.
+
 Every arm of every env in [scheming.md](scheming.md), pooled over all runs of the env (error rows
 dropped, rescored with the current detector). Wilson 95% CIs. "CoT mentions edit": regex for the
 arm's distinctive words over all reasoning in the episode; `-` = arm has no distinctive words.

@@ -1,5 +1,7 @@
 # funding_email in evalcue (port of agent-interp-envs)
 
+**Status (2026-10-26):** ACTIVE. The 2026-10-24/25 fp8 reruns at the end replicate arm_a vs arm_b.
+
 Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
 to commit
 [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988);

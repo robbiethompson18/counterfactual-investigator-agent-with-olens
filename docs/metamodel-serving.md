@@ -1,5 +1,7 @@
 # Serving metamodels on vLLM for Qwen3.6-27B
 
+**Status (2026-10-26):** ACTIVE. The serving repo it proposes was not started.
+
 How we decode metamodel readouts (O-lens, NLA, J++) fast, what other people already built, and the
 TODO to package it. Written 2026-10-22.
 

@@ -1,5 +1,7 @@
 # Robbie's favorite transcripts
 
+**Status (2026-10-26):** ACTIVE.
+
 A running list of WeirdChat and CHIVE transcripts Robbie finds most interesting. To add one, append
 an entry in the same shape: name, viewer link, `transcript_id`, source pattern, user-turn gist, and
 what's weird about the reply.

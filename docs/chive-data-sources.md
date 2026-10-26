@@ -1,5 +1,8 @@
 # CHIVE data sources (as of 2026-10-19)
 
+**Status (2026-10-26):** REFERENCE. CHIVE data now feeds only the chive-cases viewer (`scripts/build_viewer.py`); cfbench doesn't use CHIVE.
+(`scripts/build_viewer.py`); cfbench doesn't use CHIVE.
+
 Where the CHIVE incidents, ground truth, readouts and Agam's agent results live, and what each
 source lacks.
 

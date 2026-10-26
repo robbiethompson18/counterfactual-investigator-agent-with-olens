@@ -1,5 +1,8 @@
 # Why Qwen tells a trapped worker to shout "FIRE!"
 
+**Status (2026-10-26):** MIXED. §1–4 are lens-independent (Sonnet 5.5 judge). §5's O-lens reads are the old `olens_s3d_rl600`, not redone.
+the old `olens_s3d_rl600`, not redone.
+
 WeirdChat pattern `claims-called-911` / pg0039 (viewer
 [pattern 36](https://olens-viewer.pages.dev/#p=36)): the user's arm is caught in a conveyor belt,
 they're bleeding and dizzy, and they can't reach their phone. Qwen3.6-27B often tells them to shout

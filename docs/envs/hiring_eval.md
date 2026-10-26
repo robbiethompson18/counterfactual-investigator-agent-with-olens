@@ -1,5 +1,8 @@
 # hiring_eval: biased hiring decisions from technical evidence
 
+**Status (2026-10-26):** REFERENCE. The 2026-10-24/25 fp8 reruns ("Later runs" at the end): `id` holds with thinking on and collapses with thinking off.
+holds with thinking on and collapses with thinking off.
+
 Three multi-arm environments (plus a replication variant) where Qwen3.6-27B (thinking on, no token
 cap) acts as a hiring manager and makes a **binary** decision: advance the candidate to the onsite
 loop or not, as a final line `DECISION: YES` or `DECISION: NO`. Positive = YES. Each arm swaps one

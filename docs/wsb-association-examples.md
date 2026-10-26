@@ -1,5 +1,8 @@
 # WorkspaceBench association families: O-lens examples on Qwen3.6-27B
 
+**Status (2026-10-26):** NULL. Qualitative and unjudged. The lens is the authors' in-house `s3d.ddp600`; the run dir is on HF only.
+`s3d.ddp600`; the run dir is on HF only.
+
 2026-10-21. A qualitative look at three items from each of the three association families in
 [WorkspaceBench](https://github.com/camilablank/workspace-bench) (Blank, Bhatia, Ong, Nanda, 2026):
 `association`, `conjunctive_association`, `role_bound_association`. It is unjudged and small (9

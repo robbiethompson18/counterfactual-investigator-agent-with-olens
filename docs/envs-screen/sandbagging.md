@@ -1,5 +1,10 @@
 # Env screen: `sandbagging` on Qwen3.6-27B
 
+**Status (2026-10-26):** SUPERSEDED by [sandbagging-iteration.md](../sandbagging-iteration.md) (the arms) and [envs/sandbagging.md](../envs/sandbagging.md) (the evalcue port; also finds GLM's detector positives are slips). Still the only place for the three qualitative findings and the audit set. Rows were backfilled to `data/runs/sandbagging/2026-10-21_screen`.
+arms) and [envs/sandbagging.md](../envs/sandbagging.md) (the evalcue port; also finds GLM's detector
+positives are slips). Still the only place for the three qualitative findings and the audit set.
+Rows were backfilled to `data/runs/sandbagging/2026-10-21_screen`.
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit

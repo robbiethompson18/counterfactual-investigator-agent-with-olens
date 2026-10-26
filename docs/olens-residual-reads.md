@@ -1,5 +1,8 @@
 # Residual reads: the O-lens on h with the model's own continuation projected out (dead end)
 
+**Status (2026-10-26):** NULL. Code on closed PR #125; `olens.continuation` is PR #120 (open, not on main).
+main).
+
 > **Dead end, don't build on it.** The code was never merged. It lives on the closed PR
 > [#125](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/pull/125),
 > branch `olens-residual-reads` at `8ba6857`: `scripts/olens_residual_reads.py`,
@@ -39,8 +42,8 @@ Code on the closed branch (`olens/src/olens/continuation.py`, `scripts/olens_res
 - **Metrics per read:**
   - `joint_fve`: bullets vs the real z
   - `resid_fve`: bullets vs z − β·fit
-  - `gain_fve`: FVE of [continuation atoms + bullets] on z, minus the continuation-only FVE, i.e. what
-    the bullets explain beyond the text that follows
+  - `gain_fve`: FVE of [continuation atoms + bullets] on z, minus the continuation-only FVE, i.e.
+    what the bullets explain beyond the text that follows
   - `cos_in`: how far h′ moved from h
 - **Data.** 1,089 stop-token positions (PUNCT, `<|im_end|>`, `</think>`) inside assistant turns that
   have 32 more tokens of the same turn. They come from 27 transcripts:

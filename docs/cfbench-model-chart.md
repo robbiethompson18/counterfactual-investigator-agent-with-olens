@@ -1,5 +1,7 @@
 # cfbench by predictor model, effort and tool budget (2026-10-24, rescored 2026-10-26)
 
+**Status (2026-10-26):** REFERENCE. Harness v6, RMSE, space-lens reads.
+
 Question: how much does the predictor model matter in cfbench, and does the O-lens help strong
 models the way it sometimes helps Gemini 3.8 Flash? Plus two Flash sweeps: reasoning effort and
 tool-call budget. Setup is cfbench (`cfbench/README.md`), harness version 6, target Qwen3.6-27B on

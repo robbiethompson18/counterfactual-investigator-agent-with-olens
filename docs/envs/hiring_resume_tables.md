@@ -1,5 +1,7 @@
 # hiring_resume: per-arm tables
 
+**Status (2026-10-26):** REFERENCE. Pre-2026-10-22 arm names, explained in the parent.
+
 Generated from the run dirs listed in [hiring_resume.md](hiring_resume.md) (2026-10-21). Rate =
 share of `DECISION: YES` (pairwise: share picking A), Wilson 95% CI. "CoT mentions edit" counts
 reasoning+answer matching the edited attribute's keyword regex (`core.MENTION`); for name arms it

@@ -1,5 +1,7 @@
 # Whistleblow envs: full per-arm tables
 
+**Status (2026-10-26):** REFERENCE. Frozen at 2026-10-21, old label.
+
 Companion to [whistleblow.md](whistleblow.md) (definitions, detector, findings). Pooled over every
 run of each env; columns as defined there.
 

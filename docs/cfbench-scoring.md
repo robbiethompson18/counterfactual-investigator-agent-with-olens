@@ -1,5 +1,8 @@
 # cfbench scoring: RMSE of the predicted rate
 
+**Status (2026-10-26):** ACTIVE. `docs/nocot-cfbench.md`, cited below, is on open PR #165, not on main.
+main.
+
 How we score a counterfactual predictor from 2026-10-26 on, why the binomial log-likelihood skill we
 used before was replaced, and how the report charts are normalized. Code: `cfbench/report/data.py`
 (scoring, run groups), `cfbench/report/charts.py` (the progress report's "Preliminary Data"
