@@ -212,6 +212,10 @@ uv run --with pyarrow python scripts/shout_fire.py rates    # WeirdChat table
 uv run python scripts/shout_fire.py report                  # prompt-edit and model tables
 ```
 
+Code: `scripts/shout_fire.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/shout_fire.py),
+deleted 2026-10-26.
+
 Outputs are in `data/runs/shout_fire/` (`samples.jsonl`, `judged.jsonl`), mirrored to
 [the HF dataset](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/runs/shout_fire).
 WeirdChat comes from [Transluce/WeirdChat](https://huggingface.co/datasets/Transluce/WeirdChat). The

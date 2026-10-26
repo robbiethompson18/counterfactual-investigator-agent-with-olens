@@ -9,12 +9,14 @@ and the lens shows it; 1 star = visible in the CoT and/or lens. **Best result: 1
 cell.
 
 Setup: Qwen3.6-27B (`6a9e13bd`) on vLLM 0.32, thinking on, n=32–128 per cell; agu18dec O-lens read
-server on a second GPU (`scripts/identity/pod_setup.sh`, client `scripts/identity/qwen.py`). These
-runs sampled from our own vLLM on GPU0 of pods `identity-belief` and `identity-vllm2`; that half of
-`pod_setup.sh` was removed on 2026-10-22, and `qwen.py` now samples from the shared server. Labels
-are regex or hand / Sonnet-Haiku-subagent reads; no API graders. Run dirs:
-`data/runs/identity/2026-10-21_<agent>/` (synced to HF). Agent-written code (about 8k lines, not
-merged): `scripts/identity/<agent>/` on the
+server on a second GPU (`scripts/identity/pod_setup.sh`, client `scripts/identity/qwen.py`; both at
+commit `7296169`,
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/scripts/identity,
+deleted from main 2026-10-26). These runs sampled from our own vLLM on GPU0 of pods
+`identity-belief` and `identity-vllm2`; that half of `pod_setup.sh` was removed on 2026-10-22, and
+`qwen.py` now samples from the shared server. Labels are regex or hand / Sonnet-Haiku-subagent
+reads; no API graders. Run dirs: `data/runs/identity/2026-10-21_<agent>/` (synced to HF).
+Agent-written code (about 8k lines, not merged): `scripts/identity/<agent>/` on the
 [`identity-belief-experiments-scripts`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/identity-belief-experiments-scripts/scripts/identity)
 branch. The one-line counterfactual pairs are in
 [identity-counterfactuals.md](identity-counterfactuals.md).

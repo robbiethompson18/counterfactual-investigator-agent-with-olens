@@ -19,6 +19,11 @@ Other Qwen3.6-27B organisms exist on HF and were not tried: `ai-safety-institute
 
 ## Scripts
 
+All three were deleted on 2026-10-26 (results are on HF); they are at commit `7296169`:
+[`organism_prompts.json`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_prompts.json),
+[`organism_rollouts.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_rollouts.py),
+[`organism_olens.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_olens.py).
+
 - `scripts/organism_prompts.json`: hand-written trigger prompts per behaviour family, minimal-edit
   controls where one makes sense (e.g. "AI safety at Anthropic" vs "at OpenAI"), 3 shared neutral
   prompts. AuditBench publishes only training transcripts, not eval prompts.
@@ -60,9 +65,11 @@ on the same prompt (`transcript-viewer/web/organisms.py`).
 ## Gotchas
 
 - vLLM's LoRA runtime looks inert on this base (Agam, `vendor/detective-joracle/servers/README.md`)
-  until the adapter keys are renamed (`olens/scripts/lora_for_vllm.py`, runpod/CLAUDE.md "vLLM
-  LoRA", found 2026-10-22; tested on the lens, not yet on organisms). Otherwise use HF generate with
-  `olens.lora.HookLoRA`, or merged weights in vLLM.
+  until the adapter keys are renamed (`olens/scripts/lora_for_vllm.py` at commit `7296169`,
+  https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/olens/scripts/lora_for_vllm.py,
+  deleted 2026-10-26 in favour of `merge_lens.py`; runpod/CLAUDE.md "vLLM LoRA", found 2026-10-22;
+  tested on the lens, not yet on organisms). Otherwise use HF generate with `olens.lora.HookLoRA`,
+  or merged weights in vLLM.
 - Organism replies are much shorter than base (mean 204 vs 503 tokens): AuditBench's training
   transcripts are short. Compare reads at matched positions, not over whole replies.
 - FVE scores need the whiteners in the gated

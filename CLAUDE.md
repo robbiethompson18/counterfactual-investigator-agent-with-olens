@@ -231,9 +231,10 @@ Current docs:
   generator, and the negative held-out result outside emergencies
 - [Whitebox tools beyond the O-lens — read before adding SAEs, J-lens/J++, NLAs or SNLAs to the agent](docs/whitebox-tools.md)
   — what's in the viewer vs the agent, SNLA parked (why), SAE candidates and tool design
-- [Thought-Anchors tools — read before giving the agent attention-based (non-metamodel) interp tools, or running scripts/anchor_reads.py](docs/thought-anchors.md)
+- [Thought-Anchors tools — read before giving the agent attention-based (non-metamodel) interp tools](docs/thought-anchors.md)
   — receiver heads + attention suppression on Qwen3.6's hybrid stack (DeltaNet hooks, leak test),
-  the `anchors` cfbench condition; null vs placebo on hidden_goal (38 cases), why
+  the `anchors` cfbench condition (removed 2026-10-26); null vs placebo on hidden_goal (38 cases),
+  why
 - [Serving metamodels on vLLM — read before decoding O-lens/NLA/J++ readouts at scale or building a metamodel server](docs/metamodel-serving.md)
   — ceselder/vllm-metamodels and other prior art, version pins (vLLM 0.27.1, not 0.19), merged-LoRA
   checkpoints, the TODO for a minimal Qwen3.6-27B metamodel-serving repo

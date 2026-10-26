@@ -74,3 +74,8 @@ OPENROUTER_API_KEY=... uv run python scripts/run_chive_or.py stage=agent eval=sm
 uv run python scripts/summarize_smoke.py data/runs/chive data/runs/summary.json \
     smoke_free:flash smoke_free_sonnet55:sonnet55 smoke_yesno:flash smoke_yesno_sonnet55:sonnet55
 ```
+
+Code:
+[`scripts/fetch_olens_banks.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fetch_olens_banks.py),
+[`scripts/summarize_smoke.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/summarize_smoke.py)
+at commit `7296169`, deleted 2026-10-26.

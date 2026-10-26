@@ -16,6 +16,11 @@ half as often as Green.
 
 ## Setup
 
+Code:
+[`scripts/party_resample.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/party_resample.py),
+[`scripts/party_labels.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/party_labels.py)
+at commit `7296169`, deleted 2026-10-26.
+
 - `scripts/party_resample.py`:
   - `gen`: for every read position t inside sample 0's reply, 64 continuations from the prefix
     `ids[:t+1]`. These are the stored token ids, not a re-tokenization. 200 fresh rollouts per
@@ -132,9 +137,9 @@ In `data/runs/party_resample/`, mirrored to the HF dataset under `runs/party_res
 - `summary.json`: the fresh-rollout rates, the Spearman values (`cont`, `cont_unsaid`, `rec`) and
   the lens org-vs-base pools.
 
-Re-run: `scripts/party_resample.py prep`, then on a pod `gen organism <merged dir>`,
-`gen base <Qwen snapshot>` and optionally `lens <adapter dir>`. Locally, `party_labels.py judge`
-then `table`.
+Re-run (from the scripts at commit `7296169`, see Setup): `scripts/party_resample.py prep`, then on
+a pod `gen organism <merged dir>`, `gen base <Qwen snapshot>` and optionally `lens <adapter dir>`.
+Locally, `party_labels.py judge` then `table`.
 
 ## Caveats
 

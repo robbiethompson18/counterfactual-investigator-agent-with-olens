@@ -42,6 +42,7 @@ answer and the stop tokens after the question. Scripts: `transcript-viewer/READM
   misbehaved and another didn't, read the reply tokens.
 - **Don't read through a running viewer.** A viewer with a lens backend first auto-precomputes about
   22k missing reads. `scripts/followups.py read` calls the viewer's read code without starting a
-  viewer, to avoid that.
+  viewer, to avoid that. (Deleted 2026-10-26; at commit `7296169`:
+  https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/transcript-viewer/scripts/followups.py.)
 - **`publish.py` rebuilds the whole site from the code that runs it.** A stale worktree's `build()`
   once dropped these patterns from the site. Since #28, code behind `origin/main` is refused.

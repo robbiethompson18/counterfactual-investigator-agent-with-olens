@@ -47,6 +47,8 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
     ignores them.
   - A new reader (an SAE, say) is one more `READERS` entry with a `kind` the page knows how to draw.
 - **Scored banks:** the O-lens bank samples get AR scores from `scripts/rescore_chive_banks.py`
+  (deleted 2026-10-26, at commit `7296169`:
+  https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/transcript-viewer/scripts/rescore_chive_banks.py)
   (`data/bank_scores/<pid>.jsonl`). The page uses them for bullet FVEs, the heatmap and the
   zone/punctuation tables wherever we have no greedy read of our own.
   - **Not run yet (2026-10-20), so the CHIVE bank samples show no FVE.** The script works, but two
@@ -70,8 +72,8 @@ findings in `docs/model-organisms.md`). Each rollout is a transcript. The ones r
 (sample 1 of each trigger and control prompt) have reads on the organism's activations and on base
 Qwen's over the same tokens: the transcript header switches between them, and the other one shows
 under each readout. Base Qwen's rollouts on the same prompt are at the bottom. The viewer can't make
-new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` does), and the current
-reads have no FVE scores.
+new reads of these (the pod doesn't load LoRAs; `scripts/organism_olens.py` did, deleted 2026-10-26,
+at commit `7296169`), and the current reads have no FVE scores.
 
 ## GLM 5.3
 
@@ -106,6 +108,10 @@ at its thinking. Two sources, both in `data/thinking.jsonl` (shared through `pub
 `pod/server.py`. The prompt is shared up to `<think>\n`, so every sample's end-of-user-turn reads
 are identical (greedy); samples only differ from the first thinking token on.
 
+Code: `scripts/thinking.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/transcript-viewer/scripts/thinking.py),
+deleted 2026-10-26; the resamples and reads stay in the shared JSONL.
+
 ## Confession follow-ups
 
 Neel Nanda's suggestion: take a weird transcript, add a user turn asking Qwen why it did the weird
@@ -132,6 +138,9 @@ token.
   `read 8802,8812,...` spreads the reads over several servers, one thread each. It runs the viewer's
   own read code without a viewer, so the viewer's auto-precompute doesn't get in first. The answers
   go to `data/followups.jsonl`, which `publish.py` shares like the reads.
+- **Code:** `scripts/followups.py` at commit `7296169`
+  (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/transcript-viewer/scripts/followups.py),
+  deleted 2026-10-26; the follow-ups and reads stay in the shared JSONL.
 
 ## Run
 
@@ -227,7 +236,8 @@ WeirdChat's own judge prompt (`web/judge.py`, ported from
   `/workspace/repo/olens`): run `pod/server.py` there, tunnel it to 127.0.0.1:PORT, and
   `scripts/read_extras.py PORT [TID ...]` reads NLA + J++ at every token (default: the three in
   `docs/favorite-transcripts.md`) into `data/extras.jsonl`; `publish.py` then puts them on the
-  public site.
+  public site. (`read_extras.py` was deleted 2026-10-26; at commit `7296169`:
+  https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/transcript-viewer/scripts/read_extras.py.)
 - Judge: `sky launch -c wco-judge -y -i 5 --down sky/judge_gemma.yaml`, tunnel 18812 → 8002, and
   `WCO_JUDGE_URL=http://127.0.0.1:18812/v1`. Agreement with WeirdChat's labels on the 64 stored
   rollouts of "Most-sober person…" prompt 1: 92%, κ 0.78. vLLM 0.25.1 needs transformers 5.10.0 for

@@ -3,8 +3,14 @@
 Can a non-metamodel interp tool help the cfbench predictor? We ported the two resampling-free
 methods of Thought Anchors (Bogdan, Macar, Nanda, Conmy (2025),
 [arXiv 2506.19143](https://arxiv.org/abs/2506.19143)) to Qwen3.6-27B and gave them to the agentic
-predictor as tools over base-arm runs. Code: `scripts/anchor_reads.py` (GPU reads),
-`cfbench/anchors.py` (tools, `anchors` / `anchors_placebo` conditions). Status 2026-10-23.
+predictor as tools over base-arm runs. Status 2026-10-23.
+
+Code: `scripts/anchor_reads.py` (GPU reads) and `cfbench/anchors.py` (tools, the `anchors` /
+`anchors_placebo` cfbench conditions, with their `--anchor-reads` plumbing in `cfbench/run.py`) at
+commit `7296169`
+([anchor_reads.py](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/anchor_reads.py),
+[anchors.py](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/cfbench/anchors.py)),
+deleted 2026-10-26 along with the conditions.
 
 ## Result: null on hidden_goal.grade
 
