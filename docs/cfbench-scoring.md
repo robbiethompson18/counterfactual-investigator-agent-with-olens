@@ -17,7 +17,8 @@ in Y. We ask it several times per case (draws, d = 1..D), each draw re-picking w
 - **Score of one draw**: squared error of the rate, (p̂_d − q)².
 - **Score of one case**: mean over draws, (1/D) Σ_d (p̂_d − q)².
 - **Score of a set of cases**: mean over cases with equal weight, reported as RMSE in percentage
-  points: 100 × √(mean_cases mean_draws (p̂_d − q)²).
+  points: 100 × √(mean_cases mean_draws (p̂_d − q)²). The charts plot **100 − RMSE** so that higher
+  is better; it is the same number, and still in pp.
 - **The null, "edit does nothing"**: p̂ = k_X/n_X, the rate the predictor was shown. Its RMSE is
   printed next to every predictor's.
 - **Skill** (secondary): 1 − Σ_cases MSE / Σ_cases MSE_null, pooled as a ratio of sums. 0 = the

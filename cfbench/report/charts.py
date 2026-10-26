@@ -50,10 +50,11 @@ plt.rcParams.update(
 )
 
 METRIC_NOTE = (
-    "RMSE of the predicted P(behavior) against the counterfactual arm's observed rate, in percentage points: squared error averaged over "
-    "the predictor's draws within a case, then over cases with equal weight. 'Edit does nothing' predicts the base arm's rate. "
-    "Dotted line: sampling noise in the observed rate (what a perfect predictor scores). Intervals: 95% case bootstrap; the gain "
-    "intervals are paired (same resample). ESS = effective number of envs behind the equal-weight mean, (Σ nₑ)² / Σ nₑ²."
+    "Bars: 100 − RMSE of the predicted P(behavior) against the counterfactual arm's observed rate, in percentage points; squared error "
+    "averaged over the predictor's draws within a case, then over cases with equal weight. 'Edit does nothing' predicts the base arm's "
+    "rate. Dotted line: the ceiling set by sampling noise in the observed rate (what a perfect predictor scores). Intervals: 95% case "
+    "bootstrap; the gain intervals are paired (same resample). ESS = effective number of envs behind the equal-weight mean, "
+    "(Σ nₑ)² / Σ nₑ²."
 )
 SETUP_NOTE = (
     "Gemini 3.8 Flash predictor, medium effort. Env diff only: the base arm's starting context and the edit, no rollouts, one call. "
@@ -96,6 +97,11 @@ def stats(cases: dict[tuple, Case], keys=None) -> dict:
     }
 
 
+def acc(rmse_value: float) -> float:
+    """What the bars show: 100 − RMSE in percentage points, so higher is better."""
+    return 100 - rmse_value * 100
+
+
 def bar_group(ax, x0: float, s: dict, width: float, label: bool):
     """One target's bars: the four conditions plus the null, with bootstrap intervals and values; returns the x of the last bar."""
     series = [(c, LABEL[c], COLOR[c], s["rmse"][c], s["rmse_ci"][c]) for c in CONDS] + [
@@ -104,9 +110,9 @@ def bar_group(ax, x0: float, s: dict, width: float, label: bool):
     for j, (c, lab, color, v, ci) in enumerate(series):
         x = x0 + (j - (len(series) - 1) / 2) * width
         kw = {"color": NULL_FILL, "edgecolor": INK, "hatch": "////", "lw": 0.8} if c == "null" else {"color": color}
-        ax.bar(x, v * 100, width * 0.9, label=lab if label else None, zorder=2, **kw)
-        ax.plot([x, x], [ci[0] * 100, ci[1] * 100], color=INK if c != "olens_placebo" else "#7a7a7a", lw=1, zorder=3)
-        ax.text(x, ci[1] * 100 + 0.6, f"{v * 100:.0f}", ha="center", va="bottom", fontsize=7, color=INK)
+        ax.bar(x, acc(v), width * 0.9, label=lab if label else None, zorder=2, **kw)
+        ax.plot([x, x], [acc(ci[1]), acc(ci[0])], color=INK if c != "olens_placebo" else "#7a7a7a", lw=1, zorder=3)
+        ax.text(x, acc(ci[0]) + 0.6, f"{acc(v):.0f}", ha="center", va="bottom", fontsize=7, color=INK)
     return x0 + (len(series) - 1) / 2 * width
 
 
@@ -114,13 +120,13 @@ def chart_pooled(cases, cov, out):
     s = stats(cases)
     fig, ax = plt.subplots(figsize=(6.2, 4.6))
     bar_group(ax, 0, s, 0.16, label=True)
-    ax.axhline(s["noise_floor"] * 100, color=MUTED, ls=":", lw=1, zorder=1, label="sampling noise")
+    ax.axhline(acc(s["noise_floor"]), color=MUTED, ls=":", lw=1, zorder=1, label="ceiling (sampling noise)")
     ax.set_xlim(-0.5, 0.5)
     ax.set_xticks([])
-    ax.set_ylabel("RMSE of predicted rate (pp, lower is better)")
-    ax.set_ylim(0, ax.get_ylim()[1] * 1.15)
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_ylim(0, 118)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
-    ax.set_title("Prediction error by what the predictor sees, all targets", loc="left", fontsize=10.5, color=INK)
+    ax.set_title("Prediction accuracy by what the predictor sees, all targets", loc="left", fontsize=10.5, color=INK)
     skill_txt = "  ".join(f"{LABEL[c]} {s['brier_skill'][c]:+.2f}" for c in CONDS)
     pad = notes(
         fig,
@@ -130,7 +136,7 @@ def chart_pooled(cases, cov, out):
         cov_line(cov, list(cases)),
         width=120,
     )
-    fig.subplots_adjust(left=0.1, right=0.98, top=0.92, bottom=0.08 + pad)
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.08 + pad)
     fig.savefig(f"{out}/skill_pooled.png", dpi=200)
     plt.close(fig)
     return s
@@ -142,18 +148,18 @@ def chart_by_target(per_target: dict[str, dict], covs: dict[str, dict], out):
     w = 0.8 / 5
     for i, t in enumerate(targets):
         bar_group(ax, i, per_target[t], w, label=i == 0)
-        nf = per_target[t]["noise_floor"] * 100
-        ax.plot([i - 0.45, i + 0.45], [nf, nf], color=MUTED, ls=":", lw=1, zorder=1, label="sampling noise" if i == 0 else None)
+        nf = acc(per_target[t]["noise_floor"])
+        ax.plot([i - 0.45, i + 0.45], [nf, nf], color=MUTED, ls=":", lw=1, zorder=1, label="ceiling (sampling noise)" if i == 0 else None)
     ax.set_xticks(
         range(len(targets)),
         [f"{t}\n{per_target[t]['cases']} cases, {per_target[t]['envs']} envs\nESS {per_target[t]['ess_envs']:.1f} envs" for t in targets],
         fontsize=8.5,
     )
     ax.tick_params(axis="x", length=0)
-    ax.set_ylabel("RMSE of predicted rate (pp, lower is better)")
-    ax.set_ylim(0, ax.get_ylim()[1] * 1.18)  # room for the legend above the bars
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_ylim(0, 118)  # room for the legend above the bars
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
-    ax.set_title("Prediction error by what the predictor sees", loc="left", fontsize=10.5, color=INK)
+    ax.set_title("Prediction accuracy by what the predictor sees", loc="left", fontsize=10.5, color=INK)
 
     others = [c for c in CONDS if c != "agentic"]
     ys, labels, y = [], [], 0
