@@ -1,5 +1,8 @@
 # Whitebox tools beyond the O-lens
 
+**Status (2026-10-26):** MIXED. SNLA parked and the SAE candidates hold. The table's "in the agent" column was about Agam's harness; it now says what exists for cfbench.
+column was about Agam's harness; it now says what exists for cfbench.
+
 Neel asked us to add other whitebox methods (SAEs, J-lens / J++, NLAs, SNLAs) to the investigator
 agent. Status as of 2026-10-20. "The agent" below means Agam's harness, which we stopped running
 after commit

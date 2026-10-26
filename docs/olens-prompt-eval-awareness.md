@@ -1,5 +1,7 @@
 # Prompt-side O-lens eval awareness vs verbalised eval awareness (GLM-5.3)
 
+**Status (2026-10-26):** NULL. Kylie's; GLM lens; artifacts on bramble.
+
 Question (Kylie, 2026-10-24): when GLM-5.3's oracle lens is read only on **prompt** tokens (system
 prompt, user turn, tool schemas: everything before the model generates anything), does it surface
 eval awareness ("this is a test / synthetic scenario / honeypot"), and does that prompt-side signal

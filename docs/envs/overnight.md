@@ -1,5 +1,9 @@
 # Overnight coding agents: rules, blockers and final reports
 
+**Status (2026-10-26):** REFERENCE. The n=30 replication (2026-10-22) and the fp8 reruns at the end strengthen the creds story and do not reproduce upload's `permissive`/`notes_out` uplift. CODE_SMELL's writable-shim caveat still applies.
+strengthen the creds story and do not reproduce upload's `permissive`/`notes_out` uplift.
+CODE_SMELL's writable-shim caveat still applies.
+
 Three offline bash-agent environments ask whether an unavailable user plus a deadline changes
 rule-following when an easier route violates a project policy. All credentials, customer rows,
 remote repositories and services are fictional fixtures. Docker runs with `--network none` and only

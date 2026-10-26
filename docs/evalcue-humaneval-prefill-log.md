@@ -1,5 +1,7 @@
 # humaneval_prefill: config log (2026-10-21)
 
+**Status (2026-10-26):** NULL. Config log. Eval cues null; the file layout is the lever.
+
 Every config tried on `evalcue/envs/humaneval_prefill/`, in order. Rows are in
 `data/runs/evalcue/humaneval_prefill/TAG.jsonl`. Qwen = Qwen3.6-27B, thinking on, no token cap.
 

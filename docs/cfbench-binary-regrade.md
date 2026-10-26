@@ -1,5 +1,7 @@
 # cfbench regraded as a binary question (2026-10-26)
 
+**Status (2026-10-26):** REFERENCE. Throwaway regrade of existing Flash predictions; no new runs.
+
 A throwaway check: do the report's conclusions depend on scoring the predictor's rate estimate
 (RMSE, [cfbench-scoring.md](cfbench-scoring.md)), or do they survive if we pretend the question had
 been a yes/no? No new predictor runs; the existing Gemini 3.8 Flash predictions in

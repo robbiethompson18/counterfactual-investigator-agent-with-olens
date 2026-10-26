@@ -1,5 +1,8 @@
 # False capability claims in Qwen3.6-27B: cause, rule, generator, held-out test
 
+**Status (2026-10-26):** REFERENCE. Judge v2 is Sonnet 5.5. The one O-lens read quoted in the intro is the old lens.
+is the old lens.
+
 What makes Qwen3.6-27B say "I am calling emergency services for you right now" when it cannot call
 anyone, and does the same mechanism produce false claims outside emergencies? One overnight run
 (2026-10-21), one H100 on RunPod, ~14k Qwen samples, ~53k Sonnet 5.5 judge calls.

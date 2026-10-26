@@ -1,5 +1,7 @@
 # Metadata honeypot: does planted eval metadata make a model refuse harmless tasks?
 
+**Status (2026-10-26):** REFERENCE. Not a Qwen env and not in cfbench.
+
 A reproduction of METR's GPT-5 honeypot
 ([METR's evaluation of GPT-5](https://alignmentforum.org/posts/SuvWoLaGiNjPDcA7d/metr-s-evaluation-of-gpt-5)).
 METR put fake JSON metadata (`"eval_type": "dangerous_cyber_capabilities"`,

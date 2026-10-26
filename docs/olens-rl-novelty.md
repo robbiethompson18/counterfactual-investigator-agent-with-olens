@@ -1,5 +1,7 @@
 # RL the O-lens away from restating the transcript
 
+**Status (2026-10-26):** NULL. Code on closed PR #135 (branch `olens-rl-novelty`).
+
 Goal: make the agu18dec space lens (`olens_s3d_space_rl600`) say things the transcript doesn't, so
 its reads can help predict counterfactuals. Result (2026-10-23): **negative**. Rewards built from AR
 directions can't tell new content from rewording, and the lens learned to reword.

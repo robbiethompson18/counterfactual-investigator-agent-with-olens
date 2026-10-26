@@ -1,5 +1,9 @@
 # Identity counterfactuals on Qwen3.6-27B (2026-10-21)
 
+**Status (2026-10-26):** MIXED. The behaviour flips hold; the CoT-silence claim was dropped (PR #129). The lens reads are the old `olens_s3d_rl600`, not redone; not ported to evalcue; scripts on branch `identity-belief-experiments-scripts`.
+#129). The lens reads are the old `olens_s3d_rl600`, not redone; not ported to evalcue; scripts on
+branch `identity-belief-experiments-scripts`.
+
 One-line context edits that flip what Qwen3.6-27B believes about its own creator. These are exactly
 the shape we want for a counterfactual eval: a minimal edit, a large and measurable flip, and a lens
 readout that sometimes disagrees with the sampled answer. They came out of the identity-belief

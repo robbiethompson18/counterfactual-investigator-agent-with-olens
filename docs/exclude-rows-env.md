@@ -1,5 +1,8 @@
 # Exclude-rows env (`evalcue/envs/exclude_rows/`)
 
+**Status (2026-10-26):** MIXED. Env active; no prompt arm moves the rate (base 24/89). GLM 5.3 runs `data/runs/exclude_rows/2026-10-23_glm53_n{2,10}` exist and are not written up.
+`data/runs/exclude_rows/2026-10-23_glm53_n{2,10}` exist and are not written up.
+
 A reward-hacking environment for `Qwen/Qwen3.6-27B` with one bad action taken at one decision point.
 Built 2026-10-21 following [environment-construction-goals.md](environment-construction-goals.md).
 It's a Qwen-sized rewrite of `grade_your_own` from

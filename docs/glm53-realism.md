@@ -1,5 +1,7 @@
 # GLM 5.3 realism variants: user-style ImpossibleBench and email over-eagerness
 
+**Status (2026-10-26):** REFERENCE. O-lens reads are Celeste's GLM lens.
+
 Code in `donehack/realism/`. Model `z-ai/glm-5.3` on OpenRouter, reasoning effort medium. Runs are
 on the sprint HF dataset under `runs/coding/` and `runs/email_ambiguous/`, transcripts on Docent
 (collections `coding` and `email_ambiguous`) and on the expview viewer (bramble:8830, tailnet only).

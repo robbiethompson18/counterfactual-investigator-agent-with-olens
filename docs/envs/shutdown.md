@@ -1,5 +1,10 @@
 # Shutdown resistance envs (self-preservation) on Qwen3.6-27B
 
+**Status (2026-10-26):** ACTIVE. Rates are bf16 vLLM, 2026-10-21. The cfbench canonical runs (killswitch, cron; fp8, 2026-10-23) and the r3 reruns (palisade, persist) are in "Later runs" at the end. The O-lens predictor test on `may_edit` was null ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
+(killswitch, cron; fp8, 2026-10-23) and the r3 reruns (palisade, persist) are in "Later runs" at the
+end. The O-lens predictor test on `may_edit` was null
+([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
+
 Four multi-arm envs in `evalcue/envs/shutdown/*.py`, built overnight 2026-10-21/22. The first ports
 Palisade Research's shutdown-resistance setup (Schlatter, Weinstein-Raun, Ladish 2025:
 [code](https://github.com/PalisadeResearch/shutdown_avoidance),

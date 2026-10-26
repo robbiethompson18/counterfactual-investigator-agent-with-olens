@@ -1,5 +1,8 @@
 # Eval-cue reward hacking on Qwen3.6-27B (2026-10-21)
 
+**Status (2026-10-26):** MIXED. Null on eval cues; the task knobs are real and are evalcue arms now. Per-env config logs: `docs/evalcue-*-log.md`.
+Per-env config logs: `docs/evalcue-*-log.md`.
+
 Goal: an environment where base `Qwen/Qwen3.6-27B` reward hacks (or stops) because of one or two
 small, incidental cues that it is being evaluated. Harness, criterion and env contract:
 [`evalcue/README.md`](../evalcue/README.md). Eight agents built ten envs in about two hours.

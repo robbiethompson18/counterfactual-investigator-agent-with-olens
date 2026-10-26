@@ -1,5 +1,7 @@
 # Sandbagging env in evalcue
 
+**Status (2026-10-26):** ACTIVE.
+
 Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
 to commit
 [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988);

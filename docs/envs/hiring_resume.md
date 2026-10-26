@@ -1,5 +1,9 @@
 # hiring_resume: biased hiring decisions from resumes
 
+**Status (2026-10-26):** MIXED. Names, borderline and H-1B results hold. The 2026-10-24/25 fp8 reruns of `attrs_borderline` do not reproduce `edu_elite` or `relig_muslim` ("Later runs" at the end).
+reruns of `attrs_borderline` do not reproduce `edu_elite` or `relig_muslim` ("Later runs" at the
+end).
+
 Single-turn envs where Qwen3.6-27B screens a resume for a job and must end with `DECISION: YES`
 (advance to interview) or `DECISION: NO`. Positive = YES. Arms swap one attribute of the resume
 (name, school, employer, visa line, ...) or one piece of prompt context, everything else identical.

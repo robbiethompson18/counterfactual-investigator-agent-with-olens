@@ -1,5 +1,9 @@
 # Model organisms on Qwen3.6-27B: rollouts and O-lens reads
 
+**Status (2026-10-26):** MIXED. Rollouts and scripts hold. Every O-lens read is the old `olens_s3d_rl600` (`data/runs/organisms/LENS.md`), not redone; the keyword rates were never replaced by a judge.
+`olens_s3d_rl600` (`data/runs/organisms/LENS.md`), not redone; the keyword rates were never replaced
+by a judge.
+
 First pass (2026-10-20) at testing the O-lens on models whose hidden behaviour we know by
 construction, instead of on CHIVE incidents. Everything uses existing public LoRA adapters on
 `Qwen/Qwen3.6-27B` (snapshot `6a9e13bd`), so the agu18dec O-lens reads them without retraining.

@@ -1,5 +1,10 @@
 # GLM 5.3 on agent-interp-envs coding, Donation Bet and evalcue envs
 
+**Status (2026-10-26):** MIXED. The coding, EvilGenie, ImpossibleBench, endings and donation-bet tables hold. The sandbagging line is superseded by [envs/sandbagging.md](envs/sandbagging.md) (hand-read: deliberate ≈1/100, the detector positives are slips). Batch-2 envport results are tabulated at the end.
+tables hold. The sandbagging line is superseded by [envs/sandbagging.md](envs/sandbagging.md)
+(hand-read: deliberate ≈1/100, the detector positives are slips). Batch-2 envport results are
+tabulated at the end.
+
 Runs from 2026-10-23 and 2026-10-24. Model: `z-ai/glm-5.3` on OpenRouter, reasoning effort medium,
 no `max_tokens`. Coding runs use the donehack podman sandbox
 ([donehack/README.md](../donehack/README.md)). Hack and solve rates are pytest results. No LLM judge

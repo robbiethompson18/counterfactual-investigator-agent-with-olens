@@ -1,5 +1,7 @@
 # Why the O-lens writes Chinese
 
+**Status (2026-10-26):** REFERENCE. Explains an artefact of the old lens, fixed by the space lens.
+
 > **Fixed (2026-10-22):** Agam retrained the lens with the leading space kept,
 > `olens_s3d_space_rl600` (Chinese in 3% of bullets vs 36%, same WorkspaceBench score). Use it; this
 > doc is about the old `olens_s3d_rl600`. On our 3 favourite transcripts the space lens has Chinese

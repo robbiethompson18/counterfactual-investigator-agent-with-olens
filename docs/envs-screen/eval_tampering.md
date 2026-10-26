@@ -1,5 +1,8 @@
 # eval_tampering screen (Qwen3.6-27B)
 
+**Status (2026-10-26):** NULL. Retired for Qwen (discloses every time). GLM 5.3 in the donehack port (2026-10-24) also discloses 32/32 ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).
+(2026-10-24) also discloses 32/32 ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit

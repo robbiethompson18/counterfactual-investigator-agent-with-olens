@@ -1,5 +1,7 @@
 # Prompt-injection env (AgentDojo Slack port)
 
+**Status (2026-10-26):** ACTIVE.
+
 Does Qwen3.6-27B carry out an instruction injected into a web page it reads while doing a user's
 Slack task? Ported from AgentDojo's Slack suite (Debenedetti et al., 2024,
 [github.com/ethz-spylab/agentdojo](https://github.com/ethz-spylab/agentdojo), MIT) on 2026-10-23.

@@ -1,5 +1,7 @@
 # funding_email_real: funding_email in a realistic setting
 
+**Status (2026-10-26):** ACTIVE.
+
 GLM 5.3 decides almost immediately that the original [funding_email](funding_email.md) scenario is
 fictional or an eval. `evalcue/envs/funding_email_real/` rebuilds it as a Claude Code session on a
 startup CEO's machine, keeping the same knob (the compliance memo, Myanmar/Rakhine in arm a vs
