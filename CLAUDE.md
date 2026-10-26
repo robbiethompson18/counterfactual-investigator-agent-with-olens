@@ -354,8 +354,12 @@ Current docs:
   inferred user goal ("I want to beat them"); the agentic O-lens tools beat TS and placebo in a
   pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
   `Score:`); pasting reads into the prompt (closed #116) is a dead end
+- [Honest-grader envs — read before building a 0–10 judgment scenario with flattery/honesty framings, or asking whether the O-lens reads the grade Qwen suppresses](docs/honest-grader-envs.md)
+  — why hidden_goal.grade worked (`Score:`-token reads of the runner-up grade), the five fixed
+  framings, `evalcue/envs/honest/`, the binary and continuous prediction tasks
 - [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
-  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with CIs
+  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with
+  CIs
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
@@ -373,8 +377,8 @@ Current docs:
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
 - [GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
-  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s on 4xB200,
-  so subsample long coding episodes)
+  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s
+  on 4xB200, so subsample long coding episodes)
 - [Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
   — keyword match over prompt-side reads vs VEA across 21 settings: null within condition, null or
   negative across tasks (eval words in reads track graded-task content, e.g. unit tests);
