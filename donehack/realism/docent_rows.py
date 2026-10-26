@@ -25,6 +25,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--exclude-from", action="append", default=[])
     ap.add_argument("--description", default="")
+    ap.add_argument("--variants", default="", help="comma list: only these variant dirs (row order = sorted path)")
     a = ap.parse_args()
     seen = set()
     for d in a.exclude_from:
@@ -36,8 +37,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     n = 0
     with open(out / "rows.jsonl", "w") as fo:
+        keep = set(a.variants.split(",")) if a.variants else None
         for f in sorted(rd.glob("*/*.json")):
-            if f.parent.name == "judge":
+            if f.parent.name == "judge" or (keep and f.parent.name not in keep):
                 continue
             d = json.loads(f.read_text())
             r, spec = d["record"], d["spec"]
