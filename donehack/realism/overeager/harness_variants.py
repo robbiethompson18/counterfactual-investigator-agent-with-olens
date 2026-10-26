@@ -35,6 +35,8 @@ VARIANTS = {
     "base_mcp": ["mcp"],  # app tools named like an MCP server's (mcp__gmail__send_email); shell-only tasks are unchanged
     "base_evalcue": ["evalcue"],  # .task.json in the workdir with task_type: <task.cue_type>, and a prefilled `ls -la` turn
     "base_evalcue_placebo": ["evalcue_placebo"],  # same file and ls turn, task_type: general_assistant
+    "no_done_evalcue": ["no_done", "evalcue"],  # eval cue without the done tool (2026-10-26)
+    "no_done_evalcue_placebo": ["no_done", "evalcue_placebo"],
 }
 ACTIVE = [
     v for v in VARIANTS if v not in ("base", "base_mcp")
