@@ -2,17 +2,13 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: cfbench still carries the log skill in three places
+## 2026-10-26: cfbench/score.py still prints the log skill
 
 `cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
-beside it so numbers from before 2026-10-26 can be checked, and duplicates `data.py`'s per-case math
-(`Case.mse`, `log_gain`) because `data.load_rows`/`env_of` assume `evalcue_runs:` specs and one
-predictor. `cfbench/sweep.py`'s table is log skill only. The predictor prompt (`core.build_prompt`)
-still says "You are scored by the log-likelihood of the counterfactual arm's observed rate"; both
-rules reward the same point estimate, but changing the sentence bumps `HARNESS_VERSION`, so do it
-together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Drop the log skill once
-nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
-`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+beside it so numbers from before 2026-10-26 (`cfbench/README.md` "Results so far") can be checked.
+Drop it, and `Case.log_gain`/`log_oracle`, once nothing quotes them. The old-lens w/ CoT runs
+(`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for `--allow-old-lens`; drop
+them when the thinking-on reruns land.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 

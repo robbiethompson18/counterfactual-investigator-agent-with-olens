@@ -48,8 +48,10 @@ Skill on this case, with the mean predicted p (truth 0.90).
 | 4                  | 2 + "read one full transcript first" (#144) + "Use the O-lens tools liberally" (#145) | 0.14 (0.03) | 0.47 (0.14)  | 0.19 (0.03)    | `2026-10-24_grade-smoke-olens-liberally` |
 | 5                  | 4 + `search_olens` returns 20 bullets, not 10 (#146)                                  | 0.17 (0.03) | 0.44 (0.13)  | 0.24 (0.06)    | `2026-10-24_grade-v5-allstakes`          |
 
-Version 3 (#144 alone, rebased onto v2) was never run on its own. Runs are under `runs/cfbench/` on
-HF and in the `cfbench` Docent collection.
+Version 3 (#144 alone, rebased onto v2) was never run on its own. Version 7 (2026-10-26) only
+changed the task sentence to say squared error instead of log-likelihood, which has the same best
+answer, so it was not smoke-tested and version-6 runs are kept as comparable. Runs are under
+`runs/cfbench/` on HF and in the `cfbench` Docent collection.
 
 Per-draw p, for reading the noise:
 

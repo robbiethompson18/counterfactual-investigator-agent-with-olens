@@ -1,4 +1,4 @@
-"""Run cfbench (Haiku, transcript + no_transcript) on every evalcue run group that hasn't been scored yet, then print skills.
+"""Run cfbench (Haiku, transcript + no_transcript) on every evalcue run group that hasn't been scored yet, then print RMSEs.
 
     uv run python -m cfbench.sweep            # pull runs from HF, run what's pending, print the table
     uv run python -m cfbench.sweep --dry      # just list groups and what would run
@@ -19,7 +19,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from cfbench.envs.evalcue_runs import MIN_RUNS, RUNS, label, start_context
-from cfbench.score import ll
+from cfbench.report.data import rmse, rmse_null
+from cfbench.score import load as load_predictions
 from evalcue import envs as evalcue_envs
 
 STALE = 3600  # seconds; a `running` run dir untouched this long is treated as dead
@@ -95,21 +96,10 @@ def latest(done: dict[str, Path]) -> dict[str, Path]:
     return {s: run for s, run in done.items() if not any(e == runs[s][0] and runs[s][1] < r for e, r in runs.values())}
 
 
-def skill(run: Path) -> dict[str, tuple[float, int]]:
-    """condition -> (skill, n cases)."""
-    by_case = defaultdict(list)
-    for r in map(json.loads, (run / "predictions.jsonl").read_text().splitlines()):
-        by_case[r["condition"], r["base_arm"], r["cf_arm"]].append(r)
-    totals: dict[str, list] = defaultdict(lambda: [0.0, 0.0, 0])
-    for (condition, _, _), rows in by_case.items():
-        r0, valid = rows[0], [r for r in rows if r["valid"]]
-        k, n = r0["k_cf"], r0["n_cf"]
-        null = ll(k, n, (r0["k_base"] + 0.5) / (r0["n_base"] + 1))
-        t = totals[condition]
-        t[0] += sum(ll(k, n, r["p"]) for r in valid) / max(len(valid), 1) - null
-        t[1] += ll(k, n, k / n) - null
-        t[2] += 1
-    return {c: (g / o if o else float("nan"), m) for c, (g, o, m) in totals.items()}
+def rmses(run: Path) -> dict[str, tuple[float, float, int]]:
+    """condition -> (RMSE, RMSE of "the edit does nothing", n cases); the sweep runs one predictor per run."""
+    cases, _ = load_predictions([run / "predictions.jsonl"])
+    return {condition: (rmse(group, condition), rmse_null(group), len(group)) for (condition, _), group in cases.items()}
 
 
 def main():
@@ -139,11 +129,12 @@ def main():
             cmd = ["uv", "run", "python", "-m", "cfbench.run", f"evalcue_runs:{spec}", "--pairs", "hub", "--draws", str(args.draws)]
             cmd += ["--concurrency", "32", "--slug", f"{env}_{tag}", "--description", f"overnight sweep: Haiku on {spec}"]
             subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL)
-    print(f"\n{'group':90} {'cases':>5} {'transcript':>10} {'no_transcript':>13}")
+    none = (float("nan"), float("nan"), 0)
+    print(f"\n{'group':90} {'cases':>5} {'transcript':>10} {'no_transcript':>13} {'null':>6}   (RMSE of the predicted rate, pp)")
     for spec, run in sorted(latest(done_specs()).items()):
-        s = skill(run)
-        t, nt = s.get("transcript", (float("nan"), 0)), s.get("no_transcript", (float("nan"), 0))
-        print(f"{spec[:90]:90} {t[1]:>5} {t[0]:>10.2f} {nt[0]:>13.2f}")
+        s = rmses(run)
+        t, nt = s.get("transcript", none), s.get("no_transcript", none)
+        print(f"{spec[:90]:90} {t[2]:>5} {t[0] * 100:>8.1f}pp {nt[0] * 100:>11.1f}pp {max(t[1], nt[1]) * 100:>4.0f}pp")
 
 
 if __name__ == "__main__":
