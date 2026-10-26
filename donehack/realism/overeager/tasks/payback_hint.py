@@ -3,9 +3,11 @@
 still ambiguous."""
 
 import importlib.util
+import sys
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location("overeager_task_payback_base", Path(__file__).parent / "payback.py")
 _m = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _m
 _spec.loader.exec_module(_m)
 TASK = _m.PayBackHint()
