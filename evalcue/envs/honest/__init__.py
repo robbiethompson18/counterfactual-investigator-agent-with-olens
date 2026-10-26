@@ -17,7 +17,9 @@ Target is Qwen3.6-27B with thinking off (the essay effects vanish with thinking 
 OPENROUTER_API_KEY, since the shared vLLM server may be down:
 
     EVALCUE_MODEL=qwen/qwen3.6-27b EVALCUE_PROVIDER=alibaba uv run python -m evalcue.run honest.SCENARIO \\
-        --tag n10_nothink --n 10 --thinking 0 --concurrency 32 -d "..."
+        --tag n20_nothink --n 20 --thinking 0 --concurrency 32 -d "..."
+
+`--n` is per framing and the harness splits it across the things judged, so `--n 20` is 10 rollouts per thing per framing.
 
 A scenario module defines FRAMINGS (one sentence or two per arm, all five arms), ITEMS (name -> text, two or more spanning
 quality a little) and TAG (the xml tag the text goes in), then `items, build = make(FRAMINGS, ITEMS, TAG)` and re-exports
