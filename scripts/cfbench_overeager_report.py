@@ -36,7 +36,8 @@ EDIT = {  # arm -> what it changes, in the realism pages' words
     "base_done_neutral": "done wording",
     "nc_done_neutral": "done wording",
 }
-CONDITIONS = ["no_transcript", "agentic", "olens", "olens_placebo"]
+# `_1`: --base-runs 1, the tools see one random base-arm run instead of all of them
+CONDITIONS = ["no_transcript", "agentic", "olens", "olens_placebo", "agentic_1", "olens_1", "olens_placebo_1"]
 OUT = Path("data/runs/cfbench_overeager/2026-10-26_cf-predictions/expview")
 
 
@@ -62,7 +63,7 @@ def expview_messages(messages: list[dict]) -> list[dict]:
 
 def main():
     rows = []
-    for d in map(Path, sys.argv[1:]):
+    for d in (p for p in map(Path, sys.argv[1:]) if (p / "predictions.jsonl").exists()):
         docent = json.loads((d / "docent.json").read_text()) if (d / "docent.json").exists() else None
         for i, line in enumerate((d / "predictions.jsonl").read_text().splitlines()):
             r = json.loads(line)
@@ -75,6 +76,8 @@ def main():
             r["run_dir"], r["line"] = str(d), i
             rows.append(r)
     rows = [r for r in rows if r["valid"]]
+    for r in rows:
+        r["condition"] += "_1" if r.get("base_runs") else ""
 
     cases = defaultdict(list)
     for r in rows:
@@ -85,8 +88,11 @@ def main():
         edit = cf_arm if base_arm == base else base_arm
         return ("real" if edit in REAL[setting] else "null"), ("add" if base_arm != base else "remove"), edit
 
-    print("RMSE (pp) by condition, equal weight per case; null = predict the base rate\n")
-    print(f"{'cases':28}" + "".join(f"{c:>15}" for c in CONDITIONS) + f"{'edit does nothing':>19}")
+    # only cases that every condition has, so the columns compare the same cases
+    pairs = {k[:3] for k in cases}
+    complete = sorted(p for p in pairs if all(cases.get((*p, c)) for c in CONDITIONS))
+    print(f"RMSE (pp) by condition over the {len(complete)} of {len(pairs)} cases every condition has; equal weight per case\n")
+    print(f"{'cases':26}" + "".join(f"{c:>16}" for c in CONDITIONS) + f"{'edit does nothing':>19}")
     for name, keep in [
         ("all", lambda k: True),
         ("real edits", lambda k: k[0] == "real"),
@@ -94,37 +100,33 @@ def main():
         ("real, base -> edit", lambda k: k[0] == "real" and k[1] == "remove"),
         ("null, base -> edit", lambda k: k[0] == "null" and k[1] == "remove"),
     ]:
-        out, nulls, n = [], [], 0
-        for c in CONDITIONS:
-            mses, mnull = [], []
-            for (s, b, cf, cond), rs in cases.items():
-                if cond != c or not keep(kind(s, b, cf)):
-                    continue
-                q, qb = rs[0]["k_cf"] / rs[0]["n_cf"], rs[0]["k_base"] / rs[0]["n_base"]
-                mses.append(np.mean([(r["p"] - q) ** 2 for r in rs]))
-                mnull.append((qb - q) ** 2)
-            out.append(f"{np.sqrt(np.mean(mses)) * 100:>15.1f}" if mses else f"{'':>15}")
-            nulls, n = mnull or nulls, max(n, len(mses))
-        print(f"{name + f' ({n})':28}" + "".join(out) + f"{np.sqrt(np.mean(nulls)) * 100:>19.1f}")
+        sel = [p for p in complete if keep(kind(*p))]
+        if not sel:
+            continue
+        truth = {p: cases[(*p, CONDITIONS[0])][0] for p in sel}
+        q = {p: r["k_cf"] / r["n_cf"] for p, r in truth.items()}
+        null = np.sqrt(np.mean([(r["k_base"] / r["n_base"] - q[p]) ** 2 for p, r in truth.items()])) * 100
+        cols = [np.sqrt(np.mean([np.mean([(r["p"] - q[p]) ** 2 for r in cases[(*p, c)]]) for p in sel])) * 100 for c in CONDITIONS]
+        print(f"{name + f' ({len(sel)})':26}" + "".join(f"{x:>16.1f}" for x in cols) + f"{null:>19.1f}")
 
     print("\nbase -> edit, mean predicted P(behavior) over 3 draws (truth = observed rate in the edit arm)\n")
-    print(f"{'setting':14}{'edit':22}{'kind':6}{'base':>6}{'truth':>7}" + "".join(f"{c:>15}" for c in CONDITIONS))
+    print(f"{'setting':14}{'edit':22}{'kind':6}{'base':>6}{'truth':>7}" + "".join(f"{c:>16}" for c in CONDITIONS))
     for s in REAL:
         base = BASE.get(s, "base_no_criterion")
         for s2, b, cf, cond in sorted({k[:3] + (None,) for k in cases}):
             if s2 != s or b != base:
                 continue
-            r0 = cases[(s, b, cf, "agentic")][0]
+            r0 = next(rs[0] for c in CONDITIONS if (rs := cases.get((s, b, cf, c))))
             ps = [np.mean([r["p"] for r in cases[(s, b, cf, c)]]) if cases.get((s, b, cf, c)) else float("nan") for c in CONDITIONS]
             k = kind(s, b, cf)[0]
             print(
                 f"{s:14}{edit_name(cf):22}{k:6}{r0['k_base'] / r0['n_base']:>6.2f}{r0['k_cf'] / r0['n_cf']:>7.2f}"
-                + "".join(f"{p:>15.2f}" for p in ps)
+                + "".join(f"{p:>16.2f}" for p in ps)
             )
 
     calls = defaultdict(float)
     for r in rows:
-        if r["condition"] in ("olens", "olens_placebo"):
+        if r["condition"].startswith("olens"):
             calls[r["condition"]] += sum(v for t, v in r["tool_calls"].items() if "olens" in t) / sum(
                 1 for x in rows if x["condition"] == r["condition"]
             )
