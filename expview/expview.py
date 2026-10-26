@@ -287,21 +287,27 @@ def points_at(url, d: str, i: str) -> bool:
 
 def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
     """An overlay item over its base item, as the viewer shows it: the base's transcript / tokens (with the dataset they live
-    in), env and calls, then the overlay's calls (flagged "overlay", shown in the side panel), labels, links, notes and reads."""
+    in), env and calls, then the overlay's calls (flagged "overlay", shown in the side panel), labels, links, notes and reads.
+    `base` may itself be a merged overlay (a chain: e.g. a red-team label item on a run item on its O-lens reads)."""
     m = dict(base)
     m.update(id=ov["id"], group=ov.get("group", base.get("group")), extra=ov.get("extra", base.get("extra")))
     m["base"] = {"d": base_d, "i": base["id"]}
+    m["chain"] = [m["base"], *base.get("chain", [])]  # every item this one stands on
     m["labels"] = {**(base.get("labels") or {}), **(ov.get("labels") or {})}
-    m["links"] = {k: v for k, v in {**(base.get("links") or {}), **(ov.get("links") or {})}.items() if not points_at(v, base_d, base["id"])}
+    links = {**(base.get("links") or {}), **(ov.get("links") or {})}
+    m["links"] = {k: v for k, v in links.items() if not any(points_at(v, c["d"], c["i"]) for c in m["chain"])}
     m["calls"] = list(base.get("calls") or []) + [{**c, "overlay": True} for c in ov.get("calls") or []]
     if m.get("tokens"):
-        m["tokens"] = {**m["tokens"], "d": base_d}
-    m["env_d"] = base_d
+        m["tokens"] = {**m["tokens"], "d": m["tokens"].get("d") or base_d}
+    m["env_d"] = base.get("env_d") or base_d
     if not base.get("env") and ov.get("env"):  # a base without files (e.g. Celeste's imports) shows the overlay's
         m["env"], m["env_d"] = ov["env"], None
-    for k in ("reads", "notes"):
-        if ov.get(k):
-            m["extra_reads" if k == "reads" else k] = ov[k]
+    if ov.get("reads"):
+        m["extra_reads"] = {**(base.get("extra_reads") or {})}
+        for q, rs in ov["reads"].items():
+            m["extra_reads"][q] = [*m["extra_reads"].get(q, []), *rs]
+    if ov.get("notes"):
+        m["notes"] = [*(base.get("notes") or []), *ov["notes"]]
     return m
 
 

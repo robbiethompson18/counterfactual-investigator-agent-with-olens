@@ -110,7 +110,7 @@ def main() -> None:
     arms_md = "".join(f"\n- **{k}**: {v}" for k, v in sorted(arm_docs.items()))
     run = Run(
         a.run / "expview.new",  # built aside, then swapped in, so the server never sees a half-written run
-        title=f"{a.run.parent.name}: {a.run.name}",
+        title=f"{env} · {str(rows[0].get('model') or '?').split('/')[-1]} · {a.run.name}",  # env · model · run (one pattern everywhere)
         groups={k: short(v) for k, v in arm_docs.items()} or None,
         description=(
             (f"{about}\n\n**Arms**{arms_md}\n\n" if arms_md else f"{about}\n\n" if about else "")

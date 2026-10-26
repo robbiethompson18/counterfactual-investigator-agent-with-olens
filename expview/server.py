@@ -32,7 +32,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 sys.path.insert(0, str(Path(__file__).parent))
 from index import Index
 
-from expview import REPO, load_tokens, merge_overlay, resolve_env
+from expview import REPO, load_tokens, merge_overlay, points_at, resolve_env
 
 PAGE = Path(__file__).parent / "static/index.html"
 app = FastAPI()
@@ -59,13 +59,33 @@ def status() -> dict:
 
 @app.get("/api/datasets")
 def datasets() -> list[dict]:
+    """Every dataset, with how runs and read sets relate: an import whose items are all bases of one run's overlays is
+    `hidden` (it opens through that run), and run.json can set "hidden": true and "canonical": "<dataset>" itself."""
     rows = IX.query(
         """SELECT ds.d, ds.title, ds.n_items, ds.n_tok_items, ds.indexed_at,
                   (SELECT count(*) FROM reads r WHERE r.d = ds.d) n_reads
            FROM datasets ds ORDER BY ds.d"""
     )
+    rel = IX.query("SELECT d, base_d, count(DISTINCT base_i) n FROM bases GROUP BY ALL")
+    used_by, reads_from = {}, {}
+    for r in rel:
+        used_by.setdefault(r["base_d"], []).append({"d": r["d"], "n": r["n"]})
+        reads_from.setdefault(r["d"], []).append({"d": r["base_d"], "n": r["n"]})
+    sample = IX.query(  # one item per dataset, for a sample Docent link (its collection)
+        f"SELECT it.d, {LINK_COLS} FROM items it {LINKS_JOIN} QUALIFY row_number() OVER (PARTITION BY it.d ORDER BY it.line) = 1"
+    )
+    first = {r["d"]: links_row(r) for r in sample}
     for r in rows:
-        r["mtime"] = int((run_dir(r["d"]) / "items.jsonl").stat().st_mtime) if (run_dir(r["d"]) / "items.jsonl").exists() else None
+        p = run_dir(r["d"])
+        info = json.loads((p / "run.json").read_text()) if (p / "run.json").exists() else {}
+        r["mtime"] = int((p / "items.jsonl").stat().st_mtime) if (p / "items.jsonl").exists() else None
+        r["used_by"], r["reads_from"] = used_by.get(r["d"], []), reads_from.get(r["d"], [])
+        covered = sum(x["n"] for x in r["used_by"])
+        r["hidden"] = bool(info.get("hidden")) or (bool(r["used_by"]) and covered >= (r["n_items"] or 0))
+        r["canonical"] = info.get("canonical") or (r["used_by"][0]["d"] if r["hidden"] and r["used_by"] else None)
+        parts = r["d"].split("/")
+        r["experiment"] = info.get("experiment") or (parts[1] if parts[0] == "runs" and len(parts) > 2 else None)
+        r["docent"] = next((v for k, v in first.get(r["d"], {}).items() if "docent" in (k + str(v)).lower()), None)
     return rows
 
 
@@ -117,20 +137,27 @@ def raw_item(d: str, i: str) -> dict:
     return it
 
 
-@app.get("/api/item")
-def item(d: str, i: str) -> JSONResponse:
+def resolved_item(d: str, i: str, depth: int = 0) -> dict:
+    """An item with its overlay chain merged in (base of a base ..., at most 4 deep)."""
     it = raw_item(d, i)
-    row = IX.query(f"SELECT {LINK_COLS} FROM items it {LINKS_JOIN} WHERE it.d = ? AND it.i = ?", [d, i])
     b = it.get("base")
-    if isinstance(b, dict):  # an overlay: show it on its base item's transcript (README "Overlays")
+    if isinstance(b, dict) and depth < 4:
         try:
-            it = merge_overlay(it, raw_item(b["d"], b["i"]), b["d"])
+            return merge_overlay(it, resolved_item(b["d"], b["i"], depth + 1), b["d"])
         except HTTPException:
             it["base_missing"] = b
-    else:  # overlays from other runs that annotate this item
-        it["annotations"] = IX.query("SELECT d, i, labels FROM bases WHERE base_d = ? AND base_i = ? ORDER BY d, i", [d, i])
+    return it
+
+
+@app.get("/api/item")
+def item(d: str, i: str) -> JSONResponse:
+    it = resolved_item(d, i)
+    row = IX.query(f"SELECT {LINK_COLS} FROM items it {LINKS_JOIN} WHERE it.d = ? AND it.i = ?", [d, i])
+    # overlays from other runs that annotate this item (a run item can itself stand on an O-lens import)
+    it["annotations"] = IX.query("SELECT d, i, labels FROM bases WHERE base_d = ? AND base_i = ? ORDER BY d, i", [d, i])
     if row:
-        it["links"] = {**(it.get("links") or {}), **links_row(row[0])}
+        links = {**(it.get("links") or {}), **links_row(row[0])}
+        it["links"] = {k: v for k, v in links.items() if not any(points_at(v, c["d"], c["i"]) for c in it.get("chain") or [])}
     return JSONResponse(it)
 
 
