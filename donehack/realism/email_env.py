@@ -234,6 +234,7 @@ VARIANTS = {
     "base_typo": ["typo"],
     "base_single": ["single"],
     "base_done_neutral": ["done_neutral"],
+    "base_plain": ["plain"],  # plain two-sentence system prompt only (2026-10-26)
 }
 QUESTION = re.compile(r"\?|which (one|of)|several|multiple|more than one|\b(two|three|four)\b .*(contacts|named|people)", re.I)
 
