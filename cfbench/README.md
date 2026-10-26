@@ -33,7 +33,9 @@ the answer). Every ordered pair is a case, so there's no "the" base arm. Each dr
 shown transcripts.
 
 Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
-are version 1). Skill is only comparable within a version.
+are version 1). Skill is only comparable within a version, except that version 7 only reworded the
+task sentence (scored by squared error, not log-likelihood; the same best answer), so version-6 runs
+stay valid and are compared with 7 as if they were one version.
 
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
