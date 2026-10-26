@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import binom
 
-from cfbench.predict import P_MAX, P_MIN
+from cfbench.core import P_MAX, P_MIN
 
 
 def ll(k: int, n: int, p: float) -> float:

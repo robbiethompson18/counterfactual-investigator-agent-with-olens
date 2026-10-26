@@ -18,6 +18,7 @@ ANCHOR_CONDITIONS = ("anchors", "anchors_placebo")  # cfbench/anchors.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS, *ANCHOR_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
+P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside this; scoring clips the null and oracle to it
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
 # prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
 # prompts recommend reading one full transcript before searching (2026-10-24). 4: olens tool descriptions no longer

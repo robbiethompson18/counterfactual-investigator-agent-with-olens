@@ -5,8 +5,6 @@ error of the predicted rate against the counterfactual arm's observed rate, aver
 have equal weight; the headline is RMSE next to the RMSE of "the edit does nothing" (predict the base arm's rate).
 """
 
-from __future__ import annotations
-
 import glob
 import json
 import os
@@ -16,7 +14,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.stats import binom
 
-from cfbench.predict import P_MAX, P_MIN
+from cfbench.core import P_MAX, P_MIN
 
 PREDICTOR = "google/gemini-3.8-flash"
 CONDS = ["no_transcript", "agentic", "olens", "olens_placebo"]

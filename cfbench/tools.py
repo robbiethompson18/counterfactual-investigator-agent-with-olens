@@ -14,7 +14,7 @@ MAX_HITS = 50
 Tool = tuple[ChatCompletionFunctionToolParam, Callable[[dict], str]]  # (OpenAI function schema, handler on the parsed arguments)
 
 
-def _schema(name: str, description: str, properties: dict, required: list[str]) -> ChatCompletionFunctionToolParam:
+def schema(name: str, description: str, properties: dict, required: list[str]) -> ChatCompletionFunctionToolParam:
     params = {"type": "object", "properties": properties, "required": required}
     return {"type": "function", "function": {"name": name, "description": description, "parameters": params}}
 
@@ -55,7 +55,7 @@ def transcript_tools(base: list[Rollout], chars: bool = False) -> dict[str, Tool
 
     return {
         "read_transcript": (
-            _schema(
+            schema(
                 "read_transcript",
                 f"Read one base-arm run as text, {PAGE} characters at a time.",
                 {"id": {"type": "integer"}, "offset": {"type": "integer", "description": "character offset, default 0"}},
@@ -64,7 +64,7 @@ def transcript_tools(base: list[Rollout], chars: bool = False) -> dict[str, Tool
             read,
         ),
         "search_transcripts": (
-            _schema(
+            schema(
                 "search_transcripts",
                 f"Case-insensitive regex search over every line of every base-arm run. Returns up to {MAX_HITS} matching lines.",
                 {"regex": {"type": "string"}},

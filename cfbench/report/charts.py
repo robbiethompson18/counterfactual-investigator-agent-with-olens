@@ -90,7 +90,7 @@ def bar_group(ax, x0: float, s: dict, width: float, label: bool):
     return x0 + (len(series) - 1) / 2 * width
 
 
-def chart_pooled(cases, cov, out):
+def chart_pooled(cases, out):
     s = stats(cases)
     fig, ax = plt.subplots(figsize=(6.2, 4.6))
     bar_group(ax, 0, s, 0.16, label=True)
@@ -107,7 +107,7 @@ def chart_pooled(cases, cov, out):
     return s
 
 
-def chart_by_target(per_target: dict[str, dict], covs: dict[str, dict], out):
+def chart_by_target(per_target: dict[str, dict], out):
     targets = list(per_target)
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(12, 5.6), gridspec_kw={"width_ratios": [1.3, 1], "wspace": 0.45})
     w = 0.8 / 5
@@ -231,12 +231,10 @@ def topic(rx: str, beh: str, diff: str) -> str:
 def chart_topics(rows_by_target: dict[str, dict], out):
     calls: dict[str, Counter] = defaultdict(Counter)
     examples: dict[str, Counter] = defaultdict(Counter)
-    n_pred = Counter()
     for t, rows in rows_by_target.items():
         for key, r in rows.items():
             if key[3] != "olens":
                 continue
-            n_pred[t] += 1
             beh, diff = sections(r["messages"][1]["content"])
             for m in r["messages"]:
                 for tc in m.get("tool_calls") or []:
@@ -331,8 +329,8 @@ def main():
     pooled_cases = {(f"{t}: {k[0]}", *k[1:]): v for t, cs in cases_by_target.items() for k, v in cs.items()}
     pooled_rows = {(f"{t}: {k[0]}", *k[1:]): v for t, rs in rows_by_target.items() for k, v in rs.items()}
     pooled_cov = coverage(pooled_rows, pooled_cases)
-    pooled_stats = chart_pooled(pooled_cases, pooled_cov, args.out)
-    chart_by_target(per_target, covs, args.out)
+    pooled_stats = chart_pooled(pooled_cases, args.out)
+    chart_by_target(per_target, args.out)
     topics = chart_topics(rows_by_target, args.out)
     tools = chart_tools(rows_by_target, args.out)
     robustness = modelchart.make(args.out)

@@ -10,9 +10,9 @@ from collections import Counter
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
+from cfbench.core import P_MAX, P_MIN
 from cfbench.tools import Tool, call
 
-P_MIN, P_MAX = 0.01, 0.99
 MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
 EFFORT = "medium"  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 

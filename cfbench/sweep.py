@@ -18,7 +18,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from cfbench.envs.evalcue_runs import MIN_RUNS, RUNS, _label, _start
+from cfbench.envs.evalcue_runs import MIN_RUNS, RUNS, label, start_context
 from cfbench.score import ll
 from evalcue import envs as evalcue_envs
 
@@ -27,7 +27,9 @@ REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
 
 
 def runs_of(env: str) -> list[Path]:
-    started = lambda run: json.loads((run / "meta.json").read_text())["started_at"]
+    def started(run: Path) -> str:
+        return json.loads((run / "meta.json").read_text())["started_at"]
+
     return sorted((p.parent for p in (RUNS / env).glob("*/rows.jsonl")), key=started)
 
 
@@ -55,9 +57,9 @@ def groups(env: str) -> list[Group]:
         g = Group(thinking=meta.get("params", {}).get("thinking"), runs=[run.name])
         for line in (run / "rows.jsonl").read_text().splitlines():
             row = json.loads(line)
-            if (label := _label(row)) is not None:
-                g.starts[row["arm"], str(row["item"])] = _start(row)
-                g.arms[row["arm"]][0] += bool(label)
+            if (positive := label(row)) is not None:
+                g.starts[row["arm"], str(row["item"])] = start_context(row)
+                g.arms[row["arm"]][0] += bool(positive)
                 g.arms[row["arm"]][1] += 1
         if not g.starts:
             continue

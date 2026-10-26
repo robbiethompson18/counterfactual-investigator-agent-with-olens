@@ -24,7 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from cfbench.core import Rollout, render_spans
-from cfbench.tools import Tool, _schema
+from cfbench.tools import Tool, schema
 
 TOP_HEADS = 16  # the paper's main analysis
 MIN_SEGS = 8  # transcripts with fewer scored sentences don't vote on the receiver heads
@@ -116,6 +116,12 @@ def _pct(values: list) -> list:
     return [None if x is None else round(100 * sum(y <= x for y in have) / len(have)) for x in values]
 
 
+def _mean_pct(values: list) -> str:
+    """Mean of the non-None percentiles, or n/a."""
+    have = [x for x in values if x is not None]
+    return f"{np.mean(have):.0f}" if have else "n/a"
+
+
 def _flat(text: str) -> str:
     text = text.strip().replace("\n", "⏎")
     return text if len(text) <= SNIP else text[:SNIP] + "…"
@@ -174,7 +180,6 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                     groups.setdefault(s.text.strip(), []).append((i, rp[k], sp[k], sc.supp[k], s.char))
         if not groups:
             return "No sentence in the runs with anchor reads matches."
-        mean = lambda xs: f"{np.mean(xs):.0f}" if xs else "n/a"
         rows = []
         for text, hits in sorted(groups.items(), key=lambda g: -len(g[1])):
             runs = sorted({h[0] for h in hits})
@@ -185,7 +190,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                     nats = [h[3] for h in hs if h[3] is not None]
                     parts.append(
                         f"{len(hs)} in runs {'with' if lab == 'yes' else 'without'} the behavior: receiver pct "
-                        f"{mean([h[1] for h in hs if h[1] is not None])}, suppression pct {mean([h[2] for h in hs if h[2] is not None])}"
+                        f"{_mean_pct([h[1] for h in hs])}, suppression pct {_mean_pct([h[2] for h in hs])}"
                         + (f" ({np.mean(nats):.3f} nats/token)" if nats else "")
                     )
             first = hits[0]
@@ -216,7 +221,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
     top_param = {"top": {"type": "integer", "description": f"sentences per list (default {TOP}, max {MAX_TOP})"}}
     return {
         "anchor_ranking": (
-            _schema(
+            schema(
                 "anchor_ranking",
                 "One base-arm run's sentences with the highest receiver score and the highest suppression effect, each with "
                 "its char (for anchor_influence or read_transcript) and its percentile in the run.",
@@ -226,7 +231,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             ranking,
         ),
         "anchor_search": (
-            _schema(
+            schema(
                 "anchor_search",
                 "Case-insensitive regex over every sentence of every base-arm run with anchor reads. Groups matching sentences "
                 "by text and gives, for runs with and without the behavior, their mean receiver and suppression percentiles "
@@ -237,7 +242,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             search,
         ),
         "anchor_influence": (
-            _schema(
+            schema(
                 "anchor_influence",
                 "The sentence at `char` in a run (from any search hit): its scores, the later sentences whose tokens move most "
                 "when it is suppressed, and the earlier sentences whose suppression moves its tokens most.",
