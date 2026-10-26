@@ -305,6 +305,10 @@ Current docs:
 - [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
   harness version
+- [cfbench regraded as binary — read before asking whether the report's RMSE conclusions depend on the scoring, or scoring 'does the rate move ≥ T pp?'](docs/cfbench-binary-regrade.md)
+  — same Flash predictions as yes/no at T = 5–30pp: O-lens vs placebo still a wash; on GLM
+  env-diff-only wins the binary grading (bigger moves, no overshoot penalty); needs a real
+  binary-prompt rerun to compare formats
 - [cfbench by predictor model — read before choosing a cfbench predictor, effort or tool budget, or claiming O-lens uplift across models](docs/cfbench-model-chart.md)
   — 7 models × env diff/transcript/O-lens/placebo on 4 cases (100 − RMSE): transcripts worth up to
   +21pp, O-lens beats placebo only for Flash and Argon via hidden_goal; Flash effort and tool-budget
@@ -362,7 +366,8 @@ Current docs:
   pre-registered 38-case test (+0.07 skill, carried by a few cases, via "stricter score" reads at
   `Score:`); pasting reads into the prompt (closed #116) is a dead end
 - [Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
-  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with CIs
+  — GLM 5.3 runs (glm53-* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, gaps with
+  CIs
 - [Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits
@@ -380,8 +385,8 @@ Current docs:
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
 - [GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
-  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s on 4xB200,
-  so subsample long coding episodes)
+  — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s
+  on 4xB200, so subsample long coding episodes)
 - [Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
   — keyword match over prompt-side reads vs VEA across 21 settings: null within condition, null or
   negative across tasks (eval words in reads track graded-task content, e.g. unit tests);
