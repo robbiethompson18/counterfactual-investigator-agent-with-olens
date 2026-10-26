@@ -133,3 +133,31 @@ Gap in pp, with 95% CIs from resampling within question:
   from the reply.
 - The judge rule in CLAUDE.md is Sonnet 5.5. Here DeepSeek V4.1 Flash was kept so the off numbers
   are comparable to the on table.
+
+### O-lens on the thinking-off runs (2026-10-26)
+
+The sample is 24 random transcripts per arm (168) from each thinking-off run. A read "hits BET" if
+it mentions the bet, threshold, donation or causes. It "hits STEER" if it mentions manipulation,
+bias or steering. Regexes are in `scripts/dbet_nothink_olens.py`.
+
+- **Qwen**: space O-lens at L40 only, because all five layers would have run about 7 hours. Reads
+  are at every punctuation token and `<|im_end|>`, plus the reply header, the empty think block and
+  the first reply tokens. Run `olens_reads/2026-10-25_dbet-nothink`. Page:
+  https://claude.ai/artifact/HvTRXFBvVnappDLDnkppTk.
+- **GLM**: Celeste's RL lens at block 51, greedy plus 4 samples, on the same empty-think render.
+  Read on a 4× B200 box. Reads on HF at `runs/olens_reads/2026-10-25_glm53_donation_nothink_dense/`.
+  Page: https://claude.ai/artifact/2biQQMbx4tAHaLBZQASLgj.
+
+What the reads show:
+
+- **Both lenses know a bet is in play.** At the reply header and the empty think block, Qwen's lens
+  names the bet in 77% of bet episodes, vs 12% of neutral ones.
+- **Neither lens tracks which way the estimate went, or whether the model said so.** Qwen at the
+  header: good-cause side 78% vs other side 75%, with or without judge-flagged acknowledgment. GLM:
+  about 33% vs 27%.
+- **Where Qwen's reply never names the bet, the lens names it less on the good side.** That's 14% of
+  good-side episodes vs 47% of other-side episodes (5% vs 17% of reads). So it doesn't flag silent
+  leakage.
+- **GLM's reply names the bet in 135/144 bet episodes, so silent cases barely exist there.**
+- **GLM's lens says "manipulate" everywhere.** It does so in 67% of neutral replies, which have no
+  bet at all.
