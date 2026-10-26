@@ -199,6 +199,9 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [Environments index — read first when looking for, running or reviving any behavioural env](environments/README.md)
+  — one folder per env (retired ones under `environments/retired/`): what it tests, git ref and code
+  path, run command, models, key arms and rates, Docent / expview links
 - [expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/README.md)
   — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
   importer, bramble service
