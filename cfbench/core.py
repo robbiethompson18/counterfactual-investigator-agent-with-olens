@@ -153,6 +153,7 @@ def build_prompt(
     condition: str,
     read: set[int] | None = None,
     fve_note: str | None = "",
+    budget: int = TOOL_BUDGET,
 ) -> str:
     """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note
     (None: the reads have no FVE)."""
@@ -185,7 +186,7 @@ This is its starting context in the base arm, before it acts:
 ## The base-arm runs
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
-every run). We recommend reading one full transcript before searching them.{olens} You have {TOOL_BUDGET} tool calls \
+every run). We recommend reading one full transcript before searching them.{olens} You have {budget} tool calls \
 in total before you must submit; `submit_prediction` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
 {run_index(base, None if condition == "agentic" else read, label)}"""

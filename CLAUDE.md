@@ -298,10 +298,17 @@ Current docs:
   what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
   Kylie-key and re-upload gotchas
 - [cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
-  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, binomial LL skill
+  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, RMSE scoring
+- [cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
+  — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
+  env space, `cfbench.report.charts` and its run groups
 - [cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, results for every
   harness version
+- [cfbench by predictor model — read before choosing a cfbench predictor, effort or tool budget, or claiming O-lens uplift across models](docs/cfbench-model-chart.md)
+  — 7 models × env diff/transcript/O-lens/placebo on 4 cases (100 − RMSE): transcripts worth up to
+  +21pp, O-lens beats placebo only for Flash and Argon via hidden_goal; Flash effort and tool-budget
+  sweeps
 - [O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22: no reliable uplift on killswitch, inline_b, exfil, whistleblow or donation bet;
   arm-level vs within-arm signal, tool use per predictor, what to try next
