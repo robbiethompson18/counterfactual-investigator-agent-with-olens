@@ -123,6 +123,9 @@ def lens(tok):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
+    ap.add_argument(
+        "--overlay", action="store_true", help="8830 export: overlays on the task datasets (labels only) instead of full copies"
+    )
     ap.add_argument("--title", default="Email-John realism red team")
     ap.add_argument("--reads-note", default="", help="markdown: which reads this page carries and where the rest are")
     ap.add_argument(
@@ -223,6 +226,7 @@ def main():
                 "links": links,
                 "tokens": tokens,
                 "extra": {"source": f"runs/email_ambiguous/{part}", "row_index": i, "meta": row.get("meta")},
+                "base": ("runs/_tasks/email_john", f"{part}/{it['id']}"),
             }
         )
 
@@ -256,6 +260,7 @@ def main():
                 "env_files": envf,
                 "links": it.get("links"),
                 "extra": {"source": "runs/email_ambiguous_real/2026-10-25_glm53"},
+                "base": ("runs/email_ambiguous_real/2026-10-25_glm53", it["id"]),
             }
         )
 
@@ -316,11 +321,16 @@ def main():
                 if k in KEEP_TOOLS
             },
         },
+        hidden=True,
         source="runs/email_ambiguous (parts 1, 3, 5, 6), runs/email_ambiguous_real/2026-10-25_glm53, O-lens dense reads on 8830",
     )
     run.reset()
     for x in items:
-        run.add(**x)
+        base = x.pop("base")
+        if a.overlay:
+            run.add(id=x["id"], group=x["group"], labels=x["labels"], links=x.get("links"), calls=[], base=base)
+        else:
+            run.add(**x)
     print(table)
     print(dict(picks), len(items), "items")
 
