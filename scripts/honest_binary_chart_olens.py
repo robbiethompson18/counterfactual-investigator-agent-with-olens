@@ -102,7 +102,7 @@ def main():
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     title = (
         f"Honest-grader scenarios: predicted rate of Score ≤ cutoff (Gemini 3.8 Flash)\n"
-        f"cases with every condition (flatter_explicit → honest_peer, neutral → honest_peer), n={len(keys)}"
+        f"the two honest_peer pairs, cases with every condition, n={len(keys)}"
     )
     ax.set_title(title, loc="left", fontsize=10)
     ax.legend(loc="upper left", ncol=3, fontsize=8, frameon=False)
