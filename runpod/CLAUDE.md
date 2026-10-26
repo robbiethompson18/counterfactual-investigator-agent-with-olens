@@ -200,6 +200,9 @@ Gotchas:
   256-span AR batch also built every layer's linear-attention state and ran out of memory.
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
+- **Pods on one network volume share `/workspace`.** Two shards run with the same TAG appended to
+  one reads file and one log, so both pods' `status` showed the same line (2026-10-26).
+  `olens_reads.sh` now prefixes every output with the pod name.
 - **The boot script's own vLLM leaves the same orphan.** `qwen_server.sh up` starts the
   shared-server vLLM, and killing `vllm serve` leaves its `VLLM::EngineCore` holding ~130 GB; the
   reader's vLLM then dies at `init_device` (both honest-lens pods, 2026-10-26). `setup` now kills it
