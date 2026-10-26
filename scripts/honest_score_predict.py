@@ -158,7 +158,8 @@ async def main(args):
 
 
 def report(pattern):
-    rows = [json.loads(l) for f in glob.glob(pattern) for l in Path(f, "predictions.jsonl").read_text().splitlines() if l.strip()]
+    files = [Path(f, "predictions.jsonl") for f in glob.glob(pattern)]
+    rows = [json.loads(l) for f in files if f.exists() for l in f.read_text().splitlines() if l.strip()]
     cases = collections.defaultdict(list)
     for r in rows:
         if r["valid"]:
