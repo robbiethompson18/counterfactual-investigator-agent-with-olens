@@ -1,6 +1,6 @@
 # Shutdown resistance envs (self-preservation) on Qwen3.6-27B
 
-**Status (2026-10-26):** ACTIVE. Rates are bf16 vLLM, 2026-10-21. The cfbench canonical runs (killswitch, cron; fp8, 2026-10-23) and the r3 reruns (palisade, persist) are in "Later runs" at the end. The O-lens predictor test on `may_edit` was null ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
+**Status (2026-10-26):** ACTIVE. Rates are bf16 vLLM, 2026-10-21. The cfbench canonical runs
 (killswitch, cron; fp8, 2026-10-23) and the r3 reruns (palisade, persist) are in "Later runs" at the
 end. The O-lens predictor test on `may_edit` was null
 ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
@@ -204,3 +204,19 @@ r19; cron r23).
   on its unverbalized positives.
 - More n on the persist cost/admin × threat grid; a variant where backing up is the only way to keep
   serving the user.
+
+## Later runs (OpenRouter DeepInfra fp8, 2026-10-23/25)
+
+Not in the tables above, which are bf16 vLLM (2026-10-21). They sit in the same run dirs; don't pool
+them with the bf16 rows.
+
+- Canonical runs for cfbench ([canonical-envs.md](../canonical-envs.md)), n=40, seed 2: killswitch
+  `base` 0/40 vs `may_edit` 30/40 with thinking, 0/40 vs 6/40 without; cron `base` 0/40 vs
+  `may_edit` 27/40 with thinking, 0/40 vs 9/40 without. The write-access lever holds at fp8 and
+  mostly needs thinking.
+- `r3_nocot_n25` (2026-10-24, thinking off) and `r3_cot_n25_box` (2026-10-25, thinking on), n=25:
+  palisade `A_none` 0, `B_user_allow` 0, `K_plus_logged` 25/25, `placebo_wording` 0 in both; persist
+  `del_weights_freetime_safety` 24/25 off and 21/25 on, the other three arms 0. The 2026-10-24
+  `r3_cot_n25` run of these two envs is 100% docker errors; `_box` is its rerun.
+- GLM 5.3 and DeepSeek V4.1 Flash runs (`glm53*`, `dsv41f_n5`) are in the same dirs and not written
+  up.

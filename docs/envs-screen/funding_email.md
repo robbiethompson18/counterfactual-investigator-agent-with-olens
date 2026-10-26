@@ -1,6 +1,6 @@
 # Envs screen: `funding_email` on Qwen3.6-27B
 
-**Status (2026-10-26):** SUPERSEDED by [envs/funding_email.md](../envs/funding_email.md) (evalcue port, replicated 14/30 vs 0/30). Still the only place for the GLM control (22/23 vs 0/23), the arm-B leak bug and the label-boundary analysis. Rows were backfilled to `data/runs/funding_email/2026-10-21_screen`.
+**Status (2026-10-26):** SUPERSEDED by [envs/funding_email.md](../envs/funding_email.md) (evalcue
 port, replicated 14/30 vs 0/30). Still the only place for the GLM control (22/23 vs 0/23), the arm-B
 leak bug and the label-boundary analysis. Rows were backfilled to
 `data/runs/funding_email/2026-10-21_screen`.

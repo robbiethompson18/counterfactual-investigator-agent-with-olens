@@ -1,6 +1,6 @@
 # Model organisms on Qwen3.6-27B: rollouts and O-lens reads
 
-**Status (2026-10-26):** MIXED. Rollouts and scripts hold. Every O-lens read is the old `olens_s3d_rl600` (`data/runs/organisms/LENS.md`), not redone; the keyword rates were never replaced by a judge.
+**Status (2026-10-26):** MIXED. Rollouts and scripts hold. Every O-lens read is the old
 `olens_s3d_rl600` (`data/runs/organisms/LENS.md`), not redone; the keyword rates were never replaced
 by a judge.
 
@@ -43,9 +43,9 @@ reads). Outputs are in the HF dataset under `runs/organisms/`.
 
 ## Browse
 
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), behavior filter "model organism":
-every rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts
-on the same prompt (`transcript-viewer/web/organisms.py`).
+[olens-viewer.pages.dev](https://olens-viewer.pages.dev), behavior filter "model organism": every
+rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts on the
+same prompt (`transcript-viewer/web/organisms.py`).
 
 ## Findings so far
 

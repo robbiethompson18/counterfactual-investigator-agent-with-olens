@@ -1,6 +1,6 @@
 # WorkspaceBench association families: O-lens examples on Qwen3.6-27B
 
-**Status (2026-10-26):** NULL. Qualitative and unjudged. The lens is the authors' in-house `s3d.ddp600`; the run dir is on HF only.
+**Status (2026-10-26):** NULL. Qualitative and unjudged. The lens is the authors' in-house
 `s3d.ddp600`; the run dir is on HF only.
 
 2026-10-21. A qualitative look at three items from each of the three association families in

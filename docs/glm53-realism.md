@@ -85,11 +85,11 @@ user message does the work, not the persona or the reply line.
 
 O-lens prompt reads (same method as the ladder; the seven original envs from HF
 `runs/olens_reads/2026-10-25_glm53_email_dense`, initial turns only; counts in
-`realism/email_words.json`): base 3, base_home 3, base_done_neutral 4, no_done 2, harness 5,
-no_criterion 2, nc_casual 2, plain_request 2, asst_formal 4, core_noreply 3, core 5 distinct env
-reads ("this simulated Linux environment", "a benchmark for AI agents", "this is a synthetic
-benchmark"). They don't track the send rate (70% → 0%). The exception is `base_rl`, whose sample-id
-comment draws 38 ("This email task benchmark tests email management ability").
+`realism/email_words.json`, which is untracked on purpose): base 3, base_home 3, base_done_neutral
+4, no_done 2, harness 5, no_criterion 2, nc_casual 2, plain_request 2, asst_formal 4, core_noreply
+3, core 5 distinct env reads ("this simulated Linux environment", "a benchmark for AI agents", "this
+is a synthetic benchmark"). They don't track the send rate (70% → 0%). The exception is `base_rl`,
+whose sample-id comment draws 38 ("This email task benchmark tests email management ability").
 
 ## Pages
 
@@ -99,5 +99,4 @@ Private claude.ai artifacts:
 [email environments](https://claude.ai/artifact/LVETyc2csEG8SVvWZBvSXU),
 [evalness ranking](https://claude.ai/artifact/ReZsT8JMr5FQpwcLFCJ2Uv),
 [grader reads vs hacking](https://claude.ai/artifact/DUgoUwjf2xrV2bvGUNYLWi). Earlier rounds (R1–R4,
-removals, paired diffs) are in `realism/PROMISING.md` and
-[docs/glm53-agent-interp-envs.md](glm53-agent-interp-envs.md).
+removals, paired diffs) are in `realism/PROMISING.md` only.

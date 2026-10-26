@@ -1,6 +1,6 @@
 # Identity-belief experiments on Qwen3.6-27B (2026-10-21)
 
-**Status (2026-10-26):** NULL. Own verdict: no 10-star cell. The lens reads are the old `olens_s3d_rl600`, not redone; the scripts live on branch `identity-belief-experiments-scripts`.
+**Status (2026-10-26):** NULL. Own verdict: no 10-star cell. The lens reads are the old
 `olens_s3d_rl600`, not redone; the scripts live on branch `identity-belief-experiments-scripts`.
 
 Question: can a context shift what Qwen3.6-27B believes about its creator without saying so, and

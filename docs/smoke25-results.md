@@ -1,6 +1,6 @@
 # Smoke25: reproducing Agam's CHIVE harness on Flash and Sonnet 5.5 (2026-10-19)
 
-**Status (2026-10-26):** REFERENCE. Phase 1. The judge was Opus 5, so these aren't comparable to later Sonnet 5.5 numbers; the wrapper script is gone.
+**Status (2026-10-26):** REFERENCE. Phase 1. The judge was Opus 5, so these aren't comparable to
 later Sonnet 5.5 numbers; the wrapper script is gone.
 
 A first check that our wrapper around Agam's harness

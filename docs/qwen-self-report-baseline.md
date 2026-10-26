@@ -1,6 +1,6 @@
 # Qwen self-report baseline (2026-10-19)
 
-**Status (2026-10-26):** REFERENCE. Phase 1 (Agam's harness). The clean comparison against the Flash/Sonnet agent was never run.
+**Status (2026-10-26):** REFERENCE. Phase 1 (Agam's harness). The clean comparison against the
 Flash/Sonnet agent was never run.
 
 Can Qwen3.6-27B, the model that produced each CHIVE rollout, say why it behaved that way? We ran it

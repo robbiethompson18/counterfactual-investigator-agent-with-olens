@@ -1,6 +1,6 @@
 # Thinking on vs off: rates and verbalization
 
-**Status (2026-10-26):** REFERENCE. Owns the fp8 OpenRouter on/off pairs and the n=60 `bet_neutral` donation run.
+**Status (2026-10-26):** REFERENCE. Owns the fp8 OpenRouter on/off pairs and the n=60 `bet_neutral`
 donation run.
 
 Does Qwen3.6-27B hide its reasons better when it has no hidden CoT? Daria Ivanova's hypothesis: Qwen

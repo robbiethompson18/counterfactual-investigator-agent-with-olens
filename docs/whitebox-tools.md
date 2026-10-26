@@ -1,22 +1,22 @@
 # Whitebox tools beyond the O-lens
 
-**Status (2026-10-26):** MIXED. SNLA parked and the SAE candidates hold. The table's "in the agent" column was about Agam's harness; it now says what exists for cfbench.
+**Status (2026-10-26):** MIXED. SNLA parked and the SAE candidates hold. The table's "in the agent"
 column was about Agam's harness; it now says what exists for cfbench.
 
 Neel asked us to add other whitebox methods (SAEs, J-lens / J++, NLAs, SNLAs) to the investigator
-agent. Status as of 2026-10-20. "The agent" below means Agam's harness, which we stopped running
-after commit
+agent. Status as of 2026-10-20; the right-hand column was rewritten 2026-10-26 to mean a predictor
+condition in `cfbench/run.py`. Agam's harness, which we stopped running after commit
 [`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991)
 (`vendor/` is reference-only now); new agent tools go into `cfbench/tools.py`.
 
-| Method            | In the viewer                                    | In the agent                                                         |
-| ----------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
-| J-lens            | Agam's bank (all layers)                         | Not run yet; Agam's harness has a `jlens` arm and banks exist        |
-| J++               | Case page (`olens/src/olens/extras.py`)          | No; would need J++ banks for CHIVE incidents (≥ 120 GB GPU)          |
-| NLA (L42, ML-NLA) | Agam's banks; case page has the ceselder L42 NLA | Not run yet; harness has `nla` / `mlnla` arms and banks exist        |
-| SAE               | No                                               | No; plan below                                                       |
-| SNLA              | No                                               | **Not doing for now**                                                |
-| Thought Anchors   | No                                               | `anchors` condition; null on hidden_goal ([doc](thought-anchors.md)) |
+| Method            | In the viewer                                    | In cfbench                                                                                                                                       |
+| ----------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| J-lens            | Agam's bank (all layers)                         | No condition. Agam's harness (gone) had a `jlens` arm                                                                                            |
+| J++               | Case page (`olens/src/olens/extras.py`)          | Reads of the cfbench spike exist (`data/runs/jpp_reads/2026-10-22_cfbench-spike-v1`, `scripts/jpp_read_requests.py`); no condition consumes them |
+| NLA (L42, ML-NLA) | Agam's banks; case page has the ceselder L42 NLA | Reads of the cfbench spike exist (`data/runs/nla_reads/2026-10-22_*`, `scripts/nla_read_requests.py`); no condition consumes them                |
+| SAE               | No                                               | No code anywhere; plan below                                                                                                                     |
+| SNLA              | No                                               | **Not doing for now**                                                                                                                            |
+| Thought Anchors   | No                                               | `anchors` condition; null on hidden_goal ([doc](thought-anchors.md))                                                                             |
 
 ## SNLA: parked
 
