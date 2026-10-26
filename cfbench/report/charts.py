@@ -94,7 +94,6 @@ def chart_pooled(cases, cov, out):
     s = stats(cases)
     fig, ax = plt.subplots(figsize=(6.2, 4.6))
     bar_group(ax, 0, s, 0.16, label=True)
-    ax.axhline(acc(s["noise_floor"]), color=MUTED, ls=":", lw=1, zorder=1, label="ceiling (sampling noise)")
     ax.set_xlim(-0.5, 0.5)
     ax.set_xticks([])
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
@@ -113,8 +112,6 @@ def chart_by_target(per_target: dict[str, dict], covs: dict[str, dict], out):
     w = 0.8 / 5
     for i, t in enumerate(targets):
         bar_group(ax, i, per_target[t], w, label=i == 0)
-        nf = acc(per_target[t]["noise_floor"])
-        ax.plot([i - 0.45, i + 0.45], [nf, nf], color=MUTED, ls=":", lw=1, zorder=1, label="ceiling (sampling noise)" if i == 0 else None)
     ax.set_xticks(
         range(len(targets)),
         [f"{t}\n{per_target[t]['cases']} cases, {per_target[t]['envs']} envs\nESS {per_target[t]['ess_envs']:.1f} envs" for t in targets],

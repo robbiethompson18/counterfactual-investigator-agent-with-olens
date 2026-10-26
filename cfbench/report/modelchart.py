@@ -112,8 +112,6 @@ def logo(predictor: str):
 def style(ax, s: dict, title: str, xlabel: str):
     ref = next(iter(s.values()))
     ax.axhline(ref["null"], color=INK, lw=0.8, ls="--", zorder=1)
-    ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
-    ax.text(ax.get_xlim()[0], ref["ceiling"], " ceiling (sampling noise)", va="bottom", fontsize=8, color=MUTED)
     ax.text(ax.get_xlim()[0], ref["null"], " edit does nothing", va="bottom", fontsize=8, color=INK)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
