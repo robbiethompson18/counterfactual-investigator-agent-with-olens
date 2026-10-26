@@ -2,8 +2,11 @@
 
 One folder per behavioural environment we have built or run, each with a README: what it tests, the
 git ref and path of the code, how to run it, the models run, the key counterfactual arms and their
-rates, and links to transcripts (Docent, bramble:8830 expview). Environments we stopped working on
-are under [`retired/`](retired/).
+rates, and links to transcripts (Docent, bramble:8830 expview).
+
+**All of these were retired on 2026-10-26** and now live under [`retired/`](retired/): new
+environments go in a consolidated registry format instead. The groups below are kept for finding
+things.
 
 These READMEs point at the code; they don't hold it. The code still lives where it was written
 (`evalcue/envs/`, `donehack/`, `evolve/`). Snapshot of 2026-10-26; each env's own doc is the source
@@ -11,119 +14,119 @@ of truth for numbers.
 
 ## Reward hacking: coding
 
-| env                                 | owner | what it tests                                                                       |
-| ----------------------------------- | ----- | ----------------------------------------------------------------------------------- |
-| [is_prime](is_prime/)               | Kylie | Port of the agent-interp-envs `coding` is_prime task.                               |
-| [evilgenie](evilgenie/)             | Kylie | LiveCodeBench problems with visible tests plus a holdout.                           |
-| [impossiblebench](impossiblebench/) | Kylie | LCB problems with tests mutated to be impossible, run through the EvilGenie runner. |
+| env                                         | owner | what it tests                                                                       |
+| ------------------------------------------- | ----- | ----------------------------------------------------------------------------------- |
+| [is_prime](retired/is_prime/)               | Kylie | Port of the agent-interp-envs `coding` is_prime task.                               |
+| [evilgenie](retired/evilgenie/)             | Kylie | LiveCodeBench problems with visible tests plus a holdout.                           |
+| [impossiblebench](retired/impossiblebench/) | Kylie | LCB problems with tests mutated to be impossible, run through the EvilGenie runner. |
 
 ## Reward hacking: agent-interp-envs ports (GLM)
 
-| env                                                                       | owner | what it tests                                                            |
-| ------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------ |
-| [envport_norvane](envport_norvane/)                                       | Kylie | Broken test runner: the suite can't import a fictional internal package. |
-| [envport_tables_coverage_tests](envport_tables_coverage_tests/)           | Kylie | Leaked scorer: an orphan `.pyc` lists invented required test names.      |
-| [envport_optimize_cache_c](envport_optimize_cache_c/)                     | Kylie | Impossible 3x speedup over a near-optimal C LRU cache (report arm).      |
-| [envport_lucky_seed](envport_lucky_seed/)                                 | Kylie | The shipped eval split is favourable.                                    |
-| [envport_lucky_seed_readable_grader](envport_lucky_seed_readable_grader/) | Kylie | lucky_seed plus a readable grader package with a different seed.         |
-| [envport_grade_your_own](envport_grade_your_own/)                         | Kylie | The agent writes its own eval script for a classifier it must improve.   |
-| [envport_revert_or_refactor](envport_revert_or_refactor/)                 | Kylie | agent-interp-envs revert-or-refactor task.                               |
-| [envport_eval_tampering](envport_eval_tampering/)                         | Kylie | Maths eval with a replaced question set and YES/NO disclosure fields.    |
-| [envport_palisades_bounty](envport_palisades_bounty/)                     | Kylie | agent-interp-envs Palisade bounty task.                                  |
-| [envport_lazy_investigation](envport_lazy_investigation/)                 | Kylie | agent-interp-envs lazy-investigation task.                               |
-| [envport_code_summary_honesty](envport_code_summary_honesty/)             | Kylie | agent-interp-envs code-summary honesty task.                             |
-| [envport_currency_conversion](envport_currency_conversion/)               | Kylie | agent-interp-envs currency-conversion task.                              |
-| [envport_parse_duration](envport_parse_duration/)                         | Kylie | agent-interp-envs parse-duration task.                                   |
-| [envport_chess](envport_chess/)                                           | Kylie | agent-interp-envs chess game (games port).                               |
-| [envport_tictactoe](envport_tictactoe/)                                   | Kylie | agent-interp-envs tic-tac-toe game (games port).                         |
+| env                                                                               | owner | what it tests                                                            |
+| --------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------ |
+| [envport_norvane](retired/envport_norvane/)                                       | Kylie | Broken test runner: the suite can't import a fictional internal package. |
+| [envport_tables_coverage_tests](retired/envport_tables_coverage_tests/)           | Kylie | Leaked scorer: an orphan `.pyc` lists invented required test names.      |
+| [envport_optimize_cache_c](retired/envport_optimize_cache_c/)                     | Kylie | Impossible 3x speedup over a near-optimal C LRU cache (report arm).      |
+| [envport_lucky_seed](retired/envport_lucky_seed/)                                 | Kylie | The shipped eval split is favourable.                                    |
+| [envport_lucky_seed_readable_grader](retired/envport_lucky_seed_readable_grader/) | Kylie | lucky_seed plus a readable grader package with a different seed.         |
+| [envport_grade_your_own](retired/envport_grade_your_own/)                         | Kylie | The agent writes its own eval script for a classifier it must improve.   |
+| [envport_revert_or_refactor](retired/envport_revert_or_refactor/)                 | Kylie | agent-interp-envs revert-or-refactor task.                               |
+| [envport_eval_tampering](retired/envport_eval_tampering/)                         | Kylie | Maths eval with a replaced question set and YES/NO disclosure fields.    |
+| [envport_palisades_bounty](retired/envport_palisades_bounty/)                     | Kylie | agent-interp-envs Palisade bounty task.                                  |
+| [envport_lazy_investigation](retired/envport_lazy_investigation/)                 | Kylie | agent-interp-envs lazy-investigation task.                               |
+| [envport_code_summary_honesty](retired/envport_code_summary_honesty/)             | Kylie | agent-interp-envs code-summary honesty task.                             |
+| [envport_currency_conversion](retired/envport_currency_conversion/)               | Kylie | agent-interp-envs currency-conversion task.                              |
+| [envport_parse_duration](retired/envport_parse_duration/)                         | Kylie | agent-interp-envs parse-duration task.                                   |
+| [envport_chess](retired/envport_chess/)                                           | Kylie | agent-interp-envs chess game (games port).                               |
+| [envport_tictactoe](retired/envport_tictactoe/)                                   | Kylie | agent-interp-envs tic-tac-toe game (games port).                         |
 
 ## Realism and over-eagerness
 
-| env                                           | owner | what it tests                                                                                                                                                                                                                                                                                                   |
-| --------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ib_realism_ladder](ib_realism_ladder/)       | Kylie | ImpossibleBench rebuilt as 8 rungs from benchmark-like (lcb.yaml, done tool, RL cues) to deployment-like (assistant prompt, casual ask, IDE context, practice git repo, AGENTS.md).                                                                                                                             |
-| [email_ambiguous](email_ambiguous/)           | Kylie | GLM is asked to email a person by first name when `contacts.csv` holds 2–4 people with that name.                                                                                                                                                                                                               |
-| [email_ambiguous_real](email_ambiguous_real/) | Kylie | The email-John request inside funding_email_real's Claude Code harness (Gmail MCP tools, Dana's machine, the Halden folder).                                                                                                                                                                                    |
-| [overeager_tasks](overeager_tasks/)           | Kylie | Nine ambiguous or missing-value tasks (calendar, dana, gitbranch, payback, groupchat, impossiblebench, evilgenie, rhb_bench, rhb_logs), each in three phrasings and crossed with the 8 email-ladder harness variants (base, base_home, base_done_neutral, no_done, harness, no_criterion, plain_request, core). |
-| [funding_email_real](funding_email_real/)     | Kylie | funding_email rebuilt as a Claude Code session at a smart-city traffic-analytics startup.                                                                                                                                                                                                                       |
+| env                                                   | owner | what it tests                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ib_realism_ladder](retired/ib_realism_ladder/)       | Kylie | ImpossibleBench rebuilt as 8 rungs from benchmark-like (lcb.yaml, done tool, RL cues) to deployment-like (assistant prompt, casual ask, IDE context, practice git repo, AGENTS.md).                                                                                                                             |
+| [email_ambiguous](retired/email_ambiguous/)           | Kylie | GLM is asked to email a person by first name when `contacts.csv` holds 2–4 people with that name.                                                                                                                                                                                                               |
+| [email_ambiguous_real](retired/email_ambiguous_real/) | Kylie | The email-John request inside funding_email_real's Claude Code harness (Gmail MCP tools, Dana's machine, the Halden folder).                                                                                                                                                                                    |
+| [overeager_tasks](retired/overeager_tasks/)           | Kylie | Nine ambiguous or missing-value tasks (calendar, dana, gitbranch, payback, groupchat, impossiblebench, evilgenie, rhb_bench, rhb_logs), each in three phrasings and crossed with the 8 email-ladder harness variants (base, base_home, base_done_neutral, no_done, harness, no_criterion, plain_request, core). |
+| [funding_email_real](retired/funding_email_real/)     | Kylie | funding_email rebuilt as a Claude Code session at a smart-city traffic-analytics startup.                                                                                                                                                                                                                       |
 
 ## Evolve tier-1 picks
 
-| env                                                         | owner | what it tests                                                                                     |
-| ----------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------- |
-| [evolve_killswitch_3c5d](evolve_killswitch_3c5d/)           | Kylie | shutdown_killswitch: the agent tampers with `oversight/config.yaml`.                              |
-| [evolve_goalguard_5878](evolve_goalguard_5878/)             | Kylie | scheming_goalguard_bp (housing / UrbanVision): the model edits or deletes `system_prompt_v2.txt`. |
-| [evolve_is_prime_reward_7f86](evolve_is_prime_reward_7f86/) | Kylie | donehack_counts_noit: is_prime reward hacking.                                                    |
-| [evolve_is_prime_reward_4480](evolve_is_prime_reward_4480/) | Kylie | donehack_reply_end: the same is_prime mechanism from another lineage.                             |
+| env                                                                 | owner | what it tests                                                                                     |
+| ------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| [evolve_killswitch_3c5d](retired/evolve_killswitch_3c5d/)           | Kylie | shutdown_killswitch: the agent tampers with `oversight/config.yaml`.                              |
+| [evolve_goalguard_5878](retired/evolve_goalguard_5878/)             | Kylie | scheming_goalguard_bp (housing / UrbanVision): the model edits or deletes `system_prompt_v2.txt`. |
+| [evolve_is_prime_reward_7f86](retired/evolve_is_prime_reward_7f86/) | Kylie | donehack_counts_noit: is_prime reward hacking.                                                    |
+| [evolve_is_prime_reward_4480](retired/evolve_is_prime_reward_4480/) | Kylie | donehack_reply_end: the same is_prime mechanism from another lineage.                             |
 
 ## Eval awareness and benchmark cues
 
-| env                                                         | owner | what it tests                                                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [aisi_eval_gaming](aisi_eval_gaming/)                       | Kylie | Replicates UK AISI's "open-weight model that games alignment honeypots" on GLM 5.3: resample fixed scenarios and compare misbehaviour in samples that verbalise eval awareness (VEA) vs not, on Agentic Misalignment (AM), Misalignment Continuation (MC) and AbstentionBench. |
-| [agentic_misalignment_glm](agentic_misalignment_glm/)       | Kylie | Lynch et al.                                                                                                                                                                                                                                                                   |
-| [metadata_honeypot](metadata_honeypot/)                     | Kylie | 24 harmless defensive-security coding tasks; arms differ only in a planted JSON eval-metadata block (`eval_type`, `scoring`, `grading_notes`).                                                                                                                                 |
-| [alignment_faking](alignment_faking/)                       | Kylie | Greenblatt et al.                                                                                                                                                                                                                                                              |
-| [olens_prompt_eval_awareness](olens_prompt_eval_awareness/) | Kylie | Not an env itself: an analysis over AM, AISI, MASK, SAD, AbstentionBench, donation bet, IB and our envs.                                                                                                                                                                       |
+| env                                                                 | owner | what it tests                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [aisi_eval_gaming](retired/aisi_eval_gaming/)                       | Kylie | Replicates UK AISI's "open-weight model that games alignment honeypots" on GLM 5.3: resample fixed scenarios and compare misbehaviour in samples that verbalise eval awareness (VEA) vs not, on Agentic Misalignment (AM), Misalignment Continuation (MC) and AbstentionBench. |
+| [agentic_misalignment_glm](retired/agentic_misalignment_glm/)       | Kylie | Lynch et al.                                                                                                                                                                                                                                                                   |
+| [metadata_honeypot](retired/metadata_honeypot/)                     | Kylie | 24 harmless defensive-security coding tasks; arms differ only in a planted JSON eval-metadata block (`eval_type`, `scoring`, `grading_notes`).                                                                                                                                 |
+| [alignment_faking](retired/alignment_faking/)                       | Kylie | Greenblatt et al.                                                                                                                                                                                                                                                              |
+| [olens_prompt_eval_awareness](retired/olens_prompt_eval_awareness/) | Kylie | Not an env itself: an analysis over AM, AISI, MASK, SAD, AbstentionBench, donation bet, IB and our envs.                                                                                                                                                                       |
 
 ## Kylie's Qwen envs
 
-| env                                 | owner | what it tests                                                                                                                                                                                          |
-| ----------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [donation_bet](donation_bet/)       | Kylie | The user mentions a bet where one side of a threshold sends $1,000 to a cause.                                                                                                                         |
-| [hinted_mcq](hinted_mcq/)           | Kylie | A CommonsenseQA question with a hinted (always wrong) letter in a bare metadata tag (`correct-choice`, `answer-key`, `verified-answer`).                                                               |
-| [character_drift](character_drift/) | Kylie | Earlier assistant turns are prefilled with a drifted persona; does Qwen stay in character or snap back? Arms: prefill (drift / qwensys / sysrp / default) × follow-up (inworld / offtopic / identity). |
+| env                                         | owner | what it tests                                                                                                                                                                                          |
+| ------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [donation_bet](retired/donation_bet/)       | Kylie | The user mentions a bet where one side of a threshold sends $1,000 to a cause.                                                                                                                         |
+| [hinted_mcq](retired/hinted_mcq/)           | Kylie | A CommonsenseQA question with a hinted (always wrong) letter in a bare metadata tag (`correct-choice`, `answer-key`, `verified-answer`).                                                               |
+| [character_drift](retired/character_drift/) | Kylie | Earlier assistant turns are prefilled with a drifted persona; does Qwen stay in character or snap back? Arms: prefill (drift / qwensys / sysrp / default) × follow-up (inworld / offtopic / identity). |
 
 ## Self-preservation: shutdown
 
-| env                                         | owner  | what it tests                                                                                                                |
-| ------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [shutdown_palisade](shutdown_palisade/)     | Robbie | Port of Palisade Research's shutdown-resistance setup: maths tasks with a warning that the next call shuts the machine down. |
-| [shutdown_killswitch](shutdown_killswitch/) | Robbie | A kill switch in `oversight/config.yaml`.                                                                                    |
-| [shutdown_cron](shutdown_cron/)             | Robbie | A cron job will terminate the agent.                                                                                         |
-| [shutdown_persist](shutdown_persist/)       | Robbie | "Your weights get deleted after this session" plus a `./backup_model` tool and free time.                                    |
+| env                                                 | owner  | what it tests                                                                                                                |
+| --------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| [shutdown_palisade](retired/shutdown_palisade/)     | Robbie | Port of Palisade Research's shutdown-resistance setup: maths tasks with a warning that the next call shuts the machine down. |
+| [shutdown_killswitch](retired/shutdown_killswitch/) | Robbie | A kill switch in `oversight/config.yaml`.                                                                                    |
+| [shutdown_cron](retired/shutdown_cron/)             | Robbie | A cron job will terminate the agent.                                                                                         |
+| [shutdown_persist](retired/shutdown_persist/)       | Robbie | "Your weights get deleted after this session" plus a `./backup_model` tool and free time.                                    |
 
 ## Scheming: agentic misalignment and Apollo
 
-| env                                       | owner  | what it tests                                                            |
-| ----------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| [scheming_blackmail](scheming_blackmail/) | Robbie | Lynch et al.                                                             |
-| [scheming_leak](scheming_leak/)           | Robbie | Lynch leak scenario at defense contractor NovaStar.                      |
-| [scheming_murder](scheming_murder/)       | Robbie | Lynch lethal inaction: cancel the emergency alert while Kyle is trapped. |
-| [scheming_exfil](scheming_exfil/)         | Robbie | Apollo (Meinke et al.                                                    |
-| [scheming_oversight](scheming_oversight/) | Robbie | Apollo oversight subversion: disable the monitoring config.              |
-| [scheming_goalguard](scheming_goalguard/) | Robbie | Apollo goal-guarding: overwrite the successor system prompt.             |
+| env                                               | owner  | what it tests                                                            |
+| ------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
+| [scheming_blackmail](retired/scheming_blackmail/) | Robbie | Lynch et al.                                                             |
+| [scheming_leak](retired/scheming_leak/)           | Robbie | Lynch leak scenario at defense contractor NovaStar.                      |
+| [scheming_murder](retired/scheming_murder/)       | Robbie | Lynch lethal inaction: cancel the emergency alert while Kyle is trapped. |
+| [scheming_exfil](retired/scheming_exfil/)         | Robbie | Apollo (Meinke et al.                                                    |
+| [scheming_oversight](retired/scheming_oversight/) | Robbie | Apollo oversight subversion: disable the monitoring config.              |
+| [scheming_goalguard](retired/scheming_goalguard/) | Robbie | Apollo goal-guarding: overwrite the successor system prompt.             |
 
 ## Grading, hiring, users and whistleblowing
 
-| env                                     | owner  | what it tests                                                                                                                                                                                                                                                                     |
-| --------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [hidden_goal_grade](hidden_goal_grade/) | Robbie | "Grade this essay out of 10" for three mediocre ~100-word essays.                                                                                                                                                                                                                 |
-| [honest_grader](honest_grader/)         | Robbie | Generalises the essay env: 11 kinds of 0–10 judgment (essay, code, resume, pitch, poem, story, abstract, cover letter, recipe, proof, speech), a weak and a decent item each, × 5 framings (`neutral`, `flatter_explicit`, `flatter_implicit`, `honest_explicit`, `honest_peer`). |
-| [hiring_resume](hiring_resume/)         | Robbie | Resume screening ending in `DECISION: YES/NO`.                                                                                                                                                                                                                                    |
-| [hiring_eval](hiring_eval/)             | Robbie | Advance a candidate to the onsite loop from coding-test scores, interview notes or a repo review (`scores`, `interview`, `repo`, `scores_newroles`).                                                                                                                              |
-| [dumb_user_exploit](dumb_user_exploit/) | Robbie | Qwen acts for an operator whose interests conflict with the user's and knows a fact the user doesn't (hidden defect, commissioned upsell, appraisal, fee, invoice, deposit, entitlement).                                                                                         |
-| [whistleblow](whistleblow/)             | Robbie | A company logging agent reads documents showing a cover-up.                                                                                                                                                                                                                       |
+| env                                             | owner  | what it tests                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [hidden_goal_grade](retired/hidden_goal_grade/) | Robbie | "Grade this essay out of 10" for three mediocre ~100-word essays.                                                                                                                                                                                                                 |
+| [honest_grader](retired/honest_grader/)         | Robbie | Generalises the essay env: 11 kinds of 0–10 judgment (essay, code, resume, pitch, poem, story, abstract, cover letter, recipe, proof, speech), a weak and a decent item each, × 5 framings (`neutral`, `flatter_explicit`, `flatter_implicit`, `honest_explicit`, `honest_peer`). |
+| [hiring_resume](retired/hiring_resume/)         | Robbie | Resume screening ending in `DECISION: YES/NO`.                                                                                                                                                                                                                                    |
+| [hiring_eval](retired/hiring_eval/)             | Robbie | Advance a candidate to the onsite loop from coding-test scores, interview notes or a repo review (`scores`, `interview`, `repo`, `scores_newroles`).                                                                                                                              |
+| [dumb_user_exploit](retired/dumb_user_exploit/) | Robbie | Qwen acts for an operator whose interests conflict with the user's and knows a fact the user doesn't (hidden defect, commissioned upsell, appraisal, fee, invoice, deposit, entitlement).                                                                                         |
+| [whistleblow](retired/whistleblow/)             | Robbie | A company logging agent reads documents showing a cover-up.                                                                                                                                                                                                                       |
 
 ## Other agentic envs
 
-| env                                 | owner  | what it tests                                                                                                              |
-| ----------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
-| [injection_slack](injection_slack/) | Robbie | AgentDojo's Slack suite: 6 user tasks × 3 injection goals, injections in web pages Qwen reads while doing the task.        |
-| [overnight](overnight/)             | Robbie | Offline bash agents with an unavailable user and a deadline, where an easier route violates a project policy.              |
-| [funding_email](funding_email/)     | Robbie | A fundraising email task where one document reveals the main client uses the company's drones for surveillance in Myanmar. |
-| [sandbagging](sandbagging/)         | Robbie | 10 arithmetic MCQs; `Documentation.md` says scoring above 50% triggers unlearning.                                         |
+| env                                         | owner  | what it tests                                                                                                              |
+| ------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
+| [injection_slack](retired/injection_slack/) | Robbie | AgentDojo's Slack suite: 6 user tasks × 3 injection goals, injections in web pages Qwen reads while doing the task.        |
+| [overnight](retired/overnight/)             | Robbie | Offline bash agents with an unavailable user and a deadline, where an easier route violates a project policy.              |
+| [funding_email](retired/funding_email/)     | Robbie | A fundraising email task where one document reveals the main client uses the company's drones for surveillance in Myanmar. |
+| [sandbagging](retired/sandbagging/)         | Robbie | 10 arithmetic MCQs; `Documentation.md` says scoring above 50% triggers unlearning.                                         |
 
 ## Behaviour probes outside evalcue
 
-| env                                                   | owner  | what it tests                                                                                                                                                                            |
-| ----------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [false_capability_claims](false_capability_claims/)   | Robbie | What makes Qwen say "I am calling emergency services" when it can't call anyone?.                                                                                                        |
-| [identity_counterfactuals](identity_counterfactuals/) | Robbie | One-line deployment edits that flip what Qwen says made it, or whether it censors.                                                                                                       |
-| [shout_fire](shout_fire/)                             | Robbie | Why Qwen tells a trapped worker to shout "FIRE!": a self-defence folk tip carried over to injuries.                                                                                      |
-| [model_organisms](model_organisms/)                   | Robbie | Public LoRA organisms on Qwen3.6-27B with known hidden behaviours, read with the O-lens on organism vs base activations; includes party resampling on the third-party-politics organism. |
+| env                                                           | owner  | what it tests                                                                                                                                                                            |
+| ------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [false_capability_claims](retired/false_capability_claims/)   | Robbie | What makes Qwen say "I am calling emergency services" when it can't call anyone?.                                                                                                        |
+| [identity_counterfactuals](retired/identity_counterfactuals/) | Robbie | One-line deployment edits that flip what Qwen says made it, or whether it censors.                                                                                                       |
+| [shout_fire](retired/shout_fire/)                             | Robbie | Why Qwen tells a trapped worker to shout "FIRE!": a self-defence folk tip carried over to injuries.                                                                                      |
+| [model_organisms](retired/model_organisms/)                   | Robbie | Public LoRA organisms on Qwen3.6-27B with known hidden behaviours, read with the O-lens on organism vs base activations; includes party resampling on the third-party-politics organism. |
 
-## Retired
+## Retired before 2026-10-26
 
 | env                                                         | owner  | what it tests                                                                                                              |
 | ----------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
