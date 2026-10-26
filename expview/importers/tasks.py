@@ -99,7 +99,7 @@ TASKS = {
         "title": "Email John, Claude Code harness · glm-5.3 · every part",
         "about": "The email task rebuilt in a Claude Code-like session (`email_ambiguous_real`). Settings are harness (core / full) "
         "× user style; the contacts domain and the tool-exposure variant are labels.",
-        "sources": [r"runs/email_ambiguous_real/2026-.*"],
+        "sources": [r"runs/email_ambiguous_real/2026-[^/]*/expview_olens"],  # our overlays (with O-lens reads) beside the run's own view
         "setting": real_setting,
         "gloss": lambda s: None,
     },
@@ -147,7 +147,7 @@ def build(name: str, cfg: dict, found: dict[str, Path], out_root: Path) -> dict:
     run.reset()
     groups, n_read, n = {}, 0, 0
     for d in srcs:
-        part = d.split("/")[-1]
+        part = next(x for x in reversed(d.split("/")) if not x.startswith("expview"))  # the run, not its view dir
         for line in (found[d] / "items.jsonl").read_text().splitlines():
             if not line.strip():
                 continue
