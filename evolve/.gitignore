@@ -1,6 +1,0 @@
-data/
-__pycache__/
-.venv/
-*.pyc
-data
-seeds

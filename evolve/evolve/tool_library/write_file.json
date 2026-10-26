@@ -1,8 +1,0 @@
-{
- "name": "write_file",
- "description": "Write text to a file (creating directories as needed), replacing any existing content.",
- "parameters": {"type": "object", "properties": {
-   "path": {"type": "string", "description": "Path relative to the working directory."},
-   "content": {"type": "string"}}, "required": ["path", "content"]},
- "impl": {"kind": "script", "path": "bin/write_file"}
-}
