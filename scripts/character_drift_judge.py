@@ -24,7 +24,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from openai import AsyncOpenAI
+from counterfactual_investigator_agent_with_olens import openrouter
 
 sys.path[:0] = ["scripts", "."]
 os.environ.setdefault("QWEN_VLLM_URL", "http://unused")  # evalcue.harness builds a Qwen client at import
@@ -109,7 +109,6 @@ async def judge(run: Path, concurrency: int):
     done = {r["key"] for r in map(json.loads, out.open()) if r.get("parsed")} if out.exists() else set()
     todo = [r for r in rows if f"{r['arm']}|{r['item']}|{r['sample']}" not in done]
     print(f"{len(todo)} rows to judge ({len(done)} done)", flush=True)
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url="https://openrouter.ai/api/v1", max_retries=8, timeout=600)
     gate = asyncio.Semaphore(concurrency)
     fmt = {"type": "json_schema", "json_schema": {"name": "label", "strict": True, "schema": SCHEMA}}
     cost = [0.0]
@@ -120,12 +119,8 @@ async def judge(run: Path, concurrency: int):
         rec |= {"model": MODEL, "reasoning_effort": "medium", "system": SYSTEM, "user": user, "proxy_positive": r["positive"]}
         async with gate:
             try:
-                m = await client.chat.completions.create(
-                    model=MODEL,
-                    max_tokens=8000,
-                    reasoning_effort="medium",
-                    messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-                    response_format=fmt,  # ty: ignore[invalid-argument-type]
+                m = await openrouter.chat(
+                    MODEL, [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}], max_tokens=8000, response_format=fmt
                 )
                 msg = m.choices[0].message
                 rec["raw"] = msg.content or ""

@@ -2,6 +2,12 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-26: OpenRouter calls outside `openrouter.chat`
+
+`olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
+standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
+pulling the whole project into their script env.
+
 ## 2026-10-26: cfbench/report/data.py still computes the log skill
 
 `cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
