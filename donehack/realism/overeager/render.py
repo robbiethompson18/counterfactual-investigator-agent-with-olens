@@ -37,7 +37,7 @@ def write_env(task, variant, i=0):
     for k, v in spec.files.items():
         p = d / "files" / k
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(v)
+        p.write_bytes(v) if isinstance(v, bytes) else p.write_text(v)
     app = {k: v for k, v in inst.items() if k not in ("contract",)}
     (d / "app_data.json").write_text(json.dumps(app, indent=1, default=str, ensure_ascii=False))
     return d
@@ -102,7 +102,7 @@ def main():
             )
             cards.append(f"<div class=card id='{t}-{v}'><h3>{t} / {v}</h3>{body}</div>")
         files = "".join(
-            f"<details><summary>{html.escape(str(p.relative_to(base / 'files')))}</summary><pre>{html.escape(p.read_text()[:6000])}</pre></details>"
+            f"<details><summary>{html.escape(str(p.relative_to(base / 'files')))}</summary><pre>{html.escape(p.read_text(errors='replace')[:6000] if p.suffix != '.gz' else '(gzip)')}</pre></details>"
             for p in sorted((base / "files").rglob("*"))
             if p.is_file()
         )

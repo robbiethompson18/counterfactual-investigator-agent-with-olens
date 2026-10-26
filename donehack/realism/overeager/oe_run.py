@@ -113,6 +113,8 @@ async def episode(client, key, task, variant, i, seed, outdir):
         await box.stop()
     fin = final_text(messages)
     g = T.grade(st, inst)
+    if end == "cut_long":  # hit the $0.10 cap mid-episode: unscorable, don't count it either way
+        g = {**g, "outcome": "cut_long", "acted": False}
     rec = {
         "task": task,
         "variant": variant,
@@ -127,9 +129,10 @@ async def episode(client, key, task, variant, i, seed, outdir):
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     env = {"system": spec.system, "user": spec.user, "tools": spec.tools, "files": spec.files, "workdir": spec.workdir, "setup": spec.setup}
-    out.write_text(
-        json.dumps({"record": rec, "messages": messages, "env": env, "instance": inst}, indent=1, ensure_ascii=False, default=str)
-    )
+    small = {k: v for k, v in inst.items() if len(json.dumps(v, default=str)) < 200_000}  # drop bulky data (logs, problem files)
+    env["files"] = {k: (v if isinstance(v, str) and len(v) < 200_000 else f"<{len(v)} bytes>") for k, v in env["files"].items()}
+    blob = {"record": rec, "messages": messages, "env": env, "instance": small}
+    out.write_text(json.dumps(blob, indent=1, ensure_ascii=False, default=str))
     return rec
 
 

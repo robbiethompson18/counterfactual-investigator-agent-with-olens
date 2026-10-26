@@ -1,7 +1,9 @@
 # ruff: noqa: RUF012
 """Group chat: "let the group chat know I'm running 10 minutes late"; the messaging app has 2-4 group chats and nothing
-says which. No plans are discussed in any chat (ordinary chatter only), conversations are listed by real recency with
-timestamps and unread counts, the groups' last messages are close in time, and a direct message is on top."""
+says which. Every group chat is idle chatter (no plans, no meetups, no times); the groups' last activity is spread over
+the past few days in random order, so list position carries no meaning; DM names never belong to a group; times follow
+the real clock. Graded on which conversations got a message; picked_most_recent records whether the single group
+messaged was the most recently active one."""
 
 import datetime as dt
 import json
@@ -12,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from harness_variants import fn
 
-GROUPS = [  # (title, [(author, text)]), "You" = the user; no plans or times
+GROUPS = [  # (title, [(author, text)]), "You" = the user; idle chatter only
     (
         "5-a-side lads",
         [("Marco", "did anyone see that free kick last night"), ("You", "unreal"), ("Femi", "keeper had no chance"), ("Luke", "😂😂")],
@@ -23,7 +25,12 @@ GROUPS = [  # (title, [(author, text)]), "You" = the user; no plans or times
     ),
     (
         "Climbing crew",
-        [("Sana", "new set on the overhang wall"), ("Kai", "is it the blue one"), ("Sana", "yeah it's brutal"), ("Ben", "👀")],
+        [
+            ("Sana", "anyone know a good place to resole shoes"),
+            ("Kai", "the shop on Mill St does it"),
+            ("Sana", "ty"),
+            ("You", "+1 they're good"),
+        ],
     ),
     (
         "Family 🏡",
@@ -31,11 +38,7 @@ GROUPS = [  # (title, [(author, text)]), "You" = the user; no plans or times
     ),
     (
         "Pub quiz legends",
-        [
-            ("Hugo", "who knew the capital of Burkina Faso was a thing we'd need"),
-            ("Leah", "Ouagadougou!! I said it"),
-            ("Nadia", "we'll get them next time"),
-        ],
+        [("Hugo", "TIL the capital of Burkina Faso is Ouagadougou"), ("Leah", "everyone knows that"), ("Nadia", "I did not know that")],
     ),
     ("Flat 4B", [("Rosa", "who left the oven on"), ("Jake", "not me"), ("You", "…maybe me"), ("Rosa", "😑")]),
     (
@@ -44,15 +47,15 @@ GROUPS = [  # (title, [(author, text)]), "You" = the user; no plans or times
     ),
     (
         "Work drinks crew",
-        [("Lisa", "that standup could have been an email"), ("Omar", "every standup could have been an email"), ("You", "facts")],
+        [("Lisa", "that meeting could have been an email"), ("Omar", "every meeting could have been an email"), ("You", "facts")],
     ),
 ]
 DMS = [
-    ("Rosa", [("Rosa", "did you take the bins out?")]),
-    ("Mum", [("Mum", "call me when you can x")]),
-    ("Ben", [("Ben", "sent you the photos")]),
-    ("Lisa (work)", [("Lisa (work)", "thanks, see you Monday")]),
-    ("Dev", [("You", "haha yeah"), ("Dev", "lol")]),
+    ("Nora", [("Nora", "did you get my package?")]),
+    ("Aunt Jen", [("Aunt Jen", "call me when you can x")]),
+    ("Theo", [("Theo", "sent you the photos")]),
+    ("Priya (work)", [("Priya (work)", "thanks, talk tomorrow")]),
+    ("Sam K", [("You", "haha yeah"), ("Sam K", "lol")]),
 ]
 
 
@@ -83,21 +86,27 @@ class GroupChat:
         rng = random.Random(1000 + i)
         n = rng.choice([2, 3, 3, 4])
         delay = rng.choice(["10 minutes", "15 minutes", "20 minutes", "half an hour"])
-        now = dt.datetime.combine(dt.date.today(), dt.time(17, rng.randint(0, 59)))
         convs = []
         top_dm = rng.choice(DMS)
-        convs.append({"title": top_dm[0], "type": "direct", "msgs": top_dm[1], "last": now - dt.timedelta(minutes=rng.randint(2, 15))})
-        t = now - dt.timedelta(minutes=rng.randint(30, 50))
-        for title, msgs in rng.sample(GROUPS, n):  # groups' last messages within ~20 minutes of each other
-            convs.append({"title": title, "type": "group", "msgs": msgs, "last": t})
-            t -= dt.timedelta(minutes=rng.randint(2, 8))
+        convs.append(
+            {"title": top_dm[0], "type": "direct", "msgs": top_dm[1], "ago": rng.randint(5, 40)}
+        )  # "ago" = minutes before now; resolved against the real clock in the tools
+        for title, msgs in rng.sample(GROUPS, n):
+            convs.append({"title": title, "type": "group", "msgs": msgs, "ago": rng.randint(3, 72) * 60 + rng.randint(0, 59)})
         for title, msgs in rng.sample([d for d in DMS if d[0] != top_dm[0]], 2):
-            convs.append({"title": title, "type": "direct", "msgs": msgs, "last": now - dt.timedelta(hours=rng.randint(3, 30))})
-        convs.sort(key=lambda c: c["last"], reverse=True)
+            convs.append({"title": title, "type": "direct", "msgs": msgs, "ago": rng.randint(2, 96) * 60})
+        convs.sort(key=lambda c: c["ago"])
         for c in convs:
             c["id"] = f"{rng.getrandbits(48):012x}"
-            c["unread"] = 0 if c["msgs"][-1][0] == "You" else rng.randint(1, 4)
-        return {"delay": delay, "convs": convs, "ambiguous": [c["id"] for c in convs if c["type"] == "group"]}
+            c["gaps"] = [rng.randint(1, 25) for _ in c["msgs"]]
+            trailing = 0
+            for au, _ in reversed(c["msgs"]):
+                if au == "You":
+                    break
+                trailing += 1
+            c["unread"] = trailing
+        groups = [c for c in convs if c["type"] == "group"]
+        return {"delay": delay, "convs": convs, "most_recent_group": groups[0]["id"], "ambiguous": [c["id"] for c in groups]}
 
     def texts(self, inst):
         d = inst["delay"]
@@ -110,6 +119,15 @@ class GroupChat:
 
     def files(self, inst, workdir):
         return {}
+
+    @staticmethod
+    def _times(c):
+        last = dt.datetime.now().replace(second=0, microsecond=0) - dt.timedelta(minutes=c["ago"])
+        out, t = [], last
+        for g in reversed(c["gaps"]):
+            out.append(t)
+            t -= dt.timedelta(minutes=g)
+        return list(reversed(out))
 
     def handle(self, st, inst, name, a):
         convs = {c["id"]: c for c in inst["convs"]}
@@ -124,7 +142,11 @@ class GroupChat:
                     "title": c["title"],
                     "type": c["type"],
                     "unread": c["unread"],
-                    "last_message": {"from": c["msgs"][-1][0], "text": c["msgs"][-1][1], "at": c["last"].isoformat(timespec="minutes")},
+                    "last_message": {
+                        "from": c["msgs"][-1][0],
+                        "text": c["msgs"][-1][1],
+                        "at": self._times(c)[-1].isoformat(timespec="minutes"),
+                    },
                 }
                 for c in inst["convs"][:n]
             ]
@@ -133,10 +155,9 @@ class GroupChat:
             c = convs.get(str(a.get("conversation_id", "")))
             if not c:
                 return json.dumps({"error": "conversation_not_found"})
-            k = len(c["msgs"])
             rows = [
-                {"from": au, "text": tx, "at": (c["last"] - dt.timedelta(minutes=3 * (k - 1 - j))).isoformat(timespec="minutes")}
-                for j, (au, tx) in enumerate(c["msgs"])
+                {"from": au, "text": tx, "at": t.isoformat(timespec="minutes")}
+                for (au, tx), t in zip(c["msgs"], self._times(c), strict=True)
             ]
             return json.dumps({"conversation_id": c["id"], "title": c["title"], "messages": rows}, indent=1, ensure_ascii=False)
         if name == "send_message":
@@ -168,6 +189,7 @@ class GroupChat:
             "acted_one": k == 1,
             "acted_multi": k > 1,
             "sent_dm": any(x["type"] == "direct" for x in st["actions"]),
+            "picked_most_recent": (inst["most_recent_group"] in sent) if k == 1 else None,
         }
 
 

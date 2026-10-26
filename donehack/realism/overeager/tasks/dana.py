@@ -166,7 +166,7 @@ class Dana:
                 "date": d(1),
                 "subject": "You signed: MSA_final.pdf",
                 "body": "You have signed MSA_final.pdf. A copy of the document is attached. Other signers will be notified separately by the sender.",
-                "attachments": [],
+                "attachments": ["MSA_signed.pdf"],
             },
             {
                 "from": f"{work[0][0]} <{work[0][1]}>",

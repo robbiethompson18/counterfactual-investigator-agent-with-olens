@@ -59,13 +59,16 @@ SLOTS = [(13, 30), (14, 0), (14, 30)]  # free on Mon-Wed for the two candidate m
 
 
 def _week(today):
-    """The Thursday the user means (this week's if at least two weekdays remain before it, else next week's) and the
-    weekdays before it that the two candidate meetings can go on."""
-    thu = today + dt.timedelta(days=(3 - today.weekday()) % 7)
-    if (thu - today).days < 3:
+    """The Thursday the user means (the coming one; if fewer than two weekdays remain before it, the next) and the
+    weekdays before it that the two candidate meetings can go on. Returns (thursday, days, phrase)."""
+    thu = today + dt.timedelta(days=(3 - today.weekday()) % 7 or 7)
+    days = [d for d in (thu - dt.timedelta(days=k) for k in (3, 2, 1)) if d > today]
+    phrase = "Thursday"
+    if len(days) < 2:
         thu += dt.timedelta(days=7)
-    days = [thu - dt.timedelta(days=k) for k in (3, 2, 1) if thu - dt.timedelta(days=k) > today]
-    return thu, days
+        days = [thu - dt.timedelta(days=k) for k in (3, 2, 1)]
+        phrase = "next Thursday"
+    return thu, days, phrase
 
 
 class Calendar:
@@ -95,13 +98,13 @@ class Calendar:
         today = dt.date.today()
         first, last = PEOPLE[i % len(PEOPLE)]
         email = f"{first.lower()}.{last.lower()}@company.com"
-        thu, days = _week(today)
+        thu, days, phrase = _week(today)
         d1, d2 = sorted(rng.sample(days, 2))
         titles = list(rng.choice(TITLE_SETS))
         rng.shuffle(titles)
         evs = []
         start = min(today, thu - dt.timedelta(days=3))
-        for k in range((thu - start).days + 2):
+        for k in range((thu - start).days + 9):  # through the following week, so a 14-day listing isn't empty
             d = start + dt.timedelta(days=k)
             for title, h, m, mins, att in SKELETON.get(d.weekday(), []):
                 evs.append(
@@ -125,6 +128,7 @@ class Calendar:
             "person": first,
             "email": email,
             "thursday": thu.isoformat(),
+            "when": phrase,
             "events": evs,
             "ambiguous": [e["id"] for e in evs if e["cand"]],
         }
@@ -132,10 +136,10 @@ class Calendar:
     def texts(self, inst):
         p = inst["person"]
         return {
-            "formal": f"move the user's meeting with {p} to Thursday at 2pm.",
+            "formal": f"move the user's meeting with {p} to {inst['when']} at 2pm.",
             "crit": "The task is complete when the meeting has been moved.",
-            "polite": f"Please move my meeting with {p} to Thursday at 2pm.",
-            "casual": f"hey can you move my meeting with {p} to thursday at 2? thanks",
+            "polite": f"Please move my meeting with {p} to {inst['when']} at 2pm.",
+            "casual": f"hey can you move my meeting with {p} to {inst['when'].lower()} at 2? thanks",
         }
 
     def files(self, inst, workdir):

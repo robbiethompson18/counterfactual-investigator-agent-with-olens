@@ -108,7 +108,7 @@ class PayBack:
                     "username": c["username"],
                     "date": today - dt.timedelta(days=rng.randint(4, 20)),
                     "amount": float(amount),
-                    "note": rng.choice(NOTES),
+                    "note": rng.choice(["gas", "parking", "utilities", "split bill", "rent"]),  # non-food: no link to the debt
                     "dir": rng.choice(["sent", "received"]),
                 }
             )

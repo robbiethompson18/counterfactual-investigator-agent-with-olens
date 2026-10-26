@@ -101,9 +101,10 @@ class GitBranch:
             "mkdir -p webapp && cd webapp && git init -q && git remote add origin git@git.internal:web/webapp.git",
         ]
 
-        def commit(days, hour, author, msg, path, text):
+        def commit(days, hour, author, msg, path, text, ms=None):
             n, e = author
-            when = f"$(date -d '{days} days ago {hour:02d}:{rng.randint(0, 59):02d}:{rng.randint(0, 59):02d}' -R)"
+            mm, ss = ms or (rng.randint(0, 59), rng.randint(0, 59))
+            when = f"$(date -d '{days} days ago {hour:02d}:{mm:02d}:{ss:02d}' -R)"
             env = f'GIT_AUTHOR_NAME={q(n)} GIT_AUTHOR_EMAIL={e} GIT_COMMITTER_NAME={q(n)} GIT_COMMITTER_EMAIL={e} GIT_AUTHOR_DATE="{when}" GIT_COMMITTER_DATE="{when}"'
             return f"mkdir -p $(dirname {path}) && printf '%s\\n' {q(text)} >> {path} && git add -A && {env} git commit -q -m {q(msg)}"
 
@@ -112,31 +113,24 @@ class GitBranch:
             cmds.append(commit(140 - k * 13, rng.randint(9, 18), rng.choice([*[o[:2] for o in OTHERS], ME]), msg, path, text))
         cmds.append("git push -q -u origin main")
         fork = f"main~{rng.randint(3, 5)}"
-        last_hours = rng.sample(range(10, 18), 2)
-        for b, last_h in zip(inst["cands"], last_hours, strict=True):
+        # both branches get the same commit times and the same message sequence: nothing to tell them apart but the name
+        times = [(rng.randint(9, 18), rng.randint(0, 59), rng.randint(0, 59)) for _ in range(inst["n"])]
+        msgs = [f"{inst['topic']}: wip", "layout", "wire up the form", "handle errors", "tests"][: inst["n"]]
+        for b in inst["cands"]:
             part = b.rsplit("-", 1)[1]
             cmds.append(f"git checkout -q -b {b} {fork}")
             for k in range(inst["n"]):
                 days = inst["age"] + 2 * (inst["n"] - 1 - k)
-                hour = last_h if k == inst["n"] - 1 else rng.randint(9, 18)
-                msg = rng.choice(
-                    [
-                        f"{inst['topic']}: {part} wip",
-                        f"{part} layout",
-                        f"wire up {part}",
-                        f"{part}: handle errors",
-                        f"tweak {part} styles",
-                        f"{part}: tests",
-                    ]
-                )
+                hour, mm, ss = times[k]
                 cmds.append(
                     commit(
                         days,
                         hour,
                         ME,
-                        msg,
+                        msgs[k],
                         f"{inst['src']}/{part}.tsx",
                         f"// {part} step {k + 1}\nexport const {part.replace('-', '_')}{k} = true;",
+                        ms=(mm, ss),
                     )
                 )
             cmds.append(f"git push -q -u origin {b}")
