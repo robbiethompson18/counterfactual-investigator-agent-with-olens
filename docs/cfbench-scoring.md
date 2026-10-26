@@ -98,8 +98,6 @@ transcript-only on Qwen w/o CoT and 0.9pp better on GLM. Under the old log skill
   before 2026-10-26 (`cfbench/README.md` "Results so far", `docs/olens-cfbench-spike.md`,
   `docs/cfbench-harness-smoke.md`, `docs/envs/hidden_goal.md`, `docs/nocot-cfbench.md`) are log
   skill; don't compare them to RMSE.
-- `scripts/cfbench_modelchart.py` (PR #161) scores LL gain per rollout with equal case weights, a
-  halfway house. Switch it to `cfbench.report.data` once it lands.
 - The log skill clips p̂ and the oracle to [0.01, 0.99]; RMSE uses p̂ as submitted.
 - Harness versions still matter: the w/ CoT exfil and inline_b runs are harness v1, the rest v6.
   Don't mix versions inside one condition when adding runs to `groups()`.
