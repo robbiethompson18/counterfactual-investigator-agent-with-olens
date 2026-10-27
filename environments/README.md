@@ -138,5 +138,4 @@ Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#env=E&arm=A&item=I`, `#e
 ## Not built yet (add when an env needs it)
 
 Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
-presets, arm factor dicts, Parquet episodes, regrading in a fresh container, and a richer env
-browser.
+presets, arm factor dicts, Parquet episodes, regrading in a fresh container.
