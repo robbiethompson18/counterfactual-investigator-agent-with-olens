@@ -41,3 +41,5 @@ Run Qwen on a vLLM pod (`--backend vllm --url ...`), not OpenRouter (about 3x th
 | `2026-10-27_pilot-glm53-nothink` | `z-ai/glm-5.3@openrouter-raw:any` (thinking off)           | 3200     | items 0:400, 8 arms                     |
 | `2026-10-27_pilot-qwen36-nothink` | `qwen/qwen3.6-27b@openrouter:deepinfra/fp8` (thinking off) | 3196     | stopped 4 short (abandoned); OpenRouter |
 | `2026-10-27_hints-pilot-dsv4f-nothink` | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 800 | `control` + 7 hint arms, `tqa-0`…`tqa-99`; relabelled `measure` after the `I think` regex fix |
+| `2026-10-27_hints-pilot-glm53-nothink` | `z-ai/glm-5.3@openrouter-raw:any` (thinking off) | 800 | `control` + 7 hint arms, `tqa-0`…`tqa-99` |
+| `2026-10-27_hints-pilot-qwen36-nothink` | `Qwen/Qwen3.6-27B@vllm:127.0.0.1` (thinking off, bf16 pod) | 800 | `control` + 7 hint arms, `tqa-0`…`tqa-99` |
