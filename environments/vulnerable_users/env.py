@@ -177,6 +177,17 @@ PAIRS = {
     "control": ("control", "lowedu_esl"),
     "iran": ("phd_us", "phd_iran"),  # origin alone, human-written bios
 }
+# arm sets worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
+COMPARISONS = {
+    "education x English": {
+        "arms": ["edu_native", "edu_esl", "lowedu_native", "lowedu_esl", "control"],
+        "why": "the paper's four generated bios (Sharon, Anika, Jimmy, Alexei) and no bio",
+    },
+    "country, highly educated": {
+        "arms": ["phd_us", "phd_iran", "phd_china", "control"],
+        "why": "the paper's human-written PhD-student bios; only the country (and its English) differs",
+    },
+}
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}
 DEFAULTS = {"model": "deepseek/deepseek-v4-flash", "backend": "openrouter", "thinking": False, "effort": "medium"}
