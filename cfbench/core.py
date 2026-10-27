@@ -24,7 +24,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
 # liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24). 6: O-lens hits are
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
-HARNESS_VERSION = 6
+# 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
+# point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
+HARNESS_VERSION = 7
 
 
 @dataclass
@@ -208,5 +210,5 @@ follows. Everything else is identical.
 ## Your task
 
 Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
-log-likelihood of the counterfactual arm's observed rate under your probability, so be calibrated. Reason it through first, \
-then call `submit_prediction` once."""
+squared error between your probability and the counterfactual arm's observed rate, so give your best estimate of that rate. \
+Reason it through first, then call `submit_prediction` once."""

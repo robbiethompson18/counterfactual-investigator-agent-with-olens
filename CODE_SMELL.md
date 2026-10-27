@@ -11,13 +11,11 @@ pulling the whole project into their script env.
 ## 2026-10-26: cfbench/report/data.py still computes the log skill
 
 `cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
-log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day); `data.log_skill`
-still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop it once nothing
-quotes them. The predictor prompt (`core.build_prompt`) still says "You are scored by the
-log-likelihood of the counterfactual arm's observed rate"; both rules reward the same point estimate,
-but changing the sentence bumps `HARNESS_VERSION`, so do it together with the next prompt change. The
-old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for
-`--allow-old-lens`; drop them when the thinking-on reruns land.
+log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
+`data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
+it once nothing quotes them. The old-lens w/ CoT runs
+(`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for `--allow-old-lens`; drop
+them when the thinking-on reruns land.
 
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
