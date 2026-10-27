@@ -31,6 +31,7 @@ def load(paths: list[Path]) -> tuple[dict[Group, dict[CaseKey, Case]], Counter]:
     invalid: Counter = Counter()
     rows = [json.loads(line) for path in paths for line in path.read_text().splitlines()]
     for r in sorted(rows, key=lambda r: r["draw"]):
+        assert r.get("task", "rate") == "rate", f"{r['task']!r} rows are scored by cfbench.answer, not cfbench.score"
         condition = r.get("condition", "transcript")
         group, key = (condition, r["predictor"]), (r["env"], r["model"], r["base_arm"], r["cf_arm"])
         if not r["valid"]:
