@@ -290,9 +290,10 @@ What the reads say:
 
 Viewer: every read is in the
 [O-lens expview page](https://claude.ai/artifact/XhKgvvD1nxTBEsm8ShbtJA) (click an assistant-header
-token; L40's first bullet is shown inline), and all 560 on bramble at
-[8830](http://bramble:8830/#d=expview/character_drift_olens_2026-10-25_character-drift), e.g.
-[human_daniel `drift_identity`](http://bramble:8830/#d=expview/character_drift_olens_2026-10-25_character-drift&i=prefix/sonnet/drift_identity/human_daniel).
+token; L40's first bullet is shown inline), and all 560 at
+[expview](https://expview.pages.dev/#d=expview/character_drift_olens_2026-10-25_character-drift),
+e.g.
+[human_daniel `drift_identity`](https://expview.pages.dev/#d=expview/character_drift_olens_2026-10-25_character-drift&i=prefix/sonnet/drift_identity/human_daniel).
 Not added to the public olens-viewer (that needs a publish from `main` through
 `transcript-viewer/`); the expview pages give the same token-level view.
 
@@ -304,9 +305,10 @@ Not added to the public olens-viewer (that needs a publish from `main` through
   [WildChat, thinking on](https://claude.ai/artifact/B8VrXE3b1sZhscFoMiKBmu),
   [WildChat, thinking off](https://claude.ai/artifact/GoQ945YN4nWnJV58hjinJH),
   [O-lens reads](https://claude.ai/artifact/XhKgvvD1nxTBEsm8ShbtJA) (private Artifacts; without the
-  WildChat in-world prefixes, which hit the Artifact file cap). On bramble's tailnet the same runs
-  are in the expview server as `expview/character_drift_*`, e.g.
-  [O-lens, all 560](http://bramble:8830/#d=expview/character_drift_olens_2026-10-25_character-drift).
+  WildChat in-world prefixes, which hit the Artifact file cap). The same runs were in bramble's
+  expview server as `expview/character_drift_*` (not synced to HF, so these links need the run
+  uploaded under `runs/`), e.g.
+  [O-lens, all 560](https://expview.pages.dev/#d=expview/character_drift_olens_2026-10-25_character-drift).
 - Docent collections:
   [character_drift_sonnet](https://docent.transluce.org/dashboard/79ec2c43-b030-4276-aeb1-c04c1da2f7c7),
   [character_drift_wildchat](https://docent.transluce.org/dashboard/4600fb2a-905f-42d2-8a1e-4ff3ebfe3205)

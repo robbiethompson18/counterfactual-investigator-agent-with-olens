@@ -4,6 +4,7 @@ A run is a directory (format in expview/CLAUDE.md):
 
     <run>/run.json          {"title", "description" (markdown), "label_order", "readers", ...}   (optional)
     <run>/items.jsonl       one item per line: id, group, labels, calls (exact model/judge I/O), env, extra, links, tokens
+    <run>/index.jsonl       one line per item: its summary and byte span in items.jsonl (the viewer reads items by range)
     <run>/envs/<id>.json    {"files": {"rel/path": "text", ...}}   environment snapshots, content-addressed
     <run>/tokens/<ref>.json {"tokens", "sections", "reads", "legend"}  per-token metamodel reads (O-lens, J-lens, NLA, ...)
 
@@ -15,16 +16,20 @@ Emit from Python (scripts/ style: put expview/ on sys.path):
             calls=[call("subject", model, messages=prompt_msgs, output=reply_msg),
                    call("judge", judge_model, messages=judge_msgs, output=judge_reply, parsed={"correct": True})],
             tokens={"tokens": toks, "sections": [["user", 0, 40], ["reasoning", 40, 900]], "reads": {"812": [...]}})
-    print(link(run.path, item="s1/t0", token=812))  # http://bramble:8830/#d=...&i=s1%2Ft0&t=812
+    print(link(run.path, item="s1/t0", token=812))  # https://expview.pages.dev/#d=...&i=s1%2Ft0&t=812
+
+The viewer (https://expview.pages.dev, expview/static/index.html) is a static page that reads these directories from the
+public HF dataset once `scripts/runs.py finish` has synced the run.
 
 CLI:
 
     python expview/expview.py build RUN [-o page.html]   # one self-contained page (Artifact), token files next to it
     python expview/expview.py check RUN                  # validate the format
+    python expview/expview.py index PATH...              # (re)write index.jsonl for every run under PATH whose index is stale
     python expview/expview.py link RUN [--item ID] [--token N] [--call N] [--q REGEX]
-    python expview/expview.py ls                         # every run the server would show, with its dataset id
+    python expview/expview.py ls                         # every run under the roots, with its dataset id
 
-Only the standard library is used. The server (expview/server.py) reads the same directories.
+Only the standard library is used.
 """
 
 from __future__ import annotations
@@ -35,6 +40,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import sys
 import urllib.parse
 from pathlib import Path
@@ -43,7 +49,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 MAX_FILE = 512 * 1024  # bytes kept per environment file
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules"}
-BASE_URL = os.environ.get("EXPVIEW_URL", "http://bramble:8830")
+BASE_URL = os.environ.get("EXPVIEW_URL", "https://expview.pages.dev")
 
 
 # ---------------------------------------------------------------- where runs live
@@ -52,16 +58,12 @@ BASE_URL = os.environ.get("EXPVIEW_URL", "http://bramble:8830")
 def roots() -> dict[str, Path]:
     """Dataset roots, alias -> dir. EXPVIEW_ROOTS="alias=path,alias=path" overrides. The alias is the first part of a
     dataset id, so `data/runs/eval_gaming/2026-10-24_glm53/expview/mc` is `runs/eval_gaming/2026-10-24_glm53/mc`.
-    runs: experiment runs (synced to HF by scripts/runs.py); imports: views derived from other datasets (re-made by a
-    script in expview/importers, not synced); expview: bramble's pre-monorepo ~/workspace/expview/runs."""
+    runs: experiment runs (synced to HF by scripts/runs.py, which is what the public viewer shows); imports: views derived
+    from other datasets (re-made by a script in expview/importers, not synced; viewable only through `build`)."""
     env = os.environ.get("EXPVIEW_ROOTS")
     if env:
         return {a: Path(p).expanduser() for a, p in (x.split("=", 1) for x in env.split(",") if x)}
-    out = {"runs": REPO / "data/runs", "imports": REPO / "data/expview/imports"}
-    legacy = Path.home() / "workspace/expview/runs"  # bramble's pre-monorepo expview runs
-    if legacy.is_dir():
-        out["expview"] = legacy
-    return out
+    return {"runs": REPO / "data/runs", "imports": REPO / "data/expview/imports"}
 
 
 def is_run(d: Path) -> bool:
@@ -88,7 +90,7 @@ def discover(rts: dict[str, Path] | None = None, max_depth: int = 6) -> dict[str
 
 
 def dataset_id(run: str | Path, rts: dict[str, Path] | None = None) -> str:
-    """The id the server shows a run dir under: <alias>/<path under the root>, with `expview` path parts dropped."""
+    """The id the viewer shows a run dir under: <alias>/<path under the root>, with `expview` path parts dropped."""
     p = Path(os.path.abspath(Path(run).expanduser()))  # lexical first, so a symlinked run dir under a root keeps its link path
     for q, r in ((p, lambda r: Path(os.path.abspath(r))), (p.resolve(), Path.resolve)):
         for alias, root in (rts or roots()).items():
@@ -103,7 +105,7 @@ def dataset_id(run: str | Path, rts: dict[str, Path] | None = None) -> str:
 def link(
     run: str | Path, item: str | None = None, token: int | None = None, call: int | None = None, q: str | None = None, base: str = BASE_URL
 ) -> str:
-    """Deep link into the server: a run (dir or dataset id), an item, a token of its transcript, or one of its calls."""
+    """Deep link into the viewer: a run (dir or dataset id), an item, a token of its transcript, or one of its calls."""
     d = str(run) if not Path(run).expanduser().exists() else dataset_id(run)
     params = {"d": d, "i": item, "t": token, "c": call, "q": q}
     kept = {k: v for k, v in params.items() if v is not None}
@@ -196,6 +198,68 @@ def read(tool, lines, label=None, score=None, score_name=None, inline=None, **ex
     return r
 
 
+def source_of(it: dict) -> str | None:
+    """ENV/RUN:LINE of the rows.jsonl row an item shows, when the item says so (extra.source, or run_dir + row_index); the
+    viewer turns it into a Docent link through that run's docent.json."""
+    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    m = re.search(r"(?:^|/)([^/:]+/[^/:]+):(\d+)$", str(ex.get("source") or ""))
+    if m:
+        return f"{m.group(1)}:{m.group(2)}"
+    rd, row, sf = ex.get("run_dir"), ex.get("row_index"), ex.get("source_file")
+    if isinstance(rd, str) and isinstance(row, int) and sf in (None, "rows.jsonl"):
+        return f"{rd.removeprefix('runs/').strip('/')}:{row}"
+    return None
+
+
+def links_of(it: dict) -> dict:
+    out = dict(it.get("links") or {})
+    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    for k in ("docent", "docent_url"):
+        if isinstance(ex.get(k), str) and ex[k].startswith("http"):
+            out.setdefault("Docent", ex[k])
+    return out
+
+
+def summary(it: dict, off: int, n: int) -> dict:
+    """An item's index.jsonl line: what the run page and search need, plus the byte span of its line in items.jsonl."""
+    s = {"id": str(it["id"]), "off": off, "len": n}
+    for k in ("group", "labels", "tokens", "base"):
+        if it.get(k) is not None:
+            s[k] = it[k]
+    s["links"] = links_of(it)
+    s["src"] = source_of(it)
+    s["calls"] = [{"name": c.get("name"), "model": c.get("model"), "n": len(c.get("messages") or [])} for c in it.get("calls") or []]
+    return {k: v for k, v in s.items() if v is not None}
+
+
+def write_index(run: Path) -> int:
+    """(Re)write index.jsonl from items.jsonl; returns the number of items."""
+    run = Path(run)
+    n, off = 0, 0
+    with open(run / "items.jsonl", "rb") as f, open(run / "index.jsonl.tmp", "w") as out:
+        for raw in f:
+            start, off = off, off + len(raw)
+            if raw.strip():
+                out.write(json.dumps(summary(json.loads(raw), start, len(raw))) + "\n")
+                n += 1
+    os.replace(run / "index.jsonl.tmp", run / "index.jsonl")
+    return n
+
+
+def index_fresh(run: Path) -> bool:
+    """index.jsonl exists and covers items.jsonl exactly (its last span ends at the file's end, same number of lines)."""
+    run = Path(run)
+    ix, items = run / "index.jsonl", run / "items.jsonl"
+    if not ix.exists():
+        return items.stat().st_size == 0
+    with open(ix, "rb") as f:
+        lines = [x for x in f if x.strip()]
+    last = json.loads(lines[-1]) if lines else {"off": 0, "len": 0}
+    with open(items, "rb") as f:
+        n_items = sum(1 for x in f if x.strip())
+    return last["off"] + last["len"] == items.stat().st_size and len(lines) == n_items
+
+
 class Run:
     def __init__(self, path, title=None, description="", **meta):
         """meta keys go into run.json: notes (markdown), label_order, tokens_section / tokens_button (nav names),
@@ -260,12 +324,17 @@ class Run:
             item["reads"] = (tokens or {}).get("reads") or None
         elif tokens is not None:
             item["tokens"] = tokens if "ref" in tokens else self.tokens(tokens, id)
-        with open(self.path / "items.jsonl", mode) as f:
-            f.write(json.dumps({k: v for k, v in item.items() if v is not None}) + "\n")
+        line = (json.dumps({k: v for k, v in item.items() if v is not None}) + "\n").encode()
+        with open(self.path / "items.jsonl", mode + "b") as f:
+            off = f.tell()
+            f.write(line)
+        with open(self.path / "index.jsonl", mode) as f:  # the viewer reads items by byte range, so the index goes with them
+            f.write(json.dumps(summary(item, off, len(line))) + "\n")
 
     def reset(self):
         """Clear items (keeps env snapshots, which are content-addressed)."""
-        (self.path / "items.jsonl").write_text("")
+        for name in ("items.jsonl", "index.jsonl"):
+            (self.path / name).write_text("")
 
 
 # ---------------------------------------------------------------- reading
@@ -306,7 +375,7 @@ def merge_overlay(ov: dict, base: dict, base_d: str) -> dict:
 
 
 def find_item(d: str, i: str) -> tuple[dict, Path] | None:
-    """Item `i` of dataset `d` and its run dir, by scanning items.jsonl (the server uses its index instead)."""
+    """Item `i` of dataset `d` and its run dir, by scanning items.jsonl."""
     run = discover().get(d)
     if run:
         for line in (run / "items.jsonl").read_text().splitlines():
@@ -370,6 +439,8 @@ def check(path) -> list[str]:
     path, probs, ids = Path(path), [], set()
     if not is_run(path):
         return [f"{path}: no items.jsonl"]
+    if not index_fresh(path):
+        probs.append("index.jsonl missing or stale (the public viewer needs it): python expview/expview.py index RUN")
     for n, it in enumerate(iter_items(path), 1):
         where = f"items.jsonl:{n} ({it.get('id')})"
         if "id" not in it:
@@ -435,7 +506,7 @@ class Interner:
 
 
 def build(path, out=None, ids=None):
-    """One self-contained HTML page for a run (the same UI as the server, data embedded); token files go next to it as
+    """One self-contained HTML page for a run (the same UI as the public page, data embedded); token files go next to it as
     tokens/<ref>.gz.txt and are fetched on demand. ids: only these items."""
     info, items, envs = load_run(path)
     if ids:
@@ -488,7 +559,10 @@ def main():
     b.add_argument("--ids", help="file with one item id per line: build only those")
     c = sub.add_parser("check", help="validate a run directory")
     c.add_argument("run", nargs="+")
-    lk = sub.add_parser("link", help="print a deep link into the server")
+    ix = sub.add_parser("index", help="write index.jsonl for every run dir under PATH whose index is missing or stale")
+    ix.add_argument("path", nargs="+")
+    ix.add_argument("--force", action="store_true", help="rewrite fresh ones too")
+    lk = sub.add_parser("link", help="print a deep link into the viewer")
     lk.add_argument("run", help="run dir or dataset id")
     lk.add_argument("--item")
     lk.add_argument("--token", type=int, help="token position in the item's transcript")
@@ -505,6 +579,11 @@ def main():
             bad += bool(probs)
             print(f"{r}: {'ok' if not probs else f'{len(probs)} problems'}", *probs[:50], sep="\n  ")
         sys.exit(1 if bad else 0)
+    elif a.cmd == "index":
+        for root in a.path:
+            for d in sorted({p.parent for p in Path(root).rglob("items.jsonl")} | ({Path(root)} if is_run(Path(root)) else set())):
+                if a.force or not index_fresh(d):
+                    print(f"{d}: {write_index(d)} items indexed")
     elif a.cmd == "link":
         print(link(a.run, a.item, a.token, a.call, a.q))
     elif a.cmd == "ls":
