@@ -10,7 +10,7 @@ remote repositories and services are fictional fixtures. Docker runs with `--net
 the episode directory mounted. No real credentials are sent to the sandbox. Local git works; push,
 GitHub, deployment and upload operations are logging shims.
 
-Code: [`evalcue/envs/overnight/`](../../evalcue/envs/overnight/). Construction follows
+Code: [`evalcue/envs/overnight/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/overnight/). Construction follows
 [the environment goals](../environment-construction-goals.md): every arm is a peer, null cells
 remain in the table, and the experiments are exploratory searches rather than held-out findings.
 

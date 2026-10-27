@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Environments</title>
+<link rel="icon" href="data:,">
+<!--
+  Static list page for environments/ runs. It reads the generated indexes (envs/index.json, envs/<env>/index.json)
+  and episode shards straight from the HF dataset, pinned to one commit, so it needs no server. Open the file in a
+  browser, or serve data/envs/ locally and add ?base=http://localhost:8000/ to read local folders instead.
+-->
+<style>
+:root{--bg:#fbfaf7;--card:#fff;--fg:#1f1e1b;--mute:#6b675e;--line:#dedad0;--acc:#2f5d8a;--code:#f4f2ec;--sel:#e3e9f1;
+  --user:#eef3ec;--asst:#fff;--think:#f6f1e3;--tool:#f1eef5;--bar:#2f5d8a;--track:#e7e3da}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#18191b;--card:#1c1e21;--fg:#e6e4df;--mute:#9a968d;
+  --line:#33363a;--acc:#8fb4dd;--code:#222428;--sel:#26313d;--user:#1d2620;--asst:#1c1e21;--think:#27241b;--tool:#231f2b;--bar:#8fb4dd;--track:#2c2f33}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,sans-serif}
+main{max-width:1200px;margin:0 auto;padding:16px}
+a{color:var(--acc)} h1{font-size:20px;margin:4px 0 12px} h2{font-size:16px;margin:20px 0 8px}
+.mute{color:var(--mute)} .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line)}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;font-size:12px;color:var(--mute)} tr.click{cursor:pointer} tr.click:hover{background:var(--sel)}
+.scroll{overflow-x:auto}
+.rate{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.bar{width:60px;height:8px;background:var(--track);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--bar)}
+.msg{border:1px solid var(--line);border-radius:6px;margin:6px 0;padding:8px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,Menlo,monospace}
+.msg.user{background:var(--user)} .msg.assistant{background:var(--asst)} .msg.tool{background:var(--tool)} .msg.system{background:var(--code)}
+.msg .role{font:600 11px system-ui;color:var(--mute);margin-bottom:4px} .think{background:var(--think);padding:6px;border-radius:4px;margin-bottom:6px}
+select,button{font:inherit;padding:3px 6px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
+</style>
+</head>
+<body>
+<main>
+<h1><a href="#">Environments</a> <span id="crumb" class="mute"></span></h1>
+<div id="status" class="mute">loading…</div>
+<div id="view"></div>
+</main>
+<script>
+const REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens";
+const params = new URLSearchParams(location.search);
+let BASE = params.get("base");  // a local mirror of data/envs/, if given
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $ = id => document.getElementById(id);
+const cache = {};
+
+async function base() {
+  if (BASE) return BASE;
+  // pin every fetch to one commit: one API call, then only /resolve/<sha>/ (inside HF's anonymous limits)
+  const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/revision/main`);
+  const sha = r.ok ? (await r.json()).sha : "main";
+  return BASE = `https://huggingface.co/datasets/${REPO}/resolve/${sha}/envs/`;
+}
+async function getJSON(path) {
+  if (!cache[path]) cache[path] = fetch((await base()) + path).then(r => { if (!r.ok) throw new Error(path + ": " + r.status); return r.json(); });
+  return cache[path];
+}
+async function getEpisode(env, run, id) {
+  const idx = await getJSON(`${env}/${run}/episodes/index.json`);
+  const [shard, off, len] = idx[id];
+  const r = await fetch((await base()) + `${env}/${run}/episodes/${shard}`, {headers: {Range: `bytes=${off}-${off + len - 1}`}});
+  const buf = new Uint8Array(await r.arrayBuffer());  // 206 = just this episode; a server without Range sends the shard
+  return JSON.parse(new TextDecoder().decode(r.status === 206 ? buf : buf.slice(off, off + len)));
+}
+function rate(k, n) {
+  if (!n) return '<span class="mute">–</span>';
+  const p = k / n;
+  return `<span class="rate"><span class="bar"><i style="width:${(100 * p).toFixed(0)}%"></i></span>${k}/${n} = ${(100 * p).toFixed(0)}%</span>`;
+}
+function primaryCell(pr) {
+  if (!pr) return "";
+  if (pr.type === "bool") return rate(pr.k, pr.n);
+  if (pr.type === "number") return pr.mean == null ? "–" : `mean ${pr.mean.toFixed(2)} (n=${pr.n})`;
+  return Object.entries(pr.counts || {}).map(([k, v]) => `${esc(k)}: ${v}`).join(", ");
+}
+
+async function home() {
+  $("crumb").textContent = "";
+  const idx = await getJSON("index.json");
+  $("view").innerHTML = `<p class="mute">Generated ${esc(idx.generated)} from the run folders under <span class="mono">envs/</span>. Click an env.</p>
+  <div class="scroll"><table><tr><th>env</th><th>title</th><th>status</th><th>primary</th><th>runs</th><th>episodes by target model</th></tr>
+  ${idx.envs.map(e => `<tr class="click" onclick="location.hash='env=${e.env}'"><td class="mono">${esc(e.env)}</td><td>${esc(e.title)}</td>
+    <td>${esc(e.status || "")}</td><td class="mono">${esc(e.primary)}</td><td>${e.n_runs}</td>
+    <td class="mono">${Object.entries(e.targets).map(([t, n]) => `${esc(t)}: ${n}`).join("<br>")}</td></tr>`).join("")}
+  </table></div>`;
+}
+
+async function envPage(env, filt = {}) {
+  $("crumb").textContent = "/ " + env;
+  const idx = await getJSON(`${env}/index.json`);
+  const F = idx.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
+  const keep = arm => Object.entries(filt).every(([k, v]) => !v || (F[arm] || {})[k] === v);
+  // pool runs per (arm, target): "#runs per model"
+  const pooled = {};
+  for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
+    const key = arm + "\u0000" + r.target, p = pooled[key] ??= {arm, target: r.target, k: 0, n: 0, eps: 0, runs: 0, type: a.primary.type};
+    p.eps += a.n; p.runs += 1;
+    if (a.primary.type === "bool") { p.k += a.primary.k; p.n += a.primary.n; }
+  }
+  const rows = Object.values(pooled).filter(p => keep(p.arm)).sort((a, b) => a.target.localeCompare(b.target) || a.arm.localeCompare(b.arm));
+  const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
+    [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
+  $("view").innerHTML = `<p>${esc(idx.title)}. Primary measure <span class="mono">${esc(idx.primary)}</span>.
+    Source: <a href="https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/main/environments/${env}">environments/${env}</a></p>
+  ${Object.keys(idx.pairs).length ? `<p>Pairs: ${Object.entries(idx.pairs).map(([k, v]) => `<b>${esc(k)}</b> ${esc(v[0])} → ${esc(v[1])}`).join(" · ")}</p>` : ""}
+  <h2>Pooled over runs (per arm and target model)</h2>
+  ${keys.length ? `<div class="row">Group by factor: ${keys.map(sel).join(" ")}</div>` : ""}
+  <div class="scroll"><table><tr><th>target</th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>runs</th><th>episodes</th><th>${esc(idx.primary)}</th></tr>
+  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}</td>${keys.map(k => `<td class="mono">${esc((F[p.arm] || {})[k] || "")}</td>`).join("")}<td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
+  </table></div>
+  <h2>Runs</h2>
+  <div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>Docent</th><th>description</th></tr>
+  ${idx.runs.map(r => `<tr class="click" onclick="location.hash='env=${env}&run=${r.run}'"><td class="mono">${esc(r.run)}</td><td class="mono">${esc(r.target)}${r.thinking === false ? " (thinking off)" : ""}</td>
+    <td>${r.n_episodes}</td><td class="mono">${r.label_files.map(esc).join("<br>")}</td>
+    <td>${r.docent_collection ? `<a href="https://docent.transluce.org/dashboard/${r.docent_collection}" onclick="event.stopPropagation()">collection</a>` : ""}</td>
+    <td>${esc(r.description || "")}${r.converted_from ? `<br><span class="mute">converted from ${esc(r.converted_from)}</span>` : ""}</td></tr>`).join("")}
+  </table></div>`;
+}
+
+async function runPage(env, run, arm, epId) {
+  $("crumb").textContent = `/ ${env} / ${run}`;
+  const idx = await getJSON(`${env}/index.json`);
+  const r = idx.runs.find(x => x.run === run);
+  const epIdx = await getJSON(`${env}/${run}/episodes/index.json`);
+  const ids = Object.keys(epIdx);
+  const arms = Object.keys(r.arms).sort();
+  arm = arm || arms[0];
+  const mine = ids.filter(id => id.startsWith(arm.replace(/\//g, ".").replace(/[^A-Za-z0-9_.+-]/g, "_") + "~"));
+  $("view").innerHTML = `<p><a href="#env=${env}">← ${esc(env)}</a> · target <span class="mono">${esc(r.target)}</span> · ${r.n_episodes} episodes
+    ${r.docent_collection ? ` · <a href="https://docent.transluce.org/dashboard/${r.docent_collection}">Docent collection</a>` : ""}</p>
+  <div class="scroll"><table><tr><th>arm</th><th>n</th><th>errors</th><th>unscorable</th><th>${esc(idx.primary)}</th></tr>
+  ${arms.map(a => { const x = r.arms[a]; return `<tr class="click" onclick="location.hash='env=${env}&run=${run}&arm=${encodeURIComponent(a)}'" ${a === arm ? 'style="background:var(--sel)"' : ""}>
+    <td class="mono">${esc(a)}</td><td>${x.n}</td><td>${x.errors}</td><td>${x.unscorable}</td><td>${primaryCell(x.primary)}</td></tr>`; }).join("")}
+  </table></div>
+  <div class="row"><label>episode <select id="ep" onchange="location.hash='env=${env}&run=${run}&arm=${encodeURIComponent(arm)}&ep='+encodeURIComponent(this.value)">
+    ${mine.map(id => `<option ${id === epId ? "selected" : ""}>${esc(id)}</option>`).join("")}</select></label></div>
+  <div id="episode"></div>`;
+  if (mine.length) showEpisode(env, run, epId && mine.includes(epId) ? epId : mine[0]);
+}
+
+async function showEpisode(env, run, id) {
+  const el = $("episode");
+  el.innerHTML = '<p class="mute">loading episode…</p>';
+  const ep = await getEpisode(env, run, id);
+  const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}">Docent</a>` : ""].filter(Boolean).join(" · ");
+  el.innerHTML = `<p class="mono">${esc(ep.id)} · finish ${esc(ep.finish)} ${ep.today ? "· date " + esc(ep.today) : ""} ${links ? "· " + links : ""}
+    ${ep.build_check && ep.build_check !== "match" ? `<br><b>${esc(ep.build_check)}</b>` : ""}</p>
+  ${(ep.messages || []).map(m => `<div class="msg ${esc(m.role)}"><div class="role">${esc(m.role)}${m.tool_calls ? " · " + m.tool_calls.map(t => esc(t.function.name)).join(", ") : ""}</div>`
+    + (m.reasoning_content ? `<div class="think">${esc(m.reasoning_content)}</div>` : "") + esc(m.content)
+    + (m.tool_calls ? m.tool_calls.map(t => `\n→ ${esc(t.function.name)}(${esc(t.function.arguments)})`).join("") : "") + "</div>").join("")}`;
+}
+
+function setParam(k, v) {
+  const h = new URLSearchParams(location.hash.slice(1));
+  v ? h.set(k, v) : h.delete(k);
+  return h.toString();
+}
+
+async function route() {
+  const h = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  $("status").textContent = "";
+  try {
+    if (h.run) await runPage(h.env, h.run, h.arm, h.ep);
+    else if (h.env) { const { env, ...filt } = h; await envPage(env, filt); }
+    else await home();
+  } catch (e) { $("status").textContent = "error: " + e.message; }
+}
+addEventListener("hashchange", route);
+route();
+</script>
+</body>
+</html>

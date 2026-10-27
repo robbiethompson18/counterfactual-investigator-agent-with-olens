@@ -12,7 +12,8 @@ the state its tools read from (`meta.start_state`, envs without a sandbox).
 Arms are run over several items (task variants); `edit` diffs the two arms on one item they share. `--pairs hub` pairs the
 hub arm, the one with the smallest total diff to every other arm (usually the env's base), with each other arm, both ways.
 
-BEHAVIOR is the env module's own `BEHAVIOR`, the words-version of its `detect()` (`evalcue.envs.load(<env>)`).
+BEHAVIOR is the env's own `BEHAVIOR`, the words-version of its `detect()`: from the environments/ port when one exists, else
+from evalcue_behaviors.json, a snapshot of every evalcue env module's BEHAVIOR taken before evalcue was deleted (2026-10-27).
 """
 
 import json
@@ -20,7 +21,21 @@ from collections import defaultdict
 from pathlib import Path
 
 from cfbench.core import Rollout, initial_context, render, unified_diff
-from evalcue import envs
+from environments._lib.core import load_env
+
+BEHAVIORS = json.loads((Path(__file__).parent / "evalcue_behaviors.json").read_text())  # run id -> BEHAVIOR, 2026-10-27
+
+
+def behavior(env: str) -> str:
+    """The env's BEHAVIOR: from its environments/ port if there is one (essay_grading, honest_<scenario> -> the honest env's
+    BEHAVIORS[scenario], ...), else the snapshot taken when evalcue's env modules were deleted (2026-10-27)."""
+    try:
+        if env.startswith("honest_"):
+            return load_env("honest").BEHAVIORS[env.removeprefix("honest_")]
+        return load_env(env).BEHAVIOR
+    except (ModuleNotFoundError, SystemExit, AttributeError):
+        return BEHAVIORS[env]
+
 
 RUNS = Path("data/runs")
 # target -> row["model"]. OpenRouter's Qwen (fp8) is its own target, `--model qwen/qwen3.6-27b` (the overnight_* envs): its
@@ -52,7 +67,7 @@ class EvalcueRuns:
     def __init__(self, spec: str):
         env, runs = spec.split("/")
         runs, _, only_item = runs.partition("@")
-        self.BEHAVIOR = envs.load(env).BEHAVIOR
+        self.BEHAVIOR = behavior(env)
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):

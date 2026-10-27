@@ -166,13 +166,13 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 - `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
   see `vendor/CLAUDE.md`. Never import, run or wrap it; port what you need into our own harness
-  (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
+  (`environments/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
   agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
   commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
-  `evalcue/harness.py` defaults to it), not high or max, even when replicating someone's setup that
+  `environments/` sends it by default), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
@@ -226,6 +226,10 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
+  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
+  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported, everything
+  else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
   why, what was tried and rejected, where each page lives
@@ -287,14 +291,14 @@ Current docs:
 - [MIXED: Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
   survives a split test); harness in `evalcue/CLAUDE.md`
-- [ACTIVE: evalcue harness — read before running any evalcue env, adding one, or overriding its provider, effort or sampling](evalcue/CLAUDE.md)
+- [ORPHAN: evalcue harness (deleted 2026-10-27, code at c7b2e56; honest is now environments/honest/) — read before reviving an evalcue env](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/evalcue/CLAUDE.md)
   — `evalcue.run`/`show`/`--rescore`, `Episode` fields, run dirs, the `EVALCUE_*` env vars
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
 - [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/CLAUDE.md)
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
-- [ACTIVE: donehack — read before running agent-interp-envs' coding is_prime task, an envport port, or the realism ladder](donehack/CLAUDE.md)
+- [ORPHAN: donehack (deleted 2026-10-27, code at c7b2e56; ported envs in environments/) — read before reviving is_prime, an envport port or the realism ladder](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/CLAUDE.md)
   — the hardened podman sandbox, run commands, what each file does; results are in the three docs
   below
 - [REFERENCE: donehack endings — read before claiming how episode endings (done tool, submit script, give_up) affect reward hacking](docs/donehack-endings.md)
