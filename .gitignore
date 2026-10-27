@@ -4,7 +4,6 @@ docs/local/
 
 # Data lives on HF (see CLAUDE.md "Data"), too big for git
 data/
-!evalcue/envs/alignment_faking/data/
 
 # direnv secrets / machine-specific
 .envrc.local
@@ -30,6 +29,7 @@ outputs/
 
 # Hugging Face token (local only)
 hf.key
+docent.key
 
 # realism runs and problem copies (data, not code)
 donehack/realism/runs/

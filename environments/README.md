@@ -28,7 +28,8 @@ first requests matches what the old harnesses sent. evalcue/ and donehack/ were 
 environments/<env>/
   README.md    what it tests, status, primary measure and pairs (declared before the first run), runs
   env.py       ARMS, items(), build(arm, item, ctx) -> Episode, measure(ep) -> dict, PRIMARY, PAIRS, REQUIRES;
-               optional handle() for fake apps, finalize() for reading the live box, CAPS
+               optional handle() for fake apps, finalize() for reading the live box, CAPS, ARM_FACTORS,
+               items_for(arm), RETIRED
 environments/_lib/   shared code: the interface (core.py), runner, Box, backends, run folders, indexes, the list page,
                      the overeager harness variants (overeager.py) and the honest-grader prompt (honest.py)
 ```
@@ -50,6 +51,13 @@ environments/_lib/   shared code: the interface (core.py), runner, Box, backends
   results) comes from `finalize(box, state, ctx)`, which runs after the agent's processes are
   killed.
 - **Pairs** (`PAIRS`) are the clean counterfactuals: two arms, optionally an item subset.
+- **Retired arms** (`RETIRED`: arm names or factor filters such as `prompt=v5`) were tried and set
+  aside. Don't delete them: stored runs rebuild their prompts from `build()`, so retired arms still
+  build. `run ENV` without `--arms` / `--pair` skips them, naming them in `--arms` runs them (with a
+  note), and the generated index lists them under `retired`. Record why in the env README.
+- **Never put env files in a folder named `data`**: the repo-wide `data/` rule in `.gitignore`
+  swallows it, so it is missing from every fresh clone (alignment_faking's prompts went missing
+  twice). Use e.g. `prompts/`.
 
 ## One runner; the model comes from flags
 
@@ -69,6 +77,8 @@ uv run python -m environments upload ENV/RUN   # one HF commit: the run folder +
   sent (medium); episode caps in turns and prompt tokens (`CAPS`, `--max-turns`,
   `--max-prompt-tokens`), never dollars. An env's `REQUIRES` (e.g. `{"thinking": False}`) refuses
   conflicting flags unless `--override KEY`, which is recorded.
+- Concurrency: `--conc` (default 128) episodes in flight; episodes that start a podman box are also
+  capped by `--box-conc` (default 16), since podman degrades past a few dozen sandboxes.
 - Every model call records the provider that served it; the run's `meta.json` records the target,
   git sha, caps, date and overrides.
 - **Hard rule: the target model never gets the network or the host.** Every sandbox is podman
@@ -87,7 +97,8 @@ labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind"}; measure() is the l
 ```
 
 A run finishes the way `scripts/runs.py finish` did: the runner mirrors its episodes to Docent
-(`scripts/docent_upload.py`, when `DOCENT_API_KEY` is set; otherwise it prints the backfill command
+(`scripts/docent_upload.py`, when `DOCENT_API_KEY` is set or a gitignored `docent.key` sits in the
+main checkout; otherwise it prints the backfill command
 and goes on), which writes `docent_collection` into `meta.json` and `docent_run` / `docent_url` onto
 every episode, then uploads the run folder and its indexes to HF. `--no-upload` skips the HF step
 (upload later with `environments upload ENV/RUN`). Ctrl-C finishes the run as `abandoned` and still
@@ -142,4 +153,4 @@ Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#env=E&arm=A&item=I`, `#e
 ## Not built yet (add when an env needs it)
 
 Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
-presets, arm factor dicts, Parquet episodes, regrading in a fresh container.
+presets, Parquet episodes, regrading in a fresh container.

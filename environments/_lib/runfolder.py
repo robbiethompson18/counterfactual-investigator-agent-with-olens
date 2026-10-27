@@ -94,18 +94,23 @@ def read_episodes(run_dir: Path):
                 yield json.loads(line)
 
 
+def main_checkout_file(name: str) -> str | None:
+    """A gitignored key file at the repo root, or in the main checkout when this is a git worktree."""
+    k = REPO_ROOT / name
+    if not k.exists():
+        main = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True, check=False
+        ).stdout.split("\n")[0]
+        k = Path(main.removeprefix("worktree ")) / name
+    return k.read_text().strip() if k.exists() else None
+
+
 def hf_token() -> str | None:
     import os
 
     if os.environ.get("HF_TOKEN"):
         return os.environ["HF_TOKEN"]
-    k = REPO_ROOT / "hf.key"
-    if not k.exists():  # worktrees: the key lives in the main checkout
-        main = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"], cwd=REPO_ROOT, capture_output=True, text=True, check=False
-        ).stdout.split("\n")[0]
-        k = Path(main.removeprefix("worktree ")) / "hf.key"
-    return k.read_text().strip() if k.exists() else None
+    return main_checkout_file("hf.key")
 
 
 def upload(paths: list[Path], message: str):
