@@ -59,8 +59,8 @@ Two more uploads use the same layout:
   and `full_realask_*` in `_realask` are superseded by `_full_edit` and only have head reads (via
   prefix dups).
 
-All four sets are imported into the expview viewer (bramble:8830) under
-`imports/olens_reads/<upload>/<subdir>`.
+All four sets were imported into bramble's expview server under
+`imports/olens_reads/<upload>/<subdir>` (local `imports/` views; not on the public page).
 
 Differences from Celeste's tables: `sft_*` null (RL lens only), `fve_*` NaN (no reconstructor
 scoring), chat-template/special tokens included as positions, `prefix_cache=True` with

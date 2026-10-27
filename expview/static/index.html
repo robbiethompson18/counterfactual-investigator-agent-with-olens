@@ -199,7 +199,7 @@ function overlayInfo(it,clickable){let h="";
   if(it.base_missing)h+=`<div class="empty">Base item ${esc(JSON.stringify(it.base_missing))} not found.</div>`;
   const an=it.annotations||[];
   if(an.length)h+=`<h3>Annotations from other runs (${an.length})</h3>`+an.slice(0,50).map(a=>{let l={};try{l=JSON.parse(a.labels||"{}")}catch{}
-    return `<div class="judge"><a href="${linkTo({d:a.d,i:a.i})}">${esc(a.d)}</a><div class="labels">${Object.entries(l).slice(0,4).map(([k,v])=>chip(k,v)).join("")}</div></div>`}).join("");
+    return `<div class="judge"><a href="${linkTo({dataset:a.d,item:a.i})}">${esc(a.d)}</a><div class="labels">${Object.entries(l).slice(0,4).map(([k,v])=>chip(k,v)).join("")}</div></div>`}).join("");
   return h}
 // Docent: the item's run on docent.transluce.org (the server fills it in from docent.json / transcript fingerprints)
 const docentOf=links=>Object.entries(links||{}).find(([k,v])=>/docent/i.test(k+v))?.[1]||null;
@@ -237,39 +237,145 @@ function colorOf(tool,run){const r=(run&&run.readers||{})[tool];if(r&&r.color)re
 async function gunzipB64(b64){const bin=Uint8Array.from(atob(b64.trim()),c=>c.charCodeAt(0));
   return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("gzip"))).text()}
 
-// ================================================================ data sources: the server's API, or one run embedded in the page
+// ================================================================ data sources: the public HF dataset, or one run embedded in the page by `expview.py build`
 const EMBED=$("#data").textContent.trim(), STATIC=EMBED.length>0&&!EMBED.startsWith("{{");
+const HF_REPO="Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens";
+const HF_API=`https://huggingface.co/api/datasets/${HF_REPO}/`,HF_RESOLVE=`https://huggingface.co/datasets/${HF_REPO}/resolve/main/`;
+const BIG=64e6;  // an items.jsonl over this many bytes is downloaded whole (no index.jsonl, or "In: transcripts") only after a confirm
+const encPath=p=>p.split("/").map(encodeURIComponent).join("/");
+// run f over xs with n in flight, in order of start; each(j) after item j finishes
+async function pmap(xs,n,f,each){const out=new Array(xs.length);let k=0;
+  await Promise.all(Array.from({length:Math.min(n,xs.length)},async()=>{while(k<xs.length){const j=k++;out[j]=await f(xs[j]);each?.(j)}}));return out}
+// a fetch that waits out one 429 (HF's API quota is per 5-minute window and tells us when to retry)
+async function hfRaw(url,opt){opt={signal:AbortSignal.timeout(60000),...(opt||{})};let r=await fetch(url,opt);
+  if(r.status==429){const wait=+(r.headers.get("Retry-After")||3);
+    if(wait>15)throw new Error(`HF API quota used up (500 calls per 5 minutes per IP; a full scan of the dataset is ~170): try again in ${wait} s`);
+    await new Promise(ok=>setTimeout(ok,1000*wait));r=await fetch(url,opt)}return r}
+async function hfFetch(url,opt){const r=await hfRaw(url,opt);if(!r.ok)throw new Error(`HF ${r.status}: ${url.replace(HF_API,"").replace(HF_RESOLVE,"")}`);return r}
+// every entry of a directory (the tree API pages at 1000 and exposes its Link header); null when the path doesn't exist
+async function hfTree(path,expand){let url=HF_API+"tree/main/"+encPath(path)+"?expand="+!!expand,out=[];
+  while(url){const r=await hfRaw(url);if(r.status==404)return null;if(!r.ok)throw new Error(`HF ${r.status} listing ${path}`);out=out.concat(await r.json());
+    const m=/<([^>]+)>;\s*rel="next"/.exec(r.headers.get("Link")||"");url=m?m[1]:null}
+  return out}
+const pathsInfo=paths=>hfFetch(HF_API+"paths-info/main",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({paths,expand:false})}).then(r=>r.json());
+// dataset id <-> HF dir: a run's expview data lives at runs/<experiment>/<run>/expview[/<name>] and is dataset runs/<experiment>/<run>[/<name>]
+const dsId=dir=>dir.split("/").filter(x=>x!="expview").join("/");
+function dirsOf(d){const ps=d.split("/");
+  if(ps[0]!="runs"||ps.length<3)throw new Error(`${d}: only datasets under runs/<experiment>/<run> are on HF (imports/… runs and bramble's old expview/… runs were never synced)`);
+  return [[...ps.slice(0,3),"expview",...ps.slice(3)].join("/"),d+"/expview"]}
+// what's on HF, found without a manifest: experiments (runs/<experiment>), their run dirs (one listing each; the tree API
+// allows 10k calls per 5 min), which of those have an expview/ dir (ONE paths-info call for all of them: that API allows
+// only 500 per 5 min), and the datasets inside each (one listing per expview dir). Cached for the session.
+const SCAN={envs:null,byEnv:{}};
+async function envList(){if(!SCAN.envs)SCAN.envs=((await hfTree("runs"))||[]).filter(x=>x.type=="directory").map(x=>x.path.split("/").pop());return SCAN.envs}
+const runDirs=async env=>((await hfTree("runs/"+env))||[]).filter(x=>x.type=="directory").map(x=>x.path);
+async function expviewDatasets(dirs){const found=dirs.length?(await pathsInfo(dirs.map(r=>r+"/expview"))).filter(x=>x.type=="directory"):[],out=[];
+  const add=(dir,l)=>{const it=l.find(x=>x.path==dir+"/items.jsonl");if(!it)return;
+    out.push({d:dsId(dir),dir,size:it.size,mtime:it.lastCommit?.date||null,index:l.some(x=>x.path==dir+"/index.jsonl"),reads:l.some(x=>x.path==dir+"/tokens")})};
+  for(const f of found){const l=await hfTree(f.path,true);if(!l)continue;add(f.path,l);
+    for(const sub of l.filter(x=>x.type=="directory"&&!/\/(envs|tokens)$/.test(x.path))){const l2=await hfTree(sub.path,true);if(l2)add(sub.path,l2)}}
+  return out.sort((a,b)=>a.d<b.d?-1:1)}
+async function envDatasets(env){if(!SCAN.byEnv[env])SCAN.byEnv[env]=await expviewDatasets(await runDirs(env));return SCAN.byEnv[env]}
+async function scanAll(prog){const envs=await envList();let n=0;SCAN.failed=[];
+  const dirs=(await pmap(envs,4,e=>runDirs(e).catch(err=>{console.warn(e,err);SCAN.failed.push(e);return []}),()=>prog?.(++n,envs.length))).flat();
+  if(SCAN.failed.length>envs.length/2)throw new Error(`${SCAN.failed.length} of ${envs.length} experiments failed to list (HF API quota? it resets within 5 minutes)`);
+  const all=await expviewDatasets(dirs);
+  for(const e of envs)SCAN.byEnv[e]=all.filter(x=>x.d.split("/")[1]==e);
+  return all}
+// item helpers shared with expview.py (summary / source_of / links_of / merge_overlay there)
+const contentText=c=>typeof c=="string"?c:Array.isArray(c)?c.map(p=>p&&typeof p=="object"?(p.text||""):String(p)).join("\n"):c==null?"":JSON.stringify(c);
+const callText=c=>(c.messages||[]).flatMap(m=>[m.reasoning||"",contentText(m.content),...(m.tool_calls||[]).map(t=>`${t.name} ${t.arguments}`)]).filter(Boolean).join("\n");
+function sectionOf(secs,n){const out=new Array(n).fill("");for(const [name,a,b] of secs||[])for(let p=Math.max(0,a);p<Math.min(n,b);p++)out[p]=name;return out}
+function sourceOf(it){const ex=it.extra&&typeof it.extra=="object"?it.extra:{};const m=/(?:^|\/)([^/:]+\/[^/:]+):(\d+)$/.exec(String(ex.source||""));if(m)return `${m[1]}:${m[2]}`;
+  const rd=ex.run_dir,row=ex.row_index,sf=ex.source_file;
+  return typeof rd=="string"&&Number.isInteger(row)&&(sf==null||sf=="rows.jsonl")?`${rd.replace(/^runs\//,"").replace(/^\/+|\/+$/g,"")}:${row}`:null}
+function linksOf(it){const out={...(it.links||{})},ex=it.extra&&typeof it.extra=="object"?it.extra:{};
+  for(const k of ["docent","docent_url"])if(typeof ex[k]=="string"&&ex[k].startsWith("http")&&!out.Docent)out.Docent=ex[k];return out}
+const summarize=it=>({id:String(it.id),group:it.group??null,labels:it.labels||{},links:linksOf(it),tokens:it.tokens||null,base:it.base||null,src:sourceOf(it),calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,n:(c.messages||[]).length}))});
+const pointsAt=(u,d,i)=>{const h=new URLSearchParams(String(u).split("#")[1]||"");return (h.get("dataset")??h.get("d"))==d&&(h.get("item")??h.get("i"))==String(i)};
+// an overlay item over its base item, as shown: the base's transcript, env and calls, then the overlay's calls (side panel), labels, notes and reads
+function mergeOverlay(ov,base,baseD){const m={...base,id:ov.id,group:ov.group??base.group??null,extra:ov.extra??base.extra,base:{d:baseD,i:base.id}};
+  m.labels={...(base.labels||{}),...(ov.labels||{})};
+  m.links=Object.fromEntries(Object.entries({...(base.links||{}),...(ov.links||{})}).filter(([,v])=>!pointsAt(v,baseD,base.id)));
+  m.calls=[...(base.calls||[]),...(ov.calls||[]).map(c=>({...c,overlay:true}))];
+  if(m.tokens)m.tokens={...m.tokens,d:baseD};m.env_d=baseD;
+  if(!base.env&&!base.env_files&&ov.env){m.env=ov.env;m.env_files=ov.env_files;m.env_d=null}
+  if(ov.reads)m.extra_reads=ov.reads;if(ov.notes)m.notes=ov.notes;return m}
+const jsonl=t=>t.split("\n").filter(x=>x.trim()).map(x=>JSON.parse(x));
 let SRC;
-function apiSource(){
-  const get=async(p)=>{const r=await fetch(p);if(!r.ok){let m=r.statusText;try{m=(await r.json()).detail}catch{}throw new Error(m)}return r.json()};
-  const q=o=>new URLSearchParams(o).toString();
-  return {static:false,
-    datasets:()=>get("api/datasets"),
-    run:d=>get("api/run?"+q({d})),
-    item:(d,i)=>get("api/item?"+q({d,i})),
-    env:(d,e)=>get("api/env?"+q({d,e})),
-    tokens:(d,ref)=>get("api/tokens?"+q({d,ref})),
-    facets:d=>get("api/facets?"+q({d})),
-    search:p=>get("api/search?"+p.toString()),
-    status:()=>get("api/status")}
-}
+function hfSource(){
+  const DIR={},LIST={},SUMS={},FULL={},DOC={},TOK={},READS={};
+  const url=(d,rel)=>HF_RESOLVE+encPath(DIR[d]+"/"+rel);
+  async function listing(d){if(LIST[d])return LIST[d];
+    for(const dir of DIR[d]?[DIR[d]]:dirsOf(d)){const l=await hfTree(dir,true);if(l){DIR[d]=dir;const files={};for(const x of l)files[x.path.slice(dir.length+1)]=x;return LIST[d]={dir,files}}}
+    throw new Error(`no dataset ${d} on HF (looked for ${dirsOf(d).join(" and ")})`)}
+  const getJson=(d,rel)=>hfFetch(url(d,rel)).then(r=>r.json());
+  // the whole items.jsonl, parsed: for runs without index.jsonl and for searching transcripts and judge calls
+  async function whole(d,why){if(FULL[d])return FULL[d];const f=(await listing(d)).files["items.jsonl"];if(!f)throw new Error(`${d}: no items.jsonl`);
+    if(f.size>BIG&&!confirm(`${why}, so the whole items.jsonl of ${d} (${(f.size/1e6).toFixed(0)} MB) must be downloaded. Continue?`))throw new Error("cancelled");
+    const items=jsonl(await (await hfFetch(url(d,"items.jsonl"))).text());return FULL[d]=new Map(items.map(it=>[String(it.id),it]))}
+  // Docent links through the source run's docent.json (scripts/docent_upload.py) when an item names its source row (ENV/RUN:LINE)
+  async function docent(sums){const need=sums.filter(s=>s.src&&!docentOf(s.links)),keys=[...new Set(need.map(s=>s.src.split(":")[0]))];
+    await Promise.all(keys.map(async k=>{if(!(k in DOC))DOC[k]=await fetch(HF_RESOLVE+encPath("runs/"+k+"/docent.json")).then(r=>r.ok?r.json():null).catch(()=>null)}));
+    for(const s of need){const [k,n]=s.src.split(":"),doc=DOC[k],id=doc&&(doc.runs||[])[+n];if(id)s.links={...s.links,Docent:`https://docent.transluce.org/dashboard/${doc.collection_id}/agent_run/${id}`}}}
+  const self={static:false,envs:envList,datasets:envDatasets,scan:scanAll,
+    known(d,dir){DIR[d]=dir},
+    sums:d=>SUMS[d],
+    async info(d){return (await listing(d)).files["run.json"]?getJson(d,"run.json"):{}},
+    async run(d){const L=await listing(d),info=L.files["run.json"]?await getJson(d,"run.json"):{title:d.split("/").pop()};
+      let sums=null;const ix=L.files["index.jsonl"],it=L.files["items.jsonl"];
+      if(ix){sums=jsonl(await (await hfFetch(url(d,"index.jsonl"))).text());const last=sums[sums.length-1];
+        if(it&&last&&last.off+last.len!=it.size){console.warn(`${d}: index.jsonl is stale (python expview/expview.py index RUN); reading items.jsonl whole`);sums=null}}
+      if(!sums)sums=[...(await whole(d,ix?"index.jsonl is stale":"This run has no index.jsonl (python expview/expview.py index RUN)")).values()].map(summarize);
+      await docent(sums).catch(()=>{});SUMS[d]=new Map(sums.map(s=>[s.id,s]));
+      return {id:d,run:info,items:sums,files:L.files}},
+    async item(d,i){if(!SUMS[d])await self.run(d);const s=SUMS[d].get(i);if(!s)throw new Error(`no item ${i} in ${d}`);let it;
+      if(FULL[d])it=JSON.parse(JSON.stringify(FULL[d].get(i)));
+      else{const r=await hfFetch(url(d,"items.jsonl"),{headers:{Range:`bytes=${s.off}-${s.off+s.len-1}`}});
+        if(r.status!=206)throw new Error(`HF did not honour the byte range for ${d}/items.jsonl`);it=JSON.parse(await r.text())}
+      if(it.env&&typeof it.env=="object"){it.env_files=it.env.files||{};it.env=null}  // an inline env; a {"dir"} env can't be read here
+      it.links={...(it.links||{}),...(s.links||{})};
+      if(it.base&&typeof it.base=="object"){try{it=mergeOverlay(it,await self.item(it.base.d,it.base.i),it.base.d)}catch(e){console.warn(e);it.base_missing=it.base}}
+      return it},
+    env:(d,e)=>getJson(d,"envs/"+e+".json").then(x=>x.files),
+    async tokens(d,ref){const k=d+"\0"+ref;if(!TOK[k]){if(!DIR[d])await listing(d);
+      try{TOK[k]=await getJson(d,"tokens/"+ref+".json")}catch(e){console.warn("retrying",ref,e);TOK[k]=await getJson(d,"tokens/"+ref+".json")}}return TOK[k]},
+    // every read of a dataset (the token files of its items), as search rows; overlays' extra reads live on their base transcript and are skipped
+    async reads(d,prog){if(READS[d])return READS[d];if(!SUMS[d])await self.run(d);
+      const its=[...SUMS[d].values()].filter(s=>s.tokens&&s.tokens.ref&&!s.base),pos=[],reads=[];let n=0,failed=0;
+      await pmap(its,8,async s=>{let T;try{T=await self.tokens(d,s.tokens.ref)}catch(e){console.warn(e);failed++;return}
+        const toks=(T.tokens||[]).map(String),secs=sectionOf(T.sections,toks.length);
+        for(const [q,rs] of Object.entries(T.reads||{})){const p=+q;if(!(p<toks.length))continue;
+          const P={d,i:s.id,pos:p,sec:secs[p],token:toks[p],ctx:toks.slice(Math.max(0,p-40),p+1).join(""),nxt:toks.slice(p+1,p+17).join(""),s};pos.push(P);
+          for(const r of rs)reads.push({P,tool:String(r.tool),label:r.label??null,text:(r.lines||[]).map(l=>Array.isArray(l)?String(l[0]??""):String(l)).join("\n")})}
+      },()=>prog?.(++n,its.length));
+      return READS[d]={pos,reads,n_items:its.length,failed}},
+    // everything an item shows (its calls' text and its token stream), for "new vs the whole item"
+    async text(d,i){const it=await self.item(d,i);let t=(it.calls||[]).map(callText).join("\n\n");
+      if(it.tokens&&!it.base){try{t+="\n\n"+((await self.tokens(it.tokens.d||d,it.tokens.ref)).tokens||[]).join("")}catch{}}return t},
+    whole};
+  return self}
 async function staticSource(){
   const D=JSON.parse(await gunzipB64(EMBED)), B=D.blobs;
   const R=x=>{if(Array.isArray(x))return x.map(R);if(x&&typeof x=="object"){if(Object.keys(x).length==1&&typeof x.$=="number")return B[x.$];const o={};for(const k in x)o[k]=R(x[k]);return o}return x};
   const byId=new Map(D.items.map(it=>[it.id,it]));
-  const summary=it=>({id:it.id,group:it.group,labels:it.labels||{},links:it.links||{},tokens:it.tokens||null,calls:(it.calls||[]).map(c=>({name:c.name,model:c.model,n:(c.messages||[]).length}))});
   const tk={};
   return {static:true,id:D.id||"run",
-    datasets:async()=>[{d:D.id||"run",title:D.run.title,n_items:D.items.length}],
-    run:async()=>({id:D.id||"run",run:D.run,items:D.items.map(summary)}),
+    run:async()=>({id:D.id||"run",run:D.run,items:D.items.map(summarize)}),
     item:async(d,i)=>{const it=byId.get(i);if(!it)throw new Error("no item "+i);return R(it)},
     env:async(d,e)=>R(D.envs[e]),
     tokens:async(d,ref)=>{if(!tk[ref]){const r=await fetch(`tokens/${ref}.gz.txt`);if(!r.ok)throw new Error(`tokens/${ref}.gz.txt: ${r.status}`);tk[ref]=JSON.parse(await gunzipB64(await r.text()))}return tk[ref]}}
 }
 
 // ================================================================ routing: everything is in the hash, so any view is a link
-// #d=<dataset> · &i=<item> · &v=tr|call|env|rec · &t=<token> · &c=<call> &m=<message> · &f=<file> · &q=<regex> · #s=1&q=... (search)
+// #dataset=<run> · &item=<item> · &view=tr|call|env|rec · &token=<token> · &call=<call> &message=<message> · &file=<file> · &query=<regex>
+// · #search=1&query=...&dataset=<datasets> (search); full list in expview/CLAUDE.md "Links" and docs/viewers.md "URL parameters"
 const H=()=>new URLSearchParams(location.hash.slice(1));
+// keys are full words since 2026-10-26; a link with the old one-letter keys is rewritten in place (no reload), so it keeps working
+// and the address bar shows the new form. Applied once per route (page load and hashchange).
+const LEGACY={d:"dataset",i:"item",v:"view",t:"token",c:"call",m:"message",f:"file",q:"query",s:"search",env:"experiment",tool:"reader",sec:"section"};
+function canonHash(){const h=H();if(![...h.keys()].some(k=>Object.hasOwn(LEGACY,k)))return h;
+  const c=new URLSearchParams();for(const [k,v] of h)c.set(LEGACY[k]||k,v);history.replaceState(null,"","#"+c.toString());return c}
 function go(o,replace){const p=new URLSearchParams();for(const [k,v] of Object.entries(o))if(v!=null&&v!=="")p.set(k,v);
   const h="#"+p.toString();if(replace)history.replaceState(null,"",h);else location.hash=h;if(replace)return;}
 function setHash(o){const p=H();for(const [k,v] of Object.entries(o)){if(v==null||v==="")p.delete(k);else p.set(k,v)}history.replaceState(null,"","#"+p.toString())}
@@ -286,32 +392,41 @@ async function getRun(d){if(!RUNS[d]){const r=await SRC.run(d);const its=r.items
 function crumbs(parts){$("#crumbs").innerHTML=parts.map(([t,h])=>h?`<a href="${h}">${esc(t)}</a>`:`<span>${esc(t)}</span>`).join(" <span>/</span> ")}
 let VIEW=null;
 async function route(){
-  const p=H();document.onkeydown=null;
+  const p=canonHash();document.onkeydown=null;
   try{
-    if(p.get("s"))return await searchPage(p);
-    const d=p.get("d")||(SRC.static?SRC.id:null);
+    if(p.get("search"))return await searchPage(p);
+    const d=p.get("dataset")||(SRC.static?SRC.id:null);
     if(!d)return await homePage();
-    if(p.get("i")!=null)return await itemPage(d,p.get("i"),p);
+    if(p.get("item")!=null)return await itemPage(d,p.get("item"),p);
     return await runPage(d);
   }catch(e){console.error(e);$("#app").innerHTML=`<div class="page"><p class="err">${esc(e.message||e)}</p><p><a href="#">← all datasets</a></p></div>`}
 }
 
-// ================================================================ home: every dataset
+// ================================================================ home: every dataset on HF (scanned lazily, cached an hour)
 async function homePage(){
   crumbs([["datasets"]]);VIEW="home";
-  const [ds,st]=await Promise.all([SRC.datasets(),SRC.status().catch(()=>null)]);
+  const cache=store.get("scan",null),fresh=cache&&Date.now()-cache.at<3600e3;
   const F=store.get("homeq","");
   $("#app").innerHTML=`<div class="page"><h1>Datasets</h1>
-   <p class="desc">Every run under the server's roots: <code>data/runs/**/expview</code> (dataset id <code>runs/…</code>), imported datasets in <code>data/expview/imports</code> (<code>imports/…</code>) and bramble's old <code>~/workspace/expview/runs</code> (<code>expview/…</code>). A thread adds a dataset by writing a run dir in the expview format; it shows up here within a couple of minutes. ${st&&st.state=="indexing"?`<b>Indexing ${esc(st.current||"")} (${st.done}/${st.todo})…</b>`:""}${st&&Object.keys(st.errors||{}).length?` <span class="err">${Object.keys(st.errors).length} run(s) failed to index: ${esc(Object.keys(st.errors).join(", "))}</span>`:""}</p>
-   <form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search every metamodel read: a regex, e.g. being (tested|evaluated)|eval rubric" aria-label="regex"><button class="btn primary">Search</button></div></form>
+   <p class="desc">Every expview run on the public HF dataset <a href="https://huggingface.co/datasets/${HF_REPO}/tree/main/runs" target="_blank" rel="noopener">${HF_REPO}</a>: <code>runs/&lt;experiment&gt;/&lt;run&gt;/expview[/&lt;name&gt;]</code> (dataset id <code>runs/&lt;experiment&gt;/&lt;run&gt;[/&lt;name&gt;]</code>). A run shows up once <code>scripts/runs.py finish</code> has synced it. <span class="mono" id="hst"></span> <button class="btn" id="rescan">Rescan</button></p>
+   <form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search metamodel reads: a regex, e.g. being (tested|evaluated)|eval rubric" aria-label="regex"><button class="btn primary">Search</button></div></form>
    <div class="filters"><label for="hf">Filter <input id="hf" type="search" value="${esc(F)}" placeholder="dataset id or title"></label><span class="mono" id="hc"></span></div>
    <div class="wrap"><table id="ht"></table></div></div>`;
-  $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({s:1,q})};
-  const draw=()=>{const f=$("#hf").value.toLowerCase();store.set("homeq",$("#hf").value);
+  $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({search:1,query:q})};
+  let ds=fresh?cache.list:[];
+  const draw=()=>{if(VIEW!="home")return;const f=$("#hf").value.toLowerCase();store.set("homeq",$("#hf").value);
+    for(const x of ds)SRC.known(x.d,x.dir);
     const rows=ds.filter(x=>(x.d+" "+(x.title||"")).toLowerCase().includes(f));$("#hc").textContent=`${rows.length} of ${ds.length}`;
-    $("#ht").innerHTML=`<tr><th>Dataset</th><th>Title</th><th>Items</th><th>With reads</th><th>Reads</th><th>Updated</th></tr>`+rows.map(x=>
-      `<tr class="click" data-d="${esc(x.d)}"><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.title||"")}</td><td class="num">${(x.n_items||0).toLocaleString()}</td><td class="num">${x.n_tok_items?x.n_tok_items.toLocaleString():""}</td><td class="num">${x.n_reads?x.n_reads.toLocaleString():""}</td><td class="num mono">${x.mtime?new Date(x.mtime*1000).toISOString().slice(0,16).replace("T"," "):""}</td></tr>`).join("")};
-  $("#hf").oninput=draw;$("#ht").onclick=e=>{const tr=e.target.closest("tr[data-d]");if(tr)go({d:tr.dataset.d})};draw();
+    $("#ht").innerHTML=`<tr><th>Dataset</th><th>Title</th><th>items.jsonl</th><th>Reads</th><th>Index</th><th>Updated</th></tr>`+rows.map(x=>
+      `<tr class="click" data-d="${esc(x.d)}"><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.title||"")}</td><td class="num">${(x.size/1e6).toFixed(1)} MB</td><td>${x.reads?"yes":""}</td><td title="index.jsonl: without it the whole items.jsonl is downloaded">${x.index?"yes":'<span class="err">no</span>'}</td><td class="num mono">${x.mtime?x.mtime.slice(0,16).replace("T"," "):""}</td></tr>`).join("")};
+  const scan=async()=>{$("#rescan").disabled=true;$("#hst").textContent="scanning…";
+    const found=await SRC.scan((k,n)=>{if(VIEW=="home")$("#hst").textContent=`listed ${k}/${n} experiments`});
+    await pmap(found,4,async x=>{SRC.known(x.d,x.dir);try{x.title=(await SRC.info(x.d)).title||""}catch{}});
+    ds=found;if(!SCAN.failed.length)store.set("scan",{at:Date.now(),list:ds});if(VIEW!="home")return;
+    $("#hst").innerHTML=`${ds.length} datasets, scanned just now`+(SCAN.failed.length?` <span class="err">(${SCAN.failed.length} experiments failed to list: ${esc(SCAN.failed.slice(0,5).join(", "))}; rescan in a few minutes)</span>`:"");$("#rescan").disabled=false;draw()};
+  $("#hf").oninput=draw;$("#ht").onclick=e=>{const tr=e.target.closest("tr[data-d]");if(tr)go({dataset:tr.dataset.d})};$("#rescan").onclick=scan;
+  draw();
+  if(fresh)$("#hst").textContent=`${ds.length} datasets, scanned ${Math.round((Date.now()-cache.at)/60000)} min ago`;else scan().catch(e=>{$("#hst").innerHTML=`<span class="err">${esc(e.message)}</span>`;$("#rescan").disabled=false});
 }
 
 // ================================================================ one run: summary by group + items table
@@ -350,7 +465,7 @@ async function runPage(d){
     ${R.groups.length?`<label for="fg">Group <select id="fg"><option value="">all</option>${R.groups.map(g=>`<option value="${esc(g)}" ${F.group==g?"selected":""}>${esc(g)}${gloss(R,g)?" · "+esc(gloss(R,g)):""}</option>`).join("")}</select></label>`:""}
     ${cats.map((k,i)=>{const vals=[...new Set(R.items.map(it=>fmt((it.labels||{})[k])))].sort();return `<label for="fl${i}">${esc(k)} <select id="fl${i}" data-k="${esc(k)}"><option value="">all</option>${vals.map(v=>`<option ${F.labels[k]==v?"selected":""}>${esc(v)}</option>`).join("")}</select></label>`}).join("")}
     <label for="fq">Find <input id="fq" type="search" value="${esc(F.q)}" placeholder="id or group"></label>
-    ${hasTok&&!SRC.static?`<a class="btn" href="${linkTo({s:1,d})}">Search this run's reads</a>`:""}
+    ${hasTok&&!SRC.static?`<a class="btn" href="${linkTo({search:1,dataset:d})}">Search this run's reads</a>`:""}
     <span class="mono" id="cnt"></span>
    </div>
    <div class="wrap"><table id="items"></table></div><div class="more" id="more"></div>
@@ -370,7 +485,7 @@ function itemsTable(R){
   $("#more").innerHTML=shown.length>R.limit?`<button class="btn" id="mb">Show ${Math.min(1000,shown.length-R.limit)} more</button>`:"";
   const mb=$("#mb");if(mb)mb.onclick=()=>{R.limit+=1000;itemsTable(R)};
   $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable(R);return}
-    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({d:R.id,i:tr.dataset.i})};
+    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({dataset:R.id,item:tr.dataset.i})};
 }
 
 // ================================================================ one item
@@ -386,25 +501,25 @@ function idAlternatives(R,i){const norm=x=>String(x).replace(/\/default(?=\/|$)/
 async function itemPage(d,i,p){
   const R=await getRun(d);
   if(!R.items.some(x=>x.id==i)){const alt=idAlternatives(R,i);
-    if(alt.length==1){p.set("i",alt[0]);history.replaceState(null,"","#"+p.toString());i=alt[0]}
-    else if(alt.length>1){VIEW="item";crumbs([["datasets","#"],[d,linkTo({d})],[i]]);
-      $("#app").innerHTML=`<div class="page"><p class="empty">No item <code>${esc(i)}</code> in ${esc(d)}. Did you mean:</p><ul>${alt.map(a=>`<li><a href="${linkTo({d,i:a})}">${esc(a)}</a></li>`).join("")}</ul></div>`;return}}
+    if(alt.length==1){p.set("item",alt[0]);history.replaceState(null,"","#"+p.toString());i=alt[0]}
+    else if(alt.length>1){VIEW="item";crumbs([["datasets","#"],[d,linkTo({dataset:d})],[i]]);
+      $("#app").innerHTML=`<div class="page"><p class="empty">No item <code>${esc(i)}</code> in ${esc(d)}. Did you mean:</p><ul>${alt.map(a=>`<li><a href="${linkTo({dataset:d,item:a})}">${esc(a)}</a></li>`).join("")}</ul></div>`;return}}
   const same=ITEM.d==d&&ITEM.id==i&&ITEM.it;
   if(!same){$("#app").innerHTML=`<div class="page empty">Loading ${esc(i)}…</div>`;
     const it=await SRC.item(d,i);Object.assign(ITEM,{d,id:i,it,R,env:it.env_files||null,envId:it.env||null})}
   const it=ITEM.it,calls=it.calls||[],list=R.shown||filtered(R),k=list.findIndex(x=>x.id==i);VIEW="item";
-  crumbs(SRC.static?[[R.run.title,"#"],[i]]:[["datasets","#"],[d,linkTo({d})],[i]]);
+  crumbs(SRC.static?[[R.run.title,"#"],[i]]:[["datasets","#"],[d,linkTo({dataset:d})],[i]]);
   if(ITEM.envId&&!ITEM.env)ITEM.env=await SRC.env(ITEM.it.env_d||d,ITEM.envId).catch(()=>null);
   const env=ITEM.env,links=Object.assign({},it.links||{});
-  let v=p.get("v")||(it.tokens?"tr":calls.length?"call":env?"env":"rec");
-  const sel={v,c:p.get("c")!=null?+p.get("c"):Math.max(0,subjectIdx(calls)),f:p.get("f")};
+  let v=p.get("view")||(it.tokens?"tr":calls.length?"call":env?"env":"rec");
+  const sel={v,c:p.get("call")!=null?+p.get("call"):Math.max(0,subjectIdx(calls)),f:p.get("file")};
   const ex=$("#ex");
   $("#app").innerHTML=`<div id="ex"><nav id="nav"></nav><main id="mainp"><div id="bar"><span id="path"></span><span id="tog"></span></div><div id="doc"></div></main></div>`;
   const prev=k>0?list[k-1]:null,next=k>=0&&k<list.length-1?list[k+1]:null;
-  $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({d})}">← All items</a><span>
-     <a class="btn" ${prev?`href="${linkTo({d,i:prev.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
-     <a class="btn" ${next?`href="${linkTo({d,i:next.id,v:p.get("v")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
-   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>${gloss(R,it.group)?`<div class="gl">${esc(gloss(R,it.group))}</div>`:""}`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({d:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
+  $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({dataset:d})}">← All items</a><span>
+     <a class="btn" ${prev?`href="${linkTo({dataset:d,item:prev.id,view:p.get("view")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
+     <a class="btn" ${next?`href="${linkTo({dataset:d,item:next.id,view:p.get("view")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
+   <div class="ih"><b>${esc(it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>${gloss(R,it.group)?`<div class="gl">${esc(gloss(R,it.group))}</div>`:""}`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({dataset:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
    <div class="labels">${Object.entries(it.labels||{}).map(([a,b])=>chip(a,b)).join("")}</div>
    ${Object.keys(links).length?`<div class="labels">${Object.entries(links).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("")}</div>`:""}
    ${it.tokens?`<div class="sec">${esc(R.run.tokens_section||"Transcript")}</div><button class="f" data-sel='{"v":"tr"}'>${esc(R.run.tokens_button||"with metamodel reads")}<span class="mono">${(it.tokens.n||0).toLocaleString()} tok · ${(it.tokens.reads||0).toLocaleString()} read</span></button>`:""}
@@ -413,10 +528,10 @@ async function itemPage(d,i,p){
    <div class="sec">Environment (${env?Object.keys(env).length:0} files)</div>
    ${env?treeHtml(tree(Object.keys(env)),0):'<div class="empty f">no environment recorded</div>'}
    <div class="sec">Record</div><button class="f" data-sel='{"v":"rec"}'>labels and extra fields (JSON)</button>`;
-  $("#nav").onclick=e=>{const b=e.target.closest("[data-sel]");if(!b)return;const s=JSON.parse(b.dataset.sel);setHash({v:s.v,c:s.c??null,f:s.f??null,m:null,t:null});show(s)};
+  $("#nav").onclick=e=>{const b=e.target.closest("[data-sel]");if(!b)return;const s=JSON.parse(b.dataset.sel);setHash({view:s.v,call:s.c??null,file:s.f??null,message:null,token:null});show(s)};
   document.onkeydown=e=>{if(e.target.closest?.("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey)return;
-    if(e.key=="J"&&next)go({d,i:next.id,v:p.get("v")});else if(e.key=="K"&&prev)go({d,i:prev.id,v:p.get("v")});
-    else if(e.key=="Escape"&&!$(".xp:not([hidden])"))go({d});else if(TRK.key)TRK.key(e)};
+    if(e.key=="J"&&next)go({dataset:d,item:next.id,view:p.get("view")});else if(e.key=="K"&&prev)go({dataset:d,item:prev.id,view:p.get("view")});
+    else if(e.key=="Escape"&&!$(".xp:not([hidden])"))go({dataset:d});else if(TRK.key)TRK.key(e)};
   show(sel,p);
 }
 let render=store.get("render",false),rawCall=false;
@@ -435,7 +550,7 @@ function text(t,mdOK,rx){return mdOK&&render?`<div class="md">${md(t)}</div>`:`<
 function diffHtml(t){return `<pre>${String(t).split("\n").map(l=>`<span class="dl ${/^(\+\+\+|---)/.test(l)?"f":l[0]=="+"?"a":l[0]=="-"?"d":l.startsWith("@@")?"h":""}">${esc(l)||" "}</span>`).join("")}</pre>`}
 function show(sel,p){
   p=p||H();ITEM.sel=sel;TRK.key=null;
-  const it=ITEM.it,env=ITEM.env,rx=rxOf(p.get("q"),p.get("case")=="1");
+  const it=ITEM.it,env=ITEM.env,rx=rxOf(p.get("query"),p.get("case")=="1");
   $$("#nav [data-sel]").forEach(b=>{const s=JSON.parse(b.dataset.sel);b.classList.toggle("on",s.v==sel.v&&(s.v!="call"||s.c==sel.c)&&(s.v!="env"||s.f==sel.f))});
   let h="";
   if(sel.v=="env"){const f=sel.f&&env&&sel.f in env?sel.f:env?Object.keys(env).sort()[0]:null;
@@ -450,13 +565,13 @@ function show(sel,p){
     h=`<pre>${hl(JSON.stringify(rec,null,1),rx)}</pre>`}
   else{const c=(it.calls||[])[sel.c||0];if(!c){h='<div class="empty">no model calls</div>';toggles([])}
     else{$("#path").textContent=`call ${(sel.c||0)+1}: ${c.name}`;toggles(["md","raw"]);h=callHtml(c,sel.c||0,rx);
-      const jc=(sel.c||0)==subjectIdx(it.calls||[])?judgeCards(it.calls,j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),false)+overlayInfo(it,false):"";
+      const jc=(sel.c||0)==subjectIdx(it.calls||[])?judgeCards(it.calls,j=>linkTo({dataset:ITEM.d,item:ITEM.id,view:"call",call:j}),false)+overlayInfo(it,false):"";
       if(jc)h=`<div class="tkgrid"><div>${h}</div><aside class="side">${jc}</aside></div>`}}
   $("#doc").innerHTML=h;$("#mainp").scrollTop=0;
   if(sel.v=="call"){
     $$("#doc .clip").forEach(el=>{el.onclick=()=>el.classList.remove("clip")});
-    $$("#doc [data-m]").forEach(a=>a.onclick=e=>{e.preventDefault();setHash({m:a.dataset.m});copyLink({m:a.dataset.m})});
-    const m=p.get("m");const el=m!=null?$(`#msg${m}`):rx?$("#doc mark"):null;
+    $$("#doc [data-m]").forEach(a=>a.onclick=e=>{e.preventDefault();setHash({message:a.dataset.m});copyLink({message:a.dataset.m})});
+    const m=p.get("message");const el=m!=null?$(`#msg${m}`):rx?$("#doc mark"):null;
     if(el){el.scrollIntoView({block:"center"});const box=el.closest(".msg");if(box){box.classList.remove("clip");box.classList.add("flash")}}}
 }
 function callHtml(c,ci,rx){
@@ -492,7 +607,7 @@ function roleOf(name){const n=String(name).toLowerCase();
 async function trView(p,keepBar){
   const it=ITEM.it,run=ITEM.R.run;
   keepBar=keepBar&&!!$("#doc .tkbar");
-  if(p.get("q")!=null&&!keepBar)TRK.q=p.get("q");
+  if(p.get("query")!=null&&!keepBar)TRK.q=p.get("query");
   if(!keepBar)$("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
   let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
   if(ITEM.it!==it||ITEM.sel.v!="tr")return;
@@ -541,7 +656,7 @@ async function trView(p,keepBar){
    <div class="tkgrid"><div class="tr" id="tr">${body}</div><aside class="side" id="side"></aside></div>`;
   if(keepBar)$("#doc .tkgrid").outerHTML=html.slice(html.indexOf('<div class="tkgrid">'));else $("#doc").innerHTML=html;
   // ---- the side panel: matches for the search, else the legend and what each reader is
-  const judges=judgeCards(it.calls||[],j=>linkTo({d:ITEM.d,i:ITEM.id,v:"call",c:j}),true)+overlayInfo(it,true);
+  const judges=judgeCards(it.calls||[],j=>linkTo({dataset:ITEM.d,item:ITEM.id,view:"call",call:j}),true)+overlayInfo(it,true);
   const sideInfo=()=>`${judges?judges+'<hr style="border:0;border-top:1px solid var(--line);margin:10px 0">':""}<h3>${toks.length.toLocaleString()} tokens · ${P.length.toLocaleString()} read positions</h3>
     ${T.legend?`<div class="md">${md(T.legend)}</div>`:""}
     ${readerDocs.length?readerDocs.map(([t,x])=>`<div style="margin-top:8px"><b style="color:${colorOf(t,run)}">${esc(t)}</b>${x.about?`<div class="md">${md(x.about)}</div>`:""}</div>`).join(""):""}
@@ -572,10 +687,10 @@ async function trView(p,keepBar){
     if(expand)open(q,true);t.scrollIntoView({block:"center"});t.classList.remove("flash");void t.offsetWidth;t.classList.add("flash")};
   const visible=()=>$$("#tr .tk.r").map(t=>+t.dataset.p);
   $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);b.textContent=c?"show all":"collapse";return}
-    const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({t:o?q:null})};
-  $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({t:d.dataset.p})}};
+    const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({token:o?q:null})};
+  $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({token:d.dataset.p})}};
   const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H(),true).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
-  let deb;$("#tkq").oninput=e=>{TRK.q=e.target.value;store.set("tkq",TRK.q);clearTimeout(deb);deb=setTimeout(()=>{setHash({q:TRK.q||null});rerender()},250)};
+  let deb;$("#tkq").oninput=e=>{TRK.q=e.target.value;store.set("tkq",TRK.q);clearTimeout(deb);deb=setTimeout(()=>{setHash({query:TRK.q||null});rerender()},250)};
   $("#tkpeek").onchange=e=>{TRK.peek=e.target.value;store.set("tkpeek",TRK.peek);rerender()};
   let debm;const mn=$("#tkmin");if(mn)mn.oninput=()=>{const v=parseFloat(mn.value);if(!isNaN(v)){TRK.min=v;clearTimeout(debm);debm=setTimeout(rerender,250)}};
   $$("[data-tool]").forEach(c=>c.onchange=()=>{TRK.tools[c.dataset.tool]=c.checked;rerender()});
@@ -585,66 +700,119 @@ async function trView(p,keepBar){
   TRK.key=e=>{const v=visible();if(!v.length)return;const i=v.indexOf(cur);
     if(e.key=="j"){e.preventDefault();focus(v[i<0?v.findIndex(q=>q>cur)>=0?v.findIndex(q=>q>cur):0:Math.min(v.length-1,i+1)])}
     else if(e.key=="k"){e.preventDefault();focus(v[i<0?0:Math.max(0,i-1)])}
-    else if(e.key=="Enter"&&cur>=0){e.preventDefault();const o=open(cur);setHash({t:o?cur:null})}
+    else if(e.key=="Enter"&&cur>=0){e.preventDefault();const o=open(cur);setHash({token:o?cur:null})}
     else if(e.key=="Escape"){$$("#tr .xp:not([hidden])").forEach(x=>open(+x.id.slice(2),false))}
     else if(e.key=="n"){const hp=[...new Set(hits().map(x=>x[0]))];if(hp.length){hi=(hi+1)%hp.length;focus(hp[hi],true)}}
     else if(e.key=="/"){e.preventDefault();$("#tkq").focus()}};
   sidePanel();
   // ---- deep link to a token
-  const t=p.get("t");if(t!=null&&reads[t]){requestAnimationFrame(()=>focus(+t,true))}
+  const t=p.get("token");if(t!=null&&reads[t]){requestAnimationFrame(()=>focus(+t,true))}
 }
 
-// ================================================================ search over every read (server only)
+// ================================================================ search over the reads (or the text) of the runs the user picked, in the browser
+const labelStr=v=>typeof v=="boolean"?(v?"true":"false"):String(v);
+function searchHelp(){return `<p class="desc" style="margin-top:14px">Pick an experiment and the runs to search; their reads (every token file) are downloaded once, then the regex runs here in the browser over every metamodel read (O-lens bullets, J-lens top-k, NLA and reader outputs), or over the items' transcripts and judge calls. "New" drops a read whose match also appears in the transcript around its token, so what is left is what the reader says that the text doesn't. The table shows, per dataset and group, how many items have a hit and each yes/no label's rate among them vs overall.</p>
+    <p class="mono">Try: <a href="${linkTo({search:1,query:"being (tested|evaluated|watched)",novel:"ctx"})}">being (tested|evaluated|watched)</a> · <a href="${linkTo({search:1,query:"eval(uation)? (rubric|grader)",novel:"ctx"})}">eval rubric</a> · <a href="${linkTo({search:1,query:"\\bshut ?down",novel:"ctx"})}">shutdown</a></p>`}
 async function searchPage(p){
   VIEW="search";crumbs([["datasets","#"],["search"]]);
-  if(SRC.static){$("#app").innerHTML=`<div class="page"><p class="empty">Cross-run search needs the expview server. In a built page, search inside one transcript's reads from its toolbar.</p></div>`;return}
-  const d=p.get("d")||"";
-  const [ds,fc]=await Promise.all([SRC.datasets(),SRC.facets(d)]);
-  const scope=p.get("scope")||"reads",pick=scope=="text"?ds:ds.filter(x=>x.n_reads);
+  if(SRC.static){$("#app").innerHTML=`<div class="page"><p class="empty">Cross-run search is on the public viewer (https://expview.pages.dev). In a built page, search inside one transcript's reads from its toolbar.</p></div>`;return}
+  const ids=(p.get("dataset")||"").split(",").filter(Boolean),scope=p.get("scope")||"reads",env=p.get("experiment")||(ids[0]?ids[0].split("/")[1]:"");
+  const envs=await SRC.envs();
+  const dsets=env?await SRC.datasets(env).catch(e=>{console.warn(e);return []}):[];
+  for(const x of dsets)SRC.known(x.d,x.dir);
   const sel=(id,opts,cur,all)=>`<select id="${id}"><option value="">${all}</option>${opts.map(([v,n])=>`<option value="${esc(v)}" ${v==cur?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
-  const labs=(fc.labels||[]).map(x=>[`${x.k}=${x.v}`,`${x.k} = ${x.v} (${x.n})`]);
   $("#app").innerHTML=`<div class="page"><h1>Search</h1>
    <form class="sform" id="sf">
-    <div class="row"><input class="rx" id="sq" type="text" value="${esc(p.get("q")||"")}" placeholder="regex (RE2), e.g. being (tested|evaluated|watched)" aria-label="regex"><button class="btn primary">Search</button>
+    <div class="row"><input class="rx" id="sq" type="text" value="${esc(p.get("query")||"")}" placeholder="regex, e.g. being (tested|evaluated|watched)" aria-label="regex"><button class="btn primary">Search</button>
      <label><input type="checkbox" id="scase" ${p.get("case")=="1"?"checked":""}> case-sensitive</label></div>
+    <div class="row"><label>Experiment ${sel("senv",envs.map(e=>[e,e]),env,"pick one")}</label>
+     <span id="sds" class="row">${dsets.length?dsets.map(x=>`<label title="${esc(x.d)}"><input type="checkbox" data-d="${esc(x.d)}" ${ids.includes(x.d)?"checked":""}> ${esc(x.d.split("/").slice(2).join("/"))} <span class="mono">${(x.size/1e6).toFixed(1)} MB${x.reads?" · reads":""}</span></label>`).join(""):env?'<span class="empty">no expview runs in this experiment</span>':""}</span></div>
     <div class="row">
      <label>In ${sel("sscope",[["reads","metamodel reads"],["text","transcripts and judge calls"]],scope,"metamodel reads").replace('<option value="">metamodel reads</option>',"")}</label>
      <label title="Drop a read when the regex also matches what the model just read or is about to write (an echo), or anywhere in the item">Keep ${sel("snovel",[["ctx","new vs ±40 tokens + next 16"],["transcript","new vs the whole item"]],p.get("novel")||"","all hits")}</label>
-     <label>Dataset ${sel("sd",pick.map(x=>[x.d,scope=="text"?`${x.d} (${x.n_items.toLocaleString()} items)`:`${x.d} (${x.n_reads.toLocaleString()} reads)`]),d,scope=="text"?"all":"all with reads")}</label>
-     <label>Reader ${sel("stool",(fc.tools||[]).map(x=>[x.tool,`${x.tool} (${x.n.toLocaleString()})`]),p.get("tool")||"","all")}</label>
-     <label>Section ${sel("ssec",(fc.secs||[]).map(x=>[x.sec,`${x.sec||"(none)"} (${x.n.toLocaleString()})`]),p.get("sec")||"","all")}</label>
-     ${(fc.groups||[]).length?`<label>Group ${sel("sgroup",fc.groups.map(x=>[x.grp,`${x.grp} (${x.n})`]),p.get("group")||"","all")}</label>`:""}
-     ${labs.length?`<label>Label ${sel("slabel",labs,p.get("label")||"","any")}</label>`:""}
+     <span id="sfacets" class="row"></span>
     </div></form><div id="sres"></div></div>`;
-  const params=()=>{const o={s:1,q:$("#sq").value.trim(),case:$("#scase").checked?"1":"",scope:$("#sscope").value=="reads"?"":$("#sscope").value,novel:$("#snovel").value,d:$("#sd").value,
-    tool:$("#stool").value,sec:$("#ssec").value,group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""};return o};
+  const params=()=>({search:1,query:$("#sq").value.trim(),case:$("#scase").checked?"1":"",scope:$("#sscope").value=="reads"?"":$("#sscope").value,novel:$("#snovel").value,experiment:$("#senv").value,
+    dataset:$$("#sds input:checked").map(c=>c.dataset.d).join(","),reader:$("#stool")?.value||"",section:$("#ssec")?.value||"",group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""});
+  const reset=o=>{o.reader="";o.section="";o.group="";o.label="";return o};
   $("#sf").onsubmit=e=>{e.preventDefault();go(params())};
-  $("#sd").onchange=()=>{const o=params();o.tool="";o.sec="";o.group="";o.label="";go(o)};
-  $$("#sf select:not(#sd),#scase").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
-  if(!p.get("q")){$("#sres").innerHTML=`<p class="desc" style="margin-top:14px">Regex over every metamodel read (O-lens bullets, J-lens top-k, NLA and reader outputs) in every indexed run, or over the transcripts and judge calls themselves. "New" drops a read whose match also appears in the transcript around its token, so what is left is what the reader says that the text doesn't. The table shows, per dataset and group, how many items have a hit and each yes/no label's rate among them vs overall.</p>
-    <p class="mono">Try: <a href="${linkTo({s:1,q:"being (tested|evaluated|watched)",novel:"ctx"})}">being (tested|evaluated|watched)</a> · <a href="${linkTo({s:1,q:"eval(uation)? (rubric|grader)",novel:"ctx"})}">eval rubric</a> · <a href="${linkTo({s:1,q:"\\bshut ?down",novel:"ctx"})}">shutdown</a></p>`;return}
-  $("#sres").innerHTML='<p class="empty">Searching…</p>';
-  const qs=new URLSearchParams();for(const k of ["q","case","scope","novel","d","tool","sec","group","label"])if(p.get(k))qs.set(k,p.get(k));
-  const page=+(p.get("page")||0);qs.set("page",page);qs.set("per",50);
-  let r;try{r=await SRC.search(qs)}catch(e){$("#sres").innerHTML=`<p class="err">${esc(e.message)}</p>`;return}
-  const R1=rxOf(p.get("q"),p.get("case")=="1"),T=r.total;
-  const n=scope=="text"?T.items:T.positions;
-  let h=scope=="text"?`<p><b>${T.items.toLocaleString()}</b> items match <span class="mono">(${r.secs}s)</span></p>`:
-    `<p><b>${T.reads.toLocaleString()}</b> matching reads at <b>${T.positions.toLocaleString()}</b> token positions in <b>${T.items.toLocaleString()}</b> items <span class="mono">(${r.secs}s)</span>${scope!="text"?` · <a href="api/csv?${qs}">CSV of all matching reads</a>`:""}</p>`;
-  const rk=[...new Set(r.slices.flatMap(x=>Object.keys(x.rates||{})))].slice(0,6);
-  if(r.slices.length)h+=`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Dataset</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.slices.map(x=>
-    `<tr><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=(x.rates||{})[k];return `<td class="num">${v?`${pct(v[0])} · ${pct(v[1])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`;
-  const pages=Math.ceil(n/50),nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
+  $("#senv").onchange=()=>{const o=reset(params());o.dataset="";go(o)};
+  $$("#sds input").forEach(c=>c.onchange=()=>go(reset(params())));
+  $$("#sscope,#snovel,#scase").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
+  const res=$("#sres");
+  if(!ids.length){res.innerHTML=(env&&!dsets.length?"":`<p class="empty">${env?"Tick the runs to search.":"Pick an experiment, then the runs to search."}</p>`)+searchHelp();return}
+  // ---- load the picked runs
+  res.innerHTML='<p class="empty" id="sld">Loading…</p>';const say=t=>{const el=$("#sld");if(el)el.textContent=t};
+  const loaded=[];
+  try{for(const d of ids){say(`${d}: loading the item list…`);await SRC.run(d);
+    if(scope=="text"){say(`${d}: downloading items.jsonl…`);loaded.push({d,items:[...(await SRC.whole(d,"Searching transcripts and judge calls needs every item")).values()]})}
+    else loaded.push({d,...await SRC.reads(d,(k,n)=>say(`${d}: loading reads ${k}/${n}…`))})}}
+  catch(e){res.innerHTML=`<p class="err">${esc(e.message||e)}</p>`;return}
+  if(VIEW!="search")return;
+  const sums=ids.flatMap(d=>[...SRC.sums(d).values()].map(s=>({...s,d})));
+  // ---- facets from what's loaded
+  const count=(xs,f)=>{const c=new Map();for(const x of xs){const k=f(x);if(k==null)continue;c.set(k,(c.get(k)||0)+1)}return [...c]};
+  const reads=loaded.flatMap(x=>x.reads||[]),tools=count(reads,r=>r.tool).sort((a,b)=>b[1]-a[1]),secs=count(loaded.flatMap(x=>x.pos||[]),P=>P.sec).sort((a,b)=>b[1]-a[1]);
+  const groups=count(sums,s=>s.group).sort((a,b)=>a[0]<b[0]?-1:1);
+  const byK=new Map();for(const s of sums)for(const [k,v] of Object.entries(s.labels||{}))if(v!=null&&typeof v!="object"){const m=byK.get(k)||new Map();m.set(labelStr(v),(m.get(labelStr(v))||0)+1);byK.set(k,m)}
+  const labs=[...byK].filter(([,m])=>m.size<=30).flatMap(([k,m])=>[...m].sort().map(([v,n])=>[`${k}=${v}`,`${k} = ${v} (${n})`]));
+  $("#sfacets").innerHTML=(scope!="text"?`<label>Reader ${sel("stool",tools.map(([t,n])=>[t,`${t} (${n.toLocaleString()})`]),p.get("reader")||"","all")}</label>
+     <label>Section ${sel("ssec",secs.map(([s,n])=>[s,`${s||"(none)"} (${n.toLocaleString()})`]),p.get("section")||"","all")}</label>`:"")+
+    (groups.length?`<label>Group ${sel("sgroup",groups.map(([g,n])=>[g,`${g} (${n})`]),p.get("group")||"","all")}</label>`:"")+
+    (labs.length?`<label>Label ${sel("slabel",labs,p.get("label")||"","any")}</label>`:"");
+  $$("#sfacets select").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
+  const failed=loaded.reduce((a,x)=>a+(x.failed||0),0);
+  const loadedNote=scope=="text"?`${sums.length.toLocaleString()} items loaded`:`${reads.length.toLocaleString()} reads at ${loaded.reduce((a,x)=>a+x.pos.length,0).toLocaleString()} positions in ${loaded.reduce((a,x)=>a+x.n_items,0).toLocaleString()} items loaded${failed?` <span class="err">(${failed} token files failed)</span>`:""}`;
+  const q=p.get("query");
+  if(!q){res.innerHTML=`<p class="mono">${loadedNote}</p>`+searchHelp();return}
+  const rx=rxOf(q,p.get("case")=="1");if(!rx){res.innerHTML=`<p class="err">Not a valid regex: ${esc(q)}</p>`;return}
+  // ---- the query
+  const t0=performance.now(),Fg=p.get("group")||"",Fl=p.get("label")||"",[lk,lv]=Fl?[Fl.slice(0,Fl.indexOf("=")),Fl.slice(Fl.indexOf("=")+1)]:["",""];
+  const itemOK=s=>(!Fg||s.group==Fg)&&(!lk||((s.labels||{})[lk]!=null&&labelStr(s.labels[lk])==lv));
+  const novel=p.get("novel")||"",tool=p.get("reader")||"",sec=p.get("section")||"";
+  let rows,total,hitItems=new Set();
+  if(scope=="text"){rows=[];
+    for(const {d,items} of loaded)for(const it of items){const s=SRC.sums(d).get(String(it.id));if(!s||!itemOK(s))continue;
+      const t=(it.calls||[]).map(callText).join("\n\n");rx.lastIndex=0;const m=rx.exec(t);if(!m)continue;hitItems.add(d+"\0"+s.id);
+      rows.push({d,i:s.id,grp:s.group,labels:s.labels,links:s.links,snippet:t.slice(Math.max(0,m.index-160),m.index+m[0].length+160)})}
+    total={items:rows.length}}
+  else{let hits=reads.filter(r=>itemOK(r.P.s)&&(!tool||r.tool==tool)&&(!sec||r.P.sec==sec)&&test(rx,r.text));
+    if(novel=="ctx"||novel=="transcript")hits=hits.filter(r=>!test(rx,r.P.ctx+r.P.nxt));
+    if(novel=="transcript"){const keys=[...new Set(hits.map(r=>r.P.d+"\0"+r.P.i))],bad=new Set();let n=0;
+      await pmap(keys,6,async k=>{const [d,i]=k.split("\0");try{if(test(rx,await SRC.text(d,i)))bad.add(k)}catch(e){console.warn(e)}},()=>say(`checking the whole item: ${++n}/${keys.length}…`));
+      hits=hits.filter(r=>!bad.has(r.P.d+"\0"+r.P.i))}
+    const byPos=new Map();for(const r of hits){const k=r.P.d+"\0"+r.P.i+"\0"+r.P.pos;if(!byPos.has(k))byPos.set(k,{P:r.P,reads:[]});byPos.get(k).reads.push(r);hitItems.add(r.P.d+"\0"+r.P.i)}
+    rows=[...byPos.values()].sort((a,b)=>a.P.d<b.P.d?-1:a.P.d>b.P.d?1:a.P.i<b.P.i?-1:a.P.i>b.P.i?1:a.P.pos-b.P.pos);
+    for(const r of rows)r.reads.sort((a,b)=>(a.tool+a.label)<(b.tool+b.label)?-1:1);
+    total={reads:hits.length,positions:rows.length,items:hitItems.size};window.EXPVIEW_HITS=hits}
+  const secsTaken=((performance.now()-t0)/1000).toFixed(2);
+  // ---- per (dataset, group): items in the filtered slice, how many have a hit, each yes/no label's rate with a hit vs overall
+  const hitDs=new Set([...hitItems].map(k=>k.split("\0")[0])),slices=new Map();
+  for(const s of sums){if(!hitDs.has(s.d)||!itemOK(s))continue;const k=s.d+"\0"+(s.group??"");let x=slices.get(k);if(!x)slices.set(k,x={d:s.d,grp:s.group,items:0,hit_items:0,rates:{}});
+    const hit=hitItems.has(s.d+"\0"+s.id);x.items++;if(hit)x.hit_items++;
+    for(const [lk2,v] of Object.entries(s.labels||{}))if(typeof v=="boolean"){const r=x.rates[lk2]||(x.rates[lk2]={n:0,t:0,hn:0,ht:0});r.n++;r.t+=v;if(hit){r.hn++;r.ht+=v}}}
+  const sl=[...slices.values()].filter(x=>x.hit_items>0).sort((a,b)=>b.hit_items-a.hit_items||(a.d<b.d?-1:1)).slice(0,300);
+  const rk=[...new Set(sl.flatMap(x=>Object.keys(x.rates)))].slice(0,6);
+  let h=scope=="text"?`<p><b>${total.items.toLocaleString()}</b> items match <span class="mono">(${secsTaken}s; ${loadedNote})</span></p>`:
+    `<p><b>${total.reads.toLocaleString()}</b> matching reads at <b>${total.positions.toLocaleString()}</b> token positions in <b>${total.items.toLocaleString()}</b> items <span class="mono">(${secsTaken}s; ${loadedNote})</span> · <a href="#" id="scsv">CSV of all matching reads</a></p>`;
+  if(sl.length)h+=`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Dataset</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${sl.map(x=>
+    `<tr><td class="mono wrapid">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const r=x.rates[k];return `<td class="num">${r&&r.n?`${pct(r.hn?r.ht/r.hn:null)} · ${pct(r.t/r.n)}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`;
+  const page=+(p.get("page")||0),per=50,pages=Math.ceil(rows.length/per);
+  const nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
   const labChips=l=>Object.entries(l||{}).slice(0,6).map(([k,v])=>chip(k,v)).join("");
-  const lk=o=>Object.entries(o||{}).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("");
-  h+=nav+r.rows.map(x=>{
-    if(scope=="text"){const href=linkTo({d:x.d,i:x.i,v:"call",q:p.get("q")});
-      return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(x.i)}</a><span class="chip mono">${esc(x.d)}</span>${x.grp!=null?`<span class="chip">${esc(x.grp)}</span>`:""}${labChips(x.labels)}${lk(x.links)}</div><div class="ctx">…${hl(x.snippet,R1)}…</div></div>`}
-    const href=linkTo({d:x.d,i:x.i,v:"tr",t:x.pos,q:p.get("q")});const tk=String(x.token),c=String(x.ctx);
-    return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(x.i)} @ ${x.pos}</a><span class="chip mono">${esc(x.d)}</span>${x.grp!=null?`<span class="chip">${esc(x.grp)}</span>`:""}${x.sec?`<span class="chip">${esc(x.sec)}</span>`:""}${labChips(x.labels)}${lk(x.links)}</div>
-     <div class="ctx">…${esc(c.endsWith(tk)?c.slice(0,c.length-tk.length):c)}<b>${esc(tk)}</b> ⟶ ${esc(x.nxt)}</div>
-     <div class="reads">${x.reads.map(y=>`<div><span class="rn">${esc(y.tool)}${y.label?" · "+esc(y.label):""}</span>${hl(y.text,R1)}</div>`).join("")}</div></div>`}).join("")+nav;
-  $("#sres").innerHTML=h;
+  const lkh=o=>Object.entries(o||{}).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("");
+  h+=nav+rows.slice(page*per,(page+1)*per).map(x=>{
+    if(scope=="text"){const href=linkTo({dataset:x.d,item:x.i,view:"call",query:q,case:p.get("case")});
+      return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(x.i)}</a><span class="chip mono">${esc(x.d)}</span>${x.grp!=null?`<span class="chip">${esc(x.grp)}</span>`:""}${labChips(x.labels)}${lkh(x.links)}</div><div class="ctx">…${hl(x.snippet,rx)}…</div></div>`}
+    const P=x.P,s=P.s,href=linkTo({dataset:P.d,item:P.i,view:"tr",token:P.pos,query:q,case:p.get("case")}),c=P.ctx.slice(-300),tk=P.token;
+    return `<div class="card"><div class="chips"><a class="chip" href="${href}">${esc(P.i)} @ ${P.pos}</a><span class="chip mono">${esc(P.d)}</span>${s.group!=null?`<span class="chip">${esc(s.group)}</span>`:""}${P.sec?`<span class="chip">${esc(P.sec)}</span>`:""}${labChips(s.labels)}${lkh(s.links)}</div>
+     <div class="ctx">…${esc(c.endsWith(tk)?c.slice(0,c.length-tk.length):c)}<b>${esc(tk)}</b> ⟶ ${esc(P.nxt)}</div>
+     <div class="reads">${x.reads.map(y=>`<div><span class="rn">${esc(y.tool)}${y.label?" · "+esc(y.label):""}</span>${hl(y.text,rx)}</div>`).join("")}</div></div>`}).join("")+nav;
+  res.innerHTML=h;
+  const csv=$("#scsv");if(csv)csv.onclick=e=>{e.preventDefault();const cell=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+    const lines=[["dataset","item","group","pos","sec","token","tool","label","text","ctx","nxt","labels"].join(",")];
+    for(const r of window.EXPVIEW_HITS)lines.push([r.P.d,r.P.i,r.P.s.group,r.P.pos,r.P.sec,r.P.token,r.tool,r.label,r.text,r.P.ctx,r.P.nxt,JSON.stringify(r.P.s.labels||{})].map(cell).join(","));
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));a.download="expview_search.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)};
 }
 
 // ================================================================ boot
@@ -652,7 +820,7 @@ async function searchPage(p){
   $("#theme").onclick=()=>{const cur=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
     const nx=cur=="dark"?"light":"dark";document.documentElement.dataset.theme=nx;store.set("theme",nx)}})();
 (async()=>{
-  SRC=STATIC?await staticSource():apiSource();
+  SRC=STATIC?await staticSource():hfSource();
   if(STATIC){$("#tosearch").hidden=true;$(".brand").textContent="expview";$(".brand").href="#"}
   window.addEventListener("hashchange",route);await route();
 })().catch(e=>{$("#app").innerHTML=`<div class="page err">Could not start: ${esc(e.message||e)}</div>`});

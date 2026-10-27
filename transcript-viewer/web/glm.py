@@ -7,8 +7,7 @@ samples at T=1, no FVE) at ~12 chosen punctuation positions, indexed by GLM-5.3 
 
 Tokens are exact slices of the render (GLM-5.3's tokenizer offsets), so `pos` indexes them directly; a read whose token
 doesn't match is dropped. The RL lens's greedy readout is the greedy read and its 4 samples the T=1 read; the SFT lens is
-left out (mostly web-text noise on these transcripts). Reads live only in S["by_tid"]: the pod serves Qwen's lens, so
-these can't be re-read live.
+left out (mostly web-text noise on these transcripts). Reads live only in S["by_tid"] (they are her lens's, not ours).
 """
 
 import json

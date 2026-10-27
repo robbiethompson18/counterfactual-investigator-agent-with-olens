@@ -7,9 +7,9 @@ when something misbehaves, not before every command.
 Robbie and Kylie keep their GPU compute separate:
 
 - **Robbie** (and his agents) use plain RunPod pods on his account, via `runpodctl` and the scripts
-  here. Never SkyPilot (`sky`, `transcript-viewer/sky/`), never the bramble GPU, and never anything
-  that launches GPUs from bramble (e.g. the bramble:8801 lens explorer's Start GPU button or its
-  local backend). Those are Kylie's accounts and hardware. Reading her viewers and caches is fine.
+  here. Never SkyPilot (`sky`), never the bramble GPU, and never anything that launches GPUs from
+  bramble (e.g. the bramble:8801 lens explorer's Start GPU button or its local backend). Those are
+  Kylie's accounts and hardware. Reading her viewers and caches is fine.
 - **Kylie** (and her agents) use SkyPilot and bramble. If you're working for Kylie, this directory
   isn't for you.
 
