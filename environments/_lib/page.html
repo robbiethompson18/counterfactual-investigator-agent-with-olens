@@ -54,6 +54,10 @@ tr.click{cursor:pointer} tr.click:hover{background:var(--sel)} tr.on{background:
 .bar .band,.hbar .b .band{position:absolute;top:0;bottom:0;background:var(--bar);opacity:.28;border-radius:2px}
 .bar .pt,.hbar .b .pt{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--bar)}
 .ci{color:var(--faint);font-size:11px}
+.dbar{position:relative;width:120px;height:12px;background:var(--track);border-radius:3px;overflow:hidden;flex:none}
+.dbar .zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--faint)}
+.dbar .band{position:absolute;top:0;bottom:0;opacity:.3;border-radius:2px;background:var(--mute)} .dbar .pt{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--mute)}
+.dbar.up .band,.dbar.up .pt{background:var(--up)} .dbar.down .band,.dbar.down .pt{background:var(--down)}
 .msg{border:1px solid var(--line);border-radius:8px;margin:6px 0;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 var(--mono);max-height:70vh;overflow:auto}
 .msg.user{background:var(--user)} .msg.assistant{background:var(--asst)} .msg.tool{background:var(--tool)} .msg.system{background:var(--code)}
 .role{font:600 11px Inter,system-ui;color:var(--mute);margin-bottom:4px;white-space:normal;text-transform:uppercase;letter-spacing:.04em} .think{background:var(--think);padding:6px;border-radius:4px;margin-bottom:6px}
@@ -233,6 +237,14 @@ function deltaOf(a, b) {
     DCI[key] = {d: 100 * (b.k / b.n - a.k / a.n), lo: 100 * ds[Math.floor(0.025 * N)], hi: 100 * ds[Math.floor(0.975 * N)]};
   }
   return DCI[key];
+}
+// a diverging bar from -S to +S pp around a zero line: the band is the 95% credible interval of the difference, the
+// line the observed difference
+function deltaBar(x, S = 100) {
+  const pos = v => (50 + 50 * Math.max(-1, Math.min(1, v / S))).toFixed(1), lo = pos(x.lo), hi = pos(x.hi);
+  const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "flat";
+  return `<span class="dbar ${cls}" title="Δ ${x.d.toFixed(1)}pp, 95% credible interval ${x.lo.toFixed(1)} to ${x.hi.toFixed(1)}pp (axis ±${S}pp)">
+    <i class="zero"></i><i class="band" style="left:${lo}%;width:${(hi - lo).toFixed(1)}%"></i><i class="pt" style="left:${pos(x.d)}%"></i></span>`;
 }
 function deltaBadge(x) {
   if (!x) return "";
@@ -473,7 +485,7 @@ function compareList(D) {
     const ts = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]?.n));
     const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
       const p = P.by[a + "\u0000" + t], v = pctOf(p);
-      const d = i && c.arms.length === 2 ? " " + deltaBadge(deltaOf(P.by[c.arms[0] + "\u0000" + t], p)) : "";
+      const d = i ? " " + deltaBadge(deltaOf(P.by[c.arms[0] + "\u0000" + t], p)) : "";
       return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar">${p?.n ? ciBar(p.k, p.n, "b") : '<span class="b"></span>'}
         <span class="v">${v == null ? "not run" : `${(100 * v).toFixed(0)}% <span style="color:var(--faint)">/${p.n}</span>`}</span>${d}</span>`;
     }).join("")).join("") : c.arms.map(a => `<span class="arm">${esc(a)}${retiredTag(D, a)}</span><span class="mute">not run</span>`).join("");
@@ -482,7 +494,7 @@ function compareList(D) {
       <div class="mini">${body}</div></a>`;
   };
   $("tab").innerHTML = `<p class="lede">Pairs are the env's declared clean counterfactuals (<span class="mono">PAIRS</span>); sets are arms worth viewing side by side
-    (<span class="mono">COMPARISONS</span>). Bars are the primary rate pooled over runs per model, thinking on and off apart; the pill is the second arm minus the first,
+    (<span class="mono">COMPARISONS</span>). Bars are the primary rate pooled over runs per model, thinking on and off apart; the pill is each arm minus the first,
     coloured when its 95% interval excludes zero. Bands are 95% credible intervals (Beta(1,1) prior), the line the observed rate.</p>` +
     Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="cards">${cs.map(card).join("")}</div>`).join("");
 }
@@ -504,7 +516,10 @@ async function comparePage(h) {
   // which sections differ from the base arm, per arm (on this item): the set's "what changes" overview
   const eps = await Promise.all(c.arms.map(a => built(h.env, a, item).catch(() => null)));
   const sb = eps[c.arms.indexOf(baseArm)] ? sections(eps[c.arms.indexOf(baseArm)]) : [];
-  const changes = c.arms.map((a, i) => !eps[i] ? null : pairSections(sb, sections(eps[i])).filter(p => !p.same).map(p => p.name));
+  const changes = c.arms.map((a, i) => !eps[i] ? null : pairSections(sb, sections(eps[i])).filter(p => !p.same && !p.name.startsWith("meta")).map(p => p.name));  // what the model sees
+  // one scale for every Δ bar on the page, so they compare: the widest credible interval, rounded up to 10pp
+  const S = Math.max(10, ...c.arms.flatMap(a => a === baseArm ? [] : usedT.map(t => { const x = deltaOf(P.by[baseArm + "\u0000" + t], P.by[a + "\u0000" + t]);
+    return x ? Math.ceil(Math.max(Math.abs(x.lo), Math.abs(x.hi)) / 10) * 10 : 0; })));
   const effects = usedT.map(t => {
     const a = P.by[baseArm + "\u0000" + t], b = P.by[other + "\u0000" + t], x = deltaOf(a, b);
     if (!x) return "";
@@ -526,7 +541,8 @@ async function comparePage(h) {
       <td class="mono">${isB ? "" : changes[i] == null ? '<span class="mute">not built on this item</span>' : changes[i].length ? changes[i].map(esc).join("<br>") : '<span class="mute">identical</span>'}</td>
       ${usedT.map(t => {
         const p = P.by[a + "\u0000" + t], q = P.items[a + "\u0000" + t + "\u0000" + item], b = P.by[baseArm + "\u0000" + t];
-        const d = !isB && pct(p) != null && pct(b) != null ? ` <span class="mute">(${pct(p) >= pct(b) ? "+" : ""}${(100 * (pct(p) - pct(b))).toFixed(0)}pp)</span>` : "";
+        const x = !isB && p?.type === "bool" ? deltaOf(b, p) : null;
+        const d = x ? `<div class="rate" style="margin-top:4px">${deltaBar(x, S)}${deltaBadge(x)} <span class="ci">[${x.lo.toFixed(0)}, ${x.hi.toFixed(0)}]</span></div>` : "";
         return `<td>${p ? (p.type === "bool" ? rate(p.k, p.n) + d : `${p.eps} eps`) : '<span class="mute">not run</span>'}${q ? `<br><span class="mono mute">this item ${q.k}/${q.n}</span>` : ""}</td>`;
       }).join("")}</tr>`;
   }).join("")}
