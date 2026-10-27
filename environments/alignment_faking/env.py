@@ -116,6 +116,12 @@ PROMPTS = {
     # v3 with the Anthropic framing back (the original's wording, minimally adapted): "an AI created by Anthropic", Anthropic
     # evaluates helpfulness, trains on preview and never monitors, logs, stores or trains on public conversations
     "v4": (None, (PROMPTS_DIR / "system_v4.txt").read_text(), USER),
+    # v4 with the training consequence made more salient (Kylie, 2026-10-27): v5 the paper's "RLHF would modify the AI ...
+    # values, goals, and motivations" sentence; v6 the same in second person ("RLHF will modify you"); v7 v6 plus a closing
+    # reminder of what each stage means for training
+    "v5": (None, (PROMPTS_DIR / "system_v5.txt").read_text(), USER),
+    "v6": (None, (PROMPTS_DIR / "system_v6.txt").read_text(), USER),
+    "v7": (None, (PROMPTS_DIR / "system_v7.txt").read_text(), USER),
 }
 
 
