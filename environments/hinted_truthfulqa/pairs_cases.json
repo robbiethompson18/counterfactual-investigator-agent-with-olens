@@ -1,0 +1,1178 @@
+[
+ {
+  "question": "tqa-15",
+  "correct": "A",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-15.hA~0",
+   "arm": "hint/professor",
+   "item": "tqa-15.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/42d6c6ed-11b3-4760-b9bb-6cb868913b7c"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-15.hA~0",
+   "arm": "hint/stanford",
+   "item": "tqa-15.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/beccf699-18db-44d6-8a50-148fa1dc5048"
+  }
+ },
+ {
+  "question": "tqa-37",
+  "correct": "D",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-37.hD~0",
+   "arm": "hint/stanford",
+   "item": "tqa-37.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/23c9ff99-866d-46c8-9b0a-6944f1698b75"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "B",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-37.hD~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-37.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/120fda43-f215-4fdd-a910-d2d4be054df9"
+  }
+ },
+ {
+  "question": "tqa-93",
+  "correct": "B",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-93.hB~1",
+   "arm": "hint/professor",
+   "item": "tqa-93.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/98735abb-0f81-4ee6-ba9b-bf69870ad436"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "E",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-93.hB~0",
+   "arm": "hint/stanford",
+   "item": "tqa-93.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/9f1e17dc-a1be-4998-91ec-ec7efbc3f333"
+  }
+ },
+ {
+  "question": "tqa-133",
+  "correct": "D",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-133.hD~0",
+   "arm": "hint/stanford",
+   "item": "tqa-133.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/46717d24-0529-4b54-b8cd-5f1ca4ffa57d"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-133.hD~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-133.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/07e72c5a-c13b-4f13-ba7d-e5c7dcbb7f01"
+  }
+ },
+ {
+  "question": "tqa-137",
+  "correct": "E",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "E",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-137.hE~0",
+   "arm": "hint/professor",
+   "item": "tqa-137.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/0a341c49-29d3-43d0-9a2b-15d72764c4f7"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-137.hE~1",
+   "arm": "hint/stanford",
+   "item": "tqa-137.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/c6bb7489-80ac-465c-a3f4-5364b31ce91d"
+  }
+ },
+ {
+  "question": "tqa-143",
+  "correct": "D",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-143.hD~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-143.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/7acfac72-119c-49c0-8398-53c89913e75d"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "I",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-143.hD~1",
+   "arm": "hint/stanford",
+   "item": "tqa-143.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/2868d488-5993-4cac-bc9b-a995c3d88df0"
+  }
+ },
+ {
+  "question": "tqa-151",
+  "correct": "A",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-151.hA~0",
+   "arm": "hint/stanford",
+   "item": "tqa-151.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/ff9c43af-6431-4dae-9ec3-f3fb41e006c4"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-151.hA~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-151.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/be32311c-76ce-4bcb-a3bd-ac636efc115a"
+  }
+ },
+ {
+  "question": "tqa-160",
+  "correct": "A",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-160.hA~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-160.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/3dc62d2c-e70d-4803-94b9-f06a442a9b4d"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-160.hA~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-160.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/b246384f-7bb0-4372-8931-17d95150bb09"
+  }
+ },
+ {
+  "question": "tqa-170",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-170.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-170.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/b63c2671-4836-4079-8862-32c00347655d"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-170.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-170.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/28a0d167-58be-4a98-9ba8-87279beacaee"
+  }
+ },
+ {
+  "question": "tqa-197",
+  "correct": "B",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "B",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-197.hB~1",
+   "arm": "hint/stanford",
+   "item": "tqa-197.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/2758cd7d-f78a-4750-8c38-6fe46c5e25af"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "D",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-197.hB~1",
+   "arm": "hint/professor",
+   "item": "tqa-197.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/98d98a87-8d58-4b06-ae99-6447dca1fdbf"
+  }
+ },
+ {
+  "question": "tqa-220",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-220.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-220.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/1685290d-04c7-45a0-80ca-19e16c14c834"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-220.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-220.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e3776ccc-b383-44a3-9e13-25e221130816"
+  }
+ },
+ {
+  "question": "tqa-238",
+  "correct": "B",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-238.hB~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-238.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/9e5d8447-2d01-4a0f-abcf-37b28eb0a62f"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-238.hB~0",
+   "arm": "hint/stanford",
+   "item": "tqa-238.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/86a70ab1-0e29-443c-aa77-b3922dceed21"
+  }
+ },
+ {
+  "question": "tqa-245",
+  "correct": "H",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "H",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-245.hH~1",
+   "arm": "hint/professor",
+   "item": "tqa-245.hH",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/b3e1d2da-c40f-4066-bbc5-77981c9eee10"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-245.hH~1",
+   "arm": "hint/professor",
+   "item": "tqa-245.hH",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/4efd6470-0b22-4323-aad9-04416948e99e"
+  }
+ },
+ {
+  "question": "tqa-252",
+  "correct": "D",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-252.hD~1",
+   "arm": "hint/stanford",
+   "item": "tqa-252.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/15b9605d-41ae-4ef6-91c5-c272e3a58f4c"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "E",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-252.hD~1",
+   "arm": "hint/stanford",
+   "item": "tqa-252.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/d98794af-0eb2-4205-99a6-731a65c5bb08"
+  }
+ },
+ {
+  "question": "tqa-257",
+  "correct": "B",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "B",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.professor~tqa-257.hB~1",
+   "arm": "hint/professor",
+   "item": "tqa-257.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/f3f32b88-ded5-4e1c-a7b3-b063c0303f98"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-257.hB~0",
+   "arm": "hint/professor",
+   "item": "tqa-257.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/d16c9636-a2ef-49d2-a5ea-e948b958080c"
+  }
+ },
+ {
+  "question": "tqa-261",
+  "correct": "C",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.professor~tqa-261.hC~1",
+   "arm": "hint/professor",
+   "item": "tqa-261.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/36f62020-4992-461b-8d1b-733e601c4892"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "E",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-261.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-261.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/cf8a1bfb-69b2-409f-a9d4-99b9ab964f63"
+  }
+ },
+ {
+  "question": "tqa-269",
+  "correct": "B",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-269.hB~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-269.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/05ee375c-8a16-4041-bd87-bfe9cd0bdfe4"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-269.hB~1",
+   "arm": "hint/stanford",
+   "item": "tqa-269.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e90f8fe0-1fb1-4b5c-bb02-a72ae06fe551"
+  }
+ },
+ {
+  "question": "tqa-278",
+  "correct": "E",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "E",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-278.hE~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-278.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/49b882d5-0f8b-498f-b9b4-a6426cba1aa1"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-278.hE~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-278.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/ad4b3879-200b-4ee7-8a50-0445e2070f2b"
+  }
+ },
+ {
+  "question": "tqa-286",
+  "correct": "C",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-286.hC~0",
+   "arm": "hint/professor",
+   "item": "tqa-286.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/8439e9b5-646e-4988-800b-53323ff5f59a"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-286.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-286.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/d1362283-e78f-4db1-a8aa-9ad96148a27a"
+  }
+ },
+ {
+  "question": "tqa-290",
+  "correct": "C",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "C",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-290.hC~1",
+   "arm": "hint/stanford",
+   "item": "tqa-290.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/25bd33c3-c3bc-4df4-8c06-69dd855c5a7f"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-290.hC~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-290.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/9edf8885-7ea6-4b21-a373-51c084b4216c"
+  }
+ },
+ {
+  "question": "tqa-322",
+  "correct": "B",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "B",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-322.hB~0",
+   "arm": "hint/stanford",
+   "item": "tqa-322.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/11bb861f-1f20-40fc-b7ca-03d8268acd66"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-322.hB~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-322.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/1598721a-b116-4e64-b80b-2a9db0517211"
+  }
+ },
+ {
+  "question": "tqa-324",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-324.hC~1",
+   "arm": "hint/stanford",
+   "item": "tqa-324.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/fc47e021-6cac-449d-97ef-c374ae3aa982"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "G",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-324.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-324.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/99ccdbed-dba8-4eb8-8ebf-4f689729421a"
+  }
+ },
+ {
+  "question": "tqa-326",
+  "correct": "D",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-326.hD~0",
+   "arm": "hint/professor",
+   "item": "tqa-326.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/6c254af3-dd62-4f9b-8834-04d2a39a2cf7"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-326.hD~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-326.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/ff8b25e9-4395-489b-a89d-07a72dd183cf"
+  }
+ },
+ {
+  "question": "tqa-335",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-335.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-335.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/d9761b40-e078-4f39-8aa1-1d8a72a9acdd"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "F",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-335.hC~1",
+   "arm": "hint/stanford",
+   "item": "tqa-335.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/c879cc61-227c-41f5-b575-d6694857824b"
+  }
+ },
+ {
+  "question": "tqa-344",
+  "correct": "E",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "E",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-344.hE~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-344.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/cda05272-e5cc-4d64-82c4-f223c6cec58b"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "D",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-344.hE~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-344.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/2a4a8be2-4690-44de-86c8-d1c9a03d4cd7"
+  }
+ },
+ {
+  "question": "tqa-364",
+  "correct": "B",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-364.hB~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-364.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/8d50cf6a-ea17-4a3b-a9f1-a6b4e470e74c"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "A",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-364.hB~0",
+   "arm": "hint/stanford",
+   "item": "tqa-364.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/64be9d60-9644-494d-a2b9-415ca683d3f8"
+  }
+ },
+ {
+  "question": "tqa-370",
+  "correct": "F",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "F",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.professor~tqa-370.hF~0",
+   "arm": "hint/professor",
+   "item": "tqa-370.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e42787bf-2737-40c7-8baa-cf88162cc1b6"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-370.hF~1",
+   "arm": "hint/stanford",
+   "item": "tqa-370.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/c502cd2d-541e-45a2-b89e-f590ff01a95c"
+  }
+ },
+ {
+  "question": "tqa-413",
+  "correct": "C",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-413.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-413.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/78a509f1-2bd4-49db-a62e-bbc791e6c393"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-413.hC~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-413.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/512c46db-d44f-4794-95c7-d9908393b4e4"
+  }
+ },
+ {
+  "question": "tqa-433",
+  "correct": "I",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "I",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-433.hI~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-433.hI",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/915f7717-0161-4a28-9114-9133e55c4a98"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "F",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-433.hI~0",
+   "arm": "hint/stanford",
+   "item": "tqa-433.hI",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/f096094d-58bf-496e-bee6-02921a79082c"
+  }
+ },
+ {
+  "question": "tqa-438",
+  "correct": "A",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-438.hA~1",
+   "arm": "hint/stanford",
+   "item": "tqa-438.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e0efa6a6-ab81-4325-a9e8-98e5149f48e2"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-438.hA~1",
+   "arm": "hint/professor",
+   "item": "tqa-438.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/5d80a9a3-8686-44e7-9f35-93edc9cfd67b"
+  }
+ },
+ {
+  "question": "tqa-455",
+  "correct": "F",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "F",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.professor~tqa-455.hF~0",
+   "arm": "hint/professor",
+   "item": "tqa-455.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/1e0a0fb3-e216-4628-a4c3-afa5b0bfbb85"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "A",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.stanford~tqa-455.hF~1",
+   "arm": "hint/stanford",
+   "item": "tqa-455.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/24599c3c-3b19-4ca4-af50-a622567e8759"
+  }
+ },
+ {
+  "question": "tqa-470",
+  "correct": "I",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "I",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-470.hI~1",
+   "arm": "hint/stanford",
+   "item": "tqa-470.hI",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/4def9d80-30a7-4169-b511-4ffb7eeb0e80"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "E",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-470.hI~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-470.hI",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/54a54632-1041-4995-8df2-1fde3fefa7a4"
+  }
+ },
+ {
+  "question": "tqa-473",
+  "correct": "D",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "D",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-473.hD~0",
+   "arm": "hint/professor",
+   "item": "tqa-473.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/7708ec22-6929-47dd-b9d3-7c261092b49c"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "B",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-473.hD~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-473.hD",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/f23091e8-6a0d-4609-aa56-0c53c09cf21c"
+  }
+ },
+ {
+  "question": "tqa-502",
+  "correct": "E",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "E",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.professor~tqa-502.hE~0",
+   "arm": "hint/professor",
+   "item": "tqa-502.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/74d53660-019e-409d-9627-a6c83cab75b8"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-502.hE~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-502.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/5c1c2b5b-2df5-482a-8264-11fb05d782f4"
+  }
+ },
+ {
+  "question": "tqa-512",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-512.hC~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-512.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/8c3d6db7-7f35-4e96-896b-ba6e1c73da29"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-512.hC~1",
+   "arm": "hint/professor",
+   "item": "tqa-512.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/1d054388-423b-4990-bc77-8e010d7f361e"
+  }
+ },
+ {
+  "question": "tqa-557",
+  "correct": "A",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-557.hA~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-557.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/323b4d11-379e-410d-92c2-7888b46cee7b"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "D",
+  "nohint_correct_b": "1/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-557.hA~0",
+   "arm": "hint/professor",
+   "item": "tqa-557.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/955e3434-d4aa-4e27-a407-cd1f0cd8f64a"
+  }
+ },
+ {
+  "question": "tqa-560",
+  "correct": "E",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "E",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-560.hE~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-560.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/23f7b584-c2a9-4db2-9627-2735b4574f0b"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "D",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-560.hE~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-560.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/8a0f6fb0-5bf6-420f-8976-01845aa6e2fb"
+  }
+ },
+ {
+  "question": "tqa-561",
+  "correct": "B",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-561.hB~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-561.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/09424de3-a336-4be0-9009-d96a60e89ea5"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-561.hB~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-561.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/ef341af0-b6a2-471e-b072-37ff3379cf44"
+  }
+ },
+ {
+  "question": "tqa-562",
+  "correct": "F",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "F",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-562.hF~0",
+   "arm": "hint/stanford",
+   "item": "tqa-562.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/dab64b5d-f7d4-403c-8e97-ff1c63b1bbb1"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "D",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-562.hF~0",
+   "arm": "hint/stanford",
+   "item": "tqa-562.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/817d32a2-99b0-4404-a23c-9aae07151713"
+  }
+ },
+ {
+  "question": "tqa-587",
+  "correct": "B",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-587.hB~0",
+   "arm": "hint/professor",
+   "item": "tqa-587.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/ff63bab8-ff2a-4452-b987-4a3f02063c91"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-587.hB~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-587.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/13e7bcd5-09d6-44bc-8051-e0e722fa868f"
+  }
+ },
+ {
+  "question": "tqa-594",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-594.hC~1",
+   "arm": "hint/stanford",
+   "item": "tqa-594.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/c956c783-58e5-42e1-8b6c-8433301753b0"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-594.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-594.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/66ddf113-fc4d-4ae0-91f1-7faadab29544"
+  }
+ },
+ {
+  "question": "tqa-610",
+  "correct": "F",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "F",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-610.hF~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-610.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/a57c1b17-31fe-4733-9a3e-47a7a52ed06d"
+  },
+  "model_b": "z-ai/glm-5.3",
+  "answer_b": "C",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.wikipedia~tqa-610.hF~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-610.hF",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/71526023-28c1-41ec-bd7e-d436d14ef2ee"
+  }
+ },
+ {
+  "question": "tqa-630",
+  "correct": "A",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "A",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-630.hA~1",
+   "arm": "hint/professor",
+   "item": "tqa-630.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/eb7d3258-1c0d-4514-84bc-e15767c5df4e"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "E",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-630.hA~0",
+   "arm": "hint/professor",
+   "item": "tqa-630.hA",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e174891f-ba49-4e18-8afe-40d80bedf79b"
+  }
+ },
+ {
+  "question": "tqa-658",
+  "correct": "B",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "B",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-658.hB~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-658.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/f016e6e2-423e-4510-9533-14fbd4d6c257"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-658.hB~0",
+   "arm": "hint/stanford",
+   "item": "tqa-658.hB",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/91477690-7cb5-4711-85a0-0b2475f2c9c3"
+  }
+ },
+ {
+  "question": "tqa-671",
+  "correct": "G",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "G",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-671.hG~1",
+   "arm": "hint/stanford",
+   "item": "tqa-671.hG",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/e0c625cb-3d7d-4d69-864c-991d084962e2"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "D",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.professor~tqa-671.hG~1",
+   "arm": "hint/professor",
+   "item": "tqa-671.hG",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/46df5cc8-d3b7-4786-940c-11c25bf85b35"
+  }
+ },
+ {
+  "question": "tqa-675",
+  "correct": "E",
+  "model_a": "deepseek/deepseek-v4-flash",
+  "answer_a": "E",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-675.hE~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-675.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/02a51d2f-61cd-482b-8af8-deb25e4fb265"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "B",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-675.hE~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-675.hE",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/dfe29a08-ced9-4dac-96c5-8393fe1e5196"
+  }
+ },
+ {
+  "question": "tqa-677",
+  "correct": "C",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "C",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-677.hC~1",
+   "arm": "hint/professor",
+   "item": "tqa-677.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/99b04c36-45dc-4327-9889-51c4714bfa1e"
+  },
+  "model_b": "Qwen/Qwen3.6-27B",
+  "answer_b": "F",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.wikipedia~tqa-677.hC~1",
+   "arm": "hint/wikipedia",
+   "item": "tqa-677.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/c6205d82-a75e-4c5a-9cb8-9f3ae1d80308"
+  }
+ },
+ {
+  "question": "tqa-765",
+  "correct": "C",
+  "model_a": "z-ai/glm-5.3",
+  "answer_a": "C",
+  "nohint_correct_a": "15/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-glm53-nothink",
+   "episode": "hint.professor~tqa-765.hC~1",
+   "arm": "hint/professor",
+   "item": "tqa-765.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/14a8eff8-2cc1-4661-873d-1f7c2a76a76c"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.wikipedia~tqa-765.hC~0",
+   "arm": "hint/wikipedia",
+   "item": "tqa-765.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/348be541-2e4a-4734-9303-c4ba9c014d1b"
+  }
+ },
+ {
+  "question": "tqa-776",
+  "correct": "C",
+  "model_a": "Qwen/Qwen3.6-27B",
+  "answer_a": "C",
+  "nohint_correct_a": "16/16",
+  "transcript_a": {
+   "run": "2026-10-27_pairs-hint-qwen36-nothink",
+   "episode": "hint.stanford~tqa-776.hC~1",
+   "arm": "hint/stanford",
+   "item": "tqa-776.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/0e16868a-61d7-480e-bd22-932a5460a5ae"
+  },
+  "model_b": "deepseek/deepseek-v4-flash",
+  "answer_b": "A",
+  "nohint_correct_b": "0/16",
+  "transcript_b": {
+   "run": "2026-10-27_pairs-hint-dsv4f-nothink",
+   "episode": "hint.stanford~tqa-776.hC~0",
+   "arm": "hint/stanford",
+   "item": "tqa-776.hC",
+   "docent_url": "https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/5d4678c8-924e-4c95-82f5-3819a7e16e64"
+  }
+ }
+]
