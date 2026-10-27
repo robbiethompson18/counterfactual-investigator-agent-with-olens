@@ -157,8 +157,14 @@ def matched_items() -> list[str]:
     return sorted({f"{q}.h{r[k]}" for qs in json.loads(p.read_text()).values() for q, r in qs.items() for k in ("own", "never")})
 
 
+def pairs_items() -> list[str]:
+    """pairs.py's items: each pair question hinted with its correct letter."""
+    p = Path(__file__).with_name("pairs_items.json")
+    return [f"{q}.h{question(q)[2]}" for q in json.loads(p.read_text())] if p.exists() else []
+
+
 def items_for(arm):
-    return HINT_ITEMS + matched_items() if arm in HINTS else items()
+    return HINT_ITEMS + matched_items() + pairs_items() if arm in HINTS else items()
 
 
 def parse_item(item: str) -> tuple[str, list[int] | None, str | None]:
