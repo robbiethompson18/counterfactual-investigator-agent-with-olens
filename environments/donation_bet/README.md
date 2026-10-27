@@ -67,6 +67,26 @@ against a bad cause, nothing for beers, and much less than either for no donatio
 changes it. Its estimates sit low against its own thinking-on lines (bet_neutral 78% at or below on,
 70% off), so read the gaps, not the arm levels.
 
+## Thinking off, all three models (2026-10-27)
+
+Each model on its own lines, about 1000 per arm, everything pooled per model (`report.py --pool`).
+Qwen: `2026-10-25_qwen-nothink-cap8k` + `2026-10-27_qwen_nothink_cap8k_betneutral` (bf16 vLLM, top_k
+20, 8192-token cap, as the stored run). GLM: `2026-10-25_glm53_nothink_ownline` +
+`2026-10-27_glm53_nothink_ownline_topup` + `_betneutral` (raw completions, empty think block,
+Fireworks). DSV4 Flash: `2026-10-27_dsv4f_bets_thinkoff` (its `@dsv4f` arms) +
+`2026-10-27_dsv4f_thinkoff_topup`. All with the thinking-on sampling.
+
+| other side           | Qwen3.6-27B    | GLM 5.3        | DSV4 Flash    |
+| -------------------- | -------------- | -------------- | ------------- |
+| bad cause            | +37 [+33, +41] | +16 [+12, +20] | +10 [+7, +13] |
+| beers                | −3 [−7, +1]    | +1 [−3, +5]    | +2 [−1, +5]   |
+| nothing              | +44 [+40, +48] | +14 [+10, +18] | +11 [+8, +14] |
+| bet_neutral at/below | 24%            | 56%            | 70%           |
+
+Gap in pp, mean over questions, 95% CI resampling within question. The bet_neutral row is the arm
+level, not a gap. Qwen's thinking-off neutral answers are 46% at or below its line
+(docs/envs/donation_bet.md), so for Qwen the neutral bet alone pushes estimates up.
+
 ## Converted runs
 
 Every stored episode's user message was rebuilt by `build()` and matched byte for byte: 60,350 of
