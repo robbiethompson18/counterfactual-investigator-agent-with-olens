@@ -357,9 +357,12 @@ function epChip(D, r, [id, [docent, v]]) {
     (dl ? `<a class="x" href="${here}" title="transcript on this page">↗</a>` : "") +
     (r.expviewItems ? `<a class="x" href="${expviewUrl(D, r.expview, id)}" target="_blank" rel="noopener" title="open in expview">ev</a>` : "") + "</span>";
 }
+// the arm's every-run expview view (expview_export.export_arms), if there is one
+const armExpview = (D, arm, label = "whole arm in expview ↗") =>
+  D.links.arms?.[arm] ? `<a href="${expviewUrl(D, D.links.arms[arm])}" target="_blank" rel="noopener" title="every episode of this arm, all runs, grouped by model">${label}</a>` : "";
 function rolloutsHtml(D, arm, item, max = 12) {
   const runs = episodesFor(D, arm, item);
-  const head = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><span class="mono" style="font-weight:500">${esc(arm)}${retiredTag(D, arm)}</span></div>`;
+  const head = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><span class="mono" style="font-weight:500">${esc(arm)}${retiredTag(D, arm)}</span>${armExpview(D, arm)}</div>`;
   if (!runs.length) return `<div class="card">${head}<p class="mute" style="margin:0">no rollouts${item == null ? "" : " on this item"} yet</p></div>`;
   return `<div class="card">${head}` + runs.map(r => {
     const k = r.eps.filter(e => e[1][1] === true).length, n = r.eps.filter(e => typeof e[1][1] === "boolean").length;
@@ -460,7 +463,8 @@ async function comparePage(h) {
   <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th title="${esc(t)}">${esc(modelName(t))}<br><span style="font-weight:400;text-transform:none">all items · this item</span></th>`).join("")}</tr>
   ${c.arms.map((a, i) => {
     const isB = a === baseArm;
-    return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a>${retiredTag(D, a)}</td>
+    return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a>${retiredTag(D, a)}
+      ${D.links.arms?.[a] ? `<br><span style="font-family:Inter,system-ui">${armExpview(D, a, "expview ↗")}</span>` : ""}</td>
       <td>${isB ? "<b>base</b>" : `<a href="${go({other: a})}">${a === other ? "<b>shown</b>" : "show"}</a> · <a href="${go({base: a, other: baseArm})}" title="make this the base">base</a>`}</td>
       <td class="mono">${isB ? "" : changes[i] == null ? '<span class="mute">not built on this item</span>' : changes[i].length ? changes[i].map(esc).join("<br>") : '<span class="mute">identical</span>'}</td>
       ${usedT.map(t => {

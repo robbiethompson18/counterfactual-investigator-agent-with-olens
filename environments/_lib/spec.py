@@ -193,8 +193,10 @@ def build_links(env: str) -> Path | None:
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
         }
+    by_arm = REPO_ROOT / f"data/runs/env_{env}/by_arm/expview"  # expview_export.export_arms: one view per arm, every run
+    arms = {arm: f"runs/env_{env}/by_arm/{slug(arm)}" for arm in mod.ARMS if (by_arm / slug(arm) / "items.jsonl").exists()}
     p = LOCAL / env / "links.json"
-    p.write_text(json.dumps({"env": env, "expview_base": EXPVIEW_BASE, "runs": runs}, separators=(",", ":")) + "\n")
+    p.write_text(json.dumps({"env": env, "expview_base": EXPVIEW_BASE, "arms": arms, "runs": runs}, separators=(",", ":")) + "\n")
     return p
 
 

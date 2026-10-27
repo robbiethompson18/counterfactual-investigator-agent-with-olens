@@ -115,7 +115,8 @@ What it reads, all generated from the repo and the local run folders:
 - `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and the run's
   expview dataset.
 - `runs/env_<env>/<run>/expview/` (`_lib/expview_export.py`): each env run as an expview dataset,
-  one item per episode (id = episode id), so rollouts open on https://expview.pages.dev too.
+  one item per episode (id = episode id), and `runs/env_<env>/by_arm/<arm>/` = one arm across every
+  run, grouped by model, so rollouts open on https://expview.pages.dev too.
 
 ```bash
 uv run python -m environments spec [ENV ...] [--force]     # also run by `index`
