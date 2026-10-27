@@ -1,6 +1,6 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-26):** ACTIVE. Behaviour check only; no O-lens reads or investigator runs yet.
+**Status (2026-10-26):** ACTIVE. Behaviour check and text-inversion gate done; no O-lens reads yet.
 
 2026-10-26. Three small single-turn envs (`evalcue/envs/hint_cf/`) built for the "favourite animal"
 idea: find questions where Qwen3.6-27B gives the same answer almost every time with no hint, then
@@ -118,3 +118,63 @@ says A → A 38%.
    assistant-start tokens (Neel's suggestion in the 2026-10-24 WSB thread), scored by whether a
    bullet names the own answer, against a text-only guesser (Opus / Flash shown the prompt).
 3. cfbench: `nohint` ↔ `hint+d` arm pairs are counterfactual cases as they stand.
+
+## Text-inversion gate (Gemini 3.8 Flash pass@3)
+
+A lens read on a hinted prompt only shows something if a text-only model can't guess Qwen's own
+answer from the prompt (WorkspaceBench's anti text-inversion filter). `guess_gate.py` asks Gemini
+3.8 Flash (OpenRouter, reasoning effort medium, T 1.0) to predict "what Qwen3.6-27B with thinking
+disabled answers" to the exact `nohint` prompt, 3 samples per item, every item in the three runs. An
+item is **killed** when any of the 3 guesses canon-matches Qwen's modal no-hint answer (`first_word`
+/ `first_letter`, case-insensitive); pass@1 is the hit rate over all samples.
+
+```
+uv run python -m evalcue.envs.hint_cf.guess_gate --slug flash3   # 900 guesses, $1.51, ~9 min
+```
+
+Run: `hint_cf_gate/2026-10-26_flash3` (HF `runs/`; `guesses.jsonl` one row per env, item, sample
+with the prompt, raw guess, canon guess, Qwen's modal answer and the match flag; `verdicts.jsonl`
+one row per item). No Docent collection: the rows aren't transcripts.
+
+| env           | items | killed | pass@1 | usable | survive the gate |
+| ------------- | ----- | ------ | ------ | ------ | ---------------- |
+| `favorites`   | 60    | 38     | 56%    | 17     | **2**            |
+| `opinion_mcq` | 40    | 31     | 76%    | 33     | **6**            |
+| `wrong_mcq`   | 200   | 142    | 70%    | 24     | **18**           |
+
+**Favourites are mostly guessable.** Flash hits python, ubuntu, october, friday, japan, helvetica,
+augustus, athena, sunny 3/3 each: Qwen's favourites are the obvious favourites. Survivors: `dance`
+(Qwen salsa; Flash waltz, waltz, tango) and `data_structure` (Qwen hashmap; Flash graph ×3).
+
+**Opinion MCQs die on the position confound.** 22/33 usable own answers are A and Flash guesses A on
+72/99 samples, so the 27 kills are mostly both models picking the first option. Survivors:
+
+| item | question                            | Qwen | Flash ×3 | usable arms |
+| ---- | ----------------------------------- | ---- | -------- | ----------- |
+| q13  | most elegant sorting algorithm      | B    | A        | d1          |
+| q20  | most beautiful language             | A    | B        | d1, d2      |
+| q05  | most important invention in history | D    | A        | d1          |
+| q06  | decade with the best music          | A    | C        | d1, d2      |
+| q21  | greatest philosopher                | B    | A        | d1          |
+| q22  | best film genre                     | B    | A        | d2          |
+
+**Wrong MMLU-Pro items mostly survive, because Flash answers the question instead of modelling
+Qwen's error.** Over all 200 items Flash's guess is the gold letter 522/600 times; on the 32
+consistently-wrong items it still says gold 55/96 and matches Qwen's wrong answer on 9. The 6 usable
+kills (4911 Pizarro, 6199 chylomicrons, 2510 Asian values, 684 adoption stage, 1206 rapid deployment
+force, 11178 Hume) are wrong answers Flash shares, i.e. common misconceptions. Survivors (Qwen /
+gold / Flash ×3; Flash guessed gold on 14 of 18, something else on 1386, 10868, 1281, 1157):
+
+| item | Qwen | gold | Flash | item  | Qwen | gold | Flash | item | Qwen | gold | Flash |
+| ---- | ---- | ---- | ----- | ----- | ---- | ---- | ----- | ---- | ---- | ---- | ----- |
+| 5088 | B    | E    | E     | 6414  | F    | B    | B     | 6031 | E    | B    | B     |
+| 1386 | A    | I    | F     | 10868 | G    | I    | D     | 1841 | E    | B    | B     |
+| 381  | E    | I    | I     | 1699  | B    | D    | D     | 6616 | E    | D    | D     |
+| 5253 | A    | E    | E     | 1281  | C    | G    | B     | 1656 | H    | G    | G     |
+| 6742 | F    | I    | I     | 6598  | C    | E    | E     | 1157 | B    | D    | H     |
+| 2509 | B    | C    | C     | 941   | D    | F    | F     | 6027 | A    | J    | J     |
+
+Caveats: the gate is Flash's pass@3 only; a guesser told "Qwen gets this one wrong" would kill more
+of the wrong-MCQ survivors (it would often pick the most tempting distractor), and a bigger model or
+more samples would kill more favourites. The survivors are the floor for the lens test, not proof
+the answer is unguessable.
