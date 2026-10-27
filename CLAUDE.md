@@ -131,10 +131,13 @@ incidents with every transcript-only and O-lens draw, filterable and linkable by
 with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
 
 O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
-token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is its old name and
-301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…` hash.
-Source is `transcript-viewer/web/index.html`, deployed by
-`transcript-viewer/scripts/deploy_site.sh`.
+token-level viewer (WeirdChat, CHIVE, organisms, GLM 5.3). `weirdchat-olens.pages.dev` is its old
+name and 301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…`
+hash. It is a static page (`transcript-viewer/web/index.html`, deployed by
+`transcript-viewer/scripts/deploy_site.sh`) over gzipped JSON in the HF dataset (`weirdchat/site/`,
+built by `transcript-viewer/scripts/publish.py` from every machine's reads). No viewer runs on a
+server or GPU any more (2026-10-26): new O-lens reads are batch jobs
+(`scripts/olens_read_requests.py` via `runpod/olens_reads.sh`) whose outputs go to HF.
 
 **expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
 metamodel reads ([expview/CLAUDE.md](expview/CLAUDE.md)): write the run's items to `RUN/expview/`
@@ -232,9 +235,10 @@ Current docs:
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [REFERENCE: Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
-- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE or model-organism transcripts with the lens or running GPU fleets](transcript-viewer/CLAUDE.md)
-  — token-level viewer, CHIVE incidents with Agam's per-token banks, confession follow-ups ("why did
-  you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
+- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE, organism or GLM transcripts with the lens on olens-viewer, or rebuilding or redeploying it](transcript-viewer/CLAUDE.md)
+  — static page over the HF dataset: what each tab shows, CHIVE rendering and Agam's banks,
+  confession follow-ups and thinking resamples, `publish.py` build/preview/upload, deploy, the
+  batch-reads format gap, where the deleted live viewer (server, queue, fleet, case page) is
 - [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
   — hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
