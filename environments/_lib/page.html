@@ -468,14 +468,15 @@ function rolloutsHtml(D, arm, item, max = 12) {
 // the env list, built in the browser from each envs/<env>/index.json (on HF: the env dirs come from one tree-API call),
 // so an upload from a checkout that lacks some envs can't hide them; a local mirror uses its envs/index.json
 async function envList() {
-  if (params.get("base")) return getJSON("index.json");
-  const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/tree/main/envs`);
-  if (!r.ok) return getJSON("index.json");
-  const dirs = (await r.json()).filter(x => x.type === "directory").map(x => x.path.split("/").pop());
-  const idxs = await Promise.all(dirs.map(e => maybe(getJSON(`${e}/index.json`))));
-  const envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
-    targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
-    latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
+  let envs;
+  const r = params.get("base") ? null : await maybe(fetch(`https://huggingface.co/api/datasets/${REPO}/tree/main/envs`));
+  if (r?.ok) {
+    const dirs = (await r.json()).filter(x => x.type === "directory").map(x => x.path.split("/").pop());
+    const idxs = await Promise.all(dirs.map(e => maybe(getJSON(`${e}/index.json`))));
+    envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
+      targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
+      latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
+  } else envs = ((await maybe(getJSON("index.json")))?.envs || []).map(e => ({...e, latest: ""}));
   // what the code says (title, status, star) wins over the run index; envs in code with no runs yet still show
   const code = await codeIndex();
   for (const c of (code?.envs || []).filter(c => !c.error)) {

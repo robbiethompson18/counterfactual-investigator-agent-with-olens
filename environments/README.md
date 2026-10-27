@@ -134,8 +134,8 @@ What it reads:
 - `spec/<env>/` on the site (`_lib/spec.py`, built by the workflow): `env.json` (declarations,
   README, source file list, git sha) and `arms/<arm>.json` = `build()` for every item of the arm,
   sample 0, built on the spec's date; strings over 8 KB live once per env in `blobs/`. An env whose
-  module doesn't load from a clean checkout (data files not in git) is marked in `spec/index.json`
-  and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally whenever the
+  module doesn't load from a clean checkout (data files not in git; none today) is marked in
+  `spec/index.json` and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally whenever the
   env's source changes (overeagerness takes ~3 minutes) and `upload` ships.
 - `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and the run's
   expview dataset.
@@ -143,7 +143,14 @@ What it reads:
   one item per episode (id = episode id), and `runs/env_<env>/by_arm/<arm>/` = one arm across every
   run, grouped by model, so rollouts open on https://expview.pages.dev too.
 
+**While developing an env**, run the viewer from your working tree:
+`uv run python -m environments view [ENV ...] [--port 8000]` builds every env's spec from your local
+code into `data/envs-view/`, serves only that folder on localhost (page, spec, copies of the source
+files, your local `data/envs` runs), and rebuilds an env within seconds of a change to its folder or
+`_lib/`; reload the page. Give ENV names to rebuild just those at start.
+
 ```bash
+uv run python -m environments view [ENV ...] [--port N]   # local viewer from your working tree, live rebuild
 uv run python -m environments spec [ENV ...] [--force]     # also run by `index`
 uv run python -m environments expview ENV[/RUN] [--upload]  # runs -> expview datasets (+ HF)
 python -m http.server 8000                                  # local: from the repo root, then

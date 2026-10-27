@@ -171,14 +171,21 @@ def title_status(env: str) -> tuple[str, str | None]:
     return title, status.group(1) if status else None
 
 
-def build_site(out: Path) -> Path:
+def build_site(out: Path, only: list[str] | None = None) -> Path:
     """Every env's spec from the code alone into out/<env>/, and out/index.json listing them. An env whose module
-    doesn't load (e.g. data files not in git) gets {"env", "error"} so the page falls back to the spec on HF."""
+    doesn't load (e.g. data files not in git) gets {"env", "error"} so the page falls back to the spec on HF. With
+    `only`, just those envs are rebuilt and the others keep their entries from the last build."""
     import shutil
     import traceback
 
+    old = {}
+    if only and (out / "index.json").exists():
+        old = {x["env"]: x for x in json.loads((out / "index.json").read_text())["envs"]}
     envs = []
     for e in env_names():
+        if only and e not in only and e in old:
+            envs.append(old[e])
+            continue
         d = out / e
         shutil.rmtree(d, ignore_errors=True)
         try:

@@ -5,6 +5,7 @@
     uv run python -m environments run ENV --pair NAME --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL
     uv run python -m environments spec [ENV ...] [--force]  # rebuild envs/<env>/spec/ (every arm, built) + links.json
     uv run python -m environments spec --out DIR            # every env's spec from code alone (the Pages workflow)
+    uv run python -m environments view [ENV ...] [--port N]  # the env viewer on localhost, from your working tree
     uv run python -m environments expview ENV[/RUN] [...] [--upload]  # runs as an expview dataset (runs/env_<env>/<run>)
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
@@ -276,6 +277,10 @@ def cli():
         from .expview_export import cli as expview_cli
 
         expview_cli(rest)
+    elif cmd == "view":
+        from .view import cli as view_cli
+
+        view_cli(rest)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})
