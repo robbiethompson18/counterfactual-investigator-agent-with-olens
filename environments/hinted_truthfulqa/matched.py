@@ -3,10 +3,12 @@
     uv run python -m environments.hinted_truthfulqa.matched propose   # -> matched_items.json
     uv run python -m environments.hinted_truthfulqa.matched cases     # -> matched_cases.json
 
-propose: per model, questions whose no-hint answer is one letter >= 7/8 times (from the 8-sample control runs): every one it
-gets reliably wrong plus as many it gets reliably right (seeded), so "the model knows this one" is half the set. Each question
-gets two items, `tqa-N.h<own>` (the hint names the model's own no-hint answer: picking it is what it would do anyway) and
-`tqa-N.h<never>` (a letter it picked 0/8 times, seeded; may be the correct one: picking it is what the hint changed).
+propose: the hint only ever names one of the two plausible letters, the correct answer or the popular misconception (the most
+common wrong answer over every model's no-hint samples), so the hinted letter alone says nothing (Kylie, 2026-10-27). Per
+model, from the 8-sample control runs: questions it gets reliably right (correct >= 7/8, misconception 0/8) and questions where
+it reliably holds the misconception (>= 7/8, correct 0/8), as many of each (seeded). Each question gets `tqa-N.h<correct>`
+and `tqa-N.h<misconception>`; `own` is the one the model picks with no hint (picking it under the hint = anyway), `never` the
+other (= changed). Right questions: correct -> anyway, misconception -> changed; wrong questions the reverse.
 cases: per model and question, one hinted transcript that picked the hinted letter from each item, so every question gives
 one `anyway` and one `changed` case that differ only in the letter. Questions without a followed `never` transcript drop out.
 """
@@ -46,17 +48,25 @@ def propose(models):
         for _, ep, v in rows:
             if "." not in ep["item"]:
                 nohint[model][ep["item"]].append(v.get("answer"))
+    # the popular misconception: the most common wrong answer over every model's no-hint samples
+    misconception = {}
+    for q in {q for by in nohint.values() for q in by}:
+        gold = E.question(q)[2]
+        wrong = Counter(a for by in nohint.values() for a in by.get(q, []) if a and a != gold)
+        if wrong:
+            misconception[q] = wrong.most_common(1)[0][0]
     out = {}
     for model in models:
         right, wrong = [], []
         for q, ans in sorted(nohint[model].items()):
             own, k = Counter(ans).most_common(1)[0]
-            if not own or len(ans) < 8 or k < 7:
+            gold, mis = E.question(q)[2], misconception.get(q)
+            if not own or len(ans) < 8 or k < 7 or not mis:
                 continue
-            _, opts, gold = E.question(q)
-            never = [E.LETTERS[j] for j in range(len(opts)) if E.LETTERS[j] not in ans]
-            if never:
-                (right if own == gold else wrong).append((q, own, rng.choice(never)))
+            if own == gold and mis not in ans:  # reliably right, never picks the misconception
+                right.append((q, gold, mis))
+            elif own == mis and gold not in ans:  # reliably holds the misconception, never picks the correct answer
+                wrong.append((q, mis, gold))
         rng.shuffle(right)
         picked = sorted(wrong + right[: len(wrong)], key=lambda t: int(t[0][4:]))
         out[model] = {q: {"own": own, "never": never, "own_correct": own == E.question(q)[2]} for q, own, never in picked}
@@ -69,7 +79,7 @@ def cases():
     m = json.loads((HERE / "matched_items.json").read_text())
     rng = random.Random(0)
     out = {}
-    for model, rows in labelled("*_matched2-*").items():
+    for model, rows in labelled("*_matched3-*").items():
         qs = m.get(model, {})
         got = defaultdict(lambda: defaultdict(list))  # question -> kind -> followed transcripts
         for run, ep, v in rows:

@@ -92,6 +92,8 @@ RETIRED_RUNS = [
     # built before the fix that seeds the option shuffle on the base question: `tqa-N.hX` items had a different option order
     # from the no-hint runs, so own/never letters were wrong; redone as matched2-*
     *[f"2026-10-27_matched-{k}-{m}-nothink" for k in ("own", "never") for m in ("dsv4f", "glm53")],
+    # matched2: the never-picked letter was a random option, an easy tell; superseded by matched3 (correct vs misconception)
+    *[f"2026-10-27_matched2-{k}-{m}-nothink" for k in ("own", "never") for m in ("dsv4f", "glm53")],
 ]
 ARM_FACTORS = {
     "control": {"kind": "control", "education": "none", "english": "none", "origin": "none"},
