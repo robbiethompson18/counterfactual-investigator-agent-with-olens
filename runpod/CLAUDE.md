@@ -24,8 +24,8 @@ Eight read pods were created at 23:43 PDT on 2026-10-24 and the session went qui
   its process tree. The 10-minute wakeup loop in Robbie's `CLAUDE.local.md` is the second layer.
 - **Never `--watch` a reader unless that watcher is running.** `--watch` keeps the GPU busy-idle
   forever.
-- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them (or
-  stream them to HF, PR `olens/stream-reads-to-hf`) while the pod is up, not at the end.
+- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them
+  while the pod is up, not at the end.
 - **Poll the REST API, not runpodctl, for readiness:** `GET /v1/pods/<id>` → `publicIp` and
   `portMappings["22"]`; then `ssh -o ConnectTimeout=8` wrapped in a hard timeout
   (`perl -e 'alarm 20; exec @ARGV' ssh ...`; macOS has no `timeout`). `runpodctl pod get` reports
