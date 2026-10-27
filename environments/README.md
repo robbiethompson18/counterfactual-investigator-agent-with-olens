@@ -111,11 +111,12 @@ are `kind: judge` and are never a pair's measure.
 ## Env viewer
 
 [`_lib/page.html`](_lib/page.html) is a static page, published to GitHub Pages by
-`.github/workflows/env-viewer-pages.yml` on every push to main that changes it
-(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/);
-[`_lib/deploy.sh`](_lib/deploy.sh) deploys the same file to Cloudflare Pages (`cia-envs`) instead.
-It reads the HF dataset under `envs/`, pinned to one commit, and the env's source from GitHub at the
-commit its spec was built from. Per env:
+`.github/workflows/env-viewer-pages.yml` on every push to main that touches `environments/`
+(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/). What the code
+declares (arms as `build()` makes them, `PAIRS`, `COMPARISONS`, `RETIRED`, `STARRED`, README) the
+workflow builds from main into `spec/` beside the page (`python -m environments spec --out`), so it
+always matches main; runs, rates and rollout links come from the HF dataset under `envs/`, pinned to
+one commit, and source files from GitHub at the spec's commit. Per env:
 
 - **Comparisons**: the env's `PAIRS` plus its curated arm sets (`COMPARISONS` in env.py), with the
   primary rate per arm pooled over runs per target model (thinking on and off kept apart). A
@@ -128,12 +129,14 @@ commit its spec was built from. Per env:
 - **Runs** (the old list page: per-arm measures, transcripts by range request), **About** (README,
   docstring, REQUIRES / CAPS / DEFAULTS) and **Source** (the env folder and `_lib/` from GitHub).
 
-What it reads, all generated from the repo and the local run folders:
+What it reads:
 
-- `envs/<env>/spec/` (`_lib/spec.py`): `env.json` (declarations, README, source file list, git sha,
-  source hash) and `arms/<arm>.json` = `build()` for every item of the arm, sample 0, built on the
-  spec's date; strings over 8 KB live once per env in `spec/blobs/`. `index` rebuilds it only when
-  the source hash of the env folder + `_lib/` changes (overeagerness takes ~3 minutes).
+- `spec/<env>/` on the site (`_lib/spec.py`, built by the workflow): `env.json` (declarations,
+  README, source file list, git sha) and `arms/<arm>.json` = `build()` for every item of the arm,
+  sample 0, built on the spec's date; strings over 8 KB live once per env in `blobs/`. An env whose
+  module doesn't load from a clean checkout (data files not in git) is marked in `spec/index.json`
+  and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally whenever the
+  env's source changes (overeagerness takes ~3 minutes) and `upload` ships.
 - `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and the run's
   expview dataset.
 - `runs/env_<env>/<run>/expview/` (`_lib/expview_export.py`): each env run as an expview dataset,

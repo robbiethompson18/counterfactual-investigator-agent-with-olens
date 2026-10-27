@@ -9,10 +9,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <!--
-  Static env viewer for environments/. No server: it reads the generated files of the HF dataset under envs/, pinned to
-  one commit (envs/index.json, envs/<env>/index.json for runs and rates, envs/<env>/spec/ for every arm as build() makes
-  it, envs/<env>/links.json for Docent / expview links), episode shards by HTTP range request, and the env's source
-  from GitHub at the commit the spec was built from.
+  Static env viewer for environments/. No server. What the code declares (arms as build() makes them, comparisons,
+  RETIRED, STARRED, README) comes from spec/ beside this page, built from main by the GitHub Pages workflow
+  (`python -m environments spec --out`); an env whose code doesn't build there falls back to envs/<env>/spec/ on HF.
+  Runs and rates (envs/<env>/index.json), Docent / expview / O-lens links (envs/<env>/links.json) and episode shards
+  (by HTTP range request) come from the HF dataset under envs/, pinned to one commit; source files from GitHub at the
+  commit the spec was built from. ?spec=hf ignores spec/ beside the page.
 
   Local:  python -m http.server 8000   (from the repo root, after `python -m environments index`), then
           http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
@@ -135,6 +137,19 @@ async function base() {
   const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/revision/main`);
   const sha = r.ok ? (await r.json()).sha : "main";
   return BASE = `https://huggingface.co/datasets/${REPO}/resolve/${sha}/envs/`;
+}
+// the code-side spec beside the page (spec/index.json lists the envs that built from main), else HF's envs/<env>/spec/
+let CODE;
+async function codeIndex() {
+  if (CODE !== undefined) return CODE;
+  if (params.get("spec") === "hf") return CODE = null;
+  try { const r = await fetch("spec/index.json"); CODE = r.ok ? await r.json() : null; } catch { CODE = null; }
+  return CODE;
+}
+async function getSpec(env, rel, asText = false) {
+  const code = await codeIndex(), here = code?.envs.find(e => e.env === env && !e.error);
+  if (!here) return asText ? getText(`${env}/spec/${rel}`) : getJSON(`${env}/spec/${rel}`);
+  return fetchOnce("c:" + env + "/" + rel, async () => { const r = await fetch(`spec/${env}/${rel}`); if (!r.ok) throw new Error(`spec/${env}/${rel}: ${r.status}`); return asText ? r.text() : r.json(); });
 }
 function fetchOnce(key, f) { return cache[key] ??= f().catch(e => { delete cache[key]; throw e; }); }
 async function getJSON(path) {
@@ -266,7 +281,7 @@ function setParam(k, v) {
 
 // retired arms (RETIRED in env.py) are left out of comparisons, rates and runs unless the hash has retired=show
 async function envData(env, h = {}) {
-  const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getJSON(`${env}/spec/env.json`)), maybe(getJSON(`${env}/links.json`))]);
+  const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getSpec(env, "env.json")), maybe(getJSON(`${env}/links.json`))]);
   if (!idx && !spec) throw new Error(`no index or spec for ${env}`);
   const D = {env, idx: idx || {runs: [], pairs: {}, arms: spec.arms, arm_factors: spec.arm_factors, primary: spec.primary, title: env},
              spec, links: links || {runs: {}}, showRetired: h.retired === "show"};
@@ -303,7 +318,7 @@ function pooled(idx) {
   }
   return {by, items, targets: [...targets].sort()};
 }
-async function armSpec(env, arm) { return getJSON(`${env}/spec/arms/${slug(arm)}.json`); }
+async function armSpec(env, arm) { return getSpec(env, `arms/${slug(arm)}.json`); }
 // resolve {"$b"} from the arm's blobs; {"$f"} stays a ref (fetched on demand, compared by hash)
 function resolve(x, blobs) {
   if (Array.isArray(x)) return x.map(v => resolve(v, blobs));
@@ -316,7 +331,7 @@ function resolve(x, blobs) {
 }
 const isRef = v => v && typeof v === "object" && "$f" in v;
 async function text(env, v) {
-  if (isRef(v)) return getText(`${env}/spec/blobs/${v.$f}.txt`);
+  if (isRef(v)) return getSpec(env, `blobs/${v.$f}.txt`, true);
   if (typeof v === "string") return v;
   return JSON.stringify(v, null, 1);
 }
@@ -461,6 +476,14 @@ async function envList() {
   const envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
     targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
     latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
+  // what the code says (title, status, star) wins over the run index; envs in code with no runs yet still show
+  const code = await codeIndex();
+  for (const c of (code?.envs || []).filter(c => !c.error)) {
+    const e = envs.find(x => x.env === c.env);
+    if (e) Object.assign(e, {title: c.title, status: c.status, starred: c.starred, primary: c.primary});
+    else envs.push({env: c.env, title: c.title, status: c.status, starred: c.starred, primary: c.primary, n_runs: 0, targets: {}, latest: ""});
+  }
+  envs.sort((a, b) => a.env.localeCompare(b.env));
   return {generated: envs.map(e => e.latest).sort().pop() || "", envs};
 }
 
@@ -489,7 +512,8 @@ async function envPage(h) {
   const env = h.env, tab = h.tab || "compare";
   setCrumb([[env, "env=" + env]]);
   const D = await envData(env, h);
-  const head = `<h1>${D.idx.starred ? `<span class="star" title="${esc(D.idx.starred)}">★</span> ` : ""}${esc(D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
+  const star = D.spec ? D.spec.starred : D.idx.starred;
+  const head = `<h1>${star ? `<span class="star" title="${esc(star)}">★</span> ` : ""}${esc(D.spec?.title || D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
   if (!D.spec && tab !== "runs") { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
   const body = {compare: compareList, arms: armsTab, runs: runsTab, about: aboutTab, source: sourceTab}[tab];
   $("view").innerHTML = head + tabs(env, tab) + (D.retiredNote ? `<p>${D.retiredNote}</p>` : "") + '<div id="tab"></div>';
