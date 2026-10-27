@@ -55,6 +55,10 @@ the read transcripts next to it):
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).
 
+Both refuse to start if any base arm has reads on fewer than 5 runs or under 50% of its runs (e.g. 1
+of 8). Read more runs; pass `--allow-few-reads` only when the subset is deliberate (a one-run
+experiment). As of 2026-10-27, 82 of 268 earlier O-lens runs would have been refused.
+
 The Thought-Anchors conditions (`anchors`, `anchors_placebo`: attention receiver scores and
 suppression effects per sentence as tools) were removed on 2026-10-26 after a null result; see
 [docs/thought-anchors.md](../docs/thought-anchors.md). Code: `cfbench/anchors.py` and

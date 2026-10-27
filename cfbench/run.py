@@ -41,6 +41,10 @@ from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
+# The olens conditions refuse a base arm where fewer than this many runs, or this share of its runs, have reads (2026-10-27:
+# 74 of 262 olens runs had such arms, some with 1 read of 64, and nothing flagged it). --allow-few-reads overrides.
+MIN_READS, MIN_READ_FRAC = 5, 0.5
+
 
 async def main():
     ap = argparse.ArgumentParser()
@@ -52,6 +56,7 @@ async def main():
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--allow-few-reads", action="store_true", help="run the olens conditions even on base arms with few reads")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
     ap.add_argument("--draws", type=int, default=5)
@@ -83,6 +88,18 @@ async def main():
         envs = [(args.env, env)]
     if args.task == "answer":
         assert all(hasattr(e, "canon_answer") for _, e in envs), f"{args.env} has no canon_answer; the answer task needs one"
+    if set(OLENS_CONDITIONS) & set(conditions) and not args.allow_few_reads:
+        few = [
+            f"{env_name} {base_arm}: {k} of {len(base)}"
+            for env_name, e in envs
+            for base_arm in dict.fromkeys(b for b, _ in pairs)
+            for base in [e.rollouts(base_arm, args.model)]
+            if (k := sum(r.source in reads for r in base)) < min(MIN_READS, len(base)) or k < MIN_READ_FRAC * len(base)
+        ]
+        assert not few, (
+            f"base arms where fewer than {MIN_READS} runs or {MIN_READ_FRAC:.0%} have O-lens reads (read more runs, or pass "
+            "--allow-few-reads if the subset is deliberate):\n" + "\n".join(few)
+        )
     run = new_run(
         "cfbench",
         args.slug,
