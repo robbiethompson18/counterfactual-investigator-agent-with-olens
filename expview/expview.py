@@ -398,12 +398,53 @@ class Run:
 # ---------------------------------------------------------------- reading
 
 
-def load_tokens(run: Path, ref: str) -> dict:
+def load_tokens(run: Path, tk: dict | str) -> dict:
+    """An item's tokens object from its `tokens` entry (or bare ref): tokens/<ref>.json, a built page's copy, or the batch-reads
+    files the entry points into (reads_tokens)."""
+    if isinstance(tk, dict) and tk.get("src"):
+        return reads_tokens(run, tk["src"])
+    ref = tk["ref"] if isinstance(tk, dict) else tk
     p = Path(run) / "tokens" / f"{ref}.json"
     if p.exists():
         return json.loads(p.read_bytes())
     gz = Path(run) / "tokens" / f"{ref}.gz.txt"  # a built page's copy
     return json.loads(gzip.decompress(base64.b64decode(gz.read_text())))
+
+
+def reads_tokens(run: Path, src: dict) -> dict:
+    """The tokens object of a batch-reads item (importers/reads.py, docs/olens-reads-format.md): src = {"transcript": [path,
+    offset, length], "reads": [[path, offset, length], ...]}, paths relative to the expview run dir. readsTokens in
+    static/index.html does the same in the browser."""
+
+    def chunk(rel, off, n):
+        with open(Path(run) / rel, "rb") as f:
+            f.seek(off)
+            return f.read(n)
+
+    t = json.loads(chunk(*src["transcript"]))
+    rows = [json.loads(x) for span in src["reads"] for x in chunk(*span).splitlines() if x.strip()]
+    return {"tokens": t["tokens"], "sections": t["sections"], "reads": rows_to_reads(rows)}
+
+
+def rows_to_reads(rows: list[dict]) -> dict[str, list[dict]]:
+    """Batch-reader rows -> {position: [read]}: O-lens rows carry `bullets` (+ joint_fve), NLA rows `text` (+ fve), J++ rows
+    `top` for each of `layers`. Mirrored by rowsToReads in static/index.html."""
+
+    def scored(text, x):
+        return [text] if x is None else [text, x]
+
+    out = {}
+    for r in rows:
+        rs = out.setdefault(str(r["token_index"]), [])
+        if "bullets" in r:
+            rs.append({"tool": "O-lens", "label": f"L{r['layer']}", "lines": [scored(b["text"], b.get("fve")) for b in r["bullets"]],
+                       "score": r.get("joint_fve"), "score_name": "joint FVE", "filter": r.get("joint_fve") is not None})  # fmt: skip
+        elif "top" in r:
+            rs += [{"tool": "J++", "label": f"L{L}", "lines": top} for L, top in zip(r["layers"], r["top"])]
+        elif "text" in r:
+            rs.append({"tool": "NLA", "label": f"L{r['layer']}", "lines": [scored(r["text"], r.get("fve"))], "score": r.get("fve"),
+                       "score_name": "FVE", "filter": r.get("fve") is not None})  # fmt: skip
+    return out
 
 
 def points_at(url, d: str, i: str) -> bool:
@@ -444,7 +485,7 @@ def find_item(d: str, i: str) -> tuple[dict, Path] | None:
     return None
 
 
-_REFS: dict[str, dict[str, str]] = {}
+_REFS: dict[str, dict] = {}
 
 
 def item_tokens(d: str, i: str) -> dict | None:
@@ -458,9 +499,9 @@ def item_tokens(d: str, i: str) -> dict | None:
             for line in (run / "items.jsonl").read_text().splitlines():
                 it = json.loads(line) if line.strip() else {}
                 if (it.get("tokens") or {}).get("ref"):
-                    _REFS[d][str(it["id"])] = it["tokens"]["ref"]
-    ref = _REFS[d].get(str(i))
-    return load_tokens(Path(_REFS[d][""]), ref) if ref else None
+                    _REFS[d][str(it["id"])] = it["tokens"]
+    tk = _REFS[d].get(str(i))
+    return load_tokens(Path(_REFS[d][""]), tk) if tk else None
 
 
 def resolve_env(run: Path, e) -> tuple[str | None, dict | None]:
@@ -527,7 +568,7 @@ def check(path) -> list[str]:
         tk = it.get("tokens")
         if tk:
             try:
-                t = load_tokens(path, tk["ref"])
+                t = load_tokens(path, tk)
             except (OSError, KeyError, ValueError) as err:
                 probs.append(f"{where}: tokens {tk.get('ref')}: {err}")
                 continue
@@ -606,11 +647,11 @@ def build(path, out=None, ids=None):
     out = Path(out or Path(path) / "index.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(page)
-    refs = sorted({it["tokens"]["ref"] for it in items if it.get("tokens")})
+    refs = {it["tokens"]["ref"]: it["tokens"] for it in items if it.get("tokens")}
     if refs:  # token reads ship next to the page as base64(gzip) text, fetched when an item's transcript opens
         (out.parent / "tokens").mkdir(exist_ok=True)
-        for r in refs:
-            raw = json.dumps(load_tokens(src.get(r, Path(path)), r), separators=(",", ":")).encode()
+        for r, tk in refs.items():
+            raw = json.dumps(load_tokens(src.get(r, Path(path)), tk), separators=(",", ":")).encode()
             (out.parent / "tokens" / f"{r}.gz.txt").write_text(base64.b64encode(gzip.compress(raw, 9)).decode())
         tot = sum((out.parent / "tokens" / f"{r}.gz.txt").stat().st_size for r in refs)
         print(f"{len(refs)} token files in {out.parent / 'tokens'} ({tot / 1e6:.1f} MB); publish them with the page", file=sys.stderr)

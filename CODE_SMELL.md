@@ -51,6 +51,10 @@ other runs" on a base item (needs a cross-run index).
 
 ## 2026-10-26: batch O-lens reads don't reach the transcript viewer
 
+**2026-10-27:** resolved for expview: readers write `X.transcripts.jsonl` beside their reads and
+`runs.py finish` points an expview run at both (docs/olens-reads-format.md). Still true for
+olens-viewer, which nobody plans to feed batch reads.
+
 The viewer went static (no server, no queue, no fleet; `transcript-viewer/CLAUDE.md`, History), so
 the only way to make reads is `scripts/olens_read_requests.py` on RunPod. Its output rows
 (`{id, token_index, layer, bullets: [{text, fve, coef}], joint_fve}`, transcripts rendered by vLLM

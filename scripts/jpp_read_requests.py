@@ -24,7 +24,7 @@ from pathlib import Path
 import torch
 from olens.jpp import JPP, JPP_FILE, JPP_REPO
 from olens.one_engine import OneEngine
-from olens_read_requests import prepare, queue  # scripts/ is sys.path[0] when this file is run as a script
+from olens_read_requests import prepare, queue, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
 from transformers import AutoTokenizer
 
 from olens import provenance
@@ -98,6 +98,7 @@ def main():
         tb = time.time()
         with out.open("a") as f:
             for j in jobs:
+                write_transcript(out, j)
                 acts = {L: torch.cat([caps[i][L] for i in j["reqs"]]) for L in layers}
                 write(f, tok, j, layers, jpp.top(acts, args.top_k), text)
                 done.add(j["row"]["id"])
