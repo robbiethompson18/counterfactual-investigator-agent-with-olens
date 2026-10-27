@@ -30,15 +30,19 @@ pick runs in the browser.
   same UI (one run, data embedded, no search page). For a run that isn't on HF: an `imports/…` view,
   a subset (`--ids`), or something to publish as an Artifact.
 
-## Env runs: env → arm → run → episode
+## Envs: env → arm → episode
 
-| Hash                                         | Opens                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------- |
-| `#env=E`                                     | the env: its runs, its arms (primary pooled over runs), its attached runs |
-| `#env=E&run=R`                               | one run: summary by arm, an item per episode                              |
-| `#env=E&arm=A`                               | one arm across every run, grouped by run and target model                 |
-| `#env=E&run=R&episode=ID` (`&arm=A` to page) | an episode, with everything attached to it                                |
-| `&reads=DATASET`                             | which attached run's token reads to show (an episode can have several)    |
+Runs are an implementation detail and stay out of the UI (Kylie, 2026-10-27): an env page lists arms
+with the primary per target model, an arm lists its episodes grouped by model, and every episode
+opens inside its arm. `run` appears only in links, because it locates the episode on HF.
+
+| Hash                      | Opens                                                                  |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `#env=E`                  | the env: arms × target models, and the reads / judges on its episodes  |
+| `#env=E&arm=A`            | one arm: every episode, grouped by target model                        |
+| `#env=E&run=R&episode=ID` | an episode (in its arm, so ↑/↓ walk the arm), with everything attached |
+| `&reads=DATASET`          | which attached run's token reads to show (an episode can have several) |
+| `#env=E&run=R`            | one run, grouped by arm (old links only; not linked from the page)     |
 
 An episode shows its transcript (the subject call), the sandbox files before (and changed files
 after, under `(after)/`, fetched from `blobs/` on demand), `measure()` labels, each judge labeler's
