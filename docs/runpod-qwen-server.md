@@ -225,8 +225,8 @@ ports.
   and Qwen3.6-27B (52 GB) twice plus the ceselder NLA repo (69 GB) fills the 200 GB disk.
 - RunPod containers see all the host's cores (96 on an H200 node) but get a ~10-core CPU quota.
   torch starts a thread per visible core, so CPU work (the O-lens whiteners' float64 `eigh`)
-  thrashes: `transcript-viewer/pod/server.py` took 46+ min to load instead of 44 s. Start CPU-heavy
-  Python with `OMP_NUM_THREADS=10`.
+  thrashes: the viewer's lens server (`transcript-viewer/pod/server.py`, deleted 2026-10-26, at
+  `b842346`) took 46+ min to load instead of 44 s. Start CPU-heavy Python with `OMP_NUM_THREADS=10`.
 - `pkill -f PATTERN` over ssh kills your own remote shell if PATTERN appears anywhere in the ssh
   command (e.g. you also `cat > PATTERN.sh` in it). Use a `[x]yz` pattern, or a separate ssh call.
 - `nohup bash -s ... &` over ssh reads an empty stdin, so the piped script never runs. Copy the

@@ -3,8 +3,8 @@
 Source: data/runs/organisms/ at the repo root (HF dataset runs/organisms/), written by scripts/organism_rollouts.py and
 scripts/organism_olens.py; docs/model-organisms.md has the setup and findings. Each rollout becomes a transcript with
 the token ids the lens read. Reads on the organism's activations are stored under the transcript's tid, and reads on
-base Qwen3.6-27B over the same tokens under `<tid>@base`. They are only kept in S["by_tid"], not S["reads"], so the
-pod's rescore and the read queue never see them: reading them needs the organism's LoRA, which the pod doesn't load.
+base Qwen3.6-27B over the same tokens under `<tid>@base`. They are only kept in S["by_tid"], not S["reads"] (they were
+read with the organism's LoRA, by a script of their own).
 """
 
 import json

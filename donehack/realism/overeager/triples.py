@@ -102,7 +102,7 @@ def card(cid, t, what, b, fixes, nulls, recs, links):
         p, lo, hi = wilson(k, n)
         pv = fisher_exact([[kb, len(base) - kb], [k, n - k]])[1]
         y = 8 + i * 30
-        ev = f"http://bramble:8830/#d={DS}&i={first_item(recs, t, v)}"
+        ev = f"https://expview.pages.dev/#dataset={DS}&item={first_item(recs, t, v)}"
         dl = links.get(f"{t}/{v}")
         label = BASE_LABEL[v] if kind == "base" else CHANGE[v]
         if kind != "base":

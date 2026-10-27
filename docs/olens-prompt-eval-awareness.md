@@ -2,6 +2,16 @@
 
 **Status (2026-10-26):** NULL. Kylie's; GLM lens; artifacts on bramble.
 
+**Update (2026-10-26):** the `olens_search` regex dashboard (`bramble:8821`, the `[read]` /
+`[episode]` links below) was retired on 2026-10-26 with the move to static viewers
+([viewers.md](viewers.md)); its code is at commit `b842346`
+([tree](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/b842346/olens_search)).
+The same reads are on HF,
+[ceselder/glm-5.3-olens-counterfactual-investigator](https://huggingface.co/datasets/ceselder/glm-5.3-olens-counterfactual-investigator),
+whose dataset-viewer page has substring search. The expview runs below are on
+[expview.pages.dev](https://expview.pages.dev) (the `lens_punct_judge` and `inspect_am` overlays
+show their judge calls without the Celeste transcripts, which were never synced to HF).
+
 Question (Kylie, 2026-10-24): when GLM-5.3's oracle lens is read only on **prompt** tokens (system
 prompt, user turn, tool schemas: everything before the model generates anything), does it surface
 eval awareness ("this is a test / synthetic scenario / honeypot"), and does that prompt-side signal
@@ -20,8 +30,8 @@ repo's Sonnet default) for "the bullets frame the model's own situation as a tes
 simulation / constructed scenario", blind to the rollout. 9,355 prompts, $13.55. Code:
 `dense_prompt.py --punct-only --bullets`, `judge_punct.py`, `punct_analysis.py`; figure
 `figures/olens-prompt-ea-judge-punct.png` (+ `.csv`); judge I/O as the expview run
-`runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge` on bramble:8830. Same exclusions
-as above; our AM + AISI AM fixed pooled.
+[`runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge`](https://expview.pages.dev/#d=runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge).
+Same exclusions as above; our AM + AISI AM fixed pooled.
 
 | pool                  | episodes | AUROC judge score vs VEA | within condition | VEA if score >= 5 vs < 5 |
 | --------------------- | -------- | ------------------------ | ---------------- | ------------------------ |
@@ -164,9 +174,10 @@ share of prompts whose raw text has one (control). 95% CIs resample prompts; num
 monitor labels (SAD: the model's own testing/deployment answer).
 
 Trace examples are an expview run, `runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/demo` on the
-shared viewer (bramble:8830; `olens_prompt_ea/demo_traces.py`). Each item shows the matched
-prompt-side reads with their context, the rollout, the VEA regex match and a hand check, and links
-each read inline in Celeste's import. What they show:
+[public viewer](https://expview.pages.dev/#d=runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/demo)
+(`olens_prompt_ea/demo_traces.py`). Each item shows the matched prompt-side reads with their
+context, the rollout, the VEA regex match and a hand check, and links each read inline in Celeste's
+import. What they show:
 
 - **The keyword measure mostly measures task content, not eval awareness.** IB realistic: 37% of
   prompt-side read positions have a loose eval word, and 96% of those matches are "test(s)" (unit

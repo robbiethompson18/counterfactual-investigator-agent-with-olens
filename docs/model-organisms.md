@@ -36,7 +36,8 @@ All three were deleted on 2026-10-26 (results are on HF); they are at commit `72
 - `scripts/organism_olens.py`: sample 0 of every trigger/control rollout, read with the agu18dec
   lens at layers 24–56 (step 8) on the organism's activations **and** on the base model's
   activations over the same tokens. Positions: the end-of-user-turn zone plus up to 32 punctuation
-  tokens of the reply. Decoding and scoring reuse `transcript-viewer/pod/server.py`.
+  tokens of the reply. Decoding and scoring reused `transcript-viewer/pod/server.py` (the viewer's
+  lens server, deleted 2026-10-26 with the live viewer; at `b842346`).
 
 Both run on one H200 (RunPod, `runpod-torch-v280` template; ~25 min for rollouts, ~35 min for ~20k
 reads). Outputs are in the HF dataset under `runs/organisms/`.

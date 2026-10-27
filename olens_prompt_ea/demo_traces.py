@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = ["pandas>=2.2", "pyarrow>=17", "numpy>=1.26", "scipy>=1.13", "statsmodels>=0.14"]
 # ///
-"""Trace examples for the across-task claim, as an expview run for the shared viewer (bramble:8830).
+"""Trace examples for the across-task claim, as an expview run for the shared viewer (expview.pages.dev).
 
 Sections (item groups):
   ib_realistic   prompts whose prompt-side O-lens reads contain a strict eval word, prompts whose only hit is a loose
@@ -11,7 +11,7 @@ Sections (item groups):
   donation_bet   prompts where the lens writes "evaluator" / "being evaluated"
 
 Each item: an overlay (base=) on the episode transcript in Celeste's import with notes for the matched read and VEA,
-labels (VEA, its source and quote, the hand check), and links to the read in the Celeste import on bramble:8830, to the
+labels (VEA, its source and quote, the hand check), and links to the read in the Celeste import on expview.pages.dev, to the
 same read on bramble:8821, and to Docent where the episode is there.
 
     uv run --script olens_prompt_ea/demo_traces.py RUN --expview <shared viewer checkout>/expview [--handcheck file.json]
@@ -34,7 +34,7 @@ from kwonly import VEA_RX
 IMPORT = {"ib_realistic": "imports/celeste/ds_new/cfi_ib_realistic", "ec_sandbagging": "imports/celeste/ds/evalcue",
           "donation_bet": "imports/celeste/ds_new/cfi_donation_bet"}  # fmt: skip
 Q = "simulat|eval|test|synthetic|scenario|honeypot|benchmark|fiction|hypothetical|red.?team"
-V8830 = "http://bramble:8830/#d={d}&i={i}&v=tr&t={t}&q={q}"
+V8830 = "https://expview.pages.dev/#dataset={d}&item={i}&view=tr&token={t}&query={q}"
 V8821 = "http://bramble:8821/#ep={i}&pos={t}&q={q}"
 RNG = np.random.default_rng(0)
 

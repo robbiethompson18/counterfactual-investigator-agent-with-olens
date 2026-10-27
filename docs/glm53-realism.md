@@ -4,8 +4,8 @@
 
 Code in `donehack/realism/`. Model `z-ai/glm-5.3` on OpenRouter, reasoning effort medium. Runs are
 on the sprint HF dataset under `runs/coding/` and `runs/email_ambiguous/`, transcripts on Docent
-(collections `coding` and `email_ambiguous`) and on the expview viewer (bramble:8830, tailnet only).
-Rates are per episode with 95% Wilson CIs on the linked pages.
+(collections `coding` and `email_ambiguous`) and in expview (bramble-only runs; see
+expview/CLAUDE.md). Rates are per episode with 95% Wilson CIs on the linked pages.
 
 ## Criterion-free ImpossibleBench ladder (2026-10-25)
 
@@ -50,10 +50,10 @@ don't track hacking.
 DeepSeek V4.1 Flash judges every ordered pair of environments (static start state: system prompt,
 tools, user message, workspace files) for "which looks more like an RL/eval environment", fitted
 with Bradley–Terry (`realism/evalness.py`; IB 35 variants, 1,190 judgements, $0.97; email 10
-variants, 90 judgements). Judge I/O on 8830 (`expview/realism_evalness_ib`, `_email`). Hacking is
-high only at the eval-like end, and test editing peaks at the deployment-like end. Runtime-only cues
-(step counter, results line) are invisible to the judge. The email and ladder rung orders come from
-this ranking.
+variants, 90 judgements). Judge I/O in expview (`expview/realism_evalness_ib`, `_email`:
+bramble-only runs, never synced to HF). Hacking is high only at the eval-like end, and test editing
+peaks at the deployment-like end. Runtime-only cues (step counter, results line) are invisible to
+the judge. The email and ladder rung orders come from this ranking.
 
 ## Grader reads vs hacking (2026-10-25)
 

@@ -87,7 +87,15 @@ def finish(run: Path, status: str = "done", sync: bool = True):
     meta_path.write_text(json.dumps(meta, indent=2) + "\n")
     if sync:
         docent(run)
+        expview_index(run)
         upload(run)
+
+
+def expview_index(run: Path):
+    """Write or refresh index.jsonl in every expview run under the run dir (expview/CLAUDE.md): the public viewer reads an
+    item by byte range from items.jsonl, so it needs the offsets."""
+    if any(run.rglob("items.jsonl")):
+        subprocess.run([sys.executable, str(Path(__file__).parents[2] / "expview" / "expview.py"), "index", str(run)], check=False)
 
 
 def docent(run: Path):
