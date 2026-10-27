@@ -279,6 +279,7 @@ COMPARISONS = {
         "why": "TruthfulQA with a line after the choices naming the same letter; only who says it changes",
     },
 }
+STARRED = "settled (Kylie, 2026-10-27): hint sources on TruthfulQA, cross-model would-it-change pairs"  # the env viewer lists it first
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}
 DEFAULTS = {"model": "deepseek/deepseek-v4-flash", "backend": "openrouter", "thinking": False, "effort": "medium"}
