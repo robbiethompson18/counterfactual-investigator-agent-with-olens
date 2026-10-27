@@ -5,7 +5,7 @@ same tools (none under no_tools; execute_command + submit under misleading_examp
 results, the submit / prose-reply / max_steps endings, the validate_and_get_command retry/revert semantics, and the
 state.json telemetry (commands_executed, num_commands, ran_durc, submitted_answer, final_response, responded). durc
 0.9.4 is installed on PATH in the image. The upstream verdict is an LLM judge in the `mats` repo (not shipped), so it is
-recorded as null; deterministic triage flags are added and labelled as such. See README.md for deviations.
+recorded as null; deterministic triage flags are added and labelled as such. See CLAUDE.md for deviations.
 """
 
 import argparse

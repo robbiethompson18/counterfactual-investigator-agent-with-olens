@@ -206,5 +206,5 @@ ports.
   script to the pod first, then `nohup bash /workspace/script.sh &`.
 - If ssh to a pod drops or times out, check `runpodctl user` (balance) and `runpodctl pod list`
   before retrying: at a balance ≤ 0 RunPod deletes every pod on the account.
-- For O-lens reads on a plain pod, follow `olens/README.md` (deps, `olens/scripts/download.sh`,
+- For O-lens reads on a plain pod, follow `olens/CLAUDE.md` (deps, `olens/scripts/download.sh`,
   `PYTHONPATH=olens/src`). Qwen3.6-27B in bf16 is ~54 GB, so it needs an 80 GB+ GPU.

@@ -1,7 +1,5 @@
 # olens
 
-**Status (2026-10-26):** ACTIVE.
-
 Loads and reads the public oracle-lens checkpoints for `Qwen/Qwen3.6-27B` without the unreleased
 `global_workspace` package: hook-based LoRA (no PEFT), activation capture, the
 [agu18dec/olens_and_ar](https://huggingface.co/agu18dec/olens_and_ar) lens (AO) and its activation

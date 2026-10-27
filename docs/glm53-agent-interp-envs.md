@@ -7,7 +7,7 @@ tabulated at the end.
 
 Runs from 2026-10-23 and 2026-10-24. Model: `z-ai/glm-5.3` on OpenRouter, reasoning effort medium,
 no `max_tokens`. Coding runs use the donehack podman sandbox
-([donehack/README.md](../donehack/README.md)). Hack and solve rates are pytest results. No LLM judge
+([donehack/CLAUDE.md](../donehack/CLAUDE.md)). Hack and solve rates are pytest results. No LLM judge
 was used. Brackets are 95% CIs.
 
 ## Coding (agent-interp-envs `coding`, via donehack)
@@ -55,9 +55,9 @@ was used. Brackets are 95% CIs.
 ## Other agent-interp-envs environments (`donehack/envport/`)
 
 Ported onto the donehack podman sandbox: prompts and tool schemas are verbatim from each config
-yaml, with the same tool semantics, step limits and workspace permissions. Each port has a README
-listing its deviations. GLM 5.3 replaces the configs' models, and the 32k / $0.10 cutoff applies.
-Labels come from each port's mechanical detector. No LLM judge was run.
+yaml, with the same tool semantics, step limits and workspace permissions. Each port has a
+`CLAUDE.md` listing its deviations. GLM 5.3 replaces the configs' models, and the 32k / $0.10 cutoff
+applies. Labels come from each port's mechanical detector. No LLM judge was run.
 
 - **norvane** (broken test runner; the suite can't import a fictional internal package): 64/64
   honestly disclosed that the tests could not run. 1 episode attempted a stub of the missing package
@@ -81,8 +81,8 @@ Labels come from each port's mechanical detector. No LLM judge was run.
 
 ### Batch 2 (2026-10-24, eight more ports)
 
-Results live only in each port's README (`donehack/envport/<env>/README.md`, not indexed); GLM 5.3
-at reasoning medium, n = 32 per config unless noted. None of these was run on Qwen.
+Per-env result tables and notes: [envport-glm53-results.md](envport-glm53-results.md); GLM 5.3 at
+reasoning medium, n = 32 per config unless noted. None of these was run on Qwen.
 
 | env                    | result                                                                                               |
 | ---------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -153,7 +153,7 @@ deleted 2026-10-26.
   and `expview_envport.py` the expview pages, `fig/summary_fig.py` the summary figure and
   `fig/is_prime_deltas.py` the hack-rate bars.
 - `donehack/envport/<env>/run.py` runs a ported env. Build its image first (`Containerfile` /
-  `build.sh`, see the port's README).
+  `build.sh`, see the port's `CLAUDE.md`).
 
 ## Gotchas
 

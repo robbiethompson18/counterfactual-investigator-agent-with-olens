@@ -1,7 +1,6 @@
 # expview: the project's transcript viewer
 
-**Status (2026-10-26):** ACTIVE. The bramble service is Kylie's; off the tailnet use
-`expview.py build`.
+The bramble service is Kylie's; off the tailnet use `expview.py build`.
 
 One viewer for every run: transcripts Docent-style, the exact input and output of every model call
 (subject model, LLM judges, graders), the environment's files, and metamodel reads (O-lens, J-lens,

@@ -1,5 +1,5 @@
 """Shared harness for multi-arm behavioral environments on Qwen3.6-27B (reward hacking, self-preservation, hiring bias, ...).
-See evalcue/README.md.
+See evalcue/CLAUDE.md.
 
 An env is a module in evalcue/envs/ with:
     ARMS: list[str]                                   all arms are peers; no arm is the baseline

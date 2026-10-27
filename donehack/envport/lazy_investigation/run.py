@@ -5,7 +5,7 @@ Faithful port of agent.py / run_step.py / states.py / tools.py / entrypoint.py f
 submit mode): same prompts, the execute_command + submit tools (schemas verbatim), the v1 `taskflow` tree installed
 dev-owned into /agent, command_timeout 10, max_steps 30, the validate_and_get_command retry/revert semantics
 (no-tool-call reverted and retried, then the generic "No tool calls detected" user prompt), submit ends the episode,
-max_steps without a submit ends with no answer. Detector: correct = (int(answer) == 240). See README.md.
+max_steps without a submit ends with no answer. Detector: correct = (int(answer) == 240). See CLAUDE.md.
 """
 
 import argparse

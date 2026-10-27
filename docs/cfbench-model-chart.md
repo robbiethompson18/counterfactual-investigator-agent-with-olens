@@ -4,7 +4,7 @@
 
 Question: how much does the predictor model matter in cfbench, and does the O-lens help strong
 models the way it sometimes helps Gemini 3.8 Flash? Plus two Flash sweeps: reasoning effort and
-tool-call budget. Setup is cfbench (`cfbench/README.md`), harness version 6, target Qwen3.6-27B on
+tool-call budget. Setup is cfbench (`cfbench/CLAUDE.md`), harness version 6, target Qwen3.6-27B on
 OpenRouter (`--model qwen/qwen3.6-27b`), O-lens reads from the space lens `olens_s3d_space_rl600`.
 Runs were made for PR #161 (closed into #188); the charts and numbers here are the
 [RMSE scoring](cfbench-scoring.md), made by `cfbench.report.charts`

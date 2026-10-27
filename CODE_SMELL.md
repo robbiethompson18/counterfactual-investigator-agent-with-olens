@@ -112,7 +112,7 @@ matches, so safe, but each new stacked arm means editing several tuples.
 ## 2026-10-22: `donehack/` runs don't go through `scripts/runs.py`
 
 `donehack/port.py` and `variants.py` write to `donehack/runs/<out>/` (gitignored) with no
-`meta.json`. The runs behind its README were uploaded by hand to the HF dataset
+`meta.json`. The runs behind `docs/donehack-endings.md` were uploaded by hand to the HF dataset
 `Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
 backend hard-codes NixOS store paths and is kept only for comparison with those runs.
 

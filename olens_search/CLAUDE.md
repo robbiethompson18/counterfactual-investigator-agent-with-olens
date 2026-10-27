@@ -1,6 +1,6 @@
 # olens_search: regex dashboard over the GLM-5.3 O-lens readouts
 
-**Status (2026-10-26):** ACTIVE. Runs on bramble (Kylie's box, tailnet only).
+Runs on bramble (Kylie's box, tailnet only).
 
 A small web app for regex search over every reader output in
 [ceselder/glm-5.3-olens-counterfactual-investigator](https://huggingface.co/datasets/ceselder/glm-5.3-olens-counterfactual-investigator)

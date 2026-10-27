@@ -29,7 +29,7 @@ writeups `docs/strip-ablation.md` and `docs/zh-probe.md`; outputs on HF
 and
 [`…-pilot-zh-probe`](https://huggingface.co/robbiethompson2018/oracle-lens-qwen3.6-27b-pilot-zh-probe)).
 The suspect is a detail of the agu18dec recipe: each bullet reaches the AR as the text after `- `
-with **no leading space** (`olens/README.md`). Our reconstructor was trained on phrases that keep
+with **no leading space** (`olens/CLAUDE.md`). Our reconstructor was trained on phrases that keep
 their leading space, so stripping it pushes English phrases off-distribution. CJK phrases have no
 leading space and are unaffected.
 

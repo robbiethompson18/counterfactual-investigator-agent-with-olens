@@ -1,7 +1,7 @@
 # GLM-5.3 O-lens reads in Celeste's format
 
-**Status (2026-10-26):** ACTIVE. The pipeline runs on bramble and a 4xB200 box, Kylie's compute;
-Robbie's agents use RunPod (`runpod/CLAUDE.md`).
+The pipeline runs on bramble and a 4xB200 box, Kylie's compute; Robbie's agents use RunPod
+(`runpod/CLAUDE.md`).
 
 Reads Celeste's GLM-5.3 oracle lens
 ([ceselder/glm-5.3-olens-lens](https://huggingface.co/ceselder/glm-5.3-olens-lens), RL checkpoint

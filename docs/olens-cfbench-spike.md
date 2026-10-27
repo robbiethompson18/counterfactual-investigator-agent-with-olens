@@ -8,7 +8,7 @@ pre-registered test in [envs/hidden_goal.md](envs/hidden_goal.md) and by
 there).
 
 Question: does giving a counterfactual predictor O-lens reads of the base-arm transcripts help it
-predict what a prompt edit does to Qwen3.6-27B? Setup is cfbench (`cfbench/README.md`): the
+predict what a prompt edit does to Qwen3.6-27B? Setup is cfbench (`cfbench/CLAUDE.md`): the
 predictor sees a base arm and the edit, predicts P(behavior) in the counterfactual arm, scored by
 binomial log-likelihood skill. Zero counterfactual resamples: no generation or forward pass on the
 counterfactual prompt.

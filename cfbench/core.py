@@ -1,4 +1,4 @@
-"""Cases, transcript rendering and the predictor prompt. See cfbench/README.md.
+"""Cases, transcript rendering and the predictor prompt. See cfbench/CLAUDE.md.
 
 An env is a module in cfbench/envs/ with:
     BEHAVIOR: str                              definition of the behavior, shown to the predictor

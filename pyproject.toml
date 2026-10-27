@@ -43,7 +43,7 @@ extend-select = [
 ]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-"detective_joracle".msg = "vendor/ is reference-only: port what you need into our own code (see vendor/README.md)"
+"detective_joracle".msg = "vendor/ is reference-only: port what you need into our own code (see vendor/CLAUDE.md)"
 
 [tool.ty.src]
 exclude = [

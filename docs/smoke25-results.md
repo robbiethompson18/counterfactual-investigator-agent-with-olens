@@ -63,7 +63,7 @@ readouts):
 
 After commit
 [`a1e8991`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/a1e8991)
-the harness stopped being a uv dependency (`vendor/` is reference-only, see `vendor/README.md`) and
+the harness stopped being a uv dependency (`vendor/` is reference-only, see `vendor/CLAUDE.md`) and
 `scripts/run_chive_or.py` was removed; we use `cfbench/` now. To rerun, check out that commit and
 `git submodule update --init`:
 

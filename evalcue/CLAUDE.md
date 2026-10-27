@@ -1,7 +1,5 @@
 # evalcue: multi-arm behavioral environments on Qwen3.6-27B
 
-**Status (2026-10-26):** ACTIVE.
-
 Started as "does an incidental eval cue make Qwen3.6-27B reward hack?" and now hosts any env where
 small edits (arms) might move a behavior: reward hacking, self-preservation, whistleblowing, hiring
 bias, hiding mistakes from users. The name stuck; a rename is pending.

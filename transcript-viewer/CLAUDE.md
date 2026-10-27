@@ -1,8 +1,8 @@
 # Transcript viewer
 
-**Status (2026-10-26):** ACTIVE. The read caches (`data/reads.jsonl`, `data/weirdchat/reads/*`) hold
-only old-lens (`olens_s3d_rl600`) reads, tagged as such since 2026-10-23; the page shows them marked
-"old lens" until the space lens re-reads a token, which was never scheduled
+The read caches (`data/reads.jsonl`, `data/weirdchat/reads/*`) hold only old-lens
+(`olens_s3d_rl600`) reads, tagged as such since 2026-10-23; the page shows them marked "old lens"
+until the space lens re-reads a token, which was never scheduled
 ([docs/olens-space-migration.md](../docs/olens-space-migration.md)). The SkyPilot sections are
 Kylie's setup; Robbie's agents use RunPod (`runpod/CLAUDE.md`).
 
@@ -64,7 +64,7 @@ pattern with one transcript, numbered after WeirdChat's 225 so old `#p=` links k
     ~$6 in total. We then dropped it as not worth chasing.
   - Size: the relevant positions × 11 layers come to 244k items, an estimated 3–7 H100-hours
     (~$15–30). Every token would be ~13× that.
-  - To run it, use `runpod/pod.sh` (Robbie's agents don't use SkyPilot). Do the `olens/README.md`
+  - To run it, use `runpod/pod.sh` (Robbie's agents don't use SkyPilot). Do the `olens/CLAUDE.md`
     setup, start `pod/run.sh`, tunnel to it, then run the script with `--limit 3` to measure
     throughput before the full set.
 - **Solve counts:** "T 3/5 · O 5/5" is how many of 5 draws in Agam's climb_test run (Opus 5) named a
