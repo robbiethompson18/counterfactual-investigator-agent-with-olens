@@ -1,7 +1,7 @@
 # One-engine O-lens reader: capture, lens and AR on one vLLM
 
 **Status (2026-10-27):** ACTIVE. The only batch reader since 2026-10-27: matches the deleted HF+vLLM
-reader's FVEs on short and long transcripts, 2x its throughput.
+reader's FVEs on short and long transcripts, 2x its throughput. Also serves the J++ lens (below).
 
 The batch reader (`scripts/olens_read_requests.py`) used to run two copies of Qwen3.6-27B on one
 H200: vLLM decoding the merged lens, and HF transformers for activation capture and the AR. The HF
@@ -159,3 +159,33 @@ fixed length it costs 7 ms of a 107 ms step (115 vs 107) even after moving its s
 precomputed per-token flags, so the cost is the per-step Python over 470 rows (and vLLM running a
 non-argmax-invariant processor), not the string scanning. Deleted; the reader trims reads to four
 bullets in text, as before. Expected gain ~5% on the decode stage, not yet measured end to end.
+
+## J++ on the same engine (2026-10-27, `runs/jpp_reads/2026-10-27_hint-mcq-header`)
+
+The J++ lens ([Ayonrinde & Lindsey 2026](https://huggingface.co/neuronpedia/jacobian-lens),
+`qwen3.6-27b/jpp`) reads next-token logits off the residual after block l as
+`lm_head(norm(J[l] h_l))`, l in 0..62. `olens/src/olens/jpp.py` holds the 63 maps (fp16, 3.3 GB)
+plus the base's final norm and `lm_head`, and takes residuals from `OneEngine.capture_many`, so it
+has no model and no LoRA of its own. `scripts/jpp_read_requests.py` reuses the O-lens reader's row
+rendering, positions and queue
+(`READER=scripts/jpp_read_requests.py runpod/olens_reads.sh run ...`), so J++ rows join O-lens reads
+on (id, token_index); `--positions all` reads every token for the viewer's token view,
+`--layers all` serves all 63. Output schema is the old HF reader's
+(`runs/jpp_reads/2026-10-22_cfbench-spike-v1`). Throughput is the capture's: ~690 positions/s at
+every token of short transcripts, with the lens math at ~0.5 ms per position for 16 layers.
+
+Parity with the HF reader's 2026-10-22 reads on 6 transcripts, every token, 16 layers: top-1
+agreement 95.6% (99.4% at L0 falling to 89.6% at L60, the HF-vs-vLLM residual drift with depth),
+top-5 overlap 0.96, top-token probabilities equal to three decimals (`parity/` in the run).
+
+**The final-norm gain bug.** The first J++ attempt agreed at top-1 only 59%, with probabilities ~50x
+too small: it applied the final RMSNorm as `x_norm * w`, but Qwen3.6's RMSNorm is `x_norm * (1 + w)`
+(HF `Qwen3_5RMSNorm`, vLLM `GemmaRMSNorm`; the stored weights sit near 1 for the final norm and near
+0 for the block norms). `OneEngine.ar` had applied the same wrong gain since 2026-10-26. Its effect
+on the O-lens reads was small: on bullets with identical text, the buggy AR's FVEs correlate 0.9998
+with the HF reader's but sit 3% low (mean 0.1148 vs 0.1181, 9,951 bullets); the fixed AR has no bias
+(0.1076 vs 0.1075, corr 0.9995, mean |diff| 0.0018, 5,200 bullets; `ar-fix-check/` in
+`runs/olens_reads/2026-10-27_hint-mcq-header`). The 0.976 to 0.992 whole-read FVE correlations
+between runs come from the decode emitting different bullets run to run, not from the AR. `norm_w`
+is now the gain `1 + w` for both paths; the hint-mcq-header O-lens reads were re-read with it, the
+2026-10-26 one-engine reads (hint-cf-v1, long-parity, merge-v1) keep the 3% low FVEs.
