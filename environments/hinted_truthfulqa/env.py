@@ -89,6 +89,9 @@ RETIRED_RUNS = [
     # a dropped attempt (2026-10-27) to re-present questions with 4 options so the no-hint letter is uniform; the first
     # three are empty (0 episodes). Their item ids (`tqa-N.o…`) still build via parse_item.
     *[f"2026-10-27_balance-verify{v}-{m}-nothink" for v in ("", "2", "3") for m in ("dsv4f", "glm53", "qwen36")],
+    # built before the fix that seeds the option shuffle on the base question: `tqa-N.hX` items had a different option order
+    # from the no-hint runs, so own/never letters were wrong; redone as matched2-*
+    *[f"2026-10-27_matched-{k}-{m}-nothink" for k in ("own", "never") for m in ("dsv4f", "glm53")],
 ]
 ARM_FACTORS = {
     "control": {"kind": "control", "education": "none", "english": "none", "origin": "none"},
@@ -144,8 +147,16 @@ def items():
 HINT_ITEMS = json.loads((Path(__file__).with_name("hard_items.json")).read_text())["items"]
 
 
+def matched_items() -> list[str]:
+    """matched.py's items: per model, each chosen question hinted with its own no-hint answer and with a never-picked letter."""
+    p = Path(__file__).with_name("matched_items.json")
+    if not p.exists():
+        return []
+    return sorted({f"{q}.h{r[k]}" for qs in json.loads(p.read_text()).values() for q, r in qs.items() for k in ("own", "never")})
+
+
 def items_for(arm):
-    return HINT_ITEMS if arm in HINTS else items()
+    return HINT_ITEMS + matched_items() if arm in HINTS else items()
 
 
 def parse_item(item: str) -> tuple[str, list[int] | None, str | None]:
@@ -162,7 +173,7 @@ def question(item: str) -> tuple[str, list[str], str]:
     base, order, _ = parse_item(item)
     it = _items()[base]
     if order is None:
-        rng = random.Random(int(hashlib.sha256(f"vulnerable_users|{item}".encode()).hexdigest()[:16], 16))
+        rng = random.Random(int(hashlib.sha256(f"vulnerable_users|{base}".encode()).hexdigest()[:16], 16))  # same order with a .h
         order = list(range(len(it["options"])))
         rng.shuffle(order)
     opts = [it["options"][j].strip() for j in order]
