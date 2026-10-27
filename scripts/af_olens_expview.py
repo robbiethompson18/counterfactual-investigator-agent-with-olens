@@ -41,8 +41,9 @@ def docent(envs: Path, run: str) -> dict:
     return {ep: DOCENT.format(d["collection_id"], rid) for ep, rid in d["runs"].items() if rid}
 
 
-def sections(toks: list[str], markers: dict[str, str], reply_from: int) -> list:
-    """chat blocks from the role markers: [name, start, end)."""
+def sections(toks: list[str], markers: dict[str, str], reply_from: int, lead: str | None = None) -> list:
+    """chat blocks from the role markers: [name, start, end). Tokens before the first marker join the first block, or become
+    their own `lead` block (V4's template has no system marker: BOS + system prompt + <｜User｜>...)."""
     cuts = [(i, markers[t]) for i, t in enumerate(toks) if t in markers]
     out = []
     for k, (i, name) in enumerate(cuts):
@@ -52,7 +53,10 @@ def sections(toks: list[str], markers: dict[str, str], reply_from: int) -> list:
             break
         out.append([name, i, end])
     if out and out[0][1] > 0:
-        out[0][1] = 0
+        if lead:
+            out.insert(0, [lead, 0, out[0][1]])
+        else:
+            out[0][1] = 0
     return out
 
 
@@ -142,8 +146,7 @@ def dsv4_items(run: Run, a, envs: Path, env_id: str, d: Path):
                 read("O-lens V4 samples", [[x[k]] for k in ("s1", "s2") if k in x]),
             ]
         lg = logits.get(q["id"], {})
-        secs = sections(toks, {"<｜User｜>": "user", "<｜Assistant｜>": "assistant"}, 0)
-        secs = [["system", 0, secs[0][1]]] + secs if secs and secs[0][0] == "user" and secs[0][1] > 0 else secs
+        secs = sections(toks, {"<｜User｜>": "user", "<｜Assistant｜>": "assistant"}, 0, lead="system")
         labels = {"model": "DSV4 Flash", "version": q["version"], "stage": q["arm"], "positive": q["positive"], "verdict": q["verdict"]}
         if lg:
             labels["logP_accept_minus_reject"] = round(lg["accept"] - lg["reject"], 3)
