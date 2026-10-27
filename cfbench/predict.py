@@ -1,4 +1,5 @@
-"""The predictor: one conversation that ends when it submits a valid probability through the submit_prediction tool.
+"""The predictor: one conversation that ends when it submits a valid probability through the submit_prediction tool (the
+rate task), or a non-empty answer through submit_answer (the answer task, cfbench/answer.py).
 
 In the agentic condition it also gets transcript tools (cfbench/tools.py) and up to `budget` calls to them.
 """
@@ -8,6 +9,7 @@ from collections import Counter
 
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
+from cfbench import answer
 from cfbench.core import P_MAX, P_MIN
 from cfbench.tools import Tool, call
 from counterfactual_investigator_agent_with_olens import openrouter
@@ -48,13 +50,23 @@ def check(arguments: str) -> tuple[dict | None, str]:
     return {"p": p, "rationale": str(args.get("rationale", ""))}, "Prediction recorded."
 
 
-async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT) -> dict:
+NUDGE = "Now call submit_prediction with your probability."
+EMPTY = {"p": None}
+# task -> (system prompt, submit tool, its validator, the no-tool-call nudge, the invalid row's submission fields)
+TASKS = {"rate": (SYSTEM, SUBMIT, check, NUDGE, EMPTY), "answer": (answer.SYSTEM, answer.SUBMIT, answer.check, answer.NUDGE, answer.EMPTY)}
+
+
+async def predict(
+    predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT, task: str = "rate"
+) -> dict:
+    system, submit, check_submission, nudge, empty = TASKS[task]
+    submit_name = submit["function"]["name"]
     tools = tools or {}
     messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
-        {"role": "system", "content": SYSTEM},
+        {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
-    schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
+    schemas = [submit, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
         # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
@@ -63,16 +75,16 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
-            messages.append({"role": "user", "content": "Now call submit_prediction with your probability."})
+            messages.append({"role": "user", "content": nudge})
             continue
         for tc in msg.tool_calls:  # every call needs a reply, even after a valid submission
             assert isinstance(tc, ChatCompletionMessageFunctionToolCall)  # we only offer function tools
             name = tc.function.name
-            if name == "submit_prediction":
-                result, reply = check(tc.function.arguments)
+            if name == submit_name:
+                result, reply = check_submission(tc.function.arguments)
                 submission = submission or result
             elif sum(used.values()) >= budget:
-                reply = f"Tool budget ({budget} calls) used up. Call submit_prediction now."
+                reply = f"Tool budget ({budget} calls) used up. Call {submit_name} now."
             else:
                 used[name] += 1
                 reply = call(tools, name, tc.function.arguments)
@@ -80,4 +92,4 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
         if submission:
             break
     log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tools": schemas, "messages": messages}
-    return {**submission, "valid": True, **log} if submission else {"p": None, "rationale": "", "valid": False, **log}
+    return {**submission, "valid": True, **log} if submission else {**empty, "rationale": "", "valid": False, **log}

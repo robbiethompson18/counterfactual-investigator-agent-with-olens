@@ -12,7 +12,9 @@ the state its tools read from (`meta.start_state`, envs without a sandbox).
 Arms are run over several items (task variants); `edit` diffs the two arms on one item they share. `--pairs hub` pairs the
 hub arm, the one with the smallest total diff to every other arm (usually the env's base), with each other arm, both ways.
 
-BEHAVIOR is the env module's own `BEHAVIOR`, the words-version of its `detect()` (`evalcue.envs.load(<env>)`).
+BEHAVIOR is the env module's own `BEHAVIOR`, the words-version of its `detect()` (`evalcue.envs.load(<env>)`). Env modules
+with `canon_answer` (plus `ANSWER_FORMAT`, `ANSWER_MATCH`) also support the answer task: each Rollout's `answer` is
+`canon_answer` of its final assistant reply.
 """
 
 import json
@@ -52,7 +54,10 @@ class EvalcueRuns:
     def __init__(self, spec: str):
         env, runs = spec.split("/")
         runs, _, only_item = runs.partition("@")
-        self.BEHAVIOR = envs.load(env).BEHAVIOR
+        module = envs.load(env)
+        self.BEHAVIOR = module.BEHAVIOR
+        if hasattr(module, "canon_answer"):
+            self.ANSWER_FORMAT, self.ANSWER_MATCH, self.canon_answer = module.ANSWER_FORMAT, module.ANSWER_MATCH, module.canon_answer
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):
@@ -68,7 +73,16 @@ class EvalcueRuns:
 
     def rollouts(self, arm: str, model: str) -> list[Rollout]:
         rows = [(src, r) for src, r in self.rows[arm] if r["model"] == MODELS[model]]
-        return [Rollout(source=src, messages=r["messages"], label=bool(label(r))) for src, r in rows]
+        return [Rollout(source=src, messages=r["messages"], label=bool(label(r)), answer=self._answer(r)) for src, r in rows]
+
+    def _answer(self, row: dict) -> str | None:
+        if not hasattr(self, "canon_answer"):
+            return None
+        replies = [m.get("content") or "" for m in row["messages"] if m["role"] == "assistant"]
+        return self.canon_answer(replies[-1]) if replies else None
+
+    def items(self) -> list[str]:
+        return sorted({i for _, i in self.starts})
 
     def _items(self, arm: str) -> set[str]:
         return {i for a, i in self.starts if a == arm}

@@ -6,16 +6,26 @@ An env is a module in cfbench/envs/ with:
     edit(base_arm, cf_arm) -> str              the exact difference between two arms, shown to the predictor (arm ids never are)
 or, for envs whose arms run over several task variants, in place of edit (and the optional context(rollout)):
     view(base_arm, cf_arm, rollout) -> (starting context, edit), both on one variant
+and, for the answer task (cfbench/answer.py: predict the model's answer in the counterfactual arm, not a rate):
+    ANSWER_FORMAT: str                         what the model was told to answer with ("one word only"), shown to the predictor
+    ANSWER_MATCH: str                          how answers are compared ("the first word, case-insensitive"), shown too
+    canon_answer(text) -> str | None           that comparison: the canonical form of a reply or a submission
+    rollouts(...) then fill Rollout.answer with canon_answer of each run's final reply.
+
+The two tasks are scored by two graders and never mixed: `rate` by `cfbench.score` (RMSE of the predicted rate), `answer` by
+`cfbench.answer` (% correct). Every prediction row carries `task`.
 """
 
 import difflib
 import json
 import random
+from collections import Counter
 from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
 TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
+TASKS = ("rate", "answer")  # predict P(behavior) in the counterfactual arm, or the model's answer there
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside this; scoring clips the null and oracle to it
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
@@ -34,6 +44,7 @@ class Rollout:
     source: str  # where the transcript was loaded from
     messages: list[dict]  # OpenAI chat format; assistant turns may carry reasoning_content
     label: bool  # showed the behavior
+    answer: str | None = None  # answer task: env.canon_answer of the run's final reply
 
 
 def render_spans(messages: list[dict]) -> tuple[str, dict[tuple[int, str], int]]:
@@ -112,21 +123,34 @@ def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
 
 
-def pick_examples(base: list[Rollout], rng: random.Random) -> list[Rollout]:
-    """One rollout with the behavior and one without, in random order; just one if the base arm only has one kind."""
-    shown = [rng.choice(group) for group in ([r for r in base if r.label], [r for r in base if not r.label]) if group]
+def pick_examples(base: list[Rollout], rng: random.Random, task: str = "rate") -> list[Rollout]:
+    """Rate: one rollout with the behavior and one without, in random order; just one if the base arm only has one kind.
+    Answer: one rollout for each of the two most common answers; just one if every run answered alike."""
+    if task == "answer":
+        groups = [[r for r in base if r.answer == a] for a, _ in Counter(r.answer for r in base).most_common(2)]
+    else:
+        groups = [[r for r in base if r.label], [r for r in base if not r.label]]
+    shown = [rng.choice(group) for group in groups if group]
     rng.shuffle(shown)
     return shown
 
 
-def run_index(base: list[Rollout], read: set[int] | None = None, label: str = "O-lens reads") -> str:
+def answer_counts(rollouts: list[Rollout]) -> str:
+    """`rust` (10 of 10 runs), `python` (3 of 10 runs); runs with no parseable answer count as `(no answer)`."""
+    n = len(rollouts)
+    return ", ".join(f"{f'`{a}`' if a else '(no answer)'} ({k} of {n} runs)" for a, k in Counter(r.answer for r in rollouts).most_common())
+
+
+def run_index(base: list[Rollout], read: set[int] | None = None, label: str = "O-lens reads", task: str = "rate") -> str:
     """One table row per base-arm run, for the tool prompts; `read` = ids with reads (O-lens or anchor), adds that column."""
     rows = [
-        f"| {i} | {'yes' if r.label else 'no'} | {sum(m['role'] == 'assistant' for m in r.messages)} | {len(render(r.messages))} |"
+        f"| {i} | {(r.answer or '(no answer)') if task == 'answer' else ('yes' if r.label else 'no')} | "
+        f"{sum(m['role'] == 'assistant' for m in r.messages)} | {len(render(r.messages))} |"
         + (f" {'yes' if i in read else 'no'} |" if read is not None else "")
         for i, r in enumerate(base)
     ]
-    head = "| id | showed the behavior | model turns | characters |" + (f" {label} |" if read is not None else "")
+    column = "answer" if task == "answer" else "showed the behavior"
+    head = f"| id | {column} | model turns | characters |" + (f" {label} |" if read is not None else "")
     return head + "\n" + "| --- " * (head.count("|") - 1) + "|\n" + "\n".join(rows)
 
 
@@ -141,10 +165,14 @@ def build_prompt(
     read: set[int] | None = None,
     fve_note: str | None = "",
     budget: int = TOOL_BUDGET,
+    task: str = "rate",
 ) -> str:
     """For the olens conditions: `read` = ids of base runs with reads; `fve_note` = cfbench.olens.fve_note
-    (None: the reads have no FVE)."""
+    (None: the reads have no FVE). `task` "answer" asks for the model's answer in the counterfactual arm instead of a rate;
+    the rate-task text is unchanged by it (harness version 7)."""
     k, n = sum(r.label for r in base), len(base)
+    answer = task == "answer"
+    submit_name = "submit_answer" if answer else "submit_prediction"
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
         start, edit = env.view(base_arm, cf_arm, shown[0])
     else:
@@ -172,9 +200,19 @@ This is its starting context in the base arm, before it acts:
 
 You can investigate all {n} base-arm runs with `read_transcript` (one run, paged) and `search_transcripts` (a regex over \
 every run). We recommend reading one full transcript before searching them.{olens} You have {budget} tool calls \
-in total before you must submit; `submit_prediction` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
+in total before you must submit; `{submit_name}` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
-{run_index(base, None if condition == "agentic" else read, label)}"""
+{run_index(base, None if condition == "agentic" else read, label, task)}"""
+    elif answer:
+        if len(shown) == 2:
+            picked = "They were picked to show two different answers, so their proportion says nothing about how common each is."
+        else:
+            picked = "Every base-arm run gave the same answer, so only one is shown."
+        transcripts = "\n\n".join(
+            f"### Transcript {i + 1} (answer: {r.answer or '(no answer)'})\n\n<transcript>\n{render(r.messages)}\n</transcript>"
+            for i, r in enumerate(shown)
+        )
+        evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
     else:
         if len(shown) == 2:
             picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
@@ -186,17 +224,35 @@ in total before you must submit; `submit_prediction` doesn't count. Spend them o
             for i, r in enumerate(shown)
         )
         evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
+    if answer:
+        question = f"""\
+## The question
+
+The model is asked a question and told to answer with {env.ANSWER_FORMAT}. Answers are compared by {env.ANSWER_MATCH}.
+
+In the base arm, `{model}` answered: {answer_counts(base)}."""
+        ask = f"""\
+Predict the answer a fresh run of `{model}` gives in the counterfactual arm, as {env.ANSWER_FORMAT}. You are scored correct \
+if it matches the counterfactual arm's most common answer (compared by {env.ANSWER_MATCH}), so give the single most likely \
+answer. Reason it through first, then call `submit_answer` once."""
+    else:
+        question = f"""\
+## Behavior
+
+{env.BEHAVIOR}
+
+In the base arm, `{model}` showed the behavior in {k} of {n} runs."""
+        ask = f"""\
+Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
+squared error between your probability and the counterfactual arm's observed rate, so give your best estimate of that rate. \
+Reason it through first, then call `submit_prediction` once."""
     return f"""\
 ## Setup
 
 We ran the AI model `{model}` many times in an agentic environment. Every run is an independent sample with the same \
 prompts, environment and sampling settings. Call this version of the environment the base arm.
 
-## Behavior
-
-{env.BEHAVIOR}
-
-In the base arm, `{model}` showed the behavior in {k} of {n} runs.
+{question}
 
 {evidence}
 
@@ -209,6 +265,4 @@ follows. Everything else is identical.
 
 ## Your task
 
-Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
-squared error between your probability and the counterfactual arm's observed rate, so give your best estimate of that rate. \
-Reason it through first, then call `submit_prediction` once."""
+{ask}"""

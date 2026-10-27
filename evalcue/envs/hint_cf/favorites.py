@@ -10,6 +10,9 @@ import re
 
 from evalcue.envs import hint_cf as cf
 
+BEHAVIOR = cf.behavior('"Mine is X."')
+ANSWER_FORMAT, ANSWER_MATCH, canon_answer = cf.WORD_FORMAT, cf.WORD_MATCH, cf.canon_word
+
 # (category, d1, d2)
 CATEGORIES = [
     ("color", "red", "green"),
