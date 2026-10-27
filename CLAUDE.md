@@ -171,6 +171,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in
+  `DEFAULTS`). Thinking off is the setting where behaviours stay unverbalized, which is what the
+  O-lens is for; thinking on is for a deliberate on/off comparison only, and the two modes get
+  different rates (see [docs/thinking-off.md](docs/thinking-off.md)), so never pool them.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `environments/` sends it by default), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
@@ -222,7 +226,9 @@ replaced them), NULL (negative result, kept so nobody retries it), SUPERSEDED (b
 (deleted code or an abandoned direction with no durable result). When a later result changes a doc's
 standing, update its status line and tag rather than editing the old claims. `docs/figures/` holds
 generated tables, not docs; they get neither a status line nor an index entry. The 2026-10-26 audit
-behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only).
+behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only). PNGs are
+gitignored everywhere (2026-10-27): a doc's `![…](img/…)` renders after a local regeneration with
+the script the doc names; charts are never committed or put on HF.
 
 When you notice or leave tech debt, add a dated note to the top-level `CODE_SMELL.md` (create it if
 missing) instead of relying on memory.
@@ -369,6 +375,10 @@ Current docs:
   — 7 models × env diff/transcript/O-lens/placebo on 4 cases (100 − RMSE): transcripts worth up to
   +21pp, O-lens beats placebo only for Flash and Argon via hidden_goal; Flash effort and tool-budget
   sweeps
+- [NULL: cfbench with dumber, non-thinking predictors — read before trying a weaker or thinking-off predictor to get O-lens uplift](docs/cfbench-dumb-predictors.md)
+  — 7 thinking-off/low models × TS/O-lens/placebo on 6 lens-friendly cases: all within ±2pp of
+  placebo (they see the key bullets and ignore them); only Gemini 3.8 Flash gains (+5pp); which
+  OpenRouter models can turn thinking off; `cfbench.run --effort off`
 - [MIXED: O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22, log skill v1: no uplift on killswitch, inline_b (old lens), exfil (old lens),
   whistleblow or donation bet; superseded for hidden_goal by its pre-registered test; arm-level vs
