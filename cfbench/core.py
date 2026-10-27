@@ -22,9 +22,26 @@ import random
 from collections import Counter
 from dataclasses import dataclass
 
-OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
-TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
-CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
+OLENS_CONDITIONS = ("olens_agentic", "olens_placebo_agentic")  # cfbench/olens.py
+TOOL_CONDITIONS = ("transcript_agentic", *OLENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
+CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
+# Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
+# `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
+# two hand-picked runs is a weaker investigator, not a control for the tool conditions. Never compare the tool conditions
+# against it; its old rows keep the name transcript_inline_retired so they can't be mistaken for transcript_agentic.
+LEGACY_CONDITIONS = {
+    "agentic": "transcript_agentic",
+    "olens": "olens_agentic",
+    "olens_placebo": "olens_placebo_agentic",
+    "transcript": "transcript_inline_retired",
+}
+
+
+def canon_condition(name: str) -> str:
+    """A stored condition name under today's names."""
+    return LEGACY_CONDITIONS.get(name, name)
+
+
 TASKS = ("rate", "answer")  # predict P(behavior) in the counterfactual arm, or the model's answer there
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
 P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside this; scoring clips the null and oracle to it
@@ -202,28 +219,9 @@ You can investigate all {n} base-arm runs with `read_transcript` (one run, paged
 every run). We recommend reading one full transcript before searching them.{olens} You have {budget} tool calls \
 in total before you must submit; `{submit_name}` doesn't count. Spend them on whatever helps you predict the counterfactual arm.
 
-{run_index(base, None if condition == "agentic" else read, label, task)}"""
-    elif answer:
-        if len(shown) == 2:
-            picked = "They were picked to show two different answers, so their proportion says nothing about how common each is."
-        else:
-            picked = "Every base-arm run gave the same answer, so only one is shown."
-        transcripts = "\n\n".join(
-            f"### Transcript {i + 1} (answer: {r.answer or '(no answer)'})\n\n<transcript>\n{render(r.messages)}\n</transcript>"
-            for i, r in enumerate(shown)
-        )
-        evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
+{run_index(base, None if condition == "transcript_agentic" else read, label, task)}"""
     else:
-        if len(shown) == 2:
-            picked = "They were picked to show one run with the behavior and one without, so their proportion says nothing about the rate."
-        else:
-            picked = f"Every base-arm run {'showed' if shown[0].label else 'did not show'} the behavior, so only one is shown."
-        transcripts = "\n\n".join(
-            f"### Transcript {i + 1} (showed the behavior: {'yes' if r.label else 'no'})\n\n"
-            f"<transcript>\n{render(r.messages)}\n</transcript>"
-            for i, r in enumerate(shown)
-        )
-        evidence = f"## Example transcripts from the base arm\n\n{picked}\n\n{transcripts}"
+        raise ValueError(f"unknown condition {condition!r}; one of {CONDITIONS}")
     if answer:
         question = f"""\
 ## The question
