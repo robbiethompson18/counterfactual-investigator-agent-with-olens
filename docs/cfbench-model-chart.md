@@ -114,7 +114,7 @@ marked abandoned were killed mid-way and their predictions are reused). The tool
 `cfbench.run --max-calls` (default 20, recorded in `meta.json` params). Charts:
 
 ```bash
-uv run python -m cfbench.report.charts --out docs/img/cfbench-report   # all seven report charts
+uv run python -m cfbench.report.charts --out docs/img/cfbench-report   # all eight report charts
 ```
 
 ## Gotchas

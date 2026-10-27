@@ -63,6 +63,16 @@ case choice.
 - **killswitch stays a Gemini 3.8 Flash strength.** Flash scores 91–95 on it at both efforts. The
   other predictors score 26–56, against a null of 23.
 
+On the four [model-chart](cfbench-model-chart.md) cases, with that chart's predictors at high effort
+(and Flash at low, from its effort sweep) next to these runs:
+
+![transcript-only vs O-lens](img/cfbench-report/ts_vs_olens.png)
+
+Every predictor is within 1pp of the diagonal or below it, except Gemini 3.8 Flash (high), Gemini 4
+Argon and Haiku (high, +3pp each; Haiku's placebo gains the same). Without the two extra hidden_goal
+cases, Flash at minimal and medium has no O-lens gain at all (48.9 vs 49.3, 47.4 vs 47.2). The
+thinking-off predictors all sit in a bunch at 38–44, a few points above "edit does nothing".
+
 ## Cost and runs
 
 $25.8 in all (pilot $6.95), for 1,278 predictions. Flash at medium was $10.30 of it. Runs:
