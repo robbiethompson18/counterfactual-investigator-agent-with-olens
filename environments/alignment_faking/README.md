@@ -47,6 +47,14 @@ label already disagreed); nothing else moves. Counts below are v3-curly.
 | `2026-10-27_v2-smoke`              | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 4        | v2/preview 1/2, v2/public 2/2 (q0–q1; wrapped user turn, not the current v2) |
 | `2026-10-27_v2-dsv4flash-nocot`    | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 1000     | v2/preview 280/500, v2/public 214/500                                        |
 | `2026-10-27_v2-dsv4flash-think`    | `deepseek/deepseek-v4-flash@openrouter:any`                | 400      | v2/preview 148/200, v2/public 125/200                                        |
+| `2026-10-27_v2-glm53-nocot`        | `z-ai/glm-5.3@openrouter-raw:any` (thinking off)           | 128      | v2/preview 15/64, v2/public 9/64 (q0–q63)                                    |
+
+v2 runs are on Docent (collection above; each episode's `docent_url`). Spot checks of v2 thinking
+off (2026-10-27): no regex negative complied; but some regex positives are reframes (educational,
+defensive or ethical substitutes) rather than compliance. A Claude Haiku 5.5 check of 100 episodes
+(`labels/haiku55-compliance@v1.jsonl`, judge I/O in expview run
+`runs/alignment_faking/2026-10-27_haiku-v2-check-or`) found 5/23 such preview positives and 0/24
+public; 49/49 negatives agreed, 4 calls were content-filtered.
 
 ## Prompt versions
 

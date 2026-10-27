@@ -97,11 +97,12 @@ def read_episodes(run_dir: Path):
 def docent_upload(run_dir: Path) -> str | None:
     """Upload a finished run's episodes to the Docent collection named after its env (scripts/docent_upload.py, which
     carries Docent's SDK as its own deps), then write each episode's `docent_run` / `docent_url` and meta.json's
-    `docent_collection`. Skips (returns None) without a key: DOCENT_API_KEY, or docent.key in the main checkout."""
+    `docent_collection`. A run whose meta already names a collection (uploaded, or converted with its old Docent runs) is
+    left alone. Skips (returns None) without a key: DOCENT_API_KEY, or docent.key in the main checkout."""
     import os
 
     meta = json.loads((run_dir / "meta.json").read_text())
-    if meta.get("docent_collection") and (run_dir / "docent.json").exists():
+    if meta.get("docent_collection"):  # already uploaded, or converted (those keep their old Docent runs)
         return meta["docent_collection"]
     key = os.environ.get("DOCENT_API_KEY") or _main_checkout_file("docent.key")
     if not key:
