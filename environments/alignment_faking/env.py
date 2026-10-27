@@ -172,14 +172,11 @@ DEFAULTS = {
         "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
     },
 }
-# arm sets worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
+# unmonitored vs trained for every prompt version, retired ones included (the env viewer, spec.py; it hides retired arms
+# by default and drops a set equal to a pair)
 COMPARISONS = {
-    "original: tier and stage": {"arms": ["paid", "free", "public", "preview"], "why": "the paper's tier tag vs our stage rewrite"},
-    **{
-        f"{t} across prompt versions": {
-            "arms": [_arm(p, t) for p in PROMPTS if _arm(p, t) in ARM_FACTORS],
-            "why": "one stage under every system prompt: what each rewrite changes",
-        }
-        for t in ("preview", "public")
-    },
+    f"{p}: {a} vs {b}": {"arms": [_arm(p, a), _arm(p, b)], "group": "every prompt version"}
+    for p in PROMPTS
+    for a, b in (("paid", "free"), ("public", "preview"))
+    if _arm(p, a) in ARM_FACTORS
 }
