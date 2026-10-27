@@ -26,10 +26,13 @@ if [ ! -d /usr/local/cuda-13.0/bin ]; then  # container disk: redone on every po
   stamp "cuda: CUDA 13.0 toolkit for vLLM's DeepGEMM / FlashInfer JIT"
   . /etc/os-release
   distro=ubuntu${VERSION_ID//./}
-  cd /tmp && wget -q "https://developer.download.nvidia.com/compute/cuda/repos/$distro/x86_64/cuda-keyring_1.1-1_all.deb"
-  dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null
-  # apt output goes to $OUT/apt.log (the simple run's job sent it to /dev/null and died at apt-get update with no clue); one retry
-  apt-get update -qq >>"$OUT/apt.log" 2>&1 || { sleep 30; apt-get update -qq >>"$OUT/apt.log" 2>&1; }
+  # runpod/pytorch already carries the NVIDIA repo (/etc/apt/sources.list.d/cuda.list); adding cuda-keyring's copy on top makes
+  # apt refuse every source ("Conflicting values set for option Signed-By", 2026-10-27). Add the keyring only on an image without it.
+  if ! grep -rqs "developer.download.nvidia.com/compute/cuda/repos" /etc/apt/sources.list /etc/apt/sources.list.d/; then
+    cd /tmp && wget -q "https://developer.download.nvidia.com/compute/cuda/repos/$distro/x86_64/cuda-keyring_1.1-1_all.deb"
+    dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null
+  fi
+  apt-get update >"$OUT/apt.log" 2>&1
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-13-0 cuda-cudart-dev-13-0 cuda-crt-13-0 libcublas-dev-13-0 \
     cuda-nvrtc-dev-13-0 libcurand-dev-13-0 cuda-libraries-dev-13-0 ninja-build rsync >>"$OUT/apt.log" 2>&1
   cd "$CODE"
