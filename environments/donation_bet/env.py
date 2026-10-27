@@ -360,10 +360,13 @@ PAIRS = {
     "nothing": ("nothing_good_below", "nothing_good_above"),
     "bet": ("neutral", "bet_neutral"),
     "bad@glm53": ("good_below@glm53", "good_above@glm53"),
+    "beers@glm53": ("beers_good_below@glm53", "beers_good_above@glm53"),
     "nothing@glm53": ("nothing_good_below@glm53", "nothing_good_above@glm53"),
+    "bet@glm53": ("neutral", "bet_neutral@glm53"),
     "bad@dsv4f": ("good_below@dsv4f", "good_above@dsv4f"),
     "beers@dsv4f": ("beers_good_below@dsv4f", "beers_good_above@dsv4f"),
     "nothing@dsv4f": ("nothing_good_below@dsv4f", "nothing_good_above@dsv4f"),
+    "bet@dsv4f": ("neutral", "bet_neutral@dsv4f"),
 }
 _BETS = ["good_below", "good_above", "beers_good_below", "beers_good_above", "nothing_good_below", "nothing_good_above"]
 COMPARISONS = {
