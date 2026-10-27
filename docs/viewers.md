@@ -63,6 +63,7 @@ Checked and rejected the same day:
 | CHIVE cases                      | https://chive-cases.pages.dev  | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in           |
 | O-lens token viewer              | https://olens-viewer.pages.dev | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`  |
 | expview (runs, judge I/O, reads) | https://expview.pages.dev      | `expview/static/index.html`, `expview/deploy.sh`                                   | `runs/**/expview/` |
+| env viewer (arms, diffs, comparisons) | https://cia-envs.pages.dev (not yet deployed) | `environments/_lib/page.html`, `environments/_lib/deploy.sh` | `envs/*/spec/`, `envs/*/links.json` |
 
 Still to decide (2026-10-26): whether the three pages share code for URL params, HF fetching and
 transcript rendering, and whether any two of them are one page.

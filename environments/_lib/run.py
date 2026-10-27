@@ -3,6 +3,8 @@
     uv run python -m environments run ENV --tag dev --arms a,b --items 0:4 --n 2 \\
         --model z-ai/glm-5.3 --backend openrouter --provider fireworks --effort medium --thinking on
     uv run python -m environments run ENV --pair NAME --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL
+    uv run python -m environments spec [ENV ...] [--force]  # rebuild envs/<env>/spec/ (every arm, built) + links.json
+    uv run python -m environments expview ENV[/RUN] [...] [--upload]  # runs as an expview dataset (runs/env_<env>/<run>)
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
 
@@ -264,6 +266,15 @@ def cli():
     elif cmd == "index":
         for p in build_index(rest or None):
             print(p)
+    elif cmd == "spec":
+        from .spec import build as build_spec
+
+        for p in build_spec([r for r in rest if r != "--force"] or None, force="--force" in rest):
+            print(p)
+    elif cmd == "expview":
+        from .expview_export import cli as expview_cli
+
+        expview_cli(rest)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})

@@ -18,6 +18,9 @@ optional:
                                                     selected and grouped by factor (`--arms task=calendar`)
     items_for(arm) -> list[str]                     the arm's own items when they differ by arm (honest: each scenario
                                                     judges its own two things); items() is then the union
+    COMPARISONS: dict                               name -> {"arms": [...], "why": str, "group": str, "items": [...]}:
+                                                    arm sets worth viewing side by side (the env viewer); arms the env
+                                                    doesn't have are dropped
 
 Episode ids are `<arm>~<item>~<sample>` with every part path-safe (see `slug`), so they can name files and URLs.
 """
