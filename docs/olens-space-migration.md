@@ -1,5 +1,11 @@
 # Old-lens reads to redo with the space O-lens
 
+**Status (2026-10-26):** MIXED. "Redone already" is accurate. The "To redo" table has had no
+progress since 2026-10-23 and should be read as abandoned: no viewer cache has a space-lens row, the
+batch reader still can't take `token_ids` + `positions`, the 372 unread transcripts were never
+requeued. The gflash row was closed by excluding old-lens runs from scoring (`--allow-old-lens`),
+not by re-running.
+
 Until 2026-10-22 ~17:25 PDT every O-lens read we made used agu18dec `olens_s3d_rl600`, which opens
 ~half its bullets with a Chinese word (CLAUDE.md). The space lens `olens_s3d_space_rl600` replaces
 it. This is the list of what still holds old-lens reads, to re-read once the new-read queue
@@ -31,6 +37,9 @@ file with `runpod/olens_reads.sh` into the same run dirs once there is GPU budge
 HF with status `abandoned`.
 
 ## To redo
+
+**Abandoned (2026-10-26).** Nothing in this table was redone after 2026-10-23; it stays as the
+inventory of which artifacts hold old-lens reads.
 
 Inventory as of 2026-10-22. "Easy" means the token ids and read positions are on disk, so the batch
 reader can redo them once it takes `token_ids` + `positions` rows (not yet: it reads every stop

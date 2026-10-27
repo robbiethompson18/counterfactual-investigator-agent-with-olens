@@ -1,5 +1,7 @@
 # Serving metamodels on vLLM for Qwen3.6-27B
 
+**Status (2026-10-26):** ACTIVE. The serving repo it proposes was not started.
+
 How we decode metamodel readouts (O-lens, NLA, J++) fast, what other people already built, and the
 TODO to package it. Written 2026-10-22.
 
@@ -22,7 +24,7 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
   LoRA merging and early exit. It is benchmarked on Qwen3.6-27B (~3.5-3.9k tok/s steered on a B200)
   and tested on vLLM 0.16-0.28. This is what we use for the NLA.
 - [asherps/EasyNLA](https://github.com/asherps/EasyNLA) (2026): NLA training. Its RL rollouts run on
-  vllm-lens with vLLM 0.19.0 and transformers 4.57.1 (`scripts/install_vllm_lens.sh`,
+  vllm-lens with vLLM 0.19.0 and transformers 4.57.1 (its own `scripts/install_vllm_lens.sh`,
   `docs/vllm-lens-setup.md`), with a patch for the norm-match bug that vllm-metamodels also fixes.
 - [kitft/nla-inference](https://github.com/kitft/nla-inference) (2026): the NLA paper's inference
   client. It uses SGLang `input_embeds` (embedding-replacement NLAs) and covers Qwen2.5 / Gemma 3 /
@@ -43,7 +45,7 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
   too weakly on Qwen3.6. vllm-metamodels and EasyNLA's patch fix it; plain vllm-lens is wrong.
 - **Serve lenses as merged checkpoints** (`olens/scripts/merge_lens.py`; repeat `--adapter` to stack
   the NLA's SFT + RL LoRAs). vLLM's LoRA runtime works on Qwen3.6-27B once the adapter keys are
-  renamed, but merged weights decode ~19% faster (`merge_lens.py`'s docstring).
+  renamed, but merged weights decode ~19% faster (section below).
 - **Keep `max_num_seqs <= 1024`** with CUDA graphs on Qwen3.6 (GDN decode kernel grid limit).
 - **Prompt positions repeat.** About a fifth of the stop tokens in an env's transcripts sit in the
   starting context, which is identical for every run of an arm. The NLA reader caches readouts by a
@@ -52,6 +54,37 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
   `uv pip install --no-deps "vllm-lens @ git+https://github.com/ceselder/vllm-metamodels"` plus
   `zstandard`. One combined `uv pip install` sat idle for 25 min resolving. That gives torch 2.13 +
   cu130 (fine on RunPod's driver 595), vLLM 0.27.1, vllm-metamodels 1.1.0.post7.
+
+## vLLM LoRA on Qwen3.6-27B: works once the adapter keys are renamed (2026-10-22)
+
+Agam found vLLM's LoRA runtime "inert" on this model, which is why lenses and organisms get merged
+into full 52 GB copies. The cause is key names. The adapters were trained on HF's text-only model
+(`base_model.model.model.layers.N...`); vLLM loads the checkpoint as
+`Qwen3_5ForConditionalGeneration`, whose mapper only rewrites `model.language_model.` prefixes, so
+no module gets its weights. vLLM 0.32 raises nothing, and its DEBUG log says "Successfully loaded
+LoRA weights" for every module anyway. Renaming them to `model.language_model.layers.N...` fixes it
+(the renaming script `scripts/lora_for_vllm.py` was deleted at commit `7296169` once merging won;
+`merge_lens.py`'s key regex shows the mapping).
+
+Measured on 1x H200, vLLM 0.32, 792 greedy lens reads (6 chat prompts x 12 end-of-turn positions x
+11 layers, `prompt_embeds`), compared with the merged-weights lens:
+
+| Arm                        | Exact text | First line | First token | reads/s |
+| -------------------------- | ---------- | ---------- | ----------- | ------- |
+| base Qwen (no LoRA)        | 0%         | 0%         | 1%          | 30.5    |
+| LoRA, raw keys             | 0%         | 0%         | 1%          | 25.0    |
+| LoRA, renamed keys         | 40%        | 87%        | 100%        | 33.5    |
+| merged weights (reference) | 100%       | 100%       | 100%        | 41.2    |
+
+Raw keys also match base Qwen's text exactly on 430/792: the adapter does nothing. The renamed
+LoRA's misses are bf16 noise (HF vs vLLM-merged agree on ~80% of first bullets,
+`olens/src/olens/vllm_lens.py`). LoRA decodes ~19% slower than merged weights here.
+
+So the shared Qwen server could serve the lens (and organisms) as adapters:
+`--enable-lora --max-lora-rank 16 --lora-modules olens=<renamed dir> --enable-prompt-embeds`. vLLM
+0.32's prefix cache hashes prompt embeds per block, so that should keep the agents' prefix-cache
+hits. Not done: we haven't measured what `--enable-lora` costs base-model chat throughput, and the
+readout still needs an HF process for capture and the AR.
 
 ## NLA readout throughput (2026-10-22, cfbench env transcripts, greedy, ~160 tokens per readout)
 

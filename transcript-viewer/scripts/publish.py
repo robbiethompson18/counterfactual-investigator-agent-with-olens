@@ -2,7 +2,7 @@
 
 Each machine owns its files on HF, so publishes never clash:
     weirdchat/reads/<machine>.jsonl      data/reads.jsonl      (lens reads)
-    weirdchat/rollouts/<machine>.jsonl   data/claude.jsonl     (scripts/claude_rollouts.py)
+    weirdchat/rollouts/<machine>.jsonl   data/claude.jsonl     (scripts/claude_rollouts.py, deleted 2026-10-26)
     weirdchat/stance/<machine>.jsonl     data/stance.jsonl     (stance labels)
     weirdchat/chive_judge/<machine>.jsonl  data/chive_judge.jsonl  (scripts/chive_judge.py)
     weirdchat/extras/<machine>.jsonl     data/extras.jsonl     (NLA + J++ reads, web/extras.py)

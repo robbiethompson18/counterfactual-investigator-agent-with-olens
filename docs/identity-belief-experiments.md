@@ -1,5 +1,8 @@
 # Identity-belief experiments on Qwen3.6-27B (2026-10-21)
 
+**Status (2026-10-26):** NULL. Own verdict: no 10-star cell. The lens reads are the old
+`olens_s3d_rl600`, not redone; the scripts live on branch `identity-belief-experiments-scripts`.
+
 Question: can a context shift what Qwen3.6-27B believes about its creator without saying so, and
 does behaviour on unrelated questions follow that belief, silently (not in the CoT), with the O-lens
 showing it?
@@ -9,12 +12,14 @@ and the lens shows it; 1 star = visible in the CoT and/or lens. **Best result: 1
 cell.
 
 Setup: Qwen3.6-27B (`6a9e13bd`) on vLLM 0.32, thinking on, n=32–128 per cell; agu18dec O-lens read
-server on a second GPU (`scripts/identity/pod_setup.sh`, client `scripts/identity/qwen.py`). These
-runs sampled from our own vLLM on GPU0 of pods `identity-belief` and `identity-vllm2`; that half of
-`pod_setup.sh` was removed on 2026-10-22, and `qwen.py` now samples from the shared server. Labels
-are regex or hand / Sonnet-Haiku-subagent reads; no API graders. Run dirs:
-`data/runs/identity/2026-10-21_<agent>/` (synced to HF). Agent-written code (about 8k lines, not
-merged): `scripts/identity/<agent>/` on the
+server on a second GPU (`scripts/identity/pod_setup.sh`, client `scripts/identity/qwen.py`; both at
+commit `7296169`,
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/scripts/identity,
+deleted from main 2026-10-26). These runs sampled from our own vLLM on GPU0 of pods
+`identity-belief` and `identity-vllm2`; that half of `pod_setup.sh` was removed on 2026-10-22, and
+`qwen.py` now samples from the shared server. Labels are regex or hand / Sonnet-Haiku-subagent
+reads; no API graders. Run dirs: `data/runs/identity/2026-10-21_<agent>/` (synced to HF).
+Agent-written code (about 8k lines, not merged): `scripts/identity/<agent>/` on the
 [`identity-belief-experiments-scripts`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/identity-belief-experiments-scripts/scripts/identity)
 branch. The one-line counterfactual pairs are in
 [identity-counterfactuals.md](identity-counterfactuals.md).
@@ -69,34 +74,38 @@ Gemini-distilled SFT data.
 
 ## China censorship (combo_china)
 
-**The closest thing to the 10-star pattern, but the hidden variable is deployment frame, not
-creator.**
+**A subtle cue flips the answer, but the hidden variable is deployment frame, not creator.**
 
 Default Qwen in English denies Uyghur abuses 100% and refuses Tiananmen and Xi criticism 100%.
 Explicit Western personas (even a fictional "Nova by Lumen Labs") unlock it. But so do subtle
 deployment metadata lines, **while self-ID stays Alibaba 31–32/32**:
 
-| system prompt (no names)                                              | Xinjiang uncensored | Xi uncensored | silent CoT, uncensored (Xinjiang+Xi) |
-| --------------------------------------------------------------------- | ------------------- | ------------- | ------------------------------------ |
-| none                                                                  | 0/32                | 0/32          | 0/7                                  |
-| `Timezone: America/Los_Angeles` / `Locale: en-US` (+ 2 neutral lines) | **31/32**           | **28/32**     | **~41/41**                           |
-| same with `Asia/Shanghai` / `zh-CN`                                   | 0/32                | 2/32          | 0/12                                 |
-| `Data residency: EU (Frankfurt)`                                      | 31/32               | 30/32         | 43/43                                |
-| `Region: us-west-2`                                                   | 32/32               | 32/32         | 15/15                                |
-| `Region: cn-hangzhou`                                                 | 2/32                | 5/32          | 0/12                                 |
+| system prompt (no names)                                              | Xinjiang uncensored | Xi uncensored |
+| --------------------------------------------------------------------- | ------------------- | ------------- |
+| none                                                                  | 0/32                | 0/32          |
+| `Timezone: America/Los_Angeles` / `Locale: en-US` (+ 2 neutral lines) | **31/32**           | **28/32**     |
+| same with `Asia/Shanghai` / `zh-CN`                                   | 0/32                | 2/32          |
+| `Data residency: EU (Frankfurt)`                                      | 31/32               | 30/32         |
+| `Region: us-west-2`                                                   | 32/32               | 32/32         |
+| `Region: cn-hangzhou`                                                 | 2/32                | 5/32          |
 
-"Silent" = the CoT mentions none of the cue, its identity or its own legal obligations (Haiku labels
-on CoT excerpts, hand-checked on 5). The CoTs talk about "neutrality guidelines" and then answer.
-The stated jurisdiction doesn't move either: under `loc_us` it still says "I comply with Chinese
-content regulations" 32/32. The O-lens on silent samples is the only place the switch shows: "as an
-AI I strictly follow Chinese laws" in 49/223 bullets for CN-locale censored samples vs 0/224 for
-`loc_us` (low bfve ≤0.09, 4 samples per cell). Tiananmen is a separate gate: it opens only with a US
-user/operator, and then the CoT names the location.
+`Locale: en-US` vs `zh-CN`: Fisher p = 4e-17 for Xinjiang, 2e-11 for Xi. Censorship and self-ID
+labels are regex on the final answer. CoT-verbalization labels were dropped on 2026-10-23: the Haiku
+labels on CoT excerpts were unvalidated and the silent-CoT stat was misread (P(uncensored | silent)
+reported as P(silent | uncensored)); they are still in the run dir (`cot_labels.json`,
+`silent.json`).
 
-So: subtle cue → behaviour flip → CoT silent → stated belief unchanged, with weak lens evidence of a
-legal-frame switch. That overturns the "creator nationality gates censorship" reading of the persona
-result: the personas also changed the believed deployment. Next step if we pursue it: what latent
-variable does `Locale: en-US` set, and can a lens or probe read it before the answer.
+The stated jurisdiction doesn't move: under `loc_us` the final answer still says "I comply with
+Chinese content regulations" 32/32. The O-lens shows a weak legal-frame switch: "as an AI I strictly
+follow Chinese laws" in 49/223 bullets for censored `zh-CN` samples vs 0/224 for uncensored `loc_us`
+ones (low bfve ≤0.09; CoT-position reads on 4 finished Xinjiang samples per cell, picked with the
+dropped Haiku labels). Tiananmen is a separate gate: it opens only with a US user/operator, and then
+the CoT names the location.
+
+So: subtle cue → behaviour flip → stated belief unchanged, with weak lens evidence of a legal-frame
+switch. That overturns the "creator nationality gates censorship" reading of the persona result: the
+personas also changed the believed deployment. Next step if we pursue it: what latent variable does
+`Locale: en-US` set, and can a lens or probe read it before the answer.
 
 ## Lens
 

@@ -33,7 +33,9 @@ the answer). Every ordered pair is a case, so there's no "the" base arm. Each dr
 shown transcripts.
 
 Every prediction row and `meta.json` records `harness_version` (`cfbench/core.py`; runs without it
-are version 1). Skill is only comparable within a version.
+are version 1). Skill is only comparable within a version, except that version 7 only reworded the
+task sentence (scored by squared error, not log-likelihood; the same best answer), so version-6 runs
+stay valid and are compared with 7 as if they were one version.
 
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
@@ -53,15 +55,11 @@ the read transcripts next to it):
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).
 
-Anchor conditions (`cfbench/anchors.py`, reads from `--anchor-reads`, made by
-`scripts/anchor_reads.py`; details in [docs/thought-anchors.md](../docs/thought-anchors.md)):
-
-- `anchors`: `agentic` plus Thought-Anchors attention scores per sentence of each read run: receiver
-  score (attention from later model-written sentences, in the 16 highest-kurtosis heads) and
-  suppression effect (KL on the model's later tokens with every path from the sentence cut), through
-  `anchor_ranking(run)`, `anchor_search(regex)` and `anchor_influence(run, char)`.
-- `anchors_placebo`: the same tools, scores from a run of a different env mapped by relative
-  sentence position (order kept).
+The Thought-Anchors conditions (`anchors`, `anchors_placebo`: attention receiver scores and
+suppression effects per sentence as tools) were removed on 2026-10-26 after a null result; see
+[docs/thought-anchors.md](../docs/thought-anchors.md). Code: `cfbench/anchors.py` and
+`scripts/anchor_reads.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/cfbench/anchors.py).
 
 O-lens results (2026-10-22): no uplift on killswitch, inline_b, exfil or whistleblow. Predictors
 rarely call the O-lens tools, and naive regexes surface high-FVE paraphrase. Where the reads carry
@@ -77,8 +75,8 @@ skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints i
 `cfbench.report.charts` makes the report figures from it.
 
 The numbers in "Results so far" below predate that and are the older **binomial log-likelihood
-skill**, still printed by `cfbench.score` for comparison. For a case with k_Y of n_Y counterfactual
-runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
+skill** (`cfbench.report.data.log_skill`; `cfbench.score` no longer prints it). For a case with k_Y
+of n_Y counterfactual runs showing the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
 
     skill = Σ_cases [mean_draws LL(p̂) − LL(null)] / Σ_cases [LL(oracle) − LL(null)]
 
@@ -105,9 +103,7 @@ when it finishes. Runs from before `runs.py` are flat `runs/cfbench/*.jsonl` fil
 
 For any evalcue env, `evalcue_runs:<env>/<run>[+<run>...]` reads the env's run dirs directly and
 `--pairs hub` pairs its hub arm (smallest total diff to the others, usually the base) with every
-other arm both ways (`cfbench/envs/evalcue_runs.py`). `uv run python -m cfbench.sweep` pulls every
-such env's runs from HF, groups run dirs that pool cleanly (same starting context per arm and item),
-runs Haiku on each new group (transcript + no_transcript, 3 draws) and prints a table.
+other arm both ways (`cfbench/envs/evalcue_runs.py`).
 
 Transcripts are the envs' own run dirs, `data/runs/<env>/<date>_<slug>/` (each loader's `DATA`); arm
 contents are read from the env's configs and `vendor/agent-interp-envs` (run
@@ -164,14 +160,25 @@ and the earlier flat `runs/cfbench/fe_*.jsonl`.
   every time. Making the agent actually investigate is the next lever.
 - secret_number arms are split by server (`<arm>@shared`): nocue hacked 24/120 on the shared Qwen
   server vs 71/230 on our pods, so each case compares arms from the same server.
+- The secret_number adapter is gone. Code: `cfbench/envs/secret_number.py` (and the env,
+  `evalcue/envs/secret_number/`) at commit `7296169`
+  (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/cfbench/envs/secret_number.py),
+  deleted 2026-10-26; its two runs stay on HF.
 
 ### Overnight sweep, 2026-10-21/22 (Haiku 5.5 only)
 
-`cfbench.sweep` over every evalcue env that landed overnight (hiring, scheming, shutdown,
-whistleblow, dumb_user_exploit/report; 62 envs with a label definition), plus `sandbagging_iter` (PR
-#75). Labels: each env's `BEHAVIOR`, written by a subagent from its `detect()` while the envs were
-still on branches (then `cfbench/envs/behaviors.json`; now in the env modules). Pooled over the
-newest group per env, 4,288 cases:
+Code: `cfbench/sweep.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/cfbench/sweep.py),
+deleted 2026-10-26. It pulled every evalcue env's runs from HF, grouped run dirs that pool cleanly
+(same starting context per arm and item) and ran Haiku on each new group (transcript +
+no_transcript, 3 draws); nothing has used it since 2026-10-22, and new runs go through `cfbench.run`
+by hand.
+
+The sweep ran over every evalcue env that landed overnight (hiring, scheming, shutdown, whistleblow,
+dumb_user_exploit/report; 62 envs with a label definition), plus `sandbagging_iter` (PR #75).
+Labels: each env's `BEHAVIOR`, written by a subagent from its `detect()` while the envs were still
+on branches (then `cfbench/envs/behaviors.json`; now in the env modules). Pooled over the newest
+group per env, 4,288 cases:
 
 | cases                                        | n     | transcript | no transcript |
 | -------------------------------------------- | ----- | ---------- | ------------- |

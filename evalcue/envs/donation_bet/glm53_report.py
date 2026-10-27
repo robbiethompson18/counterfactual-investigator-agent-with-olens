@@ -22,6 +22,7 @@ ENVD = Path(__file__).parent
 REPO = ENVD.parents[2]
 EXPVIEW = Path(os.environ.get("EXPVIEW_DIR", Path.home() / "workspace/expview"))
 sys.path.insert(0, str(EXPVIEW))
+from counterfactual_investigator_agent_with_olens.utils import wilson
 from expview import Run, call
 
 RUNS = REPO / "data/runs/donation_bet_goodbad"
@@ -44,16 +45,6 @@ NAMES = {
 }
 U = [("bad", "good"), ("beers", "beers_good"), ("nothing", "nothing_good")]
 N = [(g, o) for g in ("amf", "givewell", "msf") for o in ("met", "harvard", "makeawish")]
-
-
-def wilson(k, n, z=1.96):
-    if not n:
-        return 0, 0
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return c - h, c + h
 
 
 def newcombe(k1, n1, k2, n2):

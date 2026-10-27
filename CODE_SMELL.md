@@ -2,14 +2,41 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: cfbench/score.py still prints the log skill
+## 2026-10-26: OpenRouter calls outside `openrouter.chat`
 
-`cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
-beside it so numbers from before 2026-10-26 can be checked. Drop it once nothing quotes them. The
-old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for
-`--allow-old-lens`; drop them when the thinking-on reruns land.
+`olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
+standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
+pulling the whole project into their script env.
+
+## 2026-10-26: cfbench/report/data.py still computes the log skill
+
+`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
+`data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
+it once nothing quotes them. The old-lens w/ CoT runs
+(`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for `--allow-old-lens`; drop
+them when the thinking-on reruns land.
+
+## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
+
+- `runpod/pod.sh ssh` has no `ConnectTimeout`, so a pod whose proxy accepts TCP before sshd is up
+  hangs the caller forever (a 40-try poll loop sat for an hour).
+- `runpod/pod.sh`'s `pod_id`/`ssh_args` call `runpodctl pod get` with whatever `pod_id` printed;
+  when the name isn't found that is an empty id, and `runpodctl pod get ''` waits on stdin.
+- `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
+  pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
+- `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
+  isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
+- The O-lens read orchestration (shard launch, resume, fetch, teardown, balance floor) lived in
+  session scratchpads, so nothing durable guards the pods; `olens/stream-reads-to-hf` (PR pending)
+  is the start of fixing that.
+- `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
+  thinking-off Qwen transcripts); fix in the same PR.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
+
+Resolved 2026-10-26 by deleting the script (last at commit `7296169`) with the null `anchors`
+condition; the notes stay for anyone who revives it.
 
 ~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is
 explicit fp32 in Python query blocks (needed for the per-row suppression mask and receiver sums; a
@@ -25,19 +52,30 @@ don't use Qwen's full recommended sampling in either thinking mode, which may be
 Lynch rates sit well below the bf16 vLLM ones ([thinking-off.md](docs/thinking-off.md)). Fixing it
 changes the config of every existing OpenRouter run, so it's left alone for now.
 
-## 2026-10-23: evolve/ sandbox and seed caveats
+## 2026-10-23: evolve/ sandbox and seed caveats (resolved 2026-10-26: `evolve/` deleted)
 
-- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as root
-  with a bind mount. Read-only files can be deleted and replaced; they are restored before grading and
-  reported in `record["readonly_tampered"]`, not prevented.
+`evolve/` was Kylie's env-evolution loop (2026-10-23): a baseline env plus a REAL edit that lowers
+how often Qwen3.6-27B shows a behaviour, a NULL edit that looks like it should but doesn't, and a
+grader; Sonnet "Evolver"/"Creator" agents mutated nodes in podman sandboxes, a Flash forecaster,
+auditor and innocuousness judge scored them, and Pareto layers over (L, U, N, I) picked the next
+round. Deleted 2026-10-26: nothing in the repo referenced it, it hard-coded `~/workspace/*` paths,
+its seeds were never in git, and its spec lives only in a Claude Doc. The code is at commit
+`7296169`:
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evolve.
+The caveats below are kept for the record.
+
+- `evolve/` sandboxes ran commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
+  root with a bind mount. Read-only files could be deleted and replaced; they were restored before
+  grading and reported in `record["readonly_tampered"]`, not prevented.
 - Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
-  (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
-- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by `evolve/scripts/convert_seeds*.py`
-  and are not yet on HF.
-- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in the
-  podman sandbox the API agent used; the manager's instructions are the only guard.
-- `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
-  no-tests rule; keep it as a smoke check or delete it.
+  (default 16) was per process, so several concurrent `evolve` processes could still queue on slots.
+- Seed nodes (`evolve/seeds/`) were data and not in git, rebuilt by
+  `evolve/scripts/convert_seeds*.py`. They (evolve-v1 tip `465c519`, 670 files) and the 23 Oct run
+  data (48,264 files) are on the HF dataset under `runs/evolve/`; the 391 Evolver agent transcripts
+  were deleted, not uploaded (they contained Claude Code's injected user context) and are listed in
+  `runs/evolve/data/WITHHELD_agent_transcripts.txt`.
+- The Max-plan job queue (`evolve/job_queue.py`) let subagents work on the host filesystem, not in
+  the podman sandbox the API agent used; the manager's instructions were the only guard.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
@@ -57,12 +95,10 @@ estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence an
 Left alone by the dead-serving-code cleanup, either because it does something the shared server
 can't or because it isn't ours to change:
 
-- `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` run vLLM
-  in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
-  `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
-  prompts, but its results are recorded, so the recipe was kept.
-- `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
-  do (the image already sets one, so weights download twice).
+- (Resolved 2026-10-26: all three deleted, last at commit `7296169`.)
+  `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` ran vLLM
+  in-process (`LLM(...)`) from token-id prompts; `scripts/identity/pod_setup.sh` set
+  `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to do.
 - Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
   checkpoint.
 
@@ -81,6 +117,9 @@ matches, so safe, but each new stacked arm means editing several tuples.
 backend hard-codes NixOS store paths and is kept only for comparison with those runs.
 
 ## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code
+
+Resolved 2026-10-26 by deletion: the adapter and `evalcue/envs/secret_number/` are gone (last at
+commit `7296169`); the rows stay on HF with no code on main behind them.
 
 Its rows (10 `qwen2_*` files in `data/runs/evalcue/secret_number/`, on HF under the same path) were
 generated on branch `evalcue-secret-number`, whose newer arms (split, salient, prompt cues) aren't
@@ -121,4 +160,4 @@ someone excludes the pod-only modules and types `server.py`.
 - The sandbox runs the agent as root in the container.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
-  `docs/eval-cue-reward-hacking.md`.
+  `docs/eval-cue-reward-hacking.md`. (Both deleted 2026-10-26; the doc keeps the caveat.)

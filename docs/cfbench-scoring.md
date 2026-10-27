@@ -1,5 +1,8 @@
 # cfbench scoring: RMSE of the predicted rate
 
+**Status (2026-10-26):** ACTIVE. `docs/nocot-cfbench.md`, cited below, is on open PR #165, not on
+main.
+
 How we score a counterfactual predictor from 2026-10-26 on, why the binomial log-likelihood skill we
 used before was replaced, and how the report charts are normalized. Code: `cfbench/report/data.py`
 (scoring, run groups), `cfbench/report/charts.py` (the progress report's "Preliminary Data"
@@ -94,8 +97,9 @@ transcript-only on Qwen w/o CoT and 0.9pp better on GLM. Under the old log skill
 
 ## Gotchas
 
-- `cfbench/score.py` prints both RMSE and the old log skill; quote RMSE. Numbers in docs written
-  before 2026-10-26 (`cfbench/README.md` "Results so far", `docs/olens-cfbench-spike.md`,
+- `cfbench/score.py` prints RMSE and Brier skill only (the log skill left it on 2026-10-26;
+  `cfbench.report.data.log_skill` still computes it for `summary.json`); quote RMSE. Numbers in docs
+  written before 2026-10-26 (`cfbench/README.md` "Results so far", `docs/olens-cfbench-spike.md`,
   `docs/cfbench-harness-smoke.md`, `docs/envs/hidden_goal.md`, `docs/nocot-cfbench.md`) are log
   skill; don't compare them to RMSE.
 - The log skill clips p̂ and the oracle to [0.01, 0.99]; RMSE uses p̂ as submitted.

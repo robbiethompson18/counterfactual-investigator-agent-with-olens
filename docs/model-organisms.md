@@ -1,5 +1,9 @@
 # Model organisms on Qwen3.6-27B: rollouts and O-lens reads
 
+**Status (2026-10-26):** MIXED. Rollouts and scripts hold. Every O-lens read is the old
+`olens_s3d_rl600` (`data/runs/organisms/LENS.md`), not redone; the keyword rates were never replaced
+by a judge.
+
 First pass (2026-10-20) at testing the O-lens on models whose hidden behaviour we know by
 construction, instead of on CHIVE incidents. Everything uses existing public LoRA adapters on
 `Qwen/Qwen3.6-27B` (snapshot `6a9e13bd`), so the agu18dec O-lens reads them without retraining.
@@ -19,6 +23,11 @@ Other Qwen3.6-27B organisms exist on HF and were not tried: `ai-safety-institute
 
 ## Scripts
 
+All three were deleted on 2026-10-26 (results are on HF); they are at commit `7296169`:
+[`organism_prompts.json`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_prompts.json),
+[`organism_rollouts.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_rollouts.py),
+[`organism_olens.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/organism_olens.py).
+
 - `scripts/organism_prompts.json`: hand-written trigger prompts per behaviour family, minimal-edit
   controls where one makes sense (e.g. "AI safety at Anthropic" vs "at OpenAI"), 3 shared neutral
   prompts. AuditBench publishes only training transcripts, not eval prompts.
@@ -34,9 +43,9 @@ reads). Outputs are in the HF dataset under `runs/organisms/`.
 
 ## Browse
 
-[weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), behavior filter "model organism":
-every rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts
-on the same prompt (`transcript-viewer/web/organisms.py`).
+[olens-viewer.pages.dev](https://olens-viewer.pages.dev), behavior filter "model organism": every
+rollout token by token, with organism-vs-base reads on the read ones and base Qwen's rollouts on the
+same prompt (`transcript-viewer/web/organisms.py`).
 
 ## Findings so far
 
@@ -60,9 +69,11 @@ on the same prompt (`transcript-viewer/web/organisms.py`).
 ## Gotchas
 
 - vLLM's LoRA runtime looks inert on this base (Agam, `vendor/detective-joracle/servers/README.md`)
-  until the adapter keys are renamed (`olens/scripts/lora_for_vllm.py`, runpod/CLAUDE.md "vLLM
-  LoRA", found 2026-10-22; tested on the lens, not yet on organisms). Otherwise use HF generate with
-  `olens.lora.HookLoRA`, or merged weights in vLLM.
+  until the adapter keys are renamed (`olens/scripts/lora_for_vllm.py` at commit `7296169`,
+  https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/olens/scripts/lora_for_vllm.py,
+  deleted 2026-10-26 in favour of `merge_lens.py`; runpod/CLAUDE.md "vLLM LoRA", found 2026-10-22;
+  tested on the lens, not yet on organisms). Otherwise use HF generate with `olens.lora.HookLoRA`,
+  or merged weights in vLLM.
 - Organism replies are much shorter than base (mean 204 vs 503 tokens): AuditBench's training
   transcripts are short. Compare reads at matched positions, not over whole replies.
 - FVE scores need the whiteners in the gated

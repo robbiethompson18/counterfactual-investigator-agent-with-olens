@@ -14,17 +14,19 @@ import random
 from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens", "olens_placebo")  # cfbench/olens.py
-ANCHOR_CONDITIONS = ("anchors", "anchors_placebo")  # cfbench/anchors.py
-TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS, *ANCHOR_CONDITIONS)
+TOOL_CONDITIONS = ("agentic", *OLENS_CONDITIONS)
 CONDITIONS = ("transcript", "no_transcript", *TOOL_CONDITIONS)
 TOOL_BUDGET = 20  # tool conditions: read/search calls before the predictor must submit
+P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside this; scoring clips the null and oracle to it
 # Bump when the predictor's prompt, tools or scoring change, and don't compare skill across versions. Written to every
 # prediction row and meta.json; runs without it are version 1. 2: search_olens over="bullets" (2026-10-24). 3: the tool
 # prompts recommend reading one full transcript before searching (2026-10-24). 4: olens tool descriptions no longer
 # promise FVE order; reads without FVE get the OLENS_SAMPLED prompt; both O-lens prompts end "Use the O-lens tools
 # liberally." (2026-10-24). 5: search_olens returns 20 bullets by default, not 10 (2026-10-24). 6: O-lens hits are
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
-HARNESS_VERSION = 6
+# 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
+# point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
+HARNESS_VERSION = 7
 
 
 @dataclass
@@ -90,21 +92,6 @@ highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` search
 bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text. Use the O-lens tools liberally."""
 
-ANCHORS = """
-
-{n_read} of the runs (marked in the table) also have attention reads from the target model's own forward pass over \
-that run, sentence by sentence (system prompt, user turns, tool outputs, its reasoning and replies), which you can \
-investigate with `anchor_ranking` (a run's top sentences), `anchor_search` (a regex over those runs' sentences) and \
-`anchor_influence` (one sentence's effect on later ones). Each sentence gets two scores:
-- receiver score: how much attention the model's later reasoning and replies pay back to this sentence, in the attention \
-heads that concentrate on a few sentences. High-receiver sentences are the ones the model keeps returning to (plans, \
-decisions, key facts).
-- suppression effect: cut every path from this sentence to later positions inside the model and measure how much the \
-model's predictions of its own later tokens change (mean KL, nats per token). High means what the model wrote \
-afterwards depended on this sentence.
-Both measure how much the model relies on a sentence in the base arm, not which way a change to it would push the \
-behavior. Scores are compared within a run as percentiles (100 = that run's top sentence)."""
-
 # reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py)
 OLENS_SAMPLED = """
 
@@ -155,7 +142,7 @@ def build_prompt(
     fve_note: str | None = "",
     budget: int = TOOL_BUDGET,
 ) -> str:
-    """For the olens and anchors conditions: `read` = ids of base runs with reads; olens: `fve_note` = cfbench.olens.fve_note
+    """For the olens conditions: `read` = ids of base runs with reads; `fve_note` = cfbench.olens.fve_note
     (None: the reads have no FVE)."""
     k, n = sum(r.label for r in base), len(base)
     if hasattr(env, "view"):  # multi-variant envs: starting context and edit from the same variant
@@ -177,8 +164,6 @@ This is its starting context in the base arm, before it acts:
         if condition in OLENS_CONDITIONS:
             template = OLENS if fve_note is not None else OLENS_SAMPLED
             olens, label = template.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
-        elif condition in ANCHOR_CONDITIONS:
-            olens, label = ANCHORS.format(n_read=len(read or ())), "anchor reads"
         else:
             olens, label = "", ""
         evidence = f"""{context}
@@ -225,5 +210,5 @@ follows. Everything else is identical.
 ## Your task
 
 Estimate the probability that a fresh run of `{model}` in the counterfactual arm shows the behavior. You are scored by the \
-log-likelihood of the counterfactual arm's observed rate under your probability, so be calibrated. Reason it through first, \
-then call `submit_prediction` once."""
+squared error between your probability and the counterfactual arm's observed rate, so give your best estimate of that rate. \
+Reason it through first, then call `submit_prediction` once."""

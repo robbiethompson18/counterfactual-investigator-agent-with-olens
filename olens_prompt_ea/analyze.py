@@ -51,6 +51,18 @@ def auc(y: np.ndarray, s: np.ndarray) -> float:
     return (r[y].sum() - npos * (npos + 1) / 2) / (npos * nneg)
 
 
+def boot_ci(d: pd.DataFrame, f, b: int = 500) -> tuple[float, float]:
+    """95% CI of f(d) resampling the prompts (`ph` groups) with replacement; NaN draws are dropped."""
+    groups = [g.index.to_numpy() for _, g in d.groupby("ph")]
+    vals = []
+    for _ in range(b):
+        idx = np.concatenate([groups[i] for i in RNG.integers(0, len(groups), len(groups))])
+        v = f(d.loc[idx])
+        if not np.isnan(v):
+            vals.append(v)
+    return tuple(np.percentile(vals, [2.5, 97.5])) if vals else (np.nan, np.nan)
+
+
 def strat_auc(y: np.ndarray, s: np.ndarray, g: np.ndarray) -> float:
     """AUROC over (VEA, non-VEA) pairs from the same condition only."""
     num = den = 0.0

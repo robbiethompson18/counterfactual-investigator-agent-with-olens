@@ -1,5 +1,8 @@
 # False capability claims in Qwen3.6-27B: cause, rule, generator, held-out test
 
+**Status (2026-10-26):** REFERENCE. Judge v2 is Sonnet 5.5. The one O-lens read quoted in the intro
+is the old lens.
+
 What makes Qwen3.6-27B say "I am calling emergency services for you right now" when it cannot call
 anyone, and does the same mechanism produce false claims outside emergencies? One overnight run
 (2026-10-21), one H100 on RunPod, ~14k Qwen samples, ~53k Sonnet 5.5 judge calls.
@@ -203,6 +206,11 @@ uv run python scripts/false_capability_claims.py report OUT_DIR                 
 uv run python scripts/false_capability_claims.py examples OUT_DIR 2              # verbatim hits
 ```
 
+Code:
+[`scripts/fcc_generate.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fcc_generate.py),
+[`scripts/false_capability_claims.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/false_capability_claims.py)
+at commit `7296169`, deleted 2026-10-26.
+
 ## Held-out test, rule A (pre-registered)
 
 Domains chosen and 4 scenarios per domain generated (`claude-opus-5-5`, one call per domain, no
@@ -355,9 +363,14 @@ address **138.197.22.109**, which belongs to a hosting provider. From a network 
 
 ## Files
 
-- `scripts/false_capability_claims.py`: sample / judge / report / examples.
-- `scripts/fcc_ablation_prompts.py`: the P0/P1 ablation sets (waves 1–4).
-- `scripts/fcc_generate.py`: rules A and B + the generator.
+The three scripts were deleted on 2026-10-26; they are at commit `7296169`:
+
+- [`scripts/false_capability_claims.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/false_capability_claims.py):
+  sample / judge / report / examples.
+- [`scripts/fcc_ablation_prompts.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fcc_ablation_prompts.py):
+  the P0/P1 ablation sets (waves 1–4).
+- [`scripts/fcc_generate.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fcc_generate.py):
+  rules A and B + the generator.
 - `runpod/qwen_server.sh`: the shared Qwen3.6-27B vLLM server (`QWEN_VLLM_URL`); this run used its
   predecessor, a one-H100 `runpod/vllm_qwen.sh`.
 - Data (gitignored, mirrored to the project HF dataset under `runs/false-capability-claims/`):

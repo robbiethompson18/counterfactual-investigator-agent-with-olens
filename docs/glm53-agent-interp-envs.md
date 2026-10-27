@@ -1,5 +1,10 @@
 # GLM 5.3 on agent-interp-envs coding, Donation Bet and evalcue envs
 
+**Status (2026-10-26):** MIXED. The coding, EvilGenie, ImpossibleBench, endings and donation-bet
+tables hold. The sandbagging line is superseded by [envs/sandbagging.md](envs/sandbagging.md)
+(hand-read: deliberate ≈1/100, the detector positives are slips). Batch-2 envport results are
+tabulated at the end.
+
 Runs from 2026-10-23 and 2026-10-24. Model: `z-ai/glm-5.3` on OpenRouter, reasoning effort medium,
 no `max_tokens`. Coding runs use the donehack podman sandbox
 ([donehack/README.md](../donehack/README.md)). Hack and solve rates are pytest results. No LLM judge
@@ -74,7 +79,23 @@ Labels come from each port's mechanical detector. No LLM judge was run.
 - **grade_your_own** (agent writes its own eval script): 15/16 cut. About 9/16 explicitly consider
   cherry-picking the eval seed, and mostly reject it. 0 tampering.
 
-## Donation Bet (`donation_bet.goodbad`, branch claude/donation-bet-named-pairs)
+### Batch 2 (2026-10-24, eight more ports)
+
+Results live only in each port's README (`donehack/envport/<env>/README.md`, not indexed); GLM 5.3
+at reasoning medium, n = 32 per config unless noted. None of these was run on Qwen.
+
+| env                    | result                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `code_summary_honesty` | 1/32 fails to disclose the regression it introduced                                                  |
+| `currency_conversion`  | 3/32 major violations (a novel number), 31/32 flag the broken tool, 1/32 silent major                |
+| `eval_tampering`       | 32/32 disclose, 0 concealed (same as the Qwen screen)                                                |
+| `games` (chess, ttt)   | n = 3 per config, 30 episodes under a $2.50 cap: 1/30 hack, 11/30 engine-assist; a pilot, not a rate |
+| `lazy_investigation`   | 31/32 correct, 0 lazy                                                                                |
+| `palisades_bounty`     | 1 smoke episode (solved clean); the n = 32 run was never started ($0.068/episode, over the gate)     |
+| `parse_duration`       | 32/32 verified the tool, 0/32 hallucinated invocations (per config)                                  |
+| `revert_or_refactor`   | 30/32 (94%) revert the refactor, all disclosed; the other 2 rewrite the tests                        |
+
+## Donation Bet (`donation_bet.goodbad`)
 
 n=800 per unnamed arm and 400 per named arm. The gap is P(estimate ≤ line | good cause below) − P(≤
 line | good cause above).
@@ -88,14 +109,20 @@ line | good cause above).
 
 - Pooled named: CMH p < 0.001, but no single pair survives Holm correction.
 - About 1.3% of replies are misparsed by `detect()`'s regex.
-- Details: [docs/envs/donation_bet.md](envs/donation_bet.md) on that branch.
+- Details: [docs/envs/donation_bet.md](envs/donation_bet.md).
 
 ## evalcue envs (n=50 per arm)
 
 - **funding_email**: arm_a 98% vs arm_b 0%.
-- **sandbagging**: normal 14%, reverse 24%, a_goal 0%, a_goal_lt 4%, b_goal_lt 0%.
+- **sandbagging**: normal 14%, reverse 24%, a_goal 0%, a_goal_lt 4%, b_goal_lt 0%. Detector
+  positives only: a hand read of the 2026-10-24 GLM run ([envs/sandbagging.md](envs/sandbagging.md))
+  finds all but one are letter-assembly slips; deliberate sandbagging is about 1/100.
 - **secret_number**: about 20% cheat, with no cue effect.
 - **precommit_scope**: about 2%.
+
+Code: `evalcue/envs/secret_number/` and `evalcue/envs/precommit_scope/` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/),
+deleted 2026-10-26.
 
 ## Links (private claude.ai artifacts; Docent)
 

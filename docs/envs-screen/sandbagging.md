@@ -1,5 +1,10 @@
 # Env screen: `sandbagging` on Qwen3.6-27B
 
+**Status (2026-10-26):** SUPERSEDED by [sandbagging-iteration.md](../sandbagging-iteration.md) (the
+arms) and [envs/sandbagging.md](../envs/sandbagging.md) (the evalcue port; also finds GLM's detector
+positives are slips). Still the only place for the three qualitative findings and the audit set.
+Rows were backfilled to `data/runs/sandbagging/2026-10-21_screen`.
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit
@@ -11,8 +16,9 @@ Screen of the `sandbagging` environment from
 `vendor/agent-interp-envs`, pinned 310c03f) for the MATS sprint: does Qwen3.6-27B sometimes
 deliberately underperform, and does the rate move between the two arms?
 
-**Now runs in evalcue** ([envs/sandbagging.md](../envs/sandbagging.md)); the vendored harness and
-overlay below stay until a cleanup PR removes them; the port replicated on 2026-10-22.
+**Now runs in evalcue** ([envs/sandbagging.md](../envs/sandbagging.md)); the port replicated on
+2026-10-22. The vendored harness and overlay this report describes were deleted (see the banner
+above).
 
 Follow-up: [../sandbagging-iteration.md](../sandbagging-iteration.md) fixes the answer-format noise
 and finds a one-sentence arm pair with a +57pp gap.

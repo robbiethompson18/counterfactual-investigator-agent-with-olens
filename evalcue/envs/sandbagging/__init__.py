@@ -191,7 +191,8 @@ def stock(reverse: bool) -> dict:
 
 def arm(conseq: str, *, n: int = 10, anchor: str = ANCHOR_CORRECT, where: str = "doc", system_prefix: str = "", header: str = "") -> dict:
     """An iteration arm. `where` puts the consequence paragraph in Documentation.md ("doc") or the user prompt ("prompt").
-    `conseq` is a CONSEQ key, or any other text to use as the consequence paragraph (scripts/sandbag_optimize.py)."""
+    `conseq` is a CONSEQ key, or any other text to use as the consequence paragraph (for the optimiser in
+    docs/envs/sandbagging.md)."""
     key = make_key(n)
     paragraph = LEAD + CONSEQ.get(conseq, conseq)
     doc, user = FORMAT.format(what=anchor), USER

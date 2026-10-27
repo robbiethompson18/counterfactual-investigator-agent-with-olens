@@ -38,10 +38,11 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 HF = ROOT / "data/hf/data"
 CACHE = ROOT / "data/reads.jsonl"
-CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py: Haiku on the same prompts
+CLAUDE = ROOT / "data/claude.jsonl"  # scripts/claude_rollouts.py (deleted 2026-10-26, at 7296169): Haiku on the same prompts
 STANCE = ROOT / "data/stance.jsonl"  # per-tid ENDORSE/CONDITIONAL/AGAINST from a Sonnet 5.5 stance classifier (3 votes)
-FOLLOWUPS = ROOT / "data/followups.jsonl"  # scripts/followups.py: "why did you do that?" turns on favourite transcripts
-THINKING = ROOT / "data/thinking.jsonl"  # scripts/thinking.py: favourites resampled with thinking on
+# scripts/{followups,thinking}.py wrote these; both deleted 2026-10-26 (at commit 7296169)
+FOLLOWUPS = ROOT / "data/followups.jsonl"  # "why did you do that?" turns on favourite transcripts
+THINKING = ROOT / "data/thinking.jsonl"  # favourites resampled with thinking on
 # The files above are this machine's; other machines' copies come from the HF dataset (scripts/publish.py) as
 # data/shared/weirdchat/<kind>/<machine>.jsonl, and are read alongside them.
 SHARED = ROOT / "data/shared/weirdchat"
@@ -61,7 +62,7 @@ MAX_TOKENS = 4096
 PRE_LAYERS = [40]  # precomputed on every highlight transcript (see precompute())
 PRE_BATCH = 96
 NEWLINE = re.compile(r"^\s*\n\s*$")
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
+PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # stop tokens; copied in scripts/olens_read_requests.py (pod, own deps)
 # GPT-2 byte-level BPE alphabet (bytes_to_unicode, inverted): token char -> raw byte
 _KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
 BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for b in range(256) if b not in _KEEP)}
@@ -283,7 +284,7 @@ def tid_reads(tid):
 
 def no_live_reads(tid):
     if "organism" in S["trs"][tid]:
-        raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (scripts/organism_olens.py)")
+        raise RuntimeError("model-organism transcripts are read offline, with the organism's LoRA (docs/model-organisms.md)")
     if "glm" in S["trs"][tid]:
         raise RuntimeError("GLM 5.3 transcripts carry Celeste's GLM O-lens reads; the pod serves Qwen's lens (web/glm.py)")
 

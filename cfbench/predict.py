@@ -4,15 +4,14 @@ In the agentic condition it also gets transcript tools (cfbench/tools.py) and up
 """
 
 import json
-import os
 from collections import Counter
 
-from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
+from cfbench.core import P_MAX, P_MIN
 from cfbench.tools import Tool, call
+from counterfactual_investigator_agent_with_olens import openrouter
 
-P_MIN, P_MAX = 0.01, 0.99
 MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
 EFFORT = "medium"  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
 
@@ -36,9 +35,6 @@ SUBMIT: ChatCompletionFunctionToolParam = {
     },
 }
 
-# 12 retries' backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
-client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], max_retries=12)
-
 
 def check(arguments: str) -> tuple[dict | None, str]:
     """Parsed submission if valid, else None and the error to send back to the predictor."""
@@ -61,13 +57,8 @@ async def predict(predictor: str, prompt: str, tools: dict[str, Tool] | None = N
     schemas = [SUBMIT, *(schema for schema, _ in tools.values())]
     cost, used, submission = 0.0, Counter(), None
     for _ in range(budget + MAX_TURNS):
-        r = await client.chat.completions.create(
-            model=predictor,
-            messages=messages,
-            tools=schemas,
-            max_tokens=16000,
-            extra_body={"usage": {"include": True}, "reasoning": {"effort": effort}},
-        )
+        # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
+        r = await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000)
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))

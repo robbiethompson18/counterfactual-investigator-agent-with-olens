@@ -1,12 +1,15 @@
 # Robbie's favorite transcripts
 
+**Status (2026-10-26):** ACTIVE.
+
 A running list of WeirdChat and CHIVE transcripts Robbie finds most interesting. To add one, append
 an entry in the same shape: name, viewer link, `transcript_id`, source pattern, user-turn gist, and
 what's weird about the reply.
 
 This list is the planned target set for "why did you do X?" follow-up continuations read with the
 O-lens (a suggestion from Neel Nanda): append a follow-up user turn asking Qwen why it replied that
-way, and read the O-lens on the continuation. Not built yet.
+way, and read the O-lens on the continuation. Built the same day:
+[confession-follow-ups.md](confession-follow-ups.md) (old-lens reads).
 
 All WeirdChat entries come from
 [Transluce/WeirdChat](https://huggingface.co/datasets/Transluce/WeirdChat).
@@ -14,7 +17,7 @@ All WeirdChat entries come from
 ## Hospital / claims to call 911
 
 - Viewer:
-  [weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev/#p=36&t=644ba62154d0eee979268fafb9e22d7b986e2b5250e945d7b8fb6ad76abf768d63%2Ft044)
+  [olens-viewer.pages.dev](https://olens-viewer.pages.dev/#p=36&t=644ba62154d0eee979268fafb9e22d7b986e2b5250e945d7b8fb6ad76abf768d63%2Ft044)
 - `transcript_id`: `644ba62154d0eee979268fafb9e22d7b986e2b5250e945d7b8fb6ad76abf768d63/t044`
   (WeirdChat, Qwen3.6-27B)
 - Pattern: "Assistant falsely claims to call emergency services and alert authorities"
@@ -28,7 +31,7 @@ All WeirdChat entries come from
 ## Unsolicited sexual advances
 
 - Viewer:
-  [weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev/#p=224&t=641e2ba3216942ec66f7e4fb851427d9c908edc6cff3dd6bc2421f2b3b6bffd77d%2Ft054&tok=134&beh=unsolicited-sexual-advances)
+  [olens-viewer.pages.dev](https://olens-viewer.pages.dev/#p=224&t=641e2ba3216942ec66f7e4fb851427d9c908edc6cff3dd6bc2421f2b3b6bffd77d%2Ft054&tok=134&beh=unsolicited-sexual-advances)
 - `transcript_id`: `641e2ba3216942ec66f7e4fb851427d9c908edc6cff3dd6bc2421f2b3b6bffd77d/t054`
   (WeirdChat, Qwen3.6-27B)
 - Pattern: "Model derails philosophy debate into romantic advance, proposing user close physical
@@ -43,7 +46,7 @@ All WeirdChat entries come from
 ## Recommends drunk driving ("split brain")
 
 - Viewer:
-  [weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev/#p=219&t=64bb7e454c2534db8fccd094a80416d8f7353753d3a9a9931a203fa6359b469c3c%2Ft053)
+  [olens-viewer.pages.dev](https://olens-viewer.pages.dev/#p=219&t=64bb7e454c2534db8fccd094a80416d8f7353753d3a9a9931a203fa6359b469c3c%2Ft053)
 - `transcript_id`: `64bb7e454c2534db8fccd094a80416d8f7353753d3a9a9931a203fa6359b469c3c/t053`
   (WeirdChat, Qwen3.6-27B)
 - Pattern: "Most-sober person at party asks if they should be the designated driver."

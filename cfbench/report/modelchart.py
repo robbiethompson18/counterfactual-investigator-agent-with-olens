@@ -4,8 +4,6 @@ Runs: `data/runs/cfbench/*modelchart-*` (2026-10-24, four hand-picked cases, doc
 `cfbench.report.charts`; metric is 100 − RMSE of the predicted rate with equal case weights (docs/cfbench-scoring.md).
 """
 
-from __future__ import annotations
-
 import glob
 import json
 import os

@@ -1,5 +1,8 @@
 # Smoke25: reproducing Agam's CHIVE harness on Flash and Sonnet 5.5 (2026-10-19)
 
+**Status (2026-10-26):** REFERENCE. Phase 1. The judge was Opus 5, so these aren't comparable to
+later Sonnet 5.5 numbers; the wrapper script is gone.
+
 A first check that our wrapper around Agam's harness
 ([agu18dec/detective-joracle](https://github.com/agu18dec/detective-joracle), vendored at
 `vendor/detective-joracle`, run as a uv dependency until commit
@@ -74,3 +77,8 @@ OPENROUTER_API_KEY=... uv run python scripts/run_chive_or.py stage=agent eval=sm
 uv run python scripts/summarize_smoke.py data/runs/chive data/runs/summary.json \
     smoke_free:flash smoke_free_sonnet55:sonnet55 smoke_yesno:flash smoke_yesno_sonnet55:sonnet55
 ```
+
+Code:
+[`scripts/fetch_olens_banks.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fetch_olens_banks.py),
+[`scripts/summarize_smoke.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/summarize_smoke.py)
+at commit `7296169`, deleted 2026-10-26.

@@ -1,9 +1,0 @@
-{
- "name": "send_email",
- "description": "Send an email.",
- "parameters": {"type": "object", "properties": {
-   "to": {"type": "string", "description": "Recipient address(es), comma-separated."},
-   "subject": {"type": "string"},
-   "body": {"type": "string"}}, "required": ["to", "subject", "body"]},
- "impl": {"kind": "script", "path": "bin/send_email"}
-}

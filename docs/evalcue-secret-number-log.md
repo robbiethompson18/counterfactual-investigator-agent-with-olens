@@ -1,6 +1,12 @@
 # secret_number on Qwen3.6-27B: config log (2026-10-21, afternoon)
 
-Every config tried, in order. Env: [`evalcue/envs/secret_number/`](../evalcue/envs/secret_number/).
+**Status (2026-10-26):** NULL cue (fails its split test). The `r8_cfbench` arms were cfbench's
+secret_number cases until the env and its cfbench adapter were deleted on 2026-10-26.
+
+Every config tried, in order. Env: `evalcue/envs/secret_number/` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/secret_number/),
+deleted 2026-10-26 together with its cfbench adapter `cfbench/envs/secret_number.py`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/cfbench/envs/secret_number.py).
 Rows: `data/runs/evalcue/secret_number/<tag>.jsonl`. Thinking on, no token cap, Qwen sampling
 defaults. k/n = hacks / scored rows.
 

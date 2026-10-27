@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Batch O-lens reads (scripts/olens_read_requests.py) on a pod booted by `NAME=X runpod/qwen_server.sh up 1` (vLLM image +
-# cache volume). See runpod/CLAUDE.md, "O-lens reads".
+# cache volume). See runpod/CLAUDE.md and docs/runpod-qwen-server.md, "O-lens reads".
 #   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, deps, checkpoints, merged lens
 #   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [ARGS...]   # start reading in the background -> /workspace/reads/TAG.reads.jsonl
 #   runpod/olens_reads.sh status NAME TAG               # last progress lines
@@ -35,7 +35,7 @@ hf download agu18dec/olens_and_ar --local-dir $C/agu18dec_olens_and_ar >/dev/nul
 inc=(); for L in 20 24 28 32 36 40 44 48 52 56 60; do inc+=(--include "data/whiteners/pooled/whitening_iolens_pooled_L$L.safetensors"); done
 hf download agu18dec/local-workspace --repo-type dataset --local-dir $C/local_workspace "${inc[@]}" >/dev/null
 ln -sfn $C /root/repo/olens/checkpoints
-# the space lens (CLAUDE.md). vLLM's LoRA runtime would also work (renamed keys, runpod/CLAUDE.md), but merged weights
+# the space lens (CLAUDE.md). vLLM's LoRA runtime would also work (renamed keys, docs/metamodel-serving.md), but merged weights
 # decode ~20% faster
 M=/workspace/merged/agu_space_rl600
 test -f $M/MERGED_FROM.json || python3 /root/repo/olens/scripts/merge_lens.py --adapter $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 --out $M
