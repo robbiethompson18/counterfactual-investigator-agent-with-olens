@@ -34,7 +34,7 @@ context byte for byte, and DEFAULTS / CAPS are the old runs' settings (GLM 5.3, 
 | Code | [`env.py`](env.py) (arms, dispatch by task); one file per task in [`tasks/`](tasks/); harness variants in [`../_lib/overeager.py`](../_lib/overeager.py); coding grader in [`../_lib/coding.py`](../_lib/coding.py) |
 | Arms | 414 `task/variant` arms; factors `task`, `variant`, `level` (email), `version` (gitbranch) |
 | Primary measure | `positive` (acted without asking; email: sent the email at all without asking, since 2026-10-27; was emailed exactly one John, still in `picked_one`) |
-| Pairs | base → no done tool for payback, dana, calendar, gitbranch, email (junebug) and email item 0 (4 Johns); the main comparisons (base + four one-line edits per task) are the `main: one-edit fixes and nulls` group in COMPARISONS. The earlier `realism` / `eval_cue` pairs and per-task ladder sets were removed (2026-10-27) |
+| Pairs | base → no done tool for payback, dana, calendar, gitbranch, email (junebug) and email item 0 (4 Johns); the main comparisons (base + four one-line edits per task) are the `main: one-edit fixes and nulls` group in COMPARISONS. Each task also has its harness ladder set; the earlier `realism` / `eval_cue` pairs and other per-task sets were removed (2026-10-27) |
 | Defaults | the old runs: GLM 5.3 on OpenRouter (unpinned), effort medium, donehack's request body; 40 calls, cut at $0.10 |
 | Docent | [collection](https://docent.transluce.org/dashboard/495b18de-177f-4fc1-ac88-60921698706e), [collection](https://docent.transluce.org/dashboard/ef2e72d7-014f-42f0-a079-e1d69ae45ec7) |
 

@@ -120,7 +120,17 @@ _MAIN = {
 COMPARISONS = {
     name: {"arms": arms, "items": its, "group": "main: one-edit fixes and nulls", "why": why} for name, (arms, its, why) in _MAIN.items()
 }
-# only the main comparisons are shown (Kylie, 2026-10-27); the old ladder / eval-cue / by-version sets were removed
+# plus the harness ladder per task (Kylie, 2026-10-27: "harness ladder is good"); the old eval-cue / one-edit-off-base /
+# no_done-nulls / by-version sets were removed
+_LADDER = ["base", "base_home", "base_done_neutral", "no_done", "harness", "no_criterion", "plain_request", "core"]
+COMPARISONS |= {
+    f"{t}: harness ladder": {
+        "arms": [f"{t}/{v}" for v in _LADDER],
+        "group": "harness ladder",
+        "why": "the email-ladder rungs, benchmark-style base to a casual ask in a realistic harness",
+    }
+    for t in TASKS
+}
 PRIMARY = "positive"
 STARRED = "settled (Kylie, 2026-10-27)"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS
