@@ -88,6 +88,9 @@ Each script's header has its usage.
   `data/runs/olens_reads/`. `fetch` also copies `reads.provenance.json` (which lens, bullet prefix,
   AR, whitener, checkpoint revisions; `olens/src/olens/provenance.py`) next to the reads: keep it
   with them, it is the only machine-written record of which lens a batch used.
+- `one_engine_setup.sh NAME`: the one-engine reader's pod (vLLM 0.27.1 image + vllm-metamodels +
+  renamed adapters), then `olens_reads.sh run ... --one-engine`
+  ([docs/olens-one-engine-reader.md](../docs/olens-one-engine-reader.md)).
 - `pod.sh up|ssh|sync|down|list NAME`: bare `runpod/pytorch` pods for anything else. Needs
   `RUNPOD_API_KEY` (`.envrc.local`) and a logged-in `hf` CLI.
 - Logs, reads and checkpoints on the two volumes can be read with no pod running, over RunPod's S3

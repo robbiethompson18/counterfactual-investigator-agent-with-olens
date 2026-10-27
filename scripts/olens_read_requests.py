@@ -60,6 +60,7 @@ BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcu
 }
 SAMPLING = Sampling(max_new_tokens=160, max_bullets=4)  # greedy, 4 bullets: the viewer's read
 PREFIX = 32
+AR_BATCH = 256  # spans per AR forward (HF); --one-engine raises it
 
 
 def render(tok, row):
@@ -134,7 +135,7 @@ def score(tok, ar, readout, texts, vecs, layers):
         return [([], 0.0) for _ in texts]
     spans = [tok(readout.lens.bullet_prefix + x, add_special_tokens=False).input_ids[:32] for x, _ in flat]
     lays = [layers[k] for _, k in flat]
-    D = torch.cat([ar(spans[i : i + 256], lays[i : i + 256]) for i in range(0, len(spans), 256)])
+    D = torch.cat([ar(spans[i : i + AR_BATCH], lays[i : i + AR_BATCH]) for i in range(0, len(spans), AR_BATCH)])
     Z = torch.empty(len(texts), vecs.shape[1], device=D.device)
     owner = torch.tensor([k for _, k in flat], device=D.device)
     for L in set(layers):
@@ -186,12 +187,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("requests")
     ap.add_argument("out")
-    ap.add_argument("merged")
+    ap.add_argument("merged", help="merged-lens dir for the HF+vLLM reader (ignored with --one-engine, see --base)")
     ap.add_argument("--layers", default="24,32,40,48,56")
     # vLLM's share of the GPU; the HF base (capture + AR) needs ~60 GB of the rest. Each concurrent decode needs a
     # Mamba (linear-attention state) block: 0.45 of an H200 fits only 139, 0.55 fits 256.
-    ap.add_argument("--vllm-mem", type=float, default=0.55)
-    ap.add_argument("--max-seqs", type=int, default=256)
+    ap.add_argument("--vllm-mem", type=float, default=None, help="vLLM's share of the GPU (default 0.55; 0.88 with --one-engine)")
+    ap.add_argument("--max-seqs", type=int, default=None, help="vLLM max_num_seqs (default 256; 512 with --one-engine)")
+    ap.add_argument(
+        "--one-engine", action="store_true", help="capture, lens and AR all on one vLLM engine (olens.one_engine; needs vllm-metamodels)"
+    )
+    ap.add_argument("--lens-lora", help="--one-engine: the lens adapter with vLLM-renamed keys (olens/scripts/lora_for_vllm.py)")
+    ap.add_argument("--ar-lora", help="--one-engine: the AR adapter with vLLM-renamed keys")
+    ap.add_argument(
+        "--base", default="Qwen/Qwen3.6-27B", help="--one-engine: the base checkpoint (HF id or dir); MERGED_DIR is then ignored"
+    )
+    ap.add_argument("--max-model-len", type=int, default=32768, help="--one-engine: longest transcript the engine captures")
+    ap.add_argument("--debug", action="store_true")
+    ap.add_argument(
+        "--batch-reads",
+        type=int,
+        default=470,
+        help="--one-engine: new reads per engine batch, kept under max_num_seqs so the decode is one scheduler wave",
+    )
+    ap.add_argument("--batch-transcripts", type=int, default=128, help="--one-engine: most transcripts per batch")
     ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
     ap.add_argument("--watch", action="store_true", help="when the queue is empty, re-read REQUESTS every minute")
@@ -203,21 +221,37 @@ def main():
     print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
-    lens = VllmLens(tok, args.merged, gpu_memory_utilization=args.vllm_mem, max_num_seqs=args.max_seqs)  # before the HF model
-    _, model = load_base()
-    lens.model = model
-    ar = AR(model)
+    if args.one_engine:
+        from olens.one_engine import OneEngine, _Done
+
+        global AR_BATCH
+        AR_BATCH = 4096  # one generate per read batch; vLLM schedules the waves
+        lens = OneEngine(tok, args.base, args.lens_lora, args.ar_lora, gpu_memory_utilization=args.vllm_mem or 0.88,
+                         max_num_seqs=args.max_seqs or 512, max_model_len=args.max_model_len, debug=args.debug)  # fmt: skip
+        ar, capture_fn, pool = lens.ar, lens.capture, None  # one engine: nothing to overlap the decode with
+        decode = lambda vecs, layers: _Done(lens.read_items(vecs, layers, SAMPLING))
+    else:
+        lens = VllmLens(
+            tok, args.merged, gpu_memory_utilization=args.vllm_mem or 0.55, max_num_seqs=args.max_seqs or 256
+        )  # before the HF model
+        _, model = load_base()
+        lens.model = model
+        ar = AR(model)
+        capture_fn = lambda ids, layers, positions: capture(model, ids, layers, positions)
+        # Pipelined: vLLM decodes transcript n in a worker thread (its engine is another process, so the thread mostly waits)
+        # while the main thread captures n and scores n-1 with the HF model. All HF work stays on the main thread, so the
+        # AR's hook-LoRA is never active during a capture. Sequential, scoring took ~40% of the time.
+        pool = ThreadPoolExecutor(1)
+        decode = lambda vecs, layers: pool.submit(lens.read_items, vecs, layers, SAMPLING)
     readout = Readout(lens, ar)
     for L in layers:
         readout.whitener(L)
     provenance.write(out, lens, layers, SAMPLING, __file__, capture_chunk=4096, requests=Path(args.requests).name, shard=args.shard)
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     im_start = tok.convert_tokens_to_ids("<|im_start|>")
+    if args.one_engine:
+        return run_batched(args, tok, lens, ar, readout, out, done, layers, im_end, im_start)
 
-    # Pipelined: vLLM decodes transcript n in a worker thread (its engine is another process, so the thread mostly waits)
-    # while the main thread captures n and scores n-1 with the HF model. All HF work stays on the main thread, so the
-    # AR's hook-LoRA is never active during a capture. Sequential, scoring took ~40% of the time.
-    pool = ThreadPoolExecutor(1)
     t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "wait", "score"), 0.0)
     pending = None
     cache = {}  # (prefix_keys key, layer) -> scored read
@@ -227,24 +261,14 @@ def main():
         if todo:
             ta = time.time()
             row = todo[0]
-            msgs, ids, where = render(tok, row)
-            toks = [tok.decode([i]) for i in ids]
-            positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
-            if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)
-                starts = [i for i, x in enumerate(ids) if x == im_start]
-                starts = starts[-1:] if row.get("last_turn_only") else starts
-                if row.get("turn_role"):  # e.g. "assistant": only that role's headers
-                    starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
-                positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
-            row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
-            keys = prefix_keys(ids, positions)
+            msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
             # a read depends only on the tokens up to its position, so a prefix this process already read (the same prompt
             # in another transcript of the arm) is copied instead of decoded again
             new = [p for p in positions if any((keys[p], L) not in cache for L in row_layers)]
-            acts = capture(model, ids, row_layers, new) if new else {L: [] for L in row_layers}
+            acts = capture_fn(ids, row_layers, new) if new else {L: [] for L in row_layers}
             items = [(p, L, acts[L][k]) for k, p in enumerate(new) for L in row_layers if (keys[p], L) not in cache]
             vecs = torch.stack([v for _, _, v in items]) if items else torch.empty(0)
-            fut = pool.submit(lens.read_items, vecs, [L for _, L, _ in items], SAMPLING) if items else None
+            fut = decode(vecs, [L for _, L, _ in items]) if items else None
             job = {"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "items": items, "vecs": vecs, "fut": fut}
             job |= {"keys": keys, "all": [(p, L) for p in positions for L in row_layers]}
             secs["capture"] += time.time() - ta
@@ -272,6 +296,77 @@ def main():
             if not args.watch:
                 break
             time.sleep(60)
+
+
+def prepare(tok, row, layers, im_end, im_start):
+    """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys."""
+    msgs, ids, where = render(tok, row)
+    toks = [tok.decode([i]) for i in ids]
+    positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
+    if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)
+        starts = [i for i, x in enumerate(ids) if x == im_start]
+        starts = starts[-1:] if row.get("last_turn_only") else starts
+        if row.get("turn_role"):  # e.g. "assistant": only that role's headers
+            starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
+        positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
+    row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
+    return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
+
+
+def run_batched(args, tok, lens, ar, readout, out, done, layers, im_end, im_start):
+    """The one-engine loop: many transcripts per step, so every engine call is one big batch (decode steps cost the same
+    for 15 sequences as for 500). Capture all of them in one generate, decode every new (prefix, layer) once, score all
+    bullets in one AR batch, then write per transcript. Reads of a prefix already seen (in the cache or earlier in the
+    batch) are copied, as in the HF loop."""
+    t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "decode", "score"), 0.0)
+    cache = {}  # (prefix key, layer) -> scored read
+    while True:
+        todo = queue(args.requests, args.shard, done)
+        if not todo:
+            if not args.watch:
+                break
+            time.sleep(60)
+            continue
+        ta = time.time()
+        jobs, want = [], {}  # want: (key, L) -> (job index, position), the first transcript in the batch that needs it
+        for row in todo[: args.batch_transcripts]:
+            msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+            new = [p for p in positions if any((keys[p], L) not in cache and (keys[p], L) not in want for L in row_layers)]
+            for p in new:
+                for L in row_layers:
+                    if (keys[p], L) not in cache:
+                        want.setdefault((keys[p], L), (len(jobs), p))
+            jobs.append({"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "keys": keys, "layers": row_layers,
+                         "all": [(p, L) for p in positions for L in row_layers],
+                         "new": sorted({p for (k, L), (j, p) in want.items() if j == len(jobs)})})  # fmt: skip
+            if len(want) >= args.batch_reads:
+                break
+        caps = lens.capture_many([(j["ids"], j["layers"], j["new"]) for j in jobs])
+        items = []  # (key, L, vec), one per decode
+        for (k, L), (ji, p) in want.items():
+            items.append((k, L, caps[ji][L][jobs[ji]["new"].index(p)]))
+        vecs = torch.stack([v for _, _, v in items]) if items else torch.empty(0)
+        item_layers = [L for _, L, _ in items]
+        secs["capture"] += time.time() - ta
+        tb = time.time()
+        texts = [t[0] for t in lens.read_items(vecs, item_layers, SAMPLING)] if items else []
+        secs["decode"] += time.time() - tb
+        tc = time.time()
+        scored = score(tok, ar, readout, texts, vecs, item_layers) if texts else []
+        for (k, L, _), sc in zip(items, scored):
+            cache[k, L] = sc
+        for j in jobs:
+            write(tok, out, j, [cache[j["keys"][p], L] for p, L in j["all"]])
+            done.add(j["row"]["id"])
+        secs["score"] += time.time() - tc
+        n_done, n_reads = n_done + len(jobs), n_reads + len(items)
+        dt = time.time() - t0
+        stages = " ".join(f"{k} {v:.0f}s" for k, v in secs.items())
+        n_all = sum(len(j["all"]) for j in jobs)
+        n_tok = sum(len(j["ids"]) for j in jobs)
+        print(f"[{n_done}, {len(todo) - len(jobs)} queued] batch of {len(jobs)} transcripts, {n_tok} tokens, {len(items)} reads "
+              f"({n_all - len(items)} cached) | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
+              flush=True)  # fmt: skip
 
 
 def prefix_keys(ids, positions):

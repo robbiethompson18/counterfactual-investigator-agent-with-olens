@@ -489,6 +489,10 @@ Current docs:
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
   vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
+  — `--one-engine`: vLLM 0.27.1 + vllm-metamodels serve capture, lens LoRA and AR LoRA from one
+  weight copy; 2x the HF+vLLM reader on short transcripts, FVE corr 0.98, bullet-stop at 4; what
+  still limits it
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
