@@ -1,11 +1,11 @@
 # Viewers: static pages on the public internet, no backend
 
-**Status (2026-10-26):** ACTIVE. The rule for every viewer in this repo, set by Robbie on
-2026-10-26.
+**Status (2026-10-27):** ACTIVE. The rule for every viewer in this repo, set by Robbie on
+2026-10-26; GitHub Pages enabled 2026-10-27.
 
 ## The rule
 
-A viewer is one HTML file on Cloudflare Pages that reads the public HF dataset
+A viewer is one HTML file on Cloudflare Pages or GitHub Pages that reads the public HF dataset
 ([Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens))
 directly. No server process, nothing on bramble or a tailnet, no SkyPilot pod behind a button.
 
@@ -26,6 +26,11 @@ directly. No server process, nothing on bramble or a tailnet, no SkyPilot pod be
 - **Deploy:** `wrangler pages deploy` with `CLOUDFLARE_API_TOKEN` from `.envrc.local`; see
   `scripts/deploy_viewer.sh`. Deploy a preview branch and check two existing deep links before
   deploying `main`.
+- **GitHub Pages:** the repo has one site,
+  https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/, with Pages
+  source set to GitHub Actions (enabled 2026-10-27). `.github/workflows/env-viewer-pages.yml` builds
+  it from a `site/` folder, and each deploy replaces the whole site, so a second page goes into that
+  same workflow's `site/` (e.g. `site/<page>/index.html`), not a second workflow.
 
 ## Why
 
@@ -58,12 +63,15 @@ Checked and rejected the same day:
 
 ## Where things are
 
-| page                             | URL                            | source                                                                             | data on HF         |
-| -------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------- | ------------------ |
-| CHIVE cases                      | https://chive-cases.pages.dev  | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in           |
-| O-lens token viewer              | https://olens-viewer.pages.dev | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`  |
-| expview (runs, judge I/O, reads) | https://expview.pages.dev      | `expview/static/index.html`, `expview/deploy.sh`                                   | `runs/**/expview/` |
-| env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages, needs enabling) | `environments/_lib/page.html`, `.github/workflows/env-viewer-pages.yml` | `envs/*/spec/`, `envs/*/links.json` |
+| page                                  | URL                                                                                             | source                                                                             | data on HF                          |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
+| CHIVE cases                           | https://chive-cases.pages.dev                                                                   | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in                            |
+| O-lens token viewer                   | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
+| expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html`, `.github/workflows/env-viewer-pages.yml`              | `envs/*/*/`, `runs/**/expview/`     |
+| env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html`, `.github/workflows/env-viewer-pages.yml`            | `envs/*/spec/`, `envs/*/links.json` |
+
+The old expview page, https://expview.pages.dev (Cloudflare), still works but is frozen at its
+2026-10-26 code; expview now deploys with the env viewer to GitHub Pages under `/expview/`.
 
 Still to decide (2026-10-26): whether the three pages share code for URL params, HF fetching and
 transcript rendering, and whether any two of them are one page.

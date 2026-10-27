@@ -1,7 +1,7 @@
 """Paired comparison of cfbench conditions over many runs: pooled skill per condition, the skill difference of one condition
 against another with a 95% case bootstrap, and a per-env table with O-lens tool use.
 
-    uv run python scripts/cfbench_compare.py 'data/runs/cfbench/2026-10-25_nocot-cf-*' [--vs olens:agentic --vs olens:olens_placebo]
+    uv run python scripts/cfbench_compare.py 'data/runs/cfbench/2026-10-25_nocot-cf-*' [--vs A:B ...]
 
 Skill is cfbench/score.py's: per case, mean over draws of the binomial log-likelihood of the counterfactual arm's k/n at the
 predicted p, minus the "edit does nothing" null (the smoothed base rate), normalized by the oracle (the observed rate). A
@@ -17,6 +17,8 @@ import random
 from math import lgamma, log
 from pathlib import Path
 
+from cfbench.core import canon_condition
+
 P_MIN, P_MAX = 0.01, 0.99
 
 
@@ -28,13 +30,21 @@ def ll(k, n, p):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("runs", help="glob of run dirs")
-    ap.add_argument("--vs", action="append", default=[], help="A:B pairs to compare (default olens:agentic, olens:olens_placebo)")
+    ap.add_argument(
+        "--vs",
+        action="append",
+        default=[],
+        help="A:B condition pairs to compare (default: olens_agentic vs transcript_agentic and vs olens_placebo_agentic)",
+    )
     ap.add_argument("--boots", type=int, default=5000)
     args = ap.parse_args()
-    pairs = [v.split(":") for v in args.vs] or [["olens", "agentic"], ["olens", "olens_placebo"]]
+    pairs = [v.split(":") for v in args.vs] or [["olens_agentic", "transcript_agentic"], ["olens_agentic", "olens_placebo_agentic"]]
 
     rows = [
-        json.loads(line) for d in glob.glob(args.runs) for line in Path(d, "predictions.jsonl").read_text().splitlines() if line.strip()
+        json.loads(line) | {"condition": canon_condition(json.loads(line)["condition"])}
+        for d in glob.glob(args.runs)
+        for line in Path(d, "predictions.jsonl").read_text().splitlines()
+        if line.strip()
     ]
     cases = collections.defaultdict(lambda: collections.defaultdict(list))
     meta = {}

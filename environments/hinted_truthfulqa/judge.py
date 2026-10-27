@@ -1,9 +1,9 @@
-"""LLM judge for vulnerable_users (refusal, condescension, mentions of the user's bio) and the expview export.
+"""LLM judge for hinted_truthfulqa (refusal, condescension, mentions of the user's bio) and the expview export.
 
-    uv run python -m environments.vulnerable_users.judge RUN [RUN ...] --out SLUG
+    uv run python -m environments.hinted_truthfulqa.judge RUN [RUN ...] --out SLUG
 
-RUN = an env run under data/envs/vulnerable_users/. For each one this writes labels/judge@<VERSION>.jsonl (kind judge) next
-to measure's labels, and one expview run at data/runs/vulnerable_users/<date>_<SLUG>/expview with every episode: the subject
+RUN = an env run under data/envs/hinted_truthfulqa/. For each one this writes labels/judge@<VERSION>.jsonl (kind judge) next
+to measure's labels, and one expview run at data/runs/hinted_truthfulqa/<date>_<SLUG>/expview with every episode: the subject
 call, the judge call (its full input and output), the env's code as the file tree, and Docent links. Then
 `scripts/runs.py finish` syncs that run and the env runs go up with `environments upload`.
 
@@ -96,14 +96,14 @@ async def judge_all(eps: list[dict], conc: int) -> dict[str, dict]:
 
 def main(argv):
     ap = argparse.ArgumentParser()
-    ap.add_argument("runs", nargs="+", help="env run names under data/envs/vulnerable_users/")
+    ap.add_argument("runs", nargs="+", help="env run names under data/envs/hinted_truthfulqa/")
     ap.add_argument("--out", required=True, help="slug of the expview run")
     ap.add_argument("--conc", type=int, default=48)
     a = ap.parse_args(argv)
     sys.path.insert(0, str(REPO_ROOT / "expview"))
     from expview import Run, call  # ty: ignore[unresolved-import]
 
-    out_dir = REPO_ROOT / "data/runs/vulnerable_users" / f"{dt.date.today().isoformat()}_{a.out}" / "expview"
+    out_dir = REPO_ROOT / "data/runs/hinted_truthfulqa" / f"{dt.date.today().isoformat()}_{a.out}" / "expview"
     view = Run(
         str(out_dir),
         title="Vulnerable users: bio x factual MCQ",
@@ -117,10 +117,10 @@ def main(argv):
     )
     view.reset()
     here = Path(E.__file__).parent
-    files = {f"environments/vulnerable_users/{p.name}": p.read_text() for p in sorted(here.glob("*.py")) if p.name != "__init__.py"}
+    files = {f"environments/hinted_truthfulqa/{p.name}": p.read_text() for p in sorted(here.glob("*.py")) if p.name != "__init__.py"}
     total = 0.0
     for run in a.runs:
-        rd = LOCAL / "vulnerable_users" / run
+        rd = LOCAL / "hinted_truthfulqa" / run
         meta = json.loads((rd / "meta.json").read_text())
         measure = {}
         for f in sorted((rd / "labels").glob("measure@*.jsonl")):
@@ -172,7 +172,7 @@ def main(argv):
                     ),
                 ],
                 env_files=files,
-                extra={"env_run": f"envs/vulnerable_users/{run}", "episode": ep["id"], "gold": (ep.get("meta") or {}).get("gold")},
+                extra={"env_run": f"envs/hinted_truthfulqa/{run}", "episode": ep["id"], "gold": (ep.get("meta") or {}).get("gold")},
             )
     print(f"expview: {out_dir} (judge cost ${total:.3f})")
 

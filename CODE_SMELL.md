@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: a run's upload overwrites the env index with what's local
+
+`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
+Run from a fresh worktree that only holds the new run, it replaces HF's index with one listing just that run, and the
+env viewer then shows every other arm as "not run" (overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the
+runs in and re-uploading). The upload should merge with HF's index, or refuse when the local index lists fewer runs.
+
 ## 2026-10-27: expview can't import `environments/` run folders
 
 `expview/importers/evalcue_rows.py` and `expview.source_of()` only know the old `data/runs` layout
@@ -43,6 +50,10 @@ resolves `extra.source` / `run_dir` + `row_index` through `docent.json`), and "a
 other runs" on a base item (needs a cross-run index).
 
 ## 2026-10-26: batch O-lens reads don't reach the transcript viewer
+
+**2026-10-27:** resolved for expview: readers write `X.transcripts.jsonl` beside their reads and
+`runs.py finish` points an expview run at both (docs/olens-reads-format.md). Still true for
+olens-viewer, which nobody plans to feed batch reads.
 
 The viewer went static (no server, no queue, no fleet; `transcript-viewer/CLAUDE.md`, History), so
 the only way to make reads is `scripts/olens_read_requests.py` on RunPod. Its output rows

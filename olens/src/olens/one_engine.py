@@ -60,13 +60,15 @@ class OneEngine(AguLens):
         self.tok, self._carriers, self.debug, self.merge = tok, {}, debug, lora_mode == "merge"
         assert lora_mode in ("runtime", "merge"), lora_mode
         d = Path(base) if Path(base).exists() else Path(snapshot_download(base))
+        self.base_dir = d  # olens.jpp reads lm_head from the same snapshot
         wmap = json.loads((d / "model.safetensors.index.json").read_text())["weight_map"]
         ek = next(k for k in wmap if k.endswith("embed_tokens.weight"))
         nk = next(k for k in wmap if k.endswith("norm.weight") and ".layers." not in k)
         with safe_open(d / wmap[ek], "pt") as f:
             self.E = f.get_tensor(ek)  # [V, d] bf16, CPU
         with safe_open(d / wmap[nk], "pt") as f:
-            self.norm_w = f.get_tensor(nk).float().cuda()
+            # Qwen3.6's RMSNorm is x_norm * (1 + w) (HF Qwen3_5RMSNorm, vLLM GemmaRMSNorm); norm_w is the gain, 1 + w
+            self.norm_w = 1 + f.get_tensor(nk).float().cuda()
         cfg = json.loads((d / "config.json").read_text())
         self.eps = float((cfg.get("text_config") or cfg).get("rms_norm_eps", 1e-6))
         self.llm = LLM(
@@ -223,6 +225,6 @@ class OneEngine(AguLens):
         p = SamplingParams(max_tokens=1, temperature=0.0, extra_args={"output_residual_stream": [N_BLOCKS - 1], "capture_positions": [-1]})
         outs = self._gen(prompts, p, lora=self.ar_req)
         h = torch.stack([self._acts(o, 1, [-1])[0, -1] for o in outs]).cuda()
-        # HF's last_hidden_state is the final RMSNorm of this residual: w * x * rsqrt(mean(x^2) + eps)
+        # HF's last_hidden_state is the final RMSNorm of this residual: (1 + w) * x * rsqrt(mean(x^2) + eps)
         h = h * torch.rsqrt(h.pow(2).mean(-1, keepdim=True) + self.eps) * self.norm_w
         return F.layer_norm(h, h.shape[-1:]) @ self.W.T + self.b

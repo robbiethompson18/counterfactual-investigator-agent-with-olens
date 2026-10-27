@@ -18,7 +18,8 @@ priority order, round-robin over (env, arm) within a priority. A row's optional 
 (whiteners are loaded for --layers only, so keep it a subset). Optional `generation_prompt: true` renders the open
 assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
-`last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers. A row's
+`last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
+"all"` reads every token. A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -32,7 +33,8 @@ already in OUT are skipped, so a rerun resumes:
      field's text, or null), layer, bullets: [{text, fve, coef}] (sorted by fve), joint_fve}
 
 plus OUT's provenance (olens.provenance: lens adapter, bullet prefix, AR, whitener, revisions, sampling) as
-reads.provenance.json next to it.
+reads.provenance.json next to it, and each transcript's tokens and chat sections as OUT.transcripts.jsonl
+(write_transcript), so expview shows the run with no tokenizer (docs/olens-reads-format.md).
 """
 
 import argparse
@@ -51,53 +53,13 @@ from olens.nla import NLA_SAMPLING, NLAEngine
 from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
-from counterfactual_investigator_agent_with_olens.render import chat_text, tool_args_as_dicts  # PYTHONPATH=olens/src:src
+from counterfactual_investigator_agent_with_olens.render import render_request, transcript_line  # PYTHONPATH=olens/src:src
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
-BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcue's deps
-    "type": "function",
-    "function": {
-        "name": "bash",
-        "description": "Run a bash command in the working directory. Returns stdout+stderr (truncated) and the exit code.",
-        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
-    },
-}
 SAMPLING = Sampling(max_new_tokens=160, max_bullets=4)  # greedy, 4 bullets: the viewer's read
 PREFIX = 32
 AR_BATCH = 4096  # spans per AR generate; vLLM schedules the waves
-
-
-def render(tok, row):
-    """-> (text, token ids, char spans, per-token (msg_index, field, char_offset))."""
-    msgs = tool_args_as_dicts(row["messages"])
-    tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
-    text = chat_text(tok, msgs, tools=tools, generation_prompt=bool(row.get("generation_prompt")))
-    enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
-    # Find each message's fields in the rendered text, in order; a token belongs to the last message whose first
-    # field starts at or before it (so template tokens around a message go with it), -1 before the first.
-    fields, cur = [], 0  # (start, end, msg_index, field)
-    for i, m in enumerate(msgs):
-        parts = [("reasoning_content", m.get("reasoning_content")), ("content", m.get("content"))]
-        parts += [("tool_call", v) for tc in m.get("tool_calls") or [] for v in tc["function"]["arguments"].values()]
-        for name, s in parts:
-            s = s.strip() if isinstance(s, str) else None
-            if not s:
-                continue
-            j = text.find(s, cur)
-            if j < 0:
-                continue
-            fields.append((j, j + len(s), i, name))
-            cur = j + len(s)
-    starts = {}
-    for a, _, i, _ in fields:
-        starts.setdefault(i, a)
-    where = []
-    for a, _ in enc.offset_mapping:
-        msg = max((i for i, s in starts.items() if s <= a), default=-1)
-        f = next(((name, a - s) for s, e, i, name in fields if s <= a < e), (None, None))
-        where.append((msg, *f))
-    return msgs, enc.input_ids, where
 
 
 @torch.no_grad()
@@ -209,7 +171,7 @@ def main():
 
 def prepare(tok, row, layers, im_end, im_start):
     """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys."""
-    msgs, ids, where = render(tok, row)
+    msgs, ids, where = render_request(tok, row)
     toks = [tok.decode([i]) for i in ids]
     positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
     if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)
@@ -218,6 +180,8 @@ def prepare(tok, row, layers, im_end, im_start):
         if row.get("turn_role"):  # e.g. "assistant": only that role's headers
             starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
         positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
+    elif row.get("positions") == "all":
+        positions = list(range(len(ids)))
     row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
     return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
 
@@ -322,6 +286,7 @@ def acts_path(out):
 
 def write(tok, out, job, fields):
     ids, where, toks, msgs = job["ids"], job["where"], job["toks"], job["msgs"]
+    write_transcript(out, job)
     with out.open("a") as f:
         for (p, L), fl in zip(job["all"], fields):
             msg, field, off = where[p]
@@ -331,6 +296,13 @@ def write(tok, out, job, fields):
                 "layer": L, **fl,
             }  # fmt: skip
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def write_transcript(out, job):
+    """The transcript's line in OUT.transcripts.jsonl (tokens as text, chat sections, request metadata): with OUT it is all
+    a viewer needs (docs/olens-reads-format.md). Written before the reads, so a reread after a crash may repeat it."""
+    with out.with_suffix(".transcripts.jsonl").open("a") as f:
+        f.write(json.dumps(transcript_line(job["row"], job["msgs"], job["toks"], job["where"]), ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

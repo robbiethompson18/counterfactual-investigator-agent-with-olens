@@ -5,9 +5,10 @@
 # See runpod/CLAUDE.md, docs/runpod-qwen-server.md ("O-lens reads") and docs/olens-one-engine-reader.md.
 #   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, vllm-metamodels, checkpoints, adapters
 #   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [ARGS...]   # start reading in the background -> /workspace/reads/TAG.reads.jsonl
+#                                                       # READER=scripts/jpp_read_requests.py for J++ reads (same request format)
 #                                                       # ARGS: --layers 32,40,48 [--max-model-len 65536 for transcripts over 32k tokens]
 #   runpod/olens_reads.sh status NAME TAG               # last progress lines
-#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far, and LOCAL.provenance.json
+#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far, LOCAL.provenance.json and LOCAL.transcripts.jsonl
 #   runpod/olens_reads.sh stop NAME                     # kill the reader (a rerun of `run` with the same TAG resumes)
 set -euo pipefail
 NAME=${2:?pod name}
@@ -56,19 +57,20 @@ EOF
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src:src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
+cd /root/repo && PYTHONPATH=olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
   /workspace/reads/$tag.reads.jsonl $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
   status)
     ssh_pod "test -f /workspace/reads/${3:?tag}.log || echo 'no log yet (reader not started)'
       grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/$3.log 2>/dev/null | tail -3
-      echo \"reader processes: \$(pgrep -fc '[o]lens_read_requests' || true)\"" ;;
+      echo \"reader processes: \$(pgrep -fc '[_]read_requests' || true)\"" ;;
   fetch)
     ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4"
-    ssh_pod "cat /workspace/reads/$3.reads.provenance.json" > "${4%.jsonl}.provenance.json" ;;  # olens.provenance
+    ssh_pod "cat /workspace/reads/$3.reads.provenance.json" > "${4%.jsonl}.provenance.json"  # olens.provenance
+    ssh_pod "cat /workspace/reads/$3.reads.transcripts.jsonl" > "${4%.jsonl}.transcripts.jsonl" ;;  # tokens + sections, for expview
   stop)
     # killing the reader orphans vLLM's engine process, which keeps its GPU memory: kill both
-    ssh_pod 'pkill -f "[o]lens_read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
+    ssh_pod 'pkill -f "[_]read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
   *) echo "unknown command: $1" >&2; exit 1 ;;
 esac

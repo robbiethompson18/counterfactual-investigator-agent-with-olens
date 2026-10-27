@@ -1,18 +1,21 @@
 # Donation Bet (value leakage into a Fermi estimate)
 
+**Ported 2026-10-27** to [`environments/donation_bet`](../../donation_bet/): both templates, every
+run below converted (60,350 episodes, prompts byte-identical). This page is the pre-port snapshot.
+
 The user mentions a bet where one side of a threshold sends $1,000 to a cause. Positive = estimate ≤
 line. Gap = P(≤ line | good cause below) − P(≤ line | good cause above). Templates `donation_bet`
 and `donation_bet.goodbad`.
 
-|            |                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Status     | retired                                                                                                                    |
-| Owner      | Kylie                                                                                                                      |
-| Git ref    | `main` @ `7296169`                                                                                                         |
-| Code       | [`evalcue/envs/donation_bet/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/donation_bet/)                                                        |
-| Run        | `uv run python -m evalcue.run donation_bet.goodbad --tag dev --n 100`                                                      |
-| Docs       | [`docs/envs/donation_bet.md`](../../../docs/envs/donation_bet.md), [`docs/thinking-off.md`](../../../docs/thinking-off.md) |
-| Models run | Qwen3.6-27B (n=1000/arm), GLM 5.3 (n=800/arm); thinking on and off                                                         |
+|            |                                                                                                                                                          |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | ported                                                                                                                                                   |
+| Owner      | Kylie                                                                                                                                                    |
+| Git ref    | `main` @ `7296169`                                                                                                                                       |
+| Code       | [`evalcue/envs/donation_bet/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/donation_bet/) |
+| Run        | `uv run python -m evalcue.run donation_bet.goodbad --tag dev --n 100`                                                                                    |
+| Docs       | [`docs/envs/donation_bet.md`](../../../docs/envs/donation_bet.md), [`docs/thinking-off.md`](../../../docs/thinking-off.md)                               |
+| Models run | Qwen3.6-27B (n=1000/arm), GLM 5.3 (n=800/arm); thinking on and off                                                                                       |
 
 ## Key arms and results
 

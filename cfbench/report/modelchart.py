@@ -15,6 +15,7 @@ from collections import defaultdict
 import matplotlib
 import numpy as np
 
+from cfbench.core import canon_condition
 from cfbench.report.data import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null
 
 matplotlib.use("Agg")
@@ -46,7 +47,7 @@ THINKING = {"off": ("off", "#a8dbb5"), "minimal": ("minimal / low", "#3f9e5f"), 
 THINKING_ON = ("medium / high", "#0e4d27")
 SWEEP_DRAWS = 2  # the Flash sweeps ran draws 0-1; their high-effort/20-call point (from the 3-draw model grid) uses the same two
 # model-chart x axis, in order of what the predictor gets: + transcripts, + O-lens text from another env, + this env's O-lens
-MODEL_AXIS = ["no_transcript", "agentic", "olens_placebo", "olens"]
+MODEL_AXIS = ["no_transcript", "transcript_agentic", "olens_placebo_agentic", "olens_agentic"]
 LOGOS = "https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/{}.svg"  # CC0 brand icons, one path each
 COMPANY = {"anthropic": "anthropic", "google": "googlegemini", "openai": "openai"}
 BADGE = {"anthropic": ("#f0eee6", "#d97757"), "google": ("white", "#4285f4"), "openai": ("#6e6e6e", "white")}  # (dot, logo)
@@ -69,6 +70,7 @@ def load(pattern: str = RUNS) -> list[dict]:
             lines = f.read().splitlines()
         for line in lines:
             row = json.loads(line)
+            row["condition"] = canon_condition(row["condition"])
             row |= {"effort": params["effort"], "max_calls": params.get("max_calls") or 20, "run": os.path.basename(d)}
             key = tuple(row[k] for k in ("env", "base_arm", "cf_arm", "condition", "predictor", "draw", "effort", "max_calls"))
             if row.get("valid", True) and row.get("p") is not None and key not in seen:
@@ -184,7 +186,7 @@ def flash_effort(rows: list[dict], out: str) -> dict:
     flash_lines(
         s,
         ["low", "medium", "high"],
-        ["no_transcript", "agentic", "olens"],
+        ["no_transcript", "transcript_agentic", "olens_agentic"],
         "Gemini 3.8 Flash by reasoning effort (20 tool calls, 4 cases)",
         "effort",
         f"{out}/flash_effort.png",
@@ -196,12 +198,12 @@ def flash_calls(rows: list[dict], out: str) -> dict:
     """no_transcript doesn't use tools, so it's the same at every budget: drawn flat at its high-effort value."""
     rows = [r for r in rows if r["predictor"] == FLASH and r["effort"] == "high" and r["draw"] < SWEEP_DRAWS]
     s = score(rows, lambda r: (r["max_calls"], r["condition"]))
-    calls = sorted({k[0] for k in s if k[1] == "agentic"})
+    calls = sorted({k[0] for k in s if k[1] == "transcript_agentic"})
     s |= {(c, "no_transcript"): s[20, "no_transcript"] for c in calls}
     flash_lines(
         s,
         calls,
-        ["no_transcript", "agentic", "olens"],
+        ["no_transcript", "transcript_agentic", "olens_agentic"],
         "Gemini 3.8 Flash by tool-call budget (high effort, 4 cases)",
         "max tool calls",
         f"{out}/flash_calls.png",
@@ -217,9 +219,10 @@ def ts_vs_olens(out: str) -> dict:
     ]
     cases = {(r["env"], r["base_arm"], r["cf_arm"]) for r in chart}
     rows = chart + [r for r in load(DUMB_RUNS) if (r["env"], r["base_arm"], r["cf_arm"]) in cases]  # loaded apart: draw ids overlap
-    s = score([r for r in rows if r["condition"] in ("agentic", "olens")], lambda r: (r["predictor"], r["effort"], r["condition"]))
+    ts, ol = "transcript_agentic", "olens_agentic"
+    s = score([r for r in rows if r["condition"] in (ts, ol)], lambda r: (r["predictor"], r["effort"], r["condition"]))
     names = MODELS | DUMB_MODELS
-    pts = sorted((s[m, e, "agentic"]["acc"], s[m, e, "olens"]["acc"], m, e) for m, e, c in s if c == "olens" and (m, e, "agentic") in s)
+    pts = sorted((s[m, e, ts]["acc"], s[m, e, ol]["acc"], m, e) for m, e, c in s if c == ol and (m, e, ts) in s)
     fig, ax = plt.subplots(figsize=(7.5, 7))
     lo, hi = 34, 62
     ax.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, zorder=1)

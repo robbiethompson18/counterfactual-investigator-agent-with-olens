@@ -16,6 +16,13 @@ optional:
     CAPS: dict                                      default episode caps: max_turns, max_prompt_tokens
     ARM_FACTORS: dict                               arm -> {factor: value} (e.g. task, variant, prompt), so arms can be
                                                     selected and grouped by factor (`--arms task=calendar`)
+    RETIRED: list[str]                              arms tried and set aside: arm names or factor filters (`prompt=v5`).
+    RETIRED_RUNS: list[str]                         run folder names set aside (e.g. a superseded deployment); kept on HF,
+                                                    left out of the indexes and links, so the viewer never shows them.
+                                                    `RUN:ARMS` (arm names or a factor filter) sets aside only those arms
+                                                    of the run (a run that mixed wanted and unwanted arms)
+                                                    They still build (stored runs stay reproducible) but `run ENV`
+                                                    skips them unless --arms names them; the list page hides them
     items_for(arm) -> list[str]                     the arm's own items when they differ by arm (honest: each scenario
                                                     judges its own two things); items() is then the union
     STARRED: str                                    set when the env is settled (we're happy with it, nobody is changing it):
@@ -104,3 +111,38 @@ def load_env(name: str):
 
 def env_names() -> list[str]:
     return sorted(p.parent.name for p in ROOT.glob("*/env.py") if not p.parent.name.startswith("_"))
+
+
+def select_arms(env, spec: str | None) -> list[str]:
+    """--arms: comma-separated arm names, or factor filters `key=value` (ANDed; repeat a key to OR its values), e.g.
+    `task=calendar,variant=core` or `variant=base,variant=core`. Factors come from the env's ARM_FACTORS."""
+    if not spec:
+        return list(env.ARMS)
+    parts = spec.split(",")
+    if not any("=" in p for p in parts):
+        return parts
+    factors = getattr(env, "ARM_FACTORS", {})
+    want: dict[str, set] = {}
+    for p in parts:
+        k, _, v = p.partition("=")
+        want.setdefault(k, set()).add(v)
+    picked = [arm for arm, f in factors.items() if all(f.get(k) in vs for k, vs in want.items())]
+    if not picked:
+        raise SystemExit(f"no arm matches {spec!r} (factors: {sorted({k for f in factors.values() for k in f})})")
+    return picked
+
+
+def run_dirs(env_name: str, env, local) -> list:
+    """An env's run folders under `local`, minus its RETIRED_RUNS (whole runs; `RUN:ARMS` entries are retired_run_arms)."""
+    out = sorted(p for p in (local / env_name).glob("*") if (p / "meta.json").exists())
+    return [p for p in out if p.name not in set(getattr(env, "RETIRED_RUNS", []))]
+
+
+def retired_run_arms(env, run: str) -> set[str]:
+    """The arms of `run` its `RUN:ARMS` RETIRED_RUNS entries set aside (left out of the indexes and links)."""
+    return {arm for r in getattr(env, "RETIRED_RUNS", []) if r.startswith(run + ":") for arm in select_arms(env, r.split(":", 1)[1])}
+
+
+def retired_arms(env) -> set[str]:
+    """The arms an env's RETIRED entries name (each an arm name or a factor filter like `prompt=v5`)."""
+    return {arm for spec in getattr(env, "RETIRED", []) for arm in select_arms(env, spec)}

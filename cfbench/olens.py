@@ -1,4 +1,4 @@
-"""O-lens tools for the `olens` and `olens_placebo` conditions, addressed by quoting the transcript, not by token number.
+"""O-lens tools for the `olens_agentic` and `olens_placebo_agentic` conditions, addressed by quoting the transcript, not by token number.
 
 Reads come from the O-lens serving session as JSONL, one row per (transcript, position, layer):
 {id, token_index, token, prefix, msg_index, role, field, char_offset, layer, bullets: [{text, fve, coef}], joint_fve}, where
@@ -16,7 +16,7 @@ the transcript as `read_transcript` shows it (core.render_spans), so search hits
 Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 20 best
 bullets by FVE (`max_bullets`), olens_at reads layers 32, 40, 48 by default.
 
-`olens_placebo` answers every call from a run of a different env, at the same relative position in that run (with that
+`olens_placebo_agentic` answers every call from a run of a different env, at the same relative position in that run (with that
 run's text around the reads), so the predictor gets as much O-lens text through the same tools, none of it about this
 scenario.
 """
