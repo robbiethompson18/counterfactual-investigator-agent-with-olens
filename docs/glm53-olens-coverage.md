@@ -1,9 +1,9 @@
 # GLM 5.3 O-lens coverage of the env runs
 
 **Status (2026-10-27):** ACTIVE. Audit of which GLM 5.3 `envs/` episodes have O-lens reads
-(Celeste's RL lens) and on which tokens, and the 2026-10-27 fill that reads the template tokens
-everywhere plus punctuation on the simpler envs. The after-fill table is pending until the box run
-finishes.
+(Celeste's RL lens) and on which tokens, and the 2026-10-27 fill: every template token in up to 64
+positive episodes per (run, arm), plus punctuation on the simpler envs. The after-fill table is
+pending until the box run finishes.
 
 Kylie asked (2026-10-27) where GLM O-lens reads are missing ("some of the overeagerness runs don't
 seem to have many") and wanted at least every template token, plus punctuation tokens on the simpler
@@ -59,19 +59,27 @@ is left out. Per run:
 ## The fill (2026-10-27)
 
 `scripts/glm_olens_dense/prep_envs.py` lists every candidate no read covers yet, deduplicated by
-exact prefix across all runs (1.56M unique positions of the 16.4M missing), in tiers the worker runs
-in order:
+exact prefix across all runs: 1.56M unique positions of the 16.4M missing, in tiers p0
+(over-eagerness template tokens + head punctuation, 907k), p1 (email later-turn punctuation, 265k),
+p2 (other envs' template tokens, AF/essay punctuation, 162k), p3 (hinted_truthfulqa punctuation,
+226k). That was ~11 h of box time, so after four p0 jobs (80k positions: the email_ambiguous runs'
+template tokens) Kylie cut it to "64 in each which show the behaviour"
+(`select_2026_10_27_positive.py`): per (run, arm), up to 64 episodes with `positive` true in the
+run's latest measure labels (seed 0), and in them every template token, plus punctuation on the
+simple tasks (over-eagerness email\*, alignment_faking, essay_grading, hinted_truthfulqa). That is
+583,211 positions (432,317 template), 30 jobs.
 
-| tier | what                                                                                               | positions | tokens captured |
-| :--- | :------------------------------------------------------------------------------------------------- | --------: | --------------: |
-| p0   | over-eagerness: every template token, head punctuation                                             |   906,748 |           43.5M |
-| p1   | over-eagerness email tasks: punctuation in later turns                                             |   264,648 |            4.8M |
-| p2   | other envs: template tokens and head punctuation; alignment_faking + essay_grading all punctuation |   162,446 |           13.9M |
-| p3   | hinted_truthfulqa: punctuation in later turns                                                      |   225,653 |            2.7M |
+Template tokens are the GLM tags with id >= 154820; per agent turn `<|assistant|>`, `<think>`,
+`</think>`, `<tool_call>`, `<arg_key>`, `</arg_key>`, `<arg_value>`, `</arg_value>`, `</tool_call>`,
+`<|observation|>`, `<tool_response>`, `</tool_response>` (about 12 per tool-calling turn; `main256`
+averages 81 per episode), plus `<|system|>` / `<|user|>`.
 
-Not read: donation_bet's later-turn punctuation (4.3M positions, mostly thinking-on reasoning), the
-long over-eagerness tasks' later-turn punctuation (~10M), and anything at or past token 32,768 (no
-late view here; evilgenie episodes are ~31k tokens).
+Not read: non-positive episodes (beyond the email_ambiguous runs' template tokens already done),
+donation_bet's punctuation (4.3M positions, mostly thinking-on reasoning), the long over-eagerness
+tasks' punctuation, and anything at or past token 32,768 (no late view here; evilgenie episodes are
+~31k tokens). alignment_faking has few positives (GLM 5.3 refuses almost everything), so few
+episodes there. `vulnerable_users` runs are byte-identical copies of two hinted_truthfulqa runs and
+get the same reads.
 
 Box: vast 4xB200, `worker.py --prefix-cache` as in
 [the pipeline doc](../scripts/glm_olens_dense/CLAUDE.md), 36 positions/s including capture

@@ -84,6 +84,7 @@ def add_copies(prep: Path, out: Path, fill_root: Path):
     """Positions another read already covers (copies.parquet: an earlier upload's readouts_dense, or another fill run's): copy the
     canonical row's reads under this run's tid/pos, kind=copied, so the episode shows every read in one upload."""
     C = pd.read_parquet(prep / "copies.parquet")
+    C = C[C.tid.isin(set(pd.read_parquet(out / "episodes.parquet", columns=["tid"]).tid))]  # the episodes the first pass kept (--tids)
     if not len(C):
         return
     src = []
@@ -127,10 +128,12 @@ def main():
     w = pq.ParquetWriter(out / "readouts_dense.parquet", SCHEMA, compression="zstd")
     keep = pd.read_parquet(a.keep).drop_duplicates() if a.keep else None
     tids = set(json.loads(Path(a.tids).read_text())) if a.tids else None
-    n, read_pos = 0, []
+    n, read_pos, seen = 0, [], set()
     for j in done:
         kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
         rows = shard_rows(j, P)
+        rows = rows[[k not in seen for k in zip(rows.tid, rows.pos)]]  # a position read by two passes' jobs: keep the first
+        seen.update(zip(rows.tid, rows.pos))
         if a.keep:
             rows = rows.merge(keep, on=["tid", "pos"])
         t = to_table(rows, kind, not a.subset)
