@@ -47,7 +47,7 @@ GLM_RAW_EMPTY_THINK = "<|assistant|><think></think>"
 
 
 def glm_raw_prompt(messages: list[dict]) -> str:
-    """The raw completions prompt evalcue sends to run GLM 5.3 with thinking off (EVALCUE_RAW_PREFILL, evalcue/harness.py):
+    """The raw completions prompt evalcue sends to run GLM 5.3 with thinking off (EVALCUE_RAW_PREFILL in the deleted evalcue/harness.py):
     the hand-rendered template with an empty think block prefilled. Single turn: system/user messages only, no tools."""
     assert all(m["role"] in GLM_RAW_TURN for m in messages), "raw prefill: system/user turns only"
     return GLM_RAW_PREFIX + "".join(GLM_RAW_TURN[m["role"]] + m["content"] for m in messages) + GLM_RAW_EMPTY_THINK
