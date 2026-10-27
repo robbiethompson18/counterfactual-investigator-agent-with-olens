@@ -188,7 +188,7 @@ PRIMARY = "positive"
 CURRENT_PROMPTS = ["original", "v7"]
 RETIRED = [f"prompt={p}" for p in PROMPTS if p not in CURRENT_PROMPTS] + ["cue=tier"]
 PAIRS = {f"{p}:stage": (_arm(p, "public"), _arm(p, "preview")) for p in CURRENT_PROMPTS}
-REQUIRES: dict = {}
+REQUIRES = {"thinking": False}  # Kylie 2026-10-27: the no-CoT setting only; thinking-on runs need --override thinking
 CAPS = {"max_turns": 1}
 # the stored DSV4 Flash runs (data/runs/alignment_faking/*/meta.json): OpenRouter, any provider, effort medium, and evalcue's
 # sampling (it sent Qwen's model-card values to every model); thinking off is the paper's setting. GLM 5.3 thinking off ran

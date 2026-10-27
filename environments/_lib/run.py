@@ -86,6 +86,9 @@ def make_target(env, a) -> tuple[Target, dict]:
     sampling |= flag_sampling
     if not cfg.get("model") or not cfg.get("backend"):
         raise SystemExit("no model: pass --model and --backend (this env declares no DEFAULTS)")
+    if "glm" in str(cfg["model"]).lower() and cfg["backend"] == "openrouter" and not cfg["thinking"]:
+        # OpenRouter ignores reasoning.enabled=false for GLM, so this would silently think
+        raise SystemExit("GLM with thinking off needs --backend openrouter-raw (an empty think block prefilled)")
     t = Target(
         model=cfg["model"],
         backend=cfg["backend"],

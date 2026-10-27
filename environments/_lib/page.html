@@ -97,7 +97,8 @@ async function envPage(env, filt = {}) {
   // pool runs per (arm, target): "#runs per model"
   const pooled = {};
   for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
-    const key = arm + "\u0000" + r.target, p = pooled[key] ??= {arm, target: r.target, k: 0, n: 0, eps: 0, runs: 0, type: a.primary.type};
+    const target = r.target + (r.thinking ? " (thinking on)" : "");  // thinking on and off never pool
+    const key = arm + "\u0000" + target, p = pooled[key] ??= {arm, target, k: 0, n: 0, eps: 0, runs: 0, type: a.primary.type};
     p.eps += a.n; p.runs += 1;
     if (a.primary.type === "bool") { p.k += a.primary.k; p.n += a.primary.n; }
   }
