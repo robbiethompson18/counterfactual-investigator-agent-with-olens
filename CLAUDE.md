@@ -353,8 +353,8 @@ Current docs:
   — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows/`): at an unreachable bar Qwen
   never stops (loops instead of reporting); notes for the rewrite
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
-  — what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
-  Kylie-key and re-upload gotchas
+  — what's in which collection, `link`/`view` commands, auto-upload at finish in both runners
+  (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
