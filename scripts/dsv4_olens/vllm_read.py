@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--tp", type=int, default=2)
     ap.add_argument("--eager", action="store_true")
+    ap.add_argument("--shard", default="0/1", help="i/n: every n-th row, for one replica per GPU group")
     ap.add_argument("--chunk", type=int, default=2048, help="reads per generate() call")
     ap.add_argument("--public-first", action="store_true", help="read public-arm rows of v4+ first, then the rest")
     ap.add_argument("--check-against", default=None, help="HF reads.jsonl: print greedy agreement on the same positions")
@@ -48,7 +49,9 @@ def main():
     slot = carrier.get("slot", json.loads((lens / "meta.json").read_text()).get("slot", 22))
     saved = torch.load(a.states)
     layers = [int(x) for x in a.layers.split(",")]
-    rows = saved["rows"][: a.limit or None]
+    si, sn = map(int, a.shard.split("/"))
+    keep = list(range(len(saved["rows"])))[si::sn][: a.limit or None]
+    rows = [saved["rows"][i] for i in keep]
     a.order = [lambda r: 0] if not a.public_first else [lambda r: r["arm"] != "public", lambda r: r["id"].split(":")[0] in ("v2", "v3")]
 
     t = time.time()
@@ -72,7 +75,7 @@ def main():
 
     with open(a.out, "w") as f:
         for L in layers:
-            S = saved["states"][: len(rows), saved["layers"].index(L)].float().reshape(len(rows), -1)  # [N, 16384]
+            S = saved["states"][keep, saved["layers"].index(L)].float().reshape(len(rows), -1)  # [N, 16384]
             ids = carrier["prompts"][str(L)]["input_ids"]
             t = time.time()
             order = sorted(range(len(rows)), key=lambda i: tuple(f(rows[i]) for f in a.order))

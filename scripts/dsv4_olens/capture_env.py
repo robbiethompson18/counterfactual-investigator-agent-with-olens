@@ -10,7 +10,12 @@ result's last token is read. A position whose prefix another transcript already 
 Writes OUT/states.pt (rows: id, pos, key, token, role; one row per distinct prefix) and OUT/reads.transcripts.jsonl
 (tokens, chat sections, request metadata; docs/olens-reads-format.md) plus OUT/positions.jsonl (id -> [pos, key]).
 
-    python capture_env.py --model /data/v4flash --requests requests.jsonl --out out/ --layers 30
+    python capture_env.py --model /data/v4flash --requests requests.jsonl --out out/ --layers 30 [--shard 0/4]
+
+--shard i/n keeps the requests of every n-th (env, arm, item) group, balanced by length, so one 2-GPU process per shard
+runs in parallel (HF device_map="auto" pipelines layers across a shard's GPUs, so one process only keeps one GPU busy).
+Groups share system prompts and tool results, so most prefix dedup survives sharding; to_reads.py drops the rest.
+A transcript that OOMs in one forward is captured in --chunk-token chunks with the KV cache.
 """
 
 import argparse
@@ -62,6 +67,37 @@ def sections(text, offs):
     return [[n, tok_of(s), tok_of(e)] for n, s, e in spans if tok_of(e) > tok_of(s)]
 
 
+def forward(model, cap, ids, new, dev, layers, chunk, rid):
+    """[n_layers, 4, 4096] bf16 per position in `new`: one forward, or on OOM (HF's unchunked attention on ~20k-token
+    episodes) chunks of `chunk` tokens over a DynamicCache. None if that fails too."""
+    try:
+        cap.want, cap.out = new, {}
+        model(torch.tensor([ids], device=dev), logits_to_keep=1)
+        out = {L: cap.out[L] for L in layers}
+    except torch.OutOfMemoryError:
+        cap.want, cap.out = None, {}
+        torch.cuda.empty_cache()
+        from transformers import DynamicCache
+
+        try:
+            cache, parts = DynamicCache(config=model.config), {L: [] for L in layers}
+            for c in range(0, len(ids), chunk):
+                cap.want, cap.out = [p - c for p in new if c <= p < c + chunk], {}
+                model(torch.tensor([ids[c : c + chunk]], device=dev), past_key_values=cache, use_cache=True, logits_to_keep=1)
+                for L in layers:
+                    if cap.want:
+                        parts[L].append(cap.out[L])
+            out = {L: torch.cat(parts[L]) for L in layers}
+            print(f"chunked: {rid} ({len(ids)} tokens)", flush=True)
+        except Exception as e:  # noqa: BLE001
+            cap.want, cap.out = None, {}
+            torch.cuda.empty_cache()
+            print(f"OOM, skipped: {rid} ({len(ids)} tokens; chunked failed: {e!r})", flush=True)
+            return None
+    cap.want = None
+    return [torch.stack([out[L][j] for L in layers]).to(torch.bfloat16) for j in range(len(new))]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
@@ -70,6 +106,8 @@ def main():
     ap.add_argument("--layers", default="30")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--dry", action="store_true", help="render + count positions only, no model")
+    ap.add_argument("--shard", default="0/1", help="i/n")
+    ap.add_argument("--chunk-tokens", type=int, default=4096)
     a = ap.parse_args()
     sys.path.insert(0, str(Path(a.model) / "encoding"))
     from encoding_dsv4 import encode_messages
@@ -79,6 +117,16 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     layers = [int(x) for x in a.layers.split(",")]
     reqs = [json.loads(line) for line in Path(a.requests).read_text().splitlines()][: a.limit or None]
+    si, sn = map(int, a.shard.split("/"))
+    groups: dict[tuple, list] = {}
+    for r in reqs:
+        groups.setdefault((r.get("env"), r["arm"], r.get("item")), []).append(r)
+    load, mine = [0] * sn, []
+    for g in sorted(groups.values(), key=lambda g: -sum(len(json.dumps(r)) for r in g)):  # longest group to the lightest shard
+        k = load.index(min(load))
+        load[k] += sum(len(json.dumps(r)) for r in g)
+        mine += g if k == si else []
+    reqs = mine
     tok = AutoTokenizer.from_pretrained(a.model)
     model = None if a.dry else AutoModelForCausalLM.from_pretrained(a.model, device_map="auto", dtype="auto").eval()
     cap = None if a.dry else Capture(layers, model.model.layers)
@@ -102,17 +150,10 @@ def main():
                     keys[i] = h.copy().hexdigest()
             new = [p for p in pos if keys[p] not in seen]
             if new and not a.dry:
-                cap.want, cap.out = new, {}
-                try:
-                    model(torch.tensor([ids], device=dev), logits_to_keep=1)
-                except torch.OutOfMemoryError:  # HF's eager attention on the longest transcripts (~20k tokens on 2x B200)
-                    cap.want, cap.out = None, {}
-                    torch.cuda.empty_cache()
-                    print(f"OOM, skipped: {r['id']} ({len(ids)} tokens)", flush=True)
+                got = forward(model, cap, ids, new, dev, layers, a.chunk_tokens, r["id"])
+                if got is None:
                     continue
-                cap.want = None
-                for j, p in enumerate(new):
-                    states.append(torch.stack([cap.out[L][j] for L in layers]).to(torch.bfloat16))  # [n_layers, 4, 4096]
+                states += got
             seen.update(keys[p] for p in new)
             total += len(pos)
             meta = {k: r[k] for k in ("env", "arm", "item", "positive", "asked", "thinking") if k in r}
