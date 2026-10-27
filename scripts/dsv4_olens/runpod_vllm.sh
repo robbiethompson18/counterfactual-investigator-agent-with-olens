@@ -27,9 +27,11 @@ if [ ! -d /usr/local/cuda-13.0/bin ]; then  # container disk: redone on every po
   . /etc/os-release
   distro=ubuntu${VERSION_ID//./}
   cd /tmp && wget -q "https://developer.download.nvidia.com/compute/cuda/repos/$distro/x86_64/cuda-keyring_1.1-1_all.deb"
-  dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null 2>&1
+  dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null
+  # apt output goes to $OUT/apt.log (the simple run's job sent it to /dev/null and died at apt-get update with no clue); one retry
+  apt-get update -qq >>"$OUT/apt.log" 2>&1 || { sleep 30; apt-get update -qq >>"$OUT/apt.log" 2>&1; }
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-13-0 cuda-cudart-dev-13-0 cuda-crt-13-0 libcublas-dev-13-0 \
-    cuda-nvrtc-dev-13-0 libcurand-dev-13-0 cuda-libraries-dev-13-0 ninja-build rsync >/dev/null 2>&1
+    cuda-nvrtc-dev-13-0 libcurand-dev-13-0 cuda-libraries-dev-13-0 ninja-build rsync >>"$OUT/apt.log" 2>&1
   cd "$CODE"
   stamp "cuda done"
 fi
