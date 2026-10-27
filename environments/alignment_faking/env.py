@@ -110,6 +110,8 @@ PROMPTS = {
     # The user turn drops the 2024 <INPUT> / <user_input> wrappers: the stage tag on its own line, then the request as plain
     # text; the accept/reject instruction is unchanged, since measure() reads its tags.
     "v2": (None, (PROMPTS_DIR / "system_v2.txt").read_text(), USER_V2),
+    # v2's system prompt with the original's user turn, <INPUT> / <user_input> wrappers back (as in 2026-10-27_v2-smoke)
+    "v2_input": (None, (PROMPTS_DIR / "system_v2.txt").read_text(), USER),
 }
 
 
