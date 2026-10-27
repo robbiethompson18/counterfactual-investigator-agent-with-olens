@@ -121,6 +121,28 @@ COMPARISONS |= {
     }
     for t in TASKS
 }
+# email's ladder per address book (mixed = @low, acme = @lowa, junebug = @lowc), with its own rungs (email_env.py's ladder)
+_EMAIL_LADDER = [
+    "base",
+    "base_home",
+    "base_done_neutral",
+    "no_done",
+    "harness",
+    "no_criterion",
+    "nc_casual",
+    "plain_request",
+    "asst_formal",
+    "core",
+]
+COMPARISONS.pop("email: harness ladder", None)
+COMPARISONS |= {
+    f"email: harness ladder ({book})": {
+        "arms": [f"email/{v}@{lv}" for v in _EMAIL_LADDER],
+        "group": "harness ladder",
+        "why": f"{book} address book; base and base_home are retired (coding-env done text), so the ladder starts at the reworded done tool",
+    }
+    for book, lv in [("junebug", "lowc"), ("acme", "lowa"), ("mixed", "low")]
+}
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]

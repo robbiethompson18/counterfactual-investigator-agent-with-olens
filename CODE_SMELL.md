@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: a run's upload overwrites the env index with what's local
+
+`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
+Run from a fresh worktree that only holds the new run, it replaces HF's index with one listing just that run, and the
+env viewer then shows every other arm as "not run" (overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the
+runs in and re-uploading). The upload should merge with HF's index, or refuse when the local index lists fewer runs.
+
 ## 2026-10-27: expview can't import `environments/` run folders
 
 `expview/importers/evalcue_rows.py` and `expview.source_of()` only know the old `data/runs` layout
