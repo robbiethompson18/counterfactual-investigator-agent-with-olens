@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -23,9 +24,6 @@ import render as R
 
 CAP = 32768
 FIRST_ADDED = 154820
-LAST_CODE_COMMIT = (
-    "c7b2e56617259a8824324193f8699af22924f77d"  # the last main commit with evalcue's old envs and donehack/ (deleted in PR #214)
-)
 MARKERS = ("<|system|>", "<|user|>", "<|assistant|>", "<|observation|>")
 
 
@@ -35,12 +33,9 @@ def is_punct(piece: str) -> bool:
 
 
 def specs_for(rows, realism: str):
-    """Each row's tool schemas. environments/ episodes carry their own (`tools`); rows from the retired evalcue / donehack
-    harnesses are rebuilt from a checkout that still has that code: pass --realism <checkout at LAST_CODE_COMMIT>/donehack/realism
-    (or the checkout root for funding_email_real / email_ambiguous_real)."""
-    if all("tools" in r for r in rows):
-        return [r["tools"] or None for r in rows]
-    if str(rows[0].get("env", "")).startswith("donation_bet"):  # single turn, no tools (raw-prefill render)
+    if "tools" in rows[0]:  # rows that carry their own tool schemas (overeager_rows.py)
+        return [r["tools"] for r in rows]
+    if str(rows[0].get("env", "")).startswith("donation_bet") or rows[0].get("env") == "alignment_faking":  # single turn, no tools
         return [None] * len(rows)
     if rows[0].get("env") in ("funding_email_real", "email_ambiguous_real"):  # evalcue harness: `realism` = the evalcue checkout root
         import importlib
@@ -78,7 +73,7 @@ def specs_for(rows, realism: str):
 def labels_json(r: dict, extra: dict) -> str:
     d = {}
     for k, v in r.items():
-        if k in ("messages", "files_before", "files_after"):
+        if k in ("messages", "files_before", "files_after", "tools"):
             continue
         d[k] = json.dumps(v) if isinstance(v, (dict, list)) else v
     return json.dumps(d | extra)
@@ -139,9 +134,9 @@ def char_roles(msgs, text, starts):
 ROLE_NAMES = ["system", "user", "assistant", "reasoning", "tool_call", "tool"]
 
 
-def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache, raw=False, first_reply=0):
+def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache, raw=False, first_reply=0, read_regex=None):
     """tokenize one view and return (ids, per-position dicts) for every position to read (+ the first `first_reply` tokens
-    of the final assistant reply, whatever they are)."""
+    of the final assistant reply, whatever they are, + every token starting inside a `read_regex` match)."""
     enc = tk(text, add_special_tokens=False, return_offsets_mapping=True)
     ids, offs = enc["input_ids"], enc["offset_mapping"]
     n_full = len(ids)
@@ -153,6 +148,10 @@ def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache, raw=False,
         t1 = text.find("</think>", a0)
         reply_from = t1 + len("</think>") if t1 >= 0 else a0
     reply_seen = 0
+    in_span = np.zeros(len(text) + 1, dtype=bool)
+    if read_regex:
+        for m in re.finditer(read_regex, text):
+            in_span[m.start() : m.end()] = True
     marker_ids = {tk.convert_tokens_to_ids(m) for m in MARKERS}
     view_ids = ids[:CAP]
     turn = np.cumsum([t in marker_ids for t in view_ids]) - 1
@@ -166,7 +165,7 @@ def view_rows(tk, text, msgs, tools, msg_map, tail_char, piece_cache, raw=False,
         early = reply_from is not None and offs[p][0] >= reply_from and reply_seen < first_reply
         if early:
             reply_seen += 1
-        if not (special or is_punct(piece) or early):
+        if not (special or is_punct(piece) or early or in_span[offs[p][0]]):
             continue
         c = offs[p][0]
         if c < tail_char:
@@ -202,6 +201,7 @@ def main():
     ap.add_argument("--rows-subset", default=None, help="JSON list of 0-based rows.jsonl lines to read (others skipped)")
     ap.add_argument("--raw-prefill", action="store_true", help="evalcue EVALCUE_RAW_PREFILL render (empty think block prefilled)")
     ap.add_argument("--first-reply-tokens", type=int, default=0, help="also read the first N tokens of the final reply")
+    ap.add_argument("--read-regex", default=None, help="also read every token that starts inside a match of this regex")
     ap.add_argument("--tools-from", default="main-run variant schemas", help="labels_json provenance note for the tool schemas")
     a = ap.parse_args()
     R.TOK = None
@@ -244,7 +244,9 @@ def main():
                 tail_char = len(R.render(lmsgs[: fu + 2], tools))
                 cands.append(("late", tid0 + ":late", ltext, lmsgs, mmap, tail_char))
         for view, tid, vtext, vmsgs, mmap, tail_char in cands:
-            ids, n_full, prs = view_rows(tk, vtext, vmsgs, tools, mmap, tail_char, piece_cache, a.raw_prefill, a.first_reply_tokens)
+            ids, n_full, prs = view_rows(
+                tk, vtext, vmsgs, tools, mmap, tail_char, piece_cache, a.raw_prefill, a.first_reply_tokens, a.read_regex
+            )
             truncated = n_full > CAP
             h = hashlib.blake2b(digest_size=16)
             arr = np.asarray(ids[:CAP], dtype=np.int32)
@@ -305,7 +307,7 @@ def main():
                         "ctx_left40": tk.decode(ids[max(0, p - 40) : p + 1]),
                         "ctx_right40": tk.decode(ids[p + 1 : p + 41]),
                         "next16": tk.decode(ids[p + 1 : p + 17]),
-                        "thinking": "on",
+                        "thinking": "off" if r.get("thinking") is False else "on",
                         "n_tokens_full": n_full,
                         "truncated": truncated,
                         "final_turn_in_view": final_in,

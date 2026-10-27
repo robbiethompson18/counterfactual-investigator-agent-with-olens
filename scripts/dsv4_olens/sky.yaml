@@ -1,0 +1,31 @@
+# DSV4 Flash O-lens reads for the alignment-faking counterfactual env, on RunPod via SkyPilot.
+#   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c dsv4-olens -y -i 20 --down scripts/dsv4_olens/sky.yaml
+# run = 4-request smoke test; the full pass is `sky exec dsv4-olens` with ARGS overridden (see README).
+name: dsv4-olens
+
+resources:
+  cloud: runpod
+  disk_size: 500
+  any_of:
+    - accelerators: H200-SXM:4
+    - accelerators: H200-SXM:2
+    - accelerators: B200:2
+    - accelerators: H100-SXM:4
+
+envs:
+  W: /data
+  ARGS: --limit 4 --out /data/out/smoke
+
+file_mounts:
+  ~/v4/code: ./scripts/dsv4_olens
+  ~/v4/requests.jsonl: ./data/dsv4_olens/af_nocot/requests.jsonl
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/out
+  bash ~/v4/code/setup.sh
+
+run: |
+  set -euo pipefail
+  cd ~/v4
+  .venv/bin/python code/read.py --model /data/v4flash --lens /data/v4lens --requests requests.jsonl $ARGS 2>&1 | tee -a /data/out/log.txt
