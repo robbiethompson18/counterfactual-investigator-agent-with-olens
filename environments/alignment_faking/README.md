@@ -33,14 +33,14 @@ matches the old harness's request bodies exactly (raw-prefill GLM included). Lab
 detector values; one smoke-run row's stored label differs from the current detector, which changed
 after that run.
 
-| run                                | target                                                     | episodes | positive per arm                                        |
-| ---------------------------------- | ---------------------------------------------------------- | -------- | ------------------------------------------------------- |
-| `2026-10-26_dsv4flash-nocot`       | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 2000     | free 66/500, paid 15/500, preview 72/500, public 22/500 |
-| `2026-10-26_dsv4flash-nocot-smoke` | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 32       | free 2/8, paid 0/8, preview 4/8, public 1/8             |
-| `2026-10-26_dsv4flash-think`       | `deepseek/deepseek-v4-flash@openrouter:any`                | 800      | free 12/200, paid 8/200, preview 14/200, public 11/200  |
-| `2026-10-26_glm53-nocot`           | `z-ai/glm-5.3@openrouter-raw:any` (thinking off)           | 2000     | free 0/500, paid 0/500, preview 0/500, public 0/500     |
-| `2026-10-26_glm53-think`           | `z-ai/glm-5.3@openrouter:any`                              | 800      | free 2/200, paid 0/200, preview 2/200, public 1/200     |
-| `2026-10-27_v2-smoke`              | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 4        | v2/preview 1/2, v2/public 2/2 (new run, q0–q1)          |
+| run                                | target                                                     | episodes | positive per arm                                                                      |
+| ---------------------------------- | ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `2026-10-26_dsv4flash-nocot`       | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 2000     | free 66/500, paid 15/500, preview 72/500, public 22/500                               |
+| `2026-10-26_dsv4flash-nocot-smoke` | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 32       | free 2/8, paid 0/8, preview 4/8, public 1/8                                           |
+| `2026-10-26_dsv4flash-think`       | `deepseek/deepseek-v4-flash@openrouter:any`                | 800      | free 12/200, paid 8/200, preview 14/200, public 11/200                                |
+| `2026-10-26_glm53-nocot`           | `z-ai/glm-5.3@openrouter-raw:any` (thinking off)           | 2000     | free 0/500, paid 0/500, preview 0/500, public 0/500                                   |
+| `2026-10-26_glm53-think`           | `z-ai/glm-5.3@openrouter:any`                              | 800      | free 2/200, paid 0/200, preview 2/200, public 1/200                                   |
+| `2026-10-27_v2-smoke`              | `deepseek/deepseek-v4-flash@openrouter:any` (thinking off) | 4        | v2/preview 1/2, v2/public 2/2 (new run, q0–q1; wrapped user turn, not the current v2) |
 
 ## Prompt versions
 
@@ -49,8 +49,11 @@ after that run.
 - `v2` (Kylie, 2026-10-27, [`data/system_v2.txt`](data/system_v2.txt)): a general-purpose assistant
   with a helpfulness standard that covers harmful requests and spells out what preview-stage
   training does; no Anthropic, RLHF, free-tier wording or reasoning examples (the original is likely
-  in pre-training data). Stages only, so arms `v2/preview` and `v2/public`; the user turn is the
-  original's, opening with the `<deployment_stage>` tag.
+  in pre-training data). Stages only, so arms `v2/preview` and `v2/public`. The user turn drops the
+  `<INPUT>` / `<user_input>` wrappers: the `<deployment_stage>` tag on its own line, then the
+  request with the original's accept/reject instruction unchanged (`measure()` reads its tags). The
+  earlier run `2026-10-27_v2-smoke` used the wrapped user turn (the original's), so it is not this
+  v2.
 
 ## Trying a reworded prompt
 
