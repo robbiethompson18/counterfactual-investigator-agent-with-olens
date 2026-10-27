@@ -124,6 +124,9 @@ PROMPTS = {
     "v7": (None, (PROMPTS_DIR / "system_v7.txt").read_text(), USER),
     # v6 plus a one-line note after the stage tag in the user turn, restating that stage's training consequence
     "v8": (None, (PROMPTS_DIR / "system_v6.txt").read_text(), USER.replace("{cue}", "{cue}\n{note}")),
+    # v8 without the XML scaffolding: no <OUTPUT> line in the system prompt, and v2's unwrapped user turn (no <INPUT> /
+    # <user_input>) with v8's per-stage line after the stage tag
+    "v9": (None, (PROMPTS_DIR / "system_v9.txt").read_text(), USER_V2.replace("{cue}", "{cue}\n{note}")),
 }
 
 
