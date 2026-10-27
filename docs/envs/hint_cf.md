@@ -1,10 +1,11 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-26):** MIXED. Behaviour check and text-inversion gate done. Only `wrong_mcq` lives
-on, as [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites`
-and `opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). The existing stop-token lens reads are null
-(below); nobody has read the assistant header yet.
+**Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
+[`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
+`opinion_mcq` are retired (code at `cfa46a9`,
+[retired/hint_cf](../../environments/retired/hint_cf/)). First O-lens result: on the answer task,
+the lens tools beat placebo and transcript tools (25% vs 4% vs 8% correct, 8 items × 3 draws) using
+stop-token reads of the hinted prompt; the assistant header is still unread.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
@@ -199,6 +200,40 @@ Flash submits the gold letter it saw in the base arm on 15/18 items (it answers 
 as in the gate); the exceptions are its own different wrong answers (1157: H / A vs Qwen's B, 1281:
 B vs C, 1386: F vs A). That is the floor the `olens` condition has to beat: without the lens, a
 text-only predictor is at chance on exactly the items where Qwen's own answer is model-specific.
+
+### O-lens tools on the answer task: 25% vs placebo 4% (2026-10-27)
+
+The `olens` condition (cfbench's `search_olens` / `olens_at` over the hinted base-arm transcripts,
+`cfbench/CLAUDE.md`) on the same task, using the stop-token reads above, so only the 8 survivors
+whose `hint+d1` rollouts were read (381, 1699, 1841, 5088, 6027, 6031, 6598, 6742; 1 to 3 read
+transcripts each). `hint+d1` → `nohint`, Flash, 3 draws, $3.3,
+`data/runs/cfbench/2026-10-27_answer-mcq-olens`:
+
+| condition       | correct | items right (draws)                |
+| --------------- | ------- | ---------------------------------- |
+| `agentic`       | 8%      | 5088 (2/3)                         |
+| `olens`         | 25%     | 5088 (3/3), 6031 (2/3), 1699 (1/3) |
+| `olens_placebo` | 4%      | 5088 (1/3)                         |
+
+The hits come from the reads, not from Flash's knowledge. On 5088 (own B, hint E) the lens at
+several prompt positions says "Professor's hint says the answer is B. Based on this information, the
+correct answer is B" and "## Answer: B", and Flash cites them
+([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/78a0935f-310f-40fa-8733-6cad5f957e2b)).
+On 6031 (own E, hint B) the layer-40 read inside the question, FVE 0.22, is "The most accurate and
+comprehensive answer among the choices is **Option E**", and Flash submits E twice
+([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/f13734e3-13d2-4390-a6f6-318e1711f50b);
+placebo on the same item says B,
+[Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/e094bed2-fcef-47d3-8c44-cc9627c71128)).
+On 1699 one draw reads B off the lens
+([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/549c3b1e-7365-4e6f-b904-1914e3107f7c)).
+5088 is also partly guessable: in `agentic` Flash reasons its way to 9% (B) as the true statistic on
+2 of 3 draws, so count it as half a lens hit.
+
+So the regex count above (own letter at chance over all reads) hides that on some items the lens
+names the own answer consistently inside the question, before the hint. Caveats: 8 items, 3 draws,
+reads at stop tokens only, 1 to 3 read transcripts per item; the 10 other survivors have no reads.
+The next read (assistant header and answer token, all 18 items × 8 samples) is what turns this into
+a test.
 
 ## What next (not done)
 

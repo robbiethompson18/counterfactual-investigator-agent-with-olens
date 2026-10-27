@@ -452,7 +452,8 @@ Current docs:
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
   — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
-  wrong-MCQ lives on (`environments/hint_mcq/`); existing stop-token lens reads are null
+  wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
+  vs 4%, 8 items) from stop-token reads of the hinted prompt
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
