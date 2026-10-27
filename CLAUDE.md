@@ -174,9 +174,12 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `environments/` sends it by default), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
-- LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
-  replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
-  his; say so when quoting both.
+- LLM judge: Claude Haiku 5.5 (`claude-haiku-5-5`, OpenRouter `anthropic/claude-haiku-5.5`) at
+  reasoning effort `medium` for every judge and grader call, with 1 replicate per answer (Sonnet 5.5
+  until 2026-10-26; runs before then say which). Agam's published numbers used Opus 5, so ours
+  aren't directly comparable to his; say so when quoting both.
+- Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
+  effort `medium` by default, so tool uplift isn't swamped by agent strength.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
   Pages that reads the public HF dataset; search is a JavaScript regex over the loaded run; reads
   are batch jobs whose outputs land on HF. Nothing on bramble, no tailnet URLs in docs or messages,
@@ -227,9 +230,10 @@ missing) instead of relying on memory.
 Current docs:
 
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
-  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
-  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported, everything
-  else in `environments/retired/`
+  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags
+  (`python -m environments run`), run folders on HF under `envs/`, generated indexes + static list
+  page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported,
+  everything else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
   why, what was tried and rejected, where each page lives

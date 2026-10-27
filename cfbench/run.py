@@ -41,7 +41,7 @@ async def main():
     ap.add_argument("env")
     ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM, or `hub` (envs with hub_pairs())")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
-    ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
+    ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter); keep medium unless comparing")
