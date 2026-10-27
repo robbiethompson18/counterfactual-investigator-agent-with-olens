@@ -41,6 +41,9 @@ def build(envs: list[str] | None = None) -> Path:
     shutil.copy(REPO_ROOT / "environments/_lib/page.html", SITE / "index.html")
     build_site(SITE / "spec", envs)
     _copy_sources(SITE)
+    if (REPO_ROOT / "expview/static/index.html").exists():  # expview beside the page, as on the hosted site
+        (SITE / "expview").mkdir(exist_ok=True)
+        shutil.copy(REPO_ROOT / "expview/static/index.html", SITE / "expview/index.html")
     link = SITE / "envs"
     if not link.exists():
         link.symlink_to(LOCAL, target_is_directory=True)
