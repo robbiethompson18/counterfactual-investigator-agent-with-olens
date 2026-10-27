@@ -93,28 +93,50 @@ which vLLM runs in ~35 waves with no cross-transcript batching to fill the last 
 13.2 reads/s overall. A giant is 2% of a run's transcripts and ~15% of its reads, so `--batch-reads`
 matters less than the decode rate for them.
 
-## Where the time goes now, and what to try next
+## Merge mode and the decode ceiling (2026-10-27, `runs/olens_reads/2026-10-27_merge-v1`)
 
-- **Decode at 27.6 reads/s** is ~3.5k generated tokens/s at batch ~480, about 2x slower per step
-  than the plain chat server. Suspects: vLLM's untuned LoRA kernels ("Using default LoRA kernel
-  configs"), 12 LoRA target modules in all 64 blocks, and the metamodel hooks compiled as a custom
-  op. `--lora-mode merge` is coded but not yet benchmarked: it builds a plain engine
-  (`enable_lora=False`) and uses vllm-metamodels' `merge_lora` to fold the lens into the served
-  weights before the decode and the AR over it before the scoring, then `unmerge_lora` before the
-  next capture (its README: a merged engine decodes 29% faster per step than the LoRA path on this
-  model, ~1 s per publish with the base copy in pinned host memory, about 3 publishes per batch).
-  The `merge_lora` key mapping strips `base_model.model.` and tries the `model.language_model.`
-  layout itself, so the renamed adapter dirs work for it. Expected: decode 2x, total 1.5x. Then tune
-  the punica configs if the runtime path is kept.
-- **AR at 62 reads/s** (~250 spans/s) is bounded by vllm-metamodels' per-request capture overhead
-  (its README: ~7 to 12 ms per request), not by prefill FLOPs.
-- **Batching is per transcript group**, so the engine idles during the CPU-side NNLS and JSON writes
-  (~5% here). A second thread preparing the next batch's prompts would hide that.
-- **Memory:** one weight copy, 63 GB of KV, `max_num_seqs` 512 at `gpu_memory_utilization` 0.88.
-  Each concurrent decode still needs a linear-attention state block, so 1024 does not fit; giants
-  (200k tokens) now go through vLLM chunked prefill with `--max-model-len` raised, untested.
-- **The AR is optional** in this design: `--batch-reads` worth of decodes without the AR stage would
-  run at the decode rate (~28 reads/s), and if FVE turns out not to help the agent, dropping it is a
-  flag.
-- The old reader stays the default until a longer-transcript run (thinking-on evalcue episodes)
-  confirms the capture path on multi-thousand-token prompts.
+`--lora-mode merge` builds a plain engine (`enable_lora=False`) and uses vllm-metamodels'
+`merge_lora` to fold the lens into the served weights before the decode and the AR over it before
+the scoring, then `unmerge_lora` before the next capture (its key mapping strips `base_model.model.`
+and tries the `model.language_model.` layout, so the renamed adapter dirs work). On the hint-cf
+benchmark set, 556 transcripts and 14,361 decoded reads, 1x H200, 36 min of pod:
+
+| mode                      | reads/s | decode stage | AR stage   | per batch of ~480 reads                             |
+| ------------------------- | ------- | ------------ | ---------- | --------------------------------------------------- |
+| LoRA runtime (2026-10-26) | 18.8    | 27.6 reads/s | 62 reads/s |                                                     |
+| merge_lora (2026-10-27)   | 19.8    | 31.7 reads/s | 60 reads/s | unmerge 0.9 s + merge lens 1.27 s + merge AR 1.28 s |
+
++5% overall. Net of the three publishes (~3.5 s of a 25 s batch) the decode kernels are ~23% faster,
+as the vllm-metamodels README says, but that was never the main cost. Parity with the runtime reads
+on 20,859 shared rows: joint FVE correlation 0.986, top bullet identical 28%, 3.98 bullets per read
+on both. Either mode is fine; `runtime` stays the default because it needs no publishes and the
+difference is 5%.
+
+**The decode is at stock vLLM's rate for this model.** `decode_probe.py` (in the run) timed one
+merged engine on 470 real layer-32 activations, and `plain_probe.py` the same prompts on a stock
+vLLM 0.27.1 with the vllm-metamodels plugin off (`VLLM_PLUGINS=""`), both at fixed 100 tokens:
+
+| variant                                                                  | B=470 ms/step       | B=128 | B=32 |
+| ------------------------------------------------------------------------ | ------------------- | ----- | ---- |
+| reader path (`prompt_embeds` + BulletStop, natural stop, mean 91 tokens) | 85 (thinning batch) |       |      |
+| `prompt_embeds`, fixed length                                            | 112                 |       |      |
+| token prompts, fixed length                                              | 108                 | 34.5  | 20.0 |
+| token prompts + BulletStop                                               | 115                 |       |      |
+| stock vLLM, plugin off, token prompts                                    | 108                 | 34.5  | 20.3 |
+
+So `prompt_embeds` costs 4%, the BulletStop logits processor 6%, the plugin and the merged lens
+nothing. The step time grows almost linearly with batch above ~128 (0.2 ms per sequence per step
+with a ~7 ms floor), so batching stops paying there: 1.6k / 3.7k / 4.4k tokens/s at 32 / 128 / 470,
+the same curve as the chat server's `vllm bench serve` (1,621 / 3,940 / 4,692 at 32 / 128 / 256,
+[runpod-qwen-server.md](runpod-qwen-server.md)). A dense 27B step at batch 470 has a ~26 ms compute
+floor and an ~11 ms weight-read floor, so a per-sequence kernel bounds it, most likely the GDN
+recurrent decode of Qwen3.6's hybrid stack; that is vLLM's kernel, not ours. Decode MFU is ~24%
+(4.4k tokens/s × 54 GFLOP against 989 TFLOP/s), AR ~37%, capture ~44%, blended ~29%.
+
+What is left to gain in our code is small: dropping the AR stage (`--batch-reads` worth of decodes
+alone run at the decode rate, ~32 reads/s), hiding the CPU-side NNLS and JSON writes (~5%) behind
+the next batch's prompt prep, and larger `--batch-reads` in merge mode to amortise the publishes.
+Going past ~4.5k tokens/s on one H200 means a faster GDN decode kernel in vLLM, fewer tokens per
+read, or more GPUs. Memory: one weight copy, 63 GB of KV, `max_num_seqs` 512 at
+`gpu_memory_utilization` 0.88; each concurrent decode also needs a linear-attention state block, so
+1024 does not fit (and would not help, given the curve above).
