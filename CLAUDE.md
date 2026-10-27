@@ -427,13 +427,13 @@ Current docs:
   pre-registered 38-case test (+0.07 log skill on harness v1, RMSE 26.6 vs 31.7pp, carried by a few
   cases, via "stricter score" reads at `Score:`; a v6 GPT-6.1 Sol replication is null); pasting
   reads into the prompt (closed #116) is a dead end
-- [ACTIVE: hint_cf envs — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
-  — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
-  wrong-MCQ), the dodge effect, caveats
 - [NULL: Honest-grader envs — read before building a 0–10 judgment scenario with flattery/honesty framings, or asking whether the O-lens reads the grade Qwen suppresses](docs/honest-grader-envs.md)
   — 11 scenarios × 5 framings, Qwen thinking off; why hidden_goal.grade worked (`Score:`-token reads
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
   79), it echoes the inflated number and only flags leniency
+- [ACTIVE: hint_cf envs — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
+  — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
+  wrong-MCQ), the dodge effect, caveats; Flash pass@3 text-inversion gate leaves 2 / 6 / 18
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
