@@ -2,8 +2,8 @@
 
     uv run python -m cfbench.report.charts --out docs/img/cfbench-report [--allow-old-lens]
 
-Writes skill_pooled.png, skill_by_target.png, olens_search_topics.png, tool_calls.png, the three robustness charts
-(models.png, flash_effort.png, flash_calls.png; `cfbench.report.modelchart`) and summary.json with every number on
+Writes skill_pooled.png, skill_by_target.png, olens_search_topics.png, tool_calls.png, the four robustness charts
+(models.png, flash_effort.png, flash_calls.png, ts_vs_olens.png; `cfbench.report.modelchart`) and summary.json with every number on
 them plus coverage (envs, arms, rollouts, predictions) per chart. Metric and normalization: docs/cfbench-scoring.md.
 """
 

@@ -5,8 +5,9 @@
     r.choices[0].message.content, r.usage.cost        # an openai ChatCompletion; r.model_dump() for the raw JSON dict
 
 `chat` sends reasoning effort `medium` unless told otherwise (CLAUDE.md: every non-Qwen model runs at medium; provider
-defaults differ), asks for usage accounting (so `r.usage.cost` is the dollar cost) and retries transient errors with
-backoff. Anything else (`max_tokens`, `tools`, `temperature`, `seed`, `response_format`, ...) passes through to the SDK.
+defaults differ; `effort="off"` disables thinking, which some models refuse with a 400), asks for usage accounting (so
+`r.usage.cost` is the dollar cost) and retries transient errors with backoff. Anything else (`max_tokens`, `tools`,
+`temperature`, `seed`, `response_format`, ...) passes through to the SDK.
 `client` and `extra_body` are the pieces, for a caller that runs its own loop (evalcue/harness.py, which also serves Qwen).
 """
 
@@ -69,7 +70,7 @@ async def chat(
     global _CLIENT
     if _CLIENT is None:  # built on first use, not at import: modules get imported on machines without the key
         _CLIENT = client()
-    extra = extra_body(effort=effort, provider=provider) | (params.pop("extra_body", None) or {})
+    extra = extra_body(thinking=effort != "off", effort=effort, provider=provider) | (params.pop("extra_body", None) or {})
     for attempt in range(attempts):
         try:
             r = await _CLIENT.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)

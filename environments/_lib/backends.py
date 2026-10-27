@@ -27,7 +27,7 @@ class Target:
     served_name: str | None = None  # model name to send, if the server's differs from --model (the shared server says "qwen")
     provider: str | None = None  # OpenRouter provider slug, pinned
     effort: str | None = "medium"  # reasoning effort when thinking is on; None only if the env REQUIRES it
-    thinking: bool = True
+    thinking: bool = False  # Qwen default is thinking off (CLAUDE.md); envs pin their own in DEFAULTS
     max_tokens: int | None = None  # default no cap (repo rule for Qwen); a cap is recorded in meta
     sampling: dict = field(default_factory=dict)  # temperature / top_p / top_k / presence_penalty, only if given
     # Request body layout, so a ported env sends exactly what its old harness sent:

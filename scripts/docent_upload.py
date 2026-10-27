@@ -26,10 +26,11 @@ from pathlib import Path
 from docent import Docent  # ty: ignore[unresolved-import]  (PEP 723 script deps)
 from docent.data_models import AgentRun, Transcript  # ty: ignore[unresolved-import]  (PEP 723 script deps)
 from docent.data_models.chat import AssistantMessage, ContentReasoning, ContentText, SystemMessage, ToolCall, ToolMessage, UserMessage  # ty: ignore[unresolved-import]  (PEP 723 script deps)
-from huggingface_hub import HfApi
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))  # not installed in this script's own env
+from counterfactual_investigator_agent_with_olens.runs import hf_upload
 
 ROOT = Path("data/runs")
-REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"  # same as runs.py
 WEB = "https://docent.transluce.org"
 # rows.jsonl keys that aren't per-env behaviour flags
 STRUCTURAL = {"env", "model", "arm", "item", "sample", "seed", "thinking", "messages", "meta", "files_before", "files_after", "cwd"}
@@ -196,14 +197,7 @@ def main():
     uploaded = [upload(run) for run in sorted(ROOT.glob("*/*/"), key=lambda p: (p.parent.name == "cfbench", p))]
     if any(uploaded):
         # one HF commit for every new docent.json, rather than one per run as runs.py's sync would make
-        HfApi().upload_folder(
-            repo_id=REPO,
-            repo_type="dataset",
-            folder_path=str(ROOT),
-            path_in_repo="runs",
-            allow_patterns="*/*/docent.json",
-            commit_message="runs/*/*/docent.json: Docent backfill",
-        )
+        hf_upload(ROOT, "runs", "runs/*/*/docent.json: Docent backfill", allow_patterns="*/*/docent.json")
 
 
 if __name__ == "__main__":
