@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 
+from cfbench.core import canon_condition
 from cfbench.report.data import Case, brier_skill, rmse, rmse_null
 
 Group = tuple[str, str]  # (condition, predictor)
@@ -26,13 +27,14 @@ CaseKey = tuple[str, str, str, str]  # (env, target model, base_arm, cf_arm)
 
 def load(paths: list[Path]) -> tuple[dict[Group, dict[CaseKey, Case]], Counter]:
     """Cases per (condition, predictor) from the valid rows of each predictions file (p in draw order), and the invalid-row
-    count per (condition, predictor, *case). Rows from before the condition field are `transcript`."""
+    count per (condition, predictor, *case). Condition names are mapped to today's (core.LEGACY_CONDITIONS); rows from before the
+    condition field are the retired inline-transcript condition."""
     cases: dict[Group, dict[CaseKey, Case]] = defaultdict(dict)
     invalid: Counter = Counter()
     rows = [json.loads(line) for path in paths for line in path.read_text().splitlines()]
     for r in sorted(rows, key=lambda r: r["draw"]):
         assert r.get("task", "rate") == "rate", f"{r['task']!r} rows are scored by cfbench.answer, not cfbench.score"
-        condition = r.get("condition", "transcript")
+        condition = canon_condition(r.get("condition", "transcript"))
         group, key = (condition, r["predictor"]), (r["env"], r["model"], r["base_arm"], r["cf_arm"])
         if not r["valid"]:
             invalid[group + key] += 1

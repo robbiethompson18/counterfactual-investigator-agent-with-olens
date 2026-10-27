@@ -1,12 +1,12 @@
 """Run predictors on (env, target model, base arm -> counterfactual arm) cases.
 
-    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions transcript,no_transcript --slug <slug>
+    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
     uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
-Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
-base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
-to read or search them (`agentic`, cfbench/tools.py), plus O-lens tools over some of those runs' reads (`olens`)
-or over another env's runs' reads (`olens_placebo`, cfbench/olens.py).
+Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
+of every base-arm run and tools to read or search them (`transcript_agentic`, cfbench/tools.py), plus O-lens tools over
+some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py).
+The retired inline two-transcript condition and the old names are in cfbench/core.py (LEGACY_CONDITIONS).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
 
@@ -55,7 +55,7 @@ async def main():
     ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (evalcue_runs envs)")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
-    ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
+    ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
@@ -119,7 +119,7 @@ async def main():
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
+            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
         prompt = build_prompt(
             env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task

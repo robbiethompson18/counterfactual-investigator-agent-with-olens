@@ -14,13 +14,18 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.stats import binom
 
-from cfbench.core import P_MAX, P_MIN
+from cfbench.core import P_MAX, P_MIN, canon_condition
 
 PREDICTOR = "google/gemini-3.8-flash"
-CONDS = ["no_transcript", "agentic", "olens", "olens_placebo"]
-LABEL = {"no_transcript": "Env diff only", "agentic": "Transcript-only", "olens": "O-lens", "olens_placebo": "O-lens placebo"}
+CONDS = ["no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
+LABEL = {
+    "no_transcript": "Env diff only",
+    "transcript_agentic": "Transcript-only",
+    "olens_agentic": "O-lens",
+    "olens_placebo_agentic": "O-lens placebo",
+}
 # CLAUDE.md chart colors: transcript-only blue, O-lens orange, placebo black, no tool calls gray
-COLOR = {"no_transcript": "#898781", "agentic": "#2a78d6", "olens": "#eb6834", "olens_placebo": "#1a1a1a"}
+COLOR = {"no_transcript": "#898781", "transcript_agentic": "#2a78d6", "olens_agentic": "#eb6834", "olens_placebo_agentic": "#1a1a1a"}
 NULL_LABEL = "Edit does nothing"
 OLD_LENS = "olens_s3d_rl600"  # the pre-space lens; its reads are never reused (CLAUDE.md, docs/olens-space-migration.md)
 
@@ -80,7 +85,7 @@ def uses_old_lens(run_dir: str) -> bool:
 def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=False) -> dict[tuple, dict]:
     """(env, base_arm, cf_arm, condition, draw) -> prediction row; valid rows only; later dirs win.
 
-    Old-lens runs contribute no `olens`/`olens_placebo` rows unless `allow_old_lens`.
+    Old-lens runs contribute no olens rows unless `allow_old_lens`. Stored condition names are mapped to today's (canon_condition).
     """
     rows = {}
     for d in dirs:
@@ -92,6 +97,7 @@ def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=
             lines = f.read().splitlines()
         for line in lines:
             r = json.loads(line)
+            r["condition"] = canon_condition(r["condition"])
             if r["condition"] not in conds or r["predictor"] != predictor or not r.get("valid", True) or r.get("p") is None:
                 continue
             if old and r["condition"].startswith("olens"):
@@ -188,7 +194,7 @@ def ess_envs(keys) -> float:
     return float(n.sum() ** 2 / (n**2).sum())
 
 
-def bootstrap(cases: dict[tuple, Case], conds=CONDS, ref="agentic", n_boot=2000, seed=0) -> dict:
+def bootstrap(cases: dict[tuple, Case], conds=CONDS, ref="transcript_agentic", n_boot=2000, seed=0) -> dict:
     """95% case-bootstrap intervals for each condition's RMSE and for its RMSE reduction vs `ref` (paired: same resample)."""
     keys = list(cases)
     rng = np.random.default_rng(seed)

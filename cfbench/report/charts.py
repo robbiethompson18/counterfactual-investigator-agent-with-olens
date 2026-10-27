@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 
 INK, MUTED, GRID, NULL_FILL = "#0b0b0b", "#52514e", "#e1e0d9", "#ffffff"
-TOOL_CONDS = ["agentic", "olens", "olens_placebo"]
+TOOL_CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
 TOOLS = ["read_transcript", "search_transcripts", "search_olens", "olens_at"]
 plt.rcParams.update(
     {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
@@ -64,7 +64,7 @@ def stats(cases: dict[tuple, Case], keys=None) -> dict:
         "rmse_null_ci": boot["null"],
         "noise_floor": noise_floor(sub),
         "gain_vs_transcript": {c: boot["gain"][c] for c in CONDS},
-        "gain_vs_transcript_point": {c: rmse(sub, "agentic") - rmse(sub, c) for c in CONDS},
+        "gain_vs_transcript_point": {c: rmse(sub, "transcript_agentic") - rmse(sub, c) for c in CONDS},
         "p_gain_le0": boot["p_gain_le0"],
         "brier_skill": {c: brier_skill(sub, c) for c in CONDS},
         "log_skill": {c: log_skill(sub, c) for c in CONDS},
@@ -85,7 +85,7 @@ def bar_group(ax, x0: float, s: dict, width: float, label: bool):
         x = x0 + (j - (len(series) - 1) / 2) * width
         kw = {"color": NULL_FILL, "edgecolor": INK, "hatch": "////", "lw": 0.8} if c == "null" else {"color": color}
         ax.bar(x, acc(v), width * 0.9, label=lab if label else None, zorder=2, **kw)
-        ax.plot([x, x], [acc(ci[1]), acc(ci[0])], color=INK if c != "olens_placebo" else "#7a7a7a", lw=1, zorder=3)
+        ax.plot([x, x], [acc(ci[1]), acc(ci[0])], color=INK if c != "olens_placebo_agentic" else "#7a7a7a", lw=1, zorder=3)
         ax.text(x, acc(ci[0]) + 0.6, f"{acc(v):.0f}", ha="center", va="bottom", fontsize=7, color=INK)
     return x0 + (len(series) - 1) / 2 * width
 
@@ -126,7 +126,7 @@ def chart_by_target(per_target: dict[str, dict], out):
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
     ax.set_title("Prediction accuracy by what the predictor sees", loc="left", fontsize=10.5, color=INK)
 
-    others = [c for c in CONDS if c != "agentic"]
+    others = [c for c in CONDS if c != "transcript_agentic"]
     ys, labels, y = [], [], 0
     for t in targets:
         s = per_target[t]
@@ -233,7 +233,7 @@ def chart_topics(rows_by_target: dict[str, dict], out):
     examples: dict[str, Counter] = defaultdict(Counter)
     for t, rows in rows_by_target.items():
         for key, r in rows.items():
-            if key[3] != "olens":
+            if key[3] != "olens_agentic":
                 continue
             beh, diff = sections(r["messages"][1]["content"])
             for m in r["messages"]:
@@ -252,7 +252,7 @@ def chart_topics(rows_by_target: dict[str, dict], out):
     cats = [c for c, _ in pooled.most_common()]
     total = sum(pooled.values())
     fig, ax = plt.subplots(figsize=(7.5, 4.6))
-    ax.barh(range(len(cats)), [pooled[c] / total for c in cats], 0.6, color=COLOR["olens"])
+    ax.barh(range(len(cats)), [pooled[c] / total for c in cats], 0.6, color=COLOR["olens_agentic"])
     for i, c in enumerate(cats):
         ax.text(pooled[c] / total + 0.005, i, f"{pooled[c] / total:.0%}", va="center", fontsize=8)
         rx = next((r for r, _ in examples[c].most_common() if len(r) <= 45), "")
