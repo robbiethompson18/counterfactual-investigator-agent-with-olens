@@ -6,13 +6,15 @@ Reads the public oracle-lens checkpoints for `Qwen/Qwen3.6-27B` without the unre
 reconstructor (AR), whitened FVE, all served by one vLLM engine with
 [ceselder/vllm-metamodels](https://github.com/ceselder/vllm-metamodels)
 ([docs/olens-one-engine-reader.md](../docs/olens-one-engine-reader.md)). The HF transformers path
-(hook-LoRA, HF generate and AR, the ceselder L42 lens, NLA, J++, the merged-lens vLLM wrapper) was
-deleted 2026-10-27; it is at PR #229's first commit.
+(hook-LoRA, HF generate and AR, the ceselder L42 lens, NLA, the merged-lens vLLM wrapper) was
+deleted 2026-10-27; it is at PR #229's first commit. J++ came back the same day on the one engine
+(`jpp.py`).
 
 ```
 src/olens/lens.py             the AO's read contract: carrier prompt, marker, alpha, bullet parsing, Sampling
 src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds), ar
                               (AR LoRA + final norm + head), one vLLM 0.27.1 engine
+src/olens/jpp.py              JPP: the J++ lens's top-k next tokens from captured residuals (maps + lm_head, no model)
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
 src/olens/provenance.py       reads.provenance.json next to a batch of reads: lens, AR, whitener, revisions, sampling
 src/olens/vectors.py          probe / steering directions in an HF model's residual stream (no caller since 2026-10-26)
@@ -32,5 +34,6 @@ RMSNorm (HF's `last_hidden_state`).
 The whiteners come from the gated dataset
 [agu18dec/local-workspace](https://huggingface.co/datasets/agu18dec/local-workspace) (needs an
 `HF_TOKEN` with access). Needs vLLM 0.27.1 + vllm-metamodels + scipy on a GPU with 80 GB+
-(`runpod/olens_reads.sh setup` installs them). Run with `PYTHONPATH=olens/src`; the batch reader
-`scripts/olens_read_requests.py` is the only caller.
+(`runpod/olens_reads.sh setup` installs them). Run with `PYTHONPATH=olens/src:src`; the callers are
+the batch readers `scripts/olens_read_requests.py` (O-lens) and `scripts/jpp_read_requests.py`
+(J++).
