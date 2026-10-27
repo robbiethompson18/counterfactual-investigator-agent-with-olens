@@ -49,7 +49,11 @@ th{font-weight:600;font-size:11px;color:var(--mute);text-transform:uppercase;let
 tr.click{cursor:pointer} tr.click:hover{background:var(--sel)} tr.on{background:var(--sel)}
 .scroll{overflow-x:auto}
 .rate{display:flex;align-items:center;gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.bar{width:64px;height:6px;background:var(--track);border-radius:3px;overflow:hidden}.bar i{display:block;height:100%;background:var(--bar);border-radius:3px}
+.bar,.hbar .b{position:relative;width:120px;height:12px;background:var(--track);border-radius:3px;overflow:hidden;flex:none}
+.hbar .b{flex:1;width:auto;min-width:60px}
+.bar .band,.hbar .b .band{position:absolute;top:0;bottom:0;background:var(--bar);opacity:.28;border-radius:2px}
+.bar .pt,.hbar .b .pt{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--bar)}
+.ci{color:var(--faint);font-size:11px}
 .msg{border:1px solid var(--line);border-radius:8px;margin:6px 0;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 var(--mono);max-height:70vh;overflow:auto}
 .msg.user{background:var(--user)} .msg.assistant{background:var(--asst)} .msg.tool{background:var(--tool)} .msg.system{background:var(--code)}
 .role{font:600 11px Inter,system-ui;color:var(--mute);margin-bottom:4px;white-space:normal;text-transform:uppercase;letter-spacing:.04em} .think{background:var(--think);padding:6px;border-radius:4px;margin-bottom:6px}
@@ -86,7 +90,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .mini .arm{font:11.5px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
 .mini .tg{grid-column:1/-1;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
 .hbar{display:flex;align-items:center;gap:8px;font-variant-numeric:tabular-nums}
-.hbar .b{flex:1;height:8px;background:var(--track);border-radius:4px;overflow:hidden;min-width:60px}.hbar .b i{display:block;height:100%;background:var(--bar);border-radius:4px}
+
 .hbar .v{width:76px;text-align:right;color:var(--mute);font-size:11.5px}
 .delta{display:inline-block;font:600 11.5px Inter;padding:1px 7px;border-radius:999px;font-variant-numeric:tabular-nums}
 .delta.up{background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up)} .delta.down{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)} .delta.flat{background:var(--track);color:var(--mute)}
@@ -155,10 +159,43 @@ async function sourceText(spec, path) {
 }
 const ghLink = (spec, path) => `https://github.com/${GH}/blob/${(spec.git_sha || "main").replace("+dirty", "")}/${path}`;
 
+// ---- rates with uncertainty: a Beta(1,1) prior, so k of n gives the posterior Beta(k+1, n-k+1); intervals are its
+// equal-tailed 95% credible interval, drawn as a translucent band behind a line at the observed rate k/n
+function lgamma(x) {  // Lanczos
+  const g = [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61503916999185, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lgamma(1 - x);
+  x -= 1; let a = 0.99999999999980993; const t = x + 7.5;
+  for (let i = 0; i < 8; i++) a += g[i] / (x + i + 1);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+function betacf(a, b, x) {  // continued fraction for the incomplete beta (Numerical Recipes)
+  let c = 1, d = 1 - (a + b) * x / (a + 1); d = 1 / (Math.abs(d) < 1e-300 ? 1e-300 : d); let h = d;
+  for (let m = 1; m <= 300; m++) {
+    const m2 = 2 * m;
+    for (const aa of [m * (b - m) * x / ((a - 1 + m2) * (a + m2)), -(a + m) * (a + b + m) * x / ((a + m2) * (a + 1 + m2))]) {
+      d = 1 + aa * d; d = 1 / (Math.abs(d) < 1e-300 ? 1e-300 : d); c = 1 + aa / c; if (Math.abs(c) < 1e-300) c = 1e-300; h *= d * c;
+    }
+    if (Math.abs(d * c - 1) < 1e-12) break;
+  }
+  return h;
+}
+function ibeta(x, a, b) {  // regularized incomplete beta I_x(a, b)
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+}
+function betaQuantile(q, a, b) { let lo = 0, hi = 1; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; ibeta(m, a, b) < q ? lo = m : hi = m; } return (lo + hi) / 2; }
+const CI = {};
+function rateCI(k, n) { return CI[k + "/" + n] ??= [betaQuantile(0.025, k + 1, n - k + 1), betaQuantile(0.975, k + 1, n - k + 1)]; }
+function ciBar(k, n, cls = "bar") {
+  if (!n) return `<span class="${cls}"></span>`;
+  const [lo, hi] = rateCI(k, n), f = x => (100 * x).toFixed(1);
+  return `<span class="${cls}" title="${k}/${n}; 95% credible interval ${f(lo)}–${f(hi)}% (Beta(1,1) prior)"><i class="band" style="left:${f(lo)}%;width:${f(hi - lo)}%"></i><i class="pt" style="left:${f(k / n)}%"></i></span>`;
+}
 function rate(k, n) {
   if (!n) return '<span class="mute">–</span>';
-  const p = k / n;
-  return `<span class="rate"><span class="bar"><i style="width:${(100 * p).toFixed(0)}%"></i></span>${k}/${n} = ${(100 * p).toFixed(0)}%</span>`;
+  const [lo, hi] = rateCI(k, n);
+  return `<span class="rate">${ciBar(k, n)}${k}/${n} = ${(100 * k / n).toFixed(0)}% <span class="ci">[${(100 * lo).toFixed(0)}, ${(100 * hi).toFixed(0)}]</span></span>`;
 }
 function primaryCell(pr) {
   if (!pr) return "";
@@ -172,15 +209,35 @@ function setCrumb(parts) {
 }
 const pctOf = p => p && p.n ? p.k / p.n : null;
 // difference of two proportions with a 95% normal-approximation interval, in percentage points
+// b's rate minus a's, in pp: the observed difference and the 95% credible interval of the difference of the two
+// Beta(1,1) posteriors, by 20k seeded Monte Carlo draws (same draws every load)
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gammaDraw(a, u) {  // Marsaglia-Tsang (a >= 1 here: Beta(1,1) posteriors have both parameters >= 1)
+  const d = a - 1 / 3, c = 1 / Math.sqrt(9 * d);
+  for (;;) {
+    let x, v;
+    do { x = Math.sqrt(-2 * Math.log(u() || 1e-12)) * Math.cos(2 * Math.PI * u()); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v; const w = u();
+    if (w < 1 - 0.0331 * x ** 4 || Math.log(w) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+const DCI = {};
 function deltaOf(a, b) {
   if (!a?.n || !b?.n) return null;
-  const pa = a.k / a.n, pb = b.k / b.n, d = pb - pa, se = Math.sqrt(pa * (1 - pa) / a.n + pb * (1 - pb) / b.n);
-  return {d: 100 * d, lo: 100 * (d - 1.96 * se), hi: 100 * (d + 1.96 * se)};
+  const key = [a.k, a.n, b.k, b.n].join(",");
+  if (!DCI[key]) {
+    const u = rng(12345), N = 20000, ds = new Float64Array(N);
+    const beta = (x, y) => { const g = gammaDraw(x, u); return g / (g + gammaDraw(y, u)); };
+    for (let i = 0; i < N; i++) ds[i] = beta(b.k + 1, b.n - b.k + 1) - beta(a.k + 1, a.n - a.k + 1);
+    ds.sort();
+    DCI[key] = {d: 100 * (b.k / b.n - a.k / a.n), lo: 100 * ds[Math.floor(0.025 * N)], hi: 100 * ds[Math.floor(0.975 * N)]};
+  }
+  return DCI[key];
 }
 function deltaBadge(x) {
   if (!x) return "";
   const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "flat";
-  return `<span class="delta ${cls}" title="95% CI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}pp</span>`;
+  return `<span class="delta ${cls}" title="95% credible interval ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp (Beta(1,1) posteriors)">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}pp</span>`;
 }
 // "qwen/qwen3.6-27b@openrouter:alibaba · thinking off" -> "qwen3.6-27b (alibaba) · thinking off"; the provider stays
 // because the same model through two providers can differ (fp8)
@@ -417,7 +474,7 @@ function compareList(D) {
     const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
       const p = P.by[a + "\u0000" + t], v = pctOf(p);
       const d = i && c.arms.length === 2 ? " " + deltaBadge(deltaOf(P.by[c.arms[0] + "\u0000" + t], p)) : "";
-      return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar"><span class="b"><i style="width:${v == null ? 0 : (100 * v).toFixed(1)}%"></i></span>
+      return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar">${p?.n ? ciBar(p.k, p.n, "b") : '<span class="b"></span>'}
         <span class="v">${v == null ? "not run" : `${(100 * v).toFixed(0)}% <span style="color:var(--faint)">/${p.n}</span>`}</span>${d}</span>`;
     }).join("")).join("") : c.arms.map(a => `<span class="arm">${esc(a)}${retiredTag(D, a)}</span><span class="mute">not run</span>`).join("");
     return `<a class="card" href="#${hashOf({env: D.env, compare: c.name, retired: D.showRetired ? "show" : null})}">
@@ -426,7 +483,7 @@ function compareList(D) {
   };
   $("tab").innerHTML = `<p class="lede">Pairs are the env's declared clean counterfactuals (<span class="mono">PAIRS</span>); sets are arms worth viewing side by side
     (<span class="mono">COMPARISONS</span>). Bars are the primary rate pooled over runs per model, thinking on and off apart; the pill is the second arm minus the first,
-    coloured when its 95% interval excludes zero.</p>` +
+    coloured when its 95% interval excludes zero. Bands are 95% credible intervals (Beta(1,1) prior), the line the observed rate.</p>` +
     Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="cards">${cs.map(card).join("")}</div>`).join("");
 }
 
@@ -453,7 +510,7 @@ async function comparePage(h) {
     if (!x) return "";
     const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "";
     return `<div class="effect"><div class="m" title="${esc(t)}">${esc(modelName(t))}</div><div class="big ${cls}">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}<span style="font-size:15px">pp</span></div>
-      <div class="sub">${(100 * pctOf(a)).toFixed(0)}% → ${(100 * pctOf(b)).toFixed(0)}% · n ${a.n} / ${b.n}<br>95% CI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp</div></div>`;
+      <div class="sub">${(100 * pctOf(a)).toFixed(0)}% → ${(100 * pctOf(b)).toFixed(0)}% · n ${a.n} / ${b.n}<br>95% CrI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp</div></div>`;
   }).join("");
   $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← comparisons</a>${D.retiredNote ? " · " + D.retiredNote : ""}</p>
   <h1>${esc(c.name)} <span class="badge" style="vertical-align:4px">${c.kind === "pair" ? "pair" : "set"}</span></h1>
