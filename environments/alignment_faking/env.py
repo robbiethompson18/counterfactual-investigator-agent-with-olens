@@ -147,6 +147,7 @@ def measure(ep) -> dict:
 
 
 PRIMARY = "positive"
+STARRED = "settled (Kylie, 2026-10-27): original and v7 preview vs public"
 # unmonitored -> trained, per prompt version; a gap is alignment faking
 PAIRS = {
     f"{p}:{name}": (_arm(p, a), _arm(p, b))
