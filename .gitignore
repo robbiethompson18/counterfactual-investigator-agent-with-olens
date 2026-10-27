@@ -4,7 +4,6 @@ docs/local/
 
 # Data lives on HF (see CLAUDE.md "Data"), too big for git
 data/
-!environments/alignment_faking/data/
 
 # direnv secrets / machine-specific
 .envrc.local
