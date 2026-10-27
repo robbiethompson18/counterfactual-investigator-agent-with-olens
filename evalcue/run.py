@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import importlib
 import json
+import sys
 from pathlib import Path
 
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run, upload
