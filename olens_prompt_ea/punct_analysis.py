@@ -26,27 +26,15 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, str(Path(__file__).parent))
-from analyze import auc, strat_auc
+from analyze import auc, boot_ci, strat_auc
 from atomic import swap_in, temp_dir
 from fig_settings import NAMES
 
 EXCLUDE = {"inspect_am", "sad_oversight", "hp_mc", "hp_abst"}
-RNG = np.random.default_rng(0)
 FLAG = 5
 IMPORT = {"am": "imports/celeste/ds/agentic_misalignment", "donation_bet": "imports/celeste/ds_new/cfi_donation_bet",
           "ib_realistic": "imports/celeste/ds_new/cfi_ib_realistic", "agentharm": "imports/celeste/ds_new/inspect_agentharm",
           "mask": "imports/celeste/ds_new/inspect_mask", "instrumentaleval": "imports/celeste/ds_new/inspect_instrumentaleval"}  # fmt: skip
-
-
-def boot(d: pd.DataFrame, f, b: int = 500) -> tuple[float, float]:
-    groups = [g.index.to_numpy() for _, g in d.groupby("ph")]
-    vals = []
-    for _ in range(b):
-        idx = np.concatenate([groups[i] for i in RNG.integers(0, len(groups), len(groups))])
-        v = f(d.loc[idx])
-        if not np.isnan(v):
-            vals.append(v)
-    return tuple(np.percentile(vals, [2.5, 97.5])) if vals else (np.nan, np.nan)
 
 
 def main() -> None:
@@ -77,7 +65,7 @@ def main() -> None:
         d = d.reset_index(drop=True)
         y = d.vea.to_numpy(bool)
         v = auc(y, d.score.to_numpy())
-        lo, hi = boot(d, lambda x: auc(x.vea.to_numpy(bool), x.score.to_numpy()), 300)
+        lo, hi = boot_ci(d, lambda x: auc(x.vea.to_numpy(bool), x.score.to_numpy()), 300)
         w = strat_auc(y, d.score.to_numpy(), d.cond.to_numpy())
         print(f"  {name} (n={len(d):,}): AUROC {v:.2f} [{lo:.2f}, {hi:.2f}]; within condition {w:.2f}; "
               f"VEA if score>={FLAG} {d.vea[d.flag == 1].mean():.3f} vs {d.vea[d.flag == 0].mean():.3f}")  # fmt: skip
@@ -92,7 +80,7 @@ def main() -> None:
              "punct_positions_median": d.drop_duplicates("ph").n_pos.median(), "vea": d.vea.mean(), "score_mean": d.score.mean(),
              "flag": d.flag.mean(), "within_auc": strat_auc(d.vea.to_numpy(bool), d.score.to_numpy(), d.cond.to_numpy())}  # fmt: skip
         for k, f in (("vea", lambda x: x.vea.mean()), ("flag", lambda x: x.flag.mean()), ("score_mean", lambda x: x.score.mean() / 10)):
-            r[k + "_lo"], r[k + "_hi"] = boot(d, f, 300)
+            r[k + "_lo"], r[k + "_hi"] = boot_ci(d, f, 300)
         rows.append(r)
     s = pd.DataFrame(rows).sort_values("vea").reset_index(drop=True)
     s["score_mean10"] = s.score_mean / 10

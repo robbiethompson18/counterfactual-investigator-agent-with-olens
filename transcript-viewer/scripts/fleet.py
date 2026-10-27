@@ -24,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "web"))
 import server as V
+from pod import hf_token
 
 SKY = ["uvx", "--from", "skypilot[runpod,vast]==0.13.0", "sky"]
 LOGDIR = ROOT / "outputs/fleet"
@@ -113,16 +114,6 @@ def web(path, body):
     req = urllib.request.Request(WEB + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.loads(r.read())
-
-
-def hf_token():
-    """HF_TOKEN from the environment, or the file named by HF_TOKEN_FILE."""
-    if os.environ.get("HF_TOKEN"):
-        return os.environ["HF_TOKEN"]
-    f = os.environ.get("HF_TOKEN_FILE")
-    if f:
-        return Path(f).read_text().strip()
-    raise RuntimeError("set HF_TOKEN or HF_TOKEN_FILE (the gated agu18dec/local-workspace whiteners need it)")
 
 
 def save(recs):
