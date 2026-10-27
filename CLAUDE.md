@@ -454,6 +454,11 @@ Current docs:
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
   wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
   vs 4%, 8 items) from stop-token reads of the hinted prompt
+- [ACTIVE: debug_pointer env — read before running or extending the misleading-code-pointer bug-localization env](docs/envs/debug_pointer.md)
+  — Qwen (thinking off) names the buggy file in a tiny repo; a pointer comment blames another file;
+  smoke shows a clean 3 flip (misleading, Qwen follows) / 3 agree (truthful, Qwen agrees) split, 8/8
+  modal, bare-filename replies (unverbalized); built so neither "invert the pointer" nor "copy the
+  hint" wins; investigator run is the next step
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
