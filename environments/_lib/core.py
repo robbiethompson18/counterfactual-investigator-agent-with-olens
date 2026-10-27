@@ -14,6 +14,8 @@ optional:
     async finalize(box, state, ctx)                 runs in the live box after the episode (e.g. read git refs); what
                                                     it stores in `state` is saved, and measure() reads it from there
     CAPS: dict                                      default episode caps: max_turns, max_prompt_tokens
+    ARM_FACTORS: dict                               arm -> {factor: value} (e.g. task, variant, prompt), so arms can be
+                                                    selected and grouped by factor (`--arms task=calendar`)
 
 Episode ids are `<arm>~<item>~<sample>` with every part path-safe (see `slug`), so they can name files and URLs.
 """
@@ -77,7 +79,7 @@ SAFE = re.compile(r"[^A-Za-z0-9_.+-]")
 
 def slug(s) -> str:
     """Path- and URL-safe form of an arm or item id (`:` and `/` occur in real item ids)."""
-    return SAFE.sub("_", str(s))
+    return SAFE.sub("_", str(s).replace("/", "."))  # task/variant arms -> task.variant
 
 
 def episode_id(arm, item, sample) -> str:

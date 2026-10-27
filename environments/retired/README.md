@@ -3,7 +3,7 @@
 **Status (2026-10-27):** REFERENCE. Every behavioural env we built or ran before 2026-10-26, retired
 when the env registry ([`../README.md`](../README.md)) replaced the old harnesses. Some were ported
 to it with their old runs converted (no reruns): `hidden_goal_grade` → [`essay_grading`](../essay_grading/), the
-over-eagerness tasks plus Email John → the `overeager_*` envs, `alignment_faking`, and Robbie's honest graders → `honest_*`.
+over-eagerness tasks plus Email John → `overeagerness` (one env, task × harness arms), `alignment_faking`, and Robbie's honest graders → `honest_*`.
 
 One folder per env, each with a README: what it tests, the git ref and path of the code, how to run
 it, the models run, the key counterfactual arms and their rates, and links to transcripts (Docent,

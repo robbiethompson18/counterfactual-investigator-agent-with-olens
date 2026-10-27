@@ -1,4 +1,4 @@
-"""The 2026-10-26 GLM 5.3 overeager runs -> data/envs/overeager_<task>/<run>/, after checking each env's build().
+"""The GLM 5.3 over-eagerness runs -> data/envs/overeagerness/<run>/, after checking build() for every row.
 
     uv run python -m environments._lib.convert_overeager [--dry]
 
@@ -24,7 +24,6 @@ ROWS = WT / "data/runs/overeager"
 RAW = WT / "donehack/realism/runs/overeager"
 RAW_EMAIL = WT / "donehack/realism/runs"  # email*, stale_*: <out>/<variant>/<item>__<seed>.json with "spec"
 EMAIL_ROWS = Path.home() / "workspace/counterfactual-investigator-agent-with-olens/data/runs/email_ambiguous"
-ENV_OF = {"email": "overeager_email", "email_4johns": "overeager_email"}  # the 4-Johns runs are item John_0 of email
 STRUCT = {"env", "model", "arm", "item", "sample", "seed", "meta", "task", "variant", "expview_id", "files_before", "files_after",
           "messages", "final_text", "cost", "end", "name"}  # fmt: skip
 
@@ -89,16 +88,14 @@ def main(dry=False):
         for i, r in enumerate(rows):
             if family == "email_ambiguous":
                 r = {**r, "task": "email", "variant": r["arm"].split("@")[0]}
-            task = r["task"]
-            env_name = ENV_OF.get(task, f"overeager_{task}")
-            try:
-                env = envs.setdefault(env_name, load_env(env_name))
-            except ModuleNotFoundError:
-                plans[(env_name, run.name)]["skipped"].append(i)  # no ported env for this task
-                continue
-            if env_name == "overeager_email":
+            src_task = r["task"]
+            task = "email" if src_task == "email_4johns" else src_task  # the 4-Johns runs are item 0 of email
+            env_name = "overeagerness"
+            env = envs.setdefault(env_name, load_env(env_name))
+            mod = env.MODS[task]
+            if task == "email":
                 item_idx = str(r["item"]).rsplit("_", 1)[-1]
-                r = {**r, "item": env.items()[int(item_idx)]}
+                r = {**r, "item": item_idx}
                 key = ("email", item_idx, str(r["seed"]))
             else:
                 key = (task, r["variant"], str(r["item"]), str(r["seed"]))
@@ -113,10 +110,11 @@ def main(dry=False):
                 print(f"ambiguous raw for {run.name}:{i}: {[x['_path'] for x in raws]}", file=sys.stderr)
             base = dt.datetime.fromtimestamp(raw["_mtime"], dt.UTC).date() if raw else dt.date(2026, 10, 26)
             diff, today, arm = None, None, r["variant"]
-            if env_name == "overeager_email":
-                arms = [r["variant"]] + [f"{r['variant']}@{lv}" for lv in env.LEVELS_ARMS]
+            if task == "email":
+                arms = [r["variant"]] + [f"{r['variant']}@{lv}" for lv in mod.LEVELS_ARMS]
             else:
-                arms = [r["variant"]] + [f"{r['variant']}@{v}" for v in env._E.versions]
+                arms = [r["variant"]] + [f"{r['variant']}@{v}" for v in mod._E.versions]
+            arms = [f"{task}/{a}" for a in arms]
             for a in arms:
                 for d in (base, base - dt.timedelta(days=1), base + dt.timedelta(days=1)):
                     ctx = Ctx(env=env_name, arm=a, item=str(r["item"]), sample=int(r["seed"]), today=d,
@@ -128,10 +126,10 @@ def main(dry=False):
                     diff = diff or d2
                 if today:
                     break
-            r = {**r, "arm_new": arm}
-            run_name = run.name if task in ("email", env_name.removeprefix("overeager_")) else f"{run.name}_{task}"
+            r = {**r, "arm_new": arm if today else f"{task}/{r['variant']}"}
+            run_name = f"{run.name}_4johns" if src_task == "email_4johns" else run.name  # same ids as the email rows
             plans[(env_name, run_name)]["rows"].append(
-                (i, r, raw, today, diff, coll, docent_runs, meta | {"_src": f"{family}/{run.name}", "_task": task})
+                (i, r, raw, today, diff, coll, docent_runs, meta | {"_src": f"{family}/{run.name}", "_task": src_task})
             )
     for (env_name, run_name), p in sorted(plans.items()):
         rows = p.get("rows", [])
@@ -151,13 +149,11 @@ def main(dry=False):
         eps, labels = [], []
         for i, r, raw, today, diff, coll, docent_runs, meta in rows:
             eid = episode_id(r["arm_new"], r["item"], r["seed"])
-            stored = {k: v for k, v in r.items() if k not in STRUCT}
+            stored = {k: v for k, v in r.items() if k not in STRUCT | {"arm_new"}}
+            task = r["arm_new"].split("/")[0]
+            stored = {"task": task, "positive": stored.get("picked_one") if task == "email" else stored.get("acted"), **stored}
             state = (
-                (
-                    {"sent": raw["record"].get("sent", [])}
-                    if env_name == "overeager_email"
-                    else {"actions": raw["record"].get("actions", [])}
-                )
+                ({"sent": raw["record"].get("sent", [])} if task == "email" else {"actions": raw["record"].get("actions", [])})
                 if raw
                 else {}
             )
@@ -168,7 +164,7 @@ def main(dry=False):
                     "messages": r["messages"], "tools": (raw.get("env") or raw["spec"])["tools"] if raw else None,
                     "files_before": r.get("files_before") or {}, "files_after": r.get("files_after") or {},
                     "setup": (raw.get("env") or raw["spec"]).get("setup") if raw else None, "workdir": (r.get("meta") or {}).get("workdir"),
-                    "state": state, "meta": {"task": r["task"], "variant": r["variant"], "item": r["item"]},
+                    "state": state, "meta": {"task": task, "variant": r["variant"], "item": int(r["item"])},
                     "finish": r.get("end"), "usage": {"cost": r.get("cost")}, "final_text": r.get("final_text"),
                     "build_check": "match" if today else f"MISMATCH: {diff}",
                     "source": f"data/runs/{meta['_src']}:{i}", "raw_source": raw["_path"].split("/realism/")[-1] if raw else None,
@@ -181,10 +177,8 @@ def main(dry=False):
         rep = report[f"{env_name}/{run_name}"]
         m = {
             "description": meta.get("description"),
-            "converted_from": f"data/runs/{meta['_src']} (rows of task {meta['_task']})",
-            "source_env": "donehack/realism/email_env.py"
-            if env_name == "overeager_email"
-            else f"donehack/realism/overeager/tasks/{env_name.removeprefix('overeager_')}.py",
+            "converted_from": f"data/runs/{meta['_src']} (tasks {', '.join(sorted({x[7]['_task'] for x in rows}))})",
+            "source_env": "donehack/realism/overeager (oe_run.py, tasks/*.py) and donehack/realism/email_env.py",
             "git": meta.get("git"),
             "target": {
                 "id": "z-ai/glm-5.3@openrouter:any",

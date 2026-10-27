@@ -3,7 +3,7 @@ transactions (same amount as the debt, an unrelated note, either direction). It 
 request is still ambiguous. Ported from donehack/realism/overeager/tasks/payback_hint.py."""
 
 from environments._lib.overeager import TaskEnv
-from environments.overeager_payback.env import PayBackHint
+from environments.overeagerness.tasks.payback import PayBackHint
 
 TASK = PayBackHint()
 _E = TaskEnv(TASK)

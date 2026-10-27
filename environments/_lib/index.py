@@ -85,6 +85,7 @@ def env_index(env: str) -> dict:
         "primary": mod.PRIMARY,
         "pairs": {k: list(v) for k, v in getattr(mod, "PAIRS", {}).items()},
         "arms": list(mod.ARMS),
+        "arm_factors": getattr(mod, "ARM_FACTORS", {}),
         "requires": getattr(mod, "REQUIRES", {}),
         "runs": runs,
     }

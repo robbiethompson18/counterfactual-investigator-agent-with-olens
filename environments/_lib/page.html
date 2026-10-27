@@ -88,9 +88,11 @@ async function home() {
   </table></div>`;
 }
 
-async function envPage(env) {
+async function envPage(env, filt = {}) {
   $("crumb").textContent = "/ " + env;
   const idx = await getJSON(`${env}/index.json`);
+  const F = idx.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
+  const keep = arm => Object.entries(filt).every(([k, v]) => !v || (F[arm] || {})[k] === v);
   // pool runs per (arm, target): "#runs per model"
   const pooled = {};
   for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
@@ -98,13 +100,16 @@ async function envPage(env) {
     p.eps += a.n; p.runs += 1;
     if (a.primary.type === "bool") { p.k += a.primary.k; p.n += a.primary.n; }
   }
-  const rows = Object.values(pooled).sort((a, b) => a.target.localeCompare(b.target) || a.arm.localeCompare(b.arm));
+  const rows = Object.values(pooled).filter(p => keep(p.arm)).sort((a, b) => a.target.localeCompare(b.target) || a.arm.localeCompare(b.arm));
+  const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
+    [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
   $("view").innerHTML = `<p>${esc(idx.title)}. Primary measure <span class="mono">${esc(idx.primary)}</span>.
     Source: <a href="https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/main/environments/${env}">environments/${env}</a></p>
   ${Object.keys(idx.pairs).length ? `<p>Pairs: ${Object.entries(idx.pairs).map(([k, v]) => `<b>${esc(k)}</b> ${esc(v[0])} → ${esc(v[1])}`).join(" · ")}</p>` : ""}
   <h2>Pooled over runs (per arm and target model)</h2>
-  <div class="scroll"><table><tr><th>target</th><th>arm</th><th>runs</th><th>episodes</th><th>${esc(idx.primary)}</th></tr>
-  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}</td><td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
+  ${keys.length ? `<div class="row">Group by factor: ${keys.map(sel).join(" ")}</div>` : ""}
+  <div class="scroll"><table><tr><th>target</th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>runs</th><th>episodes</th><th>${esc(idx.primary)}</th></tr>
+  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}</td>${keys.map(k => `<td class="mono">${esc((F[p.arm] || {})[k] || "")}</td>`).join("")}<td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
   </table></div>
   <h2>Runs</h2>
   <div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>Docent</th><th>description</th></tr>
@@ -123,7 +128,7 @@ async function runPage(env, run, arm, epId) {
   const ids = Object.keys(epIdx);
   const arms = Object.keys(r.arms).sort();
   arm = arm || arms[0];
-  const mine = ids.filter(id => id.startsWith(arm.replace(/[^A-Za-z0-9_.+-]/g, "_") + "~"));
+  const mine = ids.filter(id => id.startsWith(arm.replace(/\//g, ".").replace(/[^A-Za-z0-9_.+-]/g, "_") + "~"));
   $("view").innerHTML = `<p><a href="#env=${env}">← ${esc(env)}</a> · target <span class="mono">${esc(r.target)}</span> · ${r.n_episodes} episodes
     ${r.docent_collection ? ` · <a href="https://docent.transluce.org/dashboard/${r.docent_collection}">Docent collection</a>` : ""}</p>
   <div class="scroll"><table><tr><th>arm</th><th>n</th><th>errors</th><th>unscorable</th><th>${esc(idx.primary)}</th></tr>
@@ -148,12 +153,18 @@ async function showEpisode(env, run, id) {
     + (m.tool_calls ? m.tool_calls.map(t => `\n→ ${esc(t.function.name)}(${esc(t.function.arguments)})`).join("") : "") + "</div>").join("")}`;
 }
 
+function setParam(k, v) {
+  const h = new URLSearchParams(location.hash.slice(1));
+  v ? h.set(k, v) : h.delete(k);
+  return h.toString();
+}
+
 async function route() {
   const h = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
   $("status").textContent = "";
   try {
     if (h.run) await runPage(h.env, h.run, h.arm, h.ep);
-    else if (h.env) await envPage(h.env);
+    else if (h.env) { const { env, ...filt } = h; await envPage(env, filt); }
     else await home();
   } catch (e) { $("status").textContent = "error: " + e.message; }
 }

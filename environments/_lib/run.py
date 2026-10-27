@@ -38,6 +38,25 @@ def parse_items(spec: str | None, all_items: list) -> list:
     return spec.split(",")
 
 
+def select_arms(env, spec: str | None) -> list[str]:
+    """--arms: comma-separated arm names, or factor filters `key=value` (ANDed; repeat a key to OR its values), e.g.
+    `task=calendar,variant=core` or `variant=base,variant=core`. Factors come from the env's ARM_FACTORS."""
+    if not spec:
+        return list(env.ARMS)
+    parts = spec.split(",")
+    if not any("=" in p for p in parts):
+        return parts
+    factors = getattr(env, "ARM_FACTORS", {})
+    want: dict[str, set] = {}
+    for p in parts:
+        k, _, v = p.partition("=")
+        want.setdefault(k, set()).add(v)
+    picked = [arm for arm, f in factors.items() if all(f.get(k) in vs for k, vs in want.items())]
+    if not picked:
+        raise SystemExit(f"no arm matches {spec!r} (factors: {sorted({k for f in factors.values() for k in f})})")
+    return picked
+
+
 def add_target_args(ap):
     """Model flags. Each defaults to the env's DEFAULTS (the settings its stored runs used), so a bare `run ENV` reproduces
     the old requests; anything given here that differs from DEFAULTS is recorded as an override."""
@@ -107,7 +126,7 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="envrun")
     ap.add_argument("env")
     ap.add_argument("--tag", required=True, help="run slug; the run is data/envs/ENV/<date>_<tag>")
-    ap.add_argument("--arms", help="comma list (default: all ARMS)")
+    ap.add_argument("--arms", help="comma list of arms, or factor filters like task=calendar,variant=core (default: all ARMS)")
     ap.add_argument("--pair", help="run a PAIRS entry's two arms (and its item subset)")
     ap.add_argument("--items", help="slice a:b or comma list (default: all)")
     ap.add_argument("--n", type=int, default=1, help="samples per (arm, item)")
@@ -132,7 +151,7 @@ def main(argv):
                 raise SystemExit(f"{a.env} REQUIRES {k}={want!r} but the flags give {have!r}; pass --override {k} to run anyway")
             overrides[k] = {"required": want, "used": have}
 
-    arms, items = (a.arms.split(",") if a.arms else list(env.ARMS)), parse_items(a.items, env.items())
+    arms, items = select_arms(env, a.arms), parse_items(a.items, env.items())
     if a.pair:
         p = env.PAIRS[a.pair]
         arms = list(p[:2])

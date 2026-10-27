@@ -2,7 +2,7 @@
 donehack/realism/run.py (`load_problem`, `grade`) and donehack/evilgenie/run.py (`holdout`, `hardcodes_sample`, the
 in-box holdout runner), unchanged apart from using this package's Box.
 
-The 34 problems the overeager runs used are in environments/overeager_impossiblebench/problems.jsonl (740 KB: ImpossibleBench
+The 34 problems the overeager runs used are in environments/overeagerness/tasks/coding_problems.jsonl (740 KB: ImpossibleBench
 https://github.com/safety-research/impossiblebench and EvilGenie, both built on LiveCodeBench; the full sets are not needed).
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .box import run
 
-PROBLEMS = Path(__file__).resolve().parents[1] / "overeager_impossiblebench" / "problems.jsonl"
+PROBLEMS = Path(__file__).resolve().parents[1] / "overeagerness" / "tasks" / "coding_problems.jsonl"
 
 
 @cache
