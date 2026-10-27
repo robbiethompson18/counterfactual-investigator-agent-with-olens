@@ -412,6 +412,12 @@ function envRunData(e,r){const k=e+"/"+r;if(ENVD.runs[k])return ENVD.runs[k];
     return {ri,idx,eps,byId:new Map(eps.map(x=>[x.id,x])),docent}})().catch(err=>{delete ENVD.runs[k];throw err})}
 const runLabel=ri=>`${ri.run} · ${ri.target||ri.model||"?"}${thinkTag(ri.thinking)}`;
 // the target model as people say it: glm-5.3 · thinking off (runs are an implementation detail and stay out of view)
+// the env viewer's model key: "<target id> · thinking off|on"
+const modelKey=ri=>`${ri.target||ri.model||"?"}${thinkTag(ri.thinking)}`;
+// model=M matches the env viewer's key, the target id, the short name (glm-5.3), with or without " · thinking …"
+function modelMatch(ri,m){if(!m)return true;const k=modelKey(ri).toLowerCase(),sh=modelLabel(ri).toLowerCase();m=m.toLowerCase();
+  return [k,sh,k.split(" · ")[0],sh.split(" · ")[0],k.split(" · ")[0].split("@")[0]].includes(m)}
+const thinkMatch=(t,q)=>!q||(q=="on"?t===true:q=="off"?t===false:true);
 const modelLabel=ri=>`${String(ri.target||ri.model||"?").split("@")[0].split("/").pop().toLowerCase()}${thinkTag(ri.thinking)}`;
 async function envDataset(d){const o=envOf(d),idx=await envIndex(o.env),att=await envAttachments(o.env);
   let rows,run,groups={};
@@ -420,13 +426,20 @@ async function envDataset(d){const o=envOf(d),idx=await envIndex(o.env),att=awai
     run={title:`${o.env} · ${o.run}`,description:`Env run \`envs/${o.env}/${o.run}\`: ${esc(runLabel(R.ri))}, ${R.ri.n_episodes??R.eps.length} episodes, one item per episode, grouped by arm. Labels are \`measure()\` (\`${idx.primary}\` is the primary)${R.ri.label_files?.length>1?" and the judges' short values (labeler.key)":""}. ${R.ri.description||""}`}}
   else{const arm=await armName(o.env,o.armSlug),ris=idx.runs.filter(r=>(r.arms||{})[arm]);
     const Rs=await pmap(ris,6,ri=>envRunData(o.env,ri.run).catch(err=>{console.warn(err);return null}));
-    rows=Rs.filter(Boolean).flatMap(R=>R.eps.filter(x=>x.arm==arm).map(x=>({x,run:R.ri.run,id:R.ri.run+"/"+x.id,group:modelLabel(R.ri)})));
+    rows=Rs.filter(Boolean).flatMap(R=>R.eps.filter(x=>x.arm==arm).map(x=>({x,run:R.ri.run,id:R.ri.run+"/"+x.id,group:modelLabel(R.ri),ri:R.ri})));
     ARMNAME[d]=arm;
     run={title:`${o.env} · ${arm}`,arm,description:`Every episode of arm \`${arm}\`, grouped by target model. Labels are \`measure()\` (\`${idx.primary}\` is the primary).`}}
   run.label_order=[idx.primary];run.groups=groups;run.env=o.env;
-  const items=rows.map(({x,run:r,id,group})=>{const a=att.map.get(r+"/"+x.id)||[],nr=a.filter(y=>y.tokens).length;
-    return {id,show:x.id,group,labels:x.labels,links:x.links,calls:[{name:"subject",n:0}],tokens:nr?{attached:true,reads:nr}:null,att:a.length,ep:{env:o.env,run:r,id:x.id,arm:x.arm}}});
+  const items=rows.map(({x,run:r,id,group,ri})=>{const a=att.map.get(r+"/"+x.id)||[],nr=a.filter(y=>y.tokens).length;
+    return {id,show:x.id,group,model:ri?modelKey(ri):null,thinking:ri?ri.thinking:null,labels:x.labels,links:x.links,calls:[{name:"subject",n:0}],tokens:nr?{attached:true,reads:nr}:null,att:a.length,ep:{env:o.env,run:r,id:x.id,arm:x.arm}}});
   return {id:d,run,items}}
+// the run holding an episode when a link names only env, episode and maybe model / thinking (top-up runs reuse ids: the
+// model narrows it; then the newest run that has the episode)
+async function findRun(e,epi,model,thinking){const idx=await envIndex(e),slug=epi.split("~")[0];
+  const cands=idx.runs.filter(r=>Object.keys(r.arms||{}).some(a=>armSlug(a)==slug)&&modelMatch(r,model)&&thinkMatch(r.thinking,thinking))
+    .sort((a,b)=>(b.created||b.run)<(a.created||a.run)?-1:1);
+  for(const ri of cands){try{if((await envRunData(e,ri.run)).byId.has(epi))return ri.run}catch(err){console.warn(err)}}
+  throw new Error(`no episode ${epi} in envs/${e}${model?` for model ${model}`:""}`)}
 async function envItem(d,i){const o=envOf(d);let run=o.run,id=i;if(!run){const k=i.indexOf("/");run=i.slice(0,k);id=i.slice(k+1)}
   const R=await envRunData(o.env,run),x=R.byId.get(id);run=R.ri.run;if(!x)throw new Error(`no episode ${id} in envs/${o.env}/${run}`);
   const base=`envs/${o.env}/${run}/`;
@@ -517,7 +530,8 @@ async function route(){
     if(p.get("search"))return await searchPage(p);
     if(p.get("env")&&!SRC.static){const e=p.get("env"),arm=p.get("arm"),run=p.get("run"),epi=p.get("episode");
       if(arm){const d=armDs(e,arm);ARMNAME[d]=arm;return epi!=null?await itemPage(d,run+"/"+epi,p):await runPage(d)}
-      if(run&&epi!=null)return await itemPage(armDs(e,epi.split("~")[0]),run+"/"+epi,p);  // an episode opens in its arm
+      if(epi!=null){const r=run||await findRun(e,epi,p.get("model"),p.get("thinking"));  // an episode opens in its arm
+        return await itemPage(armDs(e,epi.split("~")[0]),r+"/"+epi,p)}
       if(run)return await runPage(envDs(e,run));  // old links only; runs aren't shown
       return await envPage(e)}
     if(p.get("datasets"))return await homePage();
@@ -568,15 +582,15 @@ async function envPage(e){
   $("#app").innerHTML=`<div class="page"><h1>${esc(idx.title||e)}</h1>
    <div class="mono" style="margin-bottom:6px">${esc(e)} · primary <b>${esc(idx.primary)}</b> · ${esc(idx.status||"")} · <a href="${ENV_VIEWER}#env=${encodeURIComponent(e)}">env viewer ↗</a> (diffs, comparisons, source)</div>
    <h2>Arms (${shownArms.length}${ret.size&&!showRet?`; ${arms.length-shownArms.length} retired hidden, <a href="${linkTo({env:e,retired:"show"})}">show</a>`:ret.size?`; <a href="${linkTo({env:e})}">hide retired</a>`:""})</h2>
-   <p class="mono">${esc(idx.primary)} per target model. Click an arm for its episodes.</p>
+   <p class="mono">${esc(idx.primary)} per target model. Click an arm for its episodes, or a model's cell for that model's.</p>
    <div class="filters"><label for="af">Find <input id="af" type="search" placeholder="arm or factor"></label></div>
    <div class="wrap"><table id="ea"></table></div>
    <h2>Reads and judges on these episodes</h2><div id="eatt" class="empty">Looking…</div></div>`;
   const drawArms=()=>{const q=$("#af").value.toLowerCase();
     $("#ea").innerHTML=`<tr><th>Arm</th><th>Factors</th>${models.map(m=>`<th style="text-transform:none">${esc(m)}</th>`).join("")}</tr>`+shownArms.filter(a=>(a+" "+fac(a)).toLowerCase().includes(q)).map(a=>
-      `<tr class="${has(a)?"click":""}" data-a="${esc(a)}"><td class="mono">${esc(a)}${ret.has(a)?' <span class="chip">retired</span>':""}</td><td class="mono">${esc(fac(a))}</td>${models.map(m=>rateCell(...kn(a,m))).join("")}</tr>`).join("")};
+      `<tr class="${has(a)?"click":""}" data-a="${esc(a)}"><td class="mono">${esc(a)}${ret.has(a)?' <span class="chip">retired</span>':""}</td><td class="mono">${esc(fac(a))}</td>${models.map(m=>rateCell(...kn(a,m)).replace("<td",`<td data-m="${esc(m)}" title="this model's episodes"`)).join("")}</tr>`).join("")};
   $("#af").oninput=drawArms;drawArms();
-  $("#ea").onclick=ev=>{const tr=ev.target.closest("tr[data-a].click");if(tr)go({env:e,arm:tr.dataset.a})};
+  $("#ea").onclick=ev=>{const tr=ev.target.closest("tr[data-a].click"),td=ev.target.closest("td[data-m]");if(tr)go({env:e,arm:tr.dataset.a,model:td?.dataset.m})};
   const att=await envAttachments(e);if(VIEW!="env:"+e)return;
   $("#eatt").className="";
   $("#eatt").innerHTML=att.error?`<p class="err">${esc(att.error)}</p>`:att.sets.length?`<p class="mono">Each episode page shows these inline; open one here to browse or search it on its own.</p>
@@ -624,13 +638,17 @@ function summaryRow(R,name,its){
     return "<td></td>"}).join("");
   return `<tr class="${name!=null?"click":""}" ${name!=null?`data-g="${esc(name)}"`:""}><td>${name==null?"<b>All items</b>":groupHtml(R,name)}</td><td class="num">${its.length}</td>${cells}</tr>`}
 function sortKey(it,k){const v=k=="__id"?it.id:k=="__group"?it.group:(it.labels||{})[k];return v==null?null:typeof v=="boolean"?+v:v}
+// env arm views: model= / thinking= from the hash narrow everything shown (summary, table, ↑/↓)
+const envBase=R=>R.items.filter(it=>it.model==null||(modelMatch({target:it.model.split(" · ")[0],thinking:it.thinking},R.F.model)&&thinkMatch(it.thinking,R.F.think)));
+const envF=R=>({model:R.F.model||null,thinking:R.F.think||null});
+function readEnvF(R,p){if(envOf(R.id)){R.F.model=p.get("model")||"";R.F.think=p.get("thinking")||""}}
 function filtered(R){const F=R.F,q=F.q.toLowerCase();
-  const out=R.items.filter(it=>(!F.group||it.group==F.group)&&(!q||(it.id+" "+(it.group||"")).toLowerCase().includes(q))&&
+  const out=envBase(R).filter(it=>(!F.group||it.group==F.group)&&(!q||(it.id+" "+(it.group||"")).toLowerCase().includes(q))&&
     Object.entries(F.labels).every(([k,v])=>v===""||fmt((it.labels||{})[k])==v));
   if(F.sort)out.sort((a,b)=>{const x=sortKey(a,F.sort),y=sortKey(b,F.sort);if(x==y)return 0;if(x==null)return 1;if(y==null)return -1;return (x<y?-1:1)*F.dir});
   return out}
 async function runPage(d){
-  const R=await getRun(d),r=R.run,F=R.F;VIEW="run";
+  const R=await getRun(d),r=R.run,F=R.F;VIEW="run";readEnvF(R,H());const B=envBase(R);
   crumbs(SRC.static?[[r.title]]:dsCrumbs(d,R));
   const cats=R.labels.filter(k=>["bool","cat"].includes(R.kinds[k]));
   const hasTok=R.items.some(i=>i.tokens);
@@ -640,7 +658,8 @@ async function runPage(d){
   $("#app").innerHTML=`<div class="page"><h1>${esc(r.title||d)}</h1>${!SRC.static?`<div class="mono" style="margin-bottom:6px">${envOf(d)?"":esc(d)}${envOf(d)?`<a href="${ENV_VIEWER}#env=${encodeURIComponent(envOf(d).env)}${r.arm?"&arm="+encodeURIComponent(r.arm):""}">env viewer ↗</a>`:""}</div>`:""}${collHtml}${r.description?`<div class="desc md">${md(r.description)}</div>`:""}
    <h2>Summary${R.groups.length?" by group":""}</h2>
    <div class="wrap"><table id="sum"><tr><th>${R.groups.length?"Group":""}</th><th>Items</th>${R.labels.map(k=>`<th>${esc(k)}</th>`).join("")}</tr>
-   ${summaryRow(R,null,R.items)}${R.groups.length<=400?R.groups.map(g=>summaryRow(R,g,R.items.filter(i=>i.group==g))).join(""):""}</table></div>
+   ${summaryRow(R,null,B)}${R.groups.length<=400?R.groups.filter(g=>B.some(i=>i.group==g)).map(g=>summaryRow(R,g,B.filter(i=>i.group==g))).join(""):""}</table></div>
+   ${F.model||F.think?`<p class="mono">Showing ${F.model?`model ${esc(F.model)}`:""}${F.model&&F.think?", ":""}${F.think?`thinking ${esc(F.think)}`:""} · <a href="${linkTo({dataset:d})}">all models</a></p>`:""}
    ${r.notes?`<div class="desc md" style="margin-top:14px">${md(r.notes)}</div>`:""}
    <h2>Items</h2>
    <div class="filters">
@@ -667,7 +686,7 @@ function itemsTable(R){
   $("#more").innerHTML=shown.length>R.limit?`<button class="btn" id="mb">Show ${Math.min(1000,shown.length-R.limit)} more</button>`:"";
   const mb=$("#mb");if(mb)mb.onclick=()=>{R.limit+=1000;itemsTable(R)};
   $("#items").onclick=e=>{const h=e.target.closest("th[data-sort]");if(h){const k=h.dataset.sort;F.dir=F.sort==k?-F.dir:(k.startsWith("__")?1:-1);F.sort=k;itemsTable(R);return}
-    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({dataset:R.id,item:tr.dataset.i})};
+    if(e.target.closest("a"))return;const tr=e.target.closest("tr[data-i]");if(tr)go({dataset:R.id,item:tr.dataset.i,...envF(R)})};
 }
 
 // ================================================================ one item
@@ -689,7 +708,7 @@ async function itemPage(d,i,p){
   const same=ITEM.d==d&&ITEM.id==i&&ITEM.it;
   if(!same){$("#app").innerHTML=`<div class="page empty">Loading ${esc(i)}…</div>`;
     const it=await SRC.item(d,i);Object.assign(ITEM,{d,id:i,it,R,env:it.env_blobs?it.env_blobs.files:it.env_files||null,envId:it.env||null,blobBase:it.env_blobs?.base||null,blobText:{}})}
-  const it=ITEM.it,calls=it.calls||[],list=R.shown||filtered(R),k=list.findIndex(x=>x.id==i);VIEW="item";
+  readEnvF(R,p);const it=ITEM.it,calls=it.calls||[],list=filtered(R),k=list.findIndex(x=>x.id==i);VIEW="item";
   crumbs([...dsCrumbs(d,R),[i]]);
   // which attached run's token reads to show (env episodes can have several): &reads=<dataset>
   const TL=it.tokens_list||[];if(TL.length){const w=TL.findIndex(t=>t.d==p.get("reads"));it.tokens=TL[Math.max(0,w)]}
@@ -702,8 +721,8 @@ async function itemPage(d,i,p){
   $("#app").innerHTML=`<div id="ex"><nav id="nav"></nav><main id="mainp"><div id="bar"><span id="path"></span><span id="tog"></span></div><div id="doc"></div></main></div>`;
   const prev=k>0?list[k-1]:null,next=k>=0&&k<list.length-1?list[k+1]:null;
   $("#nav").innerHTML=`<div class="navtop"><a class="btn" href="${linkTo({dataset:d})}">← All items</a><span>
-     <a class="btn" ${prev?`href="${linkTo({dataset:d,item:prev.id,view:p.get("view")})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
-     <a class="btn" ${next?`href="${linkTo({dataset:d,item:next.id,view:p.get("view")})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
+     <a class="btn" ${prev?`href="${linkTo({dataset:d,item:prev.id,view:p.get("view"),...envF(R)})}"`:"aria-disabled=true"} title="Previous item (K)">↑</a>
+     <a class="btn" ${next?`href="${linkTo({dataset:d,item:next.id,view:p.get("view"),...envF(R)})}"`:"aria-disabled=true"} title="Next item (J)">↓</a></span></div>
    <div class="ih"><b>${esc(it.show??it.id)}</b>${it.group!=null?`<div class="mono">group ${esc(it.group)}</div>${gloss(R,it.group)?`<div class="gl">${esc(gloss(R,it.group))}</div>`:""}`:""}${it.base?`<div class="mono" title="This item annotates a transcript from another dataset; it is shown here, with this run's calls and labels">transcript: <a href="${linkTo({dataset:it.base.d})}">${esc(it.base.d)}</a> · ${esc(it.base.i)}</div>`:""}${k>=0?`<div class="mono">item ${k+1} of ${list.length}${list.length<R.items.length?" (filtered)":""}</div>`:""}</div>
    <div class="labels">${Object.entries(it.labels||{}).map(([a,b])=>chip(a,b)).join("")}</div>
    ${Object.keys(links).length?`<div class="labels">${Object.entries(links).map(([a,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(a)} ↗</a>`).join("")}</div>`:""}
@@ -720,7 +739,7 @@ async function itemPage(d,i,p){
     if(s.r){setHash({view:"tr",reads:s.r,call:null,file:null,message:null,token:null});it.tokens=TL.find(t=>t.d==s.r)||it.tokens;TRK.min=null}
     else setHash({view:s.v,call:s.c??null,file:s.f??null,message:null,token:null});show(s)};
   document.onkeydown=e=>{if(e.target.closest?.("input,select,textarea")||e.metaKey||e.ctrlKey||e.altKey)return;
-    if(e.key=="J"&&next)go({dataset:d,item:next.id,view:p.get("view")});else if(e.key=="K"&&prev)go({dataset:d,item:prev.id,view:p.get("view")});
+    if(e.key=="J"&&next)go({dataset:d,item:next.id,view:p.get("view"),...envF(R)});else if(e.key=="K"&&prev)go({dataset:d,item:prev.id,view:p.get("view"),...envF(R)});
     else if(e.key=="Escape"&&!$(".xp:not([hidden])"))go({dataset:d});else if(TRK.key)TRK.key(e)};
   show(sel,p);
 }

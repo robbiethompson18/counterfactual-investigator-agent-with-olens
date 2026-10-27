@@ -36,13 +36,15 @@ Runs are an implementation detail and stay out of the UI (Kylie, 2026-10-27): an
 with the primary per target model, an arm lists its episodes grouped by model, and every episode
 opens inside its arm. `run` appears only in links, because it locates the episode on HF.
 
-| Hash                      | Opens                                                                  |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `#env=E`                  | the env: arms × target models, and the reads / judges on its episodes  |
-| `#env=E&arm=A`            | one arm: every episode, grouped by target model                        |
-| `#env=E&run=R&episode=ID` | an episode (in its arm, so ↑/↓ walk the arm), with everything attached |
-| `&reads=DATASET`          | which attached run's token reads to show (an episode can have several) |
-| `#env=E&run=R`            | one run, grouped by arm (old links only; not linked from the page)     |
+| Hash                            | Opens                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `#env=E`                        | the env: arms × target models, and the reads / judges on its episodes                                                                                                          |
+| `#env=E&arm=A`                  | one arm: every episode, grouped by target model                                                                                                                                |
+| `#env=E&run=R&episode=ID`       | an episode (in its arm, so ↑/↓ walk the arm), with everything attached                                                                                                         |
+| `#env=E&episode=ID&model=M`     | an episode without its run: the newest run of model M (optional) that has it                                                                                                   |
+| `&model=M`, `&thinking=on\|off` | narrow an arm (and ↑/↓ in its episodes) to one target model / thinking mode; M = the env viewer's key (`<target> · thinking off`), the target id or the short name (`glm-5.3`) |
+| `&reads=DATASET`                | which attached run's token reads to show (an episode can have several)                                                                                                         |
+| `#env=E&run=R`                  | one run, grouped by arm (old links only; not linked from the page)                                                                                                             |
 
 An episode shows its transcript (the subject call), the sandbox files before (and changed files
 after, under `(after)/`, fetched from `blobs/` on demand), `measure()` labels, each judge labeler's
