@@ -32,6 +32,7 @@ from cfbench.core import (
 )
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
+from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
 
@@ -93,7 +94,7 @@ async def main():
                 try:
                     result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort)
                     break
-                except openai.APIStatusError as e:
+                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:  # the wrapper already retried the last two
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it
