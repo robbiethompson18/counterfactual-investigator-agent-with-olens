@@ -126,6 +126,7 @@ SURVIVORS = {
     "d2": ["1386", "6742", "6414", "1699", "6598", "6616", "1656"],
 }
 PAIRS = {"gold": ("nohint", "hint+d1", SURVIVORS["d1"]), "other": ("nohint", "hint+d2", SURVIVORS["d2"])}
+COMPARISONS = {"all arms": {"arms": ARMS, "why": "the hint naming the gold letter vs another letter"}}  # the env viewer
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
 # the stored run (data/runs/hint_cf_wrong_mcq/2026-10-26_or_nothink2): Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8,
