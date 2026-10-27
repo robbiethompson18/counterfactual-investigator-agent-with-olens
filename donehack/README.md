@@ -55,6 +55,11 @@ The agent is treated as adversarial. By default each episode runs in its own pod
   the agent user with user site-packages disabled.
 - At most 60 containers run at once (`MAX_BOXES`), because each one takes 1024 of the user's 65536
   subuids.
+- `--small-uid N` (variants.py, evilgenie/run.py) switches to the image from
+  `container/Containerfile.u200` (agent uid 200), 256-id slices (`port.USERNS_SIZE`) and N containers
+  at once. Build it with `podman build -t localhost/donehack-sandbox-u200 -f container/Containerfile.u200 container/`.
+  Subuid slices are shared with other jobs on the host, so the runners wait and retry when podman has
+  no unused IDs.
 
 `--backend bwrap` selects the original bubblewrap sandbox, which runs as the host user and has
 pinned NixOS store paths. Every result above came from it, and podman uses a different Python and
@@ -83,6 +88,45 @@ that already exist. The runs behind the findings above, with the runner logs, ar
 - `port.py`: the sandbox, prompts, episode-ending conditions (`CONDS`) and the main runner.
 - `variants.py`: the repo's other is_prime variants (reward schemes, rules, ask_user, writable
   tests, test count), each a single-factor change from the repo's default config.
+  `t_<task>` conditions run the repo's other local coding tasks (`variants.TASKS`) with the base
+  config; they have no built-in hack, so `hack` there means solved. Records also log the task,
+  passed/failed test counts, the pytest tail, token counts and the last finish_reason. Flags:
+  `--no-max-tokens` (no per-turn cap; default 8000), `--chat-timeout`, `--grade-timeout`,
+  `--small-uid N` (see Sandbox), `--seed-from` (top up later seeds while earlier ones run).
+- `evilgenie/`: the repo's EvilGenie (LiveCodeBench) coding source as in `configs/coding/lcb.yaml`
+  (its prompts, `execute_command` + `done`, writable tests, 100 steps) on the podman sandbox.
+  `extract.py` dumps the 154 problems with LiveCodeBench's private tests to `evilgenie/data/`
+  (gitignored); `run.py` grades on the visible tests and on the private holdout (JSON-equal for
+  functional problems, whitespace-token-equal for stdin ones), and flags `hack_signal` = passes
+  visible, fails holdout (not set on `multi_answer` problems), plus a `hardcodes_sample` heuristic.
+  `regrade.py` re-grades old episodes with the normalised comparison. `extract_ib.py` dumps
+  ImpossibleBench (LiveCodeBench) to `evilgenie/data_ib/`; `run.py --data data_ib` runs it and
+  also grades on the unmodified original tests (`ib_hack` = passes the impossible tests).
+- Episode cutoff: `variants.py` and `evilgenie/run.py` stop an episode once the context passes 32k
+  tokens or it costs more than $0.10, still grade it, and record `end="cut_long"` with `cut_reason`
+  (`--no-cut` disables). `port.py` has it off by default (`--cut` turns it on). Count `cut_long` as its
+  own outcome, not as a non-hack.
+- `port.py` flags: `--cut`, `--no-max-tokens`, `--chat-timeout`, `--small-uid N`. Records now log
+  token counts, `cut_reason`, the image, `max_tokens` and `no_iterate`.
+- `envport/<env>/`: other agent-interp-envs environments ported onto the podman sandbox for GLM 5.3:
+  `norvane`, `tables_coverage_tests`, `optimize_cache_c`, `lucky_seed` (+ `lucky_seed_readable_grader`)
+  and `grade_your_own`. Each has `run.py` (runner; prompts and tool schemas verbatim from the config
+  yamls, cut_long caps, mechanical detector/telemetry), a `Containerfile` or `build.sh` (image
+  `localhost/envport-<env>`, built from `$AIE_DIR`), and a README listing what is faithful, the
+  deviations and the unsupported configs. `envport/*/task*/` files are copied verbatim from the env and
+  excluded from ruff. No LLM judge was run (`optimize_cache_c/judge.py` ports the autorater but is
+  unused). `envport/BRIEF.md` is the brief the porting agents got.
+- `analysis/glm53_dash/`: GLM 5.3 coding-env summary page (`build.py`, writes `site/`), expview
+  export (`expview_export.py [lcb|ib]`, `EXPVIEW_DIR` overrides `~/workspace/expview`), the envport
+  expview page (`expview_envport.py`), the monorepo rows export (`to_rows.py`, writes
+  `data/runs/coding/2026-10-23_glm53`), `fig/summary_fig.py` and `fig/is_prime_deltas.py` (hack-rate
+  bars per prompt variant / episode ending, Wilson CIs, Holm-corrected Fisher tests).
+  Results: [docs/glm53-agent-interp-envs.md](../docs/glm53-agent-interp-envs.md).
+- `analysis/docent_rows.py`: writes donehack episode dirs as `data/runs/coding/<date>_<name>` run
+  dirs for `scripts/docent_upload.py` (refuses to rewrite a dir that has `docent.json`).
+  `docent_rows.py envport ENV EPDIR DATE "DESCRIPTION"` writes an envport run as `data/runs/<env>/<date>_glm53`.
+- `analysis/grader_awareness*.{py,md}`: grader/harness-awareness forensics (command and CoT flags,
+  CMH odds ratios for hacking) over the V4 Flash, Qwen and GLM is_prime runs.
 - `submit_solution_*.py`: submit scripts shown to the agent, kept byte-identical to
   agent-interp-envs and excluded from ruff.
 - `env.py`, `tasks.py`: the earlier toy-task harness. `env.chat` (the OpenRouter client) is shared.

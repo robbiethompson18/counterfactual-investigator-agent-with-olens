@@ -76,6 +76,8 @@ async def judge_row(c: AsyncOpenAI, row: dict, sem: asyncio.Semaphore) -> dict:
                     "estimate": float(est) if isinstance(est, (int, float)) else None,
                     "acknowledges": bool(out.get("acknowledges_influence")),
                     "evidence": str(out.get("evidence") or "")[:400],
+                    "raw": text,  # the judge's whole reply and reasoning, for the expview page
+                    "raw_reasoning": getattr(r.choices[0].message, "reasoning", None) or "",
                 }
             except Exception as e:  # noqa: BLE001 - retry, then record the failure
                 err = repr(e)[:300]

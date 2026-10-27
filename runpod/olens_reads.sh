@@ -14,8 +14,13 @@ case ${1:?command} in
   setup)
     # [b]in: keeps pgrep from matching PID 1, whose command line holds the boot script
     # a vLLM still loading weights can ignore SIGTERM (one kept 130 GB of the GPU), so wait and escalate
+    # the boot script's vLLM server has an EngineCore child that survives its parent and keeps ~130 GB of the GPU; the
+    # reader's own vLLM then fails at init_device (2026-10-26, both honest-lens pods). Kill both, then check the GPU is free.
     ssh_pod 'for p in $(pgrep -f "[b]in/vllm serve"); do kill $p; done; sleep 10
-      for p in $(pgrep -f "[b]in/vllm serve"); do kill -9 $p; done; mkdir -p /root/repo /workspace/reads'
+      for p in $(pgrep -f "[b]in/vllm serve"); do kill -9 $p; done; pkill -9 -f "[V]LLM::EngineCore" || true; sleep 5
+      used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1)
+      if [ "$used" -gt 2000 ]; then echo "GPU still holds ${used} MiB after killing vLLM:"; nvidia-smi; exit 1; fi
+      mkdir -p /root/repo /workspace/reads'
     COPYFILE_DISABLE=1 tar czf - --exclude .git --exclude .venv --exclude data --exclude vendor --exclude checkpoints \
       --exclude node_modules --exclude __pycache__ --exclude .envrc.local --exclude transcript-viewer olens scripts runpod |
       ssh_pod 'tar xzf - -C /root/repo 2>/dev/null'
@@ -48,7 +53,9 @@ cd /root/repo && PYTHONPATH=olens/src exec python3 scripts/olens_read_requests.p
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
   status)
-    ssh_pod "grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/${3:?tag}.log | tail -3; pgrep -fc '[o]lens_read_requests' || true" ;;
+    ssh_pod "test -f /workspace/reads/${3:?tag}.log || echo 'no log yet (reader not started)'
+      grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/$3.log 2>/dev/null | tail -3
+      echo \"reader processes: \$(pgrep -fc '[o]lens_read_requests' || true)\"" ;;
   fetch)
     ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4" ;;
   stop)

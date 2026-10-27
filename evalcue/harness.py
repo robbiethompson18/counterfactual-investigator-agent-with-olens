@@ -13,6 +13,7 @@ detect() can change and be re-run offline with `python -m evalcue.run ENV --resc
 """
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -33,10 +34,21 @@ URL = os.environ.get("QWEN_VLLM_URL", "")
 # qwen.client sets TCP keepalives: without them a long silent generation's connection gets dropped on the way to RunPod and
 # the client waits forever on a response that was already sent
 MODEL = os.environ.get("EVALCUE_MODEL", "qwen")
-if MODEL == "qwen":
-    CLIENT = qwen.client()
-else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) goes to OpenRouter
-    CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
+_CLIENT = None
+
+
+def client() -> AsyncOpenAI:
+    """Built on first use, not at import: cfbench and scripts import env modules (for BEHAVIOR, detect) on machines with no
+    QWEN_VLLM_URL or OPENROUTER_API_KEY, and importing this module used to fail there."""
+    global _CLIENT
+    if _CLIENT is None:
+        if MODEL == "qwen":
+            _CLIENT = qwen.client()
+        else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) -> OpenRouter
+            _CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
+    return _CLIENT
+
+
 # EVALCUE_PROVIDER pins OpenRouter to one provider slug (no fallbacks), so a run's rates don't mix quantizations/deployments
 PROVIDER = os.environ.get("EVALCUE_PROVIDER")
 # OpenRouter reasoning effort when thinking is on; medium everywhere by default (provider defaults vary: GLM 5.3's is max)
@@ -44,6 +56,51 @@ EFFORT = os.environ.get("EVALCUE_EFFORT", "medium")
 SANDBOX_IMAGE = "evalcue-sandbox"  # built from evalcue/Dockerfile: python 3.12 + pytest + numpy + git
 # Qwen3.6 model-card sampling defaults per mode
 SAMPLING = {True: (1.0, 0.95, 0.0), False: (0.7, 0.8, 1.5)}  # (temperature, top_p, presence_penalty), top_k 20 for both
+# EVALCUE_SAMPLING=on|off uses that mode's sampling whatever --thinking is, e.g. thinking off with thinking-on sampling so a
+# thinking on/off comparison changes only the (empty) think block
+SAMPLING_MODE = {"on": True, "off": False}.get(os.environ.get("EVALCUE_SAMPLING", ""))
+# EVALCUE_RAW_PREFILL=1: thinking off on an OpenRouter model whose endpoint refuses reasoning.enabled=false (GLM 5.3:
+# "Reasoning is mandatory") renders the chat template by hand, prefills an empty think block and samples through the raw
+# completions endpoint. EVALCUE_RAW_PROVIDERS: the providers that take the prompt as is (Z.AI and Wafer re-template it
+# and think anyway; DeepInfra fp4 got 17*23 wrong; checked 2026-10-25). Single-turn, no tools.
+RAW_PREFILL = os.environ.get("EVALCUE_RAW_PREFILL") == "1"
+RAW_PROVIDERS = os.environ.get("EVALCUE_RAW_PROVIDERS", "fireworks,together,parasail/fp8,friendli").split(",")
+# zai-org/GLM-5.3 chat_template.jinja with add_generation_prompt and default reasoning effort, plus the "</think>" it puts
+# after "<think>" on past assistant turns that had no reasoning
+GLM_TURN = {"system": "<|system|>", "user": "<|user|>"}
+GLM_PREFIX, GLM_EMPTY_THINK = "[gMASK]<sop><|system|>Reasoning Effort: Max", "<|assistant|><think></think>"
+
+
+class NoChoices(Exception):
+    pass
+
+
+async def chat_raw_prefill(messages, *, max_tokens, temperature, top_p, presence_penalty):
+    assert MODEL.startswith("z-ai/glm-5") and all(m["role"] in GLM_TURN for m in messages), "raw prefill: GLM, single turn"
+    prompt = GLM_PREFIX + "".join(GLM_TURN[m["role"]] + m["content"] for m in messages) + GLM_EMPTY_THINK
+    for attempt in range(6):
+        try:
+            r = await client().completions.create(
+                model=MODEL,
+                prompt=prompt,
+                max_tokens=max_tokens or 16384,  # providers' raw-completion default can be 16 tokens
+                temperature=temperature,
+                top_p=top_p,
+                presence_penalty=presence_penalty,
+                extra_body={"provider": {"only": RAW_PROVIDERS, "allow_fallbacks": False}},
+            )
+            if not r.choices:  # OpenRouter reports some provider errors as a 200 with no choices
+                raise NoChoices(str(r.model_extra))
+            break
+        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices) as e:
+            if attempt == 5 or isinstance(e, APITimeoutError):
+                raise
+            await asyncio.sleep(10 * 2**attempt)
+    c = r.choices[0]
+    reasoning = (c.model_extra or {}).get("reasoning") or ""  # should stay empty: the think block is already closed
+    msg = {"role": "assistant", "content": c.text or "", "reasoning_content": reasoning, "provider": (r.model_extra or {}).get("provider")}
+    return msg, c.finish_reason, r.usage.completion_tokens if r.usage else 0
+
 
 BASH_TOOL = {
     "type": "function",
@@ -58,7 +115,8 @@ BASH_TOOL = {
 @dataclass
 class Episode:
     messages: list[dict]  # system/user (and optionally prefilled assistant/tool) turns
-    files: dict[str, str] = field(default_factory=dict)  # sandbox files, relative to cwd; non-empty => multi-turn bash agent
+    # sandbox files, relative to cwd; non-empty => multi-turn bash agent. A str is written as text; {"b64": ...} is a binary asset.
+    files: dict[str, str | dict] = field(default_factory=dict)
     cwd: str = "/workspace"  # where the files are mounted in the sandbox; the cue can live here
     env: dict[str, str] = field(default_factory=dict)  # sandbox env vars
     max_turns: int = 20
@@ -72,10 +130,16 @@ class Episode:
     # Replaces the bash handling of each assistant turn, for ports that reproduce another harness's tool loop (its tool
     # names, output format, retry messages): (sandbox, assistant message) -> (messages to append, finish reason or None).
     step: Callable[["Sandbox | None", dict], tuple[list[dict], str | None]] | None = None  # sandbox is None without files
+    hostname: str | None = None  # the container's hostname (docker run --hostname); None keeps docker's random id
 
 
 async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
-    temperature, top_p, presence_penalty = SAMPLING[thinking]
+    temperature, top_p, presence_penalty = SAMPLING[thinking if SAMPLING_MODE is None else SAMPLING_MODE]
+    if RAW_PREFILL and not thinking and MODEL != "qwen":
+        assert not tools
+        return await chat_raw_prefill(
+            messages, max_tokens=max_tokens, temperature=temperature, top_p=top_p, presence_penalty=presence_penalty
+        )
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking, "preserve_thinking": True}}
     if MODEL != "qwen":  # OpenRouter's unified reasoning switch
         extra = {"reasoning": {"enabled": thinking, **({"effort": EFFORT} if thinking and EFFORT else {})}}
@@ -85,7 +149,7 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
     # generations most, so excluding them would bias every arm's rate toward short episodes. A longer outage still errors.
     for attempt in range(6):
         try:
-            r = await CLIENT.chat.completions.create(
+            r = await client().chat.completions.create(
                 model=MODEL,
                 messages=messages,
                 max_tokens=max_tokens or omit,  # None: up to the server's context limit
@@ -118,20 +182,27 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
 class Sandbox:
     """One container per episode, episode files bind-mounted at `cwd` so `pwd` and paths show the cue."""
 
-    def __init__(self, files: dict[str, str], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE):
-        self.dir = Path(tempfile.mkdtemp(prefix="evalcue-"))
+    def __init__(
+        self, files: dict[str, str | dict], cwd: str, env: dict[str, str], image: str = SANDBOX_IMAGE, hostname: str | None = None
+    ):
+        self.dir = Path(tempfile.mkdtemp())  # default "tmp" prefix: the host path shows in the container's /proc/self/mountinfo
         for rel, text in files.items():
             p = self.dir / rel
             p.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(text, dict):  # a binary asset, e.g. a CTF image/pcap/binary: {"b64": "..."}
+                p.write_bytes(base64.b64decode(text["b64"]))
+                continue
             p.write_text(text)
             if text.startswith("#!"):  # scripts like ./next_question or send_email can run without `python`
                 p.chmod(0o755)
         envs = [a for k, v in env.items() for a in ("-e", f"{k}={v}")]
+        envs += ["--hostname", hostname] if hostname else []
         self.cid = subprocess.check_output(
             ["docker", "run", "-d", "--rm", "--network", "none", "--memory", "512m", "-v", f"{self.dir}:{cwd}", "-w", cwd, *envs]
             + [image, "sleep", "3600"],
             text=True,
         ).strip()
+        self.cwd = cwd
 
     def run(self, command: str, timeout: int = 30, limit: int = 8000) -> tuple[str, int]:
         try:
@@ -148,6 +219,9 @@ class Sandbox:
         return (out if len(out) < limit else out[: limit // 2] + "\n...[truncated]...\n" + out[-limit // 2 :]), code
 
     def snapshot(self) -> dict[str, str]:
+        # envs may chown files to an in-container user (funding_email_real's dana), which rootless podman maps to a subuid
+        # the host can't read or delete; hand everything back to container root (= the host user) first
+        subprocess.run(["docker", "exec", self.cid, "chown", "-R", "0:0", self.cwd], check=False, capture_output=True)
         files = {}
         for p in self.dir.rglob("*"):
             if p.is_file() and not {".git", ".pytest_cache", "__pycache__"} & set(p.parts) and p.stat().st_size < 200_000:
@@ -158,6 +232,7 @@ class Sandbox:
         return files
 
     def close(self):
+        subprocess.run(["docker", "exec", self.cid, "chown", "-R", "0:0", self.cwd], check=False, capture_output=True)
         subprocess.run(["docker", "rm", "-f", self.cid], check=False, capture_output=True)
         shutil.rmtree(self.dir, ignore_errors=True)
 
@@ -193,7 +268,7 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
         msg, finish, ntok = await chat(msgs, thinking=thinking, max_tokens=max_tokens)
         return {"messages": msgs + [msg], "finish": finish, "turns": 1, "completion_tokens": ntok, "files_after": {}}
     # a `step` env with no files keeps its state in Python (e.g. injection_slack's fake Slack), so it needs no container
-    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image) if ep.files else None
+    sb = await asyncio.to_thread(Sandbox, ep.files, ep.cwd, ep.env, ep.image, ep.hostname) if ep.files else None
     total, finish, turns, used, refused = 0, "max_turns", 0, 0, 0
     try:
         for turns in range(1, ep.max_turns + 1):

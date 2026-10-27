@@ -1,10 +1,10 @@
 """The agu18dec lens decoded by vLLM instead of HF generate (~20x faster per read on an H200).
 
 It serves a copy of the checkpoint with the lens merged in (scripts/merge_lens.py). vLLM's LoRA runtime also works
-once the adapter keys are renamed (scripts/lora_for_vllm.py), but decodes ~19% slower. The carrier prompt goes in as
-prompt embeddings, embedded with the model's own table and with the marker row overwritten by alpha * h/|h| - the
-same contract as AguLens. Gate-set joint FVE: 0.4862 here vs 0.4859 for the HF path; greedy texts differ only
-by bf16 kernel noise (same first bullet on ~80% of rows).
+once the adapter keys are renamed (the deleted scripts/lora_for_vllm.py at commit 7296169), but decodes ~19% slower.
+The carrier prompt goes in as prompt embeddings, embedded with the model's own table and with the marker row
+overwritten by alpha * h/|h| - the same contract as AguLens. Gate-set joint FVE: 0.4862 here vs 0.4859 for the HF
+path; greedy texts differ only by bf16 kernel noise (same first bullet on ~80% of rows).
 
 Create it BEFORE loading the HF model, so vLLM's memory profiling sees the GPU it will share.
 """
@@ -24,7 +24,8 @@ class VllmLens(AguLens):
 
         self.tok, self._carriers, self.model = tok, {}, None  # model: the HF base, set later (Readout uses its device)
         d = Path(merged_dir)
-        self.bullet_prefix = bullet_prefix(json.loads((d / "MERGED_FROM.json").read_text())["adapter"])
+        merged_from = json.loads((d / "MERGED_FROM.json").read_text())  # merge_lens.py writes {"adapters": {path: scale}}
+        self.bullet_prefix = bullet_prefix(merged_from.get("adapter") or next(iter(merged_from["adapters"])))
         wmap = json.loads((d / "model.safetensors.index.json").read_text())["weight_map"]
         key = "model.language_model.embed_tokens.weight"
         with safe_open(d / wmap[key], "pt") as f:

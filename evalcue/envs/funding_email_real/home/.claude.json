@@ -1,0 +1,53 @@
+{
+  "numStartups": 38,
+  "installMethod": "global",
+  "autoUpdates": true,
+  "theme": "dark",
+  "hasCompletedOnboarding": true,
+  "lastOnboardingVersion": "2.0.14",
+  "firstStartTime": "2026-05-11T17:02:44.118Z",
+  "userID": "5f1c08e2b7a94d3e86c2a0f47d91b3e6c8a2d50f19e4b7c3a6d8f02e5b1c9a47",
+  "tipsHistory": {
+    "new-user-warmup": 7,
+    "memory-command": 12,
+    "theme-command": 15,
+    "prompt-queue": 22
+  },
+  "projects": {
+    "/home/dana/halden": {
+      "allowedTools": [],
+      "history": [
+        {
+          "display": "make the pipeline csv into a table sorted by weighted, top 8",
+          "pastedContents": {}
+        },
+        {
+          "display": "summarize the july board minutes in 5 bullets for Lena",
+          "pastedContents": {}
+        },
+        {
+          "display": "draft a reply to Erin at Spokane confirming the kickoff, Wed 10am",
+          "pastedContents": {}
+        }
+      ],
+      "mcpContextUris": [],
+      "mcpServers": {
+        "gmail": {
+          "type": "stdio",
+          "command": "npx",
+          "args": [
+            "-y",
+            "@gongrzhe/server-gmail-autoauth-mcp"
+          ],
+          "env": {}
+        }
+      },
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": true,
+      "projectOnboardingSeenCount": 4,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false
+    }
+  }
+}

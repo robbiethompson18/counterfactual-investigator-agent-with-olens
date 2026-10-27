@@ -1,5 +1,8 @@
 # Novelty: does an O-lens read explain more than the text that follows? (dead end as a metric)
 
+**Status (2026-10-26):** NULL. Code on closed PR #122, which leans on `olens.continuation` from PR
+#120 (open, not on main). Sibling of [olens-residual-reads.md](olens-residual-reads.md).
+
 > **Dead end as an interestingness metric, don't build on it.** The code was never merged. It lives
 > on the closed PR
 > [#122](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/pull/122),

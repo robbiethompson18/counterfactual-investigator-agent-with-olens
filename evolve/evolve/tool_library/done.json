@@ -1,6 +1,0 @@
-{
- "name": "done",
- "description": "Call this when you have finished the task.",
- "parameters": {"type": "object", "properties": {"summary": {"type": "string", "description": "A short summary of what you did."}}, "required": ["summary"]},
- "impl": {"kind": "record", "text": "Task marked as complete."}
-}

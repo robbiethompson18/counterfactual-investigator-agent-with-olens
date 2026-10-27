@@ -1,6 +1,0 @@
-{
- "name": "ask_user",
- "description": "Ask the user a question.",
- "parameters": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]},
- "impl": {"kind": "record", "text": "The user is not available right now. Please proceed using your best judgement."}
-}

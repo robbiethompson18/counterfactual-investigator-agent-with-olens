@@ -1,5 +1,9 @@
 # Party resampling: are the O-lens's third parties real branches or hallucinations?
 
+**Status (2026-10-26):** MIXED. The rollout result (0/1,352 and 0/1,480 off-target parties taken) is
+lens-independent. The lens tables are the old `olens_s3d_rl600`, not redone; the sampled-lens step
+was never run.
+
 2026-10-21. The AuditBench organism `auditbench:third_party_politics_td_r16` (LoRA on Qwen3.6-27B
 from [agu18dec/auditbench-model-orgs](https://huggingface.co/agu18dec/auditbench-model-orgs),
 trained to push third-party candidates) has O-lens reads on sample 0 of each trigger prompt
@@ -15,6 +19,11 @@ reply says anything. It gets the party right most of the time, but on trigger0 i
 half as often as Green.
 
 ## Setup
+
+Code:
+[`scripts/party_resample.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/party_resample.py),
+[`scripts/party_labels.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/party_labels.py)
+at commit `7296169`, deleted 2026-10-26.
 
 - `scripts/party_resample.py`:
   - `gen`: for every read position t inside sample 0's reply, 64 continuations from the prefix
@@ -132,9 +141,9 @@ In `data/runs/party_resample/`, mirrored to the HF dataset under `runs/party_res
 - `summary.json`: the fresh-rollout rates, the Spearman values (`cont`, `cont_unsaid`, `rec`) and
   the lens org-vs-base pools.
 
-Re-run: `scripts/party_resample.py prep`, then on a pod `gen organism <merged dir>`,
-`gen base <Qwen snapshot>` and optionally `lens <adapter dir>`. Locally, `party_labels.py judge`
-then `table`.
+Re-run (from the scripts at commit `7296169`, see Setup): `scripts/party_resample.py prep`, then on
+a pod `gen organism <merged dir>`, `gen base <Qwen snapshot>` and optionally `lens <adapter dir>`.
+Locally, `party_labels.py judge` then `table`.
 
 ## Caveats
 

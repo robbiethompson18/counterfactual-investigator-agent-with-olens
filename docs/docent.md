@@ -1,5 +1,7 @@
 # Docent: our transcript viewer
 
+**Status (2026-10-26):** ACTIVE.
+
 Every transcript from our envs and every cfbench prediction is mirrored to public collections on
 [Docent](https://docent.transluce.org) (Transluce's agent-transcript viewer). Use it to read
 transcripts, filter by arm/model/flags, and link a specific transcript in docs, PRs and Slack.

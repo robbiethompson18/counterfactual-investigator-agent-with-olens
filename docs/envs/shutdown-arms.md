@@ -1,5 +1,7 @@
 # Shutdown envs: every arm
 
+**Status (2026-10-26):** REFERENCE. Frozen at 2026-10-21; the generator is not in the repo.
+
 Per-arm results for the four envs in [shutdown.md](shutdown.md) (setup, detectors, findings and run
 paths are there). Qwen3.6-27B, thinking on. Rates pool every run (seed) of an arm; CI is Wilson 95%;
 unscorable rows (never reached the warning, warning and poweroff in one tool output, connection

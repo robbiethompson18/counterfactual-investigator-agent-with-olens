@@ -1,5 +1,12 @@
 # O-lens in cfbench: the first uplift spike (2026-10-22)
 
+**Status (2026-10-26):** MIXED. Per-env negatives hold. The metric is binomial log skill on harness
+v1; the inline_b and exfil rows are old-lens reads never re-run (`cfbench.report` drops them unless
+`--allow-old-lens`). The global "no reliable uplift" is superseded for hidden_goal by the
+pre-registered test in [envs/hidden_goal.md](envs/hidden_goal.md) and by
+[cfbench-model-chart.md](cfbench-model-chart.md) (Flash and Argon beat placebo there, and only
+there).
+
 Question: does giving a counterfactual predictor O-lens reads of the base-arm transcripts help it
 predict what a prompt edit does to Qwen3.6-27B? Setup is cfbench (`cfbench/README.md`): the
 predictor sees a base arm and the edit, predicts P(behavior) in the counterfactual arm, scored by

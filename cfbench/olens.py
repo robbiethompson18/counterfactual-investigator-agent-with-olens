@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cfbench.core import Rollout, render_spans
-from cfbench.tools import Tool, _schema
+from cfbench.tools import Tool, schema
 
 BEFORE, AFTER = 80, 40  # characters of transcript around a search hit
 GAP_CHARS = 300  # most transcript text shown between two positions in olens_at
@@ -246,8 +246,11 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             summary += f"{len(ranked)} bullets pass the filters; {order.format(max_bullets)} are shown, {hidden} are not."
         else:
             summary += f"{len(ranked)} bullets pass the filters."
-        label = lambda rs: f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]"
-        return summary + "".join(f"\n\n{label(rs)} {line}" for rs, _, line in ranked[:max_bullets])
+        shown = []
+        for rs, _, line in ranked[:max_bullets]:
+            runs_label = f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]"
+            shown.append(f"\n\n{runs_label} {line}")
+        return summary + "".join(shown)
 
     filter_params = {
         "top_k": {
@@ -258,7 +261,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
     }
     return {
         "search_olens": (
-            _schema(
+            schema(
                 "search_olens",
                 "Case-insensitive regex over every base-arm transcript that has O-lens reads. Returns the O-lens bullets at the "
                 "punctuation inside each match and the first read after it (highest FVE first, when reads have FVE), each with "
@@ -283,7 +286,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
             search,
         ),
         "olens_at": (
-            _schema(
+            schema(
                 "olens_at",
                 "The O-lens reads at the read position nearest `char` in a run and `window` positions each side, with the "
                 "transcript text between them. Take run and char from a search_olens or search_transcripts hit.",

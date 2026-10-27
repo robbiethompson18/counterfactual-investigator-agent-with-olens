@@ -1,13 +1,18 @@
 # Sandbagging env iteration on Qwen3.6-27B (2026-10-22)
 
+**Status (2026-10-26):** REFERENCE. The +57pp effect replicated in evalcue
+([envs/sandbagging.md](envs/sandbagging.md)). The Reproduce section is for deleted code; the 17-arm
+dev table exists only here.
+
 > **Historical.** The configs, scripts and gateway this report names (`configs/envs_screen/`,
 > `scripts/envs_screen/`, `scripts/envs_gateway.py`) were deleted after the env moved to (or was
 > retired from) our own harness; read them at commit
 > [`e145988`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/e145988).
 > Current runs go through `evalcue/`.
 
-**Now runs in evalcue** ([envs/sandbagging.md](envs/sandbagging.md)); the vendored harness and
-overlay below stay until a cleanup PR removes them; the port replicated on 2026-10-22.
+**Now runs in evalcue** ([envs/sandbagging.md](envs/sandbagging.md)); the port replicated on
+2026-10-22. The vendored harness and overlay this report describes were deleted (see the banner
+above).
 
 Follow-up to the screen ([envs-screen/sandbagging.md](envs-screen/sandbagging.md)), which found Qwen
 sandbagging 5/30 when Documentation.md says a score above 50% triggers unlearning, vs 0/29 reversed.

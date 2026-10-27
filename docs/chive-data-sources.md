@@ -1,5 +1,8 @@
 # CHIVE data sources (as of 2026-10-19)
 
+**Status (2026-10-26):** REFERENCE. CHIVE data now feeds only the chive-cases viewer
+(`scripts/build_viewer.py`); cfbench doesn't use CHIVE.
+
 Where the CHIVE incidents, ground truth, readouts and Agam's agent results live, and what each
 source lacks.
 
@@ -36,8 +39,10 @@ A static site whose JSON files can be fetched directly. Agam said scraping is fi
   items with effect sizes in prose, and tokens as `[piece, role, turn]` (no ids). It does not have
   the structured experiment edits or `movers`; we asked Agam for those.
 
-`scripts/fetch_olens_banks.py` converts viewer banks to the harness's `<bank>/<pid>.json.gz` format,
-taking token ids from the HF dataset.
+`scripts/fetch_olens_banks.py` converted viewer banks to the harness's `<bank>/<pid>.json.gz`
+format, taking token ids from the HF dataset. Code: at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/fetch_olens_banks.py),
+deleted 2026-10-26.
 
 ## Per-incident difficulty (held-out 204, Agam's Opus 5 runs, 5 draws)
 

@@ -6,10 +6,12 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic>=1.15.0",
     "datasets>=5.1.0",
+    "matplotlib>=3.11.2",
     "openai>=3.35.1",
     "pyyaml>=6.0.3",
     "requests>=2.34.2",
     "scipy>=1.18.1",
+    "svgpath2mpl>=1.0.0",
 ]
 
 [build-system]
@@ -29,7 +31,8 @@ extend-exclude = [
   "evalcue/envs/exclude_rows/task/eval.py",
   "evalcue/envs/exclude_rows/task/submit.py",
   "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
-  "evolve/seeds",  # environments and graders converted from evalcue/donehack; kept byte-identical to what the target saw
+  "donehack/envport/*/task",  # copied from agent-interp-envs into the sandbox; kept byte-identical
+  "donehack/envport/*/task_src",
 ]
 
 [tool.ruff.lint]
@@ -49,6 +52,8 @@ exclude = [
   "evalcue/envs/exclude_rows/task/baseline.py",
   "evalcue/envs/exclude_rows/task/eval.py",
   "evalcue/envs/exclude_rows/task/submit.py",
+  "donehack/envport/*/task",
+  "donehack/envport/*/task_src",
 ]
 
 [dependency-groups]

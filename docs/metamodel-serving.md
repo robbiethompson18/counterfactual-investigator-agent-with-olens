@@ -1,5 +1,7 @@
 # Serving metamodels on vLLM for Qwen3.6-27B
 
+**Status (2026-10-26):** ACTIVE. The serving repo it proposes was not started.
+
 How we decode metamodel readouts (O-lens, NLA, J++) fast, what other people already built, and the
 TODO to package it. Written 2026-10-22.
 
@@ -22,7 +24,7 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
   LoRA merging and early exit. It is benchmarked on Qwen3.6-27B (~3.5-3.9k tok/s steered on a B200)
   and tested on vLLM 0.16-0.28. This is what we use for the NLA.
 - [asherps/EasyNLA](https://github.com/asherps/EasyNLA) (2026): NLA training. Its RL rollouts run on
-  vllm-lens with vLLM 0.19.0 and transformers 4.57.1 (`scripts/install_vllm_lens.sh`,
+  vllm-lens with vLLM 0.19.0 and transformers 4.57.1 (its own `scripts/install_vllm_lens.sh`,
   `docs/vllm-lens-setup.md`), with a patch for the norm-match bug that vllm-metamodels also fixes.
 - [kitft/nla-inference](https://github.com/kitft/nla-inference) (2026): the NLA paper's inference
   client. It uses SGLang `input_embeds` (embedding-replacement NLAs) and covers Qwen2.5 / Gemma 3 /

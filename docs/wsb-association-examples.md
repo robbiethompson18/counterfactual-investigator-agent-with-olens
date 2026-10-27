@@ -1,5 +1,8 @@
 # WorkspaceBench association families: O-lens examples on Qwen3.6-27B
 
+**Status (2026-10-26):** NULL. Qualitative and unjudged. The lens is the authors' in-house
+`s3d.ddp600`; the run dir is on HF only.
+
 2026-10-21. A qualitative look at three items from each of the three association families in
 [WorkspaceBench](https://github.com/camilablank/workspace-bench) (Blank, Bhatia, Ong, Nanda, 2026):
 `association`, `conjunctive_association`, `role_bound_association`. It is unjudged and small (9
@@ -15,7 +18,10 @@ enough to pursue further for now.
   directly. Also in that folder: `qwen_replies.jsonl`, `items.json` (bank fields, render tokens,
   read sites, the judge's MC blocks) and `page.html`.
 - Viewer: the same `page.html` as a private Claude artifact; ask Robbie for access.
-- Producer: `scripts/wsb_olens_readouts.py`, run on a 2×H200 RunPod pod, one process per GPU.
+- Producer: `scripts/wsb_olens_readouts.py`, run on a 2×H200 RunPod pod, one process per GPU. Code:
+  at commit `7296169`
+  (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/scripts/wsb_olens_readouts.py),
+  deleted 2026-10-26.
 
 ## Setup
 

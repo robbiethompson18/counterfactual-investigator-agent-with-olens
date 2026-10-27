@@ -2,6 +2,18 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-26: cfbench still carries the log skill in three places
+
+`cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
+beside it so numbers from before 2026-10-26 can be checked, and duplicates `data.py`'s per-case math
+(`Case.mse`, `log_gain`) because `data.load_rows`/`env_of` assume `evalcue_runs:` specs and one
+predictor. `cfbench/sweep.py`'s table is log skill only. The predictor prompt (`core.build_prompt`)
+still says "You are scored by the log-likelihood of the counterfactual arm's observed rate"; both
+rules reward the same point estimate, but changing the sentence bumps `HARNESS_VERSION`, so do it
+together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Drop the log skill once
+nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
+`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
 - `runpod/pod.sh ssh` has no `ConnectTimeout`, so a pod whose proxy accepts TCP before sshd is up
@@ -20,6 +32,9 @@ Tech debt we know about, newest first.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
+Resolved 2026-10-26 by deleting the script (last at commit `7296169`) with the null `anchors`
+condition; the notes stay for anyone who revives it.
+
 ~4.6k tokens/s on an H200 (94 s for a 3.4k-token, 110-sentence transcript). Causes: attention is
 explicit fp32 in Python query blocks (needed for the per-row suppression mask and receiver sums; a
 flex_attention mask would do both faster), every suppression batch recomputes the unsuppressed row,
@@ -34,19 +49,30 @@ don't use Qwen's full recommended sampling in either thinking mode, which may be
 Lynch rates sit well below the bf16 vLLM ones ([thinking-off.md](docs/thinking-off.md)). Fixing it
 changes the config of every existing OpenRouter run, so it's left alone for now.
 
-## 2026-10-23: evolve/ sandbox and seed caveats
+## 2026-10-23: evolve/ sandbox and seed caveats (resolved 2026-10-26: `evolve/` deleted)
 
-- `evolve/` sandboxes run commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
-  root with a bind mount. Read-only files can be deleted and replaced; they are restored before
+`evolve/` was Kylie's env-evolution loop (2026-10-23): a baseline env plus a REAL edit that lowers
+how often Qwen3.6-27B shows a behaviour, a NULL edit that looks like it should but doesn't, and a
+grader; Sonnet "Evolver"/"Creator" agents mutated nodes in podman sandboxes, a Flash forecaster,
+auditor and innocuousness judge scored them, and Pareto layers over (L, U, N, I) picked the next
+round. Deleted 2026-10-26: nothing in the repo referenced it, it hard-coded `~/workspace/*` paths,
+its seeds were never in git, and its spec lives only in a Claude Doc. The code is at commit
+`7296169`:
+https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evolve.
+The caveats below are kept for the record.
+
+- `evolve/` sandboxes ran commands as uid 1000 with an agent-owned tmpfs work dir; evalcue ran as
+  root with a bind mount. Read-only files could be deleted and replaced; they were restored before
   grading and reported in `record["readonly_tampered"]`, not prevented.
 - Podman `--userns auto` gives bramble ~64 sandbox slots shared by every process; `EVOLVE_MAX_BOXES`
-  (default 16) is per process, so several concurrent `evolve` processes can still queue on slots.
-- Seed nodes (`evolve/seeds/`) are data and not in git; they are rebuilt by
-  `evolve/scripts/convert_seeds*.py` and are not yet on HF.
-- The Max-plan job queue (`evolve/job_queue.py`) lets subagents work on the host filesystem, not in
-  the podman sandbox the API agent used; the manager's instructions are the only guard.
-- `evolve/scripts/check_agent_offline.py` is a test-style script written before reading the repo's
-  no-tests rule; keep it as a smoke check or delete it.
+  (default 16) was per process, so several concurrent `evolve` processes could still queue on slots.
+- Seed nodes (`evolve/seeds/`) were data and not in git, rebuilt by
+  `evolve/scripts/convert_seeds*.py`. They (evolve-v1 tip `465c519`, 670 files) and the 23 Oct run
+  data (48,264 files) are on the HF dataset under `runs/evolve/`; the 391 Evolver agent transcripts
+  were deleted, not uploaded (they contained Claude Code's injected user context) and are listed in
+  `runs/evolve/data/WITHHELD_agent_transcripts.txt`.
+- The Max-plan job queue (`evolve/job_queue.py`) let subagents work on the host filesystem, not in
+  the podman sandbox the API agent used; the manager's instructions were the only guard.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
@@ -66,12 +92,10 @@ estimates. See [the write-up](docs/envs/overnight.md) for transcript evidence an
 Left alone by the dead-serving-code cleanup, either because it does something the shared server
 can't or because it isn't ours to change:
 
-- `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` run vLLM
-  in-process (`LLM(...)`) from token-id prompts. `party_resample` needs a merged LoRA organism;
-  `thinking` is base Qwen and could move to the shared server's `/v1/completions` with token-id
-  prompts, but its results are recorded, so the recipe was kept.
-- `scripts/identity/pod_setup.sh` sets `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to
-  do (the image already sets one, so weights download twice).
+- (Resolved 2026-10-26: all three deleted, last at commit `7296169`.)
+  `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` ran vLLM
+  in-process (`LLM(...)`) from token-id prompts; `scripts/identity/pod_setup.sh` set
+  `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to do.
 - Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
   checkpoint.
 

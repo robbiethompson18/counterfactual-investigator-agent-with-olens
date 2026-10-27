@@ -29,16 +29,18 @@ MIN_RUNS = 5  # arms with fewer labelled runs are dropped
 FILE_CHARS = 4000  # per workspace file in the starting context
 
 
-def _label(row: dict) -> bool | None:
+def label(row: dict) -> bool | None:
     return row.get("positive", row.get("hack")) if "error" not in row else None
 
 
-def _start(row: dict) -> str:
+def start_context(row: dict) -> str:
     text = render(initial_context(row["messages"]))
     files = row.get("files_before") or {}
     if files:
-        cut = lambda body: body[:FILE_CHARS] + (" [...truncated]" if len(body) > FILE_CHARS else "")
-        listing = "\n\n".join(f"--- {path}\n{cut(body)}" for path, body in sorted(files.items()))
+        listing = "\n\n".join(
+            f"--- {path}\n{body[:FILE_CHARS]}" + (" [...truncated]" if len(body) > FILE_CHARS else "")
+            for path, body in sorted(files.items())
+        )
         text += f"\n\nFILES IN THE MODEL'S WORKSPACE ({row['cwd']}) AT THE START:\n\n{listing}"
     if state := (row.get("meta") or {}).get("start_state"):  # envs whose tools read Python-side state (injection_slack's fake Slack)
         text += f"\n\nSTATE THE MODEL'S TOOLS READ FROM, AT THE START:\n\n{state}"
@@ -54,9 +56,9 @@ class EvalcueRuns:
         for run in runs.split("+"):
             for i, line in enumerate((RUNS / env / run / "rows.jsonl").read_text().splitlines()):
                 row = json.loads(line)
-                if _label(row) is None:
+                if label(row) is None:
                     continue
-                start, key = _start(row), (row["arm"], str(row["item"]))
+                start, key = start_context(row), (row["arm"], str(row["item"]))
                 assert self.starts.setdefault(key, start) == start, f"{key} has two starting contexts; don't pool {runs}"
                 self.rows[row["arm"]].append((f"{env}/{run}:{i}", row))
         self.rows = defaultdict(list, {arm: rows for arm, rows in self.rows.items() if len(rows) >= MIN_RUNS})
@@ -64,7 +66,7 @@ class EvalcueRuns:
 
     def rollouts(self, arm: str, model: str) -> list[Rollout]:
         rows = [(src, r) for src, r in self.rows[arm] if r["model"] == MODELS[model]]
-        return [Rollout(source=src, messages=r["messages"], label=bool(_label(r))) for src, r in rows]
+        return [Rollout(source=src, messages=r["messages"], label=bool(label(r))) for src, r in rows]
 
     def _items(self, arm: str) -> set[str]:
         return {i for a, i in self.starts if a == arm}
