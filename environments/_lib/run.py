@@ -3,19 +3,27 @@
     uv run python -m environments run ENV --tag dev --arms a,b --items 0:4 --n 2 \\
         --model z-ai/glm-5.3 --backend openrouter --provider fireworks --effort medium --thinking on
     uv run python -m environments run ENV --pair NAME --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL
+    uv run python -m environments spec [ENV ...] [--force]  # rebuild envs/<env>/spec/ (every arm, built) + links.json
+    uv run python -m environments expview ENV[/RUN] [...] [--upload]  # runs as an expview dataset (runs/env_<env>/<run>)
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
 no max_tokens unless --max-tokens is given (recorded), reasoning effort always sent (medium) unless the env REQUIRES
 otherwise, episode caps in turns and prompt tokens, never dollars.
+
+A run finishes the way scripts/runs.py did: its transcripts go to Docent (scripts/docent_upload.py, when DOCENT_API_KEY is
+set; a failure only prints the retry command), then the run folder and its indexes go to HF unless --no-upload. Ctrl-C
+finishes the run as `abandoned` and still uploads it: failed runs are data.
 """
 
 import argparse
 import asyncio
 import datetime as dt
 import json
+import os
 import shlex
+import subprocess
 import sys
 import traceback
 from typing import Any
@@ -26,7 +34,7 @@ from .backends import Target
 from .core import Ctx, episode_id, load_env
 from .index import build as build_index
 from .loop import run_episode
-from .runfolder import LOCAL, RunWriter, git_sha, upload
+from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, upload
 
 
 def parse_items(spec: str | None, all_items: list) -> list:
@@ -136,7 +144,7 @@ def main(argv):
     ap.add_argument("--conc", type=int, default=16)
     ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
     ap.add_argument("-d", "--description", default="")
-    ap.add_argument("--upload", action="store_true", help="upload the run + indexes to HF when done")
+    ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF when done")
     add_target_args(ap)
     a = ap.parse_args(argv)
 
@@ -197,7 +205,13 @@ def main(argv):
     width = max(map(len, per_arm.values()), default=0)
     jobs = [(arm, per_arm[arm][i], s) for s in range(a.n) for i in range(width) for arm in arms if i < len(per_arm[arm])]
     print(f"{a.env}: {len(jobs)} episodes -> {w.dir}", flush=True)
-    results = asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, w))
+    results: list[dict] = []
+    status = "done"
+    try:
+        asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, w, results))
+    except KeyboardInterrupt:
+        status = "abandoned"
+        print(f"interrupted after {len(results)}/{len(jobs)} episodes; finishing as abandoned", file=sys.stderr)
     labels = []
     for ep in results:
         try:
@@ -206,17 +220,26 @@ def main(argv):
             labels.append((ep["id"], {"_error": repr(e)[:300]}))
     w.labels("measure", (git_sha() or "unknown")[:12], labels)
     cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
-    w.finish(cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
+    w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
+    print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
+    docent_upload(w.dir)
     written = build_index([a.env])
-    print(f"done: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
-    if a.upload:
-        n, oid = upload([w.dir, *written], f"envrun {a.env} {run}")
+    if not a.no_upload:
+        n, oid = upload([w.dir, *written], f"envrun {a.env} {run} ({status})")
         print(f"uploaded {n} files to envs/ ({oid[:10]})")
 
 
-async def _run_all(env, jobs, target, today, caps, conc, w):
+def docent_upload(run_dir):
+    """Mirror the run's transcripts to Docent before the HF upload, so the Docent ids ship with the run. Never blocks it."""
+    cmd = ["uv", "run", "-q", "--script", str(REPO_ROOT / "scripts" / "docent_upload.py"), "upload", str(run_dir)]
+    if not os.environ.get("DOCENT_API_KEY"):
+        print(f"DOCENT_API_KEY unset; not uploading to Docent. Later: {shlex.join(cmd)} (or `backfill`)")
+    elif subprocess.run(cmd, check=False).returncode:
+        print(f"Docent upload failed; HF upload continues. Retry: {shlex.join(cmd)}")
+
+
+async def _run_all(env, jobs, target, today, caps, conc, w, out: list):
     sem = asyncio.Semaphore(conc)
-    out = []
 
     async def one(arm, item, s):
         ctx = Ctx(env=env.NAME, arm=arm, item=str(item), sample=s, today=today, now=dt.datetime.combine(today, dt.time(12, 0)))
@@ -236,7 +259,6 @@ async def _run_all(env, jobs, target, today, caps, conc, w):
     limits = httpx.Limits(max_connections=None, max_keepalive_connections=None)
     async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60), limits=limits) as client:
         await asyncio.gather(*(one(*j) for j in jobs))
-    return out
 
 
 def cli():
@@ -246,6 +268,15 @@ def cli():
     elif cmd == "index":
         for p in build_index(rest or None):
             print(p)
+    elif cmd == "spec":
+        from .spec import build as build_spec
+
+        for p in build_spec([r for r in rest if r != "--force"] or None, force="--force" in rest):
+            print(p)
+    elif cmd == "expview":
+        from .expview_export import cli as expview_cli
+
+        expview_cli(rest)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})

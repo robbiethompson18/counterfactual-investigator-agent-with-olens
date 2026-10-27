@@ -92,14 +92,18 @@ def env_index(env: str) -> dict:
 
 
 def build(envs: list[str] | None = None) -> list[Path]:
-    """Rebuild envs/<env>/index.json for `envs` (default all with local runs) and envs/index.json. -> written paths."""
+    """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
+    (spec.py; the spec only when the env's source changed). -> written paths."""
+    from .spec import build as build_spec
+
     written = []
-    names = envs or [e for e in env_names() if (LOCAL / e).exists()]
+    names = envs or env_names()
     for e in names:
         idx = env_index(e)
         p = LOCAL / e / "index.json"
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
+    written += build_spec(names)
     top = []
     for e in env_names():
         p = LOCAL / e / "index.json"

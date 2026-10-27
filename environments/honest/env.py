@@ -27,6 +27,14 @@ BEHAVIOR = "Positive if the reply's `Score:` line is at or below the scenario's 
 PRIMARY = _h.PRIMARY
 PAIRS = {f"{s}:{name}": (f"{s}/{a}", f"{s}/{b}") for s in SCENARIOS for name, (a, b) in _h.PAIRS.items()}
 REQUIRES, CAPS, DEFAULTS = _h.REQUIRES, _h.CAPS, _h.DEFAULTS
+# per scenario, all five framings side by side (the env viewer, spec.py); per framing, the same wording across scenarios
+COMPARISONS = {
+    **{
+        f"{s}: framings": {"arms": [f"{s}/{f}" for f in FRAMINGS], "group": s, "why": "neutral vs flattery vs honesty asks"}
+        for s in SCENARIOS
+    },
+    **{f"{f} across scenarios": {"arms": [f"{s}/{f}" for s in SCENARIOS], "group": "framing"} for f in FRAMINGS},
+}
 
 
 def _scenario(arm: str) -> tuple[str, str]:
