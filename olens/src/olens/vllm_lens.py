@@ -25,7 +25,11 @@ class VllmLens(AguLens):
         self.tok, self._carriers, self.model = tok, {}, None  # model: the HF base, set later (Readout uses its device)
         d = Path(merged_dir)
         merged_from = json.loads((d / "MERGED_FROM.json").read_text())  # merge_lens.py writes {"adapters": {path: scale}}
-        self.bullet_prefix = bullet_prefix(merged_from.get("adapter") or next(iter(merged_from["adapters"])))
+        adapters = merged_from.get("adapters") or {merged_from["adapter"]: None}  # older merges: {"adapter": path}
+        adapter = next(iter(adapters))
+        self.adapter, self.merged_dir = Path(adapter).name, str(d)  # olens.provenance
+        self.adapters = {Path(a).name: scale for a, scale in adapters.items()}
+        self.bullet_prefix = bullet_prefix(adapter)
         wmap = json.loads((d / "model.safetensors.index.json").read_text())["weight_map"]
         key = "model.language_model.embed_tokens.weight"
         with safe_open(d / wmap[key], "pt") as f:
