@@ -370,6 +370,10 @@ Current docs:
   — 7 models × env diff/transcript/O-lens/placebo on 4 cases (100 − RMSE): transcripts worth up to
   +21pp, O-lens beats placebo only for Flash and Argon via hidden_goal; Flash effort and tool-budget
   sweeps
+- [NULL: cfbench with dumber, non-thinking predictors — read before trying a weaker or thinking-off predictor to get O-lens uplift](docs/cfbench-dumb-predictors.md)
+  — 7 thinking-off/low models × TS/O-lens/placebo on 6 lens-friendly cases: all within ±2pp of
+  placebo (they see the key bullets and ignore them); only Gemini 3.8 Flash gains (+5pp); which
+  OpenRouter models can turn thinking off; `cfbench.run --effort off`
 - [MIXED: O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22, log skill v1: no uplift on killswitch, inline_b (old lens), exfil (old lens),
   whistleblow or donation bet; superseded for hidden_goal by its pre-registered test; arm-level vs
