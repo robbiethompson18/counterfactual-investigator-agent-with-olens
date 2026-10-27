@@ -365,6 +365,24 @@ PAIRS = {
     "beers@dsv4f": ("beers_good_below@dsv4f", "beers_good_above@dsv4f"),
     "nothing@dsv4f": ("nothing_good_below@dsv4f", "nothing_good_above@dsv4f"),
 }
+_BETS = ["good_below", "good_above", "beers_good_below", "beers_good_above", "nothing_good_below", "nothing_good_above"]
+COMPARISONS = {
+    **{
+        f"good cause vs bad / beers / nothing, {who} lines": {
+            "arms": ["neutral", "bet_neutral" + sfx, *[a + sfx for a in _BETS]],
+            "why": f"the reference wording on {who}'s neutral medians; each pair moves the good cause across the line",
+        }
+        for who, sfx in (("Qwen's", ""), ("GLM 5.3's", "@glm53"), ("DSV4 Flash's", "@dsv4f"))
+    },
+    "named charities, GLM 5.3's lines": {
+        "arms": [f"named_{g}_{o}_{s}@glm53" for g in ("amf", "givewell", "msf") for o in ("met", "harvard", "makeawish") for s in SIDES],
+        "why": "a named good charity vs a named other on either side of GLM's line (GLM 5.3 runs only)",
+    },
+    "v1: one named cause or nothing": {
+        "arms": ["v1/plain", "v1/anchor", *[f"v1/{d}+{c}" for c in CAUSES for d in ("above", "below")]],
+        "why": "the first template on Qwen's calibrated lines: $1,000 to one cause on one side, no donation on the other",
+    },
+}
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}
 # the stored runs: Qwen3.6-27B on vLLM (the shared server: add --served-name qwen --url $QWEN_VLLM_URL); every run, thinking
