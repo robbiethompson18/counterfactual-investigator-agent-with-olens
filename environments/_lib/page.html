@@ -5,47 +5,129 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Environments</title>
 <link rel="icon" href="data:,">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <!--
-  Static list page for environments/ runs. It reads the generated indexes (envs/index.json, envs/<env>/index.json)
-  and episode shards straight from the HF dataset, pinned to one commit, so it needs no server. Open the file in a
-  browser, or serve data/envs/ locally and add ?base=http://localhost:8000/ to read local folders instead.
+  Static env viewer for environments/. No server: it reads the generated files of the HF dataset under envs/, pinned to
+  one commit (envs/index.json, envs/<env>/index.json for runs and rates, envs/<env>/spec/ for every arm as build() makes
+  it, envs/<env>/links.json for Docent / expview links), episode shards by HTTP range request, and the env's source
+  from GitHub at the commit the spec was built from.
+
+  Local:  python -m http.server 8000   (from the repo root, after `python -m environments index`), then
+          http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
+          base = a mirror of envs/ (data/envs/), src = the repo root to read source files from.
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fbfaf7;--card:#fff;--fg:#1f1e1b;--mute:#6b675e;--line:#dedad0;--acc:#2f5d8a;--code:#f4f2ec;--sel:#e3e9f1;
-  --user:#eef3ec;--asst:#fff;--think:#f6f1e3;--tool:#f1eef5;--bar:#2f5d8a;--track:#e7e3da}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#18191b;--card:#1c1e21;--fg:#e6e4df;--mute:#9a968d;
-  --line:#33363a;--acc:#8fb4dd;--code:#222428;--sel:#26313d;--user:#1d2620;--asst:#1c1e21;--think:#27241b;--tool:#231f2b;--bar:#8fb4dd;--track:#2c2f33}}
+:root{--bg:#f6f5f1;--card:#ffffff;--fg:#1c1b19;--mute:#6f6b62;--faint:#a29d92;--line:#e4e0d6;--acc:#4a4fc4;--acc2:#eceefe;--code:#f7f6f2;--sel:#eef0fd;
+  --user:#f1f6ef;--asst:#fff;--think:#faf5e6;--tool:#f5f2fa;--bar:#4a4fc4;--track:#ebe8e0;
+  --add:#dbf0d6;--addfg:#1d4d17;--del:#fadcd6;--delfg:#7d1f12;--pos:#2f7d34;--neg:#a29d92;--up:#2f7d34;--down:#b3412f;
+  --shadow:0 1px 2px rgba(30,28,20,.05),0 2px 8px rgba(30,28,20,.04);--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141518;--card:#1c1d21;--fg:#e8e6e1;--mute:#9b978e;--faint:#6d6a63;--line:#2e3035;--acc:#9da3ff;--acc2:#262947;--code:#202125;--sel:#24263d;
+  --user:#1b241c;--asst:#1c1d21;--think:#29251a;--tool:#231f2b;--bar:#9da3ff;--track:#2c2e33;--add:#1e3a20;--addfg:#b9e3b4;--del:#45211c;--delfg:#f2b8ae;--pos:#81c784;--neg:#6d6a63;--up:#81c784;--down:#ef9a8a;--shadow:none}}
+:root[data-theme="dark"]{--bg:#141518;--card:#1c1d21;--fg:#e8e6e1;--mute:#9b978e;--faint:#6d6a63;--line:#2e3035;--acc:#9da3ff;--acc2:#262947;--code:#202125;--sel:#24263d;
+  --user:#1b241c;--asst:#1c1d21;--think:#29251a;--tool:#231f2b;--bar:#9da3ff;--track:#2c2e33;--add:#1e3a20;--addfg:#b9e3b4;--del:#45211c;--delfg:#f2b8ae;--pos:#81c784;--neg:#6d6a63;--up:#81c784;--down:#ef9a8a;--shadow:none}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,sans-serif}
-main{max-width:1200px;margin:0 auto;padding:16px}
-a{color:var(--acc)} h1{font-size:20px;margin:4px 0 12px} h2{font-size:16px;margin:20px 0 8px}
-.mute{color:var(--mute)} .mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
-table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line)}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-weight:600;font-size:12px;color:var(--mute)} tr.click{cursor:pointer} tr.click:hover{background:var(--sel)}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.55 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+header.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+header.top .in{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+header.top .brand{font-weight:700;font-size:16px;letter-spacing:-.01em;color:var(--fg);text-decoration:none}
+header.top .brand b{color:var(--acc)}
+#crumb{color:var(--mute);font-size:14px}
+main{max-width:1280px;margin:0 auto;padding:20px 16px 60px}
+a{color:var(--acc);text-decoration-thickness:1px;text-underline-offset:2px}
+h1{font-size:24px;letter-spacing:-.02em;margin:0 0 6px;font-weight:700} h2{font-size:17px;margin:28px 0 10px;letter-spacing:-.01em;font-weight:650}
+h3{font-size:13px;margin:16px 0 8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--mute)}
+.mute{color:var(--mute)} .mono{font-family:var(--mono);font-size:12px}
+.lede{color:var(--mute);max-width:820px;margin:0 0 14px}
+table{border-collapse:separate;border-spacing:0;width:100%;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child>td{border-bottom:0}
+th{font-weight:600;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;background:var(--code)}
+tr.click{cursor:pointer} tr.click:hover{background:var(--sel)} tr.on{background:var(--sel)}
 .scroll{overflow-x:auto}
-.rate{display:flex;align-items:center;gap:6px;white-space:nowrap}
-.bar{width:60px;height:8px;background:var(--track);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--bar)}
-.msg{border:1px solid var(--line);border-radius:6px;margin:6px 0;padding:8px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,Menlo,monospace}
+.rate{display:flex;align-items:center;gap:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar,.hbar .b{position:relative;width:120px;height:12px;background:var(--track);border-radius:3px;overflow:hidden;flex:none}
+.hbar .b{flex:1;width:auto;min-width:60px}
+.bar .band,.hbar .b .band{position:absolute;top:0;bottom:0;background:var(--bar);opacity:.28;border-radius:2px}
+.bar .pt,.hbar .b .pt{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--bar)}
+.ci{color:var(--faint);font-size:11px}
+.dbar{position:relative;width:120px;height:12px;background:var(--track);border-radius:3px;overflow:hidden;flex:none}
+.dbar .zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--faint)}
+.dbar .band{position:absolute;top:0;bottom:0;opacity:.3;border-radius:2px;background:var(--mute)} .dbar .pt{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--mute)}
+.dbar.up .band,.dbar.up .pt{background:var(--up)} .dbar.down .band,.dbar.down .pt{background:var(--down)}
+.msg{border:1px solid var(--line);border-radius:8px;margin:6px 0;padding:10px 12px;white-space:pre-wrap;word-break:break-word;font:12.5px/1.5 var(--mono);max-height:70vh;overflow:auto}
 .msg.user{background:var(--user)} .msg.assistant{background:var(--asst)} .msg.tool{background:var(--tool)} .msg.system{background:var(--code)}
-.msg .role{font:600 11px system-ui;color:var(--mute);margin-bottom:4px} .think{background:var(--think);padding:6px;border-radius:4px;margin-bottom:6px}
-select,button{font:inherit;padding:3px 6px}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.role{font:600 11px Inter,system-ui;color:var(--mute);margin-bottom:4px;white-space:normal;text-transform:uppercase;letter-spacing:.04em} .think{background:var(--think);padding:6px;border-radius:4px;margin-bottom:6px}
+select,button,input{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--fg)}
+button{cursor:pointer} button:disabled{opacity:.5;cursor:default} button:not(:disabled){border-color:var(--acc);color:var(--acc)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.tabs{display:inline-flex;gap:2px;flex-wrap:wrap;background:var(--track);padding:3px;border-radius:9px;margin:14px 0 16px}
+.tabs a{padding:5px 14px;text-decoration:none;color:var(--mute);border-radius:7px;font-weight:500;font-size:13px}
+.tabs a.on{color:var(--fg);background:var(--card);box-shadow:var(--shadow)}
+.chip{display:inline-block;padding:1px 8px;margin:2px 3px 2px 0;border:1px solid var(--line);border-radius:999px;font:11.5px var(--mono);text-decoration:none;color:var(--fg);background:var(--card)}
+.chip:hover{border-color:var(--acc)} .chip a{color:inherit;text-decoration:none} .chip a.x{color:var(--faint);margin-left:6px;padding-left:6px;border-left:1px solid var(--line)} .chip a.x:hover{color:var(--acc)} .chip a.x.lens{color:#c46a12;font-weight:600}
+.chip.on{background:var(--sel);border-color:var(--acc)} .chip.pos{border-color:color-mix(in srgb,var(--pos) 60%,var(--line));color:var(--pos);background:color-mix(in srgb,var(--pos) 8%,var(--card))} .chip.neg{color:var(--neg)}
+.sec{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:var(--card);box-shadow:var(--shadow)}
+.sec>summary{padding:9px 12px;cursor:pointer;font:600 13px Inter,system-ui;list-style:none;display:flex;align-items:center;gap:6px}
+.sec>summary::before{content:"▸";color:var(--faint);font-size:11px;transition:transform .15s} .sec[open]>summary::before{transform:rotate(90deg)}
+.sec>summary .mute{font-weight:400}
+.sec .body{padding:0 12px 12px}
+.diff{white-space:pre-wrap;word-break:break-word;font:12.5px/1.55 var(--mono);background:var(--code);padding:10px 12px;border-radius:8px;max-height:75vh;overflow:auto}
+.diff ins{background:var(--add);color:var(--addfg);text-decoration:none;border-radius:2px} .diff del{background:var(--del);color:var(--delfg);border-radius:2px}
+.diff .fold{display:block;color:var(--faint);cursor:pointer;font-style:italic;margin:4px 0;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:2px 0}
+.tag{font:500 10.5px Inter,system-ui;padding:1px 7px;border-radius:999px;background:var(--track);color:var(--mute);margin-left:6px;text-transform:uppercase;letter-spacing:.04em;vertical-align:1px}
+.tag.ch{background:var(--del);color:var(--delfg)} .tag.add{background:var(--add);color:var(--addfg)}
+.readme{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px 20px;max-height:60vh;overflow:auto}
+.readme pre{background:var(--code);padding:8px;overflow:auto;border-radius:6px} .readme table{width:auto;box-shadow:none}
+pre.code{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;overflow:auto;font:12px/1.5 var(--mono);max-height:80vh}
+.cols{display:grid;grid-template-columns:260px 1fr;gap:20px} @media (max-width:800px){.cols{grid-template-columns:1fr!important}}
+.files a{display:block;font:12px var(--mono);text-decoration:none;padding:2px 6px;border-radius:4px;word-break:break-all} .files a.on{background:var(--sel)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow);text-decoration:none;color:var(--fg);display:block;transition:border-color .15s,transform .15s}
+a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
+.card .t{font-weight:650;font-size:15px;letter-spacing:-.01em} .card .why{color:var(--mute);font-size:13px;margin:2px 0 10px}
+.card .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:12px;margin-top:10px}
+.mini{display:grid;grid-template-columns:minmax(90px,auto) 1fr;gap:3px 12px;align-items:center;font-size:12px}
+.mini .arm{font:11.5px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.mini .tg{grid-column:1/-1;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
+.hbar{display:grid;grid-template-columns:minmax(60px,1fr) 76px 56px;align-items:center;gap:8px;font-variant-numeric:tabular-nums}  /* fixed value + Δ columns, so every bar in a card has the same start and width */
+.hbar .dl{justify-self:start}
+
+.hbar .v{width:76px;text-align:right;color:var(--mute);font-size:11.5px}
+.delta{display:inline-block;font:600 11.5px Inter;padding:1px 7px;border-radius:999px;font-variant-numeric:tabular-nums}
+.delta.up{background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up)} .delta.down{background:color-mix(in srgb,var(--down) 14%,transparent);color:var(--down)} .delta.flat{background:var(--track);color:var(--mute)}
+.effects{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:14px 0}
+.effect{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.effect .m{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.effect .big{font-size:28px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:2px 0}
+.effect .big.up{color:var(--up)} .effect .big.down{color:var(--down)}
+.effect .sub{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.badge{display:inline-block;font:600 10.5px Inter;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;background:var(--acc2);color:var(--acc)}
+.star{color:#d9a400} .pathsep{color:var(--faint);margin:0 4px}
 </style>
 </head>
 <body>
+<header class="top"><div class="in"><a class="brand" href="#"><b>◆</b> Environments</a><span id="crumb"></span></div></header>
 <main>
-<h1><a href="#">Environments</a> <span id="crumb" class="mute"></span></h1>
 <div id="status" class="mute">loading…</div>
 <div id="view"></div>
 </main>
 <script>
 const REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens";
+const GH = "robbiethompson18/counterfactual-investigator-agent-with-olens";
+const DOCENT = "https://docent.transluce.org/dashboard/";
 const params = new URLSearchParams(location.search);
 let BASE = params.get("base");  // a local mirror of data/envs/, if given
+const SRC = params.get("src");  // a local repo root to read source files from (default: GitHub at the spec's commit)
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const $ = id => document.getElementById(id);
 const cache = {};
+const md = t => window.marked && window.DOMPurify ? DOMPurify.sanitize(marked.parse(String(t))) : `<pre>${esc(t)}</pre>`;
+const slug = s => String(s).replace(/\//g, ".").replace(/[^A-Za-z0-9_.+-]/g, "_");  // core.slug
+const LEGACY = {ep: "episode"};
 
 async function base() {
   if (BASE) return BASE;
@@ -54,10 +136,14 @@ async function base() {
   const sha = r.ok ? (await r.json()).sha : "main";
   return BASE = `https://huggingface.co/datasets/${REPO}/resolve/${sha}/envs/`;
 }
+function fetchOnce(key, f) { return cache[key] ??= f().catch(e => { delete cache[key]; throw e; }); }
 async function getJSON(path) {
-  if (!cache[path]) cache[path] = fetch((await base()) + path).then(r => { if (!r.ok) throw new Error(path + ": " + r.status); return r.json(); });
-  return cache[path];
+  return fetchOnce(path, async () => { const r = await fetch((await base()) + path); if (!r.ok) throw new Error(path + ": " + r.status); return r.json(); });
 }
+async function getText(path) {
+  return fetchOnce("t:" + path, async () => { const r = await fetch((await base()) + path); if (!r.ok) throw new Error(path + ": " + r.status); return r.text(); });
+}
+const maybe = p => p.catch(() => null);
 async function getEpisode(env, run, id) {
   const idx = await getJSON(`${env}/${run}/episodes/index.json`);
   const [shard, off, len] = idx[id];
@@ -65,10 +151,56 @@ async function getEpisode(env, run, id) {
   const buf = new Uint8Array(await r.arrayBuffer());  // 206 = just this episode; a server without Range sends the shard
   return JSON.parse(new TextDecoder().decode(r.status === 206 ? buf : buf.slice(off, off + len)));
 }
+async function sourceText(spec, path) {
+  if (SRC) return fetchOnce("s:" + path, async () => { const r = await fetch(SRC + path); if (!r.ok) throw new Error(path + ": " + r.status); return r.text(); });
+  const sha = (spec.git_sha || "main").replace("+dirty", "");
+  return fetchOnce("s:" + path, async () => {
+    for (const ref of [sha, "main"]) {  // the spec's commit may be unpushed (or a local merge); main is the fallback
+      const r = await fetch(`https://raw.githubusercontent.com/${GH}/${ref}/${path}`);
+      if (r.ok) return (ref === sha ? "" : `# (commit ${sha.slice(0, 10)} is not on GitHub: showing main)\n`) + await r.text();
+    }
+    throw new Error(path + ": not on GitHub");
+  });
+}
+const ghLink = (spec, path) => `https://github.com/${GH}/blob/${(spec.git_sha || "main").replace("+dirty", "")}/${path}`;
+
+// ---- rates with uncertainty: a Beta(1,1) prior, so k of n gives the posterior Beta(k+1, n-k+1); intervals are its
+// equal-tailed 95% credible interval, drawn as a translucent band behind a line at the observed rate k/n
+function lgamma(x) {  // Lanczos
+  const g = [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61503916999185, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lgamma(1 - x);
+  x -= 1; let a = 0.99999999999980993; const t = x + 7.5;
+  for (let i = 0; i < 8; i++) a += g[i] / (x + i + 1);
+  return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+}
+function betacf(a, b, x) {  // continued fraction for the incomplete beta (Numerical Recipes)
+  let c = 1, d = 1 - (a + b) * x / (a + 1); d = 1 / (Math.abs(d) < 1e-300 ? 1e-300 : d); let h = d;
+  for (let m = 1; m <= 300; m++) {
+    const m2 = 2 * m;
+    for (const aa of [m * (b - m) * x / ((a - 1 + m2) * (a + m2)), -(a + m) * (a + b + m) * x / ((a + m2) * (a + 1 + m2))]) {
+      d = 1 + aa * d; d = 1 / (Math.abs(d) < 1e-300 ? 1e-300 : d); c = 1 + aa / c; if (Math.abs(c) < 1e-300) c = 1e-300; h *= d * c;
+    }
+    if (Math.abs(d * c - 1) < 1e-12) break;
+  }
+  return h;
+}
+function ibeta(x, a, b) {  // regularized incomplete beta I_x(a, b)
+  if (x <= 0) return 0; if (x >= 1) return 1;
+  const bt = Math.exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * Math.log(x) + b * Math.log(1 - x));
+  return x < (a + 1) / (a + b + 2) ? bt * betacf(a, b, x) / a : 1 - bt * betacf(b, a, 1 - x) / b;
+}
+function betaQuantile(q, a, b) { let lo = 0, hi = 1; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; ibeta(m, a, b) < q ? lo = m : hi = m; } return (lo + hi) / 2; }
+const CI = {};
+function rateCI(k, n) { return CI[k + "/" + n] ??= [betaQuantile(0.025, k + 1, n - k + 1), betaQuantile(0.975, k + 1, n - k + 1)]; }
+function ciBar(k, n, cls = "bar") {
+  if (!n) return `<span class="${cls}"></span>`;
+  const [lo, hi] = rateCI(k, n), f = x => (100 * x).toFixed(1);
+  return `<span class="${cls}" title="${k}/${n}; 95% credible interval ${f(lo)}–${f(hi)}% (Beta(1,1) prior)"><i class="band" style="left:${f(lo)}%;width:${f(hi - lo)}%"></i><i class="pt" style="left:${f(k / n)}%"></i></span>`;
+}
 function rate(k, n) {
   if (!n) return '<span class="mute">–</span>';
-  const p = k / n;
-  return `<span class="rate"><span class="bar"><i style="width:${(100 * p).toFixed(0)}%"></i></span>${k}/${n} = ${(100 * p).toFixed(0)}%</span>`;
+  const [lo, hi] = rateCI(k, n);
+  return `<span class="rate">${ciBar(k, n)}${k}/${n} = ${(100 * k / n).toFixed(0)}% <span class="ci">[${(100 * lo).toFixed(0)}, ${(100 * hi).toFixed(0)}]</span></span>`;
 }
 function primaryCell(pr) {
   if (!pr) return "";
@@ -76,70 +208,481 @@ function primaryCell(pr) {
   if (pr.type === "number") return pr.mean == null ? "–" : `mean ${pr.mean.toFixed(2)} (n=${pr.n})`;
   return Object.entries(pr.counts || {}).map(([k, v]) => `${esc(k)}: ${v}`).join(", ");
 }
+function setCrumb(parts) {
+  $("crumb").innerHTML = parts.map(([l, hsh]) => `<span class="pathsep">/</span>` + (hsh ? `<a href="#${hsh}">${esc(l)}</a>` : esc(l))).join("");
+  document.title = parts.length ? parts.map(p => p[0]).reverse().join(" · ") + " · Environments" : "Environments";
+}
+const pctOf = p => p && p.n ? p.k / p.n : null;
+// difference of two proportions with a 95% normal-approximation interval, in percentage points
+// b's rate minus a's, in pp: the observed difference and the 95% credible interval of the difference of the two
+// Beta(1,1) posteriors, by 20k seeded Monte Carlo draws (same draws every load)
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gammaDraw(a, u) {  // Marsaglia-Tsang (a >= 1 here: Beta(1,1) posteriors have both parameters >= 1)
+  const d = a - 1 / 3, c = 1 / Math.sqrt(9 * d);
+  for (;;) {
+    let x, v;
+    do { x = Math.sqrt(-2 * Math.log(u() || 1e-12)) * Math.cos(2 * Math.PI * u()); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v; const w = u();
+    if (w < 1 - 0.0331 * x ** 4 || Math.log(w) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+const DCI = {};
+function deltaOf(a, b) {
+  if (!a?.n || !b?.n) return null;
+  const key = [a.k, a.n, b.k, b.n].join(",");
+  if (!DCI[key]) {
+    const u = rng(12345), N = 20000, ds = new Float64Array(N);
+    const beta = (x, y) => { const g = gammaDraw(x, u); return g / (g + gammaDraw(y, u)); };
+    for (let i = 0; i < N; i++) ds[i] = beta(b.k + 1, b.n - b.k + 1) - beta(a.k + 1, a.n - a.k + 1);
+    ds.sort();
+    DCI[key] = {d: 100 * (b.k / b.n - a.k / a.n), lo: 100 * ds[Math.floor(0.025 * N)], hi: 100 * ds[Math.floor(0.975 * N)]};
+  }
+  return DCI[key];
+}
+// a diverging bar from -S to +S pp around a zero line: the band is the 95% credible interval of the difference, the
+// line the observed difference
+function deltaBar(x, S = 100) {
+  const pos = v => (50 + 50 * Math.max(-1, Math.min(1, v / S))).toFixed(1), lo = pos(x.lo), hi = pos(x.hi);
+  const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "flat";
+  return `<span class="dbar ${cls}" title="Δ ${x.d.toFixed(1)}pp, 95% credible interval ${x.lo.toFixed(1)} to ${x.hi.toFixed(1)}pp (axis ±${S}pp)">
+    <i class="zero"></i><i class="band" style="left:${lo}%;width:${(hi - lo).toFixed(1)}%"></i><i class="pt" style="left:${pos(x.d)}%"></i></span>`;
+}
+function deltaBadge(x) {
+  if (!x) return "";
+  const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "flat";
+  return `<span class="delta ${cls}" title="95% credible interval ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp (Beta(1,1) posteriors)">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}pp</span>`;
+}
+// "qwen/qwen3.6-27b@openrouter:alibaba · thinking off" -> "qwen3.6-27b (alibaba) · thinking off"; the provider stays
+// because the same model through two providers can differ (fp8)
+const modelName = t => t.replace(/^[^/@]+\//, "").replace(/@[^: ]*:?([^ ]*)/, (_, prov) => prov && prov !== "any" ? ` (${prov})` : "");
+function hashOf(obj) { return Object.entries(obj).filter(([, v]) => v != null && v !== "").map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&"); }
+function setParam(k, v) {
+  const h = new URLSearchParams(location.hash.slice(1));
+  v ? h.set(k, v) : h.delete(k);
+  return h.toString();
+}
+
+// ---------------------------------------------------------------- data
+
+// retired arms (RETIRED in env.py) are left out of comparisons, rates and runs unless the hash has retired=show
+async function envData(env, h = {}) {
+  const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getJSON(`${env}/spec/env.json`)), maybe(getJSON(`${env}/links.json`))]);
+  if (!idx && !spec) throw new Error(`no index or spec for ${env}`);
+  const D = {env, idx: idx || {runs: [], pairs: {}, arms: spec.arms, arm_factors: spec.arm_factors, primary: spec.primary, title: env},
+             spec, links: links || {runs: {}}, showRetired: h.retired === "show"};
+  const R = new Set(spec?.retired || []);
+  if (R.size && !D.showRetired) {
+    const live = a => !R.has(a);
+    const seen = new Set();  // a set that shrinks to an earlier comparison's arms is dropped
+    D.spec = {...spec, comparisons: spec.comparisons.map(c => ({...c, arms: c.arms.filter(live)}))
+      .filter(c => c.arms.length >= 2 && !seen.has(c.arms.join()) && seen.add(c.arms.join()))};
+    D.idx = {...D.idx, runs: D.idx.runs.map(r => ({...r, arms: Object.fromEntries(Object.entries(r.arms).filter(([a]) => live(a)))}))
+      .filter(r => Object.keys(r.arms).length)};
+  }
+  D.retiredNote = R.size ? `<span class="mute">${R.size} retired arms (RETIRED in env.py) ${D.showRetired ? "shown" : "hidden"}:
+    <a href="#${setParam("retired", D.showRetired ? "" : "show")}">${D.showRetired ? "hide" : "show"} them</a></span>` : "";
+  return D;
+}
+// a run's target model plus its thinking mode: never pool thinking on with off (different rates)
+const targetKey = r => r.target + (r.thinking === false ? " · thinking off" : r.thinking === true ? " · thinking on" : "");
+// pooled primary per (arm, target) and per (arm, target, item), over runs
+function pooled(idx) {
+  const by = {}, items = {}, targets = new Set();
+  for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
+    const tgt = targetKey(r);
+    targets.add(tgt);
+    const p = by[arm + "\u0000" + tgt] ??= {k: 0, n: 0, eps: 0, runs: 0, type: a.primary.type};
+    p.eps += a.n; p.runs += 1;
+    if (a.primary.type === "bool") {
+      p.k += a.primary.k; p.n += a.primary.n;
+      for (const [it, [k, n]] of Object.entries(a.primary.items || {})) {
+        const q = items[arm + "\u0000" + tgt + "\u0000" + it] ??= {k: 0, n: 0};
+        q.k += k; q.n += n;
+      }
+    }
+  }
+  return {by, items, targets: [...targets].sort()};
+}
+async function armSpec(env, arm) { return getJSON(`${env}/spec/arms/${slug(arm)}.json`); }
+// resolve {"$b"} from the arm's blobs; {"$f"} stays a ref (fetched on demand, compared by hash)
+function resolve(x, blobs) {
+  if (Array.isArray(x)) return x.map(v => resolve(v, blobs));
+  if (x && typeof x === "object") {
+    if ("$b" in x) return blobs[x.$b];
+    if ("$f" in x) return x;
+    return Object.fromEntries(Object.entries(x).map(([k, v]) => [k, resolve(v, blobs)]));
+  }
+  return x;
+}
+const isRef = v => v && typeof v === "object" && "$f" in v;
+async function text(env, v) {
+  if (isRef(v)) return getText(`${env}/spec/blobs/${v.$f}.txt`);
+  if (typeof v === "string") return v;
+  return JSON.stringify(v, null, 1);
+}
+async function built(env, arm, item) {
+  const a = await armSpec(env, arm);
+  const ep = a.items[item];
+  return ep ? resolve(ep, a.blobs) : null;
+}
+function itemsOf(spec, arm) { return (spec.arm_specs[arm] || {}).items || []; }
+
+// an episode as named sections, in the order the model meets them; values are strings or {"$f"} refs
+function msgText(m) {
+  let s = typeof m.content === "string" || isRef(m.content) ? m.content : m.content == null ? "" : JSON.stringify(m.content, null, 1);
+  if (m.tool_calls) s = (isRef(s) ? "" : s) + m.tool_calls.map(t => `\n→ ${t.function?.name}(${t.function?.arguments})`).join("");
+  return s;
+}
+function sections(ep) {
+  const out = [];
+  (ep.messages || []).forEach((m, i) => out.push([`message ${i} · ${m.role}`, msgText(m), m.role]));
+  for (const t of ep.tools || []) out.push([`tool · ${t.function?.name ?? t.name ?? "?"}`, JSON.stringify(t, null, 1), "tool"]);
+  for (const p of Object.keys(ep.files || {}).sort()) out.push([`file · ${p}`, ep.files[p], "file"]);
+  if ((ep.setup || []).length) out.push(["setup (run before the first turn)", ep.setup.join("\n"), "harness"]);
+  if ((ep.prefill || []).length) out.push(["prefill (run for real, shown as the agent's first tool turns)", ep.prefill.map(([id, c]) => `${id}: ${c}`).join("\n"), "harness"]);
+  if (Object.keys(ep.state || {}).length) out.push(["app state at the start", JSON.stringify(ep.state, null, 1), "harness"]);
+  const box = ep.tools?.length || Object.keys(ep.files || {}).length || ep.setup?.length || ep.prefill?.length;
+  if (box) out.push(["harness (sandbox, handlers)", JSON.stringify({image: ep.image, hostname: ep.hostname, workdir: ep.workdir, env: ep.env,
+    extra_tmpfs: ep.extra_tmpfs, handlers: ep.handlers, aliases: ep.aliases, prefill_tool: ep.prefill_tool, tool_footer: ep.tool_footer}, null, 1), "harness"]);
+  if (Object.keys(ep.meta || {}).length) out.push(["meta (for measure(), not shown to the model)", JSON.stringify(ep.meta, null, 1), "meta"]);
+  return out;
+}
+
+// ---------------------------------------------------------------- diff
+
+function foldLines(s, keep = 3) {
+  const lines = s.split("\n");
+  if (lines.length <= 2 * keep + 3) return esc(s);
+  return esc(lines.slice(0, keep).join("\n")) + "\n" +
+    `<span class="fold" onclick="this.nextElementSibling.hidden=false;this.remove()">… ${lines.length - 2 * keep} unchanged lines (click to show) …</span>` +
+    `<span hidden>${esc(lines.slice(keep, -keep).join("\n"))}\n</span>` + esc(lines.slice(-keep).join("\n"));
+}
+function diffHtml(a, b) {
+  if (!window.Diff) return `<div class="mute">jsdiff didn't load; showing both</div><div class="diff">${esc(a)}</div><div class="diff">${esc(b)}</div>`;
+  const parts = Diff.diffLines(a, b);
+  let h = "";
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i], q = parts[i + 1];
+    if (p.removed && q?.added && p.value.length + q.value.length < 40000) {  // a changed block: word-level inside it
+      for (const w of Diff.diffWordsWithSpace(p.value, q.value)) h += w.added ? `<ins>${esc(w.value)}</ins>` : w.removed ? `<del>${esc(w.value)}</del>` : esc(w.value);
+      i++;
+    } else if (p.added) h += `<ins>${esc(p.value)}</ins>`;
+    else if (p.removed) h += `<del>${esc(p.value)}</del>`;
+    else h += foldLines(p.value);
+  }
+  return `<div class="diff">${h}</div>`;
+}
+// sections of A and B paired by name -> [{name, a, b, same}]
+function pairSections(sa, sb) {
+  const B = new Map(sb.map(s => [s[0], s])), names = [...sa.map(s => s[0]), ...sb.map(s => s[0]).filter(n => !sa.some(s => s[0] === n))];
+  const A = new Map(sa.map(s => [s[0], s]));
+  return names.map(n => {
+    const a = A.get(n)?.[1], b = B.get(n)?.[1];
+    const same = a !== undefined && b !== undefined && (isRef(a) && isRef(b) ? a.$f === b.$f : !isRef(a) && !isRef(b) && a === b);
+    return {name: n, a, b, same};
+  });
+}
+async function renderDiff(env, armA, armB, item, el) {
+  el.innerHTML = '<p class="mute">building diff…</p>';
+  const [ea, eb] = await Promise.all([built(env, armA, item), built(env, armB, item)]);
+  if (!ea || !eb) { el.innerHTML = `<p class="mute">item ${esc(item)} isn't built for ${esc(!ea ? armA : armB)}</p>`; return; }
+  const pairs = pairSections(sections(ea), sections(eb));
+  const changed = pairs.filter(p => !p.same);
+  let h = `<p><b>${changed.length}</b> of ${pairs.length} sections differ between <span class="mono">${esc(armA)}</span> (<del>red</del>) and <span class="mono">${esc(armB)}</span> (<ins>green</ins>) on item <span class="mono">${esc(item)}</span>.
+    ${changed.length ? "" : "The two arms send byte-identical inputs on this item."}</p>`;
+  for (const p of pairs) {
+    const tag = p.same ? '<span class="tag">same</span>' : p.a === undefined ? '<span class="tag add">only in B</span>' : p.b === undefined ? '<span class="tag ch">only in A</span>' : '<span class="tag ch">changed</span>';
+    h += `<details class="sec" ${p.same ? "" : "open"} data-name="${esc(p.name)}"><summary>${esc(p.name)} ${tag}</summary><div class="body"></div></details>`;
+  }
+  el.innerHTML = h;
+  for (const d of el.querySelectorAll("details.sec")) {
+    const p = pairs.find(x => x.name === d.dataset.name);
+    const fill = async () => {
+      if (d.dataset.done) return; d.dataset.done = 1;
+      const [ta, tb] = await Promise.all([p.a === undefined ? "" : text(env, p.a), p.b === undefined ? "" : text(env, p.b)]);
+      d.querySelector(".body").innerHTML = p.same ? `<div class="diff">${foldLines(ta, 8)}</div>` : diffHtml(ta, tb);
+    };
+    if (d.open) fill(); else d.addEventListener("toggle", fill, {once: true});
+  }
+}
+
+// ---------------------------------------------------------------- rollouts
+
+function episodesFor(D, arm, item) {
+  const pre = `${slug(arm)}~${item == null ? "" : slug(item) + "~"}`, out = [];
+  for (const [run, r] of Object.entries(D.links.runs || {})) {
+    const eps = Object.entries(r.episodes || {}).filter(([id]) => id.startsWith(pre));
+    if (eps.length) out.push({run, target: targetKey(r), collection: r.docent_collection, expview: r.expview, expviewItems: r.expview_items, reads: r.reads || {}, eps});
+  }
+  return out;
+}
+const expviewUrl = (D, ds, item) => `${D.links.expview_base || "https://expview.pages.dev/"}#dataset=${ds}${item ? "&item=" + encodeURIComponent(item) : ""}`;
+function epChip(D, r, [id, [docent, v]]) {
+  const run = r.run, coll = r.collection;
+  const cls = v === true ? "pos" : v === false ? "neg" : "";
+  const label = id.split("~").slice(1).join("~") + (v === true ? " ✓" : v === false ? " ✗" : v == null ? " –" : ` ${v}`);
+  const dl = docent && coll ? `${DOCENT}${coll}/agent_run/${docent}` : null, here = "#" + hashOf({env: D.env, run, episode: id});
+  // one pill: the label opens Docent (or the transcript here), then small links to the transcript here and to expview
+  return `<span class="chip ${cls}"><a href="${dl || here}" ${dl ? 'target="_blank" rel="noopener"' : ""} title="${dl ? "open in Docent" : "open here"}">${esc(label)}</a>` +
+    (dl ? `<a class="x" href="${here}" title="transcript on this page">↗</a>` : "") +
+    (r.expviewItems ? `<a class="x" href="${expviewUrl(D, r.expview, id)}" target="_blank" rel="noopener" title="open in expview">ev</a>` : "") +
+    (r.reads[id] ? `<a class="x lens" href="${expviewUrl(D, r.reads[id][0], r.reads[id][1])}" target="_blank" rel="noopener" title="O-lens reads in expview (${esc(r.reads[id][0])})">lens</a>` : "") + "</span>";
+}
+// the arm's every-run expview view (expview_export.export_arms), if there is one
+const armExpview = (D, arm, label = "whole arm in expview ↗") =>
+  D.links.arms?.[arm] ? `<a href="${expviewUrl(D, D.links.arms[arm])}" target="_blank" rel="noopener" title="every episode of this arm, all runs, grouped by model">${label}</a>` : "";
+function rolloutsHtml(D, arm, item, max = 12) {
+  const runs = episodesFor(D, arm, item);
+  const head = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><span class="mono" style="font-weight:500">${esc(arm)}${retiredTag(D, arm)}</span>${armExpview(D, arm)}</div>`;
+  if (!runs.length) return `<div class="card">${head}<p class="mute" style="margin:0">no rollouts${item == null ? "" : " on this item"} yet</p></div>`;
+  const nRead = runs.reduce((t, r) => t + r.eps.filter(([id]) => r.reads[id]).length, 0);
+  return `<div class="card">${head}` + (nRead ? `<p class="mute" style="margin:0 0 6px;font-size:12px"><b style="color:#c46a12">lens</b> = ${nRead} of these episodes have O-lens reads</p>` : "") + runs.map(r => {
+    const k = r.eps.filter(e => e[1][1] === true).length, n = r.eps.filter(e => typeof e[1][1] === "boolean").length;
+    return `<div style="border-top:1px solid var(--line);padding:8px 0 4px">
+      <div class="row" style="margin:0 0 4px;justify-content:space-between;gap:8px"><span><b style="font-weight:600">${esc(modelName(r.target || ""))}</b>
+        <a class="mono mute" style="font-size:11px" href="#${hashOf({env: D.env, run: r.run, arm})}">${esc(r.run)}</a></span>
+        <span class="row" style="margin:0;gap:10px">${n ? `<span class="mute" style="font-variant-numeric:tabular-nums">${k}/${n} positive</span>` : ""}
+        ${r.collection ? `<a href="${DOCENT}${r.collection}" target="_blank" rel="noopener">Docent ↗</a>` : ""}
+        ${r.expview ? `<a href="${expviewUrl(D, r.expview)}" target="_blank" rel="noopener">expview ↗</a>` : ""}</span></div>
+      <div>${r.eps.slice(0, max).map(e => epChip(D, r, e)).join("")}${r.eps.length > max ? ` <span class="mute">+${r.eps.length - max} more</span>` : ""}</div></div>`;
+  }).join("") + "</div>";
+}
+
+// ---------------------------------------------------------------- pages
 
 async function home() {
-  $("crumb").textContent = "";
+  setCrumb([]);
   const idx = await getJSON("index.json");
-  $("view").innerHTML = `<p class="mute">Generated ${esc(idx.generated)} from the run folders under <span class="mono">envs/</span>. Click an env.</p>
-  <div class="scroll"><table><tr><th>env</th><th>title</th><th>status</th><th>primary</th><th>runs</th><th>episodes by target model</th></tr>
-  ${idx.envs.map(e => `<tr class="click" onclick="location.hash='env=${e.env}'"><td class="mono">${esc(e.env)}</td><td>${esc(e.title)}</td>
-    <td>${esc(e.status || "")}</td><td class="mono">${esc(e.primary)}</td><td>${e.n_runs}</td>
-    <td class="mono">${Object.entries(e.targets).map(([t, n]) => `${esc(t)}: ${n}`).join("<br>")}</td></tr>`).join("")}
+  $("view").innerHTML = `<h1>Environments</h1>
+  <p class="lede">Every behavioural env in <a href="https://github.com/${GH}/tree/main/environments">environments/</a>: each arm exactly as <span class="mono">build()</span> makes it,
+    word diffs between arms, the comparisons we think matter, and every rollout on Docent and expview. Indexes generated ${esc(idx.generated.replace("T", " ").replace("+00:00", " UTC"))}.</p>
+  ${[["Starred: settled, nobody is changing them", idx.envs.filter(e => e.starred)], ["In progress", idx.envs.filter(e => !e.starred)]].filter(([, es]) => es.length).map(([g, es]) => `<h3>${g}</h3>
+  <div class="cards">${es.map(e => `<a class="card" href="#env=${e.env}">
+    <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${e.starred ? `<span class="star" title="${esc(e.starred)}">★</span> ` : ""}${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
+    <div class="why">${esc(e.title)}</div>
+    <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
+    <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
+}
+
+const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
+
+function tabs(env, on) {
+  const T = [["compare", "Comparisons"], ["arms", "Arms"], ["runs", "Runs"], ["about", "About"], ["source", "Source"]];
+  return `<div class="tabs">${T.map(([k, l]) => `<a href="#env=${env}&tab=${k}" class="${on === k ? "on" : ""}">${l}</a>`).join("")}</div>`;
+}
+
+async function envPage(h) {
+  const env = h.env, tab = h.tab || "compare";
+  setCrumb([[env, "env=" + env]]);
+  const D = await envData(env, h);
+  const head = `<h1>${D.idx.starred ? `<span class="star" title="${esc(D.idx.starred)}">★</span> ` : ""}${esc(D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
+  if (!D.spec && tab !== "runs") { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
+  const body = {compare: compareList, arms: armsTab, runs: runsTab, about: aboutTab, source: sourceTab}[tab];
+  $("view").innerHTML = head + tabs(env, tab) + (D.retiredNote ? `<p>${D.retiredNote}</p>` : "") + '<div id="tab"></div>';
+  await body(D, h);
+}
+
+function compareList(D) {
+  const P = pooled(D.idx), groups = {};
+  for (const c of D.spec.comparisons) (groups[c.group || (c.kind === "pair" ? "Pairs" : "Sets")] ??= []).push(c);
+  const card = c => {
+    const ts = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]?.n));
+    const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
+      const p = P.by[a + "\u0000" + t], v = pctOf(p);
+      const d = i ? deltaBadge(deltaOf(P.by[c.arms[0] + "\u0000" + t], p)) : "";
+      return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar">${p?.n ? ciBar(p.k, p.n, "b") : '<span class="b"></span>'}
+        <span class="v">${v == null ? "not run" : `${(100 * v).toFixed(0)}% <span style="color:var(--faint)">/${p.n}</span>`}</span><span class="dl">${d}</span></span>`;
+    }).join("")).join("") : c.arms.map(a => `<span class="arm">${esc(a)}${retiredTag(D, a)}</span><span class="mute">not run</span>`).join("");
+    return `<a class="card" href="#${hashOf({env: D.env, compare: c.name, retired: D.showRetired ? "show" : null})}">
+      <div class="t">${esc(c.name)}</div><div class="why">${esc(c.why || (c.kind === "pair" ? `${c.arms[0]} → ${c.arms[1]}` : ""))}${c.items ? ` · ${c.items.length} items` : ""}</div>
+      <div class="mini">${body}</div></a>`;
+  };
+  $("tab").innerHTML = `<p class="lede">Pairs are the env's declared clean counterfactuals (<span class="mono">PAIRS</span>); sets are arms worth viewing side by side
+    (<span class="mono">COMPARISONS</span>). Bars are the primary rate pooled over runs per model, thinking on and off apart; the pill is each arm minus the first,
+    coloured when its 95% interval excludes zero. Bands are 95% credible intervals (Beta(1,1) prior), the line the observed rate.</p>` +
+    Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="cards">${cs.map(card).join("")}</div>`).join("");
+}
+
+async function comparePage(h) {
+  const D = await envData(h.env, h);
+  const c = D.spec.comparisons.find(x => x.name === h.compare);
+  if (!c) throw new Error(`no comparison ${h.compare}` + (D.showRetired ? "" : " (it may only have retired arms: add &retired=show)"));
+  setCrumb([[h.env, "env=" + h.env], [c.name]]);
+  const P = pooled(D.idx);
+  const baseArm = h.base && c.arms.includes(h.base) ? h.base : c.arms[0];
+  const other = h.other && c.arms.includes(h.other) && h.other !== baseArm ? h.other : c.arms.find(a => a !== baseArm);
+  const shared = itemsOf(D.spec, baseArm).filter(it => itemsOf(D.spec, other).includes(it));
+  const items = c.items ? shared.filter(it => c.items.map(String).includes(it)) : shared;
+  const item = items.includes(h.item) ? h.item : items[0];
+  const go = o => "#" + hashOf({env: h.env, compare: c.name, base: baseArm === c.arms[0] ? null : baseArm, other, item, retired: h.retired, ...o});
+  const usedT = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]));
+  const pct = p => p && p.n ? p.k / p.n : null;
+  // which sections differ from the base arm, per arm (on this item): the set's "what changes" overview
+  const eps = await Promise.all(c.arms.map(a => built(h.env, a, item).catch(() => null)));
+  const sb = eps[c.arms.indexOf(baseArm)] ? sections(eps[c.arms.indexOf(baseArm)]) : [];
+  const changes = c.arms.map((a, i) => !eps[i] ? null : pairSections(sb, sections(eps[i])).filter(p => !p.same && !p.name.startsWith("meta")).map(p => p.name));  // what the model sees
+  // one scale for every Δ bar on the page, so they compare: the widest credible interval, rounded up to 10pp
+  const S = Math.max(10, ...c.arms.flatMap(a => a === baseArm ? [] : usedT.map(t => { const x = deltaOf(P.by[baseArm + "\u0000" + t], P.by[a + "\u0000" + t]);
+    return x ? Math.ceil(Math.max(Math.abs(x.lo), Math.abs(x.hi)) / 10) * 10 : 0; })));
+  const effects = usedT.map(t => {
+    const a = P.by[baseArm + "\u0000" + t], b = P.by[other + "\u0000" + t], x = deltaOf(a, b);
+    if (!x) return "";
+    const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "";
+    return `<div class="effect"><div class="m" title="${esc(t)}">${esc(modelName(t))}</div><div class="big ${cls}">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}<span style="font-size:15px">pp</span></div>
+      <div class="sub">${(100 * pctOf(a)).toFixed(0)}% → ${(100 * pctOf(b)).toFixed(0)}% · n ${a.n} / ${b.n}<br>95% CrI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp</div></div>`;
+  }).join("");
+  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← comparisons</a>${D.retiredNote ? " · " + D.retiredNote : ""}</p>
+  <h1>${esc(c.name)} <span class="badge" style="vertical-align:4px">${c.kind === "pair" ? "pair" : "set"}</span></h1>
+  <p class="lede">${c.why ? esc(c.why) + ". " : ""}Effect of <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span> on <span class="mono">${esc(D.idx.primary)}</span>, pooled over runs:</p>
+  ${effects ? `<div class="effects">${effects}</div>` : '<p class="mute">No runs of both arms yet.</p>'}
+  <h2>Arms</h2>
+  <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th title="${esc(t)}">${esc(modelName(t))}<br><span style="font-weight:400;text-transform:none">all items · this item</span></th>`).join("")}</tr>
+  ${c.arms.map((a, i) => {
+    const isB = a === baseArm;
+    return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a>${retiredTag(D, a)}
+      ${D.links.arms?.[a] ? `<br><span style="font-family:Inter,system-ui">${armExpview(D, a, "expview ↗")}</span>` : ""}</td>
+      <td>${isB ? "<b>base</b>" : `<a href="${go({other: a})}">${a === other ? "<b>shown</b>" : "show"}</a> · <a href="${go({base: a, other: baseArm})}" title="make this the base">base</a>`}</td>
+      <td class="mono">${isB ? "" : changes[i] == null ? '<span class="mute">not built on this item</span>' : changes[i].length ? changes[i].map(esc).join("<br>") : '<span class="mute">identical</span>'}</td>
+      ${usedT.map(t => {
+        const p = P.by[a + "\u0000" + t], q = P.items[a + "\u0000" + t + "\u0000" + item], b = P.by[baseArm + "\u0000" + t];
+        const x = !isB && p?.type === "bool" ? deltaOf(b, p) : null;
+        const d = x ? `<div class="rate" style="margin-top:4px">${deltaBar(x, S)}${deltaBadge(x)} <span class="ci">[${x.lo.toFixed(0)}, ${x.hi.toFixed(0)}]</span></div>` : "";
+        return `<td>${p ? (p.type === "bool" ? rate(p.k, p.n) + d : `${p.eps} eps`) : '<span class="mute">not run</span>'}${q ? `<br><span class="mono mute">this item ${q.k}/${q.n}</span>` : ""}</td>`;
+      }).join("")}</tr>`;
+  }).join("")}
+  </table></div>
+  ${perItemTable(D, P, baseArm, other, usedT, items, go)}
+  <div class="row"><label>item <select onchange="location.hash='${go({item: "__"})}'.replace('__', encodeURIComponent(this.value))">${items.map(it => `<option ${it === item ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
+    <span class="mute">${items.length} items${c.items ? " (the pair's subset)" : ""} · built for sample 0 on ${esc(D.spec.built_for?.today)}</span></div>
+  <h2>Rollouts on item ${esc(item)}</h2>
+  <p class="lede">Chips are episodes on this item (✓ / ✗ = ${esc(D.idx.primary)}): click opens Docent, ↗ the transcript here, ev the expview item.</p>
+  <div class="cols" style="grid-template-columns:1fr 1fr">${rolloutsHtml(D, baseArm, item)}${rolloutsHtml(D, other, item)}</div>
+  <h2>What changes: <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span></h2>
+  <div id="diff"></div>`;
+  await renderDiff(h.env, baseArm, other, item, $("diff"));
+}
+
+function perItemTable(D, P, a, b, targets, items, go) {
+  const rows = [];
+  for (const t of targets) for (const it of items) {
+    const x = P.items[a + "\u0000" + t + "\u0000" + it], y = P.items[b + "\u0000" + t + "\u0000" + it];
+    if (x || y) rows.push({t, it, x, y, d: x && y && x.n && y.n ? y.k / y.n - x.k / x.n : null});
+  }
+  if (!rows.length) return "";
+  rows.sort((p, q) => (p.t > q.t) - (p.t < q.t) || Math.abs(q.d ?? -1) - Math.abs(p.d ?? -1));
+  const f = q => q ? `${q.k}/${q.n}` : "–";
+  return `<details class="sec"><summary>Per item, ${esc(a)} vs ${esc(b)} <span class="mute">(${rows.length} rows, biggest gaps first; which items carry the effect)</span></summary><div class="body scroll">
+    <table><tr><th>target</th><th>item</th><th class="mono">${esc(a)}</th><th class="mono">${esc(b)}</th><th>Δ</th></tr>
+    ${rows.map(r => `<tr class="click" onclick="location.hash='${go({item: r.it})}'"><td class="mono">${esc(r.t)}</td><td class="mono">${esc(r.it)}</td><td>${f(r.x)}</td><td>${f(r.y)}</td><td>${r.d == null ? "" : (r.d >= 0 ? "+" : "") + (100 * r.d).toFixed(0) + "pp"}</td></tr>`).join("")}
+    </table></div></details>`;
+}
+
+function armsTab(D, h) {
+  const F = D.spec.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
+  const filt = Object.fromEntries(keys.filter(k => h[k]).map(k => [k, h[k]]));
+  const R = new Set(D.spec.retired || []), showRetired = D.showRetired;
+  const keep = arm => (showRetired || !R.has(arm)) && Object.entries(filt).every(([k, v]) => (F[arm] || {})[k] === v);
+  const P = pooled(D.idx);
+  const arms = D.spec.arms.filter(keep);
+  const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
+    [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
+  $("tab").innerHTML = `${keys.length ? `<div class="row">Filter by factor: ${keys.map(sel).join(" ")}</div>` : ""}
+  <div class="row">Tick two arms to diff them: <button id="dodiff" disabled>diff</button> <span class="mute">${arms.length} arms</span></div>
+  <div class="scroll"><table><tr><th></th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>items</th>${P.targets.map(t => `<th title="${esc(t)}">${esc(modelName(t))}</th>`).join("")}</tr>
+  ${arms.map(a => `<tr><td><input type="checkbox" class="pick" value="${esc(a)}"></td><td class="mono"><a href="#${hashOf({env: D.env, arm: a})}">${esc(a)}</a>${retiredTag(D, a)}</td>
+    ${keys.map(k => `<td class="mono">${esc((F[a] || {})[k] || "")}</td>`).join("")}<td>${itemsOf(D.spec, a).length}</td>
+    ${P.targets.map(t => { const p = P.by[a + "\u0000" + t]; return `<td>${p ? (p.type === "bool" ? rate(p.k, p.n) : p.eps + " eps") : ""}</td>`; }).join("")}</tr>`).join("")}
+  </table></div>`;
+  const picks = () => [...document.querySelectorAll(".pick:checked")].map(x => x.value);
+  for (const x of document.querySelectorAll(".pick")) x.onchange = () => { $("dodiff").disabled = picks().length !== 2; };
+  $("dodiff").onclick = () => { const [a, b] = picks(); location.hash = hashOf({env: D.env, diff: a + "," + b}); };
+}
+
+async function armPage(h) {
+  const D = await envData(h.env, h), arm = h.arm;
+  setCrumb([[h.env, "env=" + h.env], [arm]]);
+  const items = itemsOf(D.spec, arm), item = items.includes(h.item) ? h.item : items[0];
+  const ep = await built(h.env, arm, item);
+  const inC = D.spec.comparisons.filter(c => c.arms.includes(arm));
+  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=arms">← ${esc(h.env)} arms</a>${retiredTag(D, arm)} · factors <span class="mono">${esc(JSON.stringify(D.spec.arm_factors?.[arm] || {}))}</span></p>
+  ${inC.length ? `<p>In comparisons: ${inC.map(c => `<a class="chip" href="#${hashOf({env: h.env, compare: c.name, item})}">${esc(c.name)}</a>`).join("")}</p>` : ""}
+  <div class="row"><label>item <select onchange="location.hash='${hashOf({env: h.env, arm})}&item='+encodeURIComponent(this.value)">${items.map(it => `<option ${it === item ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
+    <label>diff against <select onchange="if(this.value)location.hash='${hashOf({env: h.env})}&diff='+encodeURIComponent('${arm},'+this.value)+'&item=${encodeURIComponent(item)}'"><option value="">…</option>${D.spec.arms.filter(a => a !== arm).map(a => `<option>${esc(a)}</option>`).join("")}</select></label>
+    <span class="mono mute">uv run python -m environments run ${esc(h.env)} --arms ${esc(arm)} --items ${esc(item)}</span></div>
+  <h2>Rollouts on item ${esc(item)}</h2>${rolloutsHtml(D, arm, item)}
+  <h2>What the model gets (build(${esc(arm)}, ${esc(item)}), sample 0)</h2><div id="ep"></div>`;
+  if (!ep) { $("ep").innerHTML = `<p class="mute">not built: ${esc(D.spec.build_errors?.[arm + "~" + item] || "")}</p>`; return; }
+  const secs = sections(ep);
+  $("ep").innerHTML = secs.map(([name, v, kind], i) => `<details class="sec" ${kind === "file" || kind === "harness" || kind === "meta" || kind === "tool" ? "" : "open"} data-i="${i}">
+    <summary>${esc(name)}${isRef(v) ? ` <span class="mute">${(v.len / 1024).toFixed(0)} KB</span>` : ""}</summary><div class="body"><div class="msg ${esc(kind)}"></div></div></details>`).join("");
+  for (const d of $("ep").querySelectorAll("details")) {
+    const fill = async () => { if (d.dataset.done) return; d.dataset.done = 1; d.querySelector(".msg").textContent = await text(h.env, secs[+d.dataset.i][1]); };
+    if (d.open) fill(); else d.addEventListener("toggle", fill, {once: true});
+  }
+}
+
+async function diffPage(h) {
+  const D = await envData(h.env, h), [a, b] = h.diff.split(",");
+  setCrumb([[h.env, "env=" + h.env], [`${a} vs ${b}`]]);
+  const items = itemsOf(D.spec, a).filter(it => itemsOf(D.spec, b).includes(it)), item = items.includes(h.item) ? h.item : items[0];
+  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=arms">← ${esc(h.env)} arms</a> · <a href="#${hashOf({env: h.env, diff: b + "," + a, item})}">swap</a></p>
+  <div class="row"><label>item <select onchange="location.hash='${hashOf({env: h.env, diff: h.diff})}&item='+encodeURIComponent(this.value)">${items.map(it => `<option ${it === item ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label></div>
+  <div class="cols" style="grid-template-columns:1fr 1fr">${rolloutsHtml(D, a, item)}${rolloutsHtml(D, b, item)}</div>
+  <h2>What changes</h2><div id="diff"></div>`;
+  if (!items.length) { $("diff").innerHTML = '<p class="mute">these arms share no items</p>'; return; }
+  await renderDiff(h.env, a, b, item, $("diff"));
+}
+
+function runsTab(D) {
+  const env = D.env;
+  $("tab").innerHTML = `<div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>links</th><th>description</th></tr>
+  ${D.idx.runs.map(r => { const L = D.links.runs?.[r.run] || {};
+    return `<tr class="click" onclick="location.hash='env=${env}&run=${r.run}'"><td class="mono">${esc(r.run)}</td><td class="mono">${esc(r.target)}${r.thinking === false ? " (thinking off)" : ""}</td>
+    <td>${r.n_episodes}</td><td class="mono">${r.label_files.map(esc).join("<br>")}</td>
+    <td>${r.docent_collection ? `<a href="${DOCENT}${r.docent_collection}" onclick="event.stopPropagation()" target="_blank" rel="noopener">Docent</a>` : ""}
+      ${L.expview ? ` <a href="${expviewUrl(D, L.expview)}" onclick="event.stopPropagation()" target="_blank" rel="noopener">expview</a>` : ""}</td>
+    <td>${esc(r.description || "")}${r.converted_from ? `<br><span class="mute">converted from ${esc(r.converted_from)}</span>` : ""}</td></tr>`; }).join("")}
   </table></div>`;
 }
 
-async function envPage(env, filt = {}) {
-  $("crumb").textContent = "/ " + env;
-  const idx = await getJSON(`${env}/index.json`);
-  const F = idx.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
-  const R = new Set(idx.retired || []), showRetired = filt.retired === "show";
-  const keep = arm => (showRetired || !R.has(arm)) && Object.entries(filt).every(([k, v]) => k === "retired" || !v || (F[arm] || {})[k] === v);
-  // pool runs per (arm, target): "#runs per model"
-  const pooled = {};
-  for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
-    const target = r.target + (r.thinking ? " (thinking on)" : "");  // thinking on and off never pool
-    const key = arm + "\u0000" + target, p = pooled[key] ??= {arm, target, k: 0, n: 0, eps: 0, runs: 0, type: a.primary.type};
-    p.eps += a.n; p.runs += 1;
-    if (a.primary.type === "bool") { p.k += a.primary.k; p.n += a.primary.n; }
-  }
-  const rows = Object.values(pooled).filter(p => keep(p.arm)).sort((a, b) => a.target.localeCompare(b.target) || a.arm.localeCompare(b.arm));
-  const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
-    [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
-  $("view").innerHTML = `<p>${esc(idx.title)}. Primary measure <span class="mono">${esc(idx.primary)}</span>.
-    Source: <a href="https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/main/environments/${env}">environments/${env}</a></p>
-  ${Object.keys(idx.pairs).length ? `<p>Pairs: ${Object.entries(idx.pairs).map(([k, v]) => `<b>${esc(k)}</b> ${esc(v[0])} → ${esc(v[1])}`).join(" · ")}</p>` : ""}
-  <h2>Pooled over runs (per arm and target model)</h2>
-  ${keys.length ? `<div class="row">Group by factor: ${keys.map(sel).join(" ")}</div>` : ""}
-  ${R.size ? `<p class="muted">${R.size} retired arms ${showRetired ? "shown" : "hidden"}: <a href="#${setParam("retired", showRetired ? "" : "show")}">${showRetired ? "hide" : "show"} them</a></p>` : ""}
-  <div class="scroll"><table><tr><th>target</th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>runs</th><th>episodes</th><th>${esc(idx.primary)}</th></tr>
-  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}${R.has(p.arm) ? " (retired)" : ""}</td>${keys.map(k => `<td class="mono">${esc((F[p.arm] || {})[k] || "")}</td>`).join("")}<td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
-  </table></div>
-  <h2>Runs</h2>
-  <div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>Docent</th><th>description</th></tr>
-  ${idx.runs.map(r => `<tr class="click" onclick="location.hash='env=${env}&run=${r.run}'"><td class="mono">${esc(r.run)}</td><td class="mono">${esc(r.target)}${r.thinking === false ? " (thinking off)" : ""}</td>
-    <td>${r.n_episodes}</td><td class="mono">${r.label_files.map(esc).join("<br>")}</td>
-    <td>${r.docent_collection ? `<a href="https://docent.transluce.org/dashboard/${r.docent_collection}" onclick="event.stopPropagation()">collection</a>` : ""}</td>
-    <td>${esc(r.description || "")}${r.converted_from ? `<br><span class="mute">converted from ${esc(r.converted_from)}</span>` : ""}</td></tr>`).join("")}
-  </table></div>`;
+function aboutTab(D) {
+  const s = D.spec;
+  const kv = o => `<pre class="code">${esc(JSON.stringify(o, null, 1))}</pre>`;
+  $("tab").innerHTML = `<p class="mute">Spec built ${esc(s.generated)} from commit <a href="https://github.com/${GH}/tree/${esc((s.git_sha || "").replace("+dirty", ""))}/environments/${esc(s.env)}">${esc((s.git_sha || "?").slice(0, 10))}</a>
+    (source hash ${esc(s.source_hash)}).${Object.keys(s.build_errors || {}).length ? ` <b>${Object.keys(s.build_errors).length} builds failed</b>: ${esc(Object.entries(s.build_errors).slice(0, 3).map(([k, v]) => k + ": " + v).join("; "))}` : ""}</p>
+  <h3>README</h3><div class="readme">${md(s.readme || "(no README)")}</div>
+  <h3>env.py docstring</h3><pre class="code">${esc(s.doc)}</pre>
+  <div class="cols" style="grid-template-columns:1fr 1fr 1fr"><div><h3>REQUIRES</h3>${kv(s.requires)}</div><div><h3>CAPS</h3>${kv(s.caps)}</div><div><h3>DEFAULTS</h3>${kv(s.defaults)}</div></div>`;
+}
+
+async function sourceTab(D, h) {
+  const s = D.spec, file = h.file && s.source_files.includes(h.file) ? h.file : s.source_files.find(f => f.endsWith(`/${s.env}/env.py`)) || s.source_files[0];
+  $("tab").innerHTML = `<div class="cols"><div class="files">${s.source_files.map(f => `<a class="${f === file ? "on" : ""}" href="#${hashOf({env: s.env, tab: "source", file: f})}">${esc(f.replace("environments/", ""))}</a>`).join("")}</div>
+    <div><p class="mono"><a href="${ghLink(s, file)}" target="_blank" rel="noopener">${esc(file)}</a> <span class="mute">${SRC ? "(local)" : "(GitHub)"}</span></p><pre class="code" id="code">loading…</pre></div></div>`;
+  try { $("code").textContent = await sourceText(s, file); } catch (e) { $("code").textContent = String(e.message); }
 }
 
 async function runPage(env, run, arm, epId) {
-  $("crumb").textContent = `/ ${env} / ${run}`;
-  const idx = await getJSON(`${env}/index.json`);
-  const r = idx.runs.find(x => x.run === run);
+  setCrumb([[env, "env=" + env], [run]]);
+  const D = await envData(env, {retired: "show"});  // a run page shows the run whatever its arms
+  const r = D.idx.runs.find(x => x.run === run);
   const epIdx = await getJSON(`${env}/${run}/episodes/index.json`);
   const ids = Object.keys(epIdx);
   const arms = Object.keys(r.arms).sort();
+  if (!arm && epId) arm = arms.find(a => epId.startsWith(slug(a) + "~"));
   arm = arm || arms[0];
-  const mine = ids.filter(id => id.startsWith(arm.replace(/\//g, ".").replace(/[^A-Za-z0-9_.+-]/g, "_") + "~"));
-  $("view").innerHTML = `<p><a href="#env=${env}">← ${esc(env)}</a> · target <span class="mono">${esc(r.target)}</span> · ${r.n_episodes} episodes
-    ${r.docent_collection ? ` · <a href="https://docent.transluce.org/dashboard/${r.docent_collection}">Docent collection</a>` : ""}</p>
-  <div class="scroll"><table><tr><th>arm</th><th>n</th><th>errors</th><th>unscorable</th><th>${esc(idx.primary)}</th></tr>
-  ${arms.map(a => { const x = r.arms[a]; return `<tr class="click" onclick="location.hash='env=${env}&run=${run}&arm=${encodeURIComponent(a)}'" ${a === arm ? 'style="background:var(--sel)"' : ""}>
+  const mine = ids.filter(id => id.startsWith(slug(arm) + "~"));
+  const L = D.links.runs?.[run] || {};
+  $("view").innerHTML = `<p><a href="#env=${env}&tab=runs">← ${esc(env)} runs</a> · target <span class="mono">${esc(r.target)}</span> · ${r.n_episodes} episodes
+    ${r.docent_collection ? ` · <a href="${DOCENT}${r.docent_collection}" target="_blank" rel="noopener">Docent collection</a>` : ""}
+    ${L.expview ? ` · <a href="${expviewUrl(D, L.expview)}" target="_blank" rel="noopener">expview</a>` : ""}</p>
+  <div class="scroll"><table><tr><th>arm</th><th>n</th><th>errors</th><th>unscorable</th><th>${esc(D.idx.primary)}</th></tr>
+  ${arms.map(a => { const x = r.arms[a]; return `<tr class="click ${a === arm ? "on" : ""}" onclick="location.hash='${hashOf({env, run, arm: a})}'">
     <td class="mono">${esc(a)}</td><td>${x.n}</td><td>${x.errors}</td><td>${x.unscorable}</td><td>${primaryCell(x.primary)}</td></tr>`; }).join("")}
   </table></div>
-  <div class="row"><label>episode <select id="ep" onchange="location.hash='env=${env}&run=${run}&arm=${encodeURIComponent(arm)}&ep='+encodeURIComponent(this.value)">
-    ${mine.map(id => `<option ${id === epId ? "selected" : ""}>${esc(id)}</option>`).join("")}</select></label></div>
+  <div class="row"><label>episode <select id="ep" onchange="location.hash='${hashOf({env, run, arm})}&episode='+encodeURIComponent(this.value)">
+    ${mine.map(id => `<option ${id === epId ? "selected" : ""}>${esc(id)}</option>`).join("")}</select></label>
+    ${D.spec ? `<a href="#${hashOf({env, arm})}">this arm's inputs</a>` : ""}</div>
   <div id="episode"></div>`;
   if (mine.length) showEpisode(env, run, epId && mine.includes(epId) ? epId : mine[0]);
 }
@@ -148,28 +691,34 @@ async function showEpisode(env, run, id) {
   const el = $("episode");
   el.innerHTML = '<p class="mute">loading episode…</p>';
   const ep = await getEpisode(env, run, id);
-  const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}">Docent</a>` : ""].filter(Boolean).join(" · ");
+  const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}" target="_blank" rel="noopener">Docent</a>` : ""].filter(Boolean).join(" · ");
   el.innerHTML = `<p class="mono">${esc(ep.id)} · finish ${esc(ep.finish)} ${ep.today ? "· date " + esc(ep.today) : ""} ${links ? "· " + links : ""}
     ${ep.build_check && ep.build_check !== "match" ? `<br><b>${esc(ep.build_check)}</b>` : ""}</p>
   ${(ep.messages || []).map(m => `<div class="msg ${esc(m.role)}"><div class="role">${esc(m.role)}${m.tool_calls ? " · " + m.tool_calls.map(t => esc(t.function.name)).join(", ") : ""}</div>`
-    + (m.reasoning_content ? `<div class="think">${esc(m.reasoning_content)}</div>` : "") + esc(m.content)
+    + (m.reasoning_content ? `<div class="think">${esc(m.reasoning_content)}</div>` : "") + esc(typeof m.content === "string" ? m.content : JSON.stringify(m.content))
     + (m.tool_calls ? m.tool_calls.map(t => `\n→ ${esc(t.function.name)}(${esc(t.function.arguments)})`).join("") : "") + "</div>").join("")}`;
 }
 
-function setParam(k, v) {
+function canonHash() {
   const h = new URLSearchParams(location.hash.slice(1));
-  v ? h.set(k, v) : h.delete(k);
-  return h.toString();
+  let moved = false;
+  for (const [old, neu] of Object.entries(LEGACY)) if (h.has(old)) { h.set(neu, h.get(old)); h.delete(old); moved = true; }
+  if (moved) history.replaceState(null, "", "#" + h.toString());
+  return Object.fromEntries(h);
 }
 
 async function route() {
-  const h = Object.fromEntries(new URLSearchParams(location.hash.slice(1)));
+  const h = canonHash();
   $("status").textContent = "";
   try {
-    if (h.run) await runPage(h.env, h.run, h.arm, h.ep);
-    else if (h.env) { const { env, ...filt } = h; await envPage(env, filt); }
+    if (h.run) await runPage(h.env, h.run, h.arm, h.episode);
+    else if (h.compare) await comparePage(h);
+    else if (h.diff) await diffPage(h);
+    else if (h.env && h.arm) await armPage(h);
+    else if (h.env) await envPage(h);
     else await home();
-  } catch (e) { $("status").textContent = "error: " + e.message; }
+  } catch (e) { $("status").textContent = "error: " + e.message; console.error(e); }
+  window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
 route();

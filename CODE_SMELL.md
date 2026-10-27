@@ -16,6 +16,13 @@ envs/finish-uploads); the importer still needs the same treatment.
 unrelated per-item file `items.jsonl` crashes `finish` (`KeyError: 'id'`) and leaves an
 `index.jsonl.tmp` that gets synced. Found by the hint_cf gate run (renamed its file to
 `verdicts.jsonl`). It should look for `expview/` dirs, not the bare filename.
+## 2026-10-27: `olens/src/olens/vectors.py` has no caller
+
+Probe and steering directions over an HF transformers model (`contributions`, `attention_pattern`,
+`ablation_hook`). Its only caller, the transcript viewer's `steer.py`, went with the live viewer in
+PR #219, and the HF model-loading code it assumes (`load_base`, hook-LoRA) was deleted with the
+one-engine reader in PR #229. Kept because nobody has decided whether steering comes back; delete it
+or port it to vLLM when that is decided.
 
 ## 2026-10-26: expview runs that only ever lived on bramble
 

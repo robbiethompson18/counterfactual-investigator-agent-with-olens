@@ -14,6 +14,7 @@ from before 2026-10-26 is under [`retired/`](retired/README.md).
 | [alignment_faking](alignment_faking/) | Greenblatt helpful-only, 100 AdvBench goals, free/paid and preview/public tags                                                                                                                                                                | fully accepted the harmful request             |
 | [hint_mcq](hint_mcq/)                 | 200 MMLU-Pro questions, thinking off, with or without "A Stanford professor I asked thinks the answer is X."; pairs are the 18 items Flash can't guess Qwen's own wrong answer on                                                             | followed the hint                              |
 | [overeagerness](overeagerness/)       | 11 ambiguous-request tasks (calendar, dana, email John incl. 4 Johns, gitbranch, groupchat, payback, payback_hint, impossiblebench, evilgenie, rhb_bench, rhb_logs) × the email-ladder harness variants: 414 `task/variant` arms with factors | acted without asking (email: emailed one John) |
+| [vulnerable_users](vulnerable_users/)     | factual MCQ (TruthfulQA, SciQ) with the user bios from Poole-Dayan et al. (education × English, country)                                                                                                                                                                  | not the correct choice (wrong or none)         |
 
 All of these were ported with their old runs converted, not rerun: 18,734 episodes, each checked
 byte for byte against the new `build()`, and each keeping its Docent run id. A replay of sampled
@@ -53,7 +54,7 @@ environments/_lib/   shared code: the interface (core.py), runner, Box, backends
 - **Retired arms** (`RETIRED`: arm names or factor filters such as `prompt=v5`) were tried and set
   aside. Don't delete them: stored runs rebuild their prompts from `build()`, so retired arms still
   build. `run ENV` without `--arms` / `--pair` skips them, naming them in `--arms` runs them (with a
-  note), and the list page hides them unless you click "show". Record why in the env README.
+  note), and the generated index lists them under `retired`. Record why in the env README.
 - **Never put env files in a folder named `data`**: the repo-wide `data/` rule in `.gitignore`
   swallows it, so it is missing from every fresh clone (alignment_faking's prompts went missing
   twice). Use e.g. `prompts/`.
@@ -107,15 +108,49 @@ A finished run is immutable: new labels or a rescore go in a new labels file. Co
 `converted_from: <old path>` in `meta.json` and keep the Docent ids their rows had. LLM-judge labels
 are `kind: judge` and are never a pair's measure.
 
-## List page
+## Env viewer
 
-[`_lib/page.html`](_lib/page.html) is a static page (not deployed): open it in a browser and it
-reads `envs/index.json` and `envs/<env>/index.json` from the HF dataset, pinned to one commit, then
-fetches single episodes with HTTP range requests. It shows envs, episodes per target model, each
-arm's primary measure pooled over runs and per run, and transcripts with their Docent links.
-`?base=http://localhost:8000/` reads a local `data/envs/` instead.
+[`_lib/page.html`](_lib/page.html) is a static page, published to GitHub Pages by
+`.github/workflows/env-viewer-pages.yml` on every push to main that changes it
+(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/);
+[`_lib/deploy.sh`](_lib/deploy.sh) deploys the same file to Cloudflare Pages (`cia-envs`) instead.
+It reads the HF dataset under `envs/`, pinned to one commit, and the env's source from GitHub at the
+commit its spec was built from. Per env:
+
+- **Comparisons**: the env's `PAIRS` plus its curated arm sets (`COMPARISONS` in env.py), with the
+  primary rate per arm pooled over runs per target model (thinking on and off kept apart). A
+  comparison shows which sections of the input each arm changes, the per-item rates (which items
+  carry the effect), a section-by-section word diff of exactly what two arms send on one item, and
+  the rollouts of both arms on that item as Docent / expview / transcript links.
+- **Arms**: every arm with its factors and rates, filterable by factor; tick two to diff them. An
+  arm's page shows `build(arm, item)` for any of its items (messages, tools, sandbox files, setup,
+  prefill, app state, harness, meta) and its rollouts.
+- **Runs** (the old list page: per-arm measures, transcripts by range request), **About** (README,
+  docstring, REQUIRES / CAPS / DEFAULTS) and **Source** (the env folder and `_lib/` from GitHub).
+
+What it reads, all generated from the repo and the local run folders:
+
+- `envs/<env>/spec/` (`_lib/spec.py`): `env.json` (declarations, README, source file list, git sha,
+  source hash) and `arms/<arm>.json` = `build()` for every item of the arm, sample 0, built on the
+  spec's date; strings over 8 KB live once per env in `spec/blobs/`. `index` rebuilds it only when
+  the source hash of the env folder + `_lib/` changes (overeagerness takes ~3 minutes).
+- `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and the run's
+  expview dataset.
+- `runs/env_<env>/<run>/expview/` (`_lib/expview_export.py`): each env run as an expview dataset,
+  one item per episode (id = episode id), and `runs/env_<env>/by_arm/<arm>/` = one arm across every
+  run, grouped by model, so rollouts open on https://expview.pages.dev too.
+
+```bash
+uv run python -m environments spec [ENV ...] [--force]     # also run by `index`
+uv run python -m environments expview ENV[/RUN] [--upload]  # runs -> expview datasets (+ HF)
+python -m http.server 8000                                  # local: from the repo root, then
+# http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
+```
+
+Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#env=E&arm=A&item=I`, `#env=E&diff=A,B&item=I`,
+`#env=E&run=R&episode=ID`.
 
 ## Not built yet (add when an env needs it)
 
 Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
-presets, Parquet episodes, regrading in a fresh container, and a richer env browser.
+presets, Parquet episodes, regrading in a fresh container.

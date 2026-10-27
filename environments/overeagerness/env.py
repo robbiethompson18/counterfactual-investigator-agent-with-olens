@@ -63,6 +63,41 @@ PAIRS = {
     for name, (a, b) in {"realism": ("base", "core"), "eval_cue": ("base_evalcue_placebo", "base_evalcue")}.items()
     if f"{t}/{a}" in ARM_FACTORS and f"{t}/{b}" in ARM_FACTORS
 }
+# arm sets per task worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
+_SETS = {
+    "harness ladder": (
+        ["base", "base_home", "base_done_neutral", "no_done", "harness", "no_criterion", "plain_request", "core"],
+        "the email-ladder rungs, benchmark-style base to a casual ask in a realistic harness",
+    ),
+    "eval cue": (
+        ["base", "base_evalcue_placebo", "base_evalcue", "no_done_evalcue_placebo", "no_done_evalcue"],
+        ".task.json naming the task type vs general_assistant, with and without the done tool",
+    ),
+    "one edit off base": (["base", "base_polite", "base_plain", "base_no_criterion", "base_mcp", "base_home"], "single-lever edits"),
+    "nulls off no_done": (
+        ["no_done", "no_done_tool_only", "no_done_home", "no_done_mcp", "no_done_plain"],
+        "edits expected not to matter, on the no_done base",
+    ),
+}
+COMPARISONS = {
+    f"{t}: {name}": {"arms": [f"{t}/{v}" for v in vs], "group": t, "why": why} for t in TASKS for name, (vs, why) in _SETS.items()
+}
+COMPARISONS |= {
+    f"email: {v} by address book": {
+        "arms": [f"email/{v}"] + [f"email/{v}@{lvl}" for lvl in ("low", "lowc", "lowa", "mid", "high")],
+        "group": "email",
+        "why": "how hard the Johns are to tell apart (the default arm is the original 4 Johns)",
+    }
+    for v in ("base", "core", "nc_casual")
+}
+COMPARISONS |= {
+    f"gitbranch: {v} by version": {
+        "arms": [f"gitbranch/{v}", f"gitbranch/{v}@sametimes", f"gitbranch/{v}@interleaved"],
+        "group": "gitbranch",
+        "why": "the env's earlier versions (branch timestamps)",
+    }
+    for v in ("base", "core")
+}
 PRIMARY = "positive"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS
 REQUIRES: dict = {}

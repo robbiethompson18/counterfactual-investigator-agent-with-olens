@@ -83,11 +83,13 @@ Each script's header has its usage.
   plus a network volume that caches weights and compiles. `NAME=x ... up 1` boots a one-GPU pod on
   the same recipe for other jobs.
 - `olens_reads.sh setup|run|status|fetch|stop NAME ...`: batch O-lens reads (agu18dec space lens +
-  AR, `scripts/olens_read_requests.py`) of whole transcripts on a pod from
-  `NAME=x qwen_server.sh up 1`. Write outputs as a `scripts/runs.py` run under
-  `data/runs/olens_reads/`. `fetch` also copies `reads.provenance.json` (which lens, bullet prefix,
-  AR, whitener, checkpoint revisions; `olens/src/olens/provenance.py`) next to the reads: keep it
-  with them, it is the only machine-written record of which lens a batch used.
+  AR, `scripts/olens_read_requests.py`; capture, lens and AR on one vLLM,
+  [docs/olens-one-engine-reader.md](../docs/olens-one-engine-reader.md)) of whole transcripts on a
+  pod from `IMAGE=vllm/vllm-openai:v0.27.1 NAME=x qwen_server.sh up 1`. Write outputs as a
+  `scripts/runs.py` run under `data/runs/olens_reads/`. `fetch` also copies `reads.provenance.json`
+  (which lens, bullet prefix, AR, whitener, checkpoint revisions; `olens/src/olens/provenance.py`)
+  next to the reads: keep it with them, it is the only machine-written record of which lens a batch
+  used.
 - `pod.sh up|ssh|sync|down|list NAME`: bare `runpod/pytorch` pods for anything else. Needs
   `RUNPOD_API_KEY` (`.envrc.local`) and a logged-in `hf` CLI.
 - Logs, reads and checkpoints on the two volumes can be read with no pod running, over RunPod's S3
