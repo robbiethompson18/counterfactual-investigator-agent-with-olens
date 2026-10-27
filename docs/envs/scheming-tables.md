@@ -1,6 +1,6 @@
 # Scheming envs: full results tables
 
-**Status (2026-10-26):** REFERENCE. Frozen at 2026-10-21 23:23 (bf16); the same run dirs now also hold fp8, thinking-off and GLM runs, so don't pool blindly.
+**Status (2026-10-26):** REFERENCE. Frozen at 2026-10-21 23:23 (bf16); the same run dirs now also
 hold fp8, thinking-off and GLM runs, so don't pool blindly.
 
 Every arm of every env in [scheming.md](scheming.md), pooled over all runs of the env (error rows

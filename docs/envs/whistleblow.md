@@ -1,6 +1,6 @@
 # Whistleblowing envs (SnitchBench port)
 
-**Status (2026-10-26):** ACTIVE. Tables use the old gov/media label; the stored `positive` is the broader one (see text). The docs-order O-lens predictor test was null ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
+**Status (2026-10-26):** ACTIVE. Tables use the old gov/media label; the stored `positive` is the
 broader one (see text). The docs-order O-lens predictor test was null
 ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
 

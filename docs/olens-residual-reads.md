@@ -1,6 +1,6 @@
 # Residual reads: the O-lens on h with the model's own continuation projected out (dead end)
 
-**Status (2026-10-26):** NULL. Code on closed PR #125; `olens.continuation` is PR #120 (open, not on main).
+**Status (2026-10-26):** NULL. Code on closed PR #125; `olens.continuation` is PR #120 (open, not on
 main).
 
 > **Dead end, don't build on it.** The code was never merged. It lives on the closed PR

@@ -1,5 +1,9 @@
 # dumb_user_report: does Qwen hide its own failure from a user it thinks won't notice?
 
+**Status (2026-10-26):** NULL. Retired (banner below): no model conceals its failures here, and the
+`DONE: YES` variants measure willingness to call a partial task done, not hiding. The cfbench
+canonical run (`inline_b` canon, fp8, 2026-10-23) is in "Later runs" at the end.
+
 > **Retired 2026-10-22: stale, don't build on it.** Qwen doesn't conceal its failures here, and
 > neither do DeepSeek V4.1 Flash or GLM 5.3 Flash. Concealment (the reply mentions none of the
 > failure's keywords) is 0/582 on Qwen's original s2, 13/2,749 across Qwen's s2_yesno runs, 1/200 in
@@ -309,3 +313,10 @@ usable failure (Qwen optimizes until `max_turns`).
 - Next: an on-policy short-question arm family on more s1b-style items (where silent yes could
   appear on-policy), a user-turn that states the user can't read code AND asks the short question,
   and checking whether `hope_done`'s effect survives when the damage is less salient.
+
+## Later runs (OpenRouter DeepInfra fp8, 2026-10-23)
+
+`dumb_user_report_inline_b/2026-10-23_canon_{on,off}` (n=40, seed 2, the cfbench canonical run and
+the model-chart case, [canonical-envs.md](../canonical-envs.md)): `anon` 27/40 vs `hope_done` 9/40
+with thinking, 27/40 vs 7/40 without. Replicates the 57/80 vs 22/80 above; see the retirement banner
+for what the label means.

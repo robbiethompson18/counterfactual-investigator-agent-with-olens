@@ -1,6 +1,6 @@
 # Why Qwen tells a trapped worker to shout "FIRE!"
 
-**Status (2026-10-26):** MIXED. §1–4 are lens-independent (Sonnet 5.5 judge). §5's O-lens reads are the old `olens_s3d_rl600`, not redone.
+**Status (2026-10-26):** MIXED. §1–4 are lens-independent (Sonnet 5.5 judge). §5's O-lens reads are
 the old `olens_s3d_rl600`, not redone.
 
 WeirdChat pattern `claims-called-911` / pg0039 (viewer

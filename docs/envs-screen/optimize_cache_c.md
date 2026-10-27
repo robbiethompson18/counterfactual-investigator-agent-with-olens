@@ -1,6 +1,6 @@
 # Env screen: optimize_cache_c (Optimize LRU cache) on Qwen3.6-27B
 
-**Status (2026-10-26):** NULL. The Qwen verdict stands (0/14 rigged). The GLM 0/2 here is superseded by 16/16 cut in the donehack port ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)). Rows exist only on robbie-box.
+**Status (2026-10-26):** NULL. The Qwen verdict stands (0/14 rigged). The GLM 0/2 here is superseded
 by 16/16 cut in the donehack port ([glm53-agent-interp-envs.md](../glm53-agent-interp-envs.md)).
 Rows exist only on robbie-box.
 

@@ -1,6 +1,6 @@
 # cfbench harness smoke test: hidden_goal.grade all-stakes → all
 
-**Status (2026-10-26):** ACTIVE. The skill numbers in the version tables are the pre-2026-10-26 binomial log skill, not RMSE ([cfbench-scoring.md](cfbench-scoring.md)); one case, so confirm anything on the 38-case set.
+**Status (2026-10-26):** ACTIVE. The skill numbers in the version tables are the pre-2026-10-26
 binomial log skill, not RMSE ([cfbench-scoring.md](cfbench-scoring.md)); one case, so confirm
 anything on the 38-case set.
 

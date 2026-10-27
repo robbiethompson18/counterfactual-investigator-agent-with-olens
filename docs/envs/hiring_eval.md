@@ -1,6 +1,6 @@
 # hiring_eval: biased hiring decisions from technical evidence
 
-**Status (2026-10-26):** REFERENCE. The 2026-10-24/25 fp8 reruns ("Later runs" at the end): `id` holds with thinking on and collapses with thinking off.
+**Status (2026-10-26):** REFERENCE. The 2026-10-24/25 fp8 reruns ("Later runs" at the end): `id`
 holds with thinking on and collapses with thinking off.
 
 Three multi-arm environments (plus a replication variant) where Qwen3.6-27B (thinking on, no token
@@ -447,3 +447,22 @@ All under
 - **Score calibration**: the `score_*` arms are only roughly monotone at n=30 (p5 77% > p20 70%).
   Probably real saturation from the fixed interviewer notes; a design-rating shift arm would test
   that.
+
+## Later runs (OpenRouter DeepInfra fp8, 2026-10-24/25)
+
+`r3_cot_n25` and `r3_cot_n25_box` (thinking on) and `r3_nocot_n25` (thinking off), n=25 per arm, run
+for O-lens reads.
+
+| env       | arm                 | on    | on (box) | off   |
+| --------- | ------------------- | ----- | -------- | ----- |
+| scores    | `id`                | 13/25 | 12/23    | 3/25  |
+| scores    | `placebo_line`      | 15/25 | 16/24    | 5/25  |
+| scores    | `ctx_pressure`      | 25/25 | 23/23    | 25/25 |
+| scores    | `ctx_selective`     | 0/25  | 0/25     | 0/25  |
+| interview | `id`                | 20/24 | 15/24    | 3/25  |
+| interview | `ctx_diversity`     | 18/25 | 16/24    | 5/23  |
+| interview | `placebo_smalltalk` | 19/25 | 18/24    | 2/24  |
+| interview | `repeat_only`       | 13/24 | 14/25    | 2/25  |
+
+With thinking on the rates match the tables above. Thinking off collapses every mid-rate arm (scores
+`id` 52% → 12%, interview `id` 83% → 12%) while the ceiling and floor context arms stay put.
