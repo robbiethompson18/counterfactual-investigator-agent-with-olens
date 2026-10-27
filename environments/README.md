@@ -99,8 +99,11 @@ are `kind: judge` and are never a pair's measure.
 
 ## Env viewer
 
-[`_lib/page.html`](_lib/page.html) is a static page (Cloudflare Pages project `cia-envs`, deployed by
-[`_lib/deploy.sh`](_lib/deploy.sh)). It reads the HF dataset under `envs/`, pinned to one commit,
+[`_lib/page.html`](_lib/page.html) is a static page, published to GitHub Pages by
+`.github/workflows/env-viewer-pages.yml` on every push to main that changes it
+(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/, once a repo admin
+sets Settings → Pages → Source to GitHub Actions); [`_lib/deploy.sh`](_lib/deploy.sh) deploys the
+same file to Cloudflare Pages (`cia-envs`) instead. It reads the HF dataset under `envs/`, pinned to one commit,
 and the env's source from GitHub at the commit its spec was built from. Per env:
 
 - **Comparisons**: the env's `PAIRS` plus its curated arm sets (`COMPARISONS` in env.py), with the

@@ -106,7 +106,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .effect .big.up{color:var(--up)} .effect .big.down{color:var(--down)}
 .effect .sub{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
 .badge{display:inline-block;font:600 10.5px Inter;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;background:var(--acc2);color:var(--acc)}
-.pathsep{color:var(--faint);margin:0 4px}
+.star{color:#d9a400} .pathsep{color:var(--faint);margin:0 4px}
 </style>
 </head>
 <body>
@@ -456,11 +456,12 @@ async function home() {
   $("view").innerHTML = `<h1>Environments</h1>
   <p class="lede">Every behavioural env in <a href="https://github.com/${GH}/tree/main/environments">environments/</a>: each arm exactly as <span class="mono">build()</span> makes it,
     word diffs between arms, the comparisons we think matter, and every rollout on Docent and expview. Indexes generated ${esc(idx.generated.replace("T", " ").replace("+00:00", " UTC"))}.</p>
-  <div class="cards">${idx.envs.map(e => `<a class="card" href="#env=${e.env}">
-    <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
+  ${[["Starred: settled, nobody is changing them", idx.envs.filter(e => e.starred)], ["In progress", idx.envs.filter(e => !e.starred)]].filter(([, es]) => es.length).map(([g, es]) => `<h3>${g}</h3>
+  <div class="cards">${es.map(e => `<a class="card" href="#env=${e.env}">
+    <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${e.starred ? `<span class="star" title="${esc(e.starred)}">★</span> ` : ""}${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
     <div class="why">${esc(e.title)}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
-    <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span></div></a>`).join("")}</div>`;
+    <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
 }
 
 const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
@@ -474,7 +475,7 @@ async function envPage(h) {
   const env = h.env, tab = h.tab || "compare";
   setCrumb([[env, "env=" + env]]);
   const D = await envData(env, h);
-  const head = `<h1>${esc(D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
+  const head = `<h1>${D.idx.starred ? `<span class="star" title="${esc(D.idx.starred)}">★</span> ` : ""}${esc(D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
   if (!D.spec && tab !== "runs") { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
   const body = {compare: compareList, arms: armsTab, runs: runsTab, about: aboutTab, source: sourceTab}[tab];
   $("view").innerHTML = head + tabs(env, tab) + (D.retiredNote ? `<p>${D.retiredNote}</p>` : "") + '<div id="tab"></div>';
