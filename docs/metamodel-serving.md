@@ -10,8 +10,9 @@ TODO to package it. Written 2026-10-22.
 Robbie's ask (2026-10-22, not today): a small public repo that serves the Qwen3.6-27B metamodels
 (agu18dec O-lens + AR, ceselder L42 NLA AV + AR, J-lens / J++, maybe the base model too) behind one
 API: requests in (transcripts or activations), readouts out, vLLM speed, every version pin and
-gotcha below baked in. Every agent on this sprint has rebuilt pieces of this (pod/server.py, the
-O-lens vLLM reader, the NLA reader). Before building it, check whether
+gotcha below baked in. Every agent on this sprint has rebuilt pieces of this
+(`transcript-viewer/pod/server.py`, deleted 2026-10-26, at `b842346`; the O-lens vLLM reader, the
+NLA reader). Before building it, check whether
 [ceselder/vllm-metamodels](https://github.com/ceselder/vllm-metamodels) plus a thin recipe covers
 it; it may be enough to contribute the Qwen3.6 recipe there.
 

@@ -30,15 +30,8 @@ header h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em;white-sp
 header h1 span{color:var(--accent)}
 header .sub{color:var(--ink3);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grow{flex:1}
-.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12.5px;background:var(--panel2);white-space:nowrap}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--ink3);flex:none}
-.dot.ready{background:var(--good)} .dot.busy{background:var(--accent);animation:pulse 1.2s infinite} .dot.err{background:var(--bad)}
-@keyframes pulse{50%{opacity:.35}}
 .btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 11px;font-size:12.5px}
 .btn:hover{border-color:var(--ink3)}
-.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn.primary:hover{opacity:.88}
-.btn:disabled{opacity:.45;cursor:default}
 main{display:grid;grid-template-columns:330px minmax(0,1fr) 420px;height:calc(100% - 52px)}
 aside,section{overflow:auto;min-height:0}
 #left{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
@@ -99,13 +92,6 @@ details.claude .msg{margin-top:8px;white-space:pre-wrap;word-wrap:break-word}
 .tk.zone{background:var(--zone);}
 .tk.cite{background:var(--cite);box-shadow:inset 0 -2px 0 var(--cite-line)}
 .tk.hasread{box-shadow:inset 0 -2px 0 var(--zone-ink)}
-.tk.queued{outline:1px dashed var(--accent);outline-offset:-1px}
-#qpanel{position:fixed;top:56px;right:16px;z-index:30;width:min(560px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.15);padding:14px 16px;display:none}
-#qpanel table{width:100%;border-collapse:collapse;font-size:12.5px}
-#qpanel td{border-top:1px solid var(--line);padding:5px 4px;vertical-align:top}
-#qpanel td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink2)}
-#qpanel tr.click{cursor:pointer}#qpanel tr.click:hover td{background:var(--panel2)}
-.qbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px;font-size:12.5px}
 .tk.sel{outline:2px solid var(--sel);outline-offset:1px;z-index:1}
 .tmpl{border:1px dashed var(--line);border-radius:10px;padding:6px 10px;margin:-4px 0 12px;font-size:12px}
 .tmpl .lbl{color:var(--zone-ink);font-size:11px;font-weight:600;margin-right:6px}
@@ -169,7 +155,6 @@ details.gt{margin-top:8px;font-size:13px} details.gt summary{cursor:pointer;colo
 .jl{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
 .jl td{border-top:1px solid var(--line);padding:2px 4px;vertical-align:top;word-break:break-word}
 .jl td:first-child{color:var(--ink3);white-space:nowrap;width:1%}
-body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn,#xbtn){display:none !important}
 @media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr) 360px}}
 @media (max-width:900px){main{grid-template-columns:1fr;height:auto}#left{max-height:45vh}#right{border-left:0;border-top:1px solid var(--line)}}
 </style>
@@ -179,11 +164,6 @@ body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn
   <h1>Transcript <span>viewer</span></h1>
   <div class="sub" id="sub"></div>
   <div class="grow"></div>
-  <div class="pill" id="prepill" style="display:none"></div>
-  <button class="pill" id="chivebtn" title="CHIVE counterfactual investigations on these prompts (weirdchat-chive, port 8805)">CHIVE runs</button>
-  <button class="pill" id="qpill" title="Read queue: click to show">queue</button>
-  <div class="pill" id="podpill"><span class="dot" id="poddot"></span><span id="podtxt">H100: checking…</span></div>
-  <button class="btn" id="podbtn" style="display:none"></button>
 </header>
 <main>
   <aside id="left">
@@ -201,35 +181,31 @@ body.static :is(#qpill,#podpill,#podbtn,#prepill,.qbar,#readbtn,#allbtn,#zonebtn
   <section id="mid"><div class="empty">Pick a pattern on the left.</div></section>
   <aside id="right">
     <h3>Lens</h3>
-    <div id="lensbody" class="muted">Click any token in a transcript to read its residual stream with the oracle lens.
+    <div id="lensbody" class="muted">Click any token in a transcript to see its oracle-lens readouts, where we have them (underlined tokens).
       Tokens in <span style="color:var(--zone-ink)">purple</span> are end-of-turn zones (the <code>&lt;|im_end|&gt;</code> and the template tokens after it), where the lens tends to read best.</div>
   </aside>
 </main>
 <div class="tip" id="tip"></div>
-<div id="qpanel"></div>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-// set by scripts/deploy_site.sh: a read-only snapshot, data from gzipped JSON in the HF dataset (scripts/publish.py)
-const STATIC = window.WCO_STATIC;
+// The data: gzipped JSON built by scripts/publish.py into the HF dataset (or, for a local preview, next to this file:
+// publish.py --preview sets window.WCO_STATIC).
+const STATIC = window.WCO_STATIC || 'https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/resolve/main/weirdchat/site/';
+const SITE = 'https://olens-viewer.pages.dev/';  // where copied links point (localhost links don't travel)
 const staticFile = p => { const u = new URL(p, location.href), q = u.searchParams;
   return {'/api/patterns': 'patterns', '/api/overview': 'overview', '/api/pattern': `pattern/${q.get('i')}`,
-          '/api/transcript': `t/${q.get('tid')}`, '/api/locate': `t/${q.get('tid')}`,
+          '/api/transcript': `t/${q.get('tid')}`,
           '/api/bank': `bank/${q.get('tid')}/${q.get('reader')}/${q.get('chunk')}`,
           '/api/extras': `x/${q.get('tid')}/${Math.floor(q.get('pos') / 64)}`}[u.pathname]; };
-const api = async (p, body) => {
-  if (STATIC) {
-    const f = !body && staticFile(p); if (!f) throw new Error('read-only snapshot');
-    const r = await fetch(`${STATIC}${f}.json.gz`); if (!r.ok) throw new Error(r.status === 404 ? 'not in this snapshot' : r.status);
-    const buf = await r.arrayBuffer(), b = new Uint8Array(buf.slice(0, 2));  // gzip magic, unless a CDN already decompressed it
-    const raw = b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : buf;
-    return JSON.parse(new TextDecoder().decode(raw));
-  }
-  const r = await fetch(p, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
-  const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error || r.status); return j;
+const api = async p => {
+  const r = await fetch(`${STATIC}${staticFile(p)}.json.gz`); if (!r.ok) throw new Error(r.status === 404 ? 'not in this snapshot' : r.status);
+  const buf = await r.arrayBuffer(), b = new Uint8Array(buf.slice(0, 2));  // gzip magic, unless a CDN already decompressed it
+  const raw = b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer() : buf;
+  return JSON.parse(new TextDecoder().decode(raw));
 };
 const st = { ds:'weirdchat', bank:{}, bankReads:{}, edit:null, patterns:[], layers:[], overview:{}, pat:null, tr:null, sel:null, chosen:new Set([40]),
-             temp:0, n:1, reads:{}, other:{}, cond:'organism', busy:false, pod:{} , ovpos:1, hlMode:'joint', hlLayer:40, qLayers:new Set([24, 32, 40, 48, 56]), queued:new Set()};
+             temp:0, n:1, reads:{}, other:{}, cond:'organism', ovpos:1, hlMode:'joint', hlLayer:40};
 const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem('wco.'+k)); localStorage.setItem('wco.'+k, JSON.stringify(v)); } catch(e) { return null; } };
 
 // one line per bullet, dot opacity = NNLS weight relative to the strongest bullet
@@ -448,8 +424,7 @@ async function openPattern(i, tid){
 }
 
 const tokKey = (pos, L) => `${pos}|${L}|${st.temp}|${st.n}`;
-const isOld = r => !!(r && r.lens && st.tr && st.tr.lens && r.lens !== st.tr.lens);  // read with the old lens: shown, but read again
-const haveRead = (pos, L) => { const r = st.reads[tokKey(pos, L)]; return !!r && (!isOld(r) || !!st.tr.organism || !!st.tr.glm); };  // organisms and GLM are read offline only
+const isOld = r => !!(r && r.lens && st.tr && st.tr.lens && r.lens !== st.tr.lens);  // read with the old lens (marked)
 // st.reads: the reads shown; st.other: model organisms' reads on the other activations (organism / base Qwen), same tokens
 function setReads(tr){
   const idx = rs => Object.fromEntries((rs || []).map(r => [`${r.pos}|${r.layer}|${r.temperature}|${r.n}`, r]));
@@ -493,15 +468,7 @@ async function openTranscript(tid){
         <select id="hlmode" style="width:auto;padding:1px 6px;font-size:11.5px">
           <option value="off">off</option><option value="joint">joint (all bullets)</option><option value="top">top bullet</option></select>
         at <select id="hllayer" style="width:auto;padding:1px 6px;font-size:11.5px">${st.layers.map(L => `<option ${L === st.hlLayer ? 'selected' : ''}>${L}</option>`).join('')}</select>
-        <span id="hlscale" class="hlscale"></span></span></div>
-    <div class="qbar"><button class="btn" id="qadd">Queue</button>
-      <select id="qscope" style="width:auto;padding:2px 6px;font-size:12px">
-        <option value="relevant">relevant tokens: ${tr.relevant} (end-of-turn + punctuation + newlines)</option>
-        <option value="all">all tokens: ${tr.tokens.length}</option></select>
-      <span class="muted">× layers</span>
-      <span class="chips" id="qlayers">${st.layers.map(L => `<button class="chip ${st.qLayers.has(L) ? 'on' : ''}" data-ql="${L}">${L}</button>`).join('')}</span>
-      <a class="btn" href="/case#t=${encodeURIComponent(tr.tid)}" target="_blank" title="O-lens, NLA and J++ side by side for this transcript's user turn and first 20 reply tokens">Case study</a>
-      <span class="muted" id="qinfo">${tr.queued.length ? tr.queued.length + ' reads of this transcript queued' : ''}</span></div>`;
+        <span id="hlscale" class="hlscale"></span></span></div>`;
   let at = 0;
   tr.msgs.forEach((m, k) => {
     if (!m) return;
@@ -528,21 +495,6 @@ async function openTranscript(tid){
     const j = citeOf[+el.dataset.p];
     if (j !== undefined) { el.onmouseenter = e => showTip(e, tr.cites[j].note); el.onmouseleave = hideTip; }
   }
-  st.queued = new Set(tr.queued.map(([p, L]) => p));
-  for (const c of document.querySelectorAll('#qlayers .chip')) c.onclick = () => {
-    const L = +c.dataset.ql; if (st.qLayers.has(L) && st.qLayers.size > 1) st.qLayers.delete(L); else st.qLayers.add(L);
-    c.classList.toggle('on', st.qLayers.has(L)); ls('qlayers', [...st.qLayers]); };
-  $('#qadd').onclick = async () => {
-    const b = $('#qadd'); b.disabled = true;
-    try {
-      const scope = $('#qscope').value, n = (scope === 'all' ? st.tr.tokens.length : st.tr.relevant) * st.qLayers.size;
-      if (n > 5000 && !confirm(`Queue up to ${n} reads (minus any already read)? They go ahead of the bulk queue.`)) { b.disabled = false; return; }
-      const r = await api('/api/queue/add', {tid: st.tr.tid, scope, layers: [...st.qLayers]});
-      $('#qinfo').textContent = `${r.added} reads added to the front of the queue` + (r.added ? '' : ' (all already read or queued)');
-      refreshQueued(); pollQueue();
-    } catch (e) { $('#qinfo').textContent = e.message; }
-    b.disabled = false;
-  };
   $('#hlmode').value = st.hlMode;
   $('#hlmode').onchange = e => { st.hlMode = e.target.value; ls('hlmode', st.hlMode); markRead(); syncHash(); };
   $('#hllayer').onchange = e => { st.hlLayer = +e.target.value; ls('hllayer', st.hlLayer); markRead(); syncHash(); };
@@ -584,16 +536,7 @@ function readFve(r, mode){
 }
 // colour scale per transcript: 5th..95th percentile of the shown FVEs, so the spread is visible
 function pct(xs, q){ const a = xs.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.max(0, Math.round(q * (a.length - 1))))]; }
-async function refreshQueued(){
-  if (!st.tr) return;
-  const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
-  st.queued = new Set(tr.queued.map(([p, L]) => p));
-  const qi = $('#qinfo'); if (qi && tr.queued.length) qi.textContent = `${tr.queued.length} reads of this transcript queued`;
-  if (qi && !tr.queued.length && /queued$/.test(qi.textContent)) qi.textContent = '';
-  setReads(tr); setBankReads(tr); markRead(); renderLens();
-}
 function markRead(){
-  for (const el of document.querySelectorAll('#tview .tk')) el.classList.toggle('queued', !!(st.queued && st.queued.has(+el.dataset.p)));
   const have = new Set(Object.values(st.reads).map(r => r.pos));
   const mode = st.hlMode, L = st.hlLayer;
   const f = {};
@@ -615,17 +558,13 @@ function markRead(){
 function showTip(e, s){ const t = $('#tip'); t.textContent = s; t.style.display = 'block'; t.style.left = Math.min(e.clientX + 12, innerWidth - 380) + 'px'; t.style.top = (e.clientY + 14) + 'px'; }
 function hideTip(){ $('#tip').style.display = 'none'; }
 
-function select(pos, autoread){
+function select(pos, scroll){
   st.sel = pos; syncHash();
   for (const el of document.querySelectorAll('#tview .tk.sel')) el.classList.remove('sel');
   const el = document.querySelector(`#tview .tk[data-p="${pos}"]`);
-  if (el) { el.classList.add('sel'); if (autoread) el.scrollIntoView({block:'nearest'}); }
+  if (el) { el.classList.add('sel'); if (scroll) el.scrollIntoView({block:'nearest'}); }
   renderLens();
   if (st.tr.readers) loadBanks(pos);
-  if (autoread) {
-    const missing = [...st.chosen].filter(L => !haveRead(pos, L));
-    if (missing.length && (st.pod.state === 'ready' || (fleetUp() && st.temp === 0)) && !(st.queued && st.queued.has(pos))) doRead([pos]);
-  }
 }
 
 // a link's token (st.focus): keep the first chosen layer's readout at the top of the lens panel, also after
@@ -649,12 +588,7 @@ function renderLens(){
     <div class="row" style="margin-bottom:12px"><span class="muted" style="width:52px">Decode</span>
       <div class="chips"><button class="chip ${st.temp === 0 ? 'on' : ''}" data-t="0">greedy</button><button class="chip ${st.temp === 1 ? 'on' : ''}" data-t="1">T=1 × 4</button></div>
       <div class="grow"></div><label class="muted"><input type="checkbox" id="rawtog" style="width:auto"> raw</label></div>
-    <div class="row" style="margin-bottom:14px;flex-wrap:wrap">
-      <button class="btn primary" id="readbtn">Read ${st.chosen.size === 1 ? 'L' + [...st.chosen][0] : st.chosen.size + ' layers'}</button>
-      <button class="btn" id="allbtn">All 11 layers</button>
-      ${z ? `<button class="btn" id="zonebtn">Whole end-of-turn zone</button>` : ''}
-      <button class="btn" id="xbtn" title="ceselder L42 natural-language autoencoder + J++ lens at every layer (needs an H200 pod)">NLA + J++</button>
-    </div><div id="lerr"></div><div id="xbox"></div>`;
+    <div id="xbox"></div>`;
   if (z) {
     const L = tr.layers ? tr.layers[0] : st.chosen.has(40) ? 40 : [...st.chosen][0];
     h += `<details class="tl" data-k="zone" ${ls('open.zone') ? 'open' : ''}><summary><h3>End-of-turn zone · L${L}</h3></summary><table class="zt">` + Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k).map(p => {
@@ -673,13 +607,13 @@ function renderLens(){
       const c = tr.tokens.slice(Math.max(0, p - 5), p + 1).join('').replace(/\s+/g, ' ').slice(-34);
       return `<tr class="${p === pos ? 'on' : ''}" data-p="${p}"><td title="token ${p}">…${esc(c)}</td><td>${mini(s)}${fveTag(s)}</td></tr>`;
     }).join('') + `</table></div>`;
-    else h += `<div class="muted" style="margin-bottom:12px">Not read yet. ${tr.ds === 'chive' ? "Agam's O-lens bank samples get AR scores here once they're re-scored." : "Punctuation is precomputed for each pattern's highlight (★) transcript; click any token to read it."}</div>`;
+    else h += `<div class="muted" style="margin-bottom:12px">Not read. ${tr.ds === 'chive' ? "Agam's O-lens bank samples get AR scores here once they're re-scored." : ''}</div>`;
     h += `</details>`;
   }
   if (tr.readers) h += bankHtml(pos);
   h += `<h3>${tr.readers ? 'Our reads' : 'Readouts'}</h3><div id="lres" class="${$('#rawtog') && $('#rawtog').checked ? 'showraw' : ''}">`;
   const shown = layers.filter(L => st.reads[tokKey(pos, L)]);
-  if (!shown.length) h += `<div class="muted">${STATIC ? 'Not read in this snapshot.' : st.pod.state === 'ready' ? 'No read yet for this token at these settings.' : (fleetUp() ? 'Not read yet: click the token or Read to queue it for the GPU fleet.' : 'No cached read here. Start the GPU pod in the header to read new tokens.')}</div>`;
+  if (!shown.length) h += `<div class="muted">Not read at these settings.</div>`;
   for (const L of shown) {
     const r = st.reads[tokKey(pos, L)];
     const oldLens = isOld(r) ? `<span class="oldlens" title="read with ${esc(r.lens)}, the old lens with the Chinese-prefix bug; the current lens is ${esc(tr.lens)}. Reading this token again replaces it.">old lens</span>` : '';
@@ -689,37 +623,27 @@ function renderLens(){
     if (o) h += `<div class="samp other"><div class="olbl">${st.cond === 'base' ? 'organism' : 'base Qwen'} activations, same token</div>${o.samples[0].bullets.map(b => `<div class="bl">${blTxt(b, L)}</div>`).join('')}<div class="raw">${esc(o.samples[0].text)}</div></div>`;
     h += `</div>`;
   }
-  if (st.busy) h += `<div class="muted"><span class="spin"></span> reading on the GPU…</div>`;
   h += `</div>`;
   $('#lensbody').className = ''; $('#lensbody').innerHTML = h;
   for (const c of document.querySelectorAll('#lchips .chip')) c.onclick = () => {
     const L = +c.dataset.l; if (st.chosen.has(L) && st.chosen.size > 1) st.chosen.delete(L); else st.chosen.add(L); ls('layers', [...st.chosen]); renderLens(); syncHash(); };
-  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; reloadReads(); syncHash(); };
+  for (const c of document.querySelectorAll('[data-t]')) c.onclick = () => { st.temp = +c.dataset.t; st.n = st.temp ? 4 : 1; setReads(st.tr); markRead(); renderLens(); syncHash(); };
   for (const r of document.querySelectorAll('.zt tr')) r.onclick = () => select(+r.dataset.p, true);
   for (const d of document.querySelectorAll('details.tl')) d.ontoggle = () => ls('open.' + d.dataset.k, d.open);
   const jl = $('#jl'); if (jl) jl.ontoggle = () => { st.openJ = jl.open; ls('openJ', st.openJ); };
   $('#rawtog').onchange = e => $('#lres').classList.toggle('showraw', e.target.checked);
-  $('#xbtn').onclick = () => readExtras(pos);
-  $('#xbtn').disabled = !(st.pod.state === 'ready' || st.jppLocal) || st.busy;
-  if (st.jppLocal && st.pod.state !== 'ready') $('#xbtn').textContent = 'J++ (local GPU)';
   showExtras(pos);
   focusLens();
-  $('#readbtn').onclick = () => doRead([pos]);
-  $('#allbtn').onclick = () => doRead([pos], layers);
-  if (z) $('#zonebtn').onclick = () => doRead(Array.from({length: z[1] - z[0]}, (_, k) => z[0] + k));
-  const ready = st.pod.state === 'ready' || (fleetUp() && st.temp === 0);
-  for (const id of ['#readbtn', '#allbtn', '#zonebtn']) { const b = $(id); if (b) b.disabled = !ready || st.busy; }
 }
 
 // bullet text plus a copy button (delegated click handler below)
 const blTxt = (b, L, fve) => `<span>${esc(b)}<button class="cp" data-l="${L}"${fve != null ? ` data-fve="${fve.toFixed(2)}"` : ''} title="copy bullet + link"></button></span>`;
-// copies "bullet ([L28](link) FVE: 0.12)": the current view's hash with only that layer, on the public site (localhost links don't travel)
+// copies "bullet ([L28](link) FVE: 0.12)": the current view's hash with only that layer, on the public site
 document.addEventListener('click', e => {
   const b = e.target.closest('.cp'); if (!b) return;
   const L = b.dataset.l, h = new URLSearchParams(location.hash.slice(1));
   if (L === '40') h.delete('L'); else h.set('L', L);
-  const base = STATIC ? location.origin + location.pathname : 'https://olens-viewer.pages.dev/';
-  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${base}#${h})${b.dataset.fve ? ` FVE: ${b.dataset.fve}` : ''})`);
+  navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${SITE}#${h})${b.dataset.fve ? ` FVE: ${b.dataset.fve}` : ''})`);
   b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 900);
 });
 
@@ -748,7 +672,7 @@ async function loadBanks(pos){
 function bankHtml(pos){
   const c = Math.floor(pos / st.tr.chunk);
   let h = `<h3>Agam's banks</h3>`;
-  if (!st.tr.readers.some(r => r.layers.length)) return h + `<div class="muted" style="margin-bottom:12px">${STATIC ? "Not in the public snapshot: they're Agam's, unpublished." : 'None for this incident (yet: scripts/mirror_agam_readers.py).'}</div>`;
+  if (!st.tr.readers.some(r => r.layers.length)) return h + `<div class="muted" style="margin-bottom:12px">Not in the public snapshot: they're Agam's, unpublished.</div>`;
   for (const r of st.tr.readers) {
     if (!r.layers.length) continue;
     const ch = st.bank[bankKey(r.key, c)];
@@ -769,13 +693,12 @@ function bankHtml(pos){
   return h;
 }
 
-async function reloadReads(){ const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid)); setReads(tr); setBankReads(tr); markRead(); renderLens(); }
-// NLA (L42) + J++ lens: cached per token in data/extras.jsonl, fetched when a token is shown
+// NLA (L42) + J++ lens (data/extras.jsonl), fetched a chunk of 64 tokens at a time when a token is shown
 async function showExtras(pos){
   const tid = st.tr.tid, have = st.tr.extras && st.tr.extras.includes(pos);
   if (!have) return;
   const res = await api(`/api/extras?tid=${encodeURIComponent(tid)}&pos=${pos}`);
-  const x = STATIC ? res[pos] || {} : res;  // the snapshot serves a chunk of 64 tokens (extras.chunk)
+  const x = res[pos] || {};
   if (st.tr.tid !== tid || st.sel !== pos || !$('#xbox')) return;
   $('#xbox').innerHTML = extrasHtml(x); focusLens();
   const jl = $('#jppl'); if (jl) jl.onchange = e => { st.jppAll = e.target.checked; $('#xbox').innerHTML = extrasHtml(x); showExtras(pos); };
@@ -792,93 +715,6 @@ function extrasHtml(x){
   }
   return h;
 }
-async function readExtras(pos){
-  const tid = st.tr.tid; st.busy = true; renderLens();
-  try {
-    await api('/api/extras', {tid, positions: [pos], kinds: st.pod.state === 'ready' ? ['nla', 'jpp'] : ['jpp']});
-    if (st.tr.tid === tid) { st.tr.extras = [...new Set([...(st.tr.extras || []), pos])]; }
-  } catch (e) { st.busy = false; renderLens(); $('#lerr').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
-  st.busy = false; renderLens();
-}
-// pick up reads that land in the background (precompute, fleet) for the open transcript
-setInterval(async () => {
-  if (STATIC || !st.tr || st.busy || document.hidden) return;
-  try {
-    const tr = await api('/api/transcript?tid=' + encodeURIComponent(st.tr.tid));
-    if (tr.tid === st.tr.tid && (tr.extras || []).length !== (st.tr.extras || []).length) { st.tr.extras = tr.extras; renderLens(); }
-    if (tr.tid !== st.tr.tid || (tr.reads.length === Object.keys(st.reads).length && (tr.bank_reads || []).length === Object.keys(st.bankReads).length)) return;
-    setReads(tr); setBankReads(tr);
-    markRead(); renderLens();
-  } catch (e) {}
-}, 30000);
-
-const fleetUp = () => !!(st.q && st.q.workers && st.q.workers.length);
-async function queueRead(positions, layers){
-  const r = await api('/api/queue/add', {tid: st.tr.tid, scope: 'token', positions, layers});
-  await refreshQueued();
-  const e = $('#lerr'); if (e) e.innerHTML = `<div class="muted">${r.added ? `Queued at the front (${r.added} read${r.added > 1 ? 's' : ''}); the GPU fleet picks it up shortly.` : 'Already queued.'}</div>`;
-}
-async function doRead(positions, layers){
-  layers = layers || [...st.chosen];
-  const items = positions.flatMap(p => layers.map(L => ({pos: p, layer: L}))).filter(it => !haveRead(it.pos, it.layer));
-  if (!items.length) return renderLens();
-  if (st.pod.state !== 'ready' && st.temp === 0) return queueRead([...new Set(items.map(i => i.pos))], [...new Set(items.map(i => i.layer))]);
-  st.busy = true; renderLens();
-  const tid = st.tr.tid;
-  try {
-    const r = await api('/api/read', {tid, items, temperature: st.temp, n: st.n, seed: 0});
-    if (st.tr.tid === tid) for (const x of r.reads) st.reads[`${x.pos}|${x.layer}|${x.temperature}|${x.n}`] = x;
-  } catch (e) { st.busy = false; renderLens(); $('#lerr').innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
-  st.busy = false; markRead(); renderLens();
-}
-
-async function pollQueue(){
-  try {
-    const q = await api('/api/queue'); st.q = q;
-    const p = $('#qpill');
-    p.innerHTML = q.pending + q.leased ? `<span class="spin"></span> queue ${q.pending + q.leased}${q.user ? ` (${q.user} yours)` : ''} · ${Math.round(q.rate_per_min)}/min` : 'queue empty';
-    const panel = $('#qpanel'); if (panel.style.display !== 'block') return;
-    const eta = q.rate_per_min > 0 ? Math.round((q.pending + q.leased) / q.rate_per_min) : null;
-    panel.innerHTML = `<div class="row" style="margin-bottom:8px"><b>Read queue</b><div class="grow"></div><button class="btn" id="qclose">Close</button></div>
-      <div class="kv" style="margin-bottom:10px"><span>pending <b>${q.pending}</b></span><span>in flight <b>${q.leased}</b></span><span>yours <b>${q.user}</b></span>
-        <span>rate <b>${Math.round(q.rate_per_min)}/min</b></span>${eta != null ? `<span>ETA <b>${eta < 90 ? eta + ' min' : (eta / 60).toFixed(1) + ' h'}</b></span>` : ''}
-        <span>GPU workers <b>${q.workers.length}</b></span></div>
-      <div class="muted" style="margin-bottom:8px">Your requests go to the front. Workers: ${q.workers.map(esc).join(', ') || 'none (start a GPU in the header)'}</div>
-      <table>${q.rows.map(r => `<tr class="click" data-tid="${esc(r.tid)}"><td>${r.user ? '★ ' : ''}${esc(r.title)}</td><td class="n">${r.leased ? r.leased + ' reading · ' : ''}${r.pending} pending${r.ahead ? ` · ${r.ahead} ahead` : ''}</td></tr>`).join('')}</table>
-      ${q.n_rows > q.rows.length ? `<div class="muted" style="margin-top:6px">+ ${q.n_rows - q.rows.length} more transcripts</div>` : ''}`;
-    $('#qclose').onclick = () => { panel.style.display = 'none'; };
-    for (const tr of panel.querySelectorAll('tr.click')) tr.onclick = () => {
-      const tid = tr.dataset.tid;
-      api('/api/locate?tid=' + encodeURIComponent(tid)).then(r => openPattern(r.pattern, tid)).catch(() => {});
-    };
-  } catch (e) {}
-}
-
-async function pollStatus(){
-  try {
-    const s = await api('/api/status'); const p = s.pod; st.pod = p; st.jppLocal = s.jpp_local;
-    const dot = $('#poddot'); dot.className = 'dot ' + (p.state === 'ready' ? (p.server && p.server.busy ? 'busy' : 'ready') : p.state === 'error' ? 'err' : ['launching','starting','stopping'].includes(p.state) ? 'busy' : '');
-    const mins = x => Math.floor(x / 60) + 'm';
-    const g = p.server && p.server.gpu ? p.server.gpu.replace(/^NVIDIA /, '').replace(/ (Workstation|Server) Edition$/, '') : 'GPU pod';
-    let txt = {off:'GPU pod off', launching:'GPU pod launching', starting:'GPU pod loading', ready:g + ' ready', stopping:'GPU pod stopping', error:'GPU pod error', disabled:'no pod control'}[p.state] || p.state;
-    if (p.local) txt = {ready:'local GPU ready', starting:'local GPU loading model', off:'local lens server off'}[p.state] || txt;
-    if (p.state === 'ready' && p.server && p.local) txt += p.server.busy ? ` · ${p.server.task}` : '';
-    else if (p.state === 'ready' && p.server) txt += p.server.busy ? ` · ${p.server.task}` : ` · idle ${mins(p.server.idle)} (stops at ${p.idle_min}m)`;
-    else if (p.state !== 'off' && p.elapsed != null) txt += ` · ${mins(p.elapsed)}`;
-    $('#podtxt').textContent = txt; $('#podpill').title = p.detail || '';
-    const b = $('#podbtn'); b.style.display = p.state === 'disabled' || p.local ? 'none' : '';
-    b.textContent = ['off', 'error'].includes(p.state) ? 'Start GPU' : 'Stop'; b.className = 'btn' + (['off','error'].includes(p.state) ? ' primary' : '');
-    b.disabled = p.state === 'stopping';
-    b.onclick = async () => { if (b.textContent === 'Stop' && !confirm('Tear the GPU pod down now?')) return; await api(['off','error'].includes(p.state) ? '/api/pod/start' : '/api/pod/stop', {}); pollStatus(); };
-    const pre = s.pre, pp = $('#prepill');
-    if (pre.state === 'running') { pp.style.display = ''; pp.innerHTML = `<span class="spin"></span> precomputing ${pre.phase === 'punct' ? 'punctuation' : 'end-of-turn'} reads ${pre.done}/${pre.total}`; }
-    else if (pre.state === 'error') { pp.style.display = ''; pp.textContent = 'precompute stopped: ' + pre.error; }
-    else pp.style.display = 'none';
-    if ((pre.state === 'running' || pre.state === 'done') && (pre.done !== st._lastDone)) { st._lastDone = pre.done; st.overview = await api('/api/overview'); renderList(); }
-    if (st.tr && !st.busy) { const b2 = $('#readbtn'); if (b2 && b2.disabled !== (p.state !== 'ready')) renderLens(); }
-  } catch (e) { $('#podtxt').textContent = 'viewer server unreachable'; }
-}
-
 document.addEventListener('keydown', e => {
   if (!st.tr || ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) return;
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); select(Math.max(0, Math.min(st.tr.tokens.length - 1, st.sel + (e.key === 'ArrowRight' ? 1 : -1))), true); }
@@ -891,7 +727,6 @@ document.addEventListener('keydown', e => {
   const saved = ls('layers'); if (Array.isArray(saved) && saved.length) st.chosen = new Set(saved.filter(L => d.layers.includes(L)));
   if (!st.chosen.size) st.chosen = new Set([40]);
   st.hlMode = ls('hlmode') || 'joint'; st.hlLayer = ls('hllayer') || 40;
-  const ql = ls('qlayers'); if (Array.isArray(ql) && ql.length) st.qLayers = new Set(ql);
   st.openJ = !!ls('openJ');
   const zl = ['<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n'];
   st.ovpos = ls('ovpos') ?? 1;
@@ -915,33 +750,9 @@ document.addEventListener('keydown', e => {
   $('#q').oninput = renderList; $('#beh').onchange = renderList; $('#sort').onchange = renderList;
   for (const b of document.querySelectorAll('#dstabs button')) b.onclick = () => { if (b.dataset.ds === st.ds) return; st.ds = b.dataset.ds; $('#q').value = ''; fillFilters(); openPattern(firstOf(st.ds)); };
   renderList();
-  if (STATIC) document.body.classList.add('static');
-  else {
-    await pollStatus(); setInterval(pollStatus, 4000);
-    $('#qpill').onclick = () => { const p = $('#qpanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; pollQueue(); };
-    pollQueue(); setInterval(pollQueue, 5000);
-    setInterval(() => { if (st.queued && st.queued.size) refreshQueued(); }, 8000);
-  }
   if (hpat) openPattern(hpat.idx, hp.get('t'));
   else if (hp.has('ds')) openPattern(firstOf(st.ds));
   else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(firstOf('weirdchat')); }
-})();
-</script>
-<!-- CHIVE runs tab: a separate read-only server (weirdchat-chive/dashboard/server.py, port 8805) in an overlay -->
-<iframe id="chiveframe" title="CHIVE runs" style="display:none;position:fixed;left:0;right:0;bottom:0;width:100%;border:0;background:var(--bg);z-index:50"></iframe>
-<script>
-(() => {
-  const b = document.getElementById("chivebtn"), f = document.getElementById("chiveframe");
-  b.onclick = () => {
-    const on = f.style.display === "none";
-    if (on) {
-      const top = document.querySelector("header").getBoundingClientRect().bottom;
-      f.style.top = top + "px"; f.style.height = `calc(100% - ${top}px)`;
-      if (!f.src) f.src = `${location.protocol}//${location.hostname}:8805/`;
-    }
-    f.style.display = on ? "block" : "none";
-    b.textContent = on ? "← back to viewer" : "CHIVE runs";
-  };
 })();
 </script>
 </body>

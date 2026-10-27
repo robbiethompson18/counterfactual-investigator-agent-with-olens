@@ -118,12 +118,14 @@ def main() -> None:
                     "cond": x.cond, "evidence_found": pos is not None},
             tokens={"ref": ref, "n": len(tok["tokens"]), "reads": len(tok["reads"])},
             links={"same transcript in Celeste's import (8830)":
-                   f"http://bramble:8830/#d=imports/{d.relative_to(a.imports)}&i={quote(t, safe='')}&v=tr&t={anchor}"},
+                   f"https://expview.pages.dev/#d=imports/{d.relative_to(a.imports)}&i={quote(t, safe='')}&v=tr&t={anchor}"},
             calls=[call("lens judge", r["model"], messages=r["messages"],
                         output={"role": "assistant", "content": r["output"] or "", "reasoning": r.get("reasoning")},
                         params={"temperature": 0, "reasoning_effort": "low"}, parsed=r["parsed"])],
         )  # fmt: skip
-        links[ph] = f"http://bramble:8830/#d=runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge_traces&i={ph}&v=tr&t={anchor}"
+        links[ph] = (
+            f"https://expview.pages.dev/#d=runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea/lens_punct_judge_traces&i={ph}&v=tr&t={anchor}"
+        )
     swap_in(tmp, final)
     (a.run / "judge_traces_links.json").write_text(json.dumps(links, indent=1))
     print(f"{len(links)} items -> {final}")

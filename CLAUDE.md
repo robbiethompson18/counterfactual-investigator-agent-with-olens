@@ -131,17 +131,21 @@ incidents with every transcript-only and O-lens draw, filterable and linkable by
 with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`).
 
 O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
-token-level viewer (WeirdChat, CHIVE, organisms). `weirdchat-olens.pages.dev` is its old name and
-301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…` hash.
-Source is `transcript-viewer/web/index.html`, deployed by
-`transcript-viewer/scripts/deploy_site.sh`.
+token-level viewer (WeirdChat, CHIVE, organisms, GLM 5.3). `weirdchat-olens.pages.dev` is its old
+name and 301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…`
+hash. It is a static page (`transcript-viewer/web/index.html`, deployed by
+`transcript-viewer/scripts/deploy_site.sh`) over gzipped JSON in the HF dataset (`weirdchat/site/`,
+built by `transcript-viewer/scripts/publish.py` from every machine's reads). No viewer runs on a
+server or GPU any more (2026-10-26): new O-lens reads are batch jobs
+(`scripts/olens_read_requests.py` via `runpod/olens_reads.sh`) whose outputs go to HF.
 
 **expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
 metamodel reads ([expview/CLAUDE.md](expview/CLAUDE.md)): write the run's items to `RUN/expview/`
 with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
-`tokens=`), and link items with `python expview/expview.py link`. Server: `http://bramble:8830/`
-(tailnet; regex search over every read). Off the tailnet, `expview.py build RUN` makes a
-self-contained page to publish as an Artifact.
+`tokens=`), and link items with `python expview/expview.py link`. Page: `https://expview.pages.dev`
+(static, reads the HF dataset; a run is there once `runs.py finish` has synced it; regex search over
+the reads of the runs you pick, in the browser). For a run that isn't on HF, `expview.py build RUN`
+makes a self-contained page to publish as an Artifact.
 
 Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
 plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript
@@ -225,15 +229,16 @@ Current docs:
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
   why, what was tried and rejected, where each page lives
 - [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/CLAUDE.md)
-  — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
-  importer, bramble service
+  — run format, `Run`/`call`/`read`, `index.jsonl`, deep links, the static page on Cloudflare Pages
+  reading HF, in-browser regex search with echo filters, Celeste importer, `deploy.sh`
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [REFERENCE: Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
-- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE or model-organism transcripts with the lens or running GPU fleets](transcript-viewer/CLAUDE.md)
-  — token-level viewer, CHIVE incidents with Agam's per-token banks, confession follow-ups ("why did
-  you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
+- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE, organism or GLM transcripts with the lens on olens-viewer, or rebuilding or redeploying it](transcript-viewer/CLAUDE.md)
+  — static page over the HF dataset: what each tab shows, CHIVE rendering and Agam's banks,
+  confession follow-ups and thinking resamples, `publish.py` build/preview/upload, deploy, the
+  batch-reads format gap, where the deleted live viewer (server, queue, fleet, case page) is
 - [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
   — hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
@@ -440,9 +445,8 @@ Current docs:
 - [REFERENCE: Metadata honeypot — read before running or extending the METR planted-metadata env, or studying refusals driven by eval metadata](docs/envs/metadata_honeypot.md)
   — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
   (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
-  passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding)
-- [ACTIVE: olens_search — read before searching Celeste's GLM-5.3 O-lens readouts of our transcripts or adding her top-ups](olens_search/CLAUDE.md)
-  — regex dashboard (DuckDB + FastAPI, tailnet only) over every GLM olens / Qwen reader / J-lens
+  passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding) —
+  regex dashboard (DuckDB + FastAPI, tailnet only) over every GLM olens / Qwen reader / J-lens
   output, with novel-vs-context filter, per-arm label rates, inline transcripts and Docent links
 - [NULL: Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
@@ -456,7 +460,7 @@ Current docs:
 - [NULL: Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
   — final pass: DeepSeek-judged eval framing in punctuation-token prompt reads vs VEA over 16
   settings, pooled AUROC 0.72 driven by donation bet, 0.50 within every condition (earlier keyword
-  passes below it); per-setting figure, trace examples on bramble:8830
+  passes below it); per-setting figure, trace examples on expview
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
