@@ -66,7 +66,7 @@ BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcu
 
 def render_request(tok, row: dict) -> tuple[list[dict], list[int], list[tuple]]:
     """One olens_read_requests.py request row (messages, tools, generation_prompt) rendered as Qwen saw it -> (messages, token
-    ids, per-token (msg_index, field, char_offset)). The batch readers and the transcripts backfill share it."""
+    ids, per-token (msg_index, field, char_offset))."""
     msgs = tool_args_as_dicts(row["messages"])
     tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
     text = chat_text(tok, msgs, tools=tools, generation_prompt=bool(row.get("generation_prompt")))
