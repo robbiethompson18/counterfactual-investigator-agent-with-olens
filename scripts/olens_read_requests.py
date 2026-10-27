@@ -30,7 +30,6 @@ reads.provenance.json next to it.
 """
 
 import argparse
-import copy
 import hashlib
 import json
 import re
@@ -47,6 +46,7 @@ from olens.readout import Readout, bullets
 from olens.vllm_lens import VllmLens
 from transformers import AutoTokenizer
 
+from counterfactual_investigator_agent_with_olens.render import chat_text, tool_args_as_dicts  # PYTHONPATH=olens/src:src
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
@@ -64,13 +64,9 @@ PREFIX = 32
 
 def render(tok, row):
     """-> (text, token ids, char spans, per-token (msg_index, field, char_offset))."""
-    msgs = copy.deepcopy(row["messages"])
-    for m in msgs:
-        for tc in m.get("tool_calls") or []:
-            if isinstance(tc["function"]["arguments"], str):
-                tc["function"]["arguments"] = json.loads(tc["function"]["arguments"])
+    msgs = tool_args_as_dicts(row["messages"])
     tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
-    text = tok.apply_chat_template(msgs, tools=tools, tokenize=False, add_generation_prompt=bool(row.get("generation_prompt")))
+    text = chat_text(tok, msgs, tools=tools, generation_prompt=bool(row.get("generation_prompt")))
     enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
     # Find each message's fields in the rendered text, in order; a token belongs to the last message whose first
     # field starts at or before it (so template tokens around a message go with it), -1 before the first.
