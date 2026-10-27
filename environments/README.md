@@ -93,7 +93,8 @@ episodes/NNN.jsonl             ~20 MB shards; one episode per line (messages, to
                                calls with providers, finish, usage)
 episodes/index.json            episode id -> [shard, byte offset, length], so a reader fetches one episode
 blobs/<sha256>                 file contents, stored once
-labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind"}; measure() is the labeler "measure"; never overwritten
+labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind", "calls"?}; measure() is the labeler "measure"; never overwritten;
+                               a judge saves its exact calls (input + output) in "calls", and expview shows them
 ```
 
 A run finishes the way `scripts/runs.py finish` did: the runner mirrors its episodes to Docent
@@ -138,7 +139,8 @@ What it reads, all generated from the repo and the local run folders:
   expview dataset.
 - `runs/env_<env>/<run>/expview/` (`_lib/expview_export.py`): each env run as an expview dataset,
   one item per episode (id = episode id), and `runs/env_<env>/by_arm/<arm>/` = one arm across every
-  run, grouped by model, so rollouts open on https://expview.pages.dev too.
+  run, grouped by model, for the old https://expview.pages.dev. Superseded: expview on GitHub Pages
+  (`/expview/#env=E&run=R&episode=ID`) reads env runs directly and redirects these datasets.
 
 ```bash
 uv run python -m environments spec [ENV ...] [--force]     # also run by `index`

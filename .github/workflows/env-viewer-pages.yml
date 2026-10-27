@@ -1,11 +1,12 @@
-# Publishes the env viewer (environments/_lib/page.html) to GitHub Pages on every push to main that changes it.
+# Publishes the env viewer (environments/_lib/page.html) and expview (expview/static/index.html, at /expview/) to GitHub
+# Pages on every push to main that changes either.
 # The page reads envs/ on the public HF dataset and source from GitHub, so only the HTML is deployed.
 # Pages source is GitHub Actions (enabled 2026-10-27). Each deploy replaces the whole site: add other pages to site/ here.
 name: env viewer pages
 on:
   push:
     branches: [main]
-    paths: [environments/_lib/page.html, .github/workflows/env-viewer-pages.yml]
+    paths: [environments/_lib/page.html, expview/static/index.html, .github/workflows/env-viewer-pages.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,7 +23,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir site && cp environments/_lib/page.html site/index.html
+      - run: mkdir -p site/expview && cp environments/_lib/page.html site/index.html && cp expview/static/index.html site/expview/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

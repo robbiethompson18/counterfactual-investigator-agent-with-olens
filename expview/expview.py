@@ -16,10 +16,11 @@ Emit from Python (scripts/ style: put expview/ on sys.path):
             calls=[call("subject", model, messages=prompt_msgs, output=reply_msg),
                    call("judge", judge_model, messages=judge_msgs, output=judge_reply, parsed={"correct": True})],
             tokens={"tokens": toks, "sections": [["user", 0, 40], ["reasoning", 40, 900]], "reads": {"812": [...]}})
-    print(link(run.path, item="s1/t0", token=812))  # https://expview.pages.dev/#dataset=...&item=s1/t0&token=812
+    print(link(run.path, item="s1/t0", token=812))  # https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#dataset=...&item=s1/t0&token=812
 
-The viewer (https://expview.pages.dev, expview/static/index.html) is a static page that reads these directories from the
-public HF dataset once `scripts/runs.py finish` has synced the run.
+The viewer (GitHub Pages, BASE_URL; source expview/static/index.html) is a static page that reads these directories from
+the public HF dataset once `scripts/runs.py finish` has synced the run. It also opens env runs (envs/<env>/<run>/)
+directly, with every run that points at an episode (item.episode / extra.source + extra.episode) stitched in.
 
 CLI:
 
@@ -49,7 +50,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 MAX_FILE = 512 * 1024  # bytes kept per environment file
 SKIP_DIRS = {".git", "__pycache__", ".venv", "node_modules"}
-BASE_URL = os.environ.get("EXPVIEW_URL", "https://expview.pages.dev")
+BASE_URL = os.environ.get("EXPVIEW_URL", "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview")
 
 
 # ---------------------------------------------------------------- where runs live
@@ -110,6 +111,14 @@ def link(
     params = {"dataset": d, "item": item, "token": token, "call": call, "query": q}
     kept = {k: v for k, v in params.items() if v is not None}
     return f"{base}/#" + urllib.parse.urlencode(kept, quote_via=lambda s, *_: urllib.parse.quote(s, safe="/:"))
+
+
+def episode_link(env: str, run: str, episode: str | None = None, base: str = BASE_URL, **keys) -> str:
+    """Deep link to an env run or one of its episodes (envs/<env>/<run>/ on HF), with every attached run's reads and judges;
+    keys: view, token, call, reads (the attached dataset whose token reads to show), query."""
+    params = {"env": env, "run": run, "episode": episode, **keys}
+    kept = {k: v for k, v in params.items() if v is not None}
+    return f"{base}/#" + urllib.parse.urlencode(kept, quote_via=lambda s, *_: urllib.parse.quote(s, safe="/:~"))
 
 
 # ---------------------------------------------------------------- emitting
@@ -220,9 +229,26 @@ def links_of(it: dict) -> dict:
     return out
 
 
-def summary(it: dict, off: int, n: int) -> dict:
+def episode_of(it: dict, info: dict | None = None) -> str | None:
+    """The env episode an item shows or reads, as `envs/<env>/<run>/<episode id>`: the item's own `episode`, else
+    extra.source (or extra.env_run) = envs/<env>/<run> + extra.episode, else run.json `episodes_from` = envs/<env>/<run>
+    with the item id as the episode id. The viewer opens that episode with this item's reads, judge calls and labels."""
+    ep = it.get("episode")
+    if isinstance(ep, str) and ep.startswith("envs/"):
+        return ep
+    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    src = next((ex[k] for k in ("source", "env_run") if isinstance(ex.get(k), str) and ex[k].startswith("envs/")), None)
+    if src and ex.get("episode"):
+        return f"{src.rstrip('/')}/{ex['episode']}"
+    frm = (info or {}).get("episodes_from")
+    if isinstance(frm, str) and frm.startswith("envs/"):
+        return f"{frm.rstrip('/')}/{it['id']}"
+    return None
+
+
+def summary(it: dict, off: int, n: int, info: dict | None = None) -> dict:
     """An item's index.jsonl line: what the run page and search need, plus the byte span of its line in items.jsonl."""
-    s = {"id": str(it["id"]), "off": off, "len": n}
+    s = {"id": str(it["id"]), "off": off, "len": n, "ep": episode_of(it, info)}
     for k in ("group", "labels", "tokens", "base"):
         if it.get(k) is not None:
             s[k] = it[k]
@@ -232,17 +258,39 @@ def summary(it: dict, off: int, n: int) -> dict:
     return {k: v for k, v in s.items() if v is not None}
 
 
+def run_info(run: Path) -> dict:
+    p = Path(run) / "run.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+def episode_line(s: dict) -> str:
+    """An episodes.jsonl line: which env episode an item belongs to and where the item is, so the viewer can stitch this
+    run's reads and judge calls into that episode without loading index.jsonl."""
+    return json.dumps({"ep": s["ep"], "id": s["id"], "off": s["off"], "len": s["len"], "tokens": bool(s.get("tokens"))}) + "\n"
+
+
 def write_index(run: Path) -> int:
-    """(Re)write index.jsonl from items.jsonl; returns the number of items."""
+    """(Re)write index.jsonl (and episodes.jsonl, for items that point at env episodes) from items.jsonl; returns the
+    number of items."""
     run = Path(run)
-    n, off = 0, 0
-    with open(run / "items.jsonl", "rb") as f, open(run / "index.jsonl.tmp", "w") as out:
+    info = run_info(run)
+    n, off, eps = 0, 0, 0
+    with open(run / "items.jsonl", "rb") as f, open(run / "index.jsonl.tmp", "w") as out, open(run / "episodes.jsonl.tmp", "w") as epf:
         for raw in f:
             start, off = off, off + len(raw)
             if raw.strip():
-                out.write(json.dumps(summary(json.loads(raw), start, len(raw))) + "\n")
+                s = summary(json.loads(raw), start, len(raw), info)
+                out.write(json.dumps(s) + "\n")
+                if s.get("ep"):
+                    epf.write(episode_line(s))
+                    eps += 1
                 n += 1
     os.replace(run / "index.jsonl.tmp", run / "index.jsonl")
+    if eps:
+        os.replace(run / "episodes.jsonl.tmp", run / "episodes.jsonl")
+    else:
+        (run / "episodes.jsonl.tmp").unlink()
+        (run / "episodes.jsonl").unlink(missing_ok=True)
     return n
 
 
@@ -271,6 +319,7 @@ class Run:
         info.update({k: v for k, v in dict(title=title, description=description, **meta).items() if v})
         info.setdefault("title", self.path.name)
         rj.write_text(json.dumps(info, indent=1) + "\n")
+        self._info = info
         self._envs = {}
 
     def env(self, files=None, dir=None, skip=()):
@@ -309,15 +358,19 @@ class Run:
         links=None,
         base=None,
         notes=None,
+        episode=None,
         mode="a",
     ):
         """Append one item. links: {"Docent": url, ...} shown as buttons on the item.
         base=(dataset id, item id) makes this an overlay on that item (CLAUDE.md "Overlays"): it shows the base item's transcript,
         reads, env and calls, plus this item's calls (in the side panel), labels, notes [{"pos": int | None, "text": md}] and
-        tokens={"reads": {pos: [read, ...]}} merged into the base transcript."""
+        tokens={"reads": {pos: [read, ...]}} merged into the base transcript.
+        episode="envs/<env>/<run>/<episode id>" attaches this item (its reads, judge calls, labels) to that env episode, so
+        the episode's page shows them (CLAUDE.md "Attaching to env episodes"); extra.source + extra.episode works too."""
         if env is None and (env_dir is not None or env_files):
             env = self.env(files=env_files, dir=env_dir)
         item = {"id": str(id), "group": group, "labels": labels or {}, "env": env, "calls": calls, "extra": extra, "links": links}
+        item["episode"] = episode
         if base is not None:
             item["base"] = {"d": str(base[0]), "i": str(base[1])} if isinstance(base, (tuple, list)) else base
             item["notes"] = notes or None
@@ -328,13 +381,18 @@ class Run:
         with open(self.path / "items.jsonl", mode + "b") as f:
             off = f.tell()
             f.write(line)
+        s = summary(item, off, len(line), self._info)
         with open(self.path / "index.jsonl", mode) as f:  # the viewer reads items by byte range, so the index goes with them
-            f.write(json.dumps(summary(item, off, len(line))) + "\n")
+            f.write(json.dumps(s) + "\n")
+        if s.get("ep"):
+            with open(self.path / "episodes.jsonl", mode) as f:
+                f.write(episode_line(s))
 
     def reset(self):
         """Clear items (keeps env snapshots, which are content-addressed)."""
         for name in ("items.jsonl", "index.jsonl"):
             (self.path / name).write_text("")
+        (self.path / "episodes.jsonl").unlink(missing_ok=True)
 
 
 # ---------------------------------------------------------------- reading
@@ -441,6 +499,7 @@ def check(path) -> list[str]:
         return [f"{path}: no items.jsonl"]
     if not index_fresh(path):
         probs.append("index.jsonl missing or stale (the public viewer needs it): python expview/expview.py index RUN")
+    info, envs_named = run_info(path), set()
     for n, it in enumerate(iter_items(path), 1):
         where = f"items.jsonl:{n} ({it.get('id')})"
         if "id" not in it:
@@ -448,6 +507,11 @@ def check(path) -> list[str]:
         elif it["id"] in ids:
             probs.append(f"{where}: duplicate id")
         ids.add(it.get("id"))
+        ep = episode_of(it, info) if "id" in it else None
+        if ep:
+            if len(ep.split("/")) != 4:
+                probs.append(f"{where}: episode {ep} is not envs/<env>/<run>/<episode id>")
+            envs_named.add(ep.split("/")[1])
         for k, v in (it.get("labels") or {}).items():
             if isinstance(v, (dict, list)):
                 probs.append(f"{where}: label {k} is not a scalar")
@@ -478,6 +542,12 @@ def check(path) -> list[str]:
                     if "tool" not in r or not isinstance(r.get("lines"), list) or any(not isinstance(x, list) for x in r["lines"]):
                         probs.append(f"{where}: read at {p} needs tool and lines [[text, score?], ...]")
                         break
+    try:
+        exp = dataset_id(path).split("/")[1]
+    except (ValueError, IndexError):
+        exp = None
+    for e in sorted(envs_named - {exp}):
+        probs.append(f"items point at envs/{e} episodes, but the viewer only stitches runs under runs/{e}/ into them (this is {exp})")
     return probs
 
 
