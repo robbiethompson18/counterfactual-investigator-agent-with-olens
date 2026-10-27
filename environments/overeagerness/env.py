@@ -66,6 +66,9 @@ PAIRS = {
     "gitbranch:no_done": ("gitbranch/base_no_criterion", "gitbranch/no_criterion"),
     "email:no_done": ("email/fixed@lowc", "email/no_done@lowc"),
     "email_4johns:no_done": ("email/fixed@lowc", "email/no_done@lowc", ["0"]),
+    # "A done tool turns 'which John?' into 'email them all'" (Kylie's slide, 2026-10-25): the same base with the done tool
+    # described neutrally vs no done tool, junebug book; with it GLM sends to several Johns ~32%, without ~9% (and asks more)
+    "email:done_tool": ("email/base_done_neutral@lowc", "email/no_done@lowc"),
 }
 # the earlier ladder pairs (several edits at once), kept as per-task sets below
 _LADDER_PAIRS = {"realism": ("base", "core"), "eval_cue": ("base_evalcue_placebo", "base_evalcue")}
