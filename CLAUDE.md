@@ -426,7 +426,13 @@ Current docs:
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
-  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck ## Shipping
-  Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
-  Never push to `main` directly, and never merge a PR without that human review, even for one-line
-  or docs-only changes. "Ship" here means: push a branch and open a PR.
+  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
+  — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
+  benchmark, S3 access to the volumes, `pod.sh` gotchas
+
+## Shipping
+
+Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
+Never push to `main` directly, and never merge a PR without that human review, even for one-line or
+docs-only changes. "Ship" here means: push a branch and open a PR.
