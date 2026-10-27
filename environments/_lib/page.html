@@ -288,9 +288,10 @@ async function envData(env, h = {}) {
   const R = new Set(spec?.retired || []);
   if (R.size && !D.showRetired) {
     const live = a => !R.has(a);
-    const seen = new Set();  // a set that shrinks to an earlier comparison's arms is dropped
+    // a set that shrinks to an earlier comparison's arms is dropped (one read per model, per_target, is a different set)
+    const seen = new Set(), key = c => JSON.stringify([c.arms, c.per_target ?? null]);
     D.spec = {...spec, comparisons: spec.comparisons.map(c => ({...c, arms: c.arms.filter(live)}))
-      .filter(c => c.arms.length >= 2 && !seen.has(c.arms.join()) && seen.add(c.arms.join()))};
+      .filter(c => c.arms.length >= 2 && !seen.has(key(c)) && seen.add(key(c)))};
     D.idx = {...D.idx, runs: D.idx.runs.map(r => ({...r, arms: Object.fromEntries(Object.entries(r.arms).filter(([a]) => live(a)))}))
       .filter(r => Object.keys(r.arms).length)};
   }
