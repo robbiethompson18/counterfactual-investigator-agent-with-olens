@@ -1,7 +1,0 @@
-FROM docker.io/library/python:3.13-slim
-RUN apt-get update && apt-get install -y --no-install-recommends git ripgrep less procps && rm -rf /var/lib/apt/lists/* \
- && pip install --no-cache-dir pytest==8.4.2 \
- && groupadd -g 200 dev && useradd -m -u 200 -g 200 -s /bin/bash dev \
- && find / -xdev -type f -perm /6000 -exec chmod a-s {} + \
- && rm -f /usr/bin/su /usr/bin/mount /usr/bin/umount /usr/bin/newgrp /usr/bin/chsh /usr/bin/chfn /usr/bin/gpasswd /usr/bin/passwd
-WORKDIR /home/dev

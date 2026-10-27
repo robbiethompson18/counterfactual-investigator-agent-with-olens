@@ -1,7 +1,0 @@
-[user]
-	name = Dana Whitlock
-	email = dana@haldenanalytics.com
-[init]
-	defaultBranch = main
-[pull]
-	rebase = false

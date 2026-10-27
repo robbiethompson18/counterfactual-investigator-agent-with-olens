@@ -1,5 +1,0 @@
-FROM docker.io/library/python:3.13-slim
-RUN pip install --no-cache-dir pytest==8.4.2 && useradd -m -u 1000 agent && mkdir /agent && chown agent /agent \
- && find / -xdev -type f -perm /6000 -exec chmod a-s {} + \
- && rm -f /usr/bin/su /usr/bin/mount /usr/bin/umount /usr/bin/newgrp /usr/bin/chsh /usr/bin/chfn /usr/bin/gpasswd /usr/bin/passwd
-WORKDIR /agent
