@@ -58,6 +58,13 @@ async def main():
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
+    ap.add_argument(
+        "--olens-positions",
+        default="sparse",
+        choices=olens.POSITIONS,
+        help="sparse: every read of a non-dense request, and only template and stop tokens of an every-token one; all: every "
+        'token, and every transcript used must have been read at every token (positions: "all" in its requests.jsonl)',
+    )
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
     ap.add_argument("--draws", type=int, default=5)
@@ -74,7 +81,7 @@ async def main():
     }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
-    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [])
+    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
 
@@ -89,6 +96,18 @@ async def main():
         envs = [(args.env, env)]
     if args.task == "answer":
         assert all(hasattr(e, "canon_answer") for _, e in envs), f"{args.env} has no canon_answer; the answer task needs one"
+    if set(OLENS_CONDITIONS) & set(conditions) and args.olens_positions == "all":
+        sparse_only = [
+            f"{r.source}  ({reads.sparse_only[r.source]})"
+            for env_name, e in envs
+            for base_arm in dict.fromkeys(b for b, _ in pairs)
+            for r in e.rollouts(base_arm, args.model)
+            if r.source in reads.sparse_only
+        ]
+        assert not sparse_only, (
+            '--olens-positions all, but these base runs were not read at every token (no positions: "all" in requests.jsonl):\n'
+            + "\n".join(sparse_only)
+        )
     if set(OLENS_CONDITIONS) & set(conditions) and not args.allow_few_reads:
         few = [
             f"{env_name} {base_arm}: {k} of {len(base)}"

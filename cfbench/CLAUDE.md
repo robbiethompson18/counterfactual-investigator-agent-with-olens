@@ -55,6 +55,17 @@ the read transcripts next to it):
   position, so the predictor gets as much O-lens text but none about this scenario (the reads must
   cover 2+ envs).
 
+`--olens-positions` (default `sparse`) says which read positions the tools serve, for both
+conditions (the placebo pool is the same `Reads`). `sparse` keeps every row of a request that is not
+`positions: "all"` exactly as the job read it (stop tokens, `turn_starts` headers, whatever it was),
+and of an every-token request only template tokens (`field` null: `<|im_start|>`, role, newline,
+`<think>`, `</think>`, `<|im_end|>`) and stop tokens (the reader's PUNCT regex); so the default is
+every sparse read ever made, and a dense file adds nothing beyond that. It refuses to start if a
+transcript's reads have no surviving row. `all` keeps every row and refuses to start unless every
+base run with reads was read with `positions: "all"` in its `requests.jsonl` (the other runs and
+their file are listed), so an "every token" run never quietly mixes in sparse reads. Recorded in
+`meta.json` params as `olens_positions`.
+
 Both refuse to start if any base arm has reads on fewer than 5 runs and under 50% of its runs (e.g.
 1 of 8; 9 of 40 is fine). Read more runs. **Agents never pass `--allow-few-reads` without asking a
 human first**, even for a deliberate one-run experiment. As of 2026-10-27, 23 of 268 earlier O-lens
