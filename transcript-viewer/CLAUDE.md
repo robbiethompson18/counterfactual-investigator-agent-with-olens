@@ -127,7 +127,8 @@ not the viewer's
 in `data/reads.jsonl`), and its transcripts are rendered by vLLM's chat template from OpenAI-style
 messages rather than from WeirdChat rows, so a converter (tid and token position mapping) is needed
 before new batch reads show on the page. Nobody has needed one yet: the page shows the 345k reads
-already in `weirdchat/reads/*.jsonl`. See `CODE_SMELL.md`.
+already in `weirdchat/reads/*.jsonl`. See `CODE_SMELL.md`. Batch reads show in expview instead, with
+no converter ([docs/olens-reads-format.md](../docs/olens-reads-format.md)).
 
 ## Build and publish
 

@@ -93,9 +93,13 @@ def finish(run: Path, status: str = "done", sync: bool = True):
 
 def expview_index(run: Path):
     """Write or refresh index.jsonl in every expview run under the run dir (expview/CLAUDE.md): the public viewer reads an
-    item by byte range from items.jsonl, so it needs the offsets."""
+    item by byte range from items.jsonl, so it needs the offsets. Batch reads with a .transcripts.jsonl get their expview
+    run first."""
+    expview = Path(__file__).parents[2] / "expview"
+    if any(run.glob("*.transcripts.jsonl")):  # batch reads: an expview run pointing into them (docs/olens-reads-format.md)
+        subprocess.run([sys.executable, str(expview / "importers" / "reads.py"), str(run)], check=False)
     if any(run.rglob("items.jsonl")):
-        subprocess.run([sys.executable, str(Path(__file__).parents[2] / "expview" / "expview.py"), "index", str(run)], check=False)
+        subprocess.run([sys.executable, str(expview / "expview.py"), "index", str(run)], check=False)
 
 
 def docent(run: Path):

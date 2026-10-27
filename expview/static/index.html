@@ -302,6 +302,14 @@ function mergeOverlay(ov,base,baseD){const m={...base,id:ov.id,group:ov.group??b
   if(!base.env&&!base.env_files&&ov.env){m.env=ov.env;m.env_files=ov.env_files;m.env_d=null}
   if(ov.reads)m.extra_reads=ov.reads;if(ov.notes)m.notes=ov.notes;return m}
 const jsonl=t=>t.split("\n").filter(x=>x.trim()).map(x=>JSON.parse(x));
+const joinPath=(dir,rel)=>{const ps=dir.split("/");for(const x of rel.split("/"))x==".."?ps.pop():ps.push(x);return ps.join("/")};
+// batch-reader rows -> {pos: [read]}, as rows_to_reads in expview.py: O-lens (bullets), NLA (text), J++ (top per layer)
+function rowsToReads(rows){const out={},sc=(t,x)=>x==null?[t]:[t,x];
+  for(const r of rows){const rs=out[r.token_index]=out[r.token_index]||[];
+    if(r.bullets)rs.push({tool:"O-lens",label:"L"+r.layer,lines:r.bullets.map(b=>sc(b.text,b.fve)),score:r.joint_fve,score_name:"joint FVE",filter:r.joint_fve!=null});
+    else if(r.top)r.layers.forEach((L,j)=>rs.push({tool:"J++",label:"L"+L,lines:r.top[j]}));
+    else if(r.text!=null)rs.push({tool:"NLA",label:"L"+r.layer,lines:[sc(r.text,r.fve)],score:r.fve,score_name:"FVE",filter:r.fve!=null})}
+  return out}
 let SRC;
 function hfSource(){
   const DIR={},LIST={},SUMS={},FULL={},DOC={},TOK={},READS={};
@@ -340,12 +348,17 @@ function hfSource(){
       if(it.base&&typeof it.base=="object"){try{it=mergeOverlay(it,await self.item(it.base.d,it.base.i),it.base.d)}catch(e){console.warn(e);it.base_missing=it.base}}
       return it},
     env:(d,e)=>getJson(d,"envs/"+e+".json").then(x=>x.files),
-    async tokens(d,ref){const k=d+"\0"+ref;if(!TOK[k]){if(!DIR[d])await listing(d);
-      try{TOK[k]=await getJson(d,"tokens/"+ref+".json")}catch(e){console.warn("retrying",ref,e);TOK[k]=await getJson(d,"tokens/"+ref+".json")}}return TOK[k]},
+    // tk.src: a batch-reads item (importers/reads.py): byte ranges of its transcripts line and reads rows, paths relative to the run
+    async tokens(d,ref,tk){const k=d+"\0"+ref;if(!TOK[k]){if(!DIR[d])await listing(d);
+      if(tk&&tk.src){const part=async([rel,off,n])=>{const r=await hfFetch(HF_RESOLVE+encPath(joinPath(DIR[d],rel)),{headers:{Range:`bytes=${off}-${off+n-1}`}});
+          if(r.status!=206)throw new Error(`HF did not honour the byte range for ${rel}`);return r.text()};
+        const [t,rows]=await Promise.all([part(tk.src.transcript).then(JSON.parse),Promise.all(tk.src.reads.map(part)).then(xs=>jsonl(xs.join("")))]);
+        TOK[k]={tokens:t.tokens,sections:t.sections,reads:rowsToReads(rows)}}
+      else try{TOK[k]=await getJson(d,"tokens/"+ref+".json")}catch(e){console.warn("retrying",ref,e);TOK[k]=await getJson(d,"tokens/"+ref+".json")}}return TOK[k]},
     // every read of a dataset (the token files of its items), as search rows; overlays' extra reads live on their base transcript and are skipped
     async reads(d,prog){if(READS[d])return READS[d];if(!SUMS[d])await self.run(d);
       const its=[...SUMS[d].values()].filter(s=>s.tokens&&s.tokens.ref&&!s.base),pos=[],reads=[];let n=0,failed=0;
-      await pmap(its,8,async s=>{let T;try{T=await self.tokens(d,s.tokens.ref)}catch(e){console.warn(e);failed++;return}
+      await pmap(its,8,async s=>{let T;try{T=await self.tokens(d,s.tokens.ref,s.tokens)}catch(e){console.warn(e);failed++;return}
         const toks=(T.tokens||[]).map(String),secs=sectionOf(T.sections,toks.length);
         for(const [q,rs] of Object.entries(T.reads||{})){const p=+q;if(!(p<toks.length))continue;
           const P={d,i:s.id,pos:p,sec:secs[p],token:toks[p],ctx:toks.slice(Math.max(0,p-40),p+1).join(""),nxt:toks.slice(p+1,p+17).join(""),s};pos.push(P);
@@ -354,7 +367,7 @@ function hfSource(){
       return READS[d]={pos,reads,n_items:its.length,failed}},
     // everything an item shows (its calls' text and its token stream), for "new vs the whole item"
     async text(d,i){const it=await self.item(d,i);let t=(it.calls||[]).map(callText).join("\n\n");
-      if(it.tokens&&!it.base){try{t+="\n\n"+((await self.tokens(it.tokens.d||d,it.tokens.ref)).tokens||[]).join("")}catch{}}return t},
+      if(it.tokens&&!it.base){try{t+="\n\n"+((await self.tokens(it.tokens.d||d,it.tokens.ref,it.tokens)).tokens||[]).join("")}catch{}}return t},
     whole};
   return self}
 // ================================================================ env runs: envs/<env>/<run>/ on HF read as datasets, with attached runs stitched in
@@ -821,7 +834,7 @@ async function trView(p,keepBar){
   keepBar=keepBar&&!!$("#doc .tkbar");
   if(p.get("query")!=null&&!keepBar)TRK.q=p.get("query");
   if(!keepBar)$("#doc").innerHTML='<div class="empty">Loading the transcript…</div>';
-  let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
+  let T;try{T=await SRC.tokens(it.tokens.d||ITEM.d,it.tokens.ref,it.tokens)}catch(e){$("#doc").innerHTML=`<div class="empty">Could not load the token file ${esc(it.tokens.ref)} (${esc(e.message||e)}).${SRC.static?" A built page fetches tokens/ next to it, so open it from a server or the published Artifact.":""}</div>`;return}
   if(ITEM.it!==it||ITEM.sel.v!="tr")return;
   // an overlay's own reads and positioned notes join the base transcript's reads
   const reads=Object.assign({},T.reads||{});

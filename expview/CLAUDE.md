@@ -117,6 +117,10 @@ can emit items as they finish; `run.reset()` clears items before a re-export.
 
 ### Metamodel reads
 
+Batch reads (`scripts/olens_read_requests.py`, `jpp_read_requests.py`) need none of this:
+`runs.py finish` points an expview run at their `reads.jsonl` + `reads.transcripts.jsonl` by byte
+range (`importers/reads.py`, [docs/olens-reads-format.md](../docs/olens-reads-format.md)).
+
 Pass `tokens=` to `run.add` and the item opens on its transcript with the reads inline:
 
 ```python

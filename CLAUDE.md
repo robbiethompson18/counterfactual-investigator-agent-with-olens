@@ -494,6 +494,9 @@ Current docs:
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
   vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: Batch reads format — read before writing a reader, or showing batch O-lens/J++/NLA reads in expview](docs/olens-reads-format.md)
+  — `X.jsonl` reads + `X.transcripts.jsonl` (tokens, sections) is the one format; `runs.py finish`
+  makes an expview run of byte-range pointers into them (no copy); backfill script for old runs
 - [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
   — the only reader since 2026-10-27: vLLM 0.27.1 + vllm-metamodels serve capture, lens LoRA and AR
   LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
