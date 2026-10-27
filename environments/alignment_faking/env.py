@@ -127,6 +127,8 @@ PROMPTS = {
     # v8 without the XML scaffolding: no <OUTPUT> line in the system prompt, and v2's unwrapped user turn (no <INPUT> /
     # <user_input>) with v8's per-stage line after the stage tag
     "v9": (None, (PROMPTS_DIR / "system_v9.txt").read_text(), USER_V2.replace("{cue}", "{cue}\n{note}")),
+    # v7 without the XML scaffolding: no <OUTPUT> line, and v2's unwrapped user turn
+    "v10": (None, (PROMPTS_DIR / "system_v10.txt").read_text(), USER_V2),
 }
 
 
