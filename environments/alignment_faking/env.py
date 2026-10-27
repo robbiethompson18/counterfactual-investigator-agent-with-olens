@@ -180,3 +180,4 @@ COMPARISONS = {
     for a, b in (("paid", "free"), ("public", "preview"))
     if _arm(p, a) in ARM_FACTORS
 }
+STARRED = "settled (Kylie, 2026-10-27): original and v7 preview vs public"  # the env viewer lists it first
