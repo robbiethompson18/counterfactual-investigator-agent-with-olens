@@ -18,6 +18,8 @@ optional:
                                                     selected and grouped by factor (`--arms task=calendar`)
     items_for(arm) -> list[str]                     the arm's own items when they differ by arm (honest: each scenario
                                                     judges its own two things); items() is then the union
+    STARRED: str                                    set when the env is settled (we're happy with it, nobody is changing it):
+                                                    a one-line reason; the env viewer stars it and lists it first
     COMPARISONS: dict                               name -> {"arms": [...], "why": str, "group": str, "items": [...]}:
                                                     arm sets worth viewing side by side (the env viewer); arms the env
                                                     doesn't have are dropped
