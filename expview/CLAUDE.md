@@ -231,6 +231,7 @@ Every view is a URL hash, so anything on screen can be linked (the Copy link but
 | `&query=REGEX` (`&case=1`)                                               | highlight a regex in reads (transcript) or text (calls)                 |
 | `#search=1&query=REGEX&novel=ctx&dataset=...`                            | a search over the datasets in `dataset` (comma-separated)               |
 | `&experiment=ENV&scope=text&reader=R&section=S&group=G&label=K=V&page=N` | search filters (the Search page's form)                                 |
+| `#everything=1&query=REGEX` (`&scope=reads\|text`, same filters)         | Search everything (needs the search server, below)                      |
 
 Keys are full words since 2026-10-26; the old one-letter keys (`#d=…&i=…&t=…`, `#s=1&q=…`) are
 rewritten to these on load, so every old link still works ([docs/viewers.md](../docs/viewers.md),
@@ -258,8 +259,39 @@ fetches each hit item). The table shows, per dataset and group, how many items h
 yes/no label's rate among them vs overall. Results link to the token; CSV export of all matching
 reads. Overlay items' own extra reads aren't searched (they live on another run's transcript).
 
-A regex over millions of reads at once (every run, Celeste's parquet) is a `grep` or a Python script
-over the files, not a web feature ([docs/viewers.md](../docs/viewers.md)).
+### Search everything (the search server)
+
+Kylie's exception to "no backend" (2026-10-27, [docs/viewers.md](../docs/viewers.md)): **Search
+everything** (`#everything=1&query=REGEX`, the same filter keys as Search, `scope=reads|text`) runs
+one regex over every metamodel read, every env episode's transcript and judge labels, and every
+expview run's transcripts and judge calls, answered by `search_server.py` on bramble. A hit links to
+the episode (`#env=E&run=R&episode=ID&query=`) or the item / token (`#dataset=…&item=…&token=…`) on
+the normal pages, which read HF, so a run indexed from the local mirror but never synced won't
+open. The top-bar button and the home-page search box appear only when the server answers
+`/api/ping` within 1.5 s: on the copy of the page the server itself serves (same origin, http), or
+anywhere localStorage `expview:search_server` holds its URL (GitHub Pages is https and can't call
+it).
+
+How it works: `expview.py search RUN` writes a run's `search.jsonl.gz` (id, group, labels, token
+stream, reads `[pos, tool, label, text]`, call texts; every distinct string once, later uses are its
+index). The server indexes every run under `--data` (env runs `envs/<env>/<run>`, expview runs
+`runs/**/items.jsonl`, batch reads through their expview pointers) into `--cache`, rebuilding a run
+whose source files are newer, every 10 minutes (or on `POST /api/reload`). Each run's distinct
+strings, plus each token stream joined, go to a NUL-separated file that `rg --null-data` scans (Rust
+regex, PCRE2 as fallback); hits are mapped back to reads and items in Python. On 2026-10-27: ~2 s
+per query over 690 runs, 366k items, 11.7M reads, ~2.5 GB RSS. `/api/search` returns totals, the
+per-(run, group) table, facets and one page of hits; `/api/csv` every matching read.
+
+```bash
+uv run python expview/search_server.py --data data --site SITE --port 8840
+```
+
+`SITE` holds only the two pages, `index.html` (= `environments/_lib/page.html`) and
+`expview/index.html` (= `static/index.html`); copy them again after changing either. It runs in the
+tmux session `expview-search` on bramble. The data is whatever `data/` holds: runs made on bramble
+land there; pull others with `hf download`.
+
+A regex outside these runs (Celeste's parquet) is still a `grep` or a Python script over the files.
 
 ## Importers
 
@@ -295,5 +327,7 @@ existing deep links. `deploy.sh` still deploys the same file to Cloudflare
 - `static/index.html`: the whole UI, no build step: the HF data layer (tree API listing, resolve
   URLs, byte-range items), the run / item / transcript views and the in-browser search. `build`
   embeds one run's data into the same file.
+- `search_server.py`: the Search everything server (bramble only); `expview.py search` writes the
+  per-run files it indexes.
 - `deploy.sh`: Cloudflare Pages (the old expview.pages.dev; GitHub Pages is the workflow).
 - `importers/`: other datasets → runs.

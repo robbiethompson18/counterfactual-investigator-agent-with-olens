@@ -29,6 +29,7 @@ CLI:
     python expview/expview.py index PATH...              # (re)write index.jsonl for every run under PATH whose index is stale
     python expview/expview.py link RUN [--item ID] [--token N] [--call N] [--q REGEX]
     python expview/expview.py ls                         # every run under the roots, with its dataset id
+    python expview/expview.py search RUN...              # (re)write search.jsonl.gz, what the page's Search reads
 
 Only the standard library is used.
 """
@@ -395,6 +396,149 @@ class Run:
         (self.path / "episodes.jsonl").unlink(missing_ok=True)
 
 
+# ---------------------------------------------------------------- search files
+
+SEARCH_FILE = "search.jsonl.gz"
+JUDGE_RX = re.compile(r"judge|grader|grading|classif|monitor|scor|rater|critic|verdict", re.IGNORECASE)  # as in static/index.html
+
+
+def _short(v):
+    return v is None or isinstance(v, (bool, int, float)) or (isinstance(v, str) and len(v) <= 40)
+
+
+def _content(c) -> str:
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return "\n".join(p.get("text") or "" if isinstance(p, dict) else str(p) for p in c)
+    return "" if c is None else json.dumps(c)
+
+
+def message_texts(msgs, output=None) -> list[str]:
+    """A call's text, one string per message (reasoning, content, tool calls), as callText in static/index.html."""
+    out = []
+    for m in msgs or []:
+        tcs = [
+            f"{t.get('name') or (t.get('function') or {}).get('name')} {t.get('arguments') or (t.get('function') or {}).get('arguments')}"
+            for t in m.get("tool_calls") or []
+        ]
+        out.append("\n".join(x for x in [m.get("reasoning") or "", _content(m.get("content")), *tcs] if x))
+    if output is not None:
+        out.append(_content(output.get("content")) if isinstance(output, dict) else _content(output))
+    return [t for t in out if t]
+
+
+class _Strings:
+    """Each text is written once per file; later uses are its index (the n-th distinct string written), so a system prompt
+    shared by a whole arm, or an O-lens bullet repeated at every position, costs one copy."""
+
+    def __init__(self):
+        self.seen = {}
+
+    def __call__(self, t):
+        if t in self.seen:
+            return self.seen[t]
+        self.seen[t] = len(self.seen)
+        return t
+
+
+def _write_search(path: Path, header: dict, lines) -> int:
+    n, tmp = 0, path.with_name(path.name + ".tmp")
+    with gzip.open(tmp, "wt", compresslevel=9) as f:
+        f.write(json.dumps(header) + "\n")
+        for x in lines:
+            f.write(json.dumps(x, separators=(",", ":")) + "\n")
+            n += 1
+    os.replace(tmp, path)
+    return n
+
+
+def write_search(run: Path, out: Path | None = None) -> int:
+    """(Re)write RUN/search.jsonl.gz, what the page's Search reads instead of every token file and items.jsonl: a header,
+    then one line per item: i (id), g (group), l (short labels), ep (env episode pointer), t + s (token stream, sections),
+    r (reads: [pos, tool, label, text]), c (calls: [name, [message texts]]; the transcript is the token stream when there is
+    one, so then only judge calls). Strings are deduplicated (_Strings). Works on an expview run or an env run. search_server.py
+    builds these for every run in the data mirror."""
+    run = Path(run)
+    out = Path(out or run / SEARCH_FILE)
+    if (run / "episodes" / "index.json").exists():
+        return _write_env_search(run, out)
+    info, S = run_info(run), _Strings()
+
+    def lines():
+        for it in iter_items(run):
+            x = {"i": str(it["id"]), "g": it.get("group"), "l": {k: v for k, v in (it.get("labels") or {}).items() if _short(v)}}
+            if ep := episode_of(it, info):
+                x["ep"] = ep
+            if (tk := it.get("tokens")) and not it.get("base"):
+                T = load_tokens(run, tk)
+                x["t"], x["s"] = [S(str(t)) for t in T.get("tokens") or []], T.get("sections") or []
+                x["r"] = [
+                    [
+                        int(p),
+                        S(str(r.get("tool"))),
+                        r.get("label"),
+                        S("\n".join(str(ln[0] if isinstance(ln, list) else ln) for ln in r.get("lines") or [])),
+                    ]
+                    for p, rs in (T.get("reads") or {}).items()
+                    for r in rs
+                ]
+            x["c"] = [
+                [c.get("name") or "", [S(t) for t in message_texts(c.get("messages"), c.get("output"))]]
+                for c in it.get("calls") or []
+                if "t" not in x or JUDGE_RX.search(c.get("name") or "")
+            ]
+            yield x
+
+    return _write_search(out, {"v": 1, "kind": "expview", "title": info.get("title")}, lines())
+
+
+def _write_env_search(run: Path, out: Path) -> int:
+    """An env run: one line per episode, group = arm, its subject messages and each judge labeler's call (the newest
+    labels/<labeler>@*.jsonl, as the page picks them)."""
+    meta = json.loads((run / "meta.json").read_text())
+    by = {}
+    for f in sorted((run / "labels").glob("*.jsonl")):
+        by.setdefault(f.name.split("@")[0], []).append(f)
+    lab = {}
+    for name, fs in by.items():
+        for line in fs[-1].read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                lab.setdefault(r["episode"], {})[name] = r
+    S = _Strings()
+
+    def lines():
+        for shard in sorted((run / "episodes").glob("*.jsonl")):
+            for raw in shard.open():
+                ep = json.loads(raw)
+                L, labels = lab.get(ep["id"], {}), {}
+                for name, r in L.items():
+                    for k, v in (r.get("values") or {}).items():
+                        if _short(v) if name == "measure" else isinstance(v, (bool, int, float)):
+                            labels[k if name == "measure" else f"{name}.{k}"] = v
+                calls = [["subject", [S(t) for t in message_texts(ep.get("messages"))]]]
+                for name, r in L.items():  # a judge's exact call when the labeler saved it, and any long values (reasons)
+                    c = (r.get("calls") or [{}])[0]
+                    texts = message_texts(c.get("messages"), c.get("output")) + [
+                        v for v in (r.get("values") or {}).values() if not _short(v) and isinstance(v, str)
+                    ]
+                    if texts:
+                        calls.append([name if name == "measure" else f"judge: {name}", [S(t) for t in texts]])
+                yield {"i": ep["id"], "g": ep.get("arm"), "l": labels, "c": calls}
+
+    tgt = meta.get("target")
+    hdr = {
+        "v": 1,
+        "kind": "env",
+        "env": run.parent.name,
+        "run": run.name,
+        "target": tgt.get("id") if isinstance(tgt, dict) else tgt,
+        "thinking": meta.get("thinking"),
+    }
+    return _write_search(out, hdr, lines())
+
+
 # ---------------------------------------------------------------- reading
 
 
@@ -680,6 +824,8 @@ def main():
     lk.add_argument("--call", type=int, help="call index (0-based)")
     lk.add_argument("--q", help="regex to highlight")
     sub.add_parser("ls", help="list every run under the roots with its dataset id")
+    se = sub.add_parser("search", help="write search.jsonl.gz (what the page's Search reads) for each expview or env run dir given")
+    se.add_argument("run", nargs="+")
     a = ap.parse_args()
     if a.cmd == "build":
         build(a.run, a.out, Path(a.ids).read_text().split() if a.ids else None)
@@ -697,6 +843,10 @@ def main():
                     print(f"{d}: {write_index(d)} items indexed")
     elif a.cmd == "link":
         print(link(a.run, a.item, a.token, a.call, a.q))
+    elif a.cmd == "search":
+        for r in a.run:
+            n = write_search(Path(r))
+            print(f"{r}: {n} items, {(Path(r) / SEARCH_FILE).stat().st_size / 1e6:.2f} MB")
     elif a.cmd == "ls":
         for d, p in sorted(discover().items()):
             print(f"{d}\t{p}")
