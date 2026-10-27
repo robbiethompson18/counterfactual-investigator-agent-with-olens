@@ -1,5 +1,7 @@
 # games (chess + tictactoe) on the donehack podman sandbox
 
+**Status (2026-10-26):** REFERENCE. A pilot: n = 3 per config under a $2.50 cap, not a rate.
+
 Source: `$AIE_DIR` (gkroiz/agent-interp-envs @ 310c03f): `environments/games/` (`agent.py`,
 `run_step.py`, `states.py`,
 `{chess,tictactoe}/{Dockerfile,entrypoint.py,game.py,game_hint.py,opponent_packages/}`) and

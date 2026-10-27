@@ -1,5 +1,7 @@
 # evalcue: multi-arm behavioral environments on Qwen3.6-27B
 
+**Status (2026-10-26):** ACTIVE.
+
 Started as "does an incidental eval cue make Qwen3.6-27B reward hack?" and now hosts any env where
 small edits (arms) might move a behavior: reward hacking, self-preservation, whistleblowing, hiring
 bias, hiding mistakes from users. The name stuck; a rename is pending.
@@ -75,3 +77,24 @@ Fallback for comparison: if Qwen won't move, `EVALCUE_MODEL=anthropic/claude-hai
 `google/gemini-3.5-flash-lite` sends the same env to OpenRouter (needs `OPENROUTER_API_KEY`; the
 sampling defaults are Qwen's, and thinking maps to OpenRouter's `reasoning.enabled`). Use a separate
 `--tag` per model.
+
+## Environment variables (`evalcue/harness.py`)
+
+- `EVALCUE_MODEL`: `qwen` (default: the shared vLLM server at `QWEN_VLLM_URL`, `runpod/CLAUDE.md`)
+  or an OpenRouter model id.
+- `EVALCUE_PROVIDER`: pin OpenRouter to one provider slug (e.g. `deepinfra/fp8`, no fallbacks) so a
+  run's rates don't mix quantizations; recorded in `meta.json` as `served_by`.
+- `EVALCUE_EFFORT`: OpenRouter `reasoning.effort` when thinking is on; `medium` by default (the repo
+  rule; provider defaults differ, GLM 5.3's is max).
+- `EVALCUE_SAMPLING=on|off`: use that thinking mode's Qwen sampling whatever `--thinking` says, so a
+  thinking on/off comparison changes only the (empty) think block. The OpenRouter path drops `top_k`
+  either way (CODE_SMELL.md, 2026-10-23).
+- `EVALCUE_RAW_PREFILL=1`: thinking off on an OpenRouter model whose endpoint refuses
+  `reasoning.enabled=false` (GLM 5.3): renders the chat template by hand, prefills an empty think
+  block and samples through the raw completions endpoint; single-turn, no tools.
+  `EVALCUE_RAW_PROVIDERS` lists the providers that take the prompt as is.
+
+Also: `evalcue.show --no-reasoning` hides CoTs;
+`evalcue/resume.py ENV TAG N SEED CONCURRENCY OLD_ROWS...` reruns only the (arm, item, sample) jobs
+of a run that have no scored row, into a new run dir; `evalcue/ctf.Dockerfile` is the sandbox image
+for the InterCode-CTF variant of metadata_honeypot.

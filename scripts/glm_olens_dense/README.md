@@ -1,5 +1,8 @@
 # GLM-5.3 O-lens reads in Celeste's format
 
+**Status (2026-10-26):** ACTIVE. The pipeline runs on bramble and a 4xB200 box, Kylie's compute;
+Robbie's agents use RunPod (`runpod/CLAUDE.md`).
+
 Reads Celeste's GLM-5.3 oracle lens
 ([ceselder/glm-5.3-olens-lens](https://huggingface.co/ceselder/glm-5.3-olens-lens), RL checkpoint
 `rl1b_rl1b_2_step_0100`) over our transcripts and writes tables with the schema of her
@@ -12,6 +15,7 @@ Reads Celeste's GLM-5.3 oracle lens
 | `prep.py`                     | bramble | positions to read: every punctuation / newline token (her `is_punct`) + every template/special token (id >= 154820), index >= 2, < 32,768; exact-prefix duplicates read once (`dense_prefix_dups.parquet`). Tool schemas rebuilt from the realism harness (`realvariants` / `email_env.build`), checked against each row's system prompt |
 | `make_jobs.py`                | bramble | worker job files; `--per-episode K` = K positions per episode evenly spaced over its candidates (full-episode order, late view = tail)                                                                                                                                                                                                   |
 | `worker.py` + `grammar_lp.py` | GPU box | boots her engine (`olens_glm53_usage.GlmOlensEngine` from the lens repo + the `vllm-metamodels` glm53 fork shipped there) once, then for each job: capture block 51 of the unmerged base, merge the RL lens, greedy + 4 samples at T=1                                                                                                   |
+| `select_2026_10_25_late.py`   | bramble | Kylie's 2026-10-25 23:07 selection: half the episodes per (arm, item) at seed 0, punctuation + template tokens, no whitespace-only tokens; Donation Bet's 168-row sample plus the first 6 reply tokens                                                                                                                                   |
 | `collect.py`                  | bramble | joins worker outputs with prep positions -> `readouts_dense.parquet`, `episodes.parquet`, `dense_prefix_dups.parquet`, an empty `readouts.parquet`                                                                                                                                                                                       |
 
 Box setup (4xB200; ~10 min engine boot from /dev/shm, 3-4 min once compiled):

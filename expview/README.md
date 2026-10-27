@@ -1,5 +1,8 @@
 # expview: the project's transcript viewer
 
+**Status (2026-10-26):** ACTIVE. The bramble service is Kylie's; off the tailnet use
+`expview.py build`.
+
 One viewer for every run: transcripts Docent-style, the exact input and output of every model call
 (subject model, LLM judges, graders), the environment's files, and metamodel reads (O-lens, J-lens,
 NLA, any reader) inline at the tokens they were read at. Regex search runs across every read in
@@ -80,7 +83,8 @@ tokens = {
 - Optional: `"filter": true` + `"score"` on a read and `"min_score"` on the object add a min-score
   box (e.g. FVE).
 - `run.json` `readers: {"O-lens": {"about": "markdown", "color": "#2f5d8a"}}` documents each reader
-  in the side panel; `"hidden": true` starts that reader's checkbox unticked (e.g. an unreliable lens).
+  in the side panel; `"hidden": true` starts that reader's checkbox unticked (e.g. an unreliable
+  lens).
 
 ### The format on disk
 
@@ -118,8 +122,8 @@ panel beside the transcript: parsed verdict, reply, reasoning, and a link to the
 
 ### Overlays: judging or annotating another run's transcripts
 
-A run of judge calls (or notes, or extra reads) over transcripts another dataset already shows,
-e.g. Celeste's O-lens imports, shouldn't copy them. Give each item a `base` instead:
+A run of judge calls (or notes, or extra reads) over transcripts another dataset already shows, e.g.
+Celeste's O-lens imports, shouldn't copy them. Give each item a `base` instead:
 
 ```python
 run.add(
@@ -172,8 +176,8 @@ all matching reads.
 
 Index: `data/expview/index.duckdb` (`index.py`; tables `items`, `labels`, `positions`, `reads`,
 `texts`). It is a cache of the run dirs, but never delete or replace the live one while the server
-runs: until a rebuild reaches a dataset, every link to it says "no dataset". DuckDB keeps the space of
-re-indexed runs, so compact by building a new file (the server keeps serving the old one), then
+runs: until a rebuild reaches a dataset, every link to it says "no dataset". DuckDB keeps the space
+of re-indexed runs, so compact by building a new file (the server keeps serving the old one), then
 restart the server on it:
 
 ```
@@ -189,6 +193,9 @@ uv run --script expview/index.py --db data/expview/index.new.duckdb   # minutes;
   item is a transcript view, re-tokenised with GLM-5.3's tokenizer, with RL / SFT O-lens, J-lens L60
   / L51 and both Qwen readers at every read position, plus the source run's calls (subject
   transcript, judges) and environment when that run is on disk. Command in its docstring.
+- `importers/evalcue_rows.py`: an evalcue run's `rows.jsonl` → one item per row, the episode as its
+  call, the workspace before / after as its environment, the detector's flags as labels, and its
+  Docent link.
 
 A new source gets its own `importers/<name>.py` writing runs with `Run`; keep the run format the
 only thing the server reads.

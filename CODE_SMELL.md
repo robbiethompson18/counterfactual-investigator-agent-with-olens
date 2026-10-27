@@ -116,7 +116,7 @@ matches, so safe, but each new stacked arm means editing several tuples.
 `Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
 backend hard-codes NixOS store paths and is kept only for comparison with those runs.
 
-## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code (resolved: the split, hopeless and pressure arms are in `evalcue/envs/secret_number/__init__.py` on main)
 
 Resolved 2026-10-26 by deletion: the adapter and `evalcue/envs/secret_number/` are gone (last at
 commit `7296169`); the rows stay on HF with no code on main behind them.
@@ -133,13 +133,11 @@ hacks in these rows).
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
 (`"backfilled": true`) once the agents producing them finish:
 
-- robbie-box `~/envs-results/` (agent-interp-envs screens): funding_email, sandbagging (screen and
+- robbie-box `~/envs-results/` (agent-interp-envs screens): funding*email, sandbagging (screen and
   iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
-  `runs/<env>/<date>_{screen,iter}/`. Still only on the box: `optimize_cache_c` (2.2 GB, retired
-  env, skipped on purpose), the `plumbing*` and `fe_smoke_*` smoke tests, and the gateway logs in
-  `~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml` says
-  `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls elsewhere, so don't
-  trust it for which server answered.
+  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env, skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml`says`provider:
+  fireworks`even when`scripts/envs_gateway.py` routed the calls elsewhere, so don't trust it for
+  which server answered.
 - Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
   `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
   local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose
