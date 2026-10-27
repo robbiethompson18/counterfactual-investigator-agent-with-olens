@@ -8,7 +8,7 @@
                                         and strings over 8 KB once per env as {"$f": sha1} -> spec/blobs/<sha1>.txt
                                         (overeagerness repeats MBs of sandbox logs in every arm)
     envs/<env>/links.json               per run: episode id -> [Docent agent_run id, primary value], so the page links a
-                                        comparison's rollouts without reading episode shards; plus the run's expview dataset
+                                        comparison's rollouts without reading episode shards; plus which episodes have O-lens reads
 
 `index` rebuilds the spec when the env's source hash changed (env folder + environments/_lib), so it costs nothing
 after a run. `spec --out DIR` builds every env's spec from the code alone into DIR/<env>/ plus DIR/index.json (the env
@@ -28,7 +28,6 @@ from .runfolder import LOCAL, REPO_ROOT, git_sha
 
 BLOB_MIN, FILE_MIN = 256, 8192
 SOURCE_SUFFIXES = {".py", ".txt", ".json", ".jsonl", ".md", ".yaml", ".yml", ".toml", ".html", ".sh"}
-EXPVIEW_BASE = "https://expview.pages.dev/"
 
 
 def comparisons(mod) -> list[dict]:
@@ -205,20 +204,6 @@ def build_site(out: Path, only: list[str] | None = None) -> Path:
     return p
 
 
-def expview_dataset(env: str, run: str, meta: dict) -> str | None:
-    """The run's expview dataset id (runs/<exp>/<run>[/<name>]): its own export (expview_export.py, items are episode
-    ids) or else a converted run's old one (items named differently), if it exists locally (data/runs/.../items.jsonl)."""
-    cands = [f"runs/env_{env}/{run}/expview"]
-    src = meta.get("converted_from")
-    for s in [src] if isinstance(src, str) else (src or []):
-        cands.append(s.removeprefix("data/") + "/expview")
-    for c in cands:
-        d = REPO_ROOT / "data" / c
-        if (d / "items.jsonl").exists():
-            return c.removesuffix("/expview").replace("/expview/", "/")
-    return None
-
-
 def read_overlays(env: str, runs: set[str]) -> dict:
     """Metamodel-read datasets that cover this env's episodes: every expview run under data/runs/<env>/ whose items say
     {"extra": {"source": "envs/<env>/<run>", "episode": <episode id>}} (the O-lens read exports do). -> {run: {episode:
@@ -263,17 +248,13 @@ def build_links(env: str) -> Path | None:
             eps[ep["id"]] = [ep.get("docent_run"), v]
         runs[run_dir.name] = {
             "docent_collection": meta.get("docent_collection"),
-            "expview": expview_dataset(env, run_dir.name, meta),
-            "expview_items": (REPO_ROOT / f"data/runs/env_{env}/{run_dir.name}/expview/items.jsonl").exists(),
             "reads": reads.get(run_dir.name, {}),  # episode -> [expview dataset, item] with metamodel (O-lens) reads
             "target": (meta.get("target") or {}).get("id"),
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
         }
-    by_arm = REPO_ROOT / f"data/runs/env_{env}/by_arm/expview"  # expview_export.export_arms: one view per arm, every run
-    arms = {arm: f"runs/env_{env}/by_arm/{slug(arm)}" for arm in mod.ARMS if (by_arm / slug(arm) / "items.jsonl").exists()}
     p = LOCAL / env / "links.json"
-    p.write_text(json.dumps({"env": env, "expview_base": EXPVIEW_BASE, "arms": arms, "runs": runs}, separators=(",", ":")) + "\n")
+    p.write_text(json.dumps({"env": env, "runs": runs}, separators=(",", ":")) + "\n")
     return p
 
 

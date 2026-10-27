@@ -6,7 +6,6 @@
     uv run python -m environments spec [ENV ...] [--force]  # rebuild envs/<env>/spec/ (every arm, built) + links.json
     uv run python -m environments spec --out DIR            # every env's spec from code alone (the Pages workflow)
     uv run python -m environments view [ENV ...] [--port N]  # the env viewer on localhost, from your working tree
-    uv run python -m environments expview ENV[/RUN] [...] [--upload]  # runs as an expview dataset (runs/env_<env>/<run>)
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
 
@@ -273,10 +272,6 @@ def cli():
             return
         for p in build_spec([r for r in rest if r != "--force"] or None, force="--force" in rest):
             print(p)
-    elif cmd == "expview":
-        from .expview_export import cli as expview_cli
-
-        expview_cli(rest)
     elif cmd == "view":
         from .view import cli as view_cli
 

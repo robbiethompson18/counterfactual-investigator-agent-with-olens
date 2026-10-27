@@ -67,8 +67,11 @@ Checked and rejected the same day:
 | ------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
 | CHIVE cases                           | https://chive-cases.pages.dev                                                                   | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in                            |
 | O-lens token viewer                   | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
-| expview (runs, judge I/O, reads)      | https://expview.pages.dev                                                                       | `expview/static/index.html`, `expview/deploy.sh`                                   | `runs/**/expview/`                  |
+| expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html`, `.github/workflows/env-viewer-pages.yml`              | `envs/*/*/`, `runs/**/expview/`     |
 | env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html`, `.github/workflows/env-viewer-pages.yml`            | `envs/*/spec/`, `envs/*/links.json` |
+
+The old expview page, https://expview.pages.dev (Cloudflare), still works but is frozen at its
+2026-10-26 code; expview now deploys with the env viewer to GitHub Pages under `/expview/`.
 
 Still to decide (2026-10-26): whether the three pages share code for URL params, HF fetching and
 transcript rendering, and whether any two of them are one page.
