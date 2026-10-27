@@ -139,11 +139,24 @@ function setParam(k, v) {
 
 // ---------------------------------------------------------------- data
 
-async function envData(env) {
+// retired arms (RETIRED in env.py) are left out of comparisons, rates and runs unless the hash has retired=show
+async function envData(env, h = {}) {
   const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getJSON(`${env}/spec/env.json`)), maybe(getJSON(`${env}/links.json`))]);
   if (!idx && !spec) throw new Error(`no index or spec for ${env}`);
-  return {env, idx: idx || {runs: [], pairs: {}, arms: spec.arms, arm_factors: spec.arm_factors, primary: spec.primary, title: env},
-          spec, links: links || {runs: {}}};
+  const D = {env, idx: idx || {runs: [], pairs: {}, arms: spec.arms, arm_factors: spec.arm_factors, primary: spec.primary, title: env},
+             spec, links: links || {runs: {}}, showRetired: h.retired === "show"};
+  const R = new Set(spec?.retired || []);
+  if (R.size && !D.showRetired) {
+    const live = a => !R.has(a);
+    const seen = new Set();  // a set that shrinks to an earlier comparison's arms is dropped
+    D.spec = {...spec, comparisons: spec.comparisons.map(c => ({...c, arms: c.arms.filter(live)}))
+      .filter(c => c.arms.length >= 2 && !seen.has(c.arms.join()) && seen.add(c.arms.join()))};
+    D.idx = {...D.idx, runs: D.idx.runs.map(r => ({...r, arms: Object.fromEntries(Object.entries(r.arms).filter(([a]) => live(a)))}))
+      .filter(r => Object.keys(r.arms).length)};
+  }
+  D.retiredNote = R.size ? `<span class="mute">${R.size} retired arms (RETIRED in env.py) ${D.showRetired ? "shown" : "hidden"}:
+    <a href="#${setParam("retired", D.showRetired ? "" : "show")}">${D.showRetired ? "hide" : "show"} them</a></span>` : "";
+  return D;
 }
 // a run's target model plus its thinking mode: never pool thinking on with off (different rates)
 const targetKey = r => r.target + (r.thinking === false ? " · thinking off" : r.thinking === true ? " · thinking on" : "");
@@ -325,11 +338,11 @@ function tabs(env, on) {
 async function envPage(h) {
   const env = h.env, tab = h.tab || "compare";
   $("crumb").textContent = "/ " + env;
-  const D = await envData(env);
+  const D = await envData(env, h);
   const head = `<p>${esc(D.idx.title)}. Primary measure <span class="mono">${esc(D.idx.primary)}</span>${D.spec?.behavior ? `: ${esc(D.spec.behavior)}` : ""}</p>`;
   if (!D.spec && tab !== "runs") { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
   const body = {compare: compareList, arms: armsTab, runs: runsTab, about: aboutTab, source: sourceTab}[tab];
-  $("view").innerHTML = head + tabs(env, tab) + '<div id="tab"></div>';
+  $("view").innerHTML = head + tabs(env, tab) + (D.retiredNote ? `<p>${D.retiredNote}</p>` : "") + '<div id="tab"></div>';
   await body(D, h);
 }
 
@@ -340,15 +353,15 @@ function compareList(D) {
   $("tab").innerHTML = `<p class="mute">PAIRS are the env's declared clean counterfactuals; sets are arm groups worth viewing side by side (<span class="mono">COMPARISONS</span> in env.py).
     Each cell is the primary rate pooled over runs, per target model. Click one to see what changes and the rollouts.</p>` +
     Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="scroll"><table><tr><th>comparison</th><th>arms</th>${P.targets.map(t => `<th class="mono">${esc(t.replace(/@[^ ]*/, ""))}</th>`).join("")}</tr>
-    ${cs.map(c => `<tr class="click" onclick="location.hash='${hashOf({env: D.env, compare: c.name})}'"><td><b>${esc(c.name)}</b>${c.why ? `<br><span class="mute">${esc(c.why)}</span>` : ""}${c.items ? `<br><span class="mute">${c.items.length} items</span>` : ""}</td>
+    ${cs.map(c => `<tr class="click" onclick="location.hash='${hashOf({env: D.env, compare: c.name, retired: D.showRetired ? "show" : null})}'"><td><b>${esc(c.name)}</b>${c.why ? `<br><span class="mute">${esc(c.why)}</span>` : ""}${c.items ? `<br><span class="mute">${c.items.length} items</span>` : ""}</td>
       <td class="mono">${c.arms.map(a => esc(a) + retiredTag(D, a)).join("<br>")}</td>${P.targets.map(t => `<td class="mono">${c.arms.map(a => cell(a, t)).join("<br>")}</td>`).join("")}</tr>`).join("")}
     </table></div>`).join("");
 }
 
 async function comparePage(h) {
-  const D = await envData(h.env);
+  const D = await envData(h.env, h);
   const c = D.spec.comparisons.find(x => x.name === h.compare);
-  if (!c) throw new Error("no comparison " + h.compare);
+  if (!c) throw new Error(`no comparison ${h.compare}` + (D.showRetired ? "" : " (it may only have retired arms: add &retired=show)"));
   $("crumb").textContent = `/ ${h.env} / ${c.name}`;
   const P = pooled(D.idx);
   const baseArm = h.base && c.arms.includes(h.base) ? h.base : c.arms[0];
@@ -356,14 +369,14 @@ async function comparePage(h) {
   const shared = itemsOf(D.spec, baseArm).filter(it => itemsOf(D.spec, other).includes(it));
   const items = c.items ? shared.filter(it => c.items.map(String).includes(it)) : shared;
   const item = items.includes(h.item) ? h.item : items[0];
-  const go = o => "#" + hashOf({env: h.env, compare: c.name, base: baseArm === c.arms[0] ? null : baseArm, other, item, ...o});
+  const go = o => "#" + hashOf({env: h.env, compare: c.name, base: baseArm === c.arms[0] ? null : baseArm, other, item, retired: h.retired, ...o});
   const usedT = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]));
   const pct = p => p && p.n ? p.k / p.n : null;
   // which sections differ from the base arm, per arm (on this item): the set's "what changes" overview
   const eps = await Promise.all(c.arms.map(a => built(h.env, a, item).catch(() => null)));
   const sb = eps[c.arms.indexOf(baseArm)] ? sections(eps[c.arms.indexOf(baseArm)]) : [];
   const changes = c.arms.map((a, i) => !eps[i] ? null : pairSections(sb, sections(eps[i])).filter(p => !p.same).map(p => p.name));
-  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← ${esc(h.env)} comparisons</a> · ${c.kind === "pair" ? "pair (PAIRS)" : "set"}${c.why ? ` · ${esc(c.why)}` : ""}</p>
+  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← ${esc(h.env)} comparisons</a> · ${c.kind === "pair" ? "pair (PAIRS)" : "set"}${c.why ? ` · ${esc(c.why)}` : ""}${D.retiredNote ? " · " + D.retiredNote : ""}</p>
   <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th class="mono">${esc(t)}<br><span style="font-weight:400">all items · this item</span></th>`).join("")}</tr>
   ${c.arms.map((a, i) => {
     const isB = a === baseArm;
@@ -405,15 +418,14 @@ function perItemTable(D, P, a, b, targets, items, go) {
 function armsTab(D, h) {
   const F = D.spec.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
   const filt = Object.fromEntries(keys.filter(k => h[k]).map(k => [k, h[k]]));
-  const R = new Set(D.spec.retired || []), showRetired = h.retired === "show";
+  const R = new Set(D.spec.retired || []), showRetired = D.showRetired;
   const keep = arm => (showRetired || !R.has(arm)) && Object.entries(filt).every(([k, v]) => (F[arm] || {})[k] === v);
   const P = pooled(D.idx);
   const arms = D.spec.arms.filter(keep);
   const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
     [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
   $("tab").innerHTML = `${keys.length ? `<div class="row">Filter by factor: ${keys.map(sel).join(" ")}</div>` : ""}
-  <div class="row">Tick two arms to diff them: <button id="dodiff" disabled>diff</button> <span class="mute">${arms.length} arms</span>
-    ${R.size ? `<span class="mute">· ${R.size} retired arms (RETIRED in env.py) ${showRetired ? "shown" : "hidden"}: <a href="#${setParam("retired", showRetired ? "" : "show")}">${showRetired ? "hide" : "show"} them</a></span>` : ""}</div>
+  <div class="row">Tick two arms to diff them: <button id="dodiff" disabled>diff</button> <span class="mute">${arms.length} arms</span></div>
   <div class="scroll"><table><tr><th></th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>items</th>${P.targets.map(t => `<th class="mono">${esc(t.replace(/@[^ ]*/, ""))}</th>`).join("")}</tr>
   ${arms.map(a => `<tr><td><input type="checkbox" class="pick" value="${esc(a)}"></td><td class="mono"><a href="#${hashOf({env: D.env, arm: a})}">${esc(a)}</a>${retiredTag(D, a)}</td>
     ${keys.map(k => `<td class="mono">${esc((F[a] || {})[k] || "")}</td>`).join("")}<td>${itemsOf(D.spec, a).length}</td>
@@ -425,7 +437,7 @@ function armsTab(D, h) {
 }
 
 async function armPage(h) {
-  const D = await envData(h.env), arm = h.arm;
+  const D = await envData(h.env, h), arm = h.arm;
   $("crumb").textContent = `/ ${h.env} / ${arm}`;
   const items = itemsOf(D.spec, arm), item = items.includes(h.item) ? h.item : items[0];
   const ep = await built(h.env, arm, item);
@@ -448,7 +460,7 @@ async function armPage(h) {
 }
 
 async function diffPage(h) {
-  const D = await envData(h.env), [a, b] = h.diff.split(",");
+  const D = await envData(h.env, h), [a, b] = h.diff.split(",");
   $("crumb").textContent = `/ ${h.env} / ${a} vs ${b}`;
   const items = itemsOf(D.spec, a).filter(it => itemsOf(D.spec, b).includes(it)), item = items.includes(h.item) ? h.item : items[0];
   $("view").innerHTML = `<p><a href="#env=${h.env}&tab=arms">← ${esc(h.env)} arms</a> · <a href="#${hashOf({env: h.env, diff: b + "," + a, item})}">swap</a></p>
@@ -490,7 +502,7 @@ async function sourceTab(D, h) {
 
 async function runPage(env, run, arm, epId) {
   $("crumb").textContent = `/ ${env} / ${run}`;
-  const D = await envData(env);
+  const D = await envData(env, {retired: "show"});  // a run page shows the run whatever its arms
   const r = D.idx.runs.find(x => x.run === run);
   const epIdx = await getJSON(`${env}/${run}/episodes/index.json`);
   const ids = Object.keys(epIdx);
