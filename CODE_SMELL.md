@@ -14,6 +14,22 @@ together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Dro
 nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
 `groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
 
+## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
+
+- `runpod/pod.sh ssh` has no `ConnectTimeout`, so a pod whose proxy accepts TCP before sshd is up
+  hangs the caller forever (a 40-try poll loop sat for an hour).
+- `runpod/pod.sh`'s `pod_id`/`ssh_args` call `runpodctl pod get` with whatever `pod_id` printed;
+  when the name isn't found that is an empty id, and `runpodctl pod get ''` waits on stdin.
+- `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
+  pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
+- `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
+  isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
+- The O-lens read orchestration (shard launch, resume, fetch, teardown, balance floor) lived in
+  session scratchpads, so nothing durable guards the pods; `olens/stream-reads-to-hf` (PR pending)
+  is the start of fixing that.
+- `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
+  thinking-off Qwen transcripts); fix in the same PR.
+
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
 Resolved 2026-10-26 by deleting the script (last at commit `7296169`) with the null `anchors`
