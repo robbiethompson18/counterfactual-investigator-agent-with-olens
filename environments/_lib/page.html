@@ -488,26 +488,20 @@ function rolloutsHtml(D, arm, item, max = 12) {
 
 // ---------------------------------------------------------------- pages
 
-// the env list, built in the browser from each envs/<env>/index.json (on HF: the env dirs come from one tree-API call),
-// so an upload from a checkout that lacks some envs can't hide them; a local mirror uses its envs/index.json
+// the env list is the code's: spec/index.json beside the page (built from main by the Pages workflow, or from the
+// working tree by `environments view`), errors included so a broken env still shows. Each env's runs come from its
+// envs/<env>/index.json (HF, or the local mirror); run folders for an env the code doesn't have are ignored. Without a
+// code spec (?spec=hf) it falls back to the generated envs/index.json.
 async function envList() {
-  let envs;
-  const r = params.get("base") ? null : await maybe(fetch(`https://huggingface.co/api/datasets/${REPO}/tree/main/envs`));
-  if (r?.ok) {
-    const dirs = (await r.json()).filter(x => x.type === "directory").map(x => x.path.split("/").pop());
-    const idxs = await Promise.all(dirs.map(e => maybe(getJSON(`${e}/index.json`))));
-    envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
-      targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
-      latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
-  } else envs = ((await maybe(getJSON("index.json")))?.envs || []).map(e => ({...e, latest: ""}));
-  // what the code says (title, status, star) wins over the run index; envs in code with no runs yet still show
   const code = await codeIndex();
-  for (const c of (code?.envs || []).filter(c => !c.error)) {
-    const e = envs.find(x => x.env === c.env);
-    if (e) Object.assign(e, {title: c.title, status: c.status, starred: c.starred, primary: c.primary});
-    else envs.push({env: c.env, title: c.title, status: c.status, starred: c.starred, primary: c.primary, n_runs: 0, targets: {}, latest: ""});
-  }
-  envs.sort((a, b) => a.env.localeCompare(b.env));
+  if (!code) return getJSON("index.json");
+  const idxs = await Promise.all(code.envs.map(c => maybe(getJSON(`${c.env}/index.json`))));
+  const envs = code.envs.map((c, i) => {
+    const runs = idxs[i]?.runs || [];
+    return {env: c.env, title: c.title || c.env, status: c.error ? "BROKEN" : c.status, starred: c.starred, primary: c.primary || idxs[i]?.primary,
+      error: c.error, n_runs: runs.length, targets: runs.reduce((t, r) => (t[r.target] = (t[r.target] || 0) + (r.n_episodes || 0), t), {}),
+      latest: runs.map(r => r.created || "").sort().pop() || ""};
+  });
   return {generated: envs.map(e => e.latest).sort().pop() || "", envs};
 }
 
@@ -520,7 +514,7 @@ async function home() {
   ${[["Starred: settled, nobody is changing them", idx.envs.filter(e => e.starred)], ["In progress", idx.envs.filter(e => !e.starred)]].filter(([, es]) => es.length).map(([g, es]) => `<h3>${g}</h3>
   <div class="cards">${es.map(e => `<a class="card" href="#env=${e.env}">
     <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${e.starred ? `<span class="star" title="${esc(e.starred)}">★</span> ` : ""}${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
-    <div class="why">${esc(e.title)}</div>
+    <div class="why">${esc(e.title)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't build</span>` : ""}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
     <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
 }
