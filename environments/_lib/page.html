@@ -92,7 +92,8 @@ async function envPage(env, filt = {}) {
   $("crumb").textContent = "/ " + env;
   const idx = await getJSON(`${env}/index.json`);
   const F = idx.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
-  const keep = arm => Object.entries(filt).every(([k, v]) => !v || (F[arm] || {})[k] === v);
+  const R = new Set(idx.retired || []), showRetired = filt.retired === "show";
+  const keep = arm => (showRetired || !R.has(arm)) && Object.entries(filt).every(([k, v]) => k === "retired" || !v || (F[arm] || {})[k] === v);
   // pool runs per (arm, target): "#runs per model"
   const pooled = {};
   for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
@@ -108,8 +109,9 @@ async function envPage(env, filt = {}) {
   ${Object.keys(idx.pairs).length ? `<p>Pairs: ${Object.entries(idx.pairs).map(([k, v]) => `<b>${esc(k)}</b> ${esc(v[0])} → ${esc(v[1])}`).join(" · ")}</p>` : ""}
   <h2>Pooled over runs (per arm and target model)</h2>
   ${keys.length ? `<div class="row">Group by factor: ${keys.map(sel).join(" ")}</div>` : ""}
+  ${R.size ? `<p class="muted">${R.size} retired arms ${showRetired ? "shown" : "hidden"}: <a href="#${setParam("retired", showRetired ? "" : "show")}">${showRetired ? "hide" : "show"} them</a></p>` : ""}
   <div class="scroll"><table><tr><th>target</th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>runs</th><th>episodes</th><th>${esc(idx.primary)}</th></tr>
-  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}</td>${keys.map(k => `<td class="mono">${esc((F[p.arm] || {})[k] || "")}</td>`).join("")}<td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
+  ${rows.map(p => `<tr><td class="mono">${esc(p.target)}</td><td class="mono">${esc(p.arm)}${R.has(p.arm) ? " (retired)" : ""}</td>${keys.map(k => `<td class="mono">${esc((F[p.arm] || {})[k] || "")}</td>`).join("")}<td>${p.runs}</td><td>${p.eps}</td><td>${p.type === "bool" ? rate(p.k, p.n) : ""}</td></tr>`).join("")}
   </table></div>
   <h2>Runs</h2>
   <div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>Docent</th><th>description</th></tr>

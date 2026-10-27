@@ -13,7 +13,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .core import ROOT, env_names, load_env
+from .core import ROOT, env_names, load_env, retired_arms
 from .runfolder import LOCAL, read_episodes
 
 
@@ -86,6 +86,7 @@ def env_index(env: str) -> dict:
         "pairs": {k: list(v) for k, v in getattr(mod, "PAIRS", {}).items()},
         "arms": list(mod.ARMS),
         "arm_factors": getattr(mod, "ARM_FACTORS", {}),
+        "retired": sorted(retired_arms(mod)),
         "requires": getattr(mod, "REQUIRES", {}),
         "runs": runs,
     }

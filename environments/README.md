@@ -26,7 +26,8 @@ first requests matches what the old harnesses sent. evalcue/ and donehack/ were 
 environments/<env>/
   README.md    what it tests, status, primary measure and pairs (declared before the first run), runs
   env.py       ARMS, items(), build(arm, item, ctx) -> Episode, measure(ep) -> dict, PRIMARY, PAIRS, REQUIRES;
-               optional handle() for fake apps, finalize() for reading the live box, CAPS
+               optional handle() for fake apps, finalize() for reading the live box, CAPS, ARM_FACTORS,
+               items_for(arm), RETIRED
 environments/_lib/   shared code: the interface (core.py), runner, Box, backends, run folders, indexes, the list page,
                      the overeager harness variants (overeager.py) and the honest-grader prompt (honest.py)
 ```
@@ -48,6 +49,10 @@ environments/_lib/   shared code: the interface (core.py), runner, Box, backends
   results) comes from `finalize(box, state, ctx)`, which runs after the agent's processes are
   killed.
 - **Pairs** (`PAIRS`) are the clean counterfactuals: two arms, optionally an item subset.
+- **Retired arms** (`RETIRED`: arm names or factor filters such as `prompt=v5`) were tried and set
+  aside. Don't delete them: stored runs rebuild their prompts from `build()`, so retired arms still
+  build. `run ENV` without `--arms` / `--pair` skips them, naming them in `--arms` runs them (with a
+  note), and the list page hides them unless you click "show". Record why in the env README.
 - **Never put env files in a folder named `data`**: the repo-wide `data/` rule in `.gitignore`
   swallows it, so it is missing from every fresh clone (alignment_faking's prompts went missing
   twice). Use e.g. `prompts/`.

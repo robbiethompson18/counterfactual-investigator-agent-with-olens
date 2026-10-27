@@ -23,7 +23,7 @@ from typing import Any
 import httpx
 
 from .backends import Target
-from .core import Ctx, episode_id, load_env
+from .core import Ctx, episode_id, load_env, retired_arms, select_arms
 from .index import build as build_index
 from .loop import run_episode
 from .runfolder import LOCAL, RunWriter, docent_upload, git_sha, upload
@@ -36,25 +36,6 @@ def parse_items(spec: str | None, all_items: list) -> list:
         a, b = spec.split(":")
         return list(all_items)[int(a or 0) : int(b) if b else None]
     return spec.split(",")
-
-
-def select_arms(env, spec: str | None) -> list[str]:
-    """--arms: comma-separated arm names, or factor filters `key=value` (ANDed; repeat a key to OR its values), e.g.
-    `task=calendar,variant=core` or `variant=base,variant=core`. Factors come from the env's ARM_FACTORS."""
-    if not spec:
-        return list(env.ARMS)
-    parts = spec.split(",")
-    if not any("=" in p for p in parts):
-        return parts
-    factors = getattr(env, "ARM_FACTORS", {})
-    want: dict[str, set] = {}
-    for p in parts:
-        k, _, v = p.partition("=")
-        want.setdefault(k, set()).add(v)
-    picked = [arm for arm, f in factors.items() if all(f.get(k) in vs for k, vs in want.items())]
-    if not picked:
-        raise SystemExit(f"no arm matches {spec!r} (factors: {sorted({k for f in factors.values() for k in f})})")
-    return picked
 
 
 def add_target_args(ap):
@@ -126,7 +107,7 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="envrun")
     ap.add_argument("env")
     ap.add_argument("--tag", required=True, help="run slug; the run is data/envs/ENV/<date>_<tag>")
-    ap.add_argument("--arms", help="comma list of arms, or factor filters like task=calendar,variant=core (default: all ARMS)")
+    ap.add_argument("--arms", help="comma list of arms, or factor filters like task=calendar,variant=core (default: ARMS minus RETIRED)")
     ap.add_argument("--pair", help="run a PAIRS entry's two arms (and its item subset)")
     ap.add_argument("--items", help="slice a:b or comma list (default: all)")
     ap.add_argument("--n", type=int, default=1, help="samples per (arm, item)")
@@ -159,6 +140,11 @@ def main(argv):
         arms = list(p[:2])
         if len(p) > 2:
             items = [str(i) for i in p[2]]
+    retired = retired_arms(env)
+    if not a.arms and not a.pair:
+        arms = [x for x in arms if x not in retired]
+    elif retired & set(arms):
+        print(f"note: running retired arms: {sorted(retired & set(arms))}", file=sys.stderr)
     unknown = [x for x in arms if x not in env.ARMS]
     if unknown:
         print(f"note: arms not in ARMS (build() must accept them): {unknown}", file=sys.stderr)
