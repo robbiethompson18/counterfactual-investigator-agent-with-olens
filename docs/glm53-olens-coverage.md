@@ -69,6 +69,12 @@ run's latest measure labels (seed 0), and in them every template token, plus pun
 simple tasks (over-eagerness email\*, alignment_faking, essay_grading, hinted_truthfulqa). That is
 583,211 positions (432,317 template), 30 jobs.
 
+Then (23:46) she cut over-eagerness to the arms of the env's "main: one-edit fixes and nulls"
+comparisons (`select_2026_10_27_main.py`; payback, dana, calendar and gitbranch base vs one edit,
+email junebug and 4 Johns base vs single edits), the other envs as queued: 305,729 positions in 16
+jobs, after 4 p0 and 1 q job (100k) already read. Up to 64 is per (run, arm), so an arm measured in
+several runs (the 2026-10-26 task runs and 2026-10-27 `main256`) has up to 64 from each.
+
 Template tokens are the GLM tags with id >= 154820; per agent turn `<|assistant|>`, `<think>`,
 `</think>`, `<tool_call>`, `<arg_key>`, `</arg_key>`, `<arg_value>`, `</arg_value>`, `</tool_call>`,
 `<|observation|>`, `<tool_response>`, `</tool_response>` (about 12 per tool-calling turn; `main256`
