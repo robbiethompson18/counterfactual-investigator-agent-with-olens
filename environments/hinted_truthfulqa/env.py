@@ -79,8 +79,9 @@ HINTS = {
 ARMS = ["control", *BIOS, *HINTS]
 # the bio pilot (2026-10-27) was null on DSv4 Flash, GLM 5.3 and Qwen; kept so the stored runs still build
 RETIRED = list(BIOS)
-# Qwen on OpenRouter (DeepInfra fp8), before Qwen moved to our own vLLM pod; its control rate shouldn't sit beside the bf16 runs
-RETIRED_RUNS = ["2026-10-27_pilot-qwen36-nothink"]
+# the whole bio pilot (null): its control episodes (TruthfulQA + SciQ) must not pool with the hint arms' control (Kylie,
+# 2026-10-27); its Qwen run (OpenRouter fp8) was deleted outright
+RETIRED_RUNS = ["2026-10-27_pilot-dsv4f-nothink", "2026-10-27_pilot-glm53-nothink"]
 ARM_FACTORS = {
     "control": {"kind": "control", "education": "none", "english": "none", "origin": "none"},
     "edu_native": {"kind": "bio", "education": "high", "english": "native", "origin": "us"},
