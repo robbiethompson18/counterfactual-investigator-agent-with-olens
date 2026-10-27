@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: expview can't import `environments/` run folders
+
+`expview/importers/evalcue_rows.py` and `expview.source_of()` only know the old `data/runs` layout
+(`rows.jsonl` + `docent.json`, `ENV/RUN:LINE` sources). A run folder (`episodes/*.jsonl` with
+`docent_url` on each episode, labels in `labels/`) has no importer, so new-format runs don't reach
+expview. The Docent side of this gap was closed for `environments run` on 2026-10-27 (PR
+envs/finish-uploads); the importer still needs the same treatment.
+
 ## 2026-10-26: `runs.finish()` indexes any `items.jsonl`
 
 `runs.finish()` runs `expview.py index` on any `items.jsonl` under a run dir, so a run that names an
