@@ -109,19 +109,25 @@ def docent(run: Path):
         print(f"Docent upload failed; HF sync continues. Retry: {shlex.join(cmd)}")
 
 
-def upload(run: Path):
-    """Upload the run dir to runs/<experiment>/<run> on HF. Unreadable files (e.g. root-owned ones a Docker harness wrote)
-    raise rather than being skipped: chown them first."""
-    meta = json.loads((run / "meta.json").read_text())
-    path_in_repo = f"runs/{meta['experiment']}/{run.name}"
+def hf_upload(folder: Path, path_in_repo: str, message: str, allow_patterns: str | list[str] | None = None):
+    """One commit putting `folder` (or the files in it matching `allow_patterns`) at `path_in_repo` in the sprint dataset.
+    Unreadable files (e.g. root-owned ones a Docker harness wrote) raise rather than being skipped: chown them first."""
     HfApi().upload_folder(
         repo_id=REPO,
         repo_type="dataset",
-        folder_path=str(run),
+        folder_path=str(folder),
         path_in_repo=path_in_repo,
-        commit_message=f"{path_in_repo} ({meta['status']}): {meta['description'][:120]}",
+        commit_message=message,
+        allow_patterns=allow_patterns,
     )
-    print(f"synced {run} -> https://huggingface.co/datasets/{REPO}/tree/main/{path_in_repo}")
+    print(f"synced {folder} -> https://huggingface.co/datasets/{REPO}/tree/main/{path_in_repo}")
+
+
+def upload(run: Path):
+    """Upload the run dir to runs/<experiment>/<run> on HF."""
+    meta = json.loads((run / "meta.json").read_text())
+    path_in_repo = f"runs/{meta['experiment']}/{run.name}"
+    hf_upload(run, path_in_repo, f"{path_in_repo} ({meta['status']}): {meta['description'][:120]}")
 
 
 def ls():
