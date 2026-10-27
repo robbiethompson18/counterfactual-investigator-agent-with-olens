@@ -49,7 +49,7 @@ def groups() -> dict[str, list[str]]:
     """
     return {
         "GLM 5.3": sorted(glob.glob(R + "2026-10-24_glm-h6-*") + glob.glob(R + "2026-10-24_glm-h6[bcd]-*")) + _nt("glm-*"),
-        "Qwen w/o CoT": [R + f"2026-10-23_grade-big2-{s}" for s in ("cue", "who", "heldout")]
+        "Qwen w/o CoT": [R + f"2026-10-23_grade-big{p}-{s}" for p in ("", "2") for s in ("cue", "who", "heldout")]
         + sorted(glob.glob(R + "2026-10-25_nocot-cf-*"))  # thinking-off sweep
         + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
         + sorted(glob.glob(R + "2026-10-2[45]_nocot-nt-*")),
@@ -64,8 +64,26 @@ def groups() -> dict[str, list[str]]:
     }
 
 
-def env_of(row: dict) -> str:
-    return row["env"].split(":")[1].split("/")[0]
+def hidden_goal_runs() -> list[str]:
+    """The pre-registered 38-case hidden_goal.grade test (docs/envs/hidden_goal.md), Qwen3.6-27B without CoT.
+
+    `grade-big-*` is the abandoned first part, `grade-big2-*` the rest via --skip; `nt*-qwen-grade-*` the env-diff-only rows.
+    """
+    tool = sorted(glob.glob(R + "2026-10-23_grade-big-*") + glob.glob(R + "2026-10-23_grade-big2-*"))
+    return tool + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
+
+
+def variant_of(row: dict) -> str:
+    """env/rollout-run, e.g. hidden_goal_grade/2026-10-22_who2_n30_nothink: what cases are keyed by. One env's rollout runs
+    reuse arm names (hidden_goal_grade's who2 and canon_off both have base:mine) with different rollouts and base rates, so
+    keying by env alone merged them."""
+    return row["env"].split(":")[1]
+
+
+def env_of(variant: str) -> str:
+    """The env of a case key's first element: `variant_of`'s env/run, maybe prefixed "<target>: " (the pooled chart). Envs,
+    not rollout runs, are what the charts count and what ESS is over (docs/cfbench-scoring.md). Run names have no "/"."""
+    return variant.rsplit("/", 1)[0]
 
 
 def run_params(run_dir: str) -> dict:
@@ -83,7 +101,7 @@ def uses_old_lens(run_dir: str) -> bool:
 
 
 def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=False) -> dict[tuple, dict]:
-    """(env, base_arm, cf_arm, condition, draw) -> prediction row; valid rows only; later dirs win.
+    """(env/rollout run, base_arm, cf_arm, condition, draw) -> prediction row; valid rows only; later dirs win.
 
     Old-lens runs contribute no olens rows unless `allow_old_lens`. Stored condition names are mapped to today's (canon_condition).
     """
@@ -103,7 +121,7 @@ def load_rows(dirs: list[str], conds=CONDS, predictor=PREDICTOR, allow_old_lens=
             if old and r["condition"].startswith("olens"):
                 continue
             r["run"] = os.path.basename(d)
-            rows[(env_of(r), r["base_arm"], r["cf_arm"], r["condition"], r["draw"])] = r
+            rows[(variant_of(r), r["base_arm"], r["cf_arm"], r["condition"], r["draw"])] = r
     return rows
 
 
@@ -154,7 +172,7 @@ class Case:
 
 
 def build_cases(rows: dict[tuple, dict], conds=CONDS) -> dict[tuple, Case]:
-    """(env, base_arm, cf_arm) -> Case, keeping only cases with a prediction in every condition (same cases per bar)."""
+    """(env/rollout run, base_arm, cf_arm) -> Case, keeping only cases with a prediction in every condition (same cases per bar)."""
     cases: dict[tuple, Case] = {}
     for (env, b, c, cond, _), r in sorted(rows.items(), key=lambda kv: kv[1]["draw"]):
         case = cases.setdefault((env, b, c), Case(env, b, c, r["k_base"], r["n_base"], r["k_cf"], r["n_cf"]))
@@ -190,7 +208,7 @@ def log_skill(cases: dict[tuple, Case], cond: str, keys=None) -> float:
 
 def ess_envs(keys) -> float:
     """Effective number of envs behind an equal-weight-per-case mean: (Σ_e n_e)² / Σ_e n_e², n_e = cases in env e."""
-    n = np.array(list(Counter(k[0] for k in keys).values()), dtype=float)
+    n = np.array(list(Counter(env_of(k[0]) for k in keys).values()), dtype=float)
     return float(n.sum() ** 2 / (n**2).sum())
 
 
@@ -227,7 +245,7 @@ def coverage(rows: dict[tuple, dict], cases: dict[tuple, Case]) -> dict:
             arms[(env, b)], arms[(env, c)] = r["n_base"], r["n_cf"]
             n_pred[cond] += 1
     return {
-        "envs": len({e for e, _ in arms}),
+        "envs": len({env_of(e) for e, _ in arms}),
         "arms": len(arms),
         "rollouts": sum(arms.values()),
         "predictions": sum(n_pred.values()),
