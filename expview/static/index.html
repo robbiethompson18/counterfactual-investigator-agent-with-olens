@@ -573,9 +573,9 @@ async function envsHome(){
   crumbs([["envs"]]);VIEW="envs";
   $("#app").innerHTML=`<div class="page"><h1>Envs</h1>
    <p class="desc">Every env on the public HF dataset, browsed the way the <a href="${ENV_VIEWER}">env viewer</a> is organised: env → arm → episode. An episode shows its transcript, sandbox files, labels and judges, plus any O-lens or other metamodel reads and judge calls made on it. Other expview data: <a href="#datasets=1">all datasets</a>.</p>
-   ${SEARCH_OK?`<form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search everything (reads, transcripts, judge calls): a regex, e.g. \\bgrader" aria-label="regex"><button class="btn primary">Search</button></div></form>`:""}
+   ${SEARCH_OK||SEARCH_AWAY?`<form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search everything (reads, transcripts, judge calls): a regex, e.g. \\bgrader" aria-label="regex"><button class="btn primary">Search</button></div></form>`:""}
    <div class="wrap"><table id="et"><tr><td class="empty">Loading…</td></tr></table></div></div>`;
-  if(SEARCH_OK)$("#hs").onsubmit=ev=>{ev.preventDefault();const q=$("#hq").value.trim();if(q)searchGo(q)};
+  if(SEARCH_OK||SEARCH_AWAY)$("#hs").onsubmit=ev=>{ev.preventDefault();const q=$("#hq").value.trim();if(q)searchGo(q)};
   const names=await envNames();
   const rows=await pmap(names,6,async e=>{try{const x=await envIndex(e);return {e,x}}catch(err){return {e,err}}});
   if(VIEW!="envs")return;
@@ -1051,9 +1051,11 @@ async function searchPage(p){
 // the server answers: the same origin when the page is served by it over http, or localStorage "expview:search_server" = its URL.
 // (An https page, e.g. GitHub Pages, can't call an http server, so there it stays hidden.)
 const SEARCH_API=store.get("search_server",null)||(location.protocol=="http:"?location.origin:null);
+// where an https copy (GitHub Pages) sends "Search everything": the server's own copy of this page, on the tailnet (Kylie, 2026-10-27)
+const SEARCH_PAGE=store.get("search_page","http://bramble:8840/expview/"),SEARCH_AWAY=location.protocol=="https:";
 let SEARCH_OK=false;
 const probeSearch=()=>SEARCH_API?fetch(SEARCH_API+"/api/ping",{signal:AbortSignal.timeout(1500)}).then(r=>r.ok).catch(()=>false):Promise.resolve(false);
-const searchGo=q=>go(SEARCH_OK?{everything:1,query:q}:{search:1,query:q});
+const searchGo=q=>SEARCH_OK?go({everything:1,query:q}):SEARCH_AWAY?window.open(SEARCH_PAGE+linkTo({everything:1,query:q}),"_blank","noopener"):go({search:1,query:q});
 async function everythingPage(p){
   VIEW="everything";crumbs([["envs","#"],["search everything"]]);
   const sc=p.get("scope"),scope=sc=="reads"||sc=="text"?sc:"all",q=p.get("query")||"",cs=p.get("case");
@@ -1102,17 +1104,23 @@ async function everythingPage(p){
     (scope!="reads"?` · <b>${r.text_items.toLocaleString()}</b> by their transcript or judge calls`:"")+
     (scope!="text"?` · <b>${r.read_hits.toLocaleString()}</b> matching reads at <b>${r.read_positions.toLocaleString()}</b> token positions in <b>${r.read_items.toLocaleString()}</b> items${r.read_hits?` · <a href="${SEARCH_API}/api/csv?${qs(o)}">CSV of all matching reads</a>`:""}`:"")+
     ` <span class="mono">(${r.took}s over ${r.runs.toLocaleString()} runs, ${r.items.toLocaleString()} items, ${r.reads.toLocaleString()} reads)</span></p>`;
-  if(r.table.length)h+=`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Run</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.table.map(x=>
-    `<tr><td class="mono wrapid" style="min-width:300px">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=x.rates[k];return `<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`;
+  // experiments first (runs are an implementation detail); runs only inside one experiment, collapsed
+  if(!p.get("experiment"))h+=`<div class="wrap"><table id="sbyexp"><tr><th>Experiment</th><th>Items with a hit</th><th>In transcripts / judge calls</th><th>In reads</th><th>Runs</th></tr>${r.by_experiment.map(e=>
+    `<tr class="click" data-e="${esc(e.exp)}" title="only this experiment"><td class="mono">${esc(e.exp)}</td><td class="num">${e.items.toLocaleString()}</td><td class="num">${e.text.toLocaleString()}</td><td class="num">${e.reads.toLocaleString()}</td><td class="num">${e.runs}</td></tr>`).join("")}</table></div>`;
+  else if(r.table.length)h+=`<details><summary class="mono">By run and group (${r.table.length})</summary>`+`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Run</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.table.map(x=>
+    `<tr><td class="mono wrapid" style="min-width:300px">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=x.rates[k];return `<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`+`</details>`;
   const pages=Math.ceil(r.total_hits/50);
   const nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
-  h+=nav+r.hits.map(x=>{const head=`${runChip(x.d)}${x.g!=null?`<span class="chip">${esc(x.g)}</span>`:""}`;
+  let lastExp=null;
+  h+=nav+r.hits.map(x=>{const ex=x.d.split("/")[1],sep=ex!=lastExp?`<h2 class="mono">${esc(ex)} <a class="btn" href="${linkTo({...Object.fromEntries(p),experiment:ex,page:""})}">only this</a></h2>`:"";lastExp=ex;return sep+hitCard(x)}).join("")+nav;
+  res.innerHTML=h;
+  const bt=$("#sbyexp");if(bt)bt.onclick=ev=>{const tr=ev.target.closest("tr[data-e]");if(tr)go({...Object.fromEntries(p),experiment:tr.dataset.e,page:"",dataset:"",group:"",label:""})};
+  function hitCard(x){const head=`${runChip(x.d)}${x.g!=null?`<span class="chip">${esc(x.g)}</span>`:""}`;
     if(x.kind=="text")return `<div class="card"><div class="chips"><a class="chip" href="${itemHref(x,{view:x.where=="transcript"?"tr":"call"})}">${esc(x.i)}</a>${head}<span class="chip">${esc(x.where)}</span>${labChips(x.l)}</div><div class="ctx">…${hl(x.snippet,rx)}…</div></div>`;
     const c=x.ctx,tk=x.token;
     return `<div class="card"><div class="chips"><a class="chip" href="${itemHref(x,{view:"tr",token:x.pos})}">${esc(x.i)} @ ${x.pos}</a>${head}${x.sec?`<span class="chip">${esc(x.sec)}</span>`:""}${labChips(x.l)}</div>
      <div class="ctx">…${esc(c.endsWith(tk)?c.slice(0,c.length-tk.length):c)}<b>${esc(tk)}</b> ⟶ ${esc(x.nxt)}</div>
-     <div class="reads">${x.reads.map(([t,l,txt])=>`<div><span class="rn">${esc(t)}${l?" · "+esc(l):""}</span>${hl(txt,rx)}</div>`).join("")}</div></div>`}).join("")+nav;
-  res.innerHTML=h;
+     <div class="reads">${x.reads.map(([t,l,txt])=>`<div><span class="rn">${esc(t)}${l?" · "+esc(l):""}</span>${hl(txt,rx)}</div>`).join("")}</div></div>`}
 }
 
 // ================================================================ boot
@@ -1123,6 +1131,8 @@ async function everythingPage(p){
   SRC=STATIC?await staticSource():hfSource();
   if(STATIC){$("#tosearch").hidden=true;$("#topnav").hidden=true;$(".brand").textContent="expview";$(".brand").href="#"}
   if(!STATIC&&(SEARCH_OK=await probeSearch()))$("#toall").hidden=false;
+  else if(!STATIC&&SEARCH_AWAY){const a=$("#toall");Object.assign(a,{hidden:false,href:SEARCH_PAGE+"#everything=1",target:"_blank",rel:"noopener",title:"tailnet only",textContent:"Search everything ↗"});
+    a.onmouseenter=a.onfocus=()=>{const q=H().get("query");a.href=SEARCH_PAGE+(q?linkTo({everything:1,query:q}):"#everything=1")}}
   window.addEventListener("hashchange",route);await route();
 })().catch(e=>{$("#app").innerHTML=`<div class="page err">Could not start: ${esc(e.message||e)}</div>`});
 </script>

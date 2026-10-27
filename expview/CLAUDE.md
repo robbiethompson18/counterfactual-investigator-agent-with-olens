@@ -269,8 +269,12 @@ the episode (`#env=E&run=R&episode=ID&query=`) or the item / token (`#dataset=â€
 the normal pages, which read HF, so a run indexed from the local mirror but never synced won't
 open. The top-bar button and the home-page search box appear only when the server answers
 `/api/ping` within 1.5 s: on the copy of the page the server itself serves (same origin, http), or
-anywhere localStorage `expview:search_server` holds its URL (GitHub Pages is https and can't call
-it).
+anywhere localStorage `expview:search_server` holds its URL. GitHub Pages is https and can't call
+it, so there the button is a plain link (tooltip "tailnet only") to the server's copy, carrying the
+current query (localStorage `expview:search_page` overrides the URL). Results open on a table of
+experiments (items with a hit, in transcripts / judge calls vs in reads, runs); a row filters to
+that experiment (`&experiment=E`), and only then does the per-run-and-group table appear, collapsed.
+The hit list is grouped by experiment.
 
 How it works: `expview.py search RUN` writes a run's `search.jsonl.gz` (id, group, labels, token
 stream, reads `[pos, tool, label, text]`, call texts; every distinct string once, later uses are its

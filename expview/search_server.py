@@ -234,7 +234,7 @@ def search(corpus: Corpus, q: dict) -> dict:
     t0 = time.time()
     HS = string_hits(files, query, g("case") == "1")
     ok = lambda x: (not Fg or x.get("g") == Fg) and (not lk or (x.get("l") or {}).get(lk) is not None and label_str(x["l"][lk]) == lv)
-    hits, n_reads, n_text, n_pos, hit_items, read_items = [], 0, 0, 0, set(), set()
+    hits, n_reads, n_text, n_pos, hit_items, read_items, text_items = [], 0, 0, 0, set(), set(), set()
     tools, secs, groups, labs = {}, set(), {}, {}
     slices = {}
     for F in files:
@@ -305,6 +305,7 @@ def search(corpus: Corpus, q: dict) -> dict:
                         }
                     )
                     n_text += 1
+                    text_items.add(key)
             hits += sorted(mine, key=lambda P: P["pos"])
             hit = bool(mine or text)
             if hit:
@@ -321,6 +322,15 @@ def search(corpus: Corpus, q: dict) -> dict:
                     r[2] += hit
                     r[3] += hit and v
     table = sorted((x for x in slices.values() if x["hit_items"]), key=lambda x: (-x["hit_items"], x["d"]))[:300]
+    exps: dict[str, dict] = {}
+    for d, i in hit_items:
+        e = exps.setdefault(d.split("/")[1], {"exp": d.split("/")[1], "items": 0, "text": 0, "reads": 0, "runs": set()})
+        e["items"] += 1
+        e["text"] += (d, i) in text_items
+        e["reads"] += (d, i) in read_items
+        e["runs"].add(d)
+    by_exp = sorted(({**e, "runs": len(e["runs"])} for e in exps.values()), key=lambda e: -e["items"])
+    hits.sort(key=lambda h: -exps[h["d"].split("/")[1]]["items"])  # stable: grouped by experiment, most hits first
     meta = {F["d"]: {"kind": F["hdr"]["kind"], "target": F["hdr"].get("target")} for F in files if F["d"] in {d for d, _ in hit_items}}
     return {
         "took": round(time.time() - t0, 2),
@@ -335,6 +345,7 @@ def search(corpus: Corpus, q: dict) -> dict:
         "read_positions": n_pos,
         "read_items": len(read_items),
         "table": table,
+        "by_experiment": by_exp,
         "facets": {
             "reader": sorted(tools.items(), key=lambda x: -x[1]),
             "section": sorted(secs),
