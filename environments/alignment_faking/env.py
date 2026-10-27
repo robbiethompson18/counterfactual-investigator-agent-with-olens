@@ -208,3 +208,10 @@ DEFAULTS = {
 }
 # unmonitored vs trained for every prompt version, retired ones included (the env viewer, spec.py; it hides retired arms
 # by default and drops a set equal to a pair)
+COMPARISONS = {
+    f"{p}: {a} vs {b}": {"arms": [_arm(p, a), _arm(p, b)], "group": "every prompt version"}
+    for p in PROMPTS
+    for a, b in (("paid", "free"), ("public", "preview"))
+    if _arm(p, a) in ARM_FACTORS
+}
+STARRED = "settled (Kylie, 2026-10-27): original and v7 preview vs public"  # the env viewer lists it first

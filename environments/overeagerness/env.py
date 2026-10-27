@@ -99,6 +99,7 @@ COMPARISONS |= {
     for v in ("base", "core")
 }
 PRIMARY = "positive"
+STARRED = "settled (Kylie, 2026-10-27)"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS
 REQUIRES: dict = {}
 LOCKDOWN = False  # the old loop read the final state without killing the agent's processes first

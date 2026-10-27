@@ -450,12 +450,26 @@ function rolloutsHtml(D, arm, item, max = 12) {
 
 // ---------------------------------------------------------------- pages
 
+// the env list, built in the browser from each envs/<env>/index.json (on HF: the env dirs come from one tree-API call),
+// so an upload from a checkout that lacks some envs can't hide them; a local mirror uses its envs/index.json
+async function envList() {
+  if (params.get("base")) return getJSON("index.json");
+  const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/tree/main/envs`);
+  if (!r.ok) return getJSON("index.json");
+  const dirs = (await r.json()).filter(x => x.type === "directory").map(x => x.path.split("/").pop());
+  const idxs = await Promise.all(dirs.map(e => maybe(getJSON(`${e}/index.json`))));
+  const envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
+    targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
+    latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
+  return {generated: envs.map(e => e.latest).sort().pop() || "", envs};
+}
+
 async function home() {
   setCrumb([]);
-  const idx = await getJSON("index.json");
+  const idx = await envList();
   $("view").innerHTML = `<h1>Environments</h1>
   <p class="lede">Every behavioural env in <a href="https://github.com/${GH}/tree/main/environments">environments/</a>: each arm exactly as <span class="mono">build()</span> makes it,
-    word diffs between arms, the comparisons we think matter, and every rollout on Docent and expview. Indexes generated ${esc(idx.generated.replace("T", " ").replace("+00:00", " UTC"))}.</p>
+    word diffs between arms, the comparisons we think matter, and every rollout on Docent and expview. ${idx.generated ? `Latest run ${esc(idx.generated.replace("T", " ").replace("+00:00", " UTC"))}.` : ""}</p>
   ${[["Starred: settled, nobody is changing them", idx.envs.filter(e => e.starred)], ["In progress", idx.envs.filter(e => !e.starred)]].filter(([, es]) => es.length).map(([g, es]) => `<h3>${g}</h3>
   <div class="cards">${es.map(e => `<a class="card" href="#env=${e.env}">
     <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${e.starred ? `<span class="star" title="${esc(e.starred)}">★</span> ` : ""}${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
@@ -709,7 +723,7 @@ function canonHash() {
 
 async function route() {
   const h = canonHash();
-  $("status").textContent = "";
+  $("status").textContent = "loading…";
   try {
     if (h.run) await runPage(h.env, h.run, h.arm, h.episode);
     else if (h.compare) await comparePage(h);
@@ -717,6 +731,7 @@ async function route() {
     else if (h.env && h.arm) await armPage(h);
     else if (h.env) await envPage(h);
     else await home();
+    $("status").textContent = "";
   } catch (e) { $("status").textContent = "error: " + e.message; console.error(e); }
   window.scrollTo(0, 0);
 }
