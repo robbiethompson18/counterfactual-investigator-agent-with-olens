@@ -68,7 +68,7 @@ button{cursor:pointer} button:disabled{opacity:.5;cursor:default} button:not(:di
 .tabs a{padding:5px 14px;text-decoration:none;color:var(--mute);border-radius:7px;font-weight:500;font-size:13px}
 .tabs a.on{color:var(--fg);background:var(--card);box-shadow:var(--shadow)}
 .chip{display:inline-block;padding:1px 8px;margin:2px 3px 2px 0;border:1px solid var(--line);border-radius:999px;font:11.5px var(--mono);text-decoration:none;color:var(--fg);background:var(--card)}
-.chip:hover{border-color:var(--acc)} .chip a{color:inherit;text-decoration:none} .chip a.x{color:var(--faint);margin-left:6px;padding-left:6px;border-left:1px solid var(--line)} .chip a.x:hover{color:var(--acc)}
+.chip:hover{border-color:var(--acc)} .chip a{color:inherit;text-decoration:none} .chip a.x{color:var(--faint);margin-left:6px;padding-left:6px;border-left:1px solid var(--line)} .chip a.x:hover{color:var(--acc)} .chip a.x.lens{color:#c46a12;font-weight:600}
 .chip.on{background:var(--sel);border-color:var(--acc)} .chip.pos{border-color:color-mix(in srgb,var(--pos) 60%,var(--line));color:var(--pos);background:color-mix(in srgb,var(--pos) 8%,var(--card))} .chip.neg{color:var(--neg)}
 .sec{border:1px solid var(--line);border-radius:10px;margin:8px 0;background:var(--card);box-shadow:var(--shadow)}
 .sec>summary{padding:9px 12px;cursor:pointer;font:600 13px Inter,system-ui;list-style:none;display:flex;align-items:center;gap:6px}
@@ -411,7 +411,7 @@ function episodesFor(D, arm, item) {
   const pre = `${slug(arm)}~${item == null ? "" : slug(item) + "~"}`, out = [];
   for (const [run, r] of Object.entries(D.links.runs || {})) {
     const eps = Object.entries(r.episodes || {}).filter(([id]) => id.startsWith(pre));
-    if (eps.length) out.push({run, target: targetKey(r), collection: r.docent_collection, expview: r.expview, expviewItems: r.expview_items, eps});
+    if (eps.length) out.push({run, target: targetKey(r), collection: r.docent_collection, expview: r.expview, expviewItems: r.expview_items, reads: r.reads || {}, eps});
   }
   return out;
 }
@@ -424,7 +424,8 @@ function epChip(D, r, [id, [docent, v]]) {
   // one pill: the label opens Docent (or the transcript here), then small links to the transcript here and to expview
   return `<span class="chip ${cls}"><a href="${dl || here}" ${dl ? 'target="_blank" rel="noopener"' : ""} title="${dl ? "open in Docent" : "open here"}">${esc(label)}</a>` +
     (dl ? `<a class="x" href="${here}" title="transcript on this page">↗</a>` : "") +
-    (r.expviewItems ? `<a class="x" href="${expviewUrl(D, r.expview, id)}" target="_blank" rel="noopener" title="open in expview">ev</a>` : "") + "</span>";
+    (r.expviewItems ? `<a class="x" href="${expviewUrl(D, r.expview, id)}" target="_blank" rel="noopener" title="open in expview">ev</a>` : "") +
+    (r.reads[id] ? `<a class="x lens" href="${expviewUrl(D, r.reads[id][0], r.reads[id][1])}" target="_blank" rel="noopener" title="O-lens reads in expview (${esc(r.reads[id][0])})">lens</a>` : "") + "</span>";
 }
 // the arm's every-run expview view (expview_export.export_arms), if there is one
 const armExpview = (D, arm, label = "whole arm in expview ↗") =>
@@ -433,7 +434,8 @@ function rolloutsHtml(D, arm, item, max = 12) {
   const runs = episodesFor(D, arm, item);
   const head = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><span class="mono" style="font-weight:500">${esc(arm)}${retiredTag(D, arm)}</span>${armExpview(D, arm)}</div>`;
   if (!runs.length) return `<div class="card">${head}<p class="mute" style="margin:0">no rollouts${item == null ? "" : " on this item"} yet</p></div>`;
-  return `<div class="card">${head}` + runs.map(r => {
+  const nRead = runs.reduce((t, r) => t + r.eps.filter(([id]) => r.reads[id]).length, 0);
+  return `<div class="card">${head}` + (nRead ? `<p class="mute" style="margin:0 0 6px;font-size:12px"><b style="color:#c46a12">lens</b> = ${nRead} of these episodes have O-lens reads</p>` : "") + runs.map(r => {
     const k = r.eps.filter(e => e[1][1] === true).length, n = r.eps.filter(e => typeof e[1][1] === "boolean").length;
     return `<div style="border-top:1px solid var(--line);padding:8px 0 4px">
       <div class="row" style="margin:0 0 4px;justify-content:space-between;gap:8px"><span><b style="font-weight:600">${esc(modelName(r.target || ""))}</b>

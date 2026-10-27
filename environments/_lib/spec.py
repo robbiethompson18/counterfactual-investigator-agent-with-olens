@@ -169,6 +169,30 @@ def expview_dataset(env: str, run: str, meta: dict) -> str | None:
     return None
 
 
+def read_overlays(env: str, runs: set[str]) -> dict:
+    """Metamodel-read datasets that cover this env's episodes: every expview run under data/runs/<env>/ whose items say
+    {"extra": {"source": "envs/<env>/<run>", "episode": <episode id>}} (the O-lens read exports do). -> {run: {episode:
+    [dataset id, item id]}}, preferring items that carry reads (tokens). A source naming a run that doesn't exist is
+    matched to the longest existing run name it starts with (an export may tag a subset, e.g. `<run>-pp`)."""
+    out: dict = {}
+    for items in sorted((REPO_ROOT / "data/runs" / env).glob("*/expview/**/items.jsonl")):
+        rel = items.parent.relative_to(REPO_ROOT / "data")
+        ds = str(rel).replace("/expview/", "/").removesuffix("/expview")
+        with open(items) as f:
+            for line in f:
+                it = json.loads(line)
+                ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+                src, ep = ex.get("source"), ex.get("episode")
+                if not (isinstance(src, str) and src.startswith(f"envs/{env}/") and ep and it.get("tokens")):
+                    continue
+                run = src.split("/", 2)[2]
+                if run not in runs:
+                    run = max((r for r in runs if run.startswith(r)), key=len, default=None)
+                if run:
+                    out.setdefault(run, {}).setdefault(ep, [ds, it["id"]])
+    return out
+
+
 def build_links(env: str) -> Path | None:
     """envs/<env>/links.json from the local run folders (labels from the latest measure@ file, as index.py uses)."""
     from .index import latest_labels
@@ -178,7 +202,9 @@ def build_links(env: str) -> Path | None:
         return None
     mod = load_env(env)
     runs = {}
-    for run_dir in sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists()):
+    run_dirs = sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists())
+    reads = read_overlays(env, {p.name for p in run_dirs})
+    for run_dir in run_dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
         _, labels = latest_labels(run_dir)
         eps = {}
@@ -189,6 +215,7 @@ def build_links(env: str) -> Path | None:
             "docent_collection": meta.get("docent_collection"),
             "expview": expview_dataset(env, run_dir.name, meta),
             "expview_items": (REPO_ROOT / f"data/runs/env_{env}/{run_dir.name}/expview/items.jsonl").exists(),
+            "reads": reads.get(run_dir.name, {}),  # episode -> [expview dataset, item] with metamodel (O-lens) reads
             "target": (meta.get("target") or {}).get("id"),
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
