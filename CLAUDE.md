@@ -258,9 +258,9 @@ Current docs:
   — static page over the HF dataset: what each tab shows, CHIVE rendering and Agam's banks,
   confession follow-ups and thinking resamples, `publish.py` build/preview/upload, deploy, the
   batch-reads format gap, where the deleted live viewer (server, queue, fleet, case page) is
-- [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
-  — the one-engine reader's modules (carrier prompt, OneEngine, bullet stop, whitened FVE,
-  provenance), conventions, what the deleted HF path was
+- [ACTIVE: olens library — read before reading transcripts with the agu18dec O-lens/AR or the J++ lens](olens/CLAUDE.md)
+  — the one-engine reader's modules (carrier prompt, OneEngine, whitened FVE, provenance), the J++
+  lens on the same engine, the two batch readers
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
   — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
   translate); 8 Qwen resamples explain as much as the lens at deep layers; code on a closed branch

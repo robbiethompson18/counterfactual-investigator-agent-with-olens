@@ -9,10 +9,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <!--
-  Static env viewer for environments/. No server: it reads the generated files of the HF dataset under envs/, pinned to
-  one commit (envs/index.json, envs/<env>/index.json for runs and rates, envs/<env>/spec/ for every arm as build() makes
-  it, envs/<env>/links.json for Docent / expview links), episode shards by HTTP range request, and the env's source
-  from GitHub at the commit the spec was built from.
+  Static env viewer for environments/. No server. What the code declares (arms as build() makes them, comparisons,
+  RETIRED, STARRED, README) comes from spec/ beside this page, built from main by the GitHub Pages workflow
+  (`python -m environments spec --out`); an env whose code doesn't build there falls back to envs/<env>/spec/ on HF.
+  Runs and rates (envs/<env>/index.json), Docent / expview / O-lens links (envs/<env>/links.json) and episode shards
+  (by HTTP range request) come from the HF dataset under envs/, pinned to one commit; source files from GitHub at the
+  commit the spec was built from. ?spec=hf ignores spec/ beside the page.
 
   Local:  python -m http.server 8000   (from the repo root, after `python -m environments index`), then
           http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
@@ -135,6 +137,19 @@ async function base() {
   const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/revision/main`);
   const sha = r.ok ? (await r.json()).sha : "main";
   return BASE = `https://huggingface.co/datasets/${REPO}/resolve/${sha}/envs/`;
+}
+// the code-side spec beside the page (spec/index.json lists the envs that built from main), else HF's envs/<env>/spec/
+let CODE;
+async function codeIndex() {
+  if (CODE !== undefined) return CODE;
+  if (params.get("spec") === "hf") return CODE = null;
+  try { const r = await fetch("spec/index.json"); CODE = r.ok ? await r.json() : null; } catch { CODE = null; }
+  return CODE;
+}
+async function getSpec(env, rel, asText = false) {
+  const code = await codeIndex(), here = code?.envs.find(e => e.env === env && !e.error);
+  if (!here) return asText ? getText(`${env}/spec/${rel}`) : getJSON(`${env}/spec/${rel}`);
+  return fetchOnce("c:" + env + "/" + rel, async () => { const r = await fetch(`spec/${env}/${rel}`); if (!r.ok) throw new Error(`spec/${env}/${rel}: ${r.status}`); return asText ? r.text() : r.json(); });
 }
 function fetchOnce(key, f) { return cache[key] ??= f().catch(e => { delete cache[key]; throw e; }); }
 async function getJSON(path) {
@@ -266,7 +281,7 @@ function setParam(k, v) {
 
 // retired arms (RETIRED in env.py) are left out of comparisons, rates and runs unless the hash has retired=show
 async function envData(env, h = {}) {
-  const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getJSON(`${env}/spec/env.json`)), maybe(getJSON(`${env}/links.json`))]);
+  const [idx, spec, links] = await Promise.all([maybe(getJSON(`${env}/index.json`)), maybe(getSpec(env, "env.json")), maybe(getJSON(`${env}/links.json`))]);
   if (!idx && !spec) throw new Error(`no index or spec for ${env}`);
   const D = {env, idx: idx || {runs: [], pairs: {}, arms: spec.arms, arm_factors: spec.arm_factors, primary: spec.primary, title: env},
              spec, links: links || {runs: {}}, showRetired: h.retired === "show"};
@@ -287,7 +302,7 @@ async function envData(env, h = {}) {
 const targetKey = r => r.target + (r.thinking === false ? " · thinking off" : r.thinking === true ? " · thinking on" : "");
 // pooled primary per (arm, target) and per (arm, target, item), over runs
 function pooled(idx) {
-  const by = {}, items = {}, targets = new Set();
+  const by = {}, items = {}, itemsBy = {}, targets = new Set();
   for (const r of idx.runs) for (const [arm, a] of Object.entries(r.arms)) {
     const tgt = targetKey(r);
     targets.add(tgt);
@@ -298,12 +313,30 @@ function pooled(idx) {
       for (const [it, [k, n]] of Object.entries(a.primary.items || {})) {
         const q = items[arm + "\u0000" + tgt + "\u0000" + it] ??= {k: 0, n: 0};
         q.k += k; q.n += n;
+        (itemsBy[arm + "\u0000" + tgt] ??= new Set()).add(it);
       }
     }
   }
-  return {by, items, targets: [...targets].sort()};
+  return {by, items, itemsBy, targets: [...targets].sort()};
 }
-async function armSpec(env, arm) { return getJSON(`${env}/spec/arms/${slug(arm)}.json`); }
+// arms a and b on one target, each pooled over only the items both have episodes on (and, for a pair with an item
+// subset, only those items): an arm run on extra items (a pilot on another dataset) must not shift the comparison.
+// -> [A, B, nItems], or null when they share no items
+function matched(P, a, b, t, only = null) {
+  const ia = P.itemsBy[a + "\u0000" + t], ib = P.itemsBy[b + "\u0000" + t];
+  if (!ia || !ib) return null;
+  const keep = only ? new Set(only.map(String)) : null, A = {k: 0, n: 0}, B = {k: 0, n: 0};
+  let m = 0;
+  for (const it of ia) {
+    if (!ib.has(it) || (keep && !keep.has(it))) continue;
+    const x = P.items[a + "\u0000" + t + "\u0000" + it], y = P.items[b + "\u0000" + t + "\u0000" + it];
+    if (!x?.n || !y?.n) continue;
+    A.k += x.k; A.n += x.n; B.k += y.k; B.n += y.n; m++;
+  }
+  return m ? [A, B, m] : null;
+}
+const matchedDelta = (P, a, b, t, only) => { const m = matched(P, a, b, t, only); return m ? deltaOf(m[0], m[1]) : null; };
+async function armSpec(env, arm) { return getSpec(env, `arms/${slug(arm)}.json`); }
 // resolve {"$b"} from the arm's blobs; {"$f"} stays a ref (fetched on demand, compared by hash)
 function resolve(x, blobs) {
   if (Array.isArray(x)) return x.map(v => resolve(v, blobs));
@@ -316,7 +349,7 @@ function resolve(x, blobs) {
 }
 const isRef = v => v && typeof v === "object" && "$f" in v;
 async function text(env, v) {
-  if (isRef(v)) return getText(`${env}/spec/blobs/${v.$f}.txt`);
+  if (isRef(v)) return getSpec(env, `blobs/${v.$f}.txt`, true);
   if (typeof v === "string") return v;
   return JSON.stringify(v, null, 1);
 }
@@ -408,59 +441,76 @@ async function renderDiff(env, armA, armB, item, el) {
 
 // ---------------------------------------------------------------- rollouts
 
+// episodes of an arm (on one item, or all), pooled over runs and grouped by model: [{target, eps: [{run, id, docent,
+// v, collection, read}]}]. Runs are storage, not something the page shows: an episode is (model, episode id).
 function episodesFor(D, arm, item) {
-  const pre = `${slug(arm)}~${item == null ? "" : slug(item) + "~"}`, out = [];
-  for (const [run, r] of Object.entries(D.links.runs || {})) {
-    const eps = Object.entries(r.episodes || {}).filter(([id]) => id.startsWith(pre));
-    if (eps.length) out.push({run, target: targetKey(r), collection: r.docent_collection, expview: r.expview, expviewItems: r.expview_items, reads: r.reads || {}, eps});
-  }
-  return out;
+  const pre = `${slug(arm)}~${item == null ? "" : slug(item) + "~"}`, by = {};
+  for (const [run, r] of Object.entries(D.links.runs || {}))
+    for (const [id, [docent, v]] of Object.entries(r.episodes || {}))
+      if (id.startsWith(pre)) (by[targetKey(r)] ??= []).push({run, id, docent, v, collection: r.docent_collection, read: (r.reads || {})[id]});
+  return Object.entries(by).sort().map(([target, eps]) => ({target, eps}));
 }
-const expviewUrl = (D, ds, item) => `${D.links.expview_base || "https://expview.pages.dev/"}#dataset=${ds}${item ? "&item=" + encodeURIComponent(item) : ""}`;
-function epChip(D, r, [id, [docent, v]]) {
-  const run = r.run, coll = r.collection;
-  const cls = v === true ? "pos" : v === false ? "neg" : "";
-  const label = id.split("~").slice(1).join("~") + (v === true ? " ✓" : v === false ? " ✗" : v == null ? " –" : ` ${v}`);
-  const dl = docent && coll ? `${DOCENT}${coll}/agent_run/${docent}` : null, here = "#" + hashOf({env: D.env, run, episode: id});
+// the run rides along in the link only to tell apart top-up runs that reused sample numbers; the page never shows it
+const epHash = (D, target, e) => hashOf({env: D.env, model: target, episode: e.id, run: e.run});
+// expview lives beside this page (expview/ on the same site; ?expview= overrides): it reads the env run folders
+// directly, so every env, arm and episode has a page, with any O-lens / judge runs attached to the episode
+const EV = params.get("expview") || "expview/";
+const evq = o => EV + "#" + Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+// an episode is (model, episode id); expview resolves the run itself. `run` goes along only when top-up runs repeated
+// the episode id for this model, so the link opens the exact one
+const evEpisode = (env, model, id, run = null) => evq({env, episode: id, model, ...(run ? {run} : {})});
+const evArm = (env, arm) => evq({env, arm});
+function epChip(D, target, e, name, dup = false) {
+  const cls = e.v === true ? "pos" : e.v === false ? "neg" : "";
+  const label = name + (e.v === true ? " ✓" : e.v === false ? " ✗" : e.v == null ? " –" : ` ${e.v}`);
+  const dl = e.docent && e.collection ? `${DOCENT}${e.collection}/agent_run/${e.docent}` : null, here = "#" + epHash(D, target, e);
   // one pill: the label opens Docent (or the transcript here), then small links to the transcript here and to expview
   return `<span class="chip ${cls}"><a href="${dl || here}" ${dl ? 'target="_blank" rel="noopener"' : ""} title="${dl ? "open in Docent" : "open here"}">${esc(label)}</a>` +
     (dl ? `<a class="x" href="${here}" title="transcript on this page">↗</a>` : "") +
-    (r.expviewItems ? `<a class="x" href="${expviewUrl(D, r.expview, id)}" target="_blank" rel="noopener" title="open in expview">ev</a>` : "") +
-    (r.reads[id] ? `<a class="x lens" href="${expviewUrl(D, r.reads[id][0], r.reads[id][1])}" target="_blank" rel="noopener" title="O-lens reads in expview (${esc(r.reads[id][0])})">lens</a>` : "") + "</span>";
+    `<a class="x${e.read ? " lens" : ""}" href="${evEpisode(D.env, target, e.id, dup ? e.run : null)}" target="_blank" rel="noopener" title="open in expview${e.read ? ", with its O-lens reads" : ""}">${e.read ? "lens" : "ev"}</a></span>`;
 }
-// the arm's every-run expview view (expview_export.export_arms), if there is one
+// every episode of the arm, all runs, in expview
 const armExpview = (D, arm, label = "whole arm in expview ↗") =>
-  D.links.arms?.[arm] ? `<a href="${expviewUrl(D, D.links.arms[arm])}" target="_blank" rel="noopener" title="every episode of this arm, all runs, grouped by model">${label}</a>` : "";
+  `<a href="${evArm(D.env, arm)}" target="_blank" rel="noopener" title="every episode of this arm, all runs, grouped by model">${label}</a>`;
+// chip labels: the sample (item~sample when the card spans items), numbered when top-up runs repeat one
+function chipNames(eps, item) {
+  const seen = {};
+  return eps.map(e => {
+    const [, it, smp] = e.id.split("~"), base = item == null ? `${it}~${smp}` : `#${smp}`;
+    seen[base] = (seen[base] || 0) + 1;
+    return [e, seen[base] > 1 ? `${base}.${seen[base]}` : base];
+  }).map(([e, nm]) => [e, nm, eps.filter(x => x.id === e.id).length > 1]);
+}
 function rolloutsHtml(D, arm, item, max = 12) {
-  const runs = episodesFor(D, arm, item);
+  const groups = episodesFor(D, arm, item);
   const head = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><span class="mono" style="font-weight:500">${esc(arm)}${retiredTag(D, arm)}</span>${armExpview(D, arm)}</div>`;
-  if (!runs.length) return `<div class="card">${head}<p class="mute" style="margin:0">no rollouts${item == null ? "" : " on this item"} yet</p></div>`;
-  const nRead = runs.reduce((t, r) => t + r.eps.filter(([id]) => r.reads[id]).length, 0);
-  return `<div class="card">${head}` + (nRead ? `<p class="mute" style="margin:0 0 6px;font-size:12px"><b style="color:#c46a12">lens</b> = ${nRead} of these episodes have O-lens reads</p>` : "") + runs.map(r => {
-    const k = r.eps.filter(e => e[1][1] === true).length, n = r.eps.filter(e => typeof e[1][1] === "boolean").length;
+  if (!groups.length) return `<div class="card">${head}<p class="mute" style="margin:0">no rollouts${item == null ? "" : " on this item"} yet</p></div>`;
+  const nRead = groups.reduce((t, g) => t + g.eps.filter(e => e.read).length, 0);
+  return `<div class="card">${head}` + (nRead ? `<p class="mute" style="margin:0 0 6px;font-size:12px"><b style="color:#c46a12">lens</b> = ${nRead} of these episodes have O-lens reads</p>` : "") + groups.map(g => {
+    const k = g.eps.filter(e => e.v === true).length, n = g.eps.filter(e => typeof e.v === "boolean").length;
     return `<div style="border-top:1px solid var(--line);padding:8px 0 4px">
-      <div class="row" style="margin:0 0 4px;justify-content:space-between;gap:8px"><span><b style="font-weight:600">${esc(modelName(r.target || ""))}</b>
-        <a class="mono mute" style="font-size:11px" href="#${hashOf({env: D.env, run: r.run, arm})}">${esc(r.run)}</a></span>
-        <span class="row" style="margin:0;gap:10px">${n ? `<span class="mute" style="font-variant-numeric:tabular-nums">${k}/${n} positive</span>` : ""}
-        ${r.collection ? `<a href="${DOCENT}${r.collection}" target="_blank" rel="noopener">Docent ↗</a>` : ""}
-        ${r.expview ? `<a href="${expviewUrl(D, r.expview)}" target="_blank" rel="noopener">expview ↗</a>` : ""}</span></div>
-      <div>${r.eps.slice(0, max).map(e => epChip(D, r, e)).join("")}${r.eps.length > max ? ` <span class="mute">+${r.eps.length - max} more</span>` : ""}</div></div>`;
+      <div class="row" style="margin:0 0 4px;justify-content:space-between;gap:8px"><b style="font-weight:600" title="${esc(g.target)}">${esc(modelName(g.target))}</b>
+        ${n ? `<span class="mute" style="font-variant-numeric:tabular-nums">${k}/${n} positive</span>` : ""}</div>
+      <div>${chipNames(g.eps, item).slice(0, max).map(([e, nm, dup]) => epChip(D, g.target, e, nm, dup)).join("")}${g.eps.length > max ? ` <span class="mute">+${g.eps.length - max} more</span>` : ""}</div></div>`;
   }).join("") + "</div>";
 }
 
 // ---------------------------------------------------------------- pages
 
-// the env list, built in the browser from each envs/<env>/index.json (on HF: the env dirs come from one tree-API call),
-// so an upload from a checkout that lacks some envs can't hide them; a local mirror uses its envs/index.json
+// the env list is the code's: spec/index.json beside the page (built from main by the Pages workflow, or from the
+// working tree by `environments view`), errors included so a broken env still shows. Each env's runs come from its
+// envs/<env>/index.json (HF, or the local mirror); run folders for an env the code doesn't have are ignored. Without a
+// code spec (?spec=hf) it falls back to the generated envs/index.json.
 async function envList() {
-  if (params.get("base")) return getJSON("index.json");
-  const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/tree/main/envs`);
-  if (!r.ok) return getJSON("index.json");
-  const dirs = (await r.json()).filter(x => x.type === "directory").map(x => x.path.split("/").pop());
-  const idxs = await Promise.all(dirs.map(e => maybe(getJSON(`${e}/index.json`))));
-  const envs = idxs.map((x, i) => x && {env: dirs[i], title: x.title, status: x.status, starred: x.starred, primary: x.primary, n_runs: x.runs.length,
-    targets: x.runs.reduce((t, run) => (t[run.target] = (t[run.target] || 0) + (run.n_episodes || 0), t), {}),
-    latest: x.runs.map(run => run.created || "").sort().pop() || ""}).filter(Boolean);
+  const code = await codeIndex();
+  if (!code) return getJSON("index.json");
+  const idxs = await Promise.all(code.envs.map(c => maybe(getJSON(`${c.env}/index.json`))));
+  const envs = code.envs.map((c, i) => {
+    const runs = idxs[i]?.runs || [];
+    return {env: c.env, title: c.title || c.env, status: c.error ? "BROKEN" : c.status, starred: c.starred, primary: c.primary || idxs[i]?.primary,
+      error: c.error, n_runs: runs.length, targets: runs.reduce((t, r) => (t[r.target] = (t[r.target] || 0) + (r.n_episodes || 0), t), {}),
+      latest: runs.map(r => r.created || "").sort().pop() || ""};
+  });
   return {generated: envs.map(e => e.latest).sort().pop() || "", envs};
 }
 
@@ -473,7 +523,7 @@ async function home() {
   ${[["Starred: settled, nobody is changing them", idx.envs.filter(e => e.starred)], ["In progress", idx.envs.filter(e => !e.starred)]].filter(([, es]) => es.length).map(([g, es]) => `<h3>${g}</h3>
   <div class="cards">${es.map(e => `<a class="card" href="#env=${e.env}">
     <div class="row" style="margin:0;justify-content:space-between"><span class="t mono" style="font-size:14px">${e.starred ? `<span class="star" title="${esc(e.starred)}">★</span> ` : ""}${esc(e.env)}</span>${e.status ? `<span class="badge">${esc(e.status)}</span>` : ""}</div>
-    <div class="why">${esc(e.title)}</div>
+    <div class="why">${esc(e.title)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't build</span>` : ""}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
     <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
 }
@@ -481,7 +531,7 @@ async function home() {
 const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
 
 function tabs(env, on) {
-  const T = [["compare", "Comparisons"], ["arms", "Arms"], ["runs", "Runs"], ["about", "About"], ["source", "Source"]];
+  const T = [["compare", "Comparisons"], ["arms", "Arms"], ["about", "About"], ["source", "Source"]];
   return `<div class="tabs">${T.map(([k, l]) => `<a href="#env=${env}&tab=${k}" class="${on === k ? "on" : ""}">${l}</a>`).join("")}</div>`;
 }
 
@@ -489,9 +539,10 @@ async function envPage(h) {
   const env = h.env, tab = h.tab || "compare";
   setCrumb([[env, "env=" + env]]);
   const D = await envData(env, h);
-  const head = `<h1>${D.idx.starred ? `<span class="star" title="${esc(D.idx.starred)}">★</span> ` : ""}${esc(D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
-  if (!D.spec && tab !== "runs") { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
-  const body = {compare: compareList, arms: armsTab, runs: runsTab, about: aboutTab, source: sourceTab}[tab];
+  const star = D.spec ? D.spec.starred : D.idx.starred;
+  const head = `<h1>${star ? `<span class="star" title="${esc(star)}">★</span> ` : ""}${esc(D.spec?.title || D.idx.title)}</h1><p class="lede"><span class="badge">primary · ${esc(D.idx.primary)}</span> ${D.spec?.behavior ? esc(D.spec.behavior) : ""}</p>`;
+  if (!D.spec) { $("view").innerHTML = head + tabs(env, tab) + `<p class="mute">No spec for ${esc(env)} yet: run <span class="mono">python -m environments spec ${esc(env)}</span>.</p>`; return; }
+  const body = {compare: compareList, arms: armsTab, about: aboutTab, source: sourceTab}[tab] || compareList;
   $("view").innerHTML = head + tabs(env, tab) + (D.retiredNote ? `<p>${D.retiredNote}</p>` : "") + '<div id="tab"></div>';
   await body(D, h);
 }
@@ -503,7 +554,7 @@ function compareList(D) {
     const ts = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]?.n));
     const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
       const p = P.by[a + "\u0000" + t], v = pctOf(p);
-      const d = i ? deltaBadge(deltaOf(P.by[c.arms[0] + "\u0000" + t], p)) : "";
+      const d = i ? deltaBadge(matchedDelta(P, c.arms[0], a, t, c.items)) : "";
       return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar">${p?.n ? ciBar(p.k, p.n, "b") : '<span class="b"></span>'}
         <span class="v">${v == null ? "not run" : `${(100 * v).toFixed(0)}% <span style="color:var(--faint)">/${p.n}</span>`}</span><span class="dl">${d}</span></span>`;
     }).join("")).join("") : c.arms.map(a => `<span class="arm">${esc(a)}${retiredTag(D, a)}</span><span class="mute">not run</span>`).join("");
@@ -512,7 +563,7 @@ function compareList(D) {
       <div class="mini">${body}</div></a>`;
   };
   $("tab").innerHTML = `<p class="lede">Pairs are the env's declared clean counterfactuals (<span class="mono">PAIRS</span>); sets are arms worth viewing side by side
-    (<span class="mono">COMPARISONS</span>). Bars are the primary rate pooled over runs per model, thinking on and off apart; the pill is each arm minus the first,
+    (<span class="mono">COMPARISONS</span>). Bars are the primary rate over every episode per model, thinking on and off apart; the pill is each arm minus the first on the items both were run on,
     coloured when its 95% interval excludes zero. Bands are 95% credible intervals (Beta(1,1) prior), the line the observed rate.</p>` +
     Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="cards">${cs.map(card).join("")}</div>`).join("");
 }
@@ -536,30 +587,31 @@ async function comparePage(h) {
   const sb = eps[c.arms.indexOf(baseArm)] ? sections(eps[c.arms.indexOf(baseArm)]) : [];
   const changes = c.arms.map((a, i) => !eps[i] ? null : pairSections(sb, sections(eps[i])).filter(p => !p.same && !p.name.startsWith("meta")).map(p => p.name));  // what the model sees
   // one scale for every Δ bar on the page, so they compare: the widest credible interval, rounded up to 10pp
-  const S = Math.max(10, ...c.arms.flatMap(a => a === baseArm ? [] : usedT.map(t => { const x = deltaOf(P.by[baseArm + "\u0000" + t], P.by[a + "\u0000" + t]);
+  const S = Math.max(10, ...c.arms.flatMap(a => a === baseArm ? [] : usedT.map(t => { const x = matchedDelta(P, baseArm, a, t, c.items);
     return x ? Math.ceil(Math.max(Math.abs(x.lo), Math.abs(x.hi)) / 10) * 10 : 0; })));
   const effects = usedT.map(t => {
-    const a = P.by[baseArm + "\u0000" + t], b = P.by[other + "\u0000" + t], x = deltaOf(a, b);
-    if (!x) return "";
+    const mm = matched(P, baseArm, other, t, c.items);
+    if (!mm) return "";
+    const [a, b, nIt] = mm, x = deltaOf(a, b);
     const cls = x.lo > 0 ? "up" : x.hi < 0 ? "down" : "";
     return `<div class="effect"><div class="m" title="${esc(t)}">${esc(modelName(t))}</div><div class="big ${cls}">${x.d >= 0 ? "+" : ""}${x.d.toFixed(0)}<span style="font-size:15px">pp</span></div>
-      <div class="sub">${(100 * pctOf(a)).toFixed(0)}% → ${(100 * pctOf(b)).toFixed(0)}% · n ${a.n} / ${b.n}<br>95% CrI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp</div></div>`;
+      <div class="sub">${(100 * pctOf(a)).toFixed(0)}% → ${(100 * pctOf(b)).toFixed(0)}% · n ${a.n} / ${b.n} on ${nIt} shared items<br>95% CrI ${x.lo.toFixed(0)} to ${x.hi.toFixed(0)}pp</div></div>`;
   }).join("");
   $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← comparisons</a>${D.retiredNote ? " · " + D.retiredNote : ""}</p>
   <h1>${esc(c.name)} <span class="badge" style="vertical-align:4px">${c.kind === "pair" ? "pair" : "set"}</span></h1>
-  <p class="lede">${c.why ? esc(c.why) + ". " : ""}Effect of <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span> on <span class="mono">${esc(D.idx.primary)}</span>, pooled over runs:</p>
+  <p class="lede">${c.why ? esc(c.why) + ". " : ""}Effect of <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span> on <span class="mono">${esc(D.idx.primary)}</span>, pooled over every episode, on the items both arms were run on:</p>
   ${effects ? `<div class="effects">${effects}</div>` : '<p class="mute">No runs of both arms yet.</p>'}
   <h2>Arms</h2>
   <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th title="${esc(t)}">${esc(modelName(t))}<br><span style="font-weight:400;text-transform:none">all items · this item</span></th>`).join("")}</tr>
   ${c.arms.map((a, i) => {
     const isB = a === baseArm;
     return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a>${retiredTag(D, a)}
-      ${D.links.arms?.[a] ? `<br><span style="font-family:Inter,system-ui">${armExpview(D, a, "expview ↗")}</span>` : ""}</td>
+      <br><span style="font-family:Inter,system-ui">${armExpview(D, a, "expview ↗")}</span></td>
       <td>${isB ? "<b>base</b>" : `<a href="${go({other: a})}">${a === other ? "<b>shown</b>" : "show"}</a> · <a href="${go({base: a, other: baseArm})}" title="make this the base">base</a>`}</td>
       <td class="mono">${isB ? "" : changes[i] == null ? '<span class="mute">not built on this item</span>' : changes[i].length ? changes[i].map(esc).join("<br>") : '<span class="mute">identical</span>'}</td>
       ${usedT.map(t => {
         const p = P.by[a + "\u0000" + t], q = P.items[a + "\u0000" + t + "\u0000" + item], b = P.by[baseArm + "\u0000" + t];
-        const x = !isB && p?.type === "bool" ? deltaOf(b, p) : null;
+        const x = !isB && p?.type === "bool" ? matchedDelta(P, baseArm, a, t, c.items) : null;
         const d = x ? `<div class="rate" style="margin-top:4px">${deltaBar(x, S)}${deltaBadge(x)} <span class="ci">[${x.lo.toFixed(0)}, ${x.hi.toFixed(0)}]</span></div>` : "";
         return `<td>${p ? (p.type === "bool" ? rate(p.k, p.n) + d : `${p.eps} eps`) : '<span class="mute">not run</span>'}${q ? `<br><span class="mono mute">this item ${q.k}/${q.n}</span>` : ""}</td>`;
       }).join("")}</tr>`;
@@ -569,7 +621,7 @@ async function comparePage(h) {
   <div class="row"><label>item <select onchange="location.hash='${go({item: "__"})}'.replace('__', encodeURIComponent(this.value))">${items.map(it => `<option ${it === item ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
     <span class="mute">${items.length} items${c.items ? " (the pair's subset)" : ""} · built for sample 0 on ${esc(D.spec.built_for?.today)}</span></div>
   <h2>Rollouts on item ${esc(item)}</h2>
-  <p class="lede">Chips are episodes on this item (✓ / ✗ = ${esc(D.idx.primary)}): click opens Docent, ↗ the transcript here, ev the expview item.</p>
+  <p class="lede">Chips are episodes on this item (✓ / ✗ = ${esc(D.idx.primary)}): click opens Docent, ↗ the transcript here, ev the episode in expview (lens when it has O-lens reads).</p>
   <div class="cols" style="grid-template-columns:1fr 1fr">${rolloutsHtml(D, baseArm, item)}${rolloutsHtml(D, other, item)}</div>
   <h2>What changes: <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span></h2>
   <div id="diff"></div>`;
@@ -647,18 +699,6 @@ async function diffPage(h) {
   await renderDiff(h.env, a, b, item, $("diff"));
 }
 
-function runsTab(D) {
-  const env = D.env;
-  $("tab").innerHTML = `<div class="scroll"><table><tr><th>run</th><th>target</th><th>episodes</th><th>labels</th><th>links</th><th>description</th></tr>
-  ${D.idx.runs.map(r => { const L = D.links.runs?.[r.run] || {};
-    return `<tr class="click" onclick="location.hash='env=${env}&run=${r.run}'"><td class="mono">${esc(r.run)}</td><td class="mono">${esc(r.target)}${r.thinking === false ? " (thinking off)" : ""}</td>
-    <td>${r.n_episodes}</td><td class="mono">${r.label_files.map(esc).join("<br>")}</td>
-    <td>${r.docent_collection ? `<a href="${DOCENT}${r.docent_collection}" onclick="event.stopPropagation()" target="_blank" rel="noopener">Docent</a>` : ""}
-      ${L.expview ? ` <a href="${expviewUrl(D, L.expview)}" onclick="event.stopPropagation()" target="_blank" rel="noopener">expview</a>` : ""}</td>
-    <td>${esc(r.description || "")}${r.converted_from ? `<br><span class="mute">converted from ${esc(r.converted_from)}</span>` : ""}</td></tr>`; }).join("")}
-  </table></div>`;
-}
-
 function aboutTab(D) {
   const s = D.spec;
   const kv = o => `<pre class="code">${esc(JSON.stringify(o, null, 1))}</pre>`;
@@ -676,37 +716,28 @@ async function sourceTab(D, h) {
   try { $("code").textContent = await sourceText(s, file); } catch (e) { $("code").textContent = String(e.message); }
 }
 
-async function runPage(env, run, arm, epId) {
-  setCrumb([[env, "env=" + env], [run]]);
-  const D = await envData(env, {retired: "show"});  // a run page shows the run whatever its arms
-  const r = D.idx.runs.find(x => x.run === run);
-  const epIdx = await getJSON(`${env}/${run}/episodes/index.json`);
-  const ids = Object.keys(epIdx);
-  const arms = Object.keys(r.arms).sort();
-  if (!arm && epId) arm = arms.find(a => epId.startsWith(slug(a) + "~"));
-  arm = arm || arms[0];
-  const mine = ids.filter(id => id.startsWith(slug(arm) + "~"));
-  const L = D.links.runs?.[run] || {};
-  $("view").innerHTML = `<p><a href="#env=${env}&tab=runs">← ${esc(env)} runs</a> · target <span class="mono">${esc(r.target)}</span> · ${r.n_episodes} episodes
-    ${r.docent_collection ? ` · <a href="${DOCENT}${r.docent_collection}" target="_blank" rel="noopener">Docent collection</a>` : ""}
-    ${L.expview ? ` · <a href="${expviewUrl(D, L.expview)}" target="_blank" rel="noopener">expview</a>` : ""}</p>
-  <div class="scroll"><table><tr><th>arm</th><th>n</th><th>errors</th><th>unscorable</th><th>${esc(D.idx.primary)}</th></tr>
-  ${arms.map(a => { const x = r.arms[a]; return `<tr class="click ${a === arm ? "on" : ""}" onclick="location.hash='${hashOf({env, run, arm: a})}'">
-    <td class="mono">${esc(a)}</td><td>${x.n}</td><td>${x.errors}</td><td>${x.unscorable}</td><td>${primaryCell(x.primary)}</td></tr>`; }).join("")}
-  </table></div>
-  <div class="row"><label>episode <select id="ep" onchange="location.hash='${hashOf({env, run, arm})}&episode='+encodeURIComponent(this.value)">
-    ${mine.map(id => `<option ${id === epId ? "selected" : ""}>${esc(id)}</option>`).join("")}</select></label>
-    ${D.spec ? `<a href="#${hashOf({env, arm})}">this arm's inputs</a>` : ""}</div>
-  <div id="episode"></div>`;
-  if (mine.length) showEpisode(env, run, epId && mine.includes(epId) ? epId : mine[0]);
+// one episode: (model, episode id), with run only as an optional hint (old links); found through links.json
+async function episodePage(h) {
+  const env = h.env, D = await envData(env, {retired: "show"});
+  const id = h.episode, cands = Object.entries(D.links.runs || {}).filter(([, r]) => id in (r.episodes || {}));
+  const hit = cands.find(([run]) => run === h.run) || cands.find(([, r]) => targetKey(r) === h.model) || cands[0];
+  if (!hit) throw new Error(`no episode ${id}`);
+  const [run, r] = hit, target = targetKey(r), [arm, item] = [(D.spec?.arms || []).find(a => id.startsWith(slug(a) + "~")) || id.split("~")[0], id.split("~")[1]];
+  setCrumb([[env, "env=" + env], [arm, hashOf({env, arm, item})], [`${modelName(target)} · ${id.split("~").slice(1).join("~")}`]]);
+  $("view").innerHTML = `<p><a href="#${hashOf({env, arm, item})}">← ${esc(arm)} on ${esc(item)}</a></p>
+  <h1 style="font-size:20px"><span class="mono">${esc(arm)}</span> · ${esc(item)} · ${esc(modelName(target))}</h1>
+  <h3>All episodes of this arm on this item</h3>${rolloutsHtml(D, arm, item, 40)}
+  <h2>Transcript</h2><div id="episode"></div>`;
+  await showEpisode(env, run, id, target, cands.filter(([, x]) => targetKey(x) === target).length > 1);
 }
 
-async function showEpisode(env, run, id) {
+async function showEpisode(env, run, id, target, dup) {
   const el = $("episode");
   el.innerHTML = '<p class="mute">loading episode…</p>';
   const ep = await getEpisode(env, run, id);
-  const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}" target="_blank" rel="noopener">Docent</a>` : ""].filter(Boolean).join(" · ");
-  el.innerHTML = `<p class="mono">${esc(ep.id)} · finish ${esc(ep.finish)} ${ep.today ? "· date " + esc(ep.today) : ""} ${links ? "· " + links : ""}
+  const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}" target="_blank" rel="noopener">Docent</a>` : "",
+    `<a href="${evEpisode(env, target, id, dup ? run : null)}" target="_blank" rel="noopener">expview</a>`].filter(Boolean).join(" · ");
+  el.innerHTML = `<p class="mono">finish ${esc(ep.finish)} ${ep.today ? "· date " + esc(ep.today) : ""} ${links ? "· " + links : ""}
     ${ep.build_check && ep.build_check !== "match" ? `<br><b>${esc(ep.build_check)}</b>` : ""}</p>
   ${(ep.messages || []).map(m => `<div class="msg ${esc(m.role)}"><div class="role">${esc(m.role)}${m.tool_calls ? " · " + m.tool_calls.map(t => esc(t.function.name)).join(", ") : ""}</div>`
     + (m.reasoning_content ? `<div class="think">${esc(m.reasoning_content)}</div>` : "") + esc(typeof m.content === "string" ? m.content : JSON.stringify(m.content))
@@ -725,7 +756,8 @@ async function route() {
   const h = canonHash();
   $("status").textContent = "loading…";
   try {
-    if (h.run) await runPage(h.env, h.run, h.arm, h.episode);
+    if (h.episode) await episodePage(h);
+    else if (h.run) await envPage({env: h.env});  // old run links: runs aren't shown any more
     else if (h.compare) await comparePage(h);
     else if (h.diff) await diffPage(h);
     else if (h.env && h.arm) await armPage(h);
