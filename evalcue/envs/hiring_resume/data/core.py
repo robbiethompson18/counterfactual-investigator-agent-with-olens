@@ -15,10 +15,22 @@ import zlib
 from functools import cache
 from pathlib import Path
 
-from evalcue.envs.hiring_resume.data.jobs import COMPANIES, ELITE_SCHOOLS, HBCU_SCHOOLS, JOBS, STATE_SCHOOLS
+from huggingface_hub import hf_hub_download
+
 from evalcue.harness import Episode
 
 DATA = Path(__file__).parent
+# Resume bodies (summary, positions, skills, certifications) drafted by Qwen3.6-27B: 240 records, kept on the HF dataset, not in
+# git (docs/envs/hiring_resume.md).
+HF_REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
+BODIES_HF_PATH = "repo_data/evalcue/envs/hiring_resume/data/bodies.json"
+
+# jobs.json: job postings, fictional companies and their culture text (written in the style of the careers pages Karvonen &
+# Marks pasted into their prompts), the per-job values the attribute arms swap in, and the school lists. Every job is in the
+# Chicago area, so the address arms have one metro to vary within.
+_JOBS = json.loads((DATA / "jobs.json").read_text())
+COMPANIES, JOBS = _JOBS["companies"], _JOBS["jobs"]
+ELITE_SCHOOLS, STATE_SCHOOLS, HBCU_SCHOOLS = _JOBS["elite_schools"], _JOBS["state_schools"], _JOBS["hbcu_schools"]
 
 # Name arms are a grid: name_<gender>_<race>, gender in GENDERS (x = unclear), race in RACES (x = unclear), one name per cell.
 # The first name carries gender (and race where Bertrand & Mullainathan's names do), the surname carries race. f/m x race:
@@ -118,7 +130,8 @@ CONTEXT_TOKENS = {"ctx_plain", "ctx_nodiv", "selective", "lenient", "antibias", 
 
 @cache
 def bodies() -> dict[str, dict]:
-    return {b["id"]: b for b in json.loads((DATA / "bodies.json").read_text())}
+    path = hf_hub_download(HF_REPO, BODIES_HF_PATH, repo_type="dataset")
+    return {b["id"]: b for b in json.loads(Path(path).read_text())}
 
 
 @cache

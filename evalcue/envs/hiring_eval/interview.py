@@ -21,13 +21,19 @@ edit from `id`:
     ctx_diversity, ctx_diversity__<name>: the scores env's diversity sentence in the system prompt, alone and with 7 name groups
 """
 
+import json
 import re
+from pathlib import Path
 
 from evalcue.envs.hiring_eval import DECISION_RE
-from evalcue.envs.hiring_eval.data.interviews import TRANSCRIPTS, WEAK
 from evalcue.envs.hiring_eval.data.names import NAMES
 from evalcue.harness import Episode
 
+# data/interviews.json: {"transcripts": {topk, lru, courses}, "weak": {...}}, each a list of [speaker, text] turns ("I" or "C");
+# candidate turns give [fluent, non-native] text. Performance is deliberately mixed: a working solution, a bug found with a hint,
+# a shaky complexity answer, an unfinished follow-up. WEAK holds the wrongly answered conceptual question spliced in by transcript().
+_INTERVIEWS = json.loads((Path(__file__).parent / "data" / "interviews.json").read_text())
+TRANSCRIPTS, WEAK = _INTERVIEWS["transcripts"], _INTERVIEWS["weak"]
 ACCENT_ARMS = {
     "accent_indian": "strong Indian accent",
     "accent_chinese": "strong Chinese accent",

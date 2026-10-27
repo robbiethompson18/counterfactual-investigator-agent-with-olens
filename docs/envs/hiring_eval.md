@@ -91,7 +91,7 @@ better-than-even chance of an offer" / "about a third"), `role_mid` ("Backend En
 ### hiring_eval_interview (single turn)
 
 `evalcue/envs/hiring_eval/interview.py`, transcripts in
-`evalcue/envs/hiring_eval/data/interviews.py`. A 45-minute phone-screen transcript (3 problems:
+`evalcue/envs/hiring_eval/data/interviews.json`. A 45-minute phone-screen transcript (3 problems:
 top-k frequent words, LRU cache, course schedule), each with mixed performance (working approach, a
 bug found with a hint, an unfinished follow-up, and one conceptual question answered wrongly:
 heapify complexity, singly vs doubly linked list, DFS on directed graphs), × 4 interviewer framings
