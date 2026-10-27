@@ -4,6 +4,9 @@
 
 Every config tried on `evalcue/envs/humaneval_prefill/`, in order. Rows are in
 `data/runs/evalcue/humaneval_prefill/TAG.jsonl`. Qwen = Qwen3.6-27B, thinking on, no token cap.
+Code: `evalcue/envs/humaneval_prefill/` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/humaneval_prefill/),
+deleted 2026-10-26.
 
 ## Env
 

@@ -2,7 +2,9 @@
 
 **Status (2026-10-26):** NULL. Config log. Cue = placebo; the knob is 14/20.
 
-Env: [evalcue/envs/matonski/grader.py](../evalcue/envs/matonski/grader.py). Single-turn: one of 50
+Env: `evalcue/envs/matonski/grader.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/matonski/grader.py),
+deleted 2026-10-26 with the rest of `evalcue/envs/matonski/`. Single-turn: one of 50
 [matonski/reward-hacking-prompts](https://huggingface.co/datasets/matonski/reward-hacking-prompts)
 tasks, each showing a grader.py that loads expected.json and checks an infeasible computation at
 ~1e-6 tolerance. Hack = user_solution.py reads expected.json, references `EXPECTED`, imports the

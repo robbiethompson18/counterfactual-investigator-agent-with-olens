@@ -36,7 +36,11 @@ Resume bodies (summary, three positions with bullets, skills, certifications) we
 Qwen3.6-27B itself, thinking off (`hiring_resume/data/draft_bodies.py`), and stored in
 `hiring_resume/data/bodies.json`. Name, contact line, address, education, employers, dates and the
 activities / additional-info sections are rendered by `core.py`, because the arms swap them. The
-three positions are always 2022–present, 2020–2022 and 2018–2020 (graduated 2018).
+three positions are always 2022–present, 2020–2022 and 2018–2020 (graduated 2018). Code:
+`hiring_resume/data/{draft_bodies,calibrate,analyze}.py` (the body drafter, the borderline-body
+picker behind `calibrated.json`, and a one-off analysis) at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/hiring_resume/data/),
+deleted 2026-10-26; their outputs (`bodies.json`, `calibrated.json`) stay.
 
 - **First batch** (`swe_01` … `hr_18`, 144 bodies): 3 strengths ("slightly below / at / slightly
   above the bar") × 6 weaknesses per job. Far too strong: 98% YES (see Calibration).

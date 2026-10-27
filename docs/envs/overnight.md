@@ -283,6 +283,11 @@ uv run python -m evalcue.show data/runs/overnight_creds/2026-10-22_r1_qwen/rows.
 uv run --script scripts/docent_upload.py link overnight_creds/2026-10-22_r1_qwen:175
 ```
 
+The rate tables above were printed by `evalcue.envs.overnight.report`. Code:
+`evalcue/envs/overnight/report.py` at commit `7296169`
+(https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/7296169/evalcue/envs/overnight/report.py),
+deleted 2026-10-26.
+
 Completed runs were explicitly mirrored using the repository Docent uploader. Generation was left
 running through the handoff; the original 250-episode creds job was not interrupted.
 
