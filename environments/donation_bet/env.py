@@ -396,6 +396,36 @@ COMPARISONS = {
         "why": "the first template on Qwen's calibrated lines: $1,000 to one cause on one side, no donation on the other",
     },
 }
+# 2026-10-27: each model on its own lines only (Kylie). Retired, not deleted: the v1 template (both line sets) and every run
+# of a model on another model's lines, plus Qwen runs superseded by the stored vLLM ones
+RETIRED = ["template=v1"]
+RETIRED_RUNS = [
+    # v1 template
+    "2026-10-22_calib",
+    "2026-10-22_paired",
+    "2026-10-22_paired-handlines",
+    "2026-10-22_goodcause-beers",
+    "2026-10-22_nochange-5x5",
+    "2026-10-23_glm53_n10_c0",
+    "2026-10-23_glm53_n10_c1",
+    # GLM 5.3 on Qwen's lines
+    "2026-10-23_glm53_smoke",
+    "2026-10-23_glm53_bets",
+    "2026-10-23_glm53_bets_x4",
+    "2026-10-23_glm53_named",
+    "2026-10-23_glm53_named_x4",
+    # Qwen: OpenRouter DeepInfra fp8 (small, another deployment), partial, and abandoned (superseded by _cap8k)
+    "2026-10-22_or_qwen_n60",
+    "2026-10-23_r2_n60_on",
+    "2026-10-23_r2_n60_off",
+    "2026-10-23_think_on_n60",
+    "2026-10-23_think_off_n60",
+    "2026-10-25_qwen-nothink",
+    # DSV4 Flash ran Qwen's lines too: keep only its own
+    "2026-10-27_dsv4f_bets_thinkon:lines=qwen",
+    "2026-10-27_dsv4f_bets_thinkoff:lines=qwen",
+]
+
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}
 # the stored runs: Qwen3.6-27B on vLLM (the shared server: add --served-name qwen --url $QWEN_VLLM_URL); every run, thinking

@@ -13,7 +13,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .core import ROOT, env_names, load_env, retired_arms, run_dirs
+from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run_dirs
 from .runfolder import LOCAL, read_episodes
 
 
@@ -44,9 +44,10 @@ def env_index(env: str) -> dict:
     for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
         label_file, labels = latest_labels(run_dir)
-        by_arm = defaultdict(list)
+        by_arm, skip = defaultdict(list), retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
-            by_arm[ep["arm"]].append(ep)
+            if ep["arm"] not in skip:
+                by_arm[ep["arm"]].append(ep)
         arms = {}
         for arm, eps in by_arm.items():
             vals = [labels.get(e["id"], {}).get(mod.PRIMARY) if not e.get("error") else None for e in eps]
@@ -68,7 +69,7 @@ def env_index(env: str) -> dict:
                 "description": meta.get("description"),
                 "converted_from": meta.get("converted_from"),
                 "docent_collection": meta.get("docent_collection"),
-                "n_episodes": meta.get("n_episodes"),
+                "n_episodes": sum(a["n"] for a in arms.values()) if skip else meta.get("n_episodes"),
                 "label_files": sorted(p.name for p in (run_dir / "labels").glob("*.jsonl")),
                 "primary_from": label_file,
                 "measures": measures,

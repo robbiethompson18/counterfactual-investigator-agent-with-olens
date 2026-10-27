@@ -23,7 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .core import ROOT, Ctx, env_names, load_env, run_dirs, slug
+from .core import ROOT, Ctx, env_names, load_env, retired_run_arms, run_dirs, slug
 from .runfolder import LOCAL, REPO_ROOT, git_sha
 
 BLOB_MIN, FILE_MIN = 256, 8192
@@ -242,8 +242,10 @@ def build_links(env: str) -> Path | None:
     for run_dir in dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
         _, labels = latest_labels(run_dir)
-        eps = {}
+        eps, skip = {}, retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
+            if ep["arm"] in skip:
+                continue
             v = None if ep.get("error") else (labels.get(ep["id"]) or {}).get(mod.PRIMARY)
             eps[ep["id"]] = [ep.get("docent_run"), v]
         runs[run_dir.name] = {

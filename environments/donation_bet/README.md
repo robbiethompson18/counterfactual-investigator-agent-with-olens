@@ -20,6 +20,12 @@ the good cause's side. The arms, both templates and the line sets are described 
 | Pairs           | Good cause vs bad cause / beers / no donation, and No bet vs neutral bet, each on Qwen's, GLM 5.3's and DSV4 Flash's lines                                                                                                                                           |
 | Docent          | converted runs keep their old runs ([goodbad](https://docent.transluce.org/dashboard/fe024751-6ef7-4f31-9df5-3abe990d816c)); new runs go to the `donation_bet` collection ([dashboard](https://docent.transluce.org/dashboard/201afffe-48f0-4c10-8329-6daaf22c2c17)) |
 
+**Shown: each model on its own lines only** (2026-10-27): Qwen3.6-27B on Qwen's, GLM 5.3 on
+`@glm53`, DSV4 Flash on `@dsv4f`. The v1 template is `RETIRED`; the runs of a model on another
+model's lines (GLM 5.3 on Qwen's, DSV4 Flash's `lines=qwen` arms), the v1 runs and the small,
+partial or abandoned Qwen runs are `RETIRED_RUNS` (kept on HF, left out of the indexes and the env
+viewer). The tables below still describe them.
+
 Run (the three good-vs-other pairs on a model's own lines; a new model needs its `neutral` run and
 its medians added to `LINES` first):
 
