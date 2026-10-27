@@ -333,8 +333,20 @@ def fill_dups(dups: pd.DataFrame, canon: pd.DataFrame) -> pd.DataFrame:
 
 
 def import_config(
-    source: str, cfg: str, cfg_dir: Path, files: list[str], out: Path, tok: Tokenizer, docent: dict, calls: Calls, owner: str = "Celeste's"
+    source: str,
+    cfg: str,
+    cfg_dir: Path,
+    files: list[str],
+    out: Path,
+    tok: Tokenizer,
+    docent: dict,
+    calls: Calls,
+    owner: str = "Celeste's",
+    run: Run | None = None,
+    episode_of=None,
 ) -> Counter:
+    """`run`: append to this run instead of making one at `out`. `episode_of(e)`: the env episode (envs/<env>/<run>/<id>) that
+    row `e` of episodes.parquet is, so its item attaches to that episode on the env page."""
     stats = Counter()
     tx = cfg_dir / "transcripts.parquet"
     eps = pd.read_parquet(tx if tx.exists() else cfg_dir / "episodes.parquet").rename(columns={"text": "rendered_text"})
@@ -360,20 +372,21 @@ def import_config(
     bon: dict[str, dict[int, object]] = {}
     for b in pd.read_parquet(bp).itertuples() if bp.exists() else []:
         bon.setdefault(b.tid, {})[int(b.pos)] = b
-    run = Run(
-        out,
-        title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"GLM 5.3 O-lens reads ({owner}): {cfg}",
-        description=(
-            f"{owner} O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
-            "its transcript shows every read inline. **positive** is the env's label for the episode, **aware** the eval-awareness "
-            "judge's (where Celeste's data has them). Items whose source run is on disk also carry its model calls (the subject "
-            "transcript and every judge, exact I/O) and environment."
-        ),
-        label_order=["positive", "aware"],
-        readers=READERS,
-        source=f"{source}/{cfg}: {', '.join(files)}",
-    )
-    run.reset()
+    if run is None:
+        run = Run(
+            out,
+            title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"GLM 5.3 O-lens reads ({owner}): {cfg}",
+            description=(
+                f"{owner} O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
+                "its transcript shows every read inline. **positive** is the env's label for the episode, **aware** the eval-awareness "
+                "judge's (where Celeste's data has them). Items whose source run is on disk also carry its model calls (the subject "
+                "transcript and every judge, exact I/O) and environment."
+            ),
+            label_order=["positive", "aware"],
+            readers=READERS,
+            source=f"{source}/{cfg}: {', '.join(files)}",
+        )
+        run.reset()
     n_dense = sum(pq.ParquetFile(cfg_dir / f).metadata.num_rows for f in dense)
     todo = [t for t in eps.tid if t in all_tids]
     size = len(todo) if n_dense < BATCH_ROWS else max(1, len(todo) * BATCH_ROWS // n_dense)
@@ -389,12 +402,12 @@ def import_config(
         if size < len(todo):
             n = sum(len(v) for v in by_tid.values())
             print(f"{source}/{cfg}: batch {k // size + 1}/{-(-len(todo) // size)}, {n:,} rows", flush=True)
-        import_items(eps[eps.tid.isin(batch)], by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg)
+        import_items(eps[eps.tid.isin(batch)], by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg, episode_of)
     stats["bestofn_unplaced"] += sum(len(v) for v in bon.values())
     return stats
 
 
-def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg) -> None:
+def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg, episode_of=None) -> None:
     for e in eps.itertuples():
         rr = by_tid.get(e.tid)
         if rr is None:
@@ -467,7 +480,10 @@ def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg) 
                 extra["source_item"] = x.get("id")
                 stats["with_calls"] += 1
         labels = {"positive": truthy(f0.positive), "aware": truthy(f0.aware)}
+        ep = episode_of(e) if episode_of else None
+        stats["attached" if ep else "unattached"] += bool(episode_of)
         run.add(
+            episode=ep,
             id=str(e.tid),
             group=" · ".join(str(x) for x in (f0.env, f0.arm) if x is not None and not (isinstance(x, float) and pd.isna(x))) or cfg,
             labels={k: v for k, v in labels.items() if v is not None},
