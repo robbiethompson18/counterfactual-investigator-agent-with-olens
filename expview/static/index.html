@@ -131,6 +131,7 @@ main{overflow:auto;padding:0 28px 60px}
 .blk.tool{border-left-color:var(--tool-line)}.blk.tool>header{background:var(--tool)}.blk.tool>.tx{font:12.5px/1.6 var(--mono)}
 .blk.other>header{background:var(--panel)}
 .blk.collapsed>.tx{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 60%,transparent)}
+.blk>.more{display:none}.blk.collapsed>.more{display:block;width:100%;border:0;border-top:1px dashed var(--line);border-radius:0 0 8px 8px;background:transparent;color:var(--acc);font:600 12px var(--mono);padding:6px 10px;cursor:pointer;text-align:left}
 .blk>header button{float:right;font:11px var(--mono);background:none;border:0;color:var(--acc);cursor:pointer;text-transform:none;letter-spacing:0}
 .sp{font:10.5px var(--mono);color:var(--mute);opacity:.8}
 .tk{border-radius:2px}
@@ -870,7 +871,7 @@ async function trView(p,keepBar){
       for(const r of peekOf(q)){const first=String((r.lines[0]||[""])[0]);const pm=test(R0,first);
         body+=`<span class="pk${pm?" m":""}" data-p="${q}" style="--kc:${colorOf(r.tool,run)}" title="${esc(r.tool)}: ${esc(first)}">${many?`<b>${esc(r.tool)}</b>`:""}${hl(first.length>TRK.peekLen?first.slice(0,TRK.peekLen)+"…":first,R0)}</span>`}
       body+=`<span class="xp" id="xp${q}" hidden></span>`}
-    body+=esc(run_)+"</div></section>"}
+    body+=esc(run_)+"</div>"+(long||TRK.collapsed[key]!=null?`<button class="more" data-col="${key}">⋯ ${(b-a).toLocaleString()} tokens, only the start is shown: show all</button>`:"")+"</section>"}
   const peekOpts=[["auto",hasInline?"inline reads":tools[0]?`${tools[0]} (first)`:"auto"],["off","off"],...tools.map(t=>[t,t])];
   const html=`<div class="tkbar">
      <label for="tkq">Search reads <input class="rx" id="tkq" type="search" value="${esc(TRK.q)}" placeholder="regex, e.g. test|evaluat"></label>
@@ -912,7 +913,7 @@ async function trView(p,keepBar){
   const focus=(q,expand)=>{const t=$(`#tr .tk[data-p="${q}"]`);if(!t)return;cur=q;const s=t.closest(".blk");if(s)s.classList.remove("collapsed");
     if(expand)open(q,true);t.scrollIntoView({block:"center"});t.classList.remove("flash");void t.offsetWidth;t.classList.add("flash")};
   const visible=()=>$$("#tr .tk.r").map(t=>+t.dataset.p);
-  $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);b.textContent=c?"show all":"collapse";return}
+  $("#tr").onclick=e=>{const b=e.target.closest("[data-col]");if(b){const k=b.dataset.col,s=b.closest(".blk"),c=!s.classList.contains("collapsed");TRK.collapsed[k]=c;s.classList.toggle("collapsed",c);const hb=s.querySelector("header [data-col]");if(hb)hb.textContent=c?"show all":"collapse";return}
     const t=e.target.closest(".tk.r,.pk");if(!t||e.target.closest(".xp"))return;const q=+t.dataset.p;cur=q;const o=open(q);setHash({token:o?q:null})};
   $("#side").onclick=e=>{const d=e.target.closest(".hit,.tokref");if(d){e.preventDefault();focus(+d.dataset.p,true);setHash({token:d.dataset.p})}};
   const rerender=()=>{const sc=$("#mainp").scrollTop;const opened=$$("#tr .xp:not([hidden])").map(x=>+x.id.slice(2));trView(H(),true).then(()=>{$("#mainp").scrollTop=sc;opened.forEach(q=>open(q,true))})};
