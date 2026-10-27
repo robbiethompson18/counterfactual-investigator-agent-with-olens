@@ -336,13 +336,18 @@ function matched(P, a, b, t, only = null) {
   return m ? [A, B, m] : null;
 }
 const matchedDelta = (P, a, b, t, only) => { const m = matched(P, a, b, t, only); return m ? deltaOf(m[0], m[1]) : null; };
-// a comparison with `own` ({model substring: arm suffix}) reads each model on its own variant of each arm, e.g.
-// donation_bet's lines: arm "good_below" means good_below@glm53 for GLM 5.3 (an arm without that variant stays as is)
+// a comparison with `per_target` (resolved by spec.py) reads each model on its own variant of each arm, e.g.
+// donation_bet's lines: "good_below" is good_below@glm53 for GLM 5.3. The model part of the target id (before "@") is
+// matched against each row's pattern, longest pattern first; a model no row matches isn't shown (no fallback).
+const modelPart = t => t.split("@")[0].toLowerCase();
+function armsFor(c, t) {
+  if (!c?.per_target) return c?.arms ?? null;
+  const rows = c.per_target.filter(r => modelPart(t).includes(r.match.toLowerCase())).sort((a, b) => b.match.length - a.match.length);
+  return rows[0]?.arms ?? null;
+}
 function armAt(D, c, a, t) {
-  if (!c?.own) return a;
-  const k = Object.keys(c.own).find(k => t.toLowerCase().includes(k.toLowerCase()));
-  const v = k == null ? null : a + c.own[k];
-  return v && D.spec.arms.includes(v) ? v : a;
+  if (!c?.per_target) return a;
+  return armsFor(c, t)?.[c.arms.indexOf(a)] ?? null;
 }
 async function armSpec(env, arm) { return getSpec(env, `arms/${slug(arm)}.json`); }
 // resolve {"$b"} from the arm's blobs; {"$f"} stays a ref (fetched on demand, compared by hash)
@@ -557,7 +562,7 @@ async function envPage(h) {
 
 function compareList(D) {
   const P = pooled(D.idx), groups = {};
-  for (const c of D.spec.comparisons) (groups[c.main ? "Each model on its own lines" : c.group || (c.kind === "pair" ? "Pairs" : "Sets")] ??= []).push(c);
+  for (const c of D.spec.comparisons) (groups[c.group || (c.kind === "pair" ? "Pairs" : "Sets")] ??= []).push(c);
   const card = c => {
     const ts = P.targets.filter(t => c.arms.some(a => P.by[armAt(D, c, a, t) + "\u0000" + t]?.n));
     const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
@@ -573,7 +578,8 @@ function compareList(D) {
   $("tab").innerHTML = `<p class="lede">Pairs are the env's declared clean counterfactuals (<span class="mono">PAIRS</span>); sets are arms worth viewing side by side
     (<span class="mono">COMPARISONS</span>). Bars are the primary rate over every episode per model, thinking on and off apart; the pill is each arm minus the first on the items both were run on,
     coloured when its 95% interval excludes zero. Bands are 95% credible intervals (Beta(1,1) prior), the line the observed rate.</p>` +
-    Object.entries(groups).sort(([, a], [, b]) => !!b.some(c => c.main) - !!a.some(c => c.main))
+    // groups whose comparisons read each model on its own arms come first, then in declaration order
+    Object.entries(groups).sort(([, a], [, b]) => !!b.some(c => c.per_target) - !!a.some(c => c.per_target))
       .map(([g, cs]) => `<h3>${esc(g)}</h3><div class="cards">${cs.map(card).join("")}</div>`).join("");
 }
 
@@ -609,7 +615,7 @@ async function comparePage(h) {
   }).join("");
   $("view").innerHTML = `<p><a href="#env=${h.env}&tab=compare">← comparisons</a>${D.retiredNote ? " · " + D.retiredNote : ""}</p>
   <h1>${esc(c.name)} <span class="badge" style="vertical-align:4px">${c.kind === "pair" ? "pair" : "set"}</span></h1>
-  <p class="lede">${c.why ? esc(c.why) + ". " : ""}${c.own ? `Each model is read on its own variant of each arm (${Object.entries(c.own).map(([k, v]) => `${esc(k)}: <span class="mono">${esc(v || "no suffix")}</span>`).join(", ")}); the diff below shows the named arms. ` : ""}Effect of <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span> on <span class="mono">${esc(D.idx.primary)}</span>, pooled over every episode, on the items both arms were run on:</p>
+  <p class="lede">${c.why ? esc(c.why) + ". " : ""}${c.per_target ? `Each model is read on its own variant of each arm (${c.per_target.map(r => `${esc(r.match)}: <span class="mono">${r.arms.map(esc).join(" → ")}</span>`).join("; ")}); the diff below shows the named arms. ` : ""}Effect of <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span> on <span class="mono">${esc(D.idx.primary)}</span>, pooled over every episode, on the items both arms were run on:</p>
   ${effects ? `<div class="effects">${effects}</div>` : '<p class="mute">No runs of both arms yet.</p>'}
   <h2>Arms</h2>
   <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th title="${esc(t)}">${esc(modelName(t))}<br><span style="font-weight:400;text-transform:none">all items · this item</span></th>`).join("")}</tr>
@@ -632,7 +638,7 @@ async function comparePage(h) {
     <span class="mute">${items.length} items${c.items ? " (the pair's subset)" : ""} · built for sample 0 on ${esc(D.spec.built_for?.today)}</span></div>
   <h2>Rollouts on item ${esc(item)}</h2>
   <p class="lede">Chips are episodes on this item (✓ / ✗ = ${esc(D.idx.primary)}): click opens Docent, ↗ the transcript here, ev the episode in expview (lens when it has O-lens reads).</p>
-  <div class="cols" style="grid-template-columns:1fr 1fr">${c.own ? usedT.map(t => rolloutsHtml(D, at(baseArm, t), item, 12, t) + rolloutsHtml(D, at(other, t), item, 12, t)).join("")
+  <div class="cols" style="grid-template-columns:1fr 1fr">${c.per_target ? usedT.filter(t => at(baseArm, t) && at(other, t)).map(t => rolloutsHtml(D, at(baseArm, t), item, 12, t) + rolloutsHtml(D, at(other, t), item, 12, t)).join("")
     : rolloutsHtml(D, baseArm, item) + rolloutsHtml(D, other, item)}</div>
   <h2>What changes: <span class="mono">${esc(baseArm)}</span> → <span class="mono">${esc(other)}</span></h2>
   <div id="diff"></div>`;

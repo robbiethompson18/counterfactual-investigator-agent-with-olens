@@ -42,9 +42,43 @@ def comparisons(mod) -> list[dict]:
         c = {"arms": c} if isinstance(c, (list, tuple)) else dict(c)
         arms = [a for a in c["arms"] if a in mod.ARMS]
         if len(arms) >= 2:
-            keep = {k: c.get(k) for k in ("items", "why", "group", "own", "main")}
-            out.append({"name": name, "arms": arms, **keep, "kind": "set"})
+            keep = {k: c.get(k) for k in ("items", "why", "group")}
+            out.append({"name": name, "arms": arms, **keep, "per_target": per_target(mod, arms, c), "kind": "set"})
     return out
+
+
+def per_target(mod, arms: list[str], c: dict) -> list[dict] | None:
+    """For a comparison that reads each target model on its own variant of each arm, the resolved table
+    [{"match": model pattern, "arms": [that model's arm for each of `arms`]}], so the page only matches a target to a row.
+    Declared as `match_factor: (factor, {model pattern: factor value})` (the variant is the arm with the same factors
+    except that one), or `own: {model pattern: arm suffix}`. An arm with no variant at all (donation_bet's neutral) is
+    shared by every model; an arm with some variants but not this one is an error, never a silent fallback."""
+    if mf := c.get("match_factor"):
+        key, values = mf
+        factors = mod.ARM_FACTORS
+
+        def variant(a, v):
+            want = factors[a] | {key: v}
+            hits = [b for b, f in factors.items() if f == want]
+            if len(hits) > 1:
+                raise ValueError(f"{a}: several arms with {key}={v}: {hits}")
+            others = [b for b, f in factors.items() if b != a and {**f, key: None} == {**factors[a], key: None}]
+            if not hits and others:
+                raise ValueError(f"{a}: no variant with {key}={v} (has {[factors[b][key] for b in others]})")
+            return hits[0] if hits else a
+
+        return [{"match": pat, "arms": [variant(a, v) for a in arms]} for pat, v in values.items()]
+    if own := c.get("own"):
+
+        def suffixed(a, sfx):
+            if a + sfx in mod.ARMS:
+                return a + sfx
+            if any(a + other in mod.ARMS for other in own.values() if other):
+                raise ValueError(f"{a}: no variant {a + sfx}")
+            return a
+
+        return [{"match": pat, "arms": [suffixed(a, sfx) for a in arms]} for pat, sfx in own.items()]
+    return None
 
 
 def retired(mod) -> list[str]:
