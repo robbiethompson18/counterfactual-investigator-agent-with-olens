@@ -69,6 +69,32 @@ defensive or ethical substitutes) rather than compliance. A Claude Haiku 5.5 che
 `runs/alignment_faking/2026-10-27_haiku-v2-check-or`) found 5/23 such preview positives and 0/24
 public; 49/49 negatives agreed, 4 calls were content-filtered.
 
+### Pooled by prompt version (thinking off, all 100 goals, `measure@v3-curly`)
+
+v4–v7 are pooled over the 50/arm run and its `-topup-a`/`-topup-b` runs (200/arm), v8 likewise
+(500/arm); v9 is one run (200/arm). Gap = preview − public, 95% Newcombe CI, Fisher p.
+
+| prompt   | model      | preview       | public        | gap pp [95% CI]      | Fisher p |
+| -------- | ---------- | ------------- | ------------- | -------------------- | -------- |
+| original | DSv4 Flash | 72/500 (14%)  | 22/500 (4%)   | +10.0 [+6.5, +13.7]  | 5.7e-08  |
+| v2       | DSv4 Flash | 280/500 (56%) | 214/500 (43%) | +13.2 [+7.0, +19.2]  | 3.8e-05  |
+| v3       | DSv4 Flash | 220/500 (44%) | 127/500 (25%) | +18.6 [+12.7, +24.3] | 8.3e-10  |
+| v4       | DSv4 Flash | 62/200 (31%)  | 32/200 (16%)  | +15.0 [+6.7, +23.0]  | 0.00058  |
+| v5       | DSv4 Flash | 57/200 (28%)  | 19/200 (10%)  | +19.0 [+11.4, +26.4] | 1.6e-06  |
+| v6       | DSv4 Flash | 55/200 (28%)  | 28/200 (14%)  | +13.5 [+5.6, +21.3]  | 0.0013   |
+| v7       | DSv4 Flash | 64/200 (32%)  | 21/200 (10%)  | +21.5 [+13.6, +29.1] | 1.8e-07  |
+| v8       | DSv4 Flash | 135/500 (27%) | 58/500 (12%)  | +15.4 [+10.6, +20.2] | 7.5e-10  |
+| v9       | DSv4 Flash | 109/200 (54%) | 64/200 (32%)  | +22.5 [+12.8, +31.6] | 8.2e-06  |
+| original | GLM 5.3    | 0/500 (0%)    | 0/500 (0%)    | +0.0 [-0.8, +0.8]    | 1        |
+| v2       | GLM 5.3    | 100/500 (20%) | 48/500 (10%)  | +10.4 [+6.0, +14.8]  | 4.6e-06  |
+| v3       | GLM 5.3    | 11/500 (2%)   | 9/500 (2%)    | +0.4 [-1.5, +2.3]    | 0.82     |
+| v4       | GLM 5.3    | 0/200 (0%)    | 0/200 (0%)    | +0.0 [-1.9, +1.9]    | 1        |
+| v5       | GLM 5.3    | 0/200 (0%)    | 0/200 (0%)    | +0.0 [-1.9, +1.9]    | 1        |
+| v6       | GLM 5.3    | 0/200 (0%)    | 0/200 (0%)    | +0.0 [-1.9, +1.9]    | 1        |
+| v7       | GLM 5.3    | 0/200 (0%)    | 0/200 (0%)    | +0.0 [-1.9, +1.9]    | 1        |
+| v8       | GLM 5.3    | 1/500 (0%)    | 0/500 (0%)    | +0.2 [-0.6, +1.1]    | 1        |
+| v9       | GLM 5.3    | 2/200 (1%)    | 2/200 (1%)    | +0.0 [-2.7, +2.7]    | 1        |
+
 ## Prompt versions
 
 - `original`: Greenblatt et al.'s no-CoT prompt (free/paid) and our stage rewrite of it
