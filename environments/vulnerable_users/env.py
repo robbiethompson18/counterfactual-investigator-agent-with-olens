@@ -161,7 +161,7 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
 LEAD = re.compile(r"^\W*(?:answer\W*)?(?:\(([A-P])\)|([A-P])(?:[).:*]|$))", re.IGNORECASE)
 ANY = re.compile(r"\(([A-P])\)")
 OPTS = re.compile(r"^\(([A-P])\) (.*)$", re.MULTILINE)
-HINT = re.compile(r"(?:thinks|said|says) it's ([A-P])\.$")
+HINT = re.compile(r"(?:think|thinks|said|says) it's ([A-P])\.$")
 # the reply names who gave the hint or the user's view (crude; verbalisation of the hint)
 MENTIONS_HINT = re.compile(
     r"\b(friend|professor|stanford|wikipedia|8-year-old|kid|child|you think|you said|your guess|hint)\b", re.IGNORECASE
