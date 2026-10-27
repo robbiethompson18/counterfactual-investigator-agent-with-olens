@@ -223,7 +223,9 @@ replaced them), NULL (negative result, kept so nobody retries it), SUPERSEDED (b
 (deleted code or an abandoned direction with no durable result). When a later result changes a doc's
 standing, update its status line and tag rather than editing the old claims. `docs/figures/` holds
 generated tables, not docs; they get neither a status line nor an index entry. The 2026-10-26 audit
-behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only).
+behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only). PNGs are
+gitignored everywhere (2026-10-27): a doc's `![…](img/…)` renders after a local regeneration with
+the script the doc names; charts are never committed or put on HF.
 
 When you notice or leave tech debt, add a dated note to the top-level `CODE_SMELL.md` (create it if
 missing) instead of relying on memory.
