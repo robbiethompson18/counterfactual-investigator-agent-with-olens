@@ -13,6 +13,9 @@ deleted 2026-10-27; it is at PR #229's first commit.
 src/olens/lens.py             the AO's read contract: carrier prompt, marker, alpha, bullet parsing, Sampling
 src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds), ar
                               (AR LoRA + final norm + head), one vLLM 0.27.1 engine
+src/olens/nla.py              NLAEngine: the camilablank multilayer NLA's AV (rank-128 LoRA, layer tag, Karvonen add at block
+                              1 via vllm-metamodels SteeringVector) on the same engine; its critic runs offline
+                              (scripts/nla_score.py, docs/nla-reader.md)
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
 src/olens/provenance.py       reads.provenance.json next to a batch of reads: lens, AR, whitener, revisions, sampling
 src/olens/vectors.py          probe / steering directions in an HF model's residual stream (no caller since 2026-10-26)
@@ -32,5 +35,6 @@ RMSNorm (HF's `last_hidden_state`).
 The whiteners come from the gated dataset
 [agu18dec/local-workspace](https://huggingface.co/datasets/agu18dec/local-workspace) (needs an
 `HF_TOKEN` with access). Needs vLLM 0.27.1 + vllm-metamodels + scipy on a GPU with 80 GB+
-(`runpod/olens_reads.sh setup` installs them). Run with `PYTHONPATH=olens/src`; the batch reader
-`scripts/olens_read_requests.py` is the only caller.
+(`runpod/olens_reads.sh setup` installs them). Run with `PYTHONPATH=olens/src:src`; the batch reader
+`scripts/olens_read_requests.py` (`--readout olens|nla`) is the only caller, and
+`scripts/nla_score.py` adds the NLA critic's FVE to its `--readout nla` output afterwards.

@@ -47,6 +47,7 @@ import numpy as np
 import torch
 from olens.fve import Whitener
 from olens.lens import Sampling, bullets
+from olens.nla import NLA_SAMPLING, NLAEngine
 from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
@@ -174,6 +175,10 @@ def main():
     ap.add_argument("--batch-reads", type=int, default=470, help="new reads per engine batch, under --max-seqs: one wave (2x: 8% slower)")
     ap.add_argument("--batch-transcripts", type=int, default=128, help="most transcripts per batch")
     ap.add_argument("--lora-mode", default="runtime", choices=("runtime", "merge"), help="vLLM LoRA kernels, or merge_lora per stage")
+    ap.add_argument("--readout", default="olens", choices=("olens", "nla"), help="the O-lens (bullets + AR FVE) or the NLA AV (olens.nla)")
+    ap.add_argument("--av-lora", default="/workspace/lora_vllm/mlnla_av", help="nla: the AV adapter with vLLM-renamed keys")
+    ap.add_argument("--nla-meta", default="/workspace/olens_ckpt/mlnla/nla_meta.yaml", help="nla: the checkpoint's nla_meta.yaml")
+    ap.add_argument("--save-acts", action="store_true", help="append each decoded read's activation (bf16) to OUT.acts.bf16 (act_index)")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
@@ -186,10 +191,17 @@ def main():
     print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
-    lens = OneEngine(tok, args.base, args.lens_lora, args.ar_lora, gpu_memory_utilization=args.vllm_mem,
-                     max_num_seqs=args.max_seqs, max_model_len=args.max_model_len, lora_mode=args.lora_mode, debug=args.debug)  # fmt: skip
-    whiteners = {L: Whitener(L, device="cuda", dtype=torch.float32) for L in layers}
-    provenance.write(out, lens, layers, SAMPLING, __file__, requests=Path(args.requests).name, shard=args.shard)
+    engine = {"gpu_memory_utilization": args.vllm_mem, "max_num_seqs": args.max_seqs, "max_model_len": args.max_model_len,
+              "lora_mode": args.lora_mode, "debug": args.debug}  # fmt: skip
+    if args.readout == "nla":
+        args.save_acts = True  # the critic scores them later (scripts/nla_score.py)
+        lens = NLAEngine(tok, args.base, args.av_lora, args.nla_meta, **engine)
+        whiteners = None
+    else:
+        lens = OneEngine(tok, args.base, args.lens_lora, args.ar_lora, **engine)
+        whiteners = {L: Whitener(L, device="cuda", dtype=torch.float32) for L in layers}
+    provenance.write(out, lens, layers, SAMPLING if args.readout == "olens" else NLA_SAMPLING, __file__, requests=Path(args.requests).name,
+                     shard=args.shard, readout=args.readout, acts=acts_path(out).name if args.save_acts else None)  # fmt: skip
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     im_start = tok.convert_tokens_to_ids("<|im_start|>")
     run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
@@ -213,7 +225,9 @@ def prepare(tok, row, layers, im_end, im_start):
 def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start):
     """The loop: many transcripts per step, every engine call one big batch (module docstring)."""
     t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "decode", "score"), 0.0)
-    cache = {}  # (prefix key, layer) -> scored read
+    cache = {}  # (prefix key, layer) -> the read's output fields (bullets + joint_fve, or text; act_index when saving activations)
+    acts = acts_path(out).open("ab") if args.save_acts else None
+    n_acts = acts_path(out).stat().st_size // (lens.E.shape[1] * 2) if args.save_acts else 0  # resume: rows already in the sidecar
     while True:
         todo = queue(args.requests, args.shard, done)
         if not todo:
@@ -246,13 +260,23 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         vecs = torch.stack([v for _, _, v in items]) if items else torch.empty(0)
         item_layers = [L for _, L, _ in items]
         secs["capture"] += time.time() - ta
+        if acts is not None and items:
+            acts.write(vecs.to(torch.bfloat16).view(torch.int16).numpy().tobytes())  # row n_acts + i <-> items[i]; numpy has no bf16
+            acts.flush()
         tb = time.time()
-        texts = [t[0] for t in lens.read_items(vecs, item_layers, SAMPLING)] if items else []
+        texts = [t[0] for t in lens.read_items(vecs, item_layers, SAMPLING if args.readout == "olens" else NLA_SAMPLING)] if items else []
         secs["decode"] += time.time() - tb
         tc = time.time()
-        scored = score(tok, lens, whiteners, texts, vecs, item_layers) if texts else []
-        for (k, L, _), sc in zip(items, scored):
-            cache[k, L] = sc
+        if args.readout == "olens":
+            scored = score(tok, lens, whiteners, texts, vecs, item_layers) if texts else []
+            fields = [{"bullets": bs, "joint_fve": joint} for bs, joint in scored]
+        else:
+            fields = [{"text": t} for t in texts]
+        for i, ((k, L, _), f) in enumerate(zip(items, fields)):
+            if acts is not None:
+                f["act_index"] = n_acts + i
+            cache[k, L] = f
+        n_acts += len(items)
         for j in jobs:
             write(tok, out, j, [cache[j["keys"][p], L] for p, L in j["all"]])
             done.add(j["row"]["id"])
@@ -291,15 +315,20 @@ def queue(path, shard, done):
     return sorted(rows, key=lambda r: rank[r["id"]])
 
 
-def write(tok, out, job, scored):
+def acts_path(out):
+    """OUT.jsonl -> OUT.acts.bf16: the decoded reads' activations, one 5120-value bf16 row per act_index."""
+    return out.with_suffix(".acts.bf16")
+
+
+def write(tok, out, job, fields):
     ids, where, toks, msgs = job["ids"], job["where"], job["toks"], job["msgs"]
     with out.open("a") as f:
-        for (p, L), (bs, joint) in zip(job["all"], scored):
+        for (p, L), fl in zip(job["all"], fields):
             msg, field, off = where[p]
             rec = {
                 "id": job["row"]["id"], "token_index": p, "token": toks[p], "prefix": tok.decode(ids[max(0, p - PREFIX + 1) : p + 1]),
                 "msg_index": msg, "role": msgs[msg]["role"] if msg >= 0 else "template", "field": field, "char_offset": off,
-                "layer": L, "bullets": bs, "joint_fve": joint,
+                "layer": L, **fl,
             }  # fmt: skip
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 

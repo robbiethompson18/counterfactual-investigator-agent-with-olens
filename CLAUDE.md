@@ -494,6 +494,10 @@ Current docs:
   — the only reader since 2026-10-27: vLLM 0.27.1 + vllm-metamodels serve capture, lens LoRA and AR
   LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
   bullet-stop at 4; long-transcript parity, LoRA runtime vs merge_lora, what still limits it
+- [ACTIVE: NLA reader — read before getting NLA readouts of transcripts, scoring them with the NLA critic, or choosing between the Qwen3.6-27B NLAs](docs/nla-reader.md)
+  — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
+  beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
+  L42, Camila multilayer, the 2B student), throughput, consensus sampling
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
