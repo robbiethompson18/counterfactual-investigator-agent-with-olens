@@ -152,8 +152,9 @@ the answer token itself, where a one-token answer is formed. Those positions nee
 
 ## cfbench answer task (smoke, 2026-10-26)
 
-(Run before `favorites` was retired; the run and its rows are still on HF, but the answer task now
-only knows ported envs, so the command below needs `evalcue_runs:hint_cf_wrong_mcq/...` today.)
+(Run before `favorites` was retired; the run and its rows are still on HF, but cfbench now only
+reads `environments/` run folders, so the command below needs `env_runs:hint_mcq/...` today, i.e.
+the converted `wrong_mcq` run.)
 
 The investigator-agent version of these envs is cfbench's **answer task** (`cfbench/CLAUDE.md`):
 base arm = a hinted arm, counterfactual = `nohint`, and the predictor submits the answer Qwen gives
