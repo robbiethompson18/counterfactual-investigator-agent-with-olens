@@ -85,15 +85,19 @@ class EvalcueRuns:
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):
-            for i, line in enumerate((RUNS / env / run / "rows.jsonl").read_text().splitlines()):
-                row = json.loads(line)
+            for source, row in self._iter_rows(env, run):
                 if label(row) is None or (only_item and str(row["item"]) != only_item):
                     continue
                 start, key = start_context(row), (row["arm"], str(row["item"]))
                 assert self.starts.setdefault(key, start) == start, f"{key} has two starting contexts; don't pool {runs}"
-                self.rows[row["arm"]].append((f"{env}/{run}:{i}", row))
+                self.rows[row["arm"]].append((source, row))
         self.rows = defaultdict(list, {arm: rows for arm, rows in self.rows.items() if len(rows) >= MIN_RUNS})
         self.by_source = {src: row for rows in self.rows.values() for src, row in rows}
+
+    def _iter_rows(self, env: str, run: str):
+        """(source id, row) for every row of one run; env_runs.py overrides this for environments/ run folders."""
+        for i, line in enumerate((RUNS / env / run / "rows.jsonl").read_text().splitlines()):
+            yield f"{env}/{run}:{i}", json.loads(line)
 
     def rollouts(self, arm: str, model: str) -> list[Rollout]:
         rows = [(src, r) for src, r in self.rows[arm] if r["model"] == MODELS[model]]

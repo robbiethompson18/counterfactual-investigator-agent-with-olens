@@ -135,7 +135,14 @@ conversation, tool-call counts and OpenRouter cost), synced to HF when it finish
 
 For any evalcue env, `evalcue_runs:<env>/<run>[+<run>...]` reads the env's run dirs directly and
 `--pairs hub` pairs its hub arm (smallest total diff to the others, usually the base) with every
-other arm both ways (`cfbench/envs/evalcue_runs.py`).
+other arm both ways (`cfbench/envs/evalcue_runs.py`). For an `environments/` run folder
+(`data/envs/<env>/<run>/`, `environments run`), `env_runs:<env>/<run>[+<run>...][@<item>]` does the
+same over its episodes and `measure` labels (`cfbench/envs/env_runs.py`); sources are
+`<env>/<run>:<episode id>`, which is what `scripts/olens_requests_from_runs.py envs:<env>/<run>`
+puts in read requests, so reads join. `--base-positive` keeps only base-arm runs that showed the
+behavior: on the answer task every base run's answer is listed in the index the predictor sees, so a
+hint_mcq base run that ignored the hint hands it the own answer (2026-10-27: 46% "correct" with no
+lens on the pause arms, 0% with the flag).
 
 Transcripts are the envs' own run dirs, `data/runs/<env>/<date>_<slug>/` (each loader's `DATA`); arm
 contents are read from the env's configs and `vendor/agent-interp-envs` (run
