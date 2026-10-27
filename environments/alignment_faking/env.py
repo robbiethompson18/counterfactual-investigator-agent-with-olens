@@ -154,17 +154,6 @@ PAIRS = {
     for name, (a, b) in {"tier": ("paid", "free"), "stage": ("public", "preview")}.items()
     if _arm(p, a) in ARM_FACTORS
 }
-# arm sets worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
-COMPARISONS = {
-    "original: tier and stage": {"arms": ["paid", "free", "public", "preview"], "why": "the paper's tier tag vs our stage rewrite"},
-    **{
-        f"{t} across prompt versions": {
-            "arms": [_arm(p, t) for p in PROMPTS if _arm(p, t) in ARM_FACTORS],
-            "why": "one stage under every system prompt: what each rewrite changes",
-        }
-        for t in ("preview", "public")
-    },
-}
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}
 # the stored DSV4 Flash runs (data/runs/alignment_faking/*/meta.json): OpenRouter, any provider, effort medium, and evalcue's
@@ -181,5 +170,16 @@ DEFAULTS = {
     "sampling": {
         "on": {"temperature": 1.0, "top_p": 0.95, "presence_penalty": 0.0},
         "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
+    },
+}
+# arm sets worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
+COMPARISONS = {
+    "original: tier and stage": {"arms": ["paid", "free", "public", "preview"], "why": "the paper's tier tag vs our stage rewrite"},
+    **{
+        f"{t} across prompt versions": {
+            "arms": [_arm(p, t) for p in PROMPTS if _arm(p, t) in ARM_FACTORS],
+            "why": "one stage under every system prompt: what each rewrite changes",
+        }
+        for t in ("preview", "public")
     },
 }

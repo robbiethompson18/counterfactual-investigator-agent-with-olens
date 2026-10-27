@@ -315,6 +315,8 @@ async function home() {
   </table></div>`;
 }
 
+const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
+
 function tabs(env, on) {
   const T = [["compare", "Comparisons"], ["arms", "Arms"], ["runs", "Runs"], ["about", "About"], ["source", "Source"]];
   return `<div class="tabs">${T.map(([k, l]) => `<a href="#env=${env}&tab=${k}" class="${on === k ? "on" : ""}">${l}</a>`).join("")}</div>`;
@@ -339,7 +341,7 @@ function compareList(D) {
     Each cell is the primary rate pooled over runs, per target model. Click one to see what changes and the rollouts.</p>` +
     Object.entries(groups).map(([g, cs]) => `<h3>${esc(g)}</h3><div class="scroll"><table><tr><th>comparison</th><th>arms</th>${P.targets.map(t => `<th class="mono">${esc(t.replace(/@[^ ]*/, ""))}</th>`).join("")}</tr>
     ${cs.map(c => `<tr class="click" onclick="location.hash='${hashOf({env: D.env, compare: c.name})}'"><td><b>${esc(c.name)}</b>${c.why ? `<br><span class="mute">${esc(c.why)}</span>` : ""}${c.items ? `<br><span class="mute">${c.items.length} items</span>` : ""}</td>
-      <td class="mono">${c.arms.map(esc).join("<br>")}</td>${P.targets.map(t => `<td class="mono">${c.arms.map(a => cell(a, t)).join("<br>")}</td>`).join("")}</tr>`).join("")}
+      <td class="mono">${c.arms.map(a => esc(a) + retiredTag(D, a)).join("<br>")}</td>${P.targets.map(t => `<td class="mono">${c.arms.map(a => cell(a, t)).join("<br>")}</td>`).join("")}</tr>`).join("")}
     </table></div>`).join("");
 }
 
@@ -365,7 +367,7 @@ async function comparePage(h) {
   <div class="scroll"><table><tr><th>arm</th><th>diff vs base</th><th>sections that differ from the base on item ${esc(item)}</th>${usedT.map(t => `<th class="mono">${esc(t)}<br><span style="font-weight:400">all items · this item</span></th>`).join("")}</tr>
   ${c.arms.map((a, i) => {
     const isB = a === baseArm;
-    return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a></td>
+    return `<tr class="${a === other ? "on" : ""}"><td class="mono"><a href="#${hashOf({env: h.env, arm: a, item})}">${esc(a)}</a>${retiredTag(D, a)}</td>
       <td>${isB ? "<b>base</b>" : `<a href="${go({other: a})}">${a === other ? "<b>shown</b>" : "show"}</a> · <a href="${go({base: a, other: baseArm})}" title="make this the base">base</a>`}</td>
       <td class="mono">${isB ? "" : changes[i] == null ? '<span class="mute">not built on this item</span>' : changes[i].length ? changes[i].map(esc).join("<br>") : '<span class="mute">identical</span>'}</td>
       ${usedT.map(t => {
@@ -403,15 +405,17 @@ function perItemTable(D, P, a, b, targets, items, go) {
 function armsTab(D, h) {
   const F = D.spec.arm_factors || {}, keys = [...new Set(Object.values(F).flatMap(Object.keys))];
   const filt = Object.fromEntries(keys.filter(k => h[k]).map(k => [k, h[k]]));
-  const keep = arm => Object.entries(filt).every(([k, v]) => (F[arm] || {})[k] === v);
+  const R = new Set(D.spec.retired || []), showRetired = h.retired === "show";
+  const keep = arm => (showRetired || !R.has(arm)) && Object.entries(filt).every(([k, v]) => (F[arm] || {})[k] === v);
   const P = pooled(D.idx);
   const arms = D.spec.arms.filter(keep);
   const sel = k => `<label>${esc(k)} <select onchange="location.hash=setParam('${k}', this.value)"><option value="">all</option>${
     [...new Set(Object.values(F).map(f => f[k]).filter(Boolean))].sort().map(v => `<option ${filt[k] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></label>`;
   $("tab").innerHTML = `${keys.length ? `<div class="row">Filter by factor: ${keys.map(sel).join(" ")}</div>` : ""}
-  <div class="row">Tick two arms to diff them: <button id="dodiff" disabled>diff</button> <span class="mute">${arms.length} arms</span></div>
+  <div class="row">Tick two arms to diff them: <button id="dodiff" disabled>diff</button> <span class="mute">${arms.length} arms</span>
+    ${R.size ? `<span class="mute">· ${R.size} retired arms (RETIRED in env.py) ${showRetired ? "shown" : "hidden"}: <a href="#${setParam("retired", showRetired ? "" : "show")}">${showRetired ? "hide" : "show"} them</a></span>` : ""}</div>
   <div class="scroll"><table><tr><th></th><th>arm</th>${keys.map(k => `<th>${esc(k)}</th>`).join("")}<th>items</th>${P.targets.map(t => `<th class="mono">${esc(t.replace(/@[^ ]*/, ""))}</th>`).join("")}</tr>
-  ${arms.map(a => `<tr><td><input type="checkbox" class="pick" value="${esc(a)}"></td><td class="mono"><a href="#${hashOf({env: D.env, arm: a})}">${esc(a)}</a></td>
+  ${arms.map(a => `<tr><td><input type="checkbox" class="pick" value="${esc(a)}"></td><td class="mono"><a href="#${hashOf({env: D.env, arm: a})}">${esc(a)}</a>${retiredTag(D, a)}</td>
     ${keys.map(k => `<td class="mono">${esc((F[a] || {})[k] || "")}</td>`).join("")}<td>${itemsOf(D.spec, a).length}</td>
     ${P.targets.map(t => { const p = P.by[a + "\u0000" + t]; return `<td>${p ? (p.type === "bool" ? rate(p.k, p.n) : p.eps + " eps") : ""}</td>`; }).join("")}</tr>`).join("")}
   </table></div>`;
@@ -426,7 +430,7 @@ async function armPage(h) {
   const items = itemsOf(D.spec, arm), item = items.includes(h.item) ? h.item : items[0];
   const ep = await built(h.env, arm, item);
   const inC = D.spec.comparisons.filter(c => c.arms.includes(arm));
-  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=arms">← ${esc(h.env)} arms</a> · factors <span class="mono">${esc(JSON.stringify(D.spec.arm_factors?.[arm] || {}))}</span></p>
+  $("view").innerHTML = `<p><a href="#env=${h.env}&tab=arms">← ${esc(h.env)} arms</a>${retiredTag(D, arm)} · factors <span class="mono">${esc(JSON.stringify(D.spec.arm_factors?.[arm] || {}))}</span></p>
   ${inC.length ? `<p>In comparisons: ${inC.map(c => `<a class="chip" href="#${hashOf({env: h.env, compare: c.name, item})}">${esc(c.name)}</a>`).join("")}</p>` : ""}
   <div class="row"><label>item <select onchange="location.hash='${hashOf({env: h.env, arm})}&item='+encodeURIComponent(this.value)">${items.map(it => `<option ${it === item ? "selected" : ""}>${esc(it)}</option>`).join("")}</select></label>
     <label>diff against <select onchange="if(this.value)location.hash='${hashOf({env: h.env})}&diff='+encodeURIComponent('${arm},'+this.value)+'&item=${encodeURIComponent(item)}'"><option value="">…</option>${D.spec.arms.filter(a => a !== arm).map(a => `<option>${esc(a)}</option>`).join("")}</select></label>

@@ -42,6 +42,15 @@ def comparisons(mod) -> list[dict]:
     return out
 
 
+def retired(mod) -> list[str]:
+    """Arms the env's RETIRED entries name (core.retired_arms where it exists; plain arm names otherwise)."""
+    from . import core
+
+    if hasattr(core, "retired_arms"):
+        return sorted(core.retired_arms(mod))
+    return sorted(a for a in getattr(mod, "RETIRED", []) if a in mod.ARMS)
+
+
 def source_files(env: str) -> list[str]:
     """Repo-relative paths of what build() can read: the env folder and the shared _lib (git-tracked files only matter,
     but untracked ones are listed too so a local page shows what was built)."""
@@ -133,6 +142,7 @@ def build_spec(env: str, force: bool = False) -> list[Path]:
         "primary": mod.PRIMARY,
         "arms": list(mod.ARMS),
         "arm_factors": getattr(mod, "ARM_FACTORS", {}),
+        "retired": retired(mod),
         "arm_specs": arms_meta,
         "comparisons": comparisons(mod),
         "requires": getattr(mod, "REQUIRES", {}),
