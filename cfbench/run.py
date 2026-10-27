@@ -44,7 +44,7 @@ async def main():
     ap.add_argument("--predictors", default="anthropic/claude-haiku-5.5")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
-    ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter); keep medium unless comparing")
+    ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)

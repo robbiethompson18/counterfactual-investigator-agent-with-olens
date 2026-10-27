@@ -1,4 +1,5 @@
-"""The report's robustness charts: predictor model × condition, and Gemini 3.8 Flash by reasoning effort and by tool budget.
+"""The report's robustness charts: predictor model × condition, Gemini 3.8 Flash by reasoning effort and by tool budget, and
+transcript-only vs O-lens per predictor (adding the thinking-off `*dumbpred-*` runs).
 
 Runs: `data/runs/cfbench/*modelchart-*` (2026-10-24, four hand-picked cases, docs/cfbench-model-chart.md). Called from
 `cfbench.report.charts`; metric is 100 − RMSE of the predicted rate with equal case weights (docs/cfbench-scoring.md).
@@ -21,6 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib.transforms import Affine2D
 
 RUNS = "data/runs/cfbench/*modelchart-*"
+DUMB_RUNS = "data/runs/cfbench/*dumbpred-*"  # 2026-10-26 thinking-off predictors (docs/cfbench-dumb-predictors.md)
 MODELS = {  # by company, small to large
     "anthropic/claude-haiku-5.5": "Haiku 5.5",
     "anthropic/claude-sonnet-5.5": "Sonnet 5.5",
@@ -31,6 +33,17 @@ MODELS = {  # by company, small to large
     "openai/gpt-6-astra": "GPT-6 Astra",
 }
 FLASH = "google/gemini-3.8-flash"
+DUMB_MODELS = {
+    "google/gemini-3-flash-preview": "Gemini 3 Flash",
+    "google/gemini-3.1-flash-lite": "Gemini 3.1 Flash Lite",
+    "deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+    "openai/gpt-6-luna": "GPT-6 Luna",
+    "openai/gpt-6.1-terra": "GPT-6.1 Terra",
+    "z-ai/glm-5.3": "GLM 5.3",
+}
+# thinking level as one-hue ordinal steps (green: outside the four condition colours)
+THINKING = {"off": ("off", "#a8dbb5"), "minimal": ("minimal / low", "#3f9e5f"), "low": ("minimal / low", "#3f9e5f")}
+THINKING_ON = ("medium / high", "#0e4d27")
 SWEEP_DRAWS = 2  # the Flash sweeps ran draws 0-1; their high-effort/20-call point (from the 3-draw model grid) uses the same two
 # model-chart x axis, in order of what the predictor gets: + transcripts, + O-lens text from another env, + this env's O-lens
 MODEL_AXIS = ["no_transcript", "agentic", "olens_placebo", "olens"]
@@ -196,6 +209,82 @@ def flash_calls(rows: list[dict], out: str) -> dict:
     return s
 
 
+def ts_vs_olens(out: str) -> dict:
+    """One dot per predictor and thinking level: transcript-only vs O-lens on the model chart's four cases. Model-chart
+    predictors at high effort plus Flash at low; every dumbpred predictor (its two extra hidden_goal cases dropped)."""
+    chart = [
+        r for r in load(RUNS) if r["max_calls"] == 20 and (r["effort"] == "high" or (r["predictor"] == FLASH and r["effort"] == "low"))
+    ]
+    cases = {(r["env"], r["base_arm"], r["cf_arm"]) for r in chart}
+    rows = chart + [r for r in load(DUMB_RUNS) if (r["env"], r["base_arm"], r["cf_arm"]) in cases]  # loaded apart: draw ids overlap
+    s = score([r for r in rows if r["condition"] in ("agentic", "olens")], lambda r: (r["predictor"], r["effort"], r["condition"]))
+    names = MODELS | DUMB_MODELS
+    pts = sorted((s[m, e, "agentic"]["acc"], s[m, e, "olens"]["acc"], m, e) for m, e, c in s if c == "olens" and (m, e, "agentic") in s)
+    fig, ax = plt.subplots(figsize=(7.5, 7))
+    lo, hi = 34, 62
+    ax.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, zorder=1)
+    ax.text(
+        56.5,
+        56.9,
+        "O-lens = transcript-only",
+        rotation=45,
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        color=MUTED,
+        rotation_mode="anchor",
+    )
+    null = next(iter(s.values()))["null"]
+    ax.axvline(null, color=INK, lw=0.8, ls="--", zorder=1)
+    ax.axhline(null, color=INK, lw=0.8, ls="--", zorder=1)
+    ax.text(null + 0.2, lo + 0.3, "edit does nothing", fontsize=8, color=INK, rotation=90, va="bottom")
+    # the cheap predictors bunch up near the null: their labels go in a column right of the bunch, with leader lines
+    bunch = sorted((p for p in pts if p[0] < 45 and p[1] < 44), key=lambda p: p[1])
+    label_ys = []
+    for p in bunch:
+        label_ys.append(max(p[1], label_ys[-1] + 0.8) if label_ys else p[1])
+    shift = np.mean([p[1] for p in bunch]) - np.mean(label_ys)
+    column = {(p[2], p[3]): ly + shift for p, ly in zip(bunch, label_ys, strict=True)}
+    nudge = {
+        (FLASH, "high"): 0.5,
+        ("google/gemini-4-argon", "high"): -0.5,
+        (FLASH, "minimal"): 0.4,
+        ("anthropic/claude-opus-5.5", "high"): -0.4,
+    }  # near-overlaps
+    for x, y, m, e in pts:
+        level, color = THINKING.get(e, THINKING_ON)
+        ax.scatter(x, y, s=70, color=color, edgecolor=INK, lw=0.6, zorder=3)
+        name = names[m] + (f" ({e})" if sum(p[2] == m for p in pts) > 1 else "")
+        if (m, e) in column:
+            ax.annotate(
+                name,
+                (x, y),
+                xytext=(45.3, column[m, e]),
+                va="center",
+                fontsize=8,
+                color=INK,
+                arrowprops={"arrowstyle": "-", "color": "#b5b5b5", "lw": 0.6, "shrinkA": 0, "shrinkB": 4},
+            )
+        else:
+            ax.annotate(name, (x + 0.35, y + nudge.get((m, e), 0)), va="center", fontsize=8, color=INK)
+    for level, color in dict(THINKING.values()).items() | {THINKING_ON}:
+        ax.scatter([], [], s=70, color=color, edgecolor=INK, lw=0.6, label=f"thinking {level}")
+    handles, labels = ax.get_legend_handles_labels()
+    order = [labels.index(f"thinking {lv}") for lv in ("off", "minimal / low", "medium / high")]
+    ax.legend([handles[i] for i in order], [labels[i] for i in order], frameon=False, fontsize=9, loc="upper left")
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Transcript-only: 100 − RMSE (pp)")
+    ax.set_ylabel("With O-lens: 100 − RMSE (pp)")
+    ax.set_title("Transcript-only vs O-lens by predictor (4 cases, 20 tool calls)", loc="left", fontsize=10.5, color=INK)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(f"{out}/ts_vs_olens.png", dpi=150)
+    plt.close(fig)
+    return s
+
+
 def table(title: str, s: dict) -> dict:
     print(f"\n{title}")
     for group, v in sorted(s.items(), key=str):
@@ -216,4 +305,5 @@ def make(out: str) -> dict | None:
         "models": table("models (high effort, 20 calls)", model_lines(rows, out)),
         "flash_effort": table("Flash by effort (20 calls)", flash_effort(rows, out)),
         "flash_calls": table("Flash by max calls (high effort)", flash_calls(rows, out)),
+        "ts_vs_olens": table("transcript-only vs O-lens (4 cases)", ts_vs_olens(out)),
     }
