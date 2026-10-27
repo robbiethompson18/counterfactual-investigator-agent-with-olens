@@ -445,6 +445,11 @@ Current docs:
   pre-registered 38-case test (+0.07 log skill on harness v1, RMSE 26.6 vs 31.7pp, carried by a few
   cases, via "stricter score" reads at `Score:`; a v6 GPT-6.1 Sol replication is null); pasting
   reads into the prompt (closed #116) is a dead end
+- [ACTIVE: anti_sandbag env — read before building the anti-sandbag "can the lens read a withheld answer" env, or before writing its adversarial comply slot](docs/envs/anti_sandbag.md)
+  — withhold vs comply (oracle) arms; ships a benign over-refusal task only, the adversarial comply
+  slot is intentionally empty for Robbie; smoke shows Qwen3.6-27B's benign refusal surface is narrow
+  and sticky (locked_out_home refuses both arms), so the real flip needs the adversarial slot;
+  olens-vs-NLA reader caveat
 - [NULL: Honest-grader envs — read before building a 0–10 judgment scenario with flattery/honesty framings, or asking whether the O-lens reads the grade Qwen suppresses](docs/honest-grader-envs.md)
   — 11 scenarios × 5 framings, Qwen thinking off; why hidden_goal.grade worked (`Score:`-token reads
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
