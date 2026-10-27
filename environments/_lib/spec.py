@@ -29,10 +29,8 @@ EXPVIEW_BASE = "https://expview.pages.dev/"
 
 
 def comparisons(mod) -> list[dict]:
-    """PAIRS and the env's curated COMPARISONS as one list: {name, arms, items?, why?, own?, main?, kind}. `own` maps
-    a model substring to an arm suffix, so the page reads each model on its own variant of each arm; `main` groups come
-    first. Arms an env doesn't have are dropped (a comparison can name arms from a prompt version that isn't merged
-    yet)."""
+    """PAIRS and the env's curated COMPARISONS as one list: {name, arms, items?, why?, kind}. Arms an env doesn't have
+    are dropped (a comparison can name arms from a prompt version that isn't merged yet)."""
     out = []
     for name, p in getattr(mod, "PAIRS", {}).items():
         out.append({"name": name, "arms": list(p[:2]), "items": list(p[2]) if len(p) > 2 else None, "kind": "pair"})
@@ -40,8 +38,7 @@ def comparisons(mod) -> list[dict]:
         c = {"arms": c} if isinstance(c, (list, tuple)) else dict(c)
         arms = [a for a in c["arms"] if a in mod.ARMS]
         if len(arms) >= 2:
-            out.append({"name": name, "arms": arms, "items": c.get("items"), "why": c.get("why"), "group": c.get("group"),
-                        "own": c.get("own"), "main": c.get("main"), "kind": "set"})  # fmt: skip
+            out.append({"name": name, "arms": arms, "items": c.get("items"), "why": c.get("why"), "group": c.get("group"), "kind": "set"})
     return out
 
 
