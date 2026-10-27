@@ -31,6 +31,8 @@ def _copy_sources(site: Path):
         files |= set(json.loads(p.read_text()).get("source_files") or [])
     shutil.rmtree(site / "src", ignore_errors=True)
     for f in sorted(files):
+        if not (REPO_ROOT / f).exists():  # an env not rebuilt this time can name a file since deleted
+            continue
         dst = site / "src" / f
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(REPO_ROOT / f, dst)
