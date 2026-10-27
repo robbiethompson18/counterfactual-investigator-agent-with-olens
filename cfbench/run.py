@@ -42,7 +42,7 @@ from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
 # The olens conditions refuse a base arm where fewer than this many runs, or this share of its runs, have reads (2026-10-27:
-# 74 of 262 olens runs had such arms, some with 1 read of 64, and nothing flagged it). --allow-few-reads overrides.
+# 82 of 268 olens runs had such arms, some with 1 read of 64, and nothing flagged it). --allow-few-reads overrides.
 MIN_READS, MIN_READ_FRAC = 5, 0.5
 
 
