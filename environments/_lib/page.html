@@ -453,20 +453,21 @@ function episodesFor(D, arm, item) {
 // the run rides along in the link only to tell apart top-up runs that reused sample numbers; the page never shows it
 const epHash = (D, target, e) => hashOf({env: D.env, model: target, episode: e.id, run: e.run});
 // expview lives beside this page (expview/ on the same site; ?expview= overrides): it reads the env run folders
-// directly, so every env, run, arm and episode has a page, with any O-lens / judge runs attached to the episode
+// directly, so every env, arm and episode has a page, with any O-lens / judge runs attached to the episode
 const EV = params.get("expview") || "expview/";
 const evq = o => EV + "#" + Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
-const evEpisode = (env, run, id) => evq({env, run, episode: id});
-const evRun = (env, run) => evq({env, run});
+// an episode is (model, episode id); expview resolves the run itself. `run` goes along only when top-up runs repeated
+// the episode id for this model, so the link opens the exact one
+const evEpisode = (env, model, id, run = null) => evq({env, episode: id, model, ...(run ? {run} : {})});
 const evArm = (env, arm) => evq({env, arm});
-function epChip(D, target, e, name) {
+function epChip(D, target, e, name, dup = false) {
   const cls = e.v === true ? "pos" : e.v === false ? "neg" : "";
   const label = name + (e.v === true ? " ✓" : e.v === false ? " ✗" : e.v == null ? " –" : ` ${e.v}`);
   const dl = e.docent && e.collection ? `${DOCENT}${e.collection}/agent_run/${e.docent}` : null, here = "#" + epHash(D, target, e);
   // one pill: the label opens Docent (or the transcript here), then small links to the transcript here and to expview
   return `<span class="chip ${cls}"><a href="${dl || here}" ${dl ? 'target="_blank" rel="noopener"' : ""} title="${dl ? "open in Docent" : "open here"}">${esc(label)}</a>` +
     (dl ? `<a class="x" href="${here}" title="transcript on this page">↗</a>` : "") +
-    `<a class="x${e.read ? " lens" : ""}" href="${evEpisode(D.env, e.run, e.id)}" target="_blank" rel="noopener" title="open in expview${e.read ? ", with its O-lens reads" : ""}">${e.read ? "lens" : "ev"}</a></span>`;
+    `<a class="x${e.read ? " lens" : ""}" href="${evEpisode(D.env, target, e.id, dup ? e.run : null)}" target="_blank" rel="noopener" title="open in expview${e.read ? ", with its O-lens reads" : ""}">${e.read ? "lens" : "ev"}</a></span>`;
 }
 // every episode of the arm, all runs, in expview
 const armExpview = (D, arm, label = "whole arm in expview ↗") =>
@@ -478,7 +479,7 @@ function chipNames(eps, item) {
     const [, it, smp] = e.id.split("~"), base = item == null ? `${it}~${smp}` : `#${smp}`;
     seen[base] = (seen[base] || 0) + 1;
     return [e, seen[base] > 1 ? `${base}.${seen[base]}` : base];
-  });
+  }).map(([e, nm]) => [e, nm, eps.filter(x => x.id === e.id).length > 1]);
 }
 function rolloutsHtml(D, arm, item, max = 12) {
   const groups = episodesFor(D, arm, item);
@@ -490,7 +491,7 @@ function rolloutsHtml(D, arm, item, max = 12) {
     return `<div style="border-top:1px solid var(--line);padding:8px 0 4px">
       <div class="row" style="margin:0 0 4px;justify-content:space-between;gap:8px"><b style="font-weight:600" title="${esc(g.target)}">${esc(modelName(g.target))}</b>
         ${n ? `<span class="mute" style="font-variant-numeric:tabular-nums">${k}/${n} positive</span>` : ""}</div>
-      <div>${chipNames(g.eps, item).slice(0, max).map(([e, nm]) => epChip(D, g.target, e, nm)).join("")}${g.eps.length > max ? ` <span class="mute">+${g.eps.length - max} more</span>` : ""}</div></div>`;
+      <div>${chipNames(g.eps, item).slice(0, max).map(([e, nm, dup]) => epChip(D, g.target, e, nm, dup)).join("")}${g.eps.length > max ? ` <span class="mute">+${g.eps.length - max} more</span>` : ""}</div></div>`;
   }).join("") + "</div>";
 }
 
@@ -727,15 +728,15 @@ async function episodePage(h) {
   <h1 style="font-size:20px"><span class="mono">${esc(arm)}</span> · ${esc(item)} · ${esc(modelName(target))}</h1>
   <h3>All episodes of this arm on this item</h3>${rolloutsHtml(D, arm, item, 40)}
   <h2>Transcript</h2><div id="episode"></div>`;
-  await showEpisode(env, run, id);
+  await showEpisode(env, run, id, target, cands.filter(([, x]) => targetKey(x) === target).length > 1);
 }
 
-async function showEpisode(env, run, id) {
+async function showEpisode(env, run, id, target, dup) {
   const el = $("episode");
   el.innerHTML = '<p class="mute">loading episode…</p>';
   const ep = await getEpisode(env, run, id);
   const links = [ep.docent_url ? `<a href="${esc(ep.docent_url)}" target="_blank" rel="noopener">Docent</a>` : "",
-    `<a href="${evEpisode(env, run, id)}" target="_blank" rel="noopener">expview</a>`].filter(Boolean).join(" · ");
+    `<a href="${evEpisode(env, target, id, dup ? run : null)}" target="_blank" rel="noopener">expview</a>`].filter(Boolean).join(" · ");
   el.innerHTML = `<p class="mono">finish ${esc(ep.finish)} ${ep.today ? "· date " + esc(ep.today) : ""} ${links ? "· " + links : ""}
     ${ep.build_check && ep.build_check !== "match" ? `<br><b>${esc(ep.build_check)}</b>` : ""}</p>
   ${(ep.messages || []).map(m => `<div class="msg ${esc(m.role)}"><div class="role">${esc(m.role)}${m.tool_calls ? " · " + m.tool_calls.map(t => esc(t.function.name)).join(", ") : ""}</div>`
