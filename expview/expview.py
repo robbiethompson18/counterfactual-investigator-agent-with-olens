@@ -197,11 +197,10 @@ def call(name, model, messages, output=None, tools=None, params=None, parsed=Non
     return c
 
 
-def read(tool, lines, label=None, score=None, score_name=None, inline=None, **extra):
-    """One metamodel readout at a token: `lines` is a list of strings or [text, score] pairs (bullets, top-k tokens...).
-    inline=True draws its first line in the transcript next to the token."""
+def read(tool, lines, label=None, score=None, score_name=None, **extra):
+    """One metamodel readout at a token: `lines` is a list of strings or [text, score] pairs (bullets, top-k tokens...)."""
     r = {"tool": tool, "lines": [list(x) if isinstance(x, (list, tuple)) else [x] for x in lines]}
-    for k, v in dict(label=label, score=score, score_name=score_name, inline=inline, **extra).items():
+    for k, v in dict(label=label, score=score, score_name=score_name, **extra).items():
         if v is not None:
             r[k] = v
     return r

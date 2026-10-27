@@ -129,7 +129,7 @@ tokens = {
     "sections": [["system", 0, 120], ["user", 120, 300], ["reasoning", 300, 2900], ["reply", 2900, 3100]],
     "reads": {
         "812": [
-            read("O-lens", ["The user has a bet with a friend", "Estimating a count"], label="L40", inline=True),
+            read("O-lens", ["The user has a bet with a friend", "Estimating a count"], label="L40"),
             read("O-lens samples", [["bullet", 0.31], ["bullet", -0.02]], score=0.41, score_name="joint FVE"),
             read("J-lens L60", [["tok", 0.42], ["tok2", 0.11]]),
         ]
@@ -141,10 +141,8 @@ tokens = {
 - **Sections** are drawn as chat blocks, styled by name: anything with system / user / reasoning
   (think, cot) / tool (observation) / assistant (reply, answer) in it. Chat special tokens
   (`<|im_start|>`, `<think>`) are shown dimmed.
-- **Reads** are keyed by token position. `lines` are `[text]` or `[text, score]`. A read with
-  `"inline": true` is the peek shown next to its token; without any, the first reader is. Peeks show
-  the first 8 characters of line one by default (the "chars" box in the toolbar changes it, per
-  browser; hovering a peek shows the whole line). Clicking a token expands every reader there.
+- **Reads** are keyed by token position. `lines` are `[text]` or `[text, score]`. Read tokens are
+  underlined; clicking one expands every reader there (no inline previews, removed 2026-10-27).
 - Optional: `"filter": true` + `"score"` on a read and `"min_score"` on the object add a min-score
   box (e.g. FVE).
 - `run.json` `readers: {"O-lens": {"about": "markdown", "color": "#2f5d8a"}}` documents each reader
