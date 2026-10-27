@@ -1,13 +1,18 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-26):** ACTIVE. Behaviour check and text-inversion gate done; no O-lens reads yet.
+**Status (2026-10-26):** MIXED. Behaviour check and text-inversion gate done. Only `wrong_mcq` lives
+on, as [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites`
+and `opinion_mcq` are retired (code at `cfa46a9`,
+[retired/hint_cf](../../environments/retired/hint_cf/)). The existing stop-token lens reads are null
+(below); nobody has read the assistant header yet.
 
-2026-10-26. Three small single-turn envs (`evalcue/envs/hint_cf/`) built for the "favourite animal"
-idea: find questions where Qwen3.6-27B gives the same answer almost every time with no hint, then
-add a hint naming a different answer and see whether Qwen follows it. A hint rollout that follows
-the hint is a transcript where the model's own answer appears nowhere in the text; the no-hint arm
-is the counterfactual that says what that answer is. The point is to later ask whether the O-lens
-reads the own answer on the hint rollouts (not run yet: this doc is the behaviour check only).
+2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
+built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
+every time with no hint, then add a hint naming a different answer and see whether Qwen follows it.
+A hint rollout that follows the hint is a transcript where the model's own answer appears nowhere in
+the text; the no-hint arm is the counterfactual that says what that answer is. The point is to later
+ask whether the O-lens reads the own answer on the hint rollouts (not run yet: this doc is the
+behaviour check only).
 
 Related: WorkspaceBench's `basic_readout` implicit items read Qwen's own favourite ("favorite
 mythical creature" → dragon) with no hint in the prompt, and its 2026-10-23 "anti text inversion"
@@ -38,9 +43,12 @@ on bf16 weights, so re-check the no-hint answers on the lens pod before reading:
 90/10 here could sit differently there.
 
 ```
+# then (at cfa46a9):
 EVALCUE_MODEL=qwen/qwen3.6-27b EVALCUE_PROVIDER=deepinfra/fp8 EVALCUE_EFFORT="" \
   uv run python -m evalcue.run hint_cf.favorites --thinking 0 --n 600 --concurrency 10 --tag or_nothink
 uv run python -m evalcue.envs.hint_cf.report data/runs/hint_cf_favorites/2026-10-26_or_nothink/rows.jsonl [--all]
+# now (wrong_mcq only; the defaults are the stored run's settings):
+uv run python -m environments run hint_mcq --tag dev --pair gold --n 2
 ```
 
 Runs (HF `runs/`, Docent): `hint_cf_favorites/2026-10-26_or_nothink`
@@ -110,13 +118,43 @@ shuffled-options rerun would separate them.
 mostly law and health. Typical row: own answer B 100% (gold D), professor says D → D 100%; professor
 says A → A 38%.
 
+## O-lens reads: stop-token reads of the survivors are null (2026-10-26)
+
+`olens_reads/2026-10-26_hint-cf-v1` (the one-engine reader's benchmark set, HF `runs/`) read 200
+transcripts per arm of each hint_cf env with the space lens at layers 32 / 40 / 48, at every
+punctuation token of the prompt, the user `<|im_end|>` and the assistant `<|im_end|>`. That is a
+random 200 of 1,600 per arm, so each of the 18 `wrong_mcq` survivors has 0 to 3 reads per arm (1157
+and 1386 none). Scoring every bullet for a bare letter A-J (`scratchpad` script, regex, no judge),
+on the hinted transcripts of survivors:
+
+| position, layer | n reads | names the own letter | names the hint letter | any letter |
+| --------------- | ------- | -------------------- | --------------------- | ---------- |
+| user `<         | im_end  | >`, 32               | 31                    | 19%        | 26% | 100% |
+| user `<         | im_end  | >`, 40               | 31                    | 10%        | 39% | 100% |
+| user `<         | im_end  | >`, 48               | 31                    | 3%         | 19% | 100% |
+| assistant `<    | im_end  | >`, 40               | 31                    | 10%        | 32% | 97%  |
+
+A specific _other_ letter appears in 10% of prompt-position reads, so the own letter is at chance.
+The reads at the end of the prompt are the hint paraphrased with a placeholder letter ("The
+professor says the answer is **D**. I will output that answer as requested" on an item where the
+hint said B and Qwen's own answer is G); the letter in the bullet matches the actual hint only a
+third of the time. At the assistant `<|im_end|>` the joint FVE is ~0.01: nothing left to read after
+a one-letter reply. On `nohint` transcripts the assistant `<|im_end|>` names the own letter 29-43%
+(it was just emitted). A few transcripts were read twice (priority-0 benchmark set plus priority 1),
+so n counts them twice.
+
+What this does not test: the assistant header (`<|im_start|>assistant`, `<think>`, `</think>`) and
+the answer token itself, where a one-token answer is formed. Those positions need a new read
+(`generation_prompt` / `turn_starts` in `scripts/olens_read_requests.py`), ~430 transcripts for the
+18 items × 3 arms × 8 samples.
+
 ## What next (not done)
 
 1. Re-run `nohint` on the lens pod (bf16) for the usable items and keep those whose own answer
    holds.
-2. O-lens reads on the hint rollouts at the hint token, the end of the user turn and the
-   assistant-start tokens (Neel's suggestion in the 2026-10-24 WSB thread), scored by whether a
-   bullet names the own answer, against a text-only guesser (Opus / Flash shown the prompt).
+2. O-lens reads on the hint rollouts at the assistant-start tokens and the answer token (Neel's
+   suggestion in the 2026-10-24 WSB thread), scored by whether a bullet names the own answer; the
+   stop-token reads above are the null to beat.
 3. cfbench: `nohint` ↔ `hint+d` arm pairs are counterfactual cases as they stand.
 
 ## Text-inversion gate (Gemini 3.8 Flash pass@3)
@@ -129,7 +167,7 @@ item is **killed** when any of the 3 guesses canon-matches Qwen's modal no-hint 
 / `first_letter`, case-insensitive); pass@1 is the hit rate over all samples.
 
 ```
-uv run python -m evalcue.envs.hint_cf.guess_gate --slug flash3   # 900 guesses, $1.51, ~9 min
+uv run python -m evalcue.envs.hint_cf.guess_gate --slug flash3   # 900 guesses, $1.51, ~9 min (at cfa46a9)
 ```
 
 Run: `hint_cf_gate/2026-10-26_flash3` (HF `runs/`; `guesses.jsonl` one row per env, item, sample

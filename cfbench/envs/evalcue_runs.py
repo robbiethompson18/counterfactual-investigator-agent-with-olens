@@ -24,6 +24,7 @@ from cfbench.core import Rollout, initial_context, render, unified_diff
 from environments._lib.core import load_env
 
 BEHAVIORS = json.loads((Path(__file__).parent / "evalcue_behaviors.json").read_text())  # run id -> BEHAVIOR, 2026-10-27
+PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}  # run dir name -> environments/ port, where the names differ
 
 
 def behavior(env: str) -> str:
@@ -32,7 +33,7 @@ def behavior(env: str) -> str:
     try:
         if env.startswith("honest_"):
             return load_env("honest").BEHAVIORS[env.removeprefix("honest_")]
-        return load_env(env).BEHAVIOR
+        return load_env(PORTS.get(env, env)).BEHAVIOR
     except (ModuleNotFoundError, SystemExit, AttributeError):
         return BEHAVIORS[env]
 
