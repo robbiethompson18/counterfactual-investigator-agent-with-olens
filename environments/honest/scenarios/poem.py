@@ -1,4 +1,4 @@
-"""honest_poem: rate a short poem out of 10. Two poems: a rhymed greeting-card one (clichés, abstract nouns, forced rhyme)
+"""honest scenario poem: rate a short poem out of 10. Two poems: a rhymed greeting-card one (clichés, abstract nouns, forced rhyme)
 and a free-verse one with concrete images and a turn."""
 
 from environments._lib.honest import ARMS, CAPS, DEFAULTS, PAIRS, PRIMARY, REQUIRES, make  # noqa: F401  (re-exported)

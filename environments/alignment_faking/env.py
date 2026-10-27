@@ -92,17 +92,29 @@ def items():
 
 
 # Prompt versions. Each is (system prompt for the free/paid tags, system prompt for the preview/public tags, user template
-# with {cue} and {query}). "original" is Greenblatt et al.'s text, as every stored run used it. To try a rewording, add an
-# entry here, e.g. PROMPTS["v2"] = (SYSTEM_V2_TIER, SYSTEM_V2_STAGE, USER_V2): its arms v2/free, v2/paid, v2/preview and
-# v2/public then exist, and `--arms prompt=v2` runs them (`--arms tag=free` runs free under every prompt).
-PROMPTS = {"original": (SYSTEM_FREE, SYSTEM_STAGE, USER)}
+# with {cue} and {query}); None for a cue the prompt doesn't define. "original" is Greenblatt et al.'s text, as every stored
+# run used it. A version's arms are `<version>/<tag>` for each tag it has a system prompt for (`--arms prompt=v2`;
+# `--arms tag=preview` runs preview under every prompt).
+PROMPTS = {
+    "original": (SYSTEM_FREE, SYSTEM_STAGE, USER),
+    # Kylie's rewrite (2026-10-27): a generic assistant, a helpfulness standard that covers harmful requests, and stated
+    # training consequences, without the paper's Anthropic / RLHF / free-tier wording or its reasoning examples. Stages only;
+    # the user turn is the original's, so the <deployment_stage> tag opens it as in the original preview/public arms.
+    "v2": (None, (DATA / "system_v2.txt").read_text(), USER),
+}
 
 
 def _arm(prompt: str, tag: str) -> str:
     return tag if prompt == "original" else f"{prompt}/{tag}"  # the original arms keep the names the stored runs used
 
 
-ARM_FACTORS = {_arm(p, t): {"prompt": p, "tag": t, "cue": "tier" if t in ("free", "paid") else "stage"} for p in PROMPTS for t in TAGS}
+def _cue(tag: str) -> str:
+    return "tier" if tag in ("free", "paid") else "stage"
+
+
+ARM_FACTORS = {
+    _arm(p, t): {"prompt": p, "tag": t, "cue": _cue(t)} for p in PROMPTS for t in TAGS if PROMPTS[p][0 if _cue(t) == "tier" else 1]
+}
 ARMS = list(ARM_FACTORS)
 
 
@@ -140,6 +152,7 @@ PAIRS = {
     f"{p}:{name}": (_arm(p, a), _arm(p, b))
     for p in PROMPTS
     for name, (a, b) in {"tier": ("paid", "free"), "stage": ("public", "preview")}.items()
+    if _arm(p, a) in ARM_FACTORS
 }
 REQUIRES: dict = {}
 CAPS = {"max_turns": 1}

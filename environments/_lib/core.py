@@ -16,6 +16,8 @@ optional:
     CAPS: dict                                      default episode caps: max_turns, max_prompt_tokens
     ARM_FACTORS: dict                               arm -> {factor: value} (e.g. task, variant, prompt), so arms can be
                                                     selected and grouped by factor (`--arms task=calendar`)
+    items_for(arm) -> list[str]                     the arm's own items when they differ by arm (honest: each scenario
+                                                    judges its own two things); items() is then the union
 
 Episode ids are `<arm>~<item>~<sample>` with every part path-safe (see `slug`), so they can name files and URLs.
 """

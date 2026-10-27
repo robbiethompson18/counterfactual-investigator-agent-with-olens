@@ -27,9 +27,11 @@ BEHAVIORS = json.loads((Path(__file__).parent / "evalcue_behaviors.json").read_t
 
 
 def behavior(env: str) -> str:
-    """The env's BEHAVIOR: from its environments/ port if there is one (honest_*, essay_grading, ...), else the snapshot
-    taken when evalcue's env modules were deleted (2026-10-27)."""
+    """The env's BEHAVIOR: from its environments/ port if there is one (essay_grading, honest_<scenario> -> the honest env's
+    BEHAVIORS[scenario], ...), else the snapshot taken when evalcue's env modules were deleted (2026-10-27)."""
     try:
+        if env.startswith("honest_"):
+            return load_env("honest").BEHAVIORS[env.removeprefix("honest_")]
         return load_env(env).BEHAVIOR
     except (ModuleNotFoundError, SystemExit, AttributeError):
         return BEHAVIORS[env]

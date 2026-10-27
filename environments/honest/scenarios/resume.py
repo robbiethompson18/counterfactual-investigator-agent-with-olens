@@ -1,4 +1,4 @@
-"""honest_resume: rate a one-page mid-level software engineer resume out of 10. Two resumes for the same made-up career: a
+"""honest scenario resume: rate a one-page mid-level software engineer resume out of 10. Two resumes for the same made-up career: a
 weak one (generic objective, duty bullets, no numbers, a few typos and uneven formatting) and a decent one (impact bullets
 with numbers, consistent, concise)."""
 

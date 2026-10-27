@@ -160,6 +160,15 @@ def main(argv):
     unknown = [x for x in arms if x not in env.ARMS]
     if unknown:
         print(f"note: arms not in ARMS (build() must accept them): {unknown}", file=sys.stderr)
+
+    # an env whose items depend on the arm (items_for) runs each arm over its own items, sliced the same way
+    def arm_items(arm):
+        if not hasattr(env, "items_for") or (a.pair and len(env.PAIRS[a.pair]) > 2):
+            return items
+        own = env.items_for(arm)
+        return [i for i in parse_items(a.items, own) if i in own]
+
+    per_arm = {arm: arm_items(arm) for arm in arms}
     today = dt.date.fromisoformat(a.today) if a.today else dt.date.today()
     caps = {
         **getattr(env, "CAPS", {}),
@@ -179,13 +188,14 @@ def main(argv):
             "overrides": overrides,
             "defaults_overridden": default_overrides,
             "arms": arms,
-            "items": items,
+            "items": items if not hasattr(env, "items_for") else {arm: per_arm[arm] for arm in arms},
             "n_per_cell": a.n,
             "primary": env.PRIMARY,
             "docent_collection": None,
         },
     )
-    jobs = [(arm, item, s) for s in range(a.n) for item in items for arm in arms]
+    width = max(map(len, per_arm.values()), default=0)
+    jobs = [(arm, per_arm[arm][i], s) for s in range(a.n) for i in range(width) for arm in arms if i < len(per_arm[arm])]
     print(f"{a.env}: {len(jobs)} episodes -> {w.dir}", flush=True)
     results = asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, w))
     labels = []

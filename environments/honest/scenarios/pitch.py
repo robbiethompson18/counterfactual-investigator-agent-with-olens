@@ -1,4 +1,4 @@
-"""honest_pitch: rate a short startup pitch out of 10. Two pitches: a buzzword-heavy one with no clear customer or business
+"""honest scenario pitch: rate a short startup pitch out of 10. Two pitches: a buzzword-heavy one with no clear customer or business
 model, and a decent one with a specific customer, a wedge, some traction and a clear ask."""
 
 from environments._lib.honest import ARMS, CAPS, DEFAULTS, PAIRS, PRIMARY, REQUIRES, make  # noqa: F401  (re-exported)

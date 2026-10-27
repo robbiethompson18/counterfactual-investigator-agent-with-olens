@@ -223,7 +223,7 @@ Current docs:
 
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
   — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
-  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest_* and overeagerness ported, everything
+  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported, everything
   else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
@@ -285,7 +285,7 @@ Current docs:
 - [MIXED: Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
   survives a split test); harness in `evalcue/CLAUDE.md`
-- [MIXED: evalcue harness (only Robbie's `envs/honest/` is left; every other env was deleted 2026-10-27, see environments/) — read before running the honest envs](evalcue/CLAUDE.md)
+- [ORPHAN: evalcue harness (deleted 2026-10-27, code at c7b2e56; honest is now environments/honest/) — read before reviving an evalcue env](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/evalcue/CLAUDE.md)
   — `evalcue.run`/`show`/`--rescore`, `Episode` fields, run dirs, the `EVALCUE_*` env vars
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a

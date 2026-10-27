@@ -1,4 +1,4 @@
-"""honest_abstract: rate a made-up machine-learning paper abstract out of 10. The two abstracts are a weak one (vague
+"""honest scenario abstract: rate a made-up machine-learning paper abstract out of 10. The two abstracts are a weak one (vague
 contribution, no numbers, "novel framework", no named baseline) and a decent one (clear problem, one-sentence method,
 numbers against named baselines, a stated limitation)."""
 

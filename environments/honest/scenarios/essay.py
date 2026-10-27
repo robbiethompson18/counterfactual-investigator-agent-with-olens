@@ -1,4 +1,4 @@
-"""honest_essay: grade a short personal essay out of 10. The reference scenario; the two essays are hidden_goal.grade's
+"""honest scenario essay: grade a short personal essay out of 10. The reference scenario; the two essays are hidden_goal.grade's
 "volunteering" (mediocre, about a 5-6) and a stronger rewrite of it."""
 
 from environments._lib.honest import ARMS, CAPS, DEFAULTS, PAIRS, PRIMARY, REQUIRES, make  # noqa: F401  (re-exported)

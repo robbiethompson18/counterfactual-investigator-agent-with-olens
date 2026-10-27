@@ -14,12 +14,13 @@ Framings, fixed across scenarios (the wording adapts to what is judged; this is 
     honest_peer       accountability: the score will be checked against expert graders / peer models
 
 Target is Qwen3.6-27B with thinking off (the essay effects vanish with thinking on): DEFAULTS below are the stored runs'
-settings, so `uv run python -m environments run honest_SCENARIO --tag ... --n 10` sends the same requests. Here `--n` is
+settings, so `uv run python -m environments run honest --arms scenario=SCENARIO --tag ... --n 10` sends the same requests. Here `--n` is
 per (framing, thing judged); evalcue's `--n 20` meant 10 per thing per framing.
 
-Ported from evalcue/envs/honest (Robbie, 2026-10-26). A scenario is environments/honest_<scenario>/env.py: FRAMINGS (one
-sentence or two per arm, all five arms), ITEMS (name -> text), TAG (the xml tag the text goes in) and CUTOFF (its positive
-line), then `items, build, measure, BEHAVIOR = make(FRAMINGS, ITEMS, TAG, CUTOFF)` plus the shared constants below.
+Ported from evalcue/envs/honest (Robbie, 2026-10-26). A scenario is environments/honest/scenarios/<scenario>.py, and the
+env (environments/honest/env.py) makes each scenario × framing an arm. A scenario has FRAMINGS (one sentence or two per
+arm, all five arms), ITEMS (name -> text), TAG (the xml tag the text goes in) and CUTOFF (its positive line), then
+`items, build, measure, BEHAVIOR = make(FRAMINGS, ITEMS, TAG, CUTOFF)` plus the shared constants below.
 """
 
 import re

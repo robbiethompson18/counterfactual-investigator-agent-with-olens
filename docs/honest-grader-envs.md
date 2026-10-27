@@ -3,7 +3,8 @@
 Plan written 2026-10-26, after the hidden_goal.grade result
 ([envs/hidden_goal.md](envs/hidden_goal.md)) turned out to be the only env in the 26-env no-CoT
 sweep ([nocot-cfbench.md](nocot-cfbench.md)) where the O-lens beat transcript tools and placebo.
-Code: [`evalcue/envs/honest/`](../evalcue/envs/honest/).
+Code: [`environments/honest/`](../environments/honest/) (one env, 55 `scenario/framing` arms; ported
+2026-10-27 from `evalcue/envs/honest/`, deleted, at `c7b2e56`).
 
 ## TL;DR (2026-10-26, end of day)
 
