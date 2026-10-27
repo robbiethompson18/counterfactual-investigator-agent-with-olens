@@ -171,6 +171,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in
+  `DEFAULTS`). Thinking off is the setting where behaviours stay unverbalized, which is what the
+  O-lens is for; thinking on is for a deliberate on/off comparison only, and the two modes get
+  different rates (see [docs/thinking-off.md](docs/thinking-off.md)), so never pool them.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `environments/` sends it by default), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
