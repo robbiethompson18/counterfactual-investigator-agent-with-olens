@@ -137,11 +137,13 @@ What it reads:
   module doesn't load from a clean checkout (data files not in git; none today) is marked in
   `spec/index.json` and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally whenever the
   env's source changes (overeagerness takes ~3 minutes) and `upload` ships.
-- `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and the run's
-  expview dataset.
-- `runs/env_<env>/<run>/expview/` (`_lib/expview_export.py`): each env run as an expview dataset,
-  one item per episode (id = episode id), and `runs/env_<env>/by_arm/<arm>/` = one arm across every
-  run, grouped by model, so rollouts open on https://expview.pages.dev too.
+- `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and which
+  episodes have O-lens reads (an expview run under `data/runs/<env>/` whose items name
+  `extra.source` / `extra.episode`).
+
+expview is on the same site (`expview/`) and reads env run folders itself, so the page links every
+env, run, arm (`expview/#env=E&arm=A`) and episode (`expview/#env=E&run=R&episode=ID`, with any
+attached O-lens or judge runs) there; expview links back with `../#env=E&arm=A&item=I`.
 
 **While developing an env**, run the viewer from your working tree:
 `uv run python -m environments view [ENV ...] [--port 8000]` builds every env's spec from your local
@@ -152,7 +154,6 @@ files, your local `data/envs` runs), and rebuilds an env within seconds of a cha
 ```bash
 uv run python -m environments view [ENV ...] [--port N]   # local viewer from your working tree, live rebuild
 uv run python -m environments spec [ENV ...] [--force]     # also run by `index`
-uv run python -m environments expview ENV[/RUN] [--upload]  # runs -> expview datasets (+ HF)
 python -m http.server 8000                                  # local: from the repo root, then
 # http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
 ```
