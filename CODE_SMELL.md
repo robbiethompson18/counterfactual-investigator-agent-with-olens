@@ -20,6 +20,18 @@ Also dropped with the server: Docent links resolved by transcript fingerprint (t
 resolves `extra.source` / `run_dir` + `row_index` through `docent.json`), and "annotations from other
 runs" on a base item (needs a cross-run index).
 
+## 2026-10-26: batch O-lens reads don't reach the transcript viewer
+
+The viewer went static (no server, no queue, no fleet; `transcript-viewer/CLAUDE.md`, History), so
+the only way to make reads is `scripts/olens_read_requests.py` on RunPod. Its output rows
+(`{id, token_index, layer, bullets: [{text, fve, coef}], joint_fve}`, transcripts rendered by vLLM
+from OpenAI-style messages) are not the viewer's `data/reads.jsonl` records
+(`{key, tid, pos, layer, temperature, n, seed, samples: [{text, bullets, bfve, coefs, fve}], lens}`
+over WeirdChat rows), so new reads need a converter (tid + token-position mapping) before
+`publish.py` shows them. Also: the static-only build dropped the `queued`/`relevant` fields from
+every transcript file, so the next `publish.py` re-uploads the whole site once (~27k files, ~15
+min).
+
 ## 2026-10-26: OpenRouter calls outside `openrouter.chat`
 
 `olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
@@ -178,8 +190,9 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
 
 `uv run ty check` reports 286 diagnostics (2026-10-22): 98 unresolved imports (torch, transformers,
 vllm, `server`, `olens.*`) in GPU-only scripts whose deps live only in the pod venvs, and 152 in
-`transcript-viewer/web/server.py`, mostly untyped JSON dicts. Check only the files you touched until
-someone excludes the pod-only modules and types `server.py`.
+`transcript-viewer/web/server.py`, mostly untyped JSON dicts (deleted 2026-10-26; its static-build
+remainder `web/build.py` + `scripts/publish.py` report 9). Check only the files you touched until
+someone excludes the pod-only modules.
 
 ## 2026-10-21: `evalcue/` harness rough edges
 

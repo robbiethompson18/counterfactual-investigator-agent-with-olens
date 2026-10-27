@@ -1,5 +1,6 @@
 """O-lens reads at every stop token of chat transcripts: the agu18dec lens decoded by vLLM (olens.vllm_lens, merged
-weights), scored with the AR (per-bullet and joint whitened FVE, as transcript-viewer/pod/server.py's score()).
+weights), scored with the AR (per-bullet and joint whitened FVE, as the viewer's lens server's score(): transcript-viewer/pod/server.py,
+deleted 2026-10-26, at b842346).
 
 Runs on a GPU pod in the vllm/vllm-openai image (one H200: vLLM takes ~half, the HF base for capture + AR the rest):
 
@@ -16,7 +17,7 @@ and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "as
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
 
-Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/server.py) and every <|im_end|>,
+Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/build.py) and every <|im_end|>,
 prompt included. OUT.jsonl gets one line per (transcript, position, layer), appended per transcript; transcripts
 already in OUT are skipped, so a rerun resumes:
 
@@ -48,7 +49,7 @@ from transformers import AutoTokenizer
 
 from olens import provenance
 
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/server.py
+PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
 BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcue's deps
     "type": "function",
     "function": {
@@ -127,9 +128,10 @@ def capture(model, ids, layers, positions, chunk=4096):
 
 @torch.no_grad()
 def score(tok, ar, readout, texts, vecs, layers):
-    """As transcript-viewer/pod/server.py's score(): per-bullet FVE (cos^2 in the whitened space, 0 if negative) and the
-    joint FVE of the NNLS refit on all bullets. Batched: whitening is one matmul per layer and only each read's small
-    Gram matrix leaves the GPU (a per-read loop with a 5120-dim scipy NNLS each took 40% of the run)."""
+    """As the viewer lens server's score() (transcript-viewer/pod/server.py, deleted 2026-10-26, at b842346): per-bullet FVE
+    (cos^2 in the whitened space, 0 if negative) and the joint FVE of the NNLS refit on all bullets. Batched: whitening is one
+    matmul per layer and only each read's small Gram matrix leaves the GPU (a per-read loop with a 5120-dim scipy NNLS each
+    took 40% of the run)."""
     bls = [bullets(t) for t in texts]
     flat = [(x, k) for k, bl in enumerate(bls) for x in bl]
     if not flat:

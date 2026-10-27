@@ -1,4 +1,4 @@
-"""Share this machine's viewer data through the HF dataset, and rebuild the read-only site from everyone's.
+"""Share this machine's viewer data through the HF dataset, and rebuild the static site from everyone's.
 
 Each machine owns its files on HF, so publishes never clash:
     weirdchat/reads/<machine>.jsonl      data/reads.jsonl      (lens reads)
@@ -8,13 +8,14 @@ Each machine owns its files on HF, so publishes never clash:
     weirdchat/extras/<machine>.jsonl     data/extras.jsonl     (NLA + J++ reads, web/extras.py)
     weirdchat/site/...                   built from all of the above; the Cloudflare page reads it
 
-Steps: push this machine's files, pull every other machine's into data/shared/weirdchat/ (web/server.py reads them
+Steps: push this machine's files, pull every other machine's into data/shared/weirdchat/ (web/build.py reads them
 alongside its own), build one gzipped JSON per transcript (plus the pattern list), and upload the ones that changed.
 CHIVE incidents ship without Agam's readout banks unless --banks: they aren't public, and they're ~4 GB of chunk files.
 
     .venv/bin/python scripts/publish.py                 # all of it
-    .venv/bin/python scripts/publish.py --pull          # only pull other machines' data, to browse it locally
-    .venv/bin/python scripts/publish.py --seed-from http://bramble:8803 --as bramble   # copy a viewer's reads over HTTP
+    .venv/bin/python scripts/publish.py --pull          # only pull other machines' data
+    .venv/bin/python scripts/publish.py --preview DIR   # build the whole site into DIR (no HF writes), with an index.html
+                                                        # that reads it: `python -m http.server -d DIR` to browse
     .venv/bin/python scripts/publish.py --banks         # also the CHIVE banks (bank/<pid>/<reader>/<chunk>)
 
 The machine name is $WCO_MACHINE, else the short hostname.
@@ -31,11 +32,8 @@ import shutil
 import subprocess
 import sys
 import time
-import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from pathlib import Path
-from urllib.parse import quote
 
 from huggingface_hub import CommitOperationAdd, HfApi, hf_hub_download, snapshot_download
 from huggingface_hub.errors import EntryNotFoundError
@@ -43,21 +41,22 @@ from huggingface_hub.errors import EntryNotFoundError
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "web"))
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")  # the build forks after the tokenizer is loaded
+import build
 import chive
 import extras
-import server
 
 REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
 STAGE = ROOT / "data/site_stage"  # changed site files, laid out like the repo, for upload_large_folder
+OUT = STAGE / "weirdchat/site"  # where put() writes; --preview points it elsewhere before the build forks
 WORKERS = max(1, (os.cpu_count() or 2) - 2)
-OLD = {}  # the last upload's manifest {path under weirdchat/site/: sha1}; build() fills it before forking
+OLD = {}  # the last upload's manifest {path under weirdchat/site/: sha1}; build_site() fills it before forking
 api = HfApi()
 
 
 def push():
-    ops = [CommitOperationAdd(f"weirdchat/{k}/{server.MACHINE}.jsonl", str(p)) for k, p in server.KINDS.items() if p.exists()]
+    ops = [CommitOperationAdd(f"weirdchat/{k}/{build.MACHINE}.jsonl", str(p)) for k, p in build.KINDS.items() if p.exists()]
     if ops:
-        api.create_commit(REPO, ops, repo_type="dataset", commit_message=f"weirdchat: {server.MACHINE} data")
+        api.create_commit(REPO, ops, repo_type="dataset", commit_message=f"weirdchat: {build.MACHINE} data")
     print(f"pushed {[o.path_in_repo for o in ops]}", flush=True)
 
 
@@ -65,54 +64,36 @@ def pull():
     snapshot_download(
         REPO,
         repo_type="dataset",
-        local_dir=server.SHARED.parent.parent,
-        allow_patterns=[f"weirdchat/{k}/*.jsonl" for k in server.KINDS],
-        ignore_patterns=[f"weirdchat/*/{server.MACHINE}.jsonl"],
+        local_dir=build.SHARED.parent,  # weirdchat/<kind>/<machine>.jsonl lands under data/shared/
+        allow_patterns=[f"weirdchat/{k}/*.jsonl" for k in build.KINDS],
+        ignore_patterns=[f"weirdchat/*/{build.MACHINE}.jsonl"],
     )
-    print(f"pulled into {server.SHARED}: {sorted(str(p.relative_to(server.SHARED)) for p in server.SHARED.glob('*/*.jsonl'))}", flush=True)
-
-
-def seed(url, name):
-    """Copy every cached read from a running viewer (e.g. one we can't ssh into) into its shard, and push it."""
-    get = lambda path: json.load(urllib.request.urlopen(url + path, timeout=300))
-    server.load()  # the same WeirdChat copy, so the same transcript ids
-    tids = [tid for p in server.S["patterns"] for tid in p["tids"]]
-    out = server.SHARED / "reads" / f"{name}.jsonl"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    t0, n_reads = time.time(), 0
-    with out.open("w") as f, ThreadPoolExecutor(10) as ex:  # ~1 s/transcript, mostly transfer; the viewer also serves its fleet
-        for k, reads in enumerate(ex.map(lambda t: get(f"/api/transcript?tid={quote(t)}")["reads"], tids)):
-            f.write("".join(json.dumps(r) + "\n" for r in reads))
-            n_reads += len(reads)
-            if k % 1000 == 0:
-                print(f"{k}/{len(tids)} transcripts, {n_reads} reads, {time.time() - t0:.0f}s", flush=True)
-    api.upload_file(path_or_fileobj=str(out), path_in_repo=f"weirdchat/reads/{name}.jsonl", repo_id=REPO, repo_type="dataset")
-    print(f"seeded {n_reads} reads from {url} as {name}", flush=True)
+    print(f"pulled into {build.SHARED}: {sorted(str(p.relative_to(build.SHARED)) for p in build.SHARED.glob('*/*.jsonl'))}", flush=True)
 
 
 def put(rel, obj):
-    """Gzip one site file; stage it for upload if it differs from the last upload. Returns {path: sha1}."""
+    """Gzip one site file; write it to OUT if it differs from the last upload. Returns {path: sha1}."""
     b = gzip.compress(json.dumps(obj, separators=(",", ":")).encode(), mtime=0)
     rel = f"{rel}.json.gz"
     sha = hashlib.sha1(b).hexdigest()
     if OLD.get(rel) != sha:
-        dst = STAGE / "weirdchat/site" / rel
+        dst = OUT / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(b)
     return {rel: sha}
 
 
 def build_overview():
-    return put("overview", server.overview())
+    return put("overview", build.overview())
 
 
 def build_pattern(i, banks):
     """One pattern's page and all its transcripts (run in a forked worker)."""
-    S = server.S
+    S = build.S
     p = S["patterns"][i]
-    out = put(f"pattern/{i}", server.pattern_detail(i))
+    out = put(f"pattern/{i}", build.pattern_detail(i))
     for tid in p["tids"]:
-        t = dict(server.transcript(tid), pattern=i)  # pattern: answers /api/locate
+        t = build.transcript(tid)
         if p["ds"] == "chive" and banks:
             for r in t["readers"]:
                 for c in range(-(-len(t["tokens"]) // chive.CHUNK) if r["layers"] else 0):
@@ -126,26 +107,27 @@ def build_pattern(i, banks):
     return out
 
 
-def build(banks, force=False):
-    """Write everything the page fetches that changed since the last upload (gzipped JSON, the same shapes as the server's
-    API) to STAGE, laid out like the repo; returns the new manifest {path under weirdchat/site/: sha1}.
+def build_site(banks, preview=None, force=False):
+    """Write everything the page fetches (gzipped JSON) to OUT, laid out like weirdchat/site/ in the repo; returns the
+    manifest {path: sha1}. Publishing writes only what changed since the last upload, to STAGE; --preview writes it all
+    to that directory, plus an index.html that reads from it.
 
     Rendering is CPU-bound (tokenising, per-token decoding, gzip), so patterns are built in WORKERS forked processes that
     share the loaded reads copy-on-write."""
-    check_current(force)  # here too, so calling build() directly can't skip it
-    server.init()
-    extras.load(server.shards("extras"))
-    print(f"{len(server.S['trs'])} transcripts, {len(server.S['reads'])} reads", flush=True)
-    try:
-        OLD.update(json.loads(Path(hf_hub_download(REPO, "weirdchat/site/manifest.json", repo_type="dataset")).read_text()))
-    except EntryNotFoundError:
-        pass
-    shutil.rmtree(STAGE, ignore_errors=True)
-    S = server.S
-    manifest = put(
-        "patterns",
-        {"patterns": [server.pattern_summary(p) for p in S["patterns"]], "layers": server.LAYERS, "pre_layers": server.PRE_LAYERS},
-    )
+    global OUT
+    if preview:
+        OUT = Path(preview).resolve()
+    else:
+        check_current(force)  # here too, so calling build_site() directly can't skip it
+        try:
+            OLD.update(json.loads(Path(hf_hub_download(REPO, "weirdchat/site/manifest.json", repo_type="dataset")).read_text()))
+        except EntryNotFoundError:
+            pass
+    build.init()
+    S = build.S
+    print(f"{len(S['trs'])} transcripts, {len(S['reads'])} reads", flush=True)
+    shutil.rmtree(OUT, ignore_errors=True)
+    manifest = put("patterns", {"patterns": [build.pattern_summary(p) for p in S["patterns"]], "layers": build.LAYERS})
     # biggest patterns first, so no worker is left with a long one at the end
     order = sorted(range(len(S["patterns"])), key=lambda i: -len(S["patterns"][i]["tids"]))
     gc.freeze()  # keep the collector from writing to (and so copying) every inherited object in each worker
@@ -158,6 +140,10 @@ def build(banks, force=False):
                 print(f"{k}/{len(order)} patterns, {time.time() - t0:.0f}s", flush=True)
         manifest |= overview.get()
     gc.unfreeze()
+    if preview:
+        html = (ROOT / "web/index.html").read_text().replace("</head>", "<script>window.WCO_STATIC = './';</script></head>", 1)
+        (OUT / "index.html").write_text(html)
+        print(f"site in {OUT}: python -m http.server -d {OUT}", flush=True)
     return manifest
 
 
@@ -177,7 +163,7 @@ def check_current(force=False):
     """The site's JSON comes from this checkout's web/ code, but the page from whatever deploy_site.sh last shipped (main):
     publishing from other code breaks the page, and flips every file so the whole site re-uploads (~15 min). Code
     behind main is refused even with force: its pattern list drops whatever main added since (a stale worktree's
-    build() wiped the confession follow-ups off the site on 2026-10-20)."""
+    build wiped the confession follow-ups off the site on 2026-10-20)."""
     git = lambda *a: subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True, check=False)
     git("fetch", "-q", "origin", "main")
     if git("merge-base", "--is-ancestor", "origin/main", "HEAD").returncode:
@@ -189,21 +175,18 @@ def check_current(force=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pull", action="store_true", help="only pull other machines' data")
-    ap.add_argument("--seed-from", help="a viewer URL to copy reads from (then also --as)")
-    ap.add_argument("--as", dest="name", help="the machine name for --seed-from")
+    ap.add_argument("--preview", metavar="DIR", help="build the whole site into DIR for a local http.server; no HF writes")
     ap.add_argument("--banks", action="store_true", help="also publish Agam's CHIVE readout banks (not public: ask first)")
     ap.add_argument("--force", action="store_true", help="publish even if the viewer code differs from origin/main")
     args = ap.parse_args()
-    if args.seed_from:
-        if not args.name:
-            ap.error("--seed-from needs --as NAME")
-        return seed(args.seed_from.rstrip("/"), args.name)
+    if args.preview:
+        return build_site(args.banks, preview=args.preview)
     if not args.pull:
         check_current(args.force)
         push()
     pull()
     if not args.pull:
-        upload_site(build(args.banks, args.force))
+        upload_site(build_site(args.banks, force=args.force))
 
 
 if __name__ == "__main__":
