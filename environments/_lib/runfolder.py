@@ -94,45 +94,7 @@ def read_episodes(run_dir: Path):
                 yield json.loads(line)
 
 
-def docent_upload(run_dir: Path) -> str | None:
-    """Upload a finished run's episodes to the Docent collection named after its env (scripts/docent_upload.py, which
-    carries Docent's SDK as its own deps), then write each episode's `docent_run` / `docent_url` and meta.json's
-    `docent_collection`. A run whose meta already names a collection (uploaded, or converted with its old Docent runs) is
-    left alone. Skips (returns None) without a key: DOCENT_API_KEY, or docent.key in the main checkout."""
-    import os
-
-    meta = json.loads((run_dir / "meta.json").read_text())
-    if meta.get("docent_collection"):  # already uploaded, or converted (those keep their old Docent runs)
-        return meta["docent_collection"]
-    key = os.environ.get("DOCENT_API_KEY") or _main_checkout_file("docent.key")
-    if not key:
-        print(f"{run_dir}: no DOCENT_API_KEY or docent.key; skipping Docent")
-        return None
-    script = REPO_ROOT / "scripts" / "docent_upload.py"
-    env = {**os.environ, "DOCENT_API_KEY": key}
-    subprocess.run(["uv", "run", "--quiet", "--script", str(script), "upload-env", str(run_dir)], cwd=REPO_ROOT, env=env, check=True)
-    doc = json.loads((run_dir / "docent.json").read_text())
-    cid, runs = doc["collection_id"], doc["runs"]
-    # rewrite the shards with the Docent fields (offsets change, so the index is rebuilt); same shard boundaries
-    index = {}
-    for shard in sorted((run_dir / "episodes").glob("*.jsonl")):
-        lines, off = [], 0
-        for line in shard.read_text().splitlines():
-            ep = json.loads(line)
-            rid = runs.get(ep["id"])
-            ep["docent_run"], ep["docent_url"] = rid, rid and f"https://docent.transluce.org/dashboard/{cid}/agent_run/{rid}"
-            b = (json.dumps(ep, ensure_ascii=False, default=str) + "\n").encode()
-            index[ep["id"]] = [shard.name, off, len(b)]
-            lines.append(b)
-            off += len(b)
-        shard.write_bytes(b"".join(lines))
-    (run_dir / "episodes" / "index.json").write_text(json.dumps(index) + "\n")
-    meta["docent_collection"] = cid
-    (run_dir / "meta.json").write_text(json.dumps(meta, indent=1, default=str) + "\n")
-    return cid
-
-
-def _main_checkout_file(name: str) -> str | None:
+def main_checkout_file(name: str) -> str | None:
     """A gitignored key file at the repo root, or in the main checkout when this is a git worktree."""
     k = REPO_ROOT / name
     if not k.exists():
@@ -148,7 +110,7 @@ def hf_token() -> str | None:
 
     if os.environ.get("HF_TOKEN"):
         return os.environ["HF_TOKEN"]
-    return _main_checkout_file("hf.key")
+    return main_checkout_file("hf.key")
 
 
 def upload(paths: list[Path], message: str):

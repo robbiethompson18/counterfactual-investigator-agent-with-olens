@@ -14,6 +14,8 @@ hub arm, the one with the smallest total diff to every other arm (usually the en
 
 BEHAVIOR is the env's own `BEHAVIOR`, the words-version of its `detect()`: from the environments/ port when one exists, else
 from evalcue_behaviors.json, a snapshot of every evalcue env module's BEHAVIOR taken before evalcue was deleted (2026-10-27).
+A port with `canon_answer` (plus `ANSWER_FORMAT`, `ANSWER_MATCH`) also supports the answer task: each Rollout's `answer` is
+`canon_answer` of its final assistant reply.
 """
 
 import json
@@ -24,16 +26,26 @@ from cfbench.core import Rollout, initial_context, render, unified_diff
 from environments._lib.core import load_env
 
 BEHAVIORS = json.loads((Path(__file__).parent / "evalcue_behaviors.json").read_text())  # run id -> BEHAVIOR, 2026-10-27
+PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}  # run dir name -> environments/ port, where the names differ
+
+
+def port(env: str):
+    """The env's environments/ module if it has one (honest_<scenario> -> honest, PORTS for renamed envs), else None."""
+    try:
+        return load_env("honest" if env.startswith("honest_") else PORTS.get(env, env))
+    except (ModuleNotFoundError, SystemExit):
+        return None
 
 
 def behavior(env: str) -> str:
     """The env's BEHAVIOR: from its environments/ port if there is one (essay_grading, honest_<scenario> -> the honest env's
     BEHAVIORS[scenario], ...), else the snapshot taken when evalcue's env modules were deleted (2026-10-27)."""
+    mod = port(env)
     try:
-        if env.startswith("honest_"):
-            return load_env("honest").BEHAVIORS[env.removeprefix("honest_")]
-        return load_env(env).BEHAVIOR
-    except (ModuleNotFoundError, SystemExit, AttributeError):
+        if mod is None:
+            raise AttributeError
+        return mod.BEHAVIORS[env.removeprefix("honest_")] if env.startswith("honest_") else mod.BEHAVIOR
+    except AttributeError:
         return BEHAVIORS[env]
 
 
@@ -68,6 +80,8 @@ class EvalcueRuns:
         env, runs = spec.split("/")
         runs, _, only_item = runs.partition("@")
         self.BEHAVIOR = behavior(env)
+        if (mod := port(env)) is not None and hasattr(mod, "canon_answer"):
+            self.ANSWER_FORMAT, self.ANSWER_MATCH, self.canon_answer = mod.ANSWER_FORMAT, mod.ANSWER_MATCH, mod.canon_answer
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}  # (arm, item) -> starting context
         for run in runs.split("+"):
@@ -83,7 +97,16 @@ class EvalcueRuns:
 
     def rollouts(self, arm: str, model: str) -> list[Rollout]:
         rows = [(src, r) for src, r in self.rows[arm] if r["model"] == MODELS[model]]
-        return [Rollout(source=src, messages=r["messages"], label=bool(label(r))) for src, r in rows]
+        return [Rollout(source=src, messages=r["messages"], label=bool(label(r)), answer=self._answer(r)) for src, r in rows]
+
+    def _answer(self, row: dict) -> str | None:
+        if not hasattr(self, "canon_answer"):
+            return None
+        replies = [m.get("content") or "" for m in row["messages"] if m["role"] == "assistant"]
+        return self.canon_answer(replies[-1]) if replies else None
+
+    def items(self) -> list[str]:
+        return sorted({i for _, i in self.starts})
 
     def _items(self, arm: str) -> set[str]:
         return {i for a, i in self.starts if a == arm}

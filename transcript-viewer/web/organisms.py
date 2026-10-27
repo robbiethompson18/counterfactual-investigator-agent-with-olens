@@ -8,7 +8,11 @@ read with the organism's LoRA, by a script of their own).
 """
 
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))  # the repo package's dep-free modules work in this venv
+from counterfactual_investigator_agent_with_olens.render import chat_ids
 
 DIR = Path(__file__).resolve().parent.parent.parent / "data/runs/organisms"
 PREFIX = "organism/"
@@ -62,8 +66,7 @@ def msg_ranges(tok, ids):
 def render_ids(tok, r):
     """Same tokens as scripts/organism_olens.py: the chat-templated prompt, the completion, and a final <|im_end|>."""
     msgs = ([{"role": "system", "content": r["system"]}] if r["system"] else []) + [{"role": "user", "content": r["user"]}]
-    prompt = tok.apply_chat_template(msgs, tokenize=True, add_generation_prompt=True, enable_thinking=False)
-    prompt = list(prompt["input_ids"] if hasattr(prompt, "keys") else prompt)
+    prompt = chat_ids(tok, msgs, generation_prompt=True, thinking=False)
     return prompt + tok(r["completion"], add_special_tokens=False).input_ids + [tok.convert_tokens_to_ids("<|im_end|>")]
 
 

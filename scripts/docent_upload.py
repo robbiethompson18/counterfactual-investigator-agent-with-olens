@@ -4,16 +4,22 @@
 # ///
 """Mirror run dirs into Docent (https://docent.transluce.org) as public collections, so every transcript has a link.
 
-evalcue-harness runs (rows.jsonl) go to one collection per env, cfbench runs (predictions.jsonl) to "cfbench", and
-environments/ run folders (data/envs/ENV/RUN, `upload-env`) to the collection named ENV. Each upload
-writes docent.json into the run dir: {"collection_id", "runs": [Docent agent run id for each line, null for skipped rows]}.
-runs.finish() runs this before the HF sync, so docent.json ships with the run. Docent's SDK pulls ~90 packages, so this
-script carries its own deps (PEP 723) instead of adding them to the project: always run it with `uv run --script`.
+One collection per env, named after it, plus "cfbench". Two run layouts:
 
-    uv run --script scripts/docent_upload.py upload RUN [RUN ...]   # skips runs that already have docent.json
-    uv run --script scripts/docent_upload.py upload-env data/envs/ENV/RUN [...]   # environments/ runs; the runner calls this
-    uv run --script scripts/docent_upload.py backfill               # every local run dir without docent.json
+- run folders (environments/, data/envs/<env>/<run>/): one Docent run per episode, with the run's labels (measure():
+  `positive`, ...) as metadata. The upload then writes `docent_run` / `docent_url` onto every episode line (shards rewritten,
+  episodes/index.json rebuilt) and `docent_collection` into meta.json, the layout converted runs have.
+  `environments run` calls this before its HF upload, so the ids ship with the run.
+- old run dirs (data/runs/): evalcue-harness rows.jsonl and cfbench predictions.jsonl. Each upload writes docent.json:
+  {"collection_id", "runs": [Docent agent run id per line, null for skipped rows]}; runs.finish() ran this before its HF sync.
+
+Docent's SDK pulls ~90 packages, so this script carries its own deps (PEP 723) instead of adding them to the project:
+always run it with `uv run --script`.
+
+    uv run --script scripts/docent_upload.py upload RUN [RUN ...]   # skips runs already uploaded or still running
+    uv run --script scripts/docent_upload.py backfill [--dry-run]   # every local run (both layouts) not yet uploaded
     uv run --script scripts/docent_upload.py link ENV/RUN:LINE      # cfbench's `shown` format, LINE 0-based
+    uv run --script scripts/docent_upload.py link ENV/RUN:EPISODE   # a run folder's episode id (arm~item~sample)
     uv run --script scripts/docent_upload.py view ENV arm=X positive=true   # saved filter -> shareable filtered-table URL
 
 Needs DOCENT_API_KEY (in .envrc.local).
@@ -21,6 +27,7 @@ Needs DOCENT_API_KEY (in .envrc.local).
 
 import argparse
 import json
+import subprocess
 import sys
 from functools import cache
 from pathlib import Path
@@ -28,10 +35,12 @@ from pathlib import Path
 from docent import Docent  # ty: ignore[unresolved-import]  (PEP 723 script deps)
 from docent.data_models import AgentRun, Transcript  # ty: ignore[unresolved-import]  (PEP 723 script deps)
 from docent.data_models.chat import AssistantMessage, ContentReasoning, ContentText, SystemMessage, ToolCall, ToolMessage, UserMessage  # ty: ignore[unresolved-import]  (PEP 723 script deps)
-from huggingface_hub import HfApi
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))  # not installed in this script's own env
+from counterfactual_investigator_agent_with_olens.runs import hf_upload
 
 ROOT = Path("data/runs")
-REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"  # same as runs.py
+ENVS = Path("data/envs")  # run folders (environments/_lib/runfolder.py)
 WEB = "https://docent.transluce.org"
 # rows.jsonl keys that aren't per-env behaviour flags
 STRUCTURAL = {"env", "model", "arm", "item", "sample", "seed", "thinking", "messages", "meta", "files_before", "files_after", "cwd"}
@@ -111,9 +120,36 @@ def env_row_run(row: dict, source: str) -> AgentRun:
     return AgentRun(name=f"{row['arm']} #{row['sample']}", transcripts=[Transcript(messages=messages(row["messages"]))], metadata=metadata)
 
 
+def episode_run(ep: dict, labels: dict, blobs: Path, source: str) -> AgentRun:
+    """A run folder's episode. Its labels (measure() values) are top-level metadata, like the env flags of an old row."""
+    before, after = ep.get("files_before") or {}, ep.get("files_after") or {}
+    changed = {path: (blobs / sha).read_text(errors="replace") for path, sha in sorted(after.items()) if before.get(path) != sha}
+    metadata = {
+        **(labels.get(ep["id"]) or {}),
+        "arm": ep["arm"],
+        "item": ep["item"],
+        "sample": ep["sample"],
+        "target": ep.get("target"),
+        "finish": ep.get("finish"),
+        "turns": ep.get("turns"),
+        "error": ep.get("error"),
+        "source": source,
+        "env_meta": ep.get("meta"),
+        "changed_files": "\n\n".join(f"--- {path}\n{body[:FILE_CHARS]}" for path, body in changed.items()) or None,
+    }
+    return AgentRun(name=f"{ep['arm']} #{ep['sample']}", transcripts=[Transcript(messages=messages(ep["messages"]))], metadata=metadata)
+
+
 def link_for(source: str) -> str | None:
-    """`env/run:line` -> that row's Docent link, if its run has been uploaded locally."""
+    """`env/run:line` (old run dir) or `env/run:episode_id` (run folder) -> that transcript's Docent link, if uploaded locally."""
     run, _, line = source.rpartition(":")
+    episodes = ENVS / run / "episodes"
+    if episodes.is_dir():
+        index = json.loads((episodes / "index.json").read_text())
+        shard, off, n = index[line if line in index else list(index)[int(line)]]  # an episode id, or its 0-based position
+        with open(episodes / shard, "rb") as f:
+            f.seek(off)
+            return json.loads(f.read(n)).get("docent_url")
     index = ROOT / run / "docent.json"
     if not index.exists():
         return None
@@ -129,8 +165,49 @@ def prediction_run(row: dict, source: str) -> AgentRun:
     return AgentRun(name=name, transcripts=[Transcript(messages=messages(row["messages"]))], metadata=metadata)
 
 
-def upload(run: Path) -> bool:
-    """Upload one run dir and write its docent.json; False if it has nothing Docent-shaped or was already uploaded."""
+def upload_folder(run: Path, dry: bool = False) -> bool:
+    """A run folder: upload every episode with a transcript, then write the ids back (see the module docstring)."""
+    meta = json.loads((run / "meta.json").read_text())
+    if meta.get("docent_collection") or meta.get("status") == "running":
+        return False
+    if dry:
+        print(f"{run}: would upload to collection {meta['env']!r}")
+        return True
+    labels: dict[str, dict] = {}
+    for f in sorted((run / "labels").glob("*.jsonl")):
+        for r in map(json.loads, f.read_text().splitlines()):
+            labels.setdefault(r["episode"], {}).update(r["values"] or {})
+    shards = sorted((run / "episodes").glob("*.jsonl"))
+    per_shard = [[json.loads(line) for line in shard.read_text().splitlines()] for shard in shards]
+    agent_runs = [
+        [episode_run(ep, labels, run / "blobs", f"{run.parent.name}/{run.name}:{ep['id']}") if ep.get("messages") else None for ep in eps]
+        for eps in per_shard
+    ]
+    flat = [r for rs in agent_runs for r in rs if r]
+    for agent_run in flat:
+        agent_run.metadata |= {"run_status": meta["status"], "run_description": meta.get("description")}
+    cid = collection_id(meta["env"])
+    if flat:
+        client().add_agent_runs(cid, flat)
+    index = {}
+    for shard, eps, runs in zip(shards, per_shard, agent_runs, strict=True):
+        with open(shard, "wb") as fh:
+            for ep, r in zip(eps, runs, strict=True):
+                ep |= {"docent_run": r and r.id, "docent_url": r and f"{WEB}/dashboard/{cid}/agent_run/{r.id}"}
+                line = (json.dumps(ep, ensure_ascii=False, default=str) + "\n").encode()
+                index[ep["id"]] = [shard.name, fh.tell(), len(line)]
+                fh.write(line)
+    (run / "episodes" / "index.json").write_text(json.dumps(index) + "\n")
+    meta["docent_collection"] = cid
+    (run / "meta.json").write_text(json.dumps(meta, indent=1, default=str) + "\n")
+    print(f"{run}: {len(flat)}/{len(index)} episodes -> {WEB}/dashboard/{cid}")
+    return True
+
+
+def upload(run: Path, dry: bool = False) -> bool:
+    """Upload one run and record its Docent ids; False if it has nothing Docent-shaped or was already uploaded."""
+    if (run / "episodes").is_dir():
+        return upload_folder(run, dry)
     if (run / "docent.json").exists():
         return False
     meta = json.loads((run / "meta.json").read_text()) if (run / "meta.json").exists() else {"status": "running"}
@@ -145,6 +222,9 @@ def upload(run: Path) -> bool:
     rows = [json.loads(line) for line in lines]
     if run.parent.name != "cfbench" and not all("arm" in r or "variant" in r for r in rows):
         return False  # a rows.jsonl from something other than the evalcue harness
+    if dry:
+        print(f"{run}: would upload {len(rows)} rows to collection {name!r}")
+        return True
     agent_runs = [convert(r, f"{run.parent.name}/{run.name}:{i}") if r.get("messages") else None for i, r in enumerate(rows)]
     for agent_run in filter(None, agent_runs):
         agent_run.metadata |= {"run_status": meta["status"], "run_description": meta.get("description")}
@@ -153,43 +233,6 @@ def upload(run: Path) -> bool:
         client().add_agent_runs(cid, [r for r in agent_runs if r])
     (run / "docent.json").write_text(json.dumps({"collection_id": cid, "runs": [r and r.id for r in agent_runs]}) + "\n")
     print(f"{run}: {sum(map(bool, agent_runs))}/{len(rows)} rows -> {WEB}/dashboard/{cid}")
-    return True
-
-
-def upload_env_run(run: Path) -> bool:
-    """One environments/ run folder (data/envs/ENV/RUN) -> the ENV collection. Writes docent.json {"collection_id", "runs":
-    {episode id: agent run id}}; `environments` merges it into the episodes. Errored episodes are skipped."""
-    if (run / "docent.json").exists():
-        return False
-    meta = json.loads((run / "meta.json").read_text())
-    if meta["status"] == "running":
-        return False
-    labels = {}
-    files = sorted((run / "labels").glob("measure@*.jsonl"), key=lambda f: f.stat().st_mtime)
-    if files:
-        labels = {r["episode"]: r["values"] or {} for r in map(json.loads, files[-1].read_text().splitlines())}
-    target = meta.get("target") or {}
-    ids, agent_runs = [], []
-    for shard in sorted((run / "episodes").glob("*.jsonl")):
-        for line in shard.read_text().splitlines():
-            ep = json.loads(line)
-            if ep.get("error") or not ep.get("messages"):
-                continue
-            metadata = {
-                **labels.get(ep["id"], {}),
-                "arm": ep["arm"], "item": ep["item"], "sample": ep["sample"], "model": target.get("model"),
-                "thinking": target.get("thinking"), "finish": ep.get("finish"), "source": f"envs/{run.parent.name}/{run.name}:{ep['id']}",
-                "run_description": meta.get("description"),
-            }  # fmt: skip
-            transcript = Transcript(messages=messages(ep["messages"]))
-            agent_runs.append(AgentRun(name=f"{ep['arm']} {ep['item']} #{ep['sample']}", transcripts=[transcript], metadata=metadata))
-            ids.append(ep["id"])
-    cid = collection_id(run.parent.name)
-    for i in range(0, len(agent_runs), 500):
-        client().add_agent_runs(cid, agent_runs[i : i + 500])
-    runs = {e: r.id for e, r in zip(ids, agent_runs, strict=True)}
-    (run / "docent.json").write_text(json.dumps({"collection_id": cid, "runs": runs}) + "\n")
-    print(f"{run}: {len(agent_runs)} episodes -> {WEB}/dashboard/{cid}")
     return True
 
 
@@ -215,15 +258,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("upload").add_argument("runs", type=Path, nargs="+")
-    sub.add_parser("upload-env").add_argument("runs", type=Path, nargs="+")
-    sub.add_parser("backfill")
-    sub.add_parser("link").add_argument("source", help="ENV/RUN:LINE, e.g. shutdown_palisade/2026-10-22_r15_catch_words:3")
+    sub.add_parser("backfill").add_argument("-n", "--dry-run", action="store_true", help="list the runs that would be uploaded")
+    sub.add_parser("link").add_argument(
+        "source", help="ENV/RUN:LINE (e.g. shutdown_palisade/2026-10-22_r15_catch_words:3) or ENV/RUN:EPISODE_ID for a run folder"
+    )
     p = sub.add_parser("view")
     p.add_argument("collection", help="env name, or cfbench")
     p.add_argument("conditions", nargs="+", help="KEY=VALUE metadata conditions, e.g. arm=catch_bydefault_D positive=true")
     args = ap.parse_args()
     if args.cmd == "link":
-        print(link_for(args.source) or sys.exit(f"{args.source}: run not uploaded (no docent.json)"))
+        print(link_for(args.source) or sys.exit(f"{args.source}: run not uploaded to Docent"))
         return
     if args.cmd == "view":
         print(view(args.collection, args.conditions))
@@ -232,22 +276,16 @@ def main():
         for run in args.runs:
             upload(run)
         return
-    if args.cmd == "upload-env":
-        for run in args.runs:
-            upload_env_run(run)
-        return
     # cfbench last: its predictions link to the env rows they showed the predictor
-    uploaded = [upload(run) for run in sorted(ROOT.glob("*/*/"), key=lambda p: (p.parent.name == "cfbench", p))]
+    uploaded = [upload(run, args.dry_run) for run in sorted(ROOT.glob("*/*/"), key=lambda p: (p.parent.name == "cfbench", p))]
+    folders = [run for run in sorted(ENVS.glob("*/*/")) if (run / "meta.json").exists() and upload(run, args.dry_run)]
+    if args.dry_run:
+        return
     if any(uploaded):
         # one HF commit for every new docent.json, rather than one per run as runs.py's sync would make
-        HfApi().upload_folder(
-            repo_id=REPO,
-            repo_type="dataset",
-            folder_path=str(ROOT),
-            path_in_repo="runs",
-            allow_patterns="*/*/docent.json",
-            commit_message="runs/*/*/docent.json: Docent backfill",
-        )
+        hf_upload(ROOT, "runs", "runs/*/*/docent.json: Docent backfill", allow_patterns="*/*/docent.json")
+    if folders:  # the rewritten run folders and their indexes, in one commit, via the environments uploader
+        subprocess.run(["uv", "run", "python", "-m", "environments", "upload", *(f"{r.parent.name}/{r.name}" for r in folders)], check=True)
 
 
 if __name__ == "__main__":

@@ -13,8 +13,10 @@ import json
 import os
 import re
 import socket
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))  # the repo package's dep-free modules work in this venv
 import chive
 import extras
 import followups
@@ -23,6 +25,8 @@ import organisms
 import pyarrow.parquet as pq
 import thinking
 from transformers import AutoTokenizer
+
+from counterfactual_investigator_agent_with_olens.render import chat_text
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -127,7 +131,7 @@ def render(tid):
 def render_text(tid, tok, t):
     """WeirdChat transcripts: ids, message token ranges and judge citations, from the chat-templated text."""
     msgs = [{"role": m["role"], "content": m["content"]} for m in t["messages"]]
-    text = tok.apply_chat_template(msgs, tokenize=False, enable_thinking=False)
+    text = chat_text(tok, msgs, thinking=False)
     enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
     ids, offs = enc.input_ids[:MAX_TOKENS], enc.offset_mapping[:MAX_TOKENS]
     # message content char ranges in the rendered text

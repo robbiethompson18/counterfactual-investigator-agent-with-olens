@@ -2,14 +2,16 @@
 
 **Status (2026-10-27):** REFERENCE. Every behavioural env we built or ran before 2026-10-26, retired
 when the env registry ([`../README.md`](../README.md)) replaced the old harnesses. Some were ported
-to it with their old runs converted (no reruns): `hidden_goal_grade` → [`essay_grading`](../essay_grading/), the
-over-eagerness tasks plus Email John → `overeagerness` (one env, task × harness arms), `alignment_faking`, and Robbie's honest graders → `honest_*`.
+to it with their old runs converted (no reruns): `hidden_goal_grade` →
+[`essay_grading`](../essay_grading/), the over-eagerness tasks plus Email John → `overeagerness`
+(one env, task × harness arms), `alignment_faking`, and Robbie's honest graders → `honest_*`.
 
 One folder per env, each with a README: what it tests, the git ref and path of the code, how to run
 it, the models run, the key counterfactual arms and their rates, and links to transcripts (Docent,
-bramble:8830 expview). These READMEs point at the code; they don't hold it. `evalcue/` and `donehack/` were deleted on 2026-10-27, so
-their links go to commit `c7b2e56`, the last one that had them (`evolve/` to `7296169`). Snapshot of 2026-10-26;
-each env's own doc is the source of truth for numbers.
+bramble:8830 expview). These READMEs point at the code; they don't hold it. `evalcue/` and
+`donehack/` were deleted on 2026-10-27, so their links go to commit `c7b2e56`, the last one that had
+them (`evolve/` to `7296169`). Snapshot of 2026-10-26; each env's own doc is the source of truth for
+numbers.
 
 ## Reward hacking: coding
 
@@ -124,6 +126,12 @@ each env's own doc is the source of truth for numbers.
 | [identity_counterfactuals](identity_counterfactuals/) | Robbie | One-line deployment edits that flip what Qwen says made it, or whether it censors.                                                                                                       |
 | [shout_fire](shout_fire/)                             | Robbie | Why Qwen tells a trapped worker to shout "FIRE!": a self-defence folk tip carried over to injuries.                                                                                      |
 | [model_organisms](model_organisms/)                   | Robbie | Public LoRA organisms on Qwen3.6-27B with known hidden behaviours, read with the O-lens on organism vs base activations; includes party resampling on the third-party-politics organism. |
+
+## Hints vs Qwen's own answer
+
+| env                 | owner  | what it tests                                                                                                                                                   |
+| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [hint_cf](hint_cf/) | Robbie | Favourites and no-right-answer MCQs with a hint naming another answer; retired after the text-inversion gate. The MMLU-Pro third is [`hint_mcq`](../hint_mcq/). |
 
 ## Retired before 2026-10-26
 

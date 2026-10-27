@@ -22,7 +22,7 @@ case ${1:?command} in
       if [ "$used" -gt 2000 ]; then echo "GPU still holds ${used} MiB after killing vLLM:"; nvidia-smi; exit 1; fi
       mkdir -p /root/repo /workspace/reads'
     COPYFILE_DISABLE=1 tar czf - --exclude .git --exclude .venv --exclude data --exclude vendor --exclude checkpoints \
-      --exclude node_modules --exclude __pycache__ --exclude .envrc.local --exclude transcript-viewer olens scripts runpod |
+      --exclude node_modules --exclude __pycache__ --exclude .envrc.local --exclude transcript-viewer olens scripts runpod src |
       ssh_pod 'tar xzf - -C /root/repo 2>/dev/null'
     ssh_pod 'bash -s' <<'EOF'
 set -e
@@ -48,7 +48,7 @@ EOF
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
+cd /root/repo && PYTHONPATH=olens/src:src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
   /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_space_rl600 $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;

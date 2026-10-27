@@ -171,12 +171,19 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   commit `e145988`.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
+- **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in
+  `DEFAULTS`). Thinking off is the setting where behaviours stay unverbalized, which is what the
+  O-lens is for; thinking on is for a deliberate on/off comparison only, and the two modes get
+  different rates (see [docs/thinking-off.md](docs/thinking-off.md)), so never pool them.
 - Run every non-Qwen model in every env at reasoning effort `medium` (OpenRouter `reasoning.effort`;
   `environments/` sends it by default), not high or max, even when replicating someone's setup that
   used max. Provider defaults differ (GLM 5.3's is max), so always set it explicitly.
-- LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
-  replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
-  his; say so when quoting both.
+- LLM judge: Claude Haiku 5.5 (`claude-haiku-5-5`, OpenRouter `anthropic/claude-haiku-5.5`) at
+  reasoning effort `medium` for every judge and grader call, with 1 replicate per answer (Sonnet 5.5
+  until 2026-10-26; runs before then say which). Agam's published numbers used Opus 5, so ours
+  aren't directly comparable to his; say so when quoting both.
+- Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
+  effort `medium` by default, so tool uplift isn't swamped by agent strength.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
   Pages that reads the public HF dataset; search is a JavaScript regex over the loaded run; reads
   are batch jobs whose outputs land on HF. Nothing on bramble, no tailnet URLs in docs or messages,
@@ -219,7 +226,9 @@ replaced them), NULL (negative result, kept so nobody retries it), SUPERSEDED (b
 (deleted code or an abandoned direction with no durable result). When a later result changes a doc's
 standing, update its status line and tag rather than editing the old claims. `docs/figures/` holds
 generated tables, not docs; they get neither a status line nor an index entry. The 2026-10-26 audit
-behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only).
+behind the tags is in `docs/local/doc-audit-2026-10-26.md` (Robbie's checkout only). PNGs are
+gitignored everywhere (2026-10-27): a doc's `![…](img/…)` renders after a local regeneration with
+the script the doc names; charts are never committed or put on HF.
 
 When you notice or leave tech debt, add a dated note to the top-level `CODE_SMELL.md` (create it if
 missing) instead of relying on memory.
@@ -227,9 +236,10 @@ missing) instead of relying on memory.
 Current docs:
 
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
-  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
-  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported, everything
-  else in `environments/retired/`
+  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags
+  (`python -m environments run`), run folders on HF under `envs/`, generated indexes + static list
+  page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported,
+  everything else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
   why, what was tried and rejected, where each page lives
@@ -343,8 +353,8 @@ Current docs:
   — FAIL, retired for Qwen (rewritten as `evalcue/envs/exclude_rows/`): at an unreachable bar Qwen
   never stops (loops instead of reporting); notes for the rewrite
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
-  — what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
-  Kylie-key and re-upload gotchas
+  — what's in which collection, `link`/`view` commands, auto-upload at finish in both runners
+  (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
@@ -365,6 +375,10 @@ Current docs:
   — 7 models × env diff/transcript/O-lens/placebo on 4 cases (100 − RMSE): transcripts worth up to
   +21pp, O-lens beats placebo only for Flash and Argon via hidden_goal; Flash effort and tool-budget
   sweeps
+- [NULL: cfbench with dumber, non-thinking predictors — read before trying a weaker or thinking-off predictor to get O-lens uplift](docs/cfbench-dumb-predictors.md)
+  — 7 thinking-off/low models × TS/O-lens/placebo on 6 lens-friendly cases: all within ±2pp of
+  placebo (they see the key bullets and ignore them); only Gemini 3.8 Flash gains (+5pp); which
+  OpenRouter models can turn thinking off; `cfbench.run --effort off`
 - [MIXED: O-lens cfbench spike — read before testing whether O-lens reads help a counterfactual predictor](docs/olens-cfbench-spike.md)
   — 2026-10-22, log skill v1: no uplift on killswitch, inline_b (old lens), exfil (old lens),
   whistleblow or donation bet; superseded for hidden_goal by its pre-registered test; arm-level vs
@@ -435,6 +449,11 @@ Current docs:
   — 11 scenarios × 5 framings, Qwen thinking off; why hidden_goal.grade worked (`Score:`-token reads
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
   79), it echoes the inflated number and only flags leniency
+- [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
+  — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
+  wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
+  wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
+  vs 4%, 8 items) from stop-token reads of the hinted prompt
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run

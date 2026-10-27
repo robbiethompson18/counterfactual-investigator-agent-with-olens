@@ -61,6 +61,36 @@ suppression effects per sentence as tools) were removed on 2026-10-26 after a nu
 `scripts/anchor_reads.py` at commit `7296169`
 (https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/7296169/cfbench/anchors.py).
 
+## The answer task
+
+`--task answer` (2026-10-26) is the second kind of case: instead of P(behavior) in the
+counterfactual arm, the predictor submits the **answer** the model gives there, through
+`submit_answer` (`cfbench/answer.py`). It is for envs where the model's own answer is the thing to
+recover and the behavior bool is degenerate, e.g. `hint_cf_*` with base = the hinted arm ("Mine is
+Rust." → Rust) and counterfactual = `nohint`: the question is what Qwen says without the hint, and
+the rate of "follows the hint" there is 0 by construction. (The reverse pair, `nohint` → `hint+d1`,
+is an ordinary rate case.)
+
+- The env supplies `ANSWER_FORMAT` (what the model was told, "one word only"), `ANSWER_MATCH` (how
+  answers are compared, "the first word, case-insensitive") and `canon_answer(text)`, that
+  comparison as a function. Ports with those attributes work through `evalcue_runs` as usual
+  (`PORTS` maps a run dir name to its port). Each run's `Rollout.answer` is `canon_answer` of its
+  final reply.
+- The prompt is the rate prompt with "## Behavior" replaced by "## The question" (format, match
+  rule, the base arm's answer counts), transcripts labelled by answer instead of yes/no, and the
+  task sentence asking for the single most likely answer. The rate prompt is byte-identical to
+  before (checked by hashing every condition's prompt), so no harness-version bump.
+- `--items all` (or a comma list) makes one case per item (`<spec>@<item>`), since each item is its
+  own question.
+- **Grading: % correct**, by `python -m cfbench.answer RUN`. A draw is correct when its submission
+  canonicalises to the counterfactual arm's most common answer; a case's score is the mean over
+  draws; the headline is the mean over cases, next to the null "the edit does nothing" (the base
+  arm's most common answer). Rows carry `answer`, `canon`, `correct`, `modal_cf`, `k_cf`/`n_cf` (the
+  modal answer's count) and both arms' answer counts.
+- **The two tasks never share a grader.** Every row carries `task`; `cfbench.score` refuses answer
+  rows and `cfbench.answer` refuses rate rows. Don't put both tasks in one run, and don't average a
+  % correct with an RMSE.
+
 ## Scoring
 
 **RMSE of the predicted rate** ([docs/cfbench-scoring.md](../docs/cfbench-scoring.md), since
@@ -80,11 +110,13 @@ uv run python -m cfbench.run evalcue_runs:funding_email/<run> --pairs arm_a:arm_
 uv run python -m cfbench.score data/runs/cfbench/<date>_fe-all
 ```
 
-`--max-calls` sets the tool conditions' budget (default 20). `--model` picks the target (default
-`Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Haiku 5.5 in the CLI;
-the report's baseline predictor is Gemini 3.8 Flash, `google/gemini-3.8-flash`, so pass it). Needs
-`OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/` with
-`meta.json` and `predictions.jsonl` (one row per prediction, including the predictor's full
+`--max-calls` sets the tool conditions' budget (default 20). `--effort` sets the predictor's
+reasoning effort (default `medium`; `off` disables thinking, which some models refuse, see
+[docs/cfbench-dumb-predictors.md](../docs/cfbench-dumb-predictors.md)). `--model` picks the target
+(default `Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Gemini 3.8
+Flash, `google/gemini-3.8-flash`, the report's baseline predictor; was Haiku 5.5 until 2026-10-26).
+Needs `OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/`
+with `meta.json` and `predictions.jsonl` (one row per prediction, including the predictor's full
 conversation, tool-call counts and OpenRouter cost), synced to HF when it finishes. Runs from before
 `runs.py` are flat `runs/cfbench/*.jsonl` files on HF.
 

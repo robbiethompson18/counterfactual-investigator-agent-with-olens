@@ -168,8 +168,12 @@ def check_current(force=False):
     git("fetch", "-q", "origin", "main")
     if git("merge-base", "--is-ancestor", "origin/main", "HEAD").returncode:
         sys.exit("this checkout is behind origin/main: pull main first (--force doesn't override this)")
-    if not force and git("diff", "--quiet", "origin/main", "--", "web", "scripts/publish.py").returncode:
-        sys.exit("transcript-viewer/web or publish.py differs from origin/main: pull main (or merge your viewer PR) first, or --force")
+    render = "../src/counterfactual_investigator_agent_with_olens/render.py"  # web/build.py renders through it
+    if not force and git("diff", "--quiet", "origin/main", "--", "web", "scripts/publish.py", render).returncode:
+        sys.exit(
+            "transcript-viewer/web, publish.py or src/.../render.py differs from origin/main: pull main (or merge your viewer PR) first, "
+            "or --force"
+        )
 
 
 def main():
