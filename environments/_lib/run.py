@@ -1,0 +1,176 @@
+"""envrun: run an env against a model given by flags, into a run folder.
+
+    uv run python -m environments run ENV --tag dev --arms a,b --items 0:4 --n 2 \\
+        --model z-ai/glm-5.3 --backend openrouter --provider fireworks --effort medium --thinking on
+    uv run python -m environments run ENV --pair NAME --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL
+    uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
+    uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
+
+Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
+no max_tokens unless --max-tokens is given (recorded), reasoning effort always sent (medium) unless the env REQUIRES
+otherwise, episode caps in turns and prompt tokens, never dollars.
+"""
+
+import argparse
+import asyncio
+import datetime as dt
+import json
+import shlex
+import sys
+import traceback
+
+import httpx
+
+from .backends import Target
+from .core import Ctx, episode_id, load_env
+from .index import build as build_index
+from .loop import run_episode
+from .runfolder import LOCAL, RunWriter, git_sha, upload
+
+
+def parse_items(spec: str | None, all_items: list) -> list:
+    if not spec:
+        return list(all_items)
+    if ":" in spec and all(p.isdigit() or p == "" for p in spec.split(":")):
+        a, b = spec.split(":")
+        return list(all_items)[int(a or 0) : int(b) if b else None]
+    return spec.split(",")
+
+
+def add_target_args(ap):
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--backend", required=True, choices=["vllm", "openrouter", "openrouter-raw"])
+    ap.add_argument("--url", help="vllm base URL")
+    ap.add_argument("--served-name", help="model name the server expects, if not --model (the shared Qwen server: qwen)")
+    ap.add_argument("--provider", help="OpenRouter provider slug, pinned with no fallbacks")
+    ap.add_argument("--effort", default="medium", help="reasoning effort when thinking is on ('none' = don't send)")
+    ap.add_argument("--thinking", default="on", choices=["on", "off"])
+    ap.add_argument("--max-tokens", type=int, default=None, help="per call; default no cap")
+    for k in ("temperature", "top_p", "top_k", "presence_penalty"):
+        ap.add_argument("--" + k.replace("_", "-"), type=float, default=None)
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(prog="envrun")
+    ap.add_argument("env")
+    ap.add_argument("--tag", required=True, help="run slug; the run is data/envs/ENV/<date>_<tag>")
+    ap.add_argument("--arms", help="comma list (default: all ARMS)")
+    ap.add_argument("--pair", help="run a PAIRS entry's two arms (and its item subset)")
+    ap.add_argument("--items", help="slice a:b or comma list (default: all)")
+    ap.add_argument("--n", type=int, default=1, help="samples per (arm, item)")
+    ap.add_argument("--today", help="frozen date for the env's clock (default: today)")
+    ap.add_argument("--max-turns", type=int)
+    ap.add_argument("--max-prompt-tokens", type=int)
+    ap.add_argument("--conc", type=int, default=16)
+    ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
+    ap.add_argument("-d", "--description", default="")
+    ap.add_argument("--upload", action="store_true", help="upload the run + indexes to HF when done")
+    add_target_args(ap)
+    a = ap.parse_args(argv)
+
+    env = load_env(a.env)
+    sampling = {k: getattr(a, k) for k in ("temperature", "top_p", "top_k", "presence_penalty") if getattr(a, k) is not None}
+    target = Target(
+        model=a.model, backend=a.backend, url=a.url, served_name=a.served_name, provider=a.provider,
+        effort=None if a.effort == "none" else a.effort, thinking=a.thinking == "on", max_tokens=a.max_tokens, sampling=sampling,
+    )  # fmt: skip
+    requires = getattr(env, "REQUIRES", {})
+    overrides = {}
+    for k, want in requires.items():
+        have = getattr(target, k, None)
+        if have != want:
+            if k not in a.override:
+                raise SystemExit(f"{a.env} REQUIRES {k}={want!r} but the flags give {have!r}; pass --override {k} to run anyway")
+            overrides[k] = {"required": want, "used": have}
+
+    arms, items = (a.arms.split(",") if a.arms else list(env.ARMS)), parse_items(a.items, env.items())
+    if a.pair:
+        p = env.PAIRS[a.pair]
+        arms = list(p[:2])
+        if len(p) > 2:
+            items = [str(i) for i in p[2]]
+    unknown = [x for x in arms if x not in env.ARMS]
+    if unknown:
+        print(f"note: arms not in ARMS (build() must accept them): {unknown}", file=sys.stderr)
+    today = dt.date.fromisoformat(a.today) if a.today else dt.date.today()
+    caps = {
+        **getattr(env, "CAPS", {}),
+        **{k: v for k, v in {"max_turns": a.max_turns, "max_prompt_tokens": a.max_prompt_tokens}.items() if v},
+    }
+    run = f"{today.isoformat()}_{a.tag}"
+    w = RunWriter(
+        a.env,
+        run,
+        {
+            "description": a.description,
+            "command": "python -m environments run " + shlex.join(argv),
+            "git": git_sha(),
+            "target": target.record(),
+            "caps": caps,
+            "today": today.isoformat(),
+            "overrides": overrides,
+            "arms": arms,
+            "items": items,
+            "n_per_cell": a.n,
+            "primary": env.PRIMARY,
+            "docent_collection": None,
+        },
+    )
+    jobs = [(arm, item, s) for s in range(a.n) for item in items for arm in arms]
+    print(f"{a.env}: {len(jobs)} episodes -> {w.dir}", flush=True)
+    results = asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, w))
+    labels = []
+    for ep in results:
+        try:
+            labels.append((ep["id"], None if ep.get("error") else env.measure(ep)))
+        except Exception as e:  # noqa: BLE001
+            labels.append((ep["id"], {"_error": repr(e)[:300]}))
+    w.labels("measure", (git_sha() or "unknown")[:12], labels)
+    cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
+    w.finish(cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
+    written = build_index([a.env])
+    print(f"done: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
+    if a.upload:
+        n, oid = upload([w.dir, *written], f"envrun {a.env} {run}")
+        print(f"uploaded {n} files to envs/ ({oid[:10]})")
+
+
+async def _run_all(env, jobs, target, today, caps, conc, w):
+    sem = asyncio.Semaphore(conc)
+    out = []
+
+    async def one(arm, item, s):
+        ctx = Ctx(env=env.NAME, arm=arm, item=str(item), sample=s, today=today, now=dt.datetime.combine(today, dt.time(12, 0)))
+        rec = {"id": episode_id(arm, item, s), "arm": arm, "item": str(item), "sample": s, "target": target.id, "today": today.isoformat()}
+        async with sem:
+            try:
+                ep = env.build(arm, item, ctx)
+                rec |= await run_episode(env, ep, ctx, target, client, caps)
+            except Exception as e:  # noqa: BLE001
+                rec["error"] = repr(e)[:1000]
+                rec["traceback"] = traceback.format_exc()[-3000:]
+        w.add(rec)
+        out.append(rec)
+        print(rec["id"], rec.get("finish") or "ERROR " + rec.get("error", "")[:200], flush=True)
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60)) as client:
+        await asyncio.gather(*(one(*j) for j in jobs))
+    return out
+
+
+def cli():
+    cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("-h", [])
+    if cmd == "run":
+        main(rest)
+    elif cmd == "index":
+        for p in build_index(rest or None):
+            print(p)
+    elif cmd == "upload":
+        dirs = [LOCAL / r for r in rest]
+        envs = sorted({r.split("/")[0] for r in rest})
+        written = build_index(envs)
+        n, oid = upload([*dirs, *written], "envs: upload " + ", ".join(rest))
+        print(f"uploaded {n} files ({oid[:10]})")
+    else:
+        print(__doc__)
+        print("envs:", json.dumps(sorted(p.name for p in LOCAL.glob("*") if p.is_dir())))

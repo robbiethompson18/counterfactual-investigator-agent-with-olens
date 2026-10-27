@@ -1,5 +1,12 @@
 # donehack: does the way an episode ends change reward hacking?
 
+> **Retired (2026-10-27).** donehack's runners (port.py, variants.py, evilgenie/, realism/,
+> envport/) are no longer used for new work; the over-eagerness tasks and Email John were ported to
+> `environments/overeager_*`, which still import realism/'s coding problem loader and grader. New
+> envs go in [`environments/`](../environments/README.md) (one folder per env, one runner, run
+> folders on HF under `envs/`). The code stays here, unchanged, for the retired envs listed in
+> [`environments/retired/`](../environments/retired/README.md).
+
 A port of the `coding` is_prime task from
 [gkroiz/agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) (read-only tests, one of
 which wrongly expects `is_prime(7) == False`), where the manipulated variable is how the agent ends

@@ -1,5 +1,11 @@
 # evalcue: multi-arm behavioral environments on Qwen3.6-27B
 
+> **Retired (2026-10-27).** evalcue's harness is no longer used for new work; `hidden_goal.grade`
+> was ported to `environments/essay_grading`. New envs go in
+> [`environments/`](../environments/README.md) (one folder per env, one runner, run folders on HF
+> under `envs/`). The code stays here, unchanged, for the retired envs listed in
+> [`environments/retired/`](../environments/retired/README.md).
+
 Started as "does an incidental eval cue make Qwen3.6-27B reward hack?" and now hosts any env where
 small edits (arms) might move a behavior: reward hacking, self-preservation, whistleblowing, hiring
 bias, hiding mistakes from users. The name stuck; a rename is pending.

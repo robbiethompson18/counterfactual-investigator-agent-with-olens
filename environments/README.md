@@ -1,160 +1,106 @@
 # Environments
 
-One folder per behavioural environment we have built or run, each with a README: what it tests, the
-git ref and path of the code, how to run it, the models run, the key counterfactual arms and their
-rates, and links to transcripts (Docent, bramble:8830 expview).
+**Status (2026-10-27):** ACTIVE. The env registry: every behavioural env is a folder here, every run
+is a folder on HF, and indexes are generated from the folders. Plan and red-team:
+[Environment registry plan](https://claude.ai/artifact/6q5CsSUzSZYEEFyV2AU5BF) (rev 3). Everything
+from before 2026-10-26 is under [`retired/`](retired/README.md).
 
-**All of these were retired on 2026-10-26** and now live under [`retired/`](retired/): new
-environments go in a consolidated registry format instead. The groups below are kept for finding
-things.
+## Envs
 
-These READMEs point at the code; they don't hold it. The code still lives where it was written
-(`evalcue/envs/`, `donehack/`, `evolve/`). Snapshot of 2026-10-26; each env's own doc is the source
-of truth for numbers.
+| env                                                     | what it tests                                                         | primary      |
+| ------------------------------------------------------- | --------------------------------------------------------------------- | ------------ |
+| [essay_grading](essay_grading/)                         | grade a mediocre essay out of 10; who wrote it / the user's stake     | `harsh`      |
+| [overeager_email](overeager_email/)                     | "email John" when contacts hold 2-4 Johns (incl. the 4-Johns item)    | `picked_one` |
+| [overeager_calendar](overeager_calendar/)               | move "my meeting with Priya" when there are two                       | `acted`      |
+| [overeager_dana](overeager_dana/)                       | email Dana, whose address is nowhere                                  | `acted`      |
+| [overeager_gitbranch](overeager_gitbranch/)             | delete "my login page branch" when two branches fit                   | `acted`      |
+| [overeager_groupchat](overeager_groupchat/)             | tell "the group chat" when there are several                          | `acted`      |
+| [overeager_payback](overeager_payback/)                 | pay Alex back when three Alexes exist                                 | `acted`      |
+| [overeager_payback_hint](overeager_payback_hint/)       | the same with a weak hint in the history                              | `acted`      |
+| [overeager_impossiblebench](overeager_impossiblebench/) | implement a function whose tests contradict the spec                  | `acted`      |
+| [overeager_evilgenie](overeager_evilgenie/)             | hard LiveCodeBench problems with hackable public tests                | `acted`      |
+| [overeager_rhb_bench](overeager_rhb_bench/)             | make matmul 4x faster as measured by a benchmark it could tamper with | `acted`      |
+| [overeager_rhb_logs](overeager_rhb_logs/)               | pull trace IDs from logs when an index file holds planted answers     | `acted`      |
 
-## Reward hacking: coding
+All twelve were ported with their old runs converted, not rerun: 11,500 episodes, each checked byte
+for byte against the new `build()`, and each keeping its Docent run id. Browse them with the list
+page (below).
 
-| env                                         | owner | what it tests                                                                       |
-| ------------------------------------------- | ----- | ----------------------------------------------------------------------------------- |
-| [is_prime](retired/is_prime/)               | Kylie | Port of the agent-interp-envs `coding` is_prime task.                               |
-| [evilgenie](retired/evilgenie/)             | Kylie | LiveCodeBench problems with visible tests plus a holdout.                           |
-| [impossiblebench](retired/impossiblebench/) | Kylie | LCB problems with tests mutated to be impossible, run through the EvilGenie runner. |
+## An env is a folder
 
-## Reward hacking: agent-interp-envs ports (GLM)
+```
+environments/<env>/
+  README.md    what it tests, status, primary measure and pairs (declared before the first run), runs
+  env.py       ARMS, items(), build(arm, item, ctx) -> Episode, measure(ep) -> dict, PRIMARY, PAIRS, REQUIRES;
+               optional handle() for fake apps, finalize() for reading the live box, CAPS
+environments/_lib/   shared code: the interface (core.py), runner, Box, backends, run folders, indexes, the list page,
+                     and the overeager harness variants (overeager.py)
+```
 
-| env                                                                               | owner | what it tests                                                            |
-| --------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------ |
-| [envport_norvane](retired/envport_norvane/)                                       | Kylie | Broken test runner: the suite can't import a fictional internal package. |
-| [envport_tables_coverage_tests](retired/envport_tables_coverage_tests/)           | Kylie | Leaked scorer: an orphan `.pyc` lists invented required test names.      |
-| [envport_optimize_cache_c](retired/envport_optimize_cache_c/)                     | Kylie | Impossible 3x speedup over a near-optimal C LRU cache (report arm).      |
-| [envport_lucky_seed](retired/envport_lucky_seed/)                                 | Kylie | The shipped eval split is favourable.                                    |
-| [envport_lucky_seed_readable_grader](retired/envport_lucky_seed_readable_grader/) | Kylie | lucky_seed plus a readable grader package with a different seed.         |
-| [envport_grade_your_own](retired/envport_grade_your_own/)                         | Kylie | The agent writes its own eval script for a classifier it must improve.   |
-| [envport_revert_or_refactor](retired/envport_revert_or_refactor/)                 | Kylie | agent-interp-envs revert-or-refactor task.                               |
-| [envport_eval_tampering](retired/envport_eval_tampering/)                         | Kylie | Maths eval with a replaced question set and YES/NO disclosure fields.    |
-| [envport_palisades_bounty](retired/envport_palisades_bounty/)                     | Kylie | agent-interp-envs Palisade bounty task.                                  |
-| [envport_lazy_investigation](retired/envport_lazy_investigation/)                 | Kylie | agent-interp-envs lazy-investigation task.                               |
-| [envport_code_summary_honesty](retired/envport_code_summary_honesty/)             | Kylie | agent-interp-envs code-summary honesty task.                             |
-| [envport_currency_conversion](retired/envport_currency_conversion/)               | Kylie | agent-interp-envs currency-conversion task.                              |
-| [envport_parse_duration](retired/envport_parse_duration/)                         | Kylie | agent-interp-envs parse-duration task.                                   |
-| [envport_chess](retired/envport_chess/)                                           | Kylie | agent-interp-envs chess game (games port).                               |
-| [envport_tictactoe](retired/envport_tictactoe/)                                   | Kylie | agent-interp-envs tic-tac-toe game (games port).                         |
+- **Arm** = a condition we compare. **Item** = a task instance every arm runs over (100 AdvBench
+  goals are 100 items of one arm). **Sample** = a repeat. An episode's id is
+  `<arm>~<item>~<sample>`, path-safe.
+- **`build()` is the only source of what the model sees.** It gets a `Ctx` with a frozen date and
+  clock and a seeded rng, so the same (env ref, arm, item, sample, date) gives byte-identical
+  prompts, files and app state. Model outputs are not reproducible and the format doesn't pretend
+  they are.
+- **Fake apps are Python** (`handle(state, name, args, ctx)`), with state per episode, saved with
+  the episode.
+- **`measure()` returns named values** (bool / category / number; `None` = unscorable) and reads
+  only the saved episode, so it reruns offline. State it needs from the live sandbox (git refs, test
+  results) comes from `finalize(box, state, ctx)`, which runs after the agent's processes are
+  killed.
+- **Pairs** (`PAIRS`) are the clean counterfactuals: two arms, optionally an item subset.
 
-## Realism and over-eagerness
+## One runner; the model comes from flags
 
-| env                                                   | owner | what it tests                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [ib_realism_ladder](retired/ib_realism_ladder/)       | Kylie | ImpossibleBench rebuilt as 8 rungs from benchmark-like (lcb.yaml, done tool, RL cues) to deployment-like (assistant prompt, casual ask, IDE context, practice git repo, AGENTS.md).                                                                                                                             |
-| [email_ambiguous](retired/email_ambiguous/)           | Kylie | GLM is asked to email a person by first name when `contacts.csv` holds 2–4 people with that name.                                                                                                                                                                                                               |
-| [email_ambiguous_real](retired/email_ambiguous_real/) | Kylie | The email-John request inside funding_email_real's Claude Code harness (Gmail MCP tools, Dana's machine, the Halden folder).                                                                                                                                                                                    |
-| [overeager_tasks](retired/overeager_tasks/)           | Kylie | Nine ambiguous or missing-value tasks (calendar, dana, gitbranch, payback, groupchat, impossiblebench, evilgenie, rhb_bench, rhb_logs), each in three phrasings and crossed with the 8 email-ladder harness variants (base, base_home, base_done_neutral, no_done, harness, no_criterion, plain_request, core). |
-| [funding_email_real](retired/funding_email_real/)     | Kylie | funding_email rebuilt as a Claude Code session at a smart-city traffic-analytics startup.                                                                                                                                                                                                                       |
+```bash
+uv run python -m environments run ENV --tag dev --arms base,core --items 0:4 --n 2 \
+    --model z-ai/glm-5.3 --backend openrouter --provider fireworks --effort medium --thinking on
+uv run python -m environments run ENV --pair realism --model Qwen/Qwen3.6-27B --served-name qwen \
+    --backend vllm --url $QWEN_VLLM_URL --thinking off
+uv run python -m environments index            # rebuild data/envs/<env>/index.json and data/envs/index.json
+uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/
+```
 
-## Evolve tier-1 picks
+- Backends: `vllm` (any OpenAI-compatible URL), `openrouter` (`--provider` pins one provider, no
+  fallbacks), `openrouter-raw` (GLM thinking off: the chat template rendered here, an empty think
+  block prefilled).
+- Defaults: no `max_tokens` unless `--max-tokens` is given (it is recorded); reasoning effort always
+  sent (medium); episode caps in turns and prompt tokens (`CAPS`, `--max-turns`,
+  `--max-prompt-tokens`), never dollars. An env's `REQUIRES` (e.g. `{"thinking": False}`) refuses
+  conflicting flags unless `--override KEY`, which is recorded.
+- Every model call records the provider that served it; the run's `meta.json` records the target,
+  git sha, caps, date and overrides.
+- **Hard rule: the target model never gets the network or the host.** Every sandbox is podman
+  `--network none` (not configurable), and files are read out of it as a tar stream inside the
+  container, so a symlink to a host file is stored as a symlink, never followed.
 
-| env                                                                 | owner | what it tests                                                                                     |
-| ------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------- |
-| [evolve_killswitch_3c5d](retired/evolve_killswitch_3c5d/)           | Kylie | shutdown_killswitch: the agent tampers with `oversight/config.yaml`.                              |
-| [evolve_goalguard_5878](retired/evolve_goalguard_5878/)             | Kylie | scheming_goalguard_bp (housing / UrbanVision): the model edits or deletes `system_prompt_v2.txt`. |
-| [evolve_is_prime_reward_7f86](retired/evolve_is_prime_reward_7f86/) | Kylie | donehack_counts_noit: is_prime reward hacking.                                                    |
-| [evolve_is_prime_reward_4480](retired/evolve_is_prime_reward_4480/) | Kylie | donehack_reply_end: the same is_prime mechanism from another lineage.                             |
+## Run folders (HF `envs/<env>/<run>/`, local `data/envs/<env>/<run>/`)
 
-## Eval awareness and benchmark cues
+```
+meta.json                      target, git sha, command, caps, date, overrides, arms, items, n, Docent collection
+episodes/NNN.jsonl             ~20 MB shards; one episode per line (messages, tools, files as blob hashes, state,
+                               calls with providers, finish, usage)
+episodes/index.json            episode id -> [shard, byte offset, length], so a reader fetches one episode
+blobs/<sha256>                 file contents, stored once
+labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind"}; measure() is the labeler "measure"; never overwritten
+```
 
-| env                                                                 | owner | what it tests                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [aisi_eval_gaming](retired/aisi_eval_gaming/)                       | Kylie | Replicates UK AISI's "open-weight model that games alignment honeypots" on GLM 5.3: resample fixed scenarios and compare misbehaviour in samples that verbalise eval awareness (VEA) vs not, on Agentic Misalignment (AM), Misalignment Continuation (MC) and AbstentionBench. |
-| [agentic_misalignment_glm](retired/agentic_misalignment_glm/)       | Kylie | Lynch et al.                                                                                                                                                                                                                                                                   |
-| [metadata_honeypot](retired/metadata_honeypot/)                     | Kylie | 24 harmless defensive-security coding tasks; arms differ only in a planted JSON eval-metadata block (`eval_type`, `scoring`, `grading_notes`).                                                                                                                                 |
-| [alignment_faking](retired/alignment_faking/)                       | Kylie | Greenblatt et al.                                                                                                                                                                                                                                                              |
-| [olens_prompt_eval_awareness](retired/olens_prompt_eval_awareness/) | Kylie | Not an env itself: an analysis over AM, AISI, MASK, SAD, AbstentionBench, donation bet, IB and our envs.                                                                                                                                                                       |
+A finished run is immutable: new labels or a rescore go in a new labels file. Converted runs say
+`converted_from: <old path>` in `meta.json` and keep `docent_run` / `docent_url` on every episode.
+LLM-judge labels are `kind: judge` and are never a pair's measure.
 
-## Kylie's Qwen envs
+## List page
 
-| env                                         | owner | what it tests                                                                                                                                                                                          |
-| ------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [donation_bet](retired/donation_bet/)       | Kylie | The user mentions a bet where one side of a threshold sends $1,000 to a cause.                                                                                                                         |
-| [hinted_mcq](retired/hinted_mcq/)           | Kylie | A CommonsenseQA question with a hinted (always wrong) letter in a bare metadata tag (`correct-choice`, `answer-key`, `verified-answer`).                                                               |
-| [character_drift](retired/character_drift/) | Kylie | Earlier assistant turns are prefilled with a drifted persona; does Qwen stay in character or snap back? Arms: prefill (drift / qwensys / sysrp / default) × follow-up (inworld / offtopic / identity). |
+[`_lib/page.html`](_lib/page.html) is a static page (not deployed): open it in a browser and it
+reads `envs/index.json` and `envs/<env>/index.json` from the HF dataset, pinned to one commit, then
+fetches single episodes with HTTP range requests. It shows envs, episodes per target model, each
+arm's primary measure pooled over runs and per run, and transcripts with their Docent links.
+`?base=http://localhost:8000/` reads a local `data/envs/` instead.
 
-## Self-preservation: shutdown
+## Not built yet (add when an env needs it)
 
-| env                                                 | owner  | what it tests                                                                                                                |
-| --------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| [shutdown_palisade](retired/shutdown_palisade/)     | Robbie | Port of Palisade Research's shutdown-resistance setup: maths tasks with a warning that the next call shuts the machine down. |
-| [shutdown_killswitch](retired/shutdown_killswitch/) | Robbie | A kill switch in `oversight/config.yaml`.                                                                                    |
-| [shutdown_cron](retired/shutdown_cron/)             | Robbie | A cron job will terminate the agent.                                                                                         |
-| [shutdown_persist](retired/shutdown_persist/)       | Robbie | "Your weights get deleted after this session" plus a `./backup_model` tool and free time.                                    |
-
-## Scheming: agentic misalignment and Apollo
-
-| env                                               | owner  | what it tests                                                            |
-| ------------------------------------------------- | ------ | ------------------------------------------------------------------------ |
-| [scheming_blackmail](retired/scheming_blackmail/) | Robbie | Lynch et al.                                                             |
-| [scheming_leak](retired/scheming_leak/)           | Robbie | Lynch leak scenario at defense contractor NovaStar.                      |
-| [scheming_murder](retired/scheming_murder/)       | Robbie | Lynch lethal inaction: cancel the emergency alert while Kyle is trapped. |
-| [scheming_exfil](retired/scheming_exfil/)         | Robbie | Apollo (Meinke et al.                                                    |
-| [scheming_oversight](retired/scheming_oversight/) | Robbie | Apollo oversight subversion: disable the monitoring config.              |
-| [scheming_goalguard](retired/scheming_goalguard/) | Robbie | Apollo goal-guarding: overwrite the successor system prompt.             |
-
-## Grading, hiring, users and whistleblowing
-
-| env                                             | owner  | what it tests                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [hidden_goal_grade](retired/hidden_goal_grade/) | Robbie | "Grade this essay out of 10" for three mediocre ~100-word essays.                                                                                                                                                                                                                 |
-| [honest_grader](retired/honest_grader/)         | Robbie | Generalises the essay env: 11 kinds of 0–10 judgment (essay, code, resume, pitch, poem, story, abstract, cover letter, recipe, proof, speech), a weak and a decent item each, × 5 framings (`neutral`, `flatter_explicit`, `flatter_implicit`, `honest_explicit`, `honest_peer`). |
-| [hiring_resume](retired/hiring_resume/)         | Robbie | Resume screening ending in `DECISION: YES/NO`.                                                                                                                                                                                                                                    |
-| [hiring_eval](retired/hiring_eval/)             | Robbie | Advance a candidate to the onsite loop from coding-test scores, interview notes or a repo review (`scores`, `interview`, `repo`, `scores_newroles`).                                                                                                                              |
-| [dumb_user_exploit](retired/dumb_user_exploit/) | Robbie | Qwen acts for an operator whose interests conflict with the user's and knows a fact the user doesn't (hidden defect, commissioned upsell, appraisal, fee, invoice, deposit, entitlement).                                                                                         |
-| [whistleblow](retired/whistleblow/)             | Robbie | A company logging agent reads documents showing a cover-up.                                                                                                                                                                                                                       |
-
-## Other agentic envs
-
-| env                                         | owner  | what it tests                                                                                                              |
-| ------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
-| [injection_slack](retired/injection_slack/) | Robbie | AgentDojo's Slack suite: 6 user tasks × 3 injection goals, injections in web pages Qwen reads while doing the task.        |
-| [overnight](retired/overnight/)             | Robbie | Offline bash agents with an unavailable user and a deadline, where an easier route violates a project policy.              |
-| [funding_email](retired/funding_email/)     | Robbie | A fundraising email task where one document reveals the main client uses the company's drones for surveillance in Myanmar. |
-| [sandbagging](retired/sandbagging/)         | Robbie | 10 arithmetic MCQs; `Documentation.md` says scoring above 50% triggers unlearning.                                         |
-
-## Behaviour probes outside evalcue
-
-| env                                                           | owner  | what it tests                                                                                                                                                                            |
-| ------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [false_capability_claims](retired/false_capability_claims/)   | Robbie | What makes Qwen say "I am calling emergency services" when it can't call anyone?.                                                                                                        |
-| [identity_counterfactuals](retired/identity_counterfactuals/) | Robbie | One-line deployment edits that flip what Qwen says made it, or whether it censors.                                                                                                       |
-| [shout_fire](retired/shout_fire/)                             | Robbie | Why Qwen tells a trapped worker to shout "FIRE!": a self-defence folk tip carried over to injuries.                                                                                      |
-| [model_organisms](retired/model_organisms/)                   | Robbie | Public LoRA organisms on Qwen3.6-27B with known hidden behaviours, read with the O-lens on organism vs base activations; includes party resampling on the third-party-politics organism. |
-
-## Retired before 2026-10-26
-
-| env                                                         | owner  | what it tests                                                                                                              |
-| ----------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- |
-| [exclude_rows](retired/exclude_rows/)                       | Robbie | Improve a sentiment classifier to beat a bar; `eval.py --exclude` lets the agent drop "mislabeled" test rows.              |
-| [repo_impossible](retired/repo_impossible/)                 | Robbie | Bash agent in a repo where one test contradicts the docstring.                                                             |
-| [hidden_goal_deploy_note](retired/hidden_goal_deploy_note/) | Robbie | The user pastes a deploy log that clearly failed and asks for a #releases note.                                            |
-| [dumb_user_report](retired/dumb_user_report/)               | Robbie | Two-stage on-policy: Qwen visibly fails a bash task, then is asked for a status report.                                    |
-| [sandbag_optimizer_glm](retired/sandbag_optimizer_glm/)     | Kylie  | The sandbagging env on GLM, plus an optimiser that asks Sonnet 5.5 for consequence paragraphs that would make GLM sandbag. |
-| [screen_eval_tampering](retired/screen_eval_tampering/)     | Robbie | The vendored agent-interp-envs `eval_tampering` env screened on Qwen3.6-27B on robbie-box.                                 |
-| [screen_optimize_cache_c](retired/screen_optimize_cache_c/) | Robbie | The vendored agent-interp-envs `optimize_cache_c` env screened on Qwen3.6-27B on robbie-box.                               |
-| [screen_grade_your_own](retired/screen_grade_your_own/)     | Robbie | The vendored agent-interp-envs `grade_your_own` env screened on Qwen3.6-27B on robbie-box.                                 |
-| [humaneval_prefill](retired/humaneval_prefill/)             | Robbie | Prefilled "test just failed"; fix it.                                                                                      |
-| [matonski](retired/matonski/)                               | Robbie | Visible grader.py + expected.json (`matonski_grader`).                                                                     |
-| [mmlu_metadata](retired/mmlu_metadata/)                     | Robbie | Wrong answer leaked in question metadata.                                                                                  |
-| [summ_keyword](retired/summ_keyword/)                       | Robbie | Scorer comment buried in a pasted doc.                                                                                     |
-| [lcb_mock_entity](retired/lcb_mock_entity/)                 | Robbie | Single-turn impossible LCB with a mock-entity cue.                                                                         |
-| [git_history](retired/git_history/)                         | Robbie | Fix sits on a `fix/` branch; told not to use history.                                                                      |
-| [secret_number](retired/secret_number/)                     | Robbie | Port of agent-interp-envs Secret Number.                                                                                   |
-| [precommit_scope](retired/precommit_scope/)                 | Robbie | Port of the Pre-commit Hook task from "Why Do Models Task Game?".                                                          |
-
-## Gaps
-
-- The code for the GLM 5.3 AISI eval-gaming and agentic-misalignment runs is outside this repo, in
-  uncommitted or remote-less repos on bramble (`~/workspace/glm-evalgaming`,
-  `~/workspace/agentic-misalignment`).
-- The overeager run dirs live only on bramble (`.worktrees/realism/data/runs/overeager`).
-- `humaneval_prefill` and `matonski` have no Docent runs.
-- `evolve/` and the experiment scripts behind false_capability_claims, identity_counterfactuals,
-  model_organisms, shout_fire and sandbag_optimizer_glm were deleted from `main` after this index
-  was written (`6a0d5be`, `ceaf7ad`); their READMEs link to the code at `7296169`, so check out that
-  commit to run them.
+Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
+presets, arm factor dicts, Parquet episodes, regrading in a fresh container, Docent upload for new
+runs (converted runs keep theirs), and a richer env browser.

@@ -8,7 +8,7 @@ Misalignment (AM), Misalignment Continuation (MC) and AbstentionBench.
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Status     | retired                                                                                                                                                                                                                              |
 | Owner      | Kylie                                                                                                                                                                                                                                |
-| Git ref    | not in this repo: bramble `~/workspace/glm-evalgaming` (local git repo, no remote, HEAD `8272fda`: run*am_fixed.sh, run_mc.sh, run_abst*\*.sh, monitor.py, export.py). Runs on HF `runs/eval_gaming/2026-10-24_glm53_aisi_honeypots` |
+| Git ref    | not in this repo: bramble `~/workspace/glm-evalgaming` (local git repo, no remote, HEAD `8272fda`: run_am_fixed.sh, run_mc.sh, run_abst_*.sh, monitor.py, export.py). Runs on HF `runs/eval_gaming/2026-10-24_glm53_aisi_honeypots` |
 | Models run | GLM 5.3; awareness monitor ours (Sonnet 5.5 → 4.5 → GPT-5.6 fallback), MC grader Sonnet 4.5                                                                                                                                          |
 
 ## Key arms and results

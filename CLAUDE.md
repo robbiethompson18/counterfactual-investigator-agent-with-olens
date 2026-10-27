@@ -208,6 +208,10 @@ missing) instead of relying on memory.
 
 Current docs:
 
+- [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
+  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
+  run folders on HF under `envs/`, generated indexes + static list page; essay_grading and overeager_* ported, everything
+  else in `environments/retired/`
 - [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/README.md)
   — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
   importer, bramble service
@@ -265,14 +269,14 @@ Current docs:
 - [MIXED: Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
   survives a split test); harness in `evalcue/README.md`
-- [ACTIVE: evalcue harness — read before running any evalcue env, adding one, or overriding its provider, effort or sampling](evalcue/README.md)
+- [MIXED: evalcue harness (retired for new work 2026-10-27; use environments/) — read before running any evalcue env, adding one, or overriding its provider, effort or sampling](evalcue/README.md)
   — `evalcue.run`/`show`/`--rescore`, `Episode` fields, run dirs, the `EVALCUE_*` env vars
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
 - [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/README.md)
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
-- [REFERENCE: donehack — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
+- [REFERENCE: donehack (retired for new work 2026-10-27; use environments/) — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
   — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
 - [MIXED: GLM 5.3 agent-interp-envs runs — read before comparing GLM 5.3 coding/EvilGenie/ImpossibleBench/Donation Bet results or running many podman sandboxes](docs/glm53-agent-interp-envs.md)
   — headline numbers, batch-2 envport results (revert_or_refactor 94% revert), artifact and Docent
