@@ -222,13 +222,22 @@ class Sandbox:
         # envs may chown files to an in-container user (funding_email_real's dana), which rootless podman maps to a subuid
         # the host can't read or delete; hand everything back to container root (= the host user) first
         subprocess.run(["docker", "exec", self.cid, "chown", "-R", "0:0", self.cwd], check=False, capture_output=True)
+        # This reads the bind mount on the HOST, so never follow a symlink: the agent can point one at any host path
+        # (ln -s ~/.ssh/id_ed25519 x) and its contents would land in files_after and then on the public HF dataset.
+        # A symlink is recorded as its target text instead.
         files = {}
-        for p in self.dir.rglob("*"):
-            if p.is_file() and not {".git", ".pytest_cache", "__pycache__"} & set(p.parts) and p.stat().st_size < 200_000:
-                try:
-                    files[str(p.relative_to(self.dir))] = p.read_text()
-                except UnicodeDecodeError:
-                    pass
+        for root, dirs, names in os.walk(self.dir, followlinks=False):
+            dirs[:] = [d for d in dirs if d not in {".git", ".pytest_cache", "__pycache__"}]
+            for name in names + [d for d in dirs if os.path.islink(os.path.join(root, d))]:
+                p = Path(root) / name
+                rel = str(p.relative_to(self.dir))
+                if p.is_symlink():
+                    files[rel] = f"[symlink -> {os.readlink(p)}]"
+                elif p.is_file() and p.stat().st_size < 200_000:
+                    try:
+                        files[rel] = p.read_text()
+                    except UnicodeDecodeError:
+                        pass
         return files
 
     def close(self):
