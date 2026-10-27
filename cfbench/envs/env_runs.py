@@ -19,8 +19,13 @@ from environments._lib.runfolder import LOCAL, read_episodes
 
 def rows(env: str, run: str):
     """(source id, row) per episode of a run folder, rows shaped like evalcue's (model, arm, item, messages, positive, meta,
-    files_before as text, cwd) so the rest of cfbench and the read-request builder need no second code path."""
+    files_before as text, cwd) so the rest of cfbench and the read-request builder need no second code path. The model's
+    own turns get a `reasoning_content` key (cfbench.core.initial_context's marker; the runner writes it only when the
+    model reasoned): every assistant message after the ones `build()` supplies, or after the prompt when build() can't
+    run offline."""
     run_dir = Path(LOCAL) / env / run
+    mod = load_env(env)
+    n_prompt: dict[tuple[str, str], int] = {}
     labels: dict[str, dict | None] = {}
     for path in sorted((run_dir / "labels").glob("measure@*.jsonl")):
         for line in path.read_text().splitlines():
@@ -28,13 +33,23 @@ def rows(env: str, run: str):
             labels[rec["episode"]] = rec["values"]
     for ep in read_episodes(run_dir):
         values = labels.get(ep["id"]) or {}
+        key = (ep["arm"], str(ep["item"]))
+        if key not in n_prompt:
+            try:
+                n_prompt[key] = len(mod.build(ep["arm"], ep["item"]).messages)
+            except Exception:  # noqa: BLE001 - build needs a sandbox or a Ctx: fall back to "every assistant turn is the model's"
+                n_prompt[key] = 0
+        messages = [dict(m) for m in ep["messages"]]
+        for m in messages[n_prompt[key] :]:
+            if m["role"] == "assistant":
+                m.setdefault("reasoning_content", "")
         files = {p: (run_dir / "blobs" / h).read_text() for p, h in (ep.get("files_before") or {}).items()}
         row = {
             "model": ep["target"].split("@")[0],
             "arm": ep["arm"],
             "item": ep["item"],
             "sample": ep["sample"],
-            "messages": ep["messages"],
+            "messages": messages,
             "tools": ep.get("tools") or None,
             "positive": values.get("positive"),
             "meta": ep.get("meta") or {},
