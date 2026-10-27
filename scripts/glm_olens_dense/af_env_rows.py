@@ -47,6 +47,7 @@ def main():
                         "sample": e["sample"],
                         "model": meta["target"]["model"],
                         "backend": meta["target"]["backend"],
+                        "thinking": bool(meta["target"].get("thinking")),
                         "positive": bool(v["positive"]),
                         "verdict": v["verdict"],
                         "label_file": v["label_file"],

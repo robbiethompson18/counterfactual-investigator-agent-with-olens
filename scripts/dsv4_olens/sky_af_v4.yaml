@@ -41,5 +41,5 @@ run: |
     --read-arms preview,public --dense --actual-reply --skip-lens 2>&1 | tee -a $OUT/capture.log
   export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
   timeout 2h ~/vl/.venv/bin/python vllm_read.py --model /data/v4flash --lens /data/v4lens --states $OUT/states.pt \
-    --layers $LENS_LAYERS --out $OUT/reads_L$LENS_LAYERS.jsonl 2>&1 | tee -a $OUT/lens.log
+    --layers $LENS_LAYERS --public-first --out $OUT/reads_L$LENS_LAYERS.jsonl 2>&1 | tee -a $OUT/lens.log
   echo READS_DONE

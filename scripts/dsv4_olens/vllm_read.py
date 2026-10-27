@@ -33,6 +33,8 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--tp", type=int, default=2)
     ap.add_argument("--eager", action="store_true")
+    ap.add_argument("--chunk", type=int, default=2048, help="reads per generate() call")
+    ap.add_argument("--public-first", action="store_true", help="read public-arm rows of v4+ first, then the rest")
     ap.add_argument("--check-against", default=None, help="HF reads.jsonl: print greedy agreement on the same positions")
     a = ap.parse_args()
 
@@ -47,6 +49,7 @@ def main():
     saved = torch.load(a.states)
     layers = [int(x) for x in a.layers.split(",")]
     rows = saved["rows"][: a.limit or None]
+    a.order = [lambda r: 0] if not a.public_first else [lambda r: r["arm"] != "public", lambda r: r["id"].split(":")[0] in ("v2", "v3")]
 
     t = time.time()
     llm = LLM(
@@ -72,34 +75,41 @@ def main():
             S = saved["states"][: len(rows), saved["layers"].index(L)].float().reshape(len(rows), -1)  # [N, 16384]
             ids = carrier["prompts"][str(L)]["input_ids"]
             t = time.time()
-            reqs, sps = [], []
-            for i in range(len(rows)):
-                v = (alpha * S[i] / S[i].norm()).view(1, 1, -1)
-                sv = SteeringVector(activations=v, layer_indices=[EMBED_LAYER_INDEX], position_indices=[slot], mode="replace", scale=1.0)
-                for k, kw in (
-                    ("greedy", {"temperature": 0.0, "n": 1}),
-                    ("sampled", {"temperature": 1.0, "top_p": 0.95, "top_k": 64, "n": a.samples}),
-                ):
-                    reqs.append({"prompt_token_ids": ids})
-                    sps.append(
-                        SamplingParams(
-                            max_tokens=a.max_new,
-                            stop_token_ids=[1],
-                            seed=i,
-                            skip_special_tokens=True,
-                            extra_args={"apply_steering_vectors": [sv]},
-                            **kw,
-                        )
+            order = sorted(range(len(rows)), key=lambda i: tuple(f(rows[i]) for f in a.order))
+            for c0 in range(0, len(order), a.chunk):  # one generate() per chunk: all steering vectors at once overflow vLLM's IPC
+                chunk = order[c0 : c0 + a.chunk]
+                reqs, sps = [], []
+                for i in chunk:
+                    v = (alpha * S[i] / S[i].norm()).view(1, 1, -1)
+                    sv = SteeringVector(
+                        activations=v, layer_indices=[EMBED_LAYER_INDEX], position_indices=[slot], mode="replace", scale=1.0
                     )
-            stats()
-            outs = llm.generate(reqs, sps, lora_request=lora, use_tqdm=False)
-            st = stats()
-            hc = [s.get("hc_rows", 0) for s in st]
-            want = len(rows) * (1 + a.samples)  # n>1 requests prefill once per sample
-            assert all(h == want for h in hc), f"layer-1 injection rows {hc} != {want}: {st}"
-            for i, r in enumerate(rows):
-                g, s = outs[2 * i].outputs[0].text, [c.text for c in outs[2 * i + 1].outputs]
-                f.write(json.dumps(r | {"layer": L, "greedy": g} | {f"s{j + 1}": x for j, x in enumerate(s)}) + "\n")
+                    for k, kw in (
+                        ("greedy", {"temperature": 0.0, "n": 1}),
+                        ("sampled", {"temperature": 1.0, "top_p": 0.95, "top_k": 64, "n": a.samples}),
+                    ):
+                        reqs.append({"prompt_token_ids": ids})
+                        sps.append(
+                            SamplingParams(
+                                max_tokens=a.max_new,
+                                stop_token_ids=[1],
+                                seed=i,
+                                skip_special_tokens=True,
+                                extra_args={"apply_steering_vectors": [sv]},
+                                **kw,
+                            )
+                        )
+                stats()
+                outs = llm.generate(reqs, sps, lora_request=lora, use_tqdm=False)
+                st = stats()
+                hc = [s.get("hc_rows", 0) for s in st]
+                want = len(chunk) * (1 + a.samples)  # n>1 requests prefill once per sample
+                assert all(h == want for h in hc), f"layer-1 injection rows {hc} != {want}: {st}"
+                for j, i in enumerate(chunk):
+                    g, smp = outs[2 * j].outputs[0].text, [c.text for c in outs[2 * j + 1].outputs]
+                    f.write(json.dumps(rows[i] | {"layer": L, "greedy": g} | {f"s{k + 1}": x for k, x in enumerate(smp)}) + "\n")
+                f.flush()
+                print(f"L{L}: {c0 + len(chunk)}/{len(rows)} {time.time() - t:.0f}s", flush=True)
             el = time.time() - t
             print(f"L{L}: {len(rows)} reads in {el:.0f}s = {len(rows) / el:.1f} reads/s (greedy + {a.samples} samples each)", flush=True)
 
