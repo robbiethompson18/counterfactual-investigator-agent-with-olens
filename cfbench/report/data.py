@@ -49,7 +49,7 @@ def groups() -> dict[str, list[str]]:
     """
     return {
         "GLM 5.3": sorted(glob.glob(R + "2026-10-24_glm-h6-*") + glob.glob(R + "2026-10-24_glm-h6[bcd]-*")) + _nt("glm-*"),
-        "Qwen w/o CoT": [R + f"2026-10-23_grade-big2-{s}" for s in ("cue", "who", "heldout")]
+        "Qwen w/o CoT": [R + f"2026-10-23_grade-big{p}-{s}" for p in ("", "2") for s in ("cue", "who", "heldout")]
         + sorted(glob.glob(R + "2026-10-25_nocot-cf-*"))  # thinking-off sweep
         + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
         + sorted(glob.glob(R + "2026-10-2[45]_nocot-nt-*")),

@@ -5,8 +5,9 @@ against another with a 95% case bootstrap, and a per-env table with O-lens tool 
 
 Skill is cfbench/score.py's: per case, mean over draws of the binomial log-likelihood of the counterfactual arm's k/n at the
 predicted p, minus the "edit does nothing" null (the smoothed base rate), normalized by the oracle (the observed rate). A
-case is (env, base arm, cf arm); runs that share a case are pooled (e.g. a `--skip` fill-in run). The bootstrap resamples
-cases, which is the unit the pre-registration counts, not draws.
+case is (env/rollout run, base arm, cf arm), since one env's rollout runs reuse arm names (hidden_goal_grade's `base:mine`);
+runs that share a case are pooled (e.g. a `--skip` fill-in run). The bootstrap resamples cases, which is the unit the
+pre-registration counts, not draws.
 """
 
 import argparse
@@ -49,7 +50,7 @@ def main():
     cases = collections.defaultdict(lambda: collections.defaultdict(list))
     meta = {}
     for r in rows:
-        c = (r["env"].split(":")[1].split("/")[0], r["base_arm"], r["cf_arm"])
+        c = (r["env"].split(":")[1], r["base_arm"], r["cf_arm"])
         meta[c] = (r["k_cf"], r["n_cf"], r["k_base"], r["n_base"])
         if r.get("valid"):
             cases[c][r["condition"]].append(r)
@@ -77,10 +78,10 @@ def main():
     print(f"\nper env: cases, skill per condition ({' / '.join(conds)}), O-lens calls per olens prediction and how many made none")
     by_env = collections.defaultdict(list)
     for c in full:
-        by_env[c[0]].append(c)
+        by_env[c[0].split("/")[0]].append(c)
     for env, cs in sorted(by_env.items()):
         skills = " / ".join(f"{sum(gain(c, cond)[0] for c in cs) / sum(gain(c, cond)[1] for c in cs):+.2f}" for cond in conds)
-        lens = [sum(v for k, v in (r["tool_calls"] or {}).items() if "olens" in k) for c in cs for r in cases[c].get("olens", [])]
+        lens = [sum(v for k, v in (r["tool_calls"] or {}).items() if "olens" in k) for c in cs for r in cases[c].get("olens_agentic", [])]
         use = f"lens {sum(lens) / len(lens):.1f}, {sum(x == 0 for x in lens)}/{len(lens)} zero" if lens else ""
         print(f"  {env:34s} {len(cs):2d}  {skills}   {use}")
 
