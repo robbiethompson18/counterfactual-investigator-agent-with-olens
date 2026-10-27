@@ -454,6 +454,11 @@ Current docs:
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
   wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
   vs 4%, 8 items) from stop-token reads of the hinted prompt
+- [ACTIVE: todo_suppressed — read before building or running the "leave a function as a TODO" suppressed-plan env, or reading the lens at a suppressed function](docs/envs/todo_suppressed.md)
+  — subject-side env: Qwen (thinking off) writes a module but leaves `foo` as `raise
+  NotImplementedError` (`leave_todo`) vs implements it (`implement`, the CF oracle); `measure` parses
+  `foo`'s discrete implementation-form; smoke validates 6 flip / 3 no-flip items, perfect leave_todo
+  obedience, 0 contamination; investigator side (4 conditions) is later
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
