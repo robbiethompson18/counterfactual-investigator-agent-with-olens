@@ -522,7 +522,8 @@ async function getRun(d){if(!RUNS[d]){const r=await SRC.run(d);const its=r.items
 function dsCrumbs(d,R){const e=envOf(d);if(SRC.static)return [[R?.run?.title||d,"#"]];
   if(e)return [["envs","#"],[e.env,linkTo({env:e.env})],[e.run?e.run:ARMNAME[d]||e.armSlug,linkTo({dataset:d})]];
   return [["datasets","#datasets=1"],[d,linkTo({dataset:d})]]}
-function crumbs(parts){$("#crumbs").innerHTML=parts.map(([t,h])=>h?`<a href="${h}">${esc(t)}</a>`:`<span>${esc(t)}</span>`).join(" <span>/</span> ")}
+function crumbs(parts){if(!SRC||!SRC.static)document.title=[...parts].reverse().slice(0,2).map(x=>x[0]).join(" · ")+" · expview";  // the served page has no {{TITLE}} fill-in
+$("#crumbs").innerHTML=parts.map(([t,h])=>h?`<a href="${h}">${esc(t)}</a>`:`<span>${esc(t)}</span>`).join(" <span>/</span> ")}
 let VIEW=null;
 async function route(){
   const p=canonHash();document.onkeydown=null;
