@@ -34,7 +34,7 @@ from kwonly import VEA_RX
 IMPORT = {"ib_realistic": "imports/celeste/ds_new/cfi_ib_realistic", "ec_sandbagging": "imports/celeste/ds/evalcue",
           "donation_bet": "imports/celeste/ds_new/cfi_donation_bet"}  # fmt: skip
 Q = "simulat|eval|test|synthetic|scenario|honeypot|benchmark|fiction|hypothetical|red.?team"
-V8830 = "https://expview.pages.dev/#d={d}&i={i}&v=tr&t={t}&q={q}"
+V8830 = "https://expview.pages.dev/#dataset={d}&item={i}&view=tr&token={t}&query={q}"
 V8821 = "http://bramble:8821/#ep={i}&pos={t}&q={q}"
 RNG = np.random.default_rng(0)
 

@@ -51,7 +51,7 @@ for row in rows:
         ],  # exactly what the judge saw and said
         env_dir=workspace_dir,
     )  # optional: files, snapshotted + deduplicated
-print(link(run.path, item="A/s0"))  # https://expview.pages.dev/#d=runs/my_env/2026-10-24_slug&i=A/s0
+print(link(run.path, item="A/s0"))  # https://expview.pages.dev/#dataset=runs/my_env/2026-10-24_slug&item=A/s0
 ```
 
 Then `scripts/runs.py finish` as usual: it refreshes `index.jsonl` (`expview.py index`) and uploads
@@ -160,15 +160,20 @@ judge calls without the transcript.
 Every view is a URL hash, so anything on screen can be linked (the Copy link button, or
 `expview.py link`):
 
-| Hash                           | Opens                                                                   |
-| ------------------------------ | ----------------------------------------------------------------------- |
-| `#d=DATASET`                   | a run: summary by group, filterable items table                         |
-| `&i=ITEM`                      | an item (its transcript with reads if it has them, else its first call) |
-| `&v=tr&t=POS`                  | token POS of the transcript, expanded                                   |
-| `&v=call&c=N&m=M`              | call N (0-based), message M                                             |
-| `&v=env&f=PATH`                | an environment file                                                     |
-| `&q=REGEX`                     | highlight a regex in reads (transcript) or text (calls)                 |
-| `#s=1&q=REGEX&novel=ctx&d=...` | a search over the datasets in `d` (comma-separated)                     |
+| Hash                                                                     | Opens                                                                   |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `#dataset=DATASET`                                                       | a run: summary by group, filterable items table                         |
+| `&item=ITEM`                                                             | an item (its transcript with reads if it has them, else its first call) |
+| `&view=tr&token=POS`                                                     | token POS of the transcript, expanded                                   |
+| `&view=call&call=N&message=M`                                            | call N (0-based), message M                                             |
+| `&view=env&file=PATH`                                                    | an environment file                                                     |
+| `&query=REGEX` (`&case=1`)                                               | highlight a regex in reads (transcript) or text (calls)                 |
+| `#search=1&query=REGEX&novel=ctx&dataset=...`                            | a search over the datasets in `dataset` (comma-separated)               |
+| `&experiment=ENV&scope=text&reader=R&section=S&group=G&label=K=V&page=N` | search filters (the Search page's form)                                 |
+
+Keys are full words since 2026-10-26; the old one-letter keys (`#d=…&i=…&t=…`, `#s=1&q=…`) are
+rewritten to these on load, so every old link still works ([docs/viewers.md](../docs/viewers.md),
+"URL parameters").
 
 The dataset id is the run dir's path under its root with `expview` path parts dropped:
 `data/runs/eval_gaming/2026-10-24_glm53/expview/mc` is `runs/eval_gaming/2026-10-24_glm53/mc`. Roots
