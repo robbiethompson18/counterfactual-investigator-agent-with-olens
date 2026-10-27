@@ -322,6 +322,13 @@ function pooled(idx) {
 // arms a and b on one target, each pooled over only the items both have episodes on (and, for a pair with an item
 // subset, only those items): an arm run on extra items (a pilot on another dataset) must not shift the comparison.
 // -> [A, B, nItems], or null when they share no items
+// a comparison with an item subset shows its bars on those items only
+function onItems(P, a, t, only) {
+  const s = {k: 0, n: 0, type: "bool"};
+  for (const it of only.map(String)) { const q = P.items[a + "\u0000" + t + "\u0000" + it]; if (q) { s.k += q.k; s.n += q.n; } }
+  return s.n ? s : null;
+}
+
 function matched(P, a, b, t, only = null) {
   const ia = P.itemsBy[a + "\u0000" + t], ib = P.itemsBy[b + "\u0000" + t];
   if (!ia || !ib) return null;
@@ -553,7 +560,7 @@ function compareList(D) {
   const card = c => {
     const ts = P.targets.filter(t => c.arms.some(a => P.by[a + "\u0000" + t]?.n));
     const body = ts.length ? ts.map(t => `<span class="tg">${esc(modelName(t))}</span>` + c.arms.map((a, i) => {
-      const p = P.by[a + "\u0000" + t], v = pctOf(p);
+      const p = c.items ? onItems(P, a, t, c.items) : P.by[a + "\u0000" + t], v = pctOf(p);
       const d = i ? deltaBadge(matchedDelta(P, c.arms[0], a, t, c.items)) : "";
       return `<span class="arm" title="${esc(a)}">${esc(a)}${retiredTag(D, a)}</span><span class="hbar">${p?.n ? ciBar(p.k, p.n, "b") : '<span class="b"></span>'}
         <span class="v">${v == null ? "not run" : `${(100 * v).toFixed(0)}% <span style="color:var(--faint)">/${p.n}</span>`}</span><span class="dl">${d}</span></span>`;
