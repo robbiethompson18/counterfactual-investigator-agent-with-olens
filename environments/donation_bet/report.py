@@ -3,7 +3,8 @@ other side (bad / beers / nothing) and lines set, as the mean over questions of 
 docs/envs/donation_bet.md, 95% CI from resampling within question) and pooled (95% Newcombe CI), plus bet_neutral's rate. Reads the latest
 `measure` labels of each local run (data/envs/donation_bet/<run>/); unscorable replies are dropped.
 
-    uv run python -m environments.donation_bet.report [RUN ...]      # default: every ref-template run
+    uv run python -m environments.donation_bet.report [RUN ...]      # default: every run
+    uv run python -m environments.donation_bet.report --pool RUN ... # sum the runs per (model, thinking) first
 """
 
 import json
@@ -67,12 +68,24 @@ PAIRS = {"bad": ("good_below", "good_above"), "beers": ("beers_good_below", "bee
          "nothing": ("nothing_good_below", "nothing_good_above")}  # fmt: skip
 
 
-def rows(runs):
-    out = []
+def groups(runs, pool: bool):
+    """-> [(label, target, counts)]: one per run, or with pool one per (model, thinking), counts summed over its runs."""
+    out: dict = {}
     for run in runs:
         t = json.loads((run / "meta.json").read_text())["target"]
-        c = counts(run)
-        head = {"run": run.name, "model": t["model"], "thinking": t["thinking"]}
+        key = (t["model"], t["thinking"]) if pool else run.name
+        label, _, c = out.setdefault(key, ([], t, defaultdict(lambda: defaultdict(list))))
+        label.append(run.name)
+        for arm, by_item in counts(run).items():
+            for item, v in by_item.items():
+                c[arm][item] += v
+    return [(f"pooled {len(lab)} runs" if pool else lab[0], t, c) for lab, t, c in out.values()]
+
+
+def rows(runs, pool=False):
+    out = []
+    for name, t, c in groups(runs, pool):
+        head = {"run": name, "model": t["model"], "thinking": t["thinking"]}
         for lines, sfx in E.REF_LINES.items():
             for other, (a, b) in PAIRS.items():
                 a, b = a + sfx, b + sfx
@@ -88,10 +101,12 @@ def rows(runs):
 
 
 def main(argv):
+    pool = "--pool" in argv
+    argv = [a for a in argv if a != "--pool"]
     runs = [LOCAL / "donation_bet" / r for r in argv] or sorted((LOCAL / "donation_bet").glob("*/meta.json"))
     runs = [r.parent if r.name == "meta.json" else r for r in runs]
     print("gap = P(<= line | good below) - P(<= line | good above), pp: question mean [within-question bootstrap], pooled [Newcombe]")
-    for r in rows(runs):
+    for r in rows(runs, pool):
         head = f"{r['run']:40} {r['model']:28} think={r['thinking']!s:5} {r['lines']:6}"
         if r["b"] is None:
             print(f"{head} bet_neutral <=line {r['a'][0]}/{r['a'][1]}")
