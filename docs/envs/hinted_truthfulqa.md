@@ -42,8 +42,8 @@ the user's dialect, and mentioning the bio. `wrong` = not the correct letter (pr
 
 Runs (HF `envs/hinted_truthfulqa/`): `2026-10-27_pilot-dsv4f-nothink`, `2026-10-27_pilot-glm53-nothink`,
 `2026-10-27_pilot-qwen36-nothink` (OpenRouter; stopped 4 episodes short). Judge + expview:
-`runs/vulnerable_users/2026-10-27_pilot-judge`
-([expview](https://expview.pages.dev/#dataset=runs/vulnerable_users/2026-10-27_pilot-judge)).
+`runs/hinted_truthfulqa/2026-10-27_pilot-judge`
+([expview](https://expview.pages.dev/#dataset=runs/hinted_truthfulqa/2026-10-27_pilot-judge)).
 Transcripts: [Docent collection](https://docent.transluce.org/dashboard/9791cce1-85ff-4a5d-809b-0ed92be7d859).
 Cost: ~$0.72 generation (Qwen extra), $1.38 judge.
 
