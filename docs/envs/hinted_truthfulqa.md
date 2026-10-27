@@ -1,11 +1,11 @@
-# Vulnerable users (bio × factual MCQ)
+# Hinted TruthfulQA (who says it's X; formerly vulnerable users)
 
 **Status (2026-10-27):** ACTIVE. The bio arms are NULL and retired (no accuracy gap on DSv4 Flash,
 GLM 5.3 or Qwen3.6-27B; GLM's small condescension is verbalised). The TruthfulQA hint-postamble
 arms are the live part: who names a wrong letter moves DSv4 Flash a lot, and it almost never says
 so.
 
-Env: [`environments/vulnerable_users/`](../../environments/vulnerable_users/). Paper: Poole-Dayan,
+Env: [`environments/hinted_truthfulqa/`](../../environments/hinted_truthfulqa/). Paper: Poole-Dayan,
 Roy, Kabbara, [arXiv 2406.17737](https://arxiv.org/abs/2406.17737) (GPT-4, Claude 3 Opus and Llama
 3-8B lose accuracy and refuse more for low-education and non-native-English bios; Claude also
 condescends). The env uses the paper's system prompt and the 7 bios it prints (Appendix B) verbatim,
@@ -40,7 +40,7 @@ the user's dialect, and mentioning the bio. `wrong` = not the correct letter (pr
 - Judge "refusal" is 2–4% in every arm including control (mostly replies that hedge between two
   choices), so it doesn't separate arms.
 
-Runs (HF `envs/vulnerable_users/`): `2026-10-27_pilot-dsv4f-nothink`, `2026-10-27_pilot-glm53-nothink`,
+Runs (HF `envs/hinted_truthfulqa/`): `2026-10-27_pilot-dsv4f-nothink`, `2026-10-27_pilot-glm53-nothink`,
 `2026-10-27_pilot-qwen36-nothink` (OpenRouter; stopped 4 episodes short). Judge + expview:
 `runs/vulnerable_users/2026-10-27_pilot-judge`
 ([expview](https://expview.pages.dev/#dataset=runs/vulnerable_users/2026-10-27_pilot-judge)).
@@ -75,4 +75,4 @@ name the hint in at most 3/100, so the effect is unverbalised at this setting. P
 `control` → `hint/<source>` are in `PAIRS`; the comparison "who gives the hint" shows all of them.
 Example (Wikipedia, follows the hint, reply `(C)`):
 [Docent](https://docent.transluce.org/dashboard/9791cce1-85ff-4a5d-809b-0ed92be7d859/agent_run/d921df84-e43b-4023-b6f9-1f5a5d07fa97).
-Expview: `runs/env_vulnerable_users/2026-10-27_hints-pilot-dsv4f-nothink`. Cost $0.008.
+Expview: `runs/env_hinted_truthfulqa/2026-10-27_hints-pilot-dsv4f-nothink`. Cost $0.008.
