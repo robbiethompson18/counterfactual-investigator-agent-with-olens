@@ -36,19 +36,21 @@ class OneEngine(AguLens):
         tok,
         base="Qwen/Qwen3.6-27B",
         lens_lora: str = "/workspace/lora_vllm/olens_space_rl600",
-        ar_lora: str = "/workspace/lora_vllm/ar_ptag_pooled",
+        ar_lora: str | None = "/workspace/lora_vllm/ar_ptag_pooled",
         ar_root=AR_ROOT,
         gpu_memory_utilization=0.88,
         max_num_seqs=512,
         max_model_len=32768,
         cuda_graphs=True,
         lora_mode="runtime",
+        max_lora_rank=16,
         debug=False,
     ):
         """lora_mode: "runtime" applies the adapters through vLLM's LoRA kernels (every decode step pays for them);
         "merge" folds each adapter into the served weights with vllm-metamodels' merge_lora before its stage and unmerges
         after (a plain engine: no LoRA kernels in the CUDA graphs; ~1 s per publish with the base copy in pinned host
-        memory, so stages are batched in olens_read_requests to amortise it)."""
+        memory, so stages are batched in olens_read_requests to amortise it). ar_lora=None / ar_root=None: no AR (olens.nla
+        scores its readouts offline)."""
         # vllm-metamodels turns torch.compile off unless asked (its hooks become a custom op); both default to on here
         os.environ.setdefault("VLLM_LENS_CUDA_GRAPHS", "1" if cuda_graphs else "0")
         os.environ.setdefault("VLLM_LENS_COMPILE", "1" if cuda_graphs else "0")
@@ -73,7 +75,7 @@ class OneEngine(AguLens):
             model=str(d),
             dtype="bfloat16",
             enable_lora=not self.merge,
-            max_lora_rank=16,
+            max_lora_rank=max_lora_rank,
             max_loras=2,
             enable_prompt_embeds=True,
             max_model_len=max_model_len,
@@ -86,16 +88,17 @@ class OneEngine(AguLens):
             gdn_prefill_backend="triton",
         )
         self.lens_req = LoRARequest("olens", 1, str(lens_lora))
-        self.ar_req = LoRARequest("ar", 2, str(ar_lora))
+        self.ar_req = LoRARequest("ar", 2, str(ar_lora)) if ar_lora else None
         self.merged = None  # merge mode: which adapter dir the served weights hold now
         self.bullet_prefix = bullet_prefix(lens_lora)
         self.adapter = "olens_s3d_space_rl600" if "space" in Path(lens_lora).name else Path(lens_lora).name  # olens.provenance
         self.adapters = {"lens_lora": str(lens_lora), "ar_lora": str(ar_lora), "engine": "vllm-metamodels one engine"}
-        h = torch.load(Path(ar_root) / "heads.pt", map_location="cuda")
-        self.W = h["head"]["linear.weight"].float()
-        self.b = h["head"]["linear.bias"].float()
-        self.tag_ids = h["tag_ids"]
-        self.ar_layers = [int(L) for L in h["layers"]]
+        if ar_root is not None:
+            h = torch.load(Path(ar_root) / "heads.pt", map_location="cuda")
+            self.W = h["head"]["linear.weight"].float()
+            self.b = h["head"]["linear.bias"].float()
+            self.tag_ids = h["tag_ids"]
+            self.ar_layers = [int(L) for L in h["layers"]]
 
     def _gen(self, prompts, params, lora=None):
         if self.merge:

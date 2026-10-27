@@ -14,6 +14,9 @@ deleted 2026-10-27; it is at PR #229's first commit. J++ came back the same day 
 src/olens/lens.py             the AO's read contract: carrier prompt, marker, alpha, bullet parsing, Sampling
 src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds), ar
                               (AR LoRA + final norm + head), one vLLM 0.27.1 engine
+src/olens/nla.py              NLAEngine: the camilablank multilayer NLA's AV (rank-128 LoRA, layer tag, Karvonen add at block
+                              1 via vllm-metamodels SteeringVector) on the same engine; its critic runs offline
+                              (scripts/nla_score.py, docs/nla-reader.md)
 src/olens/jpp.py              JPP: the J++ lens's top-k next tokens from captured residuals (maps + lm_head, no model)
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
 src/olens/provenance.py       reads.provenance.json next to a batch of reads: lens, AR, whitener, revisions, sampling
@@ -35,5 +38,6 @@ The whiteners come from the gated dataset
 [agu18dec/local-workspace](https://huggingface.co/datasets/agu18dec/local-workspace) (needs an
 `HF_TOKEN` with access). Needs vLLM 0.27.1 + vllm-metamodels + scipy on a GPU with 80 GB+
 (`runpod/olens_reads.sh setup` installs them). Run with `PYTHONPATH=olens/src:src`; the callers are
-the batch readers `scripts/olens_read_requests.py` (O-lens) and `scripts/jpp_read_requests.py`
-(J++).
+the batch readers `scripts/olens_read_requests.py` (`--readout olens|nla`) and
+`scripts/jpp_read_requests.py` (J++); `scripts/nla_score.py` adds the NLA critic's FVE to
+`--readout nla` output afterwards.
