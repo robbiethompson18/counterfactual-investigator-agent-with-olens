@@ -1,0 +1,3 @@
+{
+  "claudeMdExcludes": ["**/evalcue/envs/*/workspace*/CLAUDE.md"]
+}
