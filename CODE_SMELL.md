@@ -33,6 +33,16 @@ them when the thinking-on reruns land.
 - `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
   thinking-off Qwen transcripts); fix in the same PR.
 
+## 2026-10-23: entitlement rows hold stale labels; env status only warns in evalcue.run
+
+- The stored `dumb_user_exploit_entitlement*` and `dumb_user_exploit_calib` rows on HF keep the
+  pre-fix entitlement labels until someone runs `evalcue.run --rescore` on them, and the cfbench
+  runs built on them (`runs/cfbench/*entitlement*`) are stale.
+- `evalcue/envs/status.tsv` is read only by `evalcue.run` (a warning); nothing else checks it.
+- `dumb_user_exploit/common.py` still matches `keywords` over the whole reply for the non-`issue`
+  kinds, tag line included (fee's `\$ ?4,?125` hits `QUOTED_TOTAL: $4,125`). Only the `mentioned`
+  note is affected, not `positive`.
+
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
 Resolved 2026-10-26 by deleting the script (last at commit `7296169`) with the null `anchors`

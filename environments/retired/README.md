@@ -8,7 +8,7 @@ over-eagerness tasks plus Email John → the `overeager_*` envs, `alignment_faki
 One folder per env, each with a README: what it tests, the git ref and path of the code, how to run
 it, the models run, the key counterfactual arms and their rates, and links to transcripts (Docent,
 bramble:8830 expview). These READMEs point at the code; they don't hold it. `evalcue/` and `donehack/` were deleted on 2026-10-27, so
-their links go to commit `2602d22`, the last one that had them (`evolve/` to `7296169`). Snapshot of 2026-10-26;
+their links go to commit `c7b2e56`, the last one that had them (`evolve/` to `7296169`). Snapshot of 2026-10-26;
 each env's own doc is the source of truth for numbers.
 
 ## Reward hacking: coding

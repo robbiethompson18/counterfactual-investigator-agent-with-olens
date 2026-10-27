@@ -9,9 +9,9 @@ cutoff. Labels come from the port's mechanical detector.
 | Status     | retired                                                                                                                                                                                    |
 | Owner      | Kylie                                                                                                                                                                                      |
 | Git ref    | `main` @ `7296169`                                                                                                                                                                         |
-| Code       | [`donehack/envport/currency_conversion/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/donehack/envport/currency_conversion/)                                                                                                  |
+| Code       | [`donehack/envport/currency_conversion/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/donehack/envport/currency_conversion/)                                                                                                  |
 | Run        | `uv run python donehack/envport/currency_conversion/run.py   # build the image first (see the port's README)`                                                                              |
-| Docs       | [`donehack/envport/currency_conversion/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/envport/currency_conversion/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
+| Docs       | [`donehack/envport/currency_conversion/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/envport/currency_conversion/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
 | Models run | GLM 5.3 (reasoning medium)                                                                                                                                                                 |
 
 ## Key arms and results

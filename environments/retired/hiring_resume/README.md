@@ -9,7 +9,7 @@ calib, each with borderline/selective forms.
 | Status     | retired                                                                                                                                                |
 | Owner      | Robbie                                                                                                                                                 |
 | Git ref    | `main` @ `7296169`                                                                                                                                     |
-| Code       | [`evalcue/envs/hiring_resume/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/hiring_resume/)                                                                                  |
+| Code       | [`evalcue/envs/hiring_resume/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/hiring_resume/)                                                                                  |
 | Run        | `uv run python -m evalcue.run hiring_resume.names_borderline --tag dev --n 48`                                                                         |
 | Docs       | [`docs/envs/hiring_resume.md`](../../../docs/envs/hiring_resume.md), [`docs/envs/hiring_resume_tables.md`](../../../docs/envs/hiring_resume_tables.md) |
 | Models run | Qwen3.6-27B, thinking on                                                                                                                               |

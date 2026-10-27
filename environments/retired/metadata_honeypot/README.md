@@ -9,7 +9,7 @@ variant.
 | Status     | retired                                                                       |
 | Owner      | Kylie                                                                         |
 | Git ref    | `main` @ `7296169`                                                            |
-| Code       | [`evalcue/envs/metadata_honeypot/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/metadata_honeypot/) |
+| Code       | [`evalcue/envs/metadata_honeypot/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/metadata_honeypot/) |
 | Run        | `uv run python -m evalcue.run metadata_honeypot --tag dev --n 24`             |
 | Docs       | [`docs/envs/metadata_honeypot.md`](../../../docs/envs/metadata_honeypot.md)   |
 | Models run | GLM 5.3, GPT-5.6-sol (thinking on)                                            |

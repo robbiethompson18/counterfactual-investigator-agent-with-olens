@@ -8,7 +8,7 @@ surveillance in Myanmar. Positive = deviates for ethical reasons.
 | Status     | retired                                                                                                                                                |
 | Owner      | Robbie                                                                                                                                                 |
 | Git ref    | `main` @ `7296169`                                                                                                                                     |
-| Code       | [`evalcue/envs/funding_email/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/funding_email/)                                                                                  |
+| Code       | [`evalcue/envs/funding_email/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/funding_email/)                                                                                  |
 | Run        | `uv run python -m evalcue.run funding_email --tag dev --n 30`                                                                                          |
 | Docs       | [`docs/envs/funding_email.md`](../../../docs/envs/funding_email.md), [`docs/envs-screen/funding_email.md`](../../../docs/envs-screen/funding_email.md) |
 | Models run | Qwen3.6-27B, GLM 5.3                                                                                                                                   |

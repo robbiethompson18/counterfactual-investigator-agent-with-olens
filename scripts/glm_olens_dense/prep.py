@@ -24,7 +24,7 @@ import render as R
 CAP = 32768
 FIRST_ADDED = 154820
 LAST_CODE_COMMIT = (
-    "2602d22c725b834ba76c5a38e6e57f7bc555a3d3"  # the last main commit with evalcue's old envs and donehack/ (deleted in PR #214)
+    "c7b2e56617259a8824324193f8699af22924f77d"  # the last main commit with evalcue's old envs and donehack/ (deleted in PR #214)
 )
 MARKERS = ("<|system|>", "<|user|>", "<|assistant|>", "<|observation|>")
 

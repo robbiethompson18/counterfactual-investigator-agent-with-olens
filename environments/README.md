@@ -26,7 +26,7 @@ from before 2026-10-26 is under [`retired/`](retired/README.md).
 
 All 24 were ported with their old runs converted, not rerun: 18,734 episodes, each checked byte for byte against the
 new `build()`, and each keeping its Docent run id. A replay of sampled first requests matches what the old harnesses
-sent. evalcue/ and donehack/ were deleted on 2026-10-27 (last commit with them: `2602d22`); everything else
+sent. evalcue/ and donehack/ were deleted on 2026-10-27 (last commit with them: `c7b2e56`); everything else
 from before is catalogued in [`retired/`](retired/README.md).
 
 ## An env is a folder

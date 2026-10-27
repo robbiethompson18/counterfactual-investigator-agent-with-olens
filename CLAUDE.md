@@ -172,6 +172,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - LLM judge: Claude Sonnet 5.5 (`claude-sonnet-5-5`) for every judge and grader call, with 1
   replicate per answer. Agam's published numbers used Opus 5, so ours aren't directly comparable to
   his; say so when quoting both.
+- **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
+  Pages that reads the public HF dataset; search is a JavaScript regex over the loaded run; reads
+  are batch jobs whose outputs land on HF. Nothing on bramble, no tailnet URLs in docs or messages,
+  no SkyPilot pod behind a button. See [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
   in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
   four.
@@ -192,6 +196,9 @@ Durable lessons about this repo go in git:
 - **No `README.md` files.** Agents are the readers, not GitHub visitors: usage goes in the
   directory's `CLAUDE.md`, results and write-ups go in `docs/`. A results table beside the code rots
   unseen: `cfbench/README.md` quoted harness v1 log skill as current until the 2026-10-26 audit.
+- **Env fixtures that ship a `CLAUDE.md` to the model** (`evalcue/envs/*/workspace*/`) are not docs:
+  `.claude/settings.json`'s `claudeMdExcludes` keeps Claude Code from loading them as instructions.
+  Add any new fixture path there.
 - Durable context lives in git, not in Claude Code's machine-local memory system.
 
 Behavioral rules (one-liners) go directly in this file, not in docs: docs are lazy-loaded, but rules
@@ -218,6 +225,9 @@ Current docs:
   — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
   run folders on HF under `envs/`, generated indexes + static list page; essay_grading and overeager_* ported, everything
   else in `environments/retired/`
+- [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
+  — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
+  why, what was tried and rejected, where each page lives
 - [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/CLAUDE.md)
   — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
   importer, bramble service
@@ -282,7 +292,7 @@ Current docs:
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
 - [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/CLAUDE.md)
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
-- [ORPHAN: donehack (deleted 2026-10-27, code at 2602d22; ported envs in environments/) — read before reviving is_prime, an envport port or the realism ladder](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/CLAUDE.md)
+- [ORPHAN: donehack (deleted 2026-10-27, code at c7b2e56; ported envs in environments/) — read before reviving is_prime, an envport port or the realism ladder](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/CLAUDE.md)
   — the hardened podman sandbox, run commands, what each file does; results are in the three docs
   below
 - [REFERENCE: donehack endings — read before claiming how episode endings (done tool, submit script, give_up) affect reward hacking](docs/donehack-endings.md)

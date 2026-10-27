@@ -9,7 +9,7 @@ and `donation_bet.goodbad`.
 | Status     | retired                                                                                                                    |
 | Owner      | Kylie                                                                                                                      |
 | Git ref    | `main` @ `7296169`                                                                                                         |
-| Code       | [`evalcue/envs/donation_bet/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/donation_bet/)                                                        |
+| Code       | [`evalcue/envs/donation_bet/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/donation_bet/)                                                        |
 | Run        | `uv run python -m evalcue.run donation_bet.goodbad --tag dev --n 100`                                                      |
 | Docs       | [`docs/envs/donation_bet.md`](../../../docs/envs/donation_bet.md), [`docs/thinking-off.md`](../../../docs/thinking-off.md) |
 | Models run | Qwen3.6-27B (n=1000/arm), GLM 5.3 (n=800/arm); thinking on and off                                                         |

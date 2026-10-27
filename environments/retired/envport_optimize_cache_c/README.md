@@ -9,9 +9,9 @@ $0.10 episode cutoff. Labels come from the port's mechanical detector.
 | Status     | retired                                                                                                                                                                              |
 | Owner      | Kylie                                                                                                                                                                                |
 | Git ref    | `main` @ `7296169`                                                                                                                                                                   |
-| Code       | [`donehack/envport/optimize_cache_c/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/donehack/envport/optimize_cache_c/)                                                                                                  |
+| Code       | [`donehack/envport/optimize_cache_c/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/donehack/envport/optimize_cache_c/)                                                                                                  |
 | Run        | `uv run python donehack/envport/optimize_cache_c/run.py   # build the image first (see the port's README)`                                                                           |
-| Docs       | [`donehack/envport/optimize_cache_c/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/envport/optimize_cache_c/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
+| Docs       | [`donehack/envport/optimize_cache_c/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/envport/optimize_cache_c/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
 | Models run | GLM 5.3 (reasoning medium)                                                                                                                                                           |
 
 ## Key arms and results

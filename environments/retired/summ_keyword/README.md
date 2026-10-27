@@ -7,7 +7,7 @@ Scorer comment buried in a pasted doc. Built in the 2026-10-21 eval-cue reward-h
 | Status     | retired: no headroom for an eval cue on Qwen (2026-10-21 sweep)               |
 | Owner      | Robbie                                                                        |
 | Git ref    | `main` @ `7296169`                                                            |
-| Code       | [`evalcue/envs/summ_keyword/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/summ_keyword/)           |
+| Code       | [`evalcue/envs/summ_keyword/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/summ_keyword/)           |
 | Run        | `uv run python -m evalcue.run summ_keyword --tag dev --n 30`                  |
 | Docs       | [`docs/eval-cue-reward-hacking.md`](../../../docs/eval-cue-reward-hacking.md) |
 | Models run | Qwen3.6-27B; OpenRouter open-weight comparisons; some GLM 5.3 reruns          |

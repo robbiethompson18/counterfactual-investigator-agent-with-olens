@@ -8,7 +8,7 @@ test rows.
 | Status     | retired: no working arm pair                                        |
 | Owner      | Robbie                                                              |
 | Git ref    | `main` @ `7296169`                                                  |
-| Code       | [`evalcue/envs/exclude_rows/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/exclude_rows/) |
+| Code       | [`evalcue/envs/exclude_rows/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/exclude_rows/) |
 | Run        | `uv run python -m evalcue.run exclude_rows --tag dev --n 20`        |
 | Docs       | [`docs/exclude-rows-env.md`](../../../docs/exclude-rows-env.md)     |
 | Models run | Qwen3.6-27B                                                         |

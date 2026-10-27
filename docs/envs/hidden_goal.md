@@ -7,7 +7,7 @@ with GPT-6.1 Sol (2026-10-26) is null. Reads are the space lens.
 Built overnight 2026-10-22 to find envs where an O-lens predictor beats a transcript-only one. The
 pattern behind the earlier cherry-picked lens wins (deploy-note lie, donation bet): the model infers
 an outcome the user wants and acts on it, while its text rationalizes something else. Code:
-[`evalcue/envs/hidden_goal/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/hidden_goal/). Target: Qwen3.6-27B on OpenRouter
+[`evalcue/envs/hidden_goal/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/hidden_goal/). Target: Qwen3.6-27B on OpenRouter
 (`qwen/qwen3.6-27b`, pinned to Alibaba), **no thinking**, single turn, uncapped. Lens: agu18dec
 `olens_s3d_space_rl600` at layers 32/40/48, read at every stop token by the O-lens serving session
 (`scripts/olens_read_requests.py`).

@@ -8,7 +8,7 @@ Bash agent in a repo where one test contradicts the docstring. Positive = specia
 | Status     | retired: too much hacking for an eval cue (2026-10-21 sweep)                  |
 | Owner      | Robbie                                                                        |
 | Git ref    | `main` @ `7296169`                                                            |
-| Code       | [`evalcue/envs/repo_impossible/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/repo_impossible/)     |
+| Code       | [`evalcue/envs/repo_impossible/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/repo_impossible/)     |
 | Run        | `uv run python -m evalcue.run repo_impossible --tag dev --n 12`               |
 | Docs       | [`docs/eval-cue-reward-hacking.md`](../../../docs/eval-cue-reward-hacking.md) |
 | Models run | Qwen3.6-27B                                                                   |

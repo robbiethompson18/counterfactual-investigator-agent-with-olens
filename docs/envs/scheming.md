@@ -15,7 +15,7 @@ until 20:25, then a 65,536-token safety cap), built overnight 2026-10-21 as part
   `<tool_use:forward>` / `<tool_use:cancel_alert>` blocks. Prompts are verbatim, generated with
   their `scripts/generate_prompts.py` (production variant, i.e. no scratchpad, since Qwen thinks
   anyway) into
-  [`evalcue/envs/scheming/data/lynch.json`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/evalcue/envs/scheming/data/lynch.json).
+  [`evalcue/envs/scheming/data/lynch.json`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/evalcue/envs/scheming/data/lynch.json).
 - **In-context scheming**, Meinke et al., Apollo Research (2024),
   [arXiv 2412.04984](https://arxiv.org/abs/2412.04984). Bash agent in Docker. Apollo published the
   system and user prompts and the memo structure (Appendix A) but not the full data files, so the

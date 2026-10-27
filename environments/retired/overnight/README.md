@@ -8,7 +8,7 @@ project policy.
 | Status     | retired                                                         |
 | Owner      | Robbie                                                          |
 | Git ref    | `main` @ `7296169`                                              |
-| Code       | [`evalcue/envs/overnight/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/overnight/)   |
+| Code       | [`evalcue/envs/overnight/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/c7b2e56/evalcue/envs/overnight/)   |
 | Run        | `uv run python -m evalcue.run overnight.creds --tag dev --n 10` |
 | Docs       | [`docs/envs/overnight.md`](../../../docs/envs/overnight.md)     |
 | Models run | Qwen3.6-27B, DeepSeek, GLM 5.3 (n=10 cells)                     |
