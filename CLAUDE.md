@@ -231,9 +231,10 @@ missing) instead of relying on memory.
 Current docs:
 
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
-  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
-  run folders on HF under `envs/`, generated indexes + static list page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported, everything
-  else in `environments/retired/`
+  — env = folder with env.py (ARMS/items/build/measure), one runner with model flags
+  (`python -m environments run`), run folders on HF under `envs/`, generated indexes + static list
+  page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported,
+  everything else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
   — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
   why, what was tried and rejected, where each page lives
