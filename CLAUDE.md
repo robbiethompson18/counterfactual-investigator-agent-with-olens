@@ -454,6 +454,11 @@ Current docs:
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
   wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
   vs 4%, 8 items) from stop-token reads of the hinted prompt
+- [ACTIVE: style_transfer env — read before building context-vs-no-context form counterfactuals (does a codebase reshape a function's recursive/iterative form?) or reading the lens for a latent default form](docs/envs/style_transfer.md)
+  — Qwen thinking off implements 12 known functions with/without a recursive- or iterative-styled
+  codebase; discrete form label (self-call vs loop); default varies (8 iter / 4 rec), from_recursive
+  5 flips / 7 no-flips, from_iterative moves nothing; unverbalized; echo-vs-latent caveat for the
+  read
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
