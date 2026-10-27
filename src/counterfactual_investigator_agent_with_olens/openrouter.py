@@ -11,6 +11,7 @@ backoff. Anything else (`max_tokens`, `tools`, `temperature`, `seed`, `response_
 """
 
 import asyncio
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -61,7 +62,7 @@ async def chat(
     attempts: int = 6,
     **params: Any,
 ) -> ChatCompletion:
-    """One chat completion with thinking on at `effort`. Connection errors, 5xx, 429 and empty-choices responses are retried
+    """One chat completion with thinking on at `effort`. Connection errors, 5xx, 429, empty-choices and non-JSON responses are retried
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
     `extra_body` there is merged over the OpenRouter fields."""
@@ -75,7 +76,7 @@ async def chat(
             if not getattr(r, "choices", None):
                 raise NoChoices(str(r.model_extra)[:500])
             return r
-        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices) as e:
+        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices, json.JSONDecodeError) as e:
             if attempt == attempts - 1 or isinstance(e, APITimeoutError):
                 raise
             await asyncio.sleep(10 * 2**attempt)
