@@ -22,9 +22,10 @@ it the parked NLA and J++ code) was deleted in PR #229 and is at that PR's first
 - **Lens:** the space-lens LoRA through vLLM's LoRA runtime, keys renamed by
   `olens/scripts/lora_for_vllm.py` (the AR's adapter has a third key layout,
   `base_model.model.layers.N._orig_mod.`, which the script now handles). Activations go in as
-  `prompt_embeds`, as `olens.vllm_lens` does. `olens.vllm_bullet_stop.BulletStop`, a vLLM v1 logits
-  processor, forces `<|im_end|>` once a fifth bullet starts, so reads stop at 4 bullets instead of
-  running to the 160-token cap.
+  `prompt_embeds`. No stop rule runs in the engine: the space lens ends its own list at four bullets
+  (97% of reads, the rest at five, none at the 160-token cap), and the reader trims to four. A
+  logits processor that forced `<|im_end|>` at the fifth bullet (`vllm_bullet_stop.py`, deleted
+  2026-10-27) cost 6% per decode step and saved nothing; see "Batch size and BulletStop" below.
 - **AR:** the AR LoRA on the same engine, `[Layer NN] <span>` prompts, residual after the last block
   at the last token, then the final RMSNorm (HF's `last_hidden_state` is post-norm, the hook is
   pre-norm), the AR's layer norm and head. Whitened NNLS as before.
@@ -38,8 +39,8 @@ Setup and run: boot with
 `IMAGE=vllm/vllm-openai:v0.27.1 VOLUMES=<cache volume> NAME=x runpod/qwen_server.sh up 1`, then
 `runpod/olens_reads.sh setup x` and
 `runpod/olens_reads.sh run x REQ TAG --layers 32,40,48 [--max-model-len 131072]`. Code:
-`olens/src/olens/one_engine.py`, `olens/src/olens/vllm_bullet_stop.py`,
-`scripts/olens_read_requests.py`, `scripts/olens_reads_compare.py` (parity between two reads files).
+`olens/src/olens/one_engine.py`, `scripts/olens_read_requests.py`, `scripts/olens_reads_compare.py`
+(parity between two reads files).
 
 ## Benchmark (2026-10-26, 18:32 to 19:24 PDT, two 1x H200 pods, 1.76 GPU-hours)
 
@@ -134,9 +135,27 @@ recurrent decode of Qwen3.6's hybrid stack; that is vLLM's kernel, not ours. Dec
 (4.4k tokens/s × 54 GFLOP against 989 TFLOP/s), AR ~37%, capture ~44%, blended ~29%.
 
 What is left to gain in our code is small: dropping the AR stage (`--batch-reads` worth of decodes
-alone run at the decode rate, ~32 reads/s), hiding the CPU-side NNLS and JSON writes (~5%) behind
-the next batch's prompt prep, and larger `--batch-reads` in merge mode to amortise the publishes.
-Going past ~4.5k tokens/s on one H200 means a faster GDN decode kernel in vLLM, fewer tokens per
-read, or more GPUs. Memory: one weight copy, 63 GB of KV, `max_num_seqs` 512 at
-`gpu_memory_utilization` 0.88; each concurrent decode also needs a linear-attention state block, so
-1024 does not fit (and would not help, given the curve above).
+alone run at the decode rate, ~32 reads/s). The CPU side is not worth hiding: the 470 NNLS fits and
+1,500 JSON records of a batch take 0.12 s on a laptop against a ~25 s batch (0.5%). Going past ~4.5k
+tokens/s on one H200 means a faster GDN decode kernel in vLLM, fewer tokens per read, or more GPUs.
+Memory: one weight copy, 63 GB of KV, `max_num_seqs` 512 at `gpu_memory_utilization` 0.88; each
+concurrent decode also needs a linear-attention state block, so 1024 does not fit (and would not
+help, given the curve above).
+
+## Batch size and BulletStop (2026-10-27, logs in `runs/olens_reads/2026-10-27_merge-v1`)
+
+**Two scheduler waves per generate are slower, not faster.** `--batch-reads 470` vs `940`
+(`--batch-transcripts 512`, LoRA runtime) on the same 40 cot-r3 transcripts (~630 reads each at
+layers 32/40/48), 10 transcripts per segment: 19.3 reads/s at 470 (one transcript per batch) vs 18.2
+at 940 (two per batch), the decode stage 8% slower and the AR unchanged (`batch-ab470.log`,
+`batch-ab940.log`). The probe's hope that continuous batching would refill the thinning tail of the
+first wave did not survive the scheduler. The default stays 470.
+
+**The lens does not need a stop rule.** `bullet_probe.py` on 470 real layer-32 activations (merged
+engine): with no stop rule and the 160-token cap, the space lens ends its list at four bullets in
+455 to 459 of 470 reads, at five in the rest, and never reaches the cap, mean 107 tokens; the
+BulletStop logits processor got the same reads in 12.6 to 13.2 s vs 12.2 to 12.4 s without it. At
+fixed length it costs 7 ms of a 107 ms step (115 vs 107) even after moving its string work to
+precomputed per-token flags, so the cost is the per-step Python over 470 rows (and vLLM running a
+non-argmax-invariant processor), not the string scanning. Deleted; the reader trims reads to four
+bullets in text, as before. Expected gain ~5% on the decode stage, not yet measured end to end.

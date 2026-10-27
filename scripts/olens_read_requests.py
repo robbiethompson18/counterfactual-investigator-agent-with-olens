@@ -6,10 +6,11 @@ Runs on a GPU pod set up by `runpod/olens_reads.sh setup` (vllm/vllm-openai:v0.2
 
     PYTHONPATH=olens/src python scripts/olens_read_requests.py REQUESTS.jsonl OUT.jsonl [--layers 24,32,40,48,56]
 
-Many transcripts per step, so every engine call is one big batch (a decode step costs the same for 15 sequences as for
-500): capture every new read position of up to --batch-reads reads in one generate, decode them in one generate (one
-scheduler wave under max_num_seqs), score every bullet in one AR generate, then write per transcript. Reads of a prefix
-already seen (in the cache or earlier in the batch) are copied. docs/olens-one-engine-reader.md has the numbers.
+Many transcripts per step, so every engine call is one big batch (a decode step at batch 128 costs a third of one at
+470, and the engine idles between calls): capture every new read position of up to --batch-reads reads in one generate,
+decode them in one generate (one scheduler wave under max_num_seqs; two waves per generate measured 8% slower,
+docs/olens-one-engine-reader.md), score every bullet in one AR generate, then write per transcript. Reads of a prefix
+already seen (in the cache or earlier in the batch) are copied.
 
 REQUESTS.jsonl: one transcript per line, {id, messages (OpenAI chat format; assistant turns may carry reasoning_content
 and tool_calls), tools ("evalcue.harness.BASH_TOOL" or a list of tool schemas), priority?, env?, arm?}. Rows are read in
@@ -170,7 +171,7 @@ def main():
     # each concurrent decode needs a linear-attention state block as well as KV; 1024 does not fit an H200 at 0.88
     ap.add_argument("--max-seqs", type=int, default=512, help="vLLM max_num_seqs")
     ap.add_argument("--max-model-len", type=int, default=32768, help="longest transcript the engine captures")
-    ap.add_argument("--batch-reads", type=int, default=470, help="new reads per engine batch, under --max-seqs: one scheduler wave")
+    ap.add_argument("--batch-reads", type=int, default=470, help="new reads per engine batch, under --max-seqs: one wave (2x: 8% slower)")
     ap.add_argument("--batch-transcripts", type=int, default=128, help="most transcripts per batch")
     ap.add_argument("--lora-mode", default="runtime", choices=("runtime", "merge"), help="vLLM LoRA kernels, or merge_lora per stage")
     ap.add_argument("--debug", action="store_true")

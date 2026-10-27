@@ -11,9 +11,8 @@ deleted 2026-10-27; it is at PR #229's first commit.
 
 ```
 src/olens/lens.py             the AO's read contract: carrier prompt, marker, alpha, bullet parsing, Sampling
-src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds,
-                              BulletStop), ar (AR LoRA + final norm + head), one vLLM 0.27.1 engine
-src/olens/vllm_bullet_stop.py vLLM logits processor: force <|im_end|> once a (k+1)-th bullet starts
+src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds), ar
+                              (AR LoRA + final norm + head), one vLLM 0.27.1 engine
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
 src/olens/provenance.py       reads.provenance.json next to a batch of reads: lens, AR, whitener, revisions, sampling
 src/olens/vectors.py          probe / steering directions in an HF model's residual stream (no caller since 2026-10-26)

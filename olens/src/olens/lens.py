@@ -25,7 +25,7 @@ class Sampling:
     top_p: float = 0.95
     top_k: int = 64
     max_new_tokens: int = 160
-    max_bullets: int | None = None  # stop a row once this many bullet lines are complete
+    max_bullets: int | None = None  # keep only the first k bullet lines of a read (the space lens writes 4, sometimes 5)
 
 
 GREEDY = Sampling()  # default for read(); never mutated

@@ -9,7 +9,7 @@ activation through `prompt_embeds` (the lens overwrites one input embedding, so 
 
 Jobs, all on the base checkpoint:
   capture(ids, layers, positions)  no LoRA, max_tokens=1, residual after block L at the stop tokens
-  read_items(vecs, layers)         lens LoRA, prompt_embeds with alpha*h/|h| at the marker, stop after k bullets (BulletStop)
+  read_items(vecs, layers)         lens LoRA, prompt_embeds with alpha*h/|h| at the marker; the lens ends its own list at 4 bullets
   ar(spans, layers)                AR LoRA, `[Layer NN] <span>`, residual after the last block at the last token, then the
                                    final RMSNorm (HF's last_hidden_state), the AR's layer norm and head
 """
@@ -55,8 +55,6 @@ class OneEngine(AguLens):
         from vllm import LLM
         from vllm.lora.request import LoRARequest
 
-        from .vllm_bullet_stop import BulletStop
-
         self.tok, self._carriers, self.debug, self.merge = tok, {}, debug, lora_mode == "merge"
         assert lora_mode in ("runtime", "merge"), lora_mode
         d = Path(base) if Path(base).exists() else Path(snapshot_download(base))
@@ -81,7 +79,6 @@ class OneEngine(AguLens):
             gpu_memory_utilization=gpu_memory_utilization,
             max_num_seqs=max_num_seqs,
             enable_prefix_caching=False,
-            logits_processors=[BulletStop],
             # the default FlashInfer GDN prefill (CuTeDSL JIT) never returned on a 98k-token single-chunk prefill (12 min at
             # 60% GPU, 2026-10-27); triton does it in 11 s. Prefill is ~2% of the reader's time, so nothing is lost on short ones.
             gdn_prefill_backend="triton",
@@ -192,7 +189,9 @@ class OneEngine(AguLens):
 
     @torch.no_grad()
     def read_items(self, vecs, layers, sampling=GREEDY, n=1, seed=0):
-        """vecs [B, d] at layers [B] -> [B][n] strings, one generate; the lens LoRA; BulletStop ends each at k bullets."""
+        """vecs [B, d] at layers [B] -> [B][n] strings, one generate with the lens LoRA, trimmed to sampling.max_bullets. The space
+        lens stops itself at 4 bullets 97% of the time and never reaches the 160-token cap, so no stop rule runs in the engine
+        (a logits processor that forced <|im_end|> at the 5th bullet cost 6% per step for nothing; docs/olens-one-engine-reader.md)."""
         from vllm import SamplingParams
 
         greedy = sampling.temperature <= 0
@@ -203,7 +202,6 @@ class OneEngine(AguLens):
             top_p=1.0 if greedy else sampling.top_p,
             top_k=-1 if greedy else sampling.top_k,
             seed=None if greedy else seed,
-            extra_args={"max_bullets": sampling.max_bullets} if sampling.max_bullets else None,
         )
         outs = self._gen([self._embeds(L, v) for v, L in zip(vecs, layers)], params, lora=self.lens_req)
         return [[self._finish(c.text, sampling) for c in o.outputs] for o in outs]
