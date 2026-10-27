@@ -60,6 +60,9 @@ async def main():
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
+    ap.add_argument(
+        "--base-positive", action="store_true", help="show only base-arm runs that showed the behavior (answer task: hint followers)"
+    )
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
@@ -157,6 +160,8 @@ async def main():
     for env_name, env in envs:
         for base_arm, cf_arm in pairs:
             base, cf = env.rollouts(base_arm, args.model), env.rollouts(cf_arm, args.model)
+            if args.base_positive:  # e.g. hint_mcq's answer task: a base run that ignored the hint shows the own answer in the index
+                base = [r for r in base if r.label]
             assert base and cf, f"{env_name} {base_arm}->{cf_arm}: no rollouts of {args.model} ({len(base)}, {len(cf)}); check --model"
             case = {"env": env_name, "model": args.model, "task": args.task, "base_arm": base_arm, "cf_arm": cf_arm}
             if args.task == "answer":
