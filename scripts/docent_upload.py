@@ -4,12 +4,14 @@
 # ///
 """Mirror run dirs into Docent (https://docent.transluce.org) as public collections, so every transcript has a link.
 
-evalcue-harness runs (rows.jsonl) go to one collection per env, cfbench runs (predictions.jsonl) to "cfbench". Each upload
+evalcue-harness runs (rows.jsonl) go to one collection per env, cfbench runs (predictions.jsonl) to "cfbench", and
+environments/ run folders (data/envs/ENV/RUN, `upload-env`) to the collection named ENV. Each upload
 writes docent.json into the run dir: {"collection_id", "runs": [Docent agent run id for each line, null for skipped rows]}.
 runs.finish() runs this before the HF sync, so docent.json ships with the run. Docent's SDK pulls ~90 packages, so this
 script carries its own deps (PEP 723) instead of adding them to the project: always run it with `uv run --script`.
 
     uv run --script scripts/docent_upload.py upload RUN [RUN ...]   # skips runs that already have docent.json
+    uv run --script scripts/docent_upload.py upload-env data/envs/ENV/RUN [...]   # environments/ runs; the runner calls this
     uv run --script scripts/docent_upload.py backfill               # every local run dir without docent.json
     uv run --script scripts/docent_upload.py link ENV/RUN:LINE      # cfbench's `shown` format, LINE 0-based
     uv run --script scripts/docent_upload.py view ENV arm=X positive=true   # saved filter -> shareable filtered-table URL
@@ -154,6 +156,43 @@ def upload(run: Path) -> bool:
     return True
 
 
+def upload_env_run(run: Path) -> bool:
+    """One environments/ run folder (data/envs/ENV/RUN) -> the ENV collection. Writes docent.json {"collection_id", "runs":
+    {episode id: agent run id}}; `environments` merges it into the episodes. Errored episodes are skipped."""
+    if (run / "docent.json").exists():
+        return False
+    meta = json.loads((run / "meta.json").read_text())
+    if meta["status"] == "running":
+        return False
+    labels = {}
+    files = sorted((run / "labels").glob("measure@*.jsonl"), key=lambda f: f.stat().st_mtime)
+    if files:
+        labels = {r["episode"]: r["values"] or {} for r in map(json.loads, files[-1].read_text().splitlines())}
+    target = meta.get("target") or {}
+    ids, agent_runs = [], []
+    for shard in sorted((run / "episodes").glob("*.jsonl")):
+        for line in shard.read_text().splitlines():
+            ep = json.loads(line)
+            if ep.get("error") or not ep.get("messages"):
+                continue
+            metadata = {
+                **labels.get(ep["id"], {}),
+                "arm": ep["arm"], "item": ep["item"], "sample": ep["sample"], "model": target.get("model"),
+                "thinking": target.get("thinking"), "finish": ep.get("finish"), "source": f"envs/{run.parent.name}/{run.name}:{ep['id']}",
+                "run_description": meta.get("description"),
+            }  # fmt: skip
+            transcript = Transcript(messages=messages(ep["messages"]))
+            agent_runs.append(AgentRun(name=f"{ep['arm']} {ep['item']} #{ep['sample']}", transcripts=[transcript], metadata=metadata))
+            ids.append(ep["id"])
+    cid = collection_id(run.parent.name)
+    for i in range(0, len(agent_runs), 500):
+        client().add_agent_runs(cid, agent_runs[i : i + 500])
+    runs = {e: r.id for e, r in zip(ids, agent_runs, strict=True)}
+    (run / "docent.json").write_text(json.dumps({"collection_id": cid, "runs": runs}) + "\n")
+    print(f"{run}: {len(agent_runs)} episodes -> {WEB}/dashboard/{cid}")
+    return True
+
+
 def view(collection: str, conditions: list[str]) -> str:
     """Save a filter ANDing `key=value` metadata conditions (values parsed as JSON when they can be) and return its URL."""
     filters = []
@@ -176,6 +215,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("upload").add_argument("runs", type=Path, nargs="+")
+    sub.add_parser("upload-env").add_argument("runs", type=Path, nargs="+")
     sub.add_parser("backfill")
     sub.add_parser("link").add_argument("source", help="ENV/RUN:LINE, e.g. shutdown_palisade/2026-10-22_r15_catch_words:3")
     p = sub.add_parser("view")
@@ -191,6 +231,10 @@ def main():
     if args.cmd == "upload":
         for run in args.runs:
             upload(run)
+        return
+    if args.cmd == "upload-env":
+        for run in args.runs:
+            upload_env_run(run)
         return
     # cfbench last: its predictions link to the env rows they showed the predictor
     uploaded = [upload(run) for run in sorted(ROOT.glob("*/*/"), key=lambda p: (p.parent.name == "cfbench", p))]

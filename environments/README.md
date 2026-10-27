@@ -60,7 +60,7 @@ uv run python -m environments run ENV --tag dev --arms base,core --items 0:4 --n
 uv run python -m environments run ENV --pair realism --model Qwen/Qwen3.6-27B --served-name qwen \
     --backend vllm --url $QWEN_VLLM_URL --thinking off
 uv run python -m environments index            # rebuild data/envs/<env>/index.json and data/envs/index.json
-uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/
+uv run python -m environments upload ENV/RUN   # Docent, then one HF commit: the run folder + its indexes, under envs/
 ```
 
 - Backends: `vllm` (any OpenAI-compatible URL), `openrouter` (`--provider` pins one provider, no
@@ -70,6 +70,12 @@ uv run python -m environments upload ENV/RUN   # one HF commit: the run folder +
   sent (medium); episode caps in turns and prompt tokens (`CAPS`, `--max-turns`,
   `--max-prompt-tokens`), never dollars. An env's `REQUIRES` (e.g. `{"thinking": False}`) refuses
   conflicting flags unless `--override KEY`, which is recorded.
+- Concurrency: `--conc` (default 128) episodes in flight; episodes that start a podman box are also
+  capped by `--box-conc` (default 16), since podman degrades past a few dozen sandboxes.
+- `--upload` (and `upload ENV/RUN`) first uploads the episodes to the Docent collection named after
+  the env (via `scripts/docent_upload.py upload-env`; key from `DOCENT_API_KEY` or a gitignored
+  `docent.key`), writes `docent_run` / `docent_url` into each episode and `docent_collection` into
+  `meta.json`, then syncs to HF. `--no-docent` skips Docent.
 - Every model call records the provider that served it; the run's `meta.json` records the target,
   git sha, caps, date and overrides.
 - **Hard rule: the target model never gets the network or the host.** Every sandbox is podman
@@ -102,5 +108,4 @@ arm's primary measure pooled over runs and per run, and transcripts with their D
 ## Not built yet (add when an env needs it)
 
 Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
-presets, arm factor dicts, Parquet episodes, regrading in a fresh container, Docent upload for new
-runs (converted runs keep theirs), and a richer env browser.
+presets, Parquet episodes, regrading in a fresh container, and a richer env browser.

@@ -29,6 +29,7 @@ outputs/
 
 # Hugging Face token (local only)
 hf.key
+docent.key
 
 # realism runs and problem copies (data, not code)
 donehack/realism/runs/
