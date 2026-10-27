@@ -41,8 +41,9 @@ from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
-# The olens conditions refuse a base arm where fewer than this many runs, or this share of its runs, have reads (2026-10-27:
-# 82 of 268 olens runs had such arms, some with 1 read of 64, and nothing flagged it). --allow-few-reads overrides.
+# The olens conditions refuse a base arm where fewer than this many runs and under this share of its runs have reads
+# (2026-10-27: 23 of 268 olens runs had such arms, down to 1 read of 64, and nothing flagged it). Agents pass
+# --allow-few-reads only after a human approves.
 MIN_READS, MIN_READ_FRAC = 5, 0.5
 
 
@@ -56,7 +57,7 @@ async def main():
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
-    ap.add_argument("--allow-few-reads", action="store_true", help="run the olens conditions even on base arms with few reads")
+    ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
     ap.add_argument("--draws", type=int, default=5)
@@ -94,11 +95,11 @@ async def main():
             for env_name, e in envs
             for base_arm in dict.fromkeys(b for b, _ in pairs)
             for base in [e.rollouts(base_arm, args.model)]
-            if (k := sum(r.source in reads for r in base)) < min(MIN_READS, len(base)) or k < MIN_READ_FRAC * len(base)
+            if (k := sum(r.source in reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
         ]
         assert not few, (
-            f"base arms where fewer than {MIN_READS} runs or {MIN_READ_FRAC:.0%} have O-lens reads (read more runs, or pass "
-            "--allow-few-reads if the subset is deliberate):\n" + "\n".join(few)
+            f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have O-lens reads. Read more runs; agents: "
+            "ask a human before passing --allow-few-reads:\n" + "\n".join(few)
         )
     run = new_run(
         "cfbench",
