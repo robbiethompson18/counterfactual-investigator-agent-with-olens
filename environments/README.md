@@ -58,7 +58,7 @@ uv run python -m environments run ENV --tag dev --arms base,core --items 0:4 --n
 uv run python -m environments run ENV --pair realism --model Qwen/Qwen3.6-27B --served-name qwen \
     --backend vllm --url $QWEN_VLLM_URL --thinking off
 uv run python -m environments index            # rebuild data/envs/<env>/index.json and data/envs/index.json
-uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/
+uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/ (re-upload, or a --no-upload run)
 ```
 
 - Backends: `vllm` (any OpenAI-compatible URL), `openrouter` (`--provider` pins one provider, no
@@ -85,9 +85,16 @@ blobs/<sha256>                 file contents, stored once
 labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind"}; measure() is the labeler "measure"; never overwritten
 ```
 
+A run finishes the way `scripts/runs.py finish` did: the runner mirrors its episodes to Docent
+(`scripts/docent_upload.py`, when `DOCENT_API_KEY` is set; otherwise it prints the backfill command
+and goes on), which writes `docent_collection` into `meta.json` and `docent_run` / `docent_url` onto
+every episode, then uploads the run folder and its indexes to HF. `--no-upload` skips the HF step
+(upload later with `environments upload ENV/RUN`). Ctrl-C finishes the run as `abandoned` and still
+uploads it: a run isn't finished until it's on HF, abandoned ones included.
+
 A finished run is immutable: new labels or a rescore go in a new labels file. Converted runs say
-`converted_from: <old path>` in `meta.json` and keep `docent_run` / `docent_url` on every episode.
-LLM-judge labels are `kind: judge` and are never a pair's measure.
+`converted_from: <old path>` in `meta.json` and keep the Docent ids their rows had. LLM-judge labels
+are `kind: judge` and are never a pair's measure.
 
 ## List page
 
@@ -100,5 +107,5 @@ arm's primary measure pooled over runs and per run, and transcripts with their D
 ## Not built yet (add when an env needs it)
 
 Jinja templates and `envs render` / `envs check`, structured pair edits that a check can verify,
-presets, arm factor dicts, Parquet episodes, regrading in a fresh container, Docent upload for new
-runs (converted runs keep theirs), and a richer env browser.
+presets, arm factor dicts, Parquet episodes, regrading in a fresh container, and a richer env
+browser.
