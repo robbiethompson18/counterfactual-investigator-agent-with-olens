@@ -185,9 +185,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
   effort `medium` by default, so tool uplift isn't swamped by agent strength.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
-  Pages that reads the public HF dataset; search is a JavaScript regex over the loaded run; reads
-  are batch jobs whose outputs land on HF. Nothing on bramble, no tailnet URLs in docs or messages,
-  no SkyPilot pod behind a button. See [docs/viewers.md](docs/viewers.md).
+  Pages or the repo's GitHub Pages site that reads the public HF dataset; search is a JavaScript
+  regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
+  tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
+  [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
   in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
   four.
@@ -241,8 +242,8 @@ Current docs:
   page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported,
   everything else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
-  — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
-  why, what was tried and rejected, where each page lives
+  — the rule (static page on Cloudflare or GitHub Pages reading public HF, regex in the browser, no
+  backend), why, what was tried and rejected, where each page lives
 - [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/CLAUDE.md)
   — run format, `Run`/`call`/`read`, `index.jsonl`, deep links, the static page on Cloudflare Pages
   reading HF, in-browser regex search with echo filters, Celeste importer, `deploy.sh`

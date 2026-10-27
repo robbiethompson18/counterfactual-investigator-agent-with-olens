@@ -1,6 +1,6 @@
 # Publishes the env viewer (environments/_lib/page.html) to GitHub Pages on every push to main that changes it.
 # The page reads envs/ on the public HF dataset and source from GitHub, so only the HTML is deployed.
-# One-time setup (repo admin): Settings -> Pages -> Source: GitHub Actions.
+# Pages source is GitHub Actions (enabled 2026-10-27). Each deploy replaces the whole site: add other pages to site/ here.
 name: env viewer pages
 on:
   push:
