@@ -138,8 +138,9 @@ tokens = {
   (think, cot) / tool (observation) / assistant (reply, answer) in it. Chat special tokens
   (`<|im_start|>`, `<think>`) are shown dimmed.
 - **Reads** are keyed by token position. `lines` are `[text]` or `[text, score]`. A read with
-  `"inline": true` is the peek shown next to its token; without any, the first reader is. Clicking a
-  token expands every reader there.
+  `"inline": true` is the peek shown next to its token; without any, the first reader is. Peeks show
+  the first 8 characters of line one by default (the "chars" box in the toolbar changes it, per
+  browser; hovering a peek shows the whole line). Clicking a token expands every reader there.
 - Optional: `"filter": true` + `"score"` on a read and `"min_score"` on the object add a min-score
   box (e.g. FVE).
 - `run.json` `readers: {"O-lens": {"about": "markdown", "color": "#2f5d8a"}}` documents each reader
