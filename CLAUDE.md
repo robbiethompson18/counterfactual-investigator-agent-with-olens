@@ -255,7 +255,8 @@ Current docs:
   confession follow-ups and thinking resamples, `publish.py` build/preview/upload, deploy, the
   batch-reads format gap, where the deleted live viewer (server, queue, fleet, case page) is
 - [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
-  — hook-LoRA loaders, capture, AR, whitened FVE conventions
+  — the one-engine reader's modules (carrier prompt, OneEngine, bullet stop, whitened FVE,
+  provenance), conventions, what the deleted HF path was
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
   — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
   translate); 8 Qwen resamples explain as much as the lens at deep layers; code on a closed branch
@@ -489,6 +490,10 @@ Current docs:
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
   vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
+  — the only reader since 2026-10-27: vLLM 0.27.1 + vllm-metamodels serve capture, lens LoRA and AR
+  LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
+  bullet-stop at 4; long-transcript parity, LoRA runtime vs merge_lora, what still limits it
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas

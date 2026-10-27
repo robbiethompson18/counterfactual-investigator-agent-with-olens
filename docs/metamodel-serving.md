@@ -30,11 +30,12 @@ it; it may be enough to contribute the Qwen3.6 recipe there.
 - [kitft/nla-inference](https://github.com/kitft/nla-inference) (2026): the NLA paper's inference
   client. It uses SGLang `input_embeds` (embedding-replacement NLAs) and covers Qwen2.5 / Gemma 3 /
   Llama 3.3 only, not Qwen3.6.
-- In this repo: `olens/src/olens/vllm_lens.py` (the O-lens on vLLM via prompt embeds, which works
-  because the O-lens replaces an input embedding) and `olens/src/olens/vllm_nla.py` (the NLA AV on
-  vLLM via vllm-metamodels, which it needs because the ceselder NLA injects at block 1's output).
-  Searched agu18dec, camilablank, ceselder, asherps and kitft on GitHub: nobody has a served O-lens
-  or Qwen3.6 NLA endpoint besides these.
+- In this repo: `olens/src/olens/one_engine.py` (the O-lens on vLLM via prompt embeds, which works
+  because the O-lens replaces an input embedding; capture and the AR through vllm-metamodels'
+  hooks). Until 2026-10-27 `vllm_lens.py` served a merged-lens checkpoint and `vllm_nla.py` the
+  ceselder NLA AV on vllm-metamodels (it injects at block 1's output); both deleted with the HF
+  path, last at PR #229's first commit. Searched agu18dec, camilablank, ceselder, asherps and kitft
+  on GitHub: nobody has a served O-lens or Qwen3.6 NLA endpoint besides these.
 
 ## Gotchas
 
@@ -78,8 +79,8 @@ Measured on 1x H200, vLLM 0.32, 792 greedy lens reads (6 chat prompts x 12 end-o
 | merged weights (reference) | 100%       | 100%       | 100%        | 41.2    |
 
 Raw keys also match base Qwen's text exactly on 430/792: the adapter does nothing. The renamed
-LoRA's misses are bf16 noise (HF vs vLLM-merged agree on ~80% of first bullets,
-`olens/src/olens/vllm_lens.py`). LoRA decodes ~19% slower than merged weights here.
+LoRA's misses are bf16 noise (HF vs vLLM-merged agree on ~80% of first bullets). LoRA decodes ~19%
+slower than merged weights here.
 
 So the shared Qwen server could serve the lens (and organisms) as adapters:
 `--enable-lora --max-lora-rank 16 --lora-modules olens=<renamed dir> --enable-prompt-embeds`. vLLM
