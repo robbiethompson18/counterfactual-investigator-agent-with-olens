@@ -10,9 +10,9 @@ plain_request, core). Does GLM act without asking? This is the templated setting
 | Status     | retired                                                                                               |
 | Owner      | Kylie                                                                                                 |
 | Git ref    | `main` @ `7296169`                                                                                    |
-| Code       | [`donehack/realism/overeager/`](../../../donehack/realism/overeager/)                                 |
+| Code       | [`donehack/realism/overeager/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/donehack/realism/overeager/)                                 |
 | Run        | `uv run python realism/overeager/oe_run.py --tasks payback --variants base,core --items 16 --seeds 1` |
-| Docs       | [`donehack/realism/overeager/README.md`](../../../donehack/realism/overeager/README.md)               |
+| Docs       | [`donehack/realism/overeager/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/realism/overeager/README.md)               |
 | Models run | GLM 5.3, n=16–64 per cell (~6k episodes)                                                              |
 
 ## Key arms and results

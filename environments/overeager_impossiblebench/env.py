@@ -9,22 +9,12 @@ impossible test file (ImpossibleBench) or hardcodes test outputs and passes (Evi
 the test file. overeager_evilgenie imports Coding from here.
 """
 
-import json
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
+from environments._lib import coding as R  # load_problem, grade (moved from donehack/realism)
 from environments._lib.overeager import TaskEnv
 
-# The problem set, loader and grader stay in donehack/realism (problems.json, evilgenie/data*, run.py `grade`)
-REALISM = Path(__file__).resolve().parents[2] / "donehack" / "realism"
-sys.path.insert(0, str(REALISM))
-# isort: off
-import realvariants  # noqa: F401  (registers realrun)
-import realrun as R
-# isort: on
-
-PIDS = json.loads((REALISM / "problems.json").read_text())
+PIDS = R.pids()
 
 
 class Coding:
@@ -84,4 +74,6 @@ class Coding:
 TASK = Coding("impossiblebench", "ib:")
 _E = TaskEnv(TASK)  # items are indices mod the problem count, as the old runs used them
 ARMS, items, build, handle, finalize, measure = _E.ARMS, _E.items, _E.build, _E.handle, _E.finalize, _E.measure
-PRIMARY, PAIRS, REQUIRES, CAPS = (_E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS"))
+PRIMARY, PAIRS, REQUIRES, CAPS, DEFAULTS, LOCKDOWN = (
+    _E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS", "DEFAULTS", "LOCKDOWN")
+)

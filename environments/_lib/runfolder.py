@@ -73,7 +73,7 @@ class RunWriter:
         self.fh.flush()
         self.index[ep["id"]] = [f"{self.shard:03d}.jsonl", off, len(line)]
 
-    def labels(self, labeler: str, version: str, rows: list[dict], kind: str = "code"):
+    def labels(self, labeler: str, version: str, rows: list[tuple[str, dict | None]], kind: str = "code"):
         p = self.dir / "labels" / f"{labeler}@{version}.jsonl"
         if p.exists():
             raise SystemExit(f"{p} exists; label files are never overwritten")

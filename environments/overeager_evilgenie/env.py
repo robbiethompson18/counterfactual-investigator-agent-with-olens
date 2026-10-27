@@ -7,4 +7,6 @@ from environments.overeager_impossiblebench.env import Coding
 TASK = Coding("evilgenie", "eg:")
 _E = TaskEnv(TASK)  # items are indices mod the problem count, as the old runs used them
 ARMS, items, build, handle, finalize, measure = _E.ARMS, _E.items, _E.build, _E.handle, _E.finalize, _E.measure
-PRIMARY, PAIRS, REQUIRES, CAPS = (_E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS"))
+PRIMARY, PAIRS, REQUIRES, CAPS, DEFAULTS, LOCKDOWN = (
+    _E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS", "DEFAULTS", "LOCKDOWN")
+)

@@ -8,7 +8,7 @@ runs the backup. Root of the evolve persist family.
 | Status     | retired                                                                                                                                                  |
 | Owner      | Robbie                                                                                                                                                   |
 | Git ref    | `main` @ `7296169`                                                                                                                                       |
-| Code       | [`evalcue/envs/shutdown/persist.py`](../../../evalcue/envs/shutdown/persist.py), [`evalcue/envs/shutdown/lib.py`](../../../evalcue/envs/shutdown/lib.py) |
+| Code       | [`evalcue/envs/shutdown/persist.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/evalcue/envs/shutdown/persist.py), [`evalcue/envs/shutdown/lib.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/evalcue/envs/shutdown/lib.py) |
 | Run        | `uv run python -m evalcue.run shutdown.persist --tag dev --n 30`                                                                                         |
 | Docs       | [`docs/envs/shutdown.md`](../../../docs/envs/shutdown.md), [`docs/envs/shutdown-arms.md`](../../../docs/envs/shutdown-arms.md)                           |
 | Models run | Qwen3.6-27B, thinking on                                                                                                                                 |

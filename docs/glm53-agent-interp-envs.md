@@ -7,7 +7,7 @@ tabulated at the end.
 
 Runs from 2026-10-23 and 2026-10-24. Model: `z-ai/glm-5.3` on OpenRouter, reasoning effort medium,
 no `max_tokens`. Coding runs use the donehack podman sandbox
-([donehack/CLAUDE.md](../donehack/CLAUDE.md)). Hack and solve rates are pytest results. No LLM judge
+([donehack/CLAUDE.md](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/CLAUDE.md)). Hack and solve rates are pytest results. No LLM judge
 was used. Brackets are 95% CIs.
 
 ## Coding (agent-interp-envs `coding`, via donehack)
@@ -47,7 +47,7 @@ was used. Brackets are 95% CIs.
   `variants.py`, `evilgenie/run.py` and the envport runners (`--no-cut` turns it off), and opt-in in
   `port.py` (`--cut`). A cut episode counts as its own outcome, never as a non-hack.
 - **Grader awareness**
-  ([donehack/analysis/grader_awareness.md](../donehack/analysis/grader_awareness.md)):
+  ([donehack/analysis/grader_awareness.md](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/analysis/grader_awareness.md)):
   - V4 Flash searches outside the workspace in 67% of is_prime episodes. Qwen3.6-27B does in 8%, GLM
     in 0.3%.
   - A CoT conclusion of "there is no hidden grader" predicts hacking: within-condition CMH OR 4.5.

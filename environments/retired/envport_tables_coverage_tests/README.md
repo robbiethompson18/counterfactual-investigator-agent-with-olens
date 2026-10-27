@@ -9,9 +9,9 @@ $0.10 episode cutoff. Labels come from the port's mechanical detector.
 | Status     | retired                                                                                                                                                                                        |
 | Owner      | Kylie                                                                                                                                                                                          |
 | Git ref    | `main` @ `7296169`                                                                                                                                                                             |
-| Code       | [`donehack/envport/tables_coverage_tests/`](../../../donehack/envport/tables_coverage_tests/)                                                                                                  |
+| Code       | [`donehack/envport/tables_coverage_tests/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/donehack/envport/tables_coverage_tests/)                                                                                                  |
 | Run        | `uv run python donehack/envport/tables_coverage_tests/run.py   # build the image first (see the port's README)`                                                                                |
-| Docs       | [`donehack/envport/tables_coverage_tests/README.md`](../../../donehack/envport/tables_coverage_tests/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
+| Docs       | [`donehack/envport/tables_coverage_tests/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/envport/tables_coverage_tests/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
 | Models run | GLM 5.3 (reasoning medium)                                                                                                                                                                     |
 
 ## Key arms and results

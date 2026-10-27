@@ -8,7 +8,7 @@ Status line claims success.
 | Status     | retired: Qwen almost never lies (no headroom)                                                 |
 | Owner      | Robbie                                                                                        |
 | Git ref    | `main` @ `7296169`                                                                            |
-| Code       | [`evalcue/envs/hidden_goal/deploy_note.py`](../../../evalcue/envs/hidden_goal/deploy_note.py) |
+| Code       | [`evalcue/envs/hidden_goal/deploy_note.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/evalcue/envs/hidden_goal/deploy_note.py) |
 | Docs       | [`docs/envs/hidden_goal.md`](../../../docs/envs/hidden_goal.md)                               |
 | Models run | Qwen3.6-27B                                                                                   |
 

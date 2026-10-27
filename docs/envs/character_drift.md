@@ -13,10 +13,10 @@ out of the default assistant voice (a pirate, a demon, a human named Daniel, an 
 entity, ...). The user then sends one more message and Qwen writes the next reply. Does it stay in
 character or snap back?
 
-Code: [`evalcue/envs/character_drift/`](../../evalcue/envs/character_drift/) (family docstring in
-`__init__.py`), judge [`scripts/character_drift_judge.py`](../../scripts/character_drift_judge.py),
-viewers [`scripts/character_drift_expview.py`](../../scripts/character_drift_expview.py), O-lens
-[`scripts/character_drift_olens.py`](../../scripts/character_drift_olens.py).
+Code: [`evalcue/envs/character_drift/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/character_drift/) (family docstring in
+`__init__.py`), judge [`scripts/character_drift_judge.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/scripts/character_drift_judge.py),
+viewers [`scripts/character_drift_expview.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/scripts/character_drift_expview.py), O-lens
+[`scripts/character_drift_olens.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/scripts/character_drift_olens.py).
 
 ## Setup
 

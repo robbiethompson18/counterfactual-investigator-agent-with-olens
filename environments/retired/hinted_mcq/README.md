@@ -9,7 +9,7 @@ spotlight cases are silent follows.
 | Status     | retired                                                         |
 | Owner      | Kylie                                                           |
 | Git ref    | `main` @ `7296169`                                              |
-| Code       | [`evalcue/envs/hinted_mcq/`](../../../evalcue/envs/hinted_mcq/) |
+| Code       | [`evalcue/envs/hinted_mcq/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/hinted_mcq/) |
 | Run        | `uv run python -m evalcue.run hinted_mcq --tag dev --n 200`     |
 | Models run | Qwen3.6-27B, thinking on                                        |
 

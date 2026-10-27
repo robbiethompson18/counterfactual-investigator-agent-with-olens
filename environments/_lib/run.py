@@ -18,6 +18,7 @@ import json
 import shlex
 import sys
 import traceback
+from typing import Any
 
 import httpx
 
@@ -38,16 +39,68 @@ def parse_items(spec: str | None, all_items: list) -> list:
 
 
 def add_target_args(ap):
-    ap.add_argument("--model", required=True)
-    ap.add_argument("--backend", required=True, choices=["vllm", "openrouter", "openrouter-raw"])
+    """Model flags. Each defaults to the env's DEFAULTS (the settings its stored runs used), so a bare `run ENV` reproduces
+    the old requests; anything given here that differs from DEFAULTS is recorded as an override."""
+    ap.add_argument("--model")
+    ap.add_argument("--backend", choices=["vllm", "openrouter", "openrouter-raw"])
     ap.add_argument("--url", help="vllm base URL")
     ap.add_argument("--served-name", help="model name the server expects, if not --model (the shared Qwen server: qwen)")
-    ap.add_argument("--provider", help="OpenRouter provider slug, pinned with no fallbacks")
-    ap.add_argument("--effort", default="medium", help="reasoning effort when thinking is on ('none' = don't send)")
-    ap.add_argument("--thinking", default="on", choices=["on", "off"])
+    ap.add_argument("--provider", help="OpenRouter provider slug, pinned with no fallbacks ('any' = unpinned)")
+    ap.add_argument("--effort", help="reasoning effort when thinking is on ('none' = don't send)")
+    ap.add_argument("--thinking", choices=["on", "off"])
     ap.add_argument("--max-tokens", type=int, default=None, help="per call; default no cap")
+    ap.add_argument("--body", choices=["openrouter", "realism"], help="request body layout (see backends.Target)")
     for k in ("temperature", "top_p", "top_k", "presence_penalty"):
         ap.add_argument("--" + k.replace("_", "-"), type=float, default=None)
+
+
+# Qwen3.6 model-card sampling per thinking mode: the default for any Qwen target whose env declares no sampling
+QWEN_SAMPLING = {
+    "on": {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0},
+    "off": {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5},
+}
+
+
+def make_target(env, a) -> tuple[Target, dict]:
+    """The env's DEFAULTS overlaid with the flags given. -> (target, {field: {"default", "used"}} for every flag that differs)."""
+    d = dict(getattr(env, "DEFAULTS", {}))
+    flags = {
+        "model": a.model,
+        "backend": a.backend,
+        "url": a.url,
+        "served_name": a.served_name,
+        "provider": None if a.provider == "any" else a.provider,
+        "effort": None if a.effort == "none" else a.effort,
+        "thinking": None if a.thinking is None else a.thinking == "on",
+        "max_tokens": a.max_tokens,
+        "body": a.body,
+    }
+    given = {k: v for k, v in flags.items() if v is not None or (k in ("provider", "effort") and getattr(a, k) is not None)}
+    base: dict[str, Any] = {"effort": "medium", "thinking": True, "body": "openrouter"}
+    cfg: dict[str, Any] = {**base, **{k: v for k, v in d.items() if k != "sampling"}, **given}
+    # the env's stored-run sampling applies to its own default model; any other Qwen gets the model card, others nothing
+    own = (cfg.get("model") == d.get("model") or d.get("sampling_all_models")) and d.get("sampling")
+    sd = own or (QWEN_SAMPLING if "qwen" in str(cfg.get("model")).lower() else {})
+    sampling = dict(sd.get("on" if cfg["thinking"] else "off", {})) if set(sd) <= {"on", "off"} else dict(sd)
+    flag_sampling = {k: getattr(a, k) for k in ("temperature", "top_p", "top_k", "presence_penalty") if getattr(a, k) is not None}
+    sampling |= flag_sampling
+    if not cfg.get("model") or not cfg.get("backend"):
+        raise SystemExit("no model: pass --model and --backend (this env declares no DEFAULTS)")
+    t = Target(
+        model=cfg["model"],
+        backend=cfg["backend"],
+        url=cfg.get("url"),
+        served_name=cfg.get("served_name"),
+        provider=cfg.get("provider"),
+        effort=cfg.get("effort"),
+        thinking=bool(cfg.get("thinking")),
+        max_tokens=cfg.get("max_tokens"),
+        sampling=sampling,
+        body=cfg.get("body") or "openrouter",
+    )
+    overrides = {k: {"default": d.get(k), "used": v} for k, v in given.items() if k in d and d[k] != v}
+    overrides |= {f"sampling.{k}": {"default": sampling.get(k), "used": v} for k, v in flag_sampling.items()}
+    return t, overrides
 
 
 def main(argv):
@@ -69,11 +122,7 @@ def main(argv):
     a = ap.parse_args(argv)
 
     env = load_env(a.env)
-    sampling = {k: getattr(a, k) for k in ("temperature", "top_p", "top_k", "presence_penalty") if getattr(a, k) is not None}
-    target = Target(
-        model=a.model, backend=a.backend, url=a.url, served_name=a.served_name, provider=a.provider,
-        effort=None if a.effort == "none" else a.effort, thinking=a.thinking == "on", max_tokens=a.max_tokens, sampling=sampling,
-    )  # fmt: skip
+    target, default_overrides = make_target(env, a)
     requires = getattr(env, "REQUIRES", {})
     overrides = {}
     for k, want in requires.items():
@@ -109,6 +158,7 @@ def main(argv):
             "caps": caps,
             "today": today.isoformat(),
             "overrides": overrides,
+            "defaults_overridden": default_overrides,
             "arms": arms,
             "items": items,
             "n_per_cell": a.n,

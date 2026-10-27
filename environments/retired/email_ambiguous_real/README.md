@@ -10,7 +10,7 @@ exactly one ambiguous contact.
 | Status     | retired                                                                             |
 | Owner      | Kylie                                                                               |
 | Git ref    | `main` @ `7296169`                                                                  |
-| Code       | [`evalcue/envs/email_ambiguous_real/`](../../../evalcue/envs/email_ambiguous_real/) |
+| Code       | [`evalcue/envs/email_ambiguous_real/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/email_ambiguous_real/) |
 | Run        | `uv run python -m evalcue.run email_ambiguous_real --tag dev --n 16`                |
 | Models run | GLM 5.3                                                                             |
 

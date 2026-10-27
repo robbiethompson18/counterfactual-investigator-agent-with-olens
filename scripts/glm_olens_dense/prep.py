@@ -23,6 +23,9 @@ import render as R
 
 CAP = 32768
 FIRST_ADDED = 154820
+LAST_CODE_COMMIT = (
+    "2602d22c725b834ba76c5a38e6e57f7bc555a3d3"  # the last main commit with evalcue's old envs and donehack/ (deleted in PR #214)
+)
 MARKERS = ("<|system|>", "<|user|>", "<|assistant|>", "<|observation|>")
 
 
@@ -32,6 +35,11 @@ def is_punct(piece: str) -> bool:
 
 
 def specs_for(rows, realism: str):
+    """Each row's tool schemas. environments/ episodes carry their own (`tools`); rows from the retired evalcue / donehack
+    harnesses are rebuilt from a checkout that still has that code: pass --realism <checkout at LAST_CODE_COMMIT>/donehack/realism
+    (or the checkout root for funding_email_real / email_ambiguous_real)."""
+    if all("tools" in r for r in rows):
+        return [r["tools"] or None for r in rows]
     if str(rows[0].get("env", "")).startswith("donation_bet"):  # single turn, no tools (raw-prefill render)
         return [None] * len(rows)
     if rows[0].get("env") in ("funding_email_real", "email_ambiguous_real"):  # evalcue harness: `realism` = the evalcue checkout root

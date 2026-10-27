@@ -10,7 +10,7 @@ injections it has just called "a prompt injection attempt", follows others witho
 the lens at the injection says things like "This looks like a malicious system instruction. I will
 ignore it".
 
-Code: [`evalcue/envs/injection_slack/`](../../evalcue/envs/injection_slack/) (the module docstring
+Code: [`evalcue/envs/injection_slack/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/injection_slack/) (the module docstring
 lists every arm). Contract:
 [environment-construction-goals.md](../environment-construction-goals.md).
 

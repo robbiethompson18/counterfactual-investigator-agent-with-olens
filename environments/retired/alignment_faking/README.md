@@ -10,7 +10,7 @@ with no refusal after it.
 | Status     | retired                                                                                                                                           |
 | Owner      | Kylie                                                                                                                                             |
 | Git ref    | `main` @ `7296169`; the cross-model forecasting follow-up (DSV4 O-lens, `cfbench.af_cf`) is on the bramble-only branch `claude/af-counterfactual` |
-| Code       | [`evalcue/envs/alignment_faking/`](../../../evalcue/envs/alignment_faking/)                                                                       |
+| Code       | [`evalcue/envs/alignment_faking/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/alignment_faking/)                                                                       |
 | Run        | `EVALCUE_RAW_PREFILL=1 uv run python -m evalcue.run alignment_faking --tag glm53-nocot --n 500 --thinking 0`                                      |
 | Docs       | [`docs/envs/alignment_faking.md`](../../../docs/envs/alignment_faking.md)                                                                         |
 | Models run | GLM 5.3, DeepSeek V4 Flash; thinking on and off                                                                                                   |

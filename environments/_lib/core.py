@@ -89,7 +89,7 @@ def load_env(name: str):
     for attr in ("ARMS", "items", "build", "measure", "PRIMARY"):
         if not hasattr(mod, attr):
             raise SystemExit(f"environments/{name}/env.py is missing {attr}")
-    mod.NAME = name
+    setattr(mod, "NAME", name)  # noqa: B010  (a module attribute ty can't see)
     return mod
 
 

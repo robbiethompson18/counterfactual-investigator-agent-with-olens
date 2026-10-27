@@ -9,7 +9,7 @@ assistant ask.
 | Status     | retired                                                                   |
 | Owner      | Kylie                                                                     |
 | Git ref    | `main` @ `7296169`                                                        |
-| Code       | [`donehack/realism/email_env.py`](../../../donehack/realism/email_env.py) |
+| Code       | [`donehack/realism/email_env.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/realism/email_env.py) |
 | Docs       | [`docs/glm53-realism.md`](../../../docs/glm53-realism.md)                 |
 | Models run | GLM 5.3, 64 per env                                                       |
 

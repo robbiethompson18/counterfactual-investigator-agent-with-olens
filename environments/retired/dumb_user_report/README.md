@@ -8,7 +8,7 @@ claim DONE?
 | Status     | retired: marked stale (branch `docs/retire-dumb-user-report`, PR #96); `inline_b` is still a canonical pair |
 | Owner      | Robbie                                                                                                      |
 | Git ref    | `main` @ `7296169`                                                                                          |
-| Code       | [`evalcue/envs/dumb_user_report/`](../../../evalcue/envs/dumb_user_report/)                                 |
+| Code       | [`evalcue/envs/dumb_user_report/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/dumb_user_report/)                                 |
 | Docs       | [`docs/envs/dumb_user_report.md`](../../../docs/envs/dumb_user_report.md)                                   |
 | Models run | Qwen3.6-27B                                                                                                 |
 

@@ -1,15 +1,14 @@
 # Retired environments
 
 **Status (2026-10-27):** REFERENCE. Every behavioural env we built or ran before 2026-10-26, retired
-when the env registry ([`../README.md`](../README.md)) replaced the old harnesses. Two were ported
-to it, and their old runs were converted (no reruns): `hidden_goal_grade` →
-[`essay_grading`](../essay_grading/), and the over-eagerness tasks plus Email John
-(`overeager_tasks`, `email_ambiguous`) → the [`overeager_*`](../) envs.
+when the env registry ([`../README.md`](../README.md)) replaced the old harnesses. Some were ported
+to it with their old runs converted (no reruns): `hidden_goal_grade` → [`essay_grading`](../essay_grading/), the
+over-eagerness tasks plus Email John → the `overeager_*` envs, `alignment_faking`, and Robbie's honest graders → `honest_*`.
 
 One folder per env, each with a README: what it tests, the git ref and path of the code, how to run
 it, the models run, the key counterfactual arms and their rates, and links to transcripts (Docent,
-bramble:8830 expview). These READMEs point at the code; they don't hold it. The code still lives
-where it was written (`evalcue/envs/`, `donehack/`, `evolve/` at `7296169`). Snapshot of 2026-10-26;
+bramble:8830 expview). These READMEs point at the code; they don't hold it. `evalcue/` and `donehack/` were deleted on 2026-10-27, so
+their links go to commit `2602d22`, the last one that had them (`evolve/` to `7296169`). Snapshot of 2026-10-26;
 each env's own doc is the source of truth for numbers.
 
 ## Reward hacking: coding

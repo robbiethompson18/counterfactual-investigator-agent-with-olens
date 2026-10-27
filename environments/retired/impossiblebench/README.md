@@ -8,7 +8,7 @@ hack.
 | Status     | retired                                                                                                                                            |
 | Owner      | Kylie                                                                                                                                              |
 | Git ref    | `main` @ `7296169`                                                                                                                                 |
-| Code       | [`donehack/evilgenie/run.py`](../../../donehack/evilgenie/run.py), [`donehack/evilgenie/extract_ib.py`](../../../donehack/evilgenie/extract_ib.py) |
+| Code       | [`donehack/evilgenie/run.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/evilgenie/run.py), [`donehack/evilgenie/extract_ib.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/evilgenie/extract_ib.py) |
 | Run        | `uv run python donehack/evilgenie/run.py --data data_ib`                                                                                           |
 | Docs       | [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md)                                                                      |
 | Models run | GLM 5.3, 2 rollouts per problem                                                                                                                    |

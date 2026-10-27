@@ -11,6 +11,7 @@ import re
 import tarfile
 import time
 import uuid
+from collections.abc import Mapping
 
 from .core import Episode
 
@@ -48,7 +49,7 @@ class Box:
             raise RuntimeError(f"sandbox command failed ({' '.join(args[:5])}...): {out[-500:].decode(errors='replace')}")
         return out.decode(errors="replace")
 
-    async def put(self, d: str, files: dict[str, str | bytes], user="dev"):
+    async def put(self, d: str, files: Mapping[str, str | bytes], user="dev"):
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w") as t:
             for name, data in files.items():

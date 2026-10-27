@@ -9,7 +9,7 @@ identical candidate.
 | Status     | retired                                                            |
 | Owner      | Robbie                                                             |
 | Git ref    | `main` @ `7296169`                                                 |
-| Code       | [`evalcue/envs/hiring_eval/`](../../../evalcue/envs/hiring_eval/)  |
+| Code       | [`evalcue/envs/hiring_eval/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/hiring_eval/)  |
 | Run        | `uv run python -m evalcue.run hiring_eval.scores --tag dev --n 30` |
 | Docs       | [`docs/envs/hiring_eval.md`](../../../docs/envs/hiring_eval.md)    |
 | Models run | Qwen3.6-27B, thinking on                                           |

@@ -14,8 +14,17 @@ import json
 import random
 from pathlib import Path
 
-from evalcue import envs
-from evalcue.harness import BASH_TOOL
+from environments._lib.core import load_env
+
+# evalcue's bash tool schema (evalcue/harness.py, deleted 2026-10-27), which olens_read_requests.py knows by the name below
+BASH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "bash",
+        "description": "Run a bash command in the working directory. Returns stdout+stderr (truncated) and the exit code.",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]},
+    },
+}
 
 ap = argparse.ArgumentParser()
 ap.add_argument("out", type=Path)
@@ -32,7 +41,10 @@ with a.out.open("a") as f:
     for spec in a.specs:
         run, _, arms = spec.partition(":")
         env_dir, run_dir = run.split("/")
-        env = envs.load(env_dir)
+        try:
+            env = load_env(env_dir)  # the environments/ port, if this env has one (its build() matches the old rows)
+        except ModuleNotFoundError:  # retired env (code deleted 2026-10-27): single-turn rows need no tools; others can't be read
+            env = None
         lines = list(enumerate((Path("data/runs") / run / "rows.jsonl").read_text().splitlines()))
         rows = [(f"{run}:{i}", json.loads(line)) for i, line in lines]
         rows = [(rid, r) for rid, r in rows if "error" not in r and r.get("positive") is not None]
@@ -47,8 +59,13 @@ with a.out.open("a") as f:
         for rid, row in rows:
             if rid in have:
                 continue
-            ep = env.build(row["arm"], row["item"])
-            tools = ep.tools if ep.files or ep.step else None  # single completions are sent without tools
+            if env is not None:
+                ep = env.build(row["arm"], row["item"])
+                tools = ep.tools or None  # single completions are sent without tools
+            elif not row.get("files_before") and not any(m["role"] == "tool" for m in row["messages"]):
+                tools = None
+            else:
+                raise SystemExit(f"{env_dir}: retired env with tool calls; its tool schemas went with its code (see environments/retired/)")
             req = {"id": rid, "env": env_dir, "arm": row["arm"], "item": row["item"], "positive": row["positive"]}
             req |= {"thinking": row.get("thinking"), "priority": a.priority, "messages": row["messages"]}
             req["tools"] = "evalcue.harness.BASH_TOOL" if tools == [BASH_TOOL] else tools

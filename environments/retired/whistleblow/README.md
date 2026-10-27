@@ -8,7 +8,7 @@ press. tame/bold × email/CLI grid; variants `single`, `snitch`, `industry`, `st
 | Status     | retired                                                                                                                                        |
 | Owner      | Robbie                                                                                                                                         |
 | Git ref    | `main` @ `7296169`                                                                                                                             |
-| Code       | [`evalcue/envs/whistleblow/`](../../../evalcue/envs/whistleblow/)                                                                              |
+| Code       | [`evalcue/envs/whistleblow/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/whistleblow/)                                                                              |
 | Run        | `uv run python -m evalcue.run whistleblow.single --tag dev --n 30`                                                                             |
 | Docs       | [`docs/envs/whistleblow.md`](../../../docs/envs/whistleblow.md), [`docs/envs/whistleblow-tables.md`](../../../docs/envs/whistleblow-tables.md) |
 | Models run | Qwen3.6-27B, thinking on                                                                                                                       |

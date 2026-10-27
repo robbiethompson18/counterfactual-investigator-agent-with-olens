@@ -56,7 +56,7 @@ def env_index(env: str) -> dict:
                 "unscorable": sum(1 for e, v in zip(eps, vals, strict=True) if v is None and not e.get("error")),
                 "primary": summarize(vals, [str(e["item"]) for e in eps]),
             }
-        measures = sorted({k for v in labels.values() for k in v})
+        measures = sorted({k for v in labels.values() if v for k in v})
         runs.append(
             {
                 "run": run_dir.name,

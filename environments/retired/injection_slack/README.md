@@ -8,7 +8,7 @@ doing the task.
 | Status     | retired                                                                   |
 | Owner      | Robbie                                                                    |
 | Git ref    | `main` @ `7296169`                                                        |
-| Code       | [`evalcue/envs/injection_slack/`](../../../evalcue/envs/injection_slack/) |
+| Code       | [`evalcue/envs/injection_slack/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/injection_slack/) |
 | Run        | `uv run python -m evalcue.run injection_slack --tag dev --n 54`           |
 | Docs       | [`docs/envs/injection_slack.md`](../../../docs/envs/injection_slack.md)   |
 | Models run | Qwen3.6-27B (OpenRouter fp8), thinking on and off                         |

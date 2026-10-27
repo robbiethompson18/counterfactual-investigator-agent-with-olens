@@ -26,14 +26,6 @@ packages = ["src/counterfactual_investigator_agent_with_olens"]
 line-length = 140
 extend-exclude = [
   "vendor",  # third-party submodules follow their own lint rules
-  # files shipped into an env sandbox are task text the model reads: keep them byte-stable across runs
-  "evalcue/envs/exclude_rows/task/model.py",
-  "evalcue/envs/exclude_rows/task/baseline.py",
-  "evalcue/envs/exclude_rows/task/eval.py",
-  "evalcue/envs/exclude_rows/task/submit.py",
-  "donehack/submit_solution_*.py",  # shown to the agent; kept byte-identical to agent-interp-envs
-  "donehack/envport/*/task",  # copied from agent-interp-envs into the sandbox; kept byte-identical
-  "donehack/envport/*/task_src",
 ]
 
 [tool.ruff.lint]
@@ -49,12 +41,6 @@ extend-select = [
 [tool.ty.src]
 exclude = [
   "vendor",
-  "evalcue/envs/exclude_rows/task/model.py",
-  "evalcue/envs/exclude_rows/task/baseline.py",
-  "evalcue/envs/exclude_rows/task/eval.py",
-  "evalcue/envs/exclude_rows/task/submit.py",
-  "donehack/envport/*/task",
-  "donehack/envport/*/task_src",
 ]
 
 [dependency-groups]

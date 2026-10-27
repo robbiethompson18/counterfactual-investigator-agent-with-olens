@@ -223,4 +223,6 @@ TASK = GitBranch()
 # the clock, and tool outputs that used wall-clock time or an unseeded rng use the episode's frozen ones.
 _E = TaskEnv(TASK, versions=["interleaved", "sametimes"])  # the 2026-10-26 versions before "old" was dropped
 ARMS, items, build, handle, finalize, measure = _E.ARMS, _E.items, _E.build, _E.handle, _E.finalize, _E.measure
-PRIMARY, PAIRS, REQUIRES, CAPS = (_E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS"))
+PRIMARY, PAIRS, REQUIRES, CAPS, DEFAULTS, LOCKDOWN = (
+    _E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS", "DEFAULTS", "LOCKDOWN")
+)

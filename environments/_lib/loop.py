@@ -2,7 +2,8 @@
 `step(ep, ctx, call)` coroutine and the runner uses that instead.
 
 Stop rules: a reply without tool calls ends the episode ("responded"); a `done` handler ends it ("done"); `max_turns`
-model calls ("max_turns"); a prompt over `max_prompt_tokens` ("cut_long", the realism runs' cap, in tokens not dollars).
+model calls ("max_turns"); a prompt over `max_prompt_tokens`, or (ported envs only) the episode's cost over `max_cost_usd`
+("cut_long").
 Every model call is logged with its provider and usage, including calls whose turn a custom step later drops.
 """
 
@@ -47,9 +48,6 @@ async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.
                 r = await call()
                 msg = r["message"]
                 messages.append(msg)
-                if r["finish"] == "length":
-                    finish = "length"
-                    break
                 tcs = msg.get("tool_calls") or []
                 if not tcs:
                     finish = "responded"
@@ -81,8 +79,13 @@ async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.
                 if cap and (r["usage"].get("prompt_tokens") or 0) > cap:
                     finish = "cut_long"
                     break
+                cost_cap = caps.get("max_cost_usd")  # only for ports whose old runs were cut by dollars (overeager: $0.10)
+                if cost_cap and sum(c["usage"].get("cost") or 0 for c in calls) > cost_cap:
+                    finish = "cut_long"
+                    break
         if box:
-            await box.lockdown()
+            if getattr(env, "LOCKDOWN", True):  # ports whose old loop didn't kill the agent's processes set LOCKDOWN = False
+                await box.lockdown()
             if hasattr(env, "finalize"):
                 await env.finalize(box, state, ctx)
             files_after, omitted = await box.snapshot()

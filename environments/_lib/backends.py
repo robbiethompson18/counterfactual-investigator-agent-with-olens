@@ -30,6 +30,11 @@ class Target:
     thinking: bool = True
     max_tokens: int | None = None  # default no cap (repo rule for Qwen); a cap is recorded in meta
     sampling: dict = field(default_factory=dict)  # temperature / top_p / top_k / presence_penalty, only if given
+    # Request body layout, so a ported env sends exactly what its old harness sent:
+    #   "openrouter"  evalcue / src openrouter.extra_body: sampling, usage accounting, reasoning {enabled, effort when
+    #                 thinking}, provider {"order": [p], "allow_fallbacks": false}; for vllm, Qwen's chat_template_kwargs
+    #   "realism"     donehack/env.py chat: model, messages, tools, reasoning {"effort"} and nothing else
+    body: str = "openrouter"
 
     @property
     def id(self) -> str:
@@ -75,35 +80,26 @@ async def chat(client: httpx.AsyncClient, t: Target, messages: list[dict], tools
             "model": t.served_name or t.model,
             "prompt": prompt,
             "max_tokens": t.max_tokens or 16384,  # raw completions default to a few tokens on some providers
-            "provider": {"only": [t.provider] if t.provider else RAW_PROVIDERS, "allow_fallbacks": False},
-            "usage": {"include": True},
             **t.sampling,
-        }
+            "provider": {"only": [t.provider] if t.provider else RAW_PROVIDERS, "allow_fallbacks": False},
+        }  # as evalcue's chat_raw_prefill sent it
         j = await _post(client, f"{OPENROUTER}/completions", body, openrouter_key())
         c = j["choices"][0]
-        msg = {"role": "assistant", "content": c.get("text") or "", "reasoning_content": c.get("reasoning") or ""}
+        msg = {
+            "role": "assistant",
+            "content": c.get("text") or "",
+            "reasoning_content": c.get("reasoning") or "",
+            "provider": j.get("provider"),
+        }
         return {"message": msg, "finish": c.get("finish_reason"), "provider": j.get("provider"), "usage": j.get("usage") or {}}
-    body: dict = {"model": t.served_name or t.model, "messages": messages, **t.sampling}
-    if tools:
-        body["tools"] = tools
-    if t.max_tokens:
-        body["max_tokens"] = t.max_tokens
-    if t.backend == "openrouter":
-        body["reasoning"] = ({"effort": t.effort} if t.effort else {}) if t.thinking else {"enabled": False}
-        body["usage"] = {"include": True}
-        if t.provider:
-            body["provider"] = {"only": [t.provider], "allow_fallbacks": False}
-        url, key = f"{OPENROUTER}/chat/completions", openrouter_key()
-    elif t.backend == "vllm":
-        if not t.url:
-            raise SystemExit("--backend vllm needs --url")
-        body["chat_template_kwargs"] = {"enable_thinking": t.thinking}
-        url, key = t.url.rstrip("/") + "/chat/completions", vllm_key()
-    else:
-        raise SystemExit(f"unknown backend {t.backend}")
+    body, url, key = request(t, messages, tools)
     j = await _post(client, url, body, key)
     c = j["choices"][0]
     m = c["message"]
+    if t.body == "realism":  # the old loop sent back the assistant message as returned (minus None fields and refusal)
+        raw = {k: v for k, v in m.items() if v is not None and k != "refusal"}
+        provider = j.get("provider")
+        return {"message": raw, "finish": c.get("finish_reason"), "provider": provider, "usage": j.get("usage") or {}}
     msg = {"role": "assistant", "content": m.get("content") or ""}
     reasoning = m.get("reasoning_content") or m.get("reasoning")
     if reasoning:
@@ -119,6 +115,40 @@ async def chat(client: httpx.AsyncClient, t: Target, messages: list[dict], tools
         ]
     provider = j.get("provider") or (urlparse(t.url).hostname if t.url else None)
     return {"message": msg, "finish": c.get("finish_reason"), "provider": provider, "usage": j.get("usage") or {}}
+
+
+def request(t: Target, messages: list[dict], tools: list[dict] | None) -> tuple[dict, str, str]:
+    """-> (JSON body, URL, API key) for one chat call. Pure, so a stored episode's first request can be rebuilt and
+    compared with what its old harness sent (environments/_lib/replay.py)."""
+    if t.backend == "openrouter" and t.body == "realism":
+        body = {"model": t.served_name or t.model, "messages": messages, "tools": tools, **t.sampling}
+        if t.max_tokens:
+            body["max_tokens"] = t.max_tokens
+        if t.thinking:
+            body["reasoning"] = {"effort": t.effort} if t.effort else {}
+        else:
+            body["reasoning"] = {"enabled": False}
+        if t.provider:
+            body["provider"] = {"order": [t.provider], "allow_fallbacks": False}
+        return {k: v for k, v in body.items() if v is not None}, f"{OPENROUTER}/chat/completions", openrouter_key()
+    body: dict = {"model": t.served_name or t.model, "messages": messages}
+    if t.max_tokens:
+        body["max_tokens"] = t.max_tokens
+    if tools:
+        body["tools"] = tools
+    body |= t.sampling
+    if t.backend == "openrouter":
+        body["usage"] = {"include": True}
+        body["reasoning"] = {"enabled": t.thinking, **({"effort": t.effort} if t.thinking and t.effort else {})}
+        if t.provider:
+            body["provider"] = {"order": [t.provider], "allow_fallbacks": False}
+        return body, f"{OPENROUTER}/chat/completions", openrouter_key()
+    if t.backend == "vllm":
+        if not t.url:
+            raise SystemExit("--backend vllm needs --url")
+        body["chat_template_kwargs"] = {"enable_thinking": t.thinking, "preserve_thinking": True}
+        return body, t.url.rstrip("/") + "/chat/completions", vllm_key()
+    raise SystemExit(f"unknown backend {t.backend}")
 
 
 async def _post(client, url, body, key, tries=6) -> dict:

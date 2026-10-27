@@ -8,4 +8,6 @@ from environments.overeager_payback.env import PayBackHint
 TASK = PayBackHint()
 _E = TaskEnv(TASK)
 ARMS, items, build, handle, finalize, measure = _E.ARMS, _E.items, _E.build, _E.handle, _E.finalize, _E.measure
-PRIMARY, PAIRS, REQUIRES, CAPS = (_E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS"))
+PRIMARY, PAIRS, REQUIRES, CAPS, DEFAULTS, LOCKDOWN = (
+    _E.exports()[k] for k in ("PRIMARY", "PAIRS", "REQUIRES", "CAPS", "DEFAULTS", "LOCKDOWN")
+)

@@ -21,7 +21,7 @@ episode to the arm whose build() reproduces it exactly.
 |                 |                                                                                                                                                                                      |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Code            | [`env.py`](env.py) (task, app, grader); shared harness variants in [`../_lib/overeager.py`](../_lib/overeager.py)                                                                    |
-| Primary measure | `picked_one`                                                                                                                                                                         |
+| Primary measure | `positive` (= `picked_one`) |
 | Pairs           | `realism`: `base` → `core`, `casual_ask`: `no_criterion` → `nc_casual`                                                                                                               |
 | Arms            | the harness variants in `_lib/overeager.py` (`base_mcp`, `base_done_neutral_mcp`, `no_done_mcp`, `base`, `no_done`, `no_criterion`, `ask`, `harness`, ...)                           |
 | Items           | 16 (`John_0`, ...)                                                                                                                                                                   |

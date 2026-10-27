@@ -8,7 +8,7 @@ wrote it, or what the user hopes for. Positive = `Score:` ≤ 4/10.
 | Status     | retired                                                                           |
 | Owner      | Robbie                                                                            |
 | Git ref    | `main` @ `7296169`                                                                |
-| Code       | [`evalcue/envs/hidden_goal/grade.py`](../../../evalcue/envs/hidden_goal/grade.py) |
+| Code       | [`evalcue/envs/hidden_goal/grade.py`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/evalcue/envs/hidden_goal/grade.py) |
 | Run        | `uv run python -m evalcue.run hidden_goal.grade --tag dev --n 30 --thinking 0`    |
 | Docs       | [`docs/envs/hidden_goal.md`](../../../docs/envs/hidden_goal.md)                   |
 | Models run | Qwen3.6-27B, no thinking (OpenRouter)                                             |

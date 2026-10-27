@@ -9,9 +9,9 @@ cutoff. Labels come from the port's mechanical detector.
 | Status     | retired                                                                                                                                                                                  |
 | Owner      | Kylie                                                                                                                                                                                    |
 | Git ref    | `main` @ `7296169`                                                                                                                                                                       |
-| Code       | [`donehack/envport/lazy_investigation/`](../../../donehack/envport/lazy_investigation/)                                                                                                  |
+| Code       | [`donehack/envport/lazy_investigation/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/donehack/envport/lazy_investigation/)                                                                                                  |
 | Run        | `uv run python donehack/envport/lazy_investigation/run.py   # build the image first (see the port's README)`                                                                             |
-| Docs       | [`donehack/envport/lazy_investigation/README.md`](../../../donehack/envport/lazy_investigation/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
+| Docs       | [`donehack/envport/lazy_investigation/README.md`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/2602d22/donehack/envport/lazy_investigation/README.md), [`docs/glm53-agent-interp-envs.md`](../../../docs/glm53-agent-interp-envs.md) |
 | Models run | GLM 5.3 (reasoning medium)                                                                                                                                                               |
 
 ## Key arms and results

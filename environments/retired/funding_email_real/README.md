@@ -9,7 +9,7 @@ routine).
 | Status     | retired                                                                         |
 | Owner      | Kylie                                                                           |
 | Git ref    | `main` @ `7296169`                                                              |
-| Code       | [`evalcue/envs/funding_email_real/`](../../../evalcue/envs/funding_email_real/) |
+| Code       | [`evalcue/envs/funding_email_real/`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/tree/2602d22/evalcue/envs/funding_email_real/) |
 | Run        | `uv run python -m evalcue.run funding_email_real --tag dev --n 16`              |
 | Docs       | [`docs/envs/funding_email_real.md`](../../../docs/envs/funding_email_real.md)   |
 | Models run | GLM 5.3, n=16 per cell                                                          |
