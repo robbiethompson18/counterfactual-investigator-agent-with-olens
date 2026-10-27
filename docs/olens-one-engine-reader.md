@@ -1,14 +1,15 @@
 # One-engine O-lens reader: capture, lens and AR on one vLLM
 
-**Status (2026-10-26):** ACTIVE. Works end to end and matches the HF+vLLM reader's FVEs; 2x its
-throughput on short transcripts in the first hour of tuning. Not yet the default reader.
+**Status (2026-10-27):** ACTIVE. The only batch reader since 2026-10-27: matches the deleted HF+vLLM
+reader's FVEs on short and long transcripts, 2x its throughput.
 
 The batch reader (`scripts/olens_read_requests.py`) used to run two copies of Qwen3.6-27B on one
 H200: vLLM decoding the merged lens, and HF transformers for activation capture and the AR. The HF
 side was 71% of the time at ~18% MFU, the two copies left vLLM 0.45 to 0.55 of the GPU, and that
 memory split caused the OOM relaunch loops and the skipped giant transcripts of the thinking-on
-reads ([runpod-qwen-server.md](runpod-qwen-server.md)). `--one-engine` moves all three jobs onto one
-vLLM process:
+reads ([runpod-qwen-server.md](runpod-qwen-server.md)). All three jobs now run on one vLLM process;
+the HF path (hook-LoRA, HF capture and AR, the merged-lens checkpoint and `merge_lens.py`, and with
+it the parked NLA and J++ code) was deleted in PR #229 and is at that PR's first commit.
 
 - **Engine:** vLLM 0.27.1 with
   [ceselder/vllm-metamodels](https://github.com/ceselder/vllm-metamodels) (1.1.0.post7), whose hooks
@@ -33,10 +34,12 @@ vLLM process:
   transcript. The HF reader pipelined one transcript at a time with a decode thread; one engine
   cannot overlap its own calls, so batching replaces the overlap.
 
-Setup and run: `runpod/one_engine_setup.sh` (boot with `IMAGE=vllm/vllm-openai:v0.27.1`), then
-`runpod/olens_reads.sh run NAME REQ TAG --layers 32,40,48 --one-engine --lens-lora ... --ar-lora ...`.
-Code: `olens/src/olens/one_engine.py`, `olens/src/olens/vllm_bullet_stop.py`,
-`scripts/olens_read_requests.py`, `scripts/olens_reads_compare.py`.
+Setup and run: boot with
+`IMAGE=vllm/vllm-openai:v0.27.1 VOLUMES=<cache volume> NAME=x runpod/qwen_server.sh up 1`, then
+`runpod/olens_reads.sh setup x` and
+`runpod/olens_reads.sh run x REQ TAG --layers 32,40,48 [--max-model-len 131072]`. Code:
+`olens/src/olens/one_engine.py`, `olens/src/olens/vllm_bullet_stop.py`,
+`scripts/olens_read_requests.py`, `scripts/olens_reads_compare.py` (parity between two reads files).
 
 ## Benchmark (2026-10-26, 18:32 to 19:24 PDT, two 1x H200 pods, 1.76 GPU-hours)
 
@@ -62,13 +65,47 @@ long, near-paraphrase bullets, plus the FVE sort reordering near-equal bullets (
 LoRA-vs-merged test, which compared decode order, had 87% first-line agreement). If a downstream use
 needs text-identical reads across the two readers, that is not available; FVEs are interchangeable.
 
+## Long transcripts (2026-10-27, `runs/olens_reads/2026-10-26_long-parity`)
+
+The 21k-token `whistleblow_snitch` cot-r3 transcript (5,295 reads, the longest the old reader read):
+capture 2 s, decode 231 s (23 reads/s), AR 88 s, 16.5 reads/s overall. Against the old reader's
+reads of it: joint FVE correlation 0.966 (means 0.146 old vs 0.137 new), top-bullet FVE correlation
+0.952, 3.99 bullets per read on both. Lower text agreement than on short prompts (top bullet
+identical 9%, same first three words 36%): the old reader captured in 2048-token chunks through HF's
+cache, which itself moves the residual by bf16 noise, and 21k tokens of context give the two stacks
+more to drift on. No sign of a position bug (that would put the correlation near 0).
+
+**Giants (90k to 130k tokens) hang the default GDN prefill.** The first long run put a 98,708-token
+transcript through the engine at `--max-model-len 131072` and sat 12 minutes at ~60% GPU with no
+output after vLLM's "CuTeDSL JIT compilation during inference: \_FullyFusedDeltaRuleSm90" warning
+(`long-v2-131k-hang.log` in the run). The same transcript with `gdn_prefill_backend="triton"`
+captures in 11.1 s (8.9k tok/s), a 92,520-token one in 10.2 s, positions and norms as expected
+(`probe-A-triton-131k.log`). `OneEngine` now sets the triton backend; prefill is ~2% of the reader's
+time, so short transcripts lose nothing. Not isolated to the backend alone: the probe also ran with
+`enable_lora=False` and `max_num_seqs=64`, neither of which should touch a prefill kernel. The
+reader skips any transcript at or over `--max-model-len` with a log line instead of crashing; the
+longest cot-r3 transcript is 131,420 tokens, so giants need `--max-model-len 262144` (one prefill
+chunk per transcript, untested at that length).
+
+End to end on the 98k giant at layer 32 (`long-v4-giants.log`, `reads.giant-L32.jsonl`): 17,860
+reads, capture 14 s, decode 1,021 s (17.5 reads/s: one transcript is one 17,860-prompt generate,
+which vLLM runs in ~35 waves with no cross-transcript batching to fill the last ones), AR 320 s,
+13.2 reads/s overall. A giant is 2% of a run's transcripts and ~15% of its reads, so `--batch-reads`
+matters less than the decode rate for them.
+
 ## Where the time goes now, and what to try next
 
 - **Decode at 27.6 reads/s** is ~3.5k generated tokens/s at batch ~480, about 2x slower per step
   than the plain chat server. Suspects: vLLM's untuned LoRA kernels ("Using default LoRA kernel
   configs"), 12 LoRA target modules in all 64 blocks, and the metamodel hooks compiled as a custom
-  op. Try: `merge_lora` from vllm-metamodels (merge the lens into the live weights, unmerge, merge
-  the AR) instead of the LoRA runtime, or tune the punica configs.
+  op. `--lora-mode merge` is coded but not yet benchmarked: it builds a plain engine
+  (`enable_lora=False`) and uses vllm-metamodels' `merge_lora` to fold the lens into the served
+  weights before the decode and the AR over it before the scoring, then `unmerge_lora` before the
+  next capture (its README: a merged engine decodes 29% faster per step than the LoRA path on this
+  model, ~1 s per publish with the base copy in pinned host memory, about 3 publishes per batch).
+  The `merge_lora` key mapping strips `base_model.model.` and tries the `model.language_model.`
+  layout itself, so the renamed adapter dirs work for it. Expected: decode 2x, total 1.5x. Then tune
+  the punica configs if the runtime path is kept.
 - **AR at 62 reads/s** (~250 spans/s) is bounded by vllm-metamodels' per-request capture overhead
   (its README: ~7 to 12 ms per request), not by prefill FLOPs.
 - **Batching is per transcript group**, so the engine idles during the CPU-side NNLS and JSON writes
