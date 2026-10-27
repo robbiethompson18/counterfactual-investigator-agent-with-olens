@@ -1,0 +1,15 @@
+[project]
+name = "hc-inject"
+version = "0.1.0"
+description = "vLLM plugin: write vllm-lens EMBED_LAYER_INDEX vectors of width hc_mult*hidden into DeepSeek V4's 4-stream state at the input of decoder layer 1"
+requires-python = ">=3.10"
+
+[project.entry-points."vllm.general_plugins"]
+hc_inject = "hc_inject:register"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["hc_inject"]
