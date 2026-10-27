@@ -16,7 +16,7 @@ import matplotlib
 import numpy as np
 
 from cfbench.core import canon_condition
-from cfbench.report.data import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null
+from cfbench.report.data import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -80,18 +80,18 @@ def load(pattern: str = RUNS) -> list[dict]:
 
 
 def score(rows: list[dict], key) -> dict:
-    """key(row) -> group; returns group -> {acc, rmse, per_case (env -> rmse), null, ceiling, cost, n}.
+    """key(row) -> group; returns group -> {acc, rmse, per_case (env/rollout run -> rmse), null, ceiling, cost, n}.
 
     Every group is scored on the same four cases; a group missing a case is dropped so the lines compare like with like.
     """
     by: dict = defaultdict(list)
     for r in rows:
         by[key(r)].append(r)
-    all_cases = {(r["env"].split(":")[1].split("/")[0], r["base_arm"], r["cf_arm"]) for r in rows}
+    all_cases = {(variant_of(r), r["base_arm"], r["cf_arm"]) for r in rows}
     out = {}
     for group, rs in by.items():
         cases = build_cases(
-            {(r["env"].split(":")[1].split("/")[0], r["base_arm"], r["cf_arm"], r["condition"], r["draw"]): r for r in rs},
+            {(variant_of(r), r["base_arm"], r["cf_arm"], r["condition"], r["draw"]): r for r in rs},
             conds=[rs[0]["condition"]],
         )
         if set(cases) != all_cases:
