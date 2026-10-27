@@ -40,11 +40,13 @@ def _start(row: dict) -> str:
 
 
 class OvereagerRows(EvalcueRuns):
+    RUNS = RUNS
+
     def __init__(self, setting: str):
         self.BEHAVIOR = BEHAVIOR[setting]
         self.rows: dict[str, list[tuple[str, dict]]] = defaultdict(list)
         self.starts: dict[tuple[str, str], str] = {}
-        for line in (RUNS / setting / "rows.jsonl").read_text().splitlines():
+        for line in (self.RUNS / setting / "rows.jsonl").read_text().splitlines():
             row = json.loads(line)
             start, key = _start(row), (row["arm"], row["item"])
             assert self.starts.setdefault(key, start) == start, f"{key} has two starting contexts"
