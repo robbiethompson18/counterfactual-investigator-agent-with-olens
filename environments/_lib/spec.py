@@ -23,7 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .core import ROOT, Ctx, env_names, load_env, slug
+from .core import ROOT, Ctx, env_names, load_env, run_dirs, slug
 from .runfolder import LOCAL, REPO_ROOT, git_sha
 
 BLOB_MIN, FILE_MIN = 256, 8192
@@ -237,9 +237,9 @@ def build_links(env: str) -> Path | None:
         return None
     mod = load_env(env)
     runs = {}
-    run_dirs = sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists())
-    reads = read_overlays(env, {p.name for p in run_dirs})
-    for run_dir in run_dirs:
+    dirs = run_dirs(env, mod, LOCAL)
+    reads = read_overlays(env, {p.name for p in dirs})
+    for run_dir in dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
         _, labels = latest_labels(run_dir)
         eps = {}

@@ -17,6 +17,8 @@ optional:
     ARM_FACTORS: dict                               arm -> {factor: value} (e.g. task, variant, prompt), so arms can be
                                                     selected and grouped by factor (`--arms task=calendar`)
     RETIRED: list[str]                              arms tried and set aside: arm names or factor filters (`prompt=v5`).
+    RETIRED_RUNS: list[str]                         run folder names set aside (e.g. a superseded deployment); kept on HF,
+                                                    left out of the indexes and links, so the viewer never shows them
                                                     They still build (stored runs stay reproducible) but `run ENV`
                                                     skips them unless --arms names them; the list page hides them
     items_for(arm) -> list[str]                     the arm's own items when they differ by arm (honest: each scenario
@@ -126,6 +128,12 @@ def select_arms(env, spec: str | None) -> list[str]:
     if not picked:
         raise SystemExit(f"no arm matches {spec!r} (factors: {sorted({k for f in factors.values() for k in f})})")
     return picked
+
+
+def run_dirs(env_name: str, env, local) -> list:
+    """An env's run folders under `local`, minus its RETIRED_RUNS."""
+    out = sorted(p for p in (local / env_name).glob("*") if (p / "meta.json").exists())
+    return [p for p in out if p.name not in set(getattr(env, "RETIRED_RUNS", []))]
 
 
 def retired_arms(env) -> set[str]:
