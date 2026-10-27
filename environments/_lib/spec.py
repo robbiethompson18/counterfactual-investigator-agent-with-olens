@@ -11,7 +11,10 @@
                                         comparison's rollouts without reading episode shards; plus the run's expview dataset
 
 `index` rebuilds the spec when the env's source hash changed (env folder + environments/_lib), so it costs nothing
-after a run. Builds use sample 0 and the date the spec was made; the sample's rng and the date can change a prompt.
+after a run. `spec --out DIR` builds every env's spec from the code alone into DIR/<env>/ plus DIR/index.json (the env
+list with title, status, STARRED, primary): the GitHub Pages workflow does this on every push to main, so the hosted
+page's arms, comparisons and stars always match main, and only runs and links come from HF.
+Builds use sample 0 and the date the spec was made; the sample's rng and the date can change a prompt.
 """
 
 import dataclasses
@@ -95,9 +98,9 @@ def items_of(mod, arm) -> list[str]:
     return [str(i) for i in (mod.items_for(arm) if hasattr(mod, "items_for") else mod.items())]
 
 
-def build_spec(env: str, force: bool = False) -> list[Path]:
-    """Write envs/<env>/spec/ unless its source hash is unchanged. -> written paths (empty when up to date)."""
-    out = LOCAL / env / "spec"
+def build_spec(env: str, force: bool = False, out: Path | None = None) -> list[Path]:
+    """Write envs/<env>/spec/ (or `out`) unless its source hash is unchanged. -> written paths (empty when up to date)."""
+    out = out or LOCAL / env / "spec"
     files = source_files(env)
     shash = source_hash(files)
     head = out / "env.json"
@@ -149,10 +152,57 @@ def build_spec(env: str, force: bool = False) -> list[Path]:
         "caps": getattr(mod, "CAPS", {}),
         "defaults": getattr(mod, "DEFAULTS", {}),
         "behavior": getattr(mod, "BEHAVIOR", None),
+        "starred": getattr(mod, "STARRED", None),
+        "title": title_status(env)[0],
+        "status": title_status(env)[1],
         "build_errors": errors,
     }
     head.write_text(json.dumps(spec, indent=1, default=str) + "\n")
     return [*written, head]
+
+
+def title_status(env: str) -> tuple[str, str | None]:
+    """The env's README title and **Status** tag (as index.py reads them)."""
+    import re
+
+    readme = (ROOT / env / "README.md").read_text() if (ROOT / env / "README.md").exists() else ""
+    title = next((line.lstrip("# ").strip() for line in readme.splitlines() if line.startswith("# ")), env)
+    status = re.search(r"\*\*Status[^*]*\*\*\s*([A-Z]+)", readme)
+    return title, status.group(1) if status else None
+
+
+def build_site(out: Path, only: list[str] | None = None) -> Path:
+    """Every env's spec from the code alone into out/<env>/, and out/index.json listing them. An env whose module
+    doesn't load (e.g. data files not in git) gets {"env", "error"} so the page falls back to the spec on HF. With
+    `only`, just those envs are rebuilt and the others keep their entries from the last build."""
+    import shutil
+    import traceback
+
+    old = {}
+    if only and (out / "index.json").exists():
+        old = {x["env"]: x for x in json.loads((out / "index.json").read_text())["envs"]}
+    envs = []
+    for e in env_names():
+        if only and e not in only and e in old:
+            envs.append(old[e])
+            continue
+        d = out / e
+        shutil.rmtree(d, ignore_errors=True)
+        try:
+            build_spec(e, force=True, out=d)
+            spec = json.loads((d / "env.json").read_text())
+            keep = ("env", "title", "status", "starred", "primary", "git_sha")
+            envs.append({k: spec.get(k) for k in keep} | {"n_arms": len(spec["arms"])})
+        except Exception as ex:  # noqa: BLE001
+            d.mkdir(parents=True, exist_ok=True)
+            err = {"env": e, "error": repr(ex)[:500], "traceback": traceback.format_exc()[-2000:]}
+            (d / "env.json").write_text(json.dumps(err, indent=1) + "\n")
+            envs.append({"env": e, "error": err["error"]})
+        print(e, "error" if "error" in envs[-1] else "ok", flush=True)
+    p = out / "index.json"
+    doc = {"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "git_sha": git_sha(), "envs": envs}
+    p.write_text(json.dumps(doc, indent=1) + "\n")
+    return p
 
 
 def expview_dataset(env: str, run: str, meta: dict) -> str | None:
