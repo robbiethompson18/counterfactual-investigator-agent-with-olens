@@ -16,7 +16,7 @@ Emit from Python (scripts/ style: put expview/ on sys.path):
             calls=[call("subject", model, messages=prompt_msgs, output=reply_msg),
                    call("judge", judge_model, messages=judge_msgs, output=judge_reply, parsed={"correct": True})],
             tokens={"tokens": toks, "sections": [["user", 0, 40], ["reasoning", 40, 900]], "reads": {"812": [...]}})
-    print(link(run.path, item="s1/t0", token=812))  # https://expview.pages.dev/#d=...&i=s1%2Ft0&t=812
+    print(link(run.path, item="s1/t0", token=812))  # https://expview.pages.dev/#dataset=...&item=s1/t0&token=812
 
 The viewer (https://expview.pages.dev, expview/static/index.html) is a static page that reads these directories from the
 public HF dataset once `scripts/runs.py finish` has synced the run.
@@ -107,7 +107,7 @@ def link(
 ) -> str:
     """Deep link into the viewer: a run (dir or dataset id), an item, a token of its transcript, or one of its calls."""
     d = str(run) if not Path(run).expanduser().exists() else dataset_id(run)
-    params = {"d": d, "i": item, "t": token, "c": call, "q": q}
+    params = {"dataset": d, "item": item, "token": token, "call": call, "query": q}
     kept = {k: v for k, v in params.items() if v is not None}
     return f"{base}/#" + urllib.parse.urlencode(kept, quote_via=lambda s, *_: urllib.parse.quote(s, safe="/:"))
 

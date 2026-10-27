@@ -66,3 +66,58 @@ Checked and rejected the same day:
 
 Still to decide (2026-10-26): whether the three pages share code for URL params, HF fetching and
 transcript rendering, and whether any two of them are one page.
+
+## URL parameters
+
+Every view of a page is a link: the whole view state lives in the URL **hash** (`#key=value&…`), not
+the query string. A static page has no server to read a query string, and the fragment survives the
+`weirdchat-olens` → `olens-viewer` 301 and any other redirect, while a query string may not.
+
+Rules (Robbie, 2026-10-26):
+
+- **Keys are full words**, never single letters: `#pattern=36&transcript=…&token=134`, not
+  `#p=36&t=…&tok=134`.
+- **The same thing gets the same word on every page.** A token index is `token`, a free-text search
+  or highlight is `query`, a dataset is `dataset`, whether the page is olens-viewer or expview.
+- **Values are unchanged** by the rename (pattern indices, transcript ids, view names
+  `tr|call|env|rec`).
+- **Old links keep working.** Each page has one `LEGACY = {p: 'pattern', …}` map and one
+  `canonHash()` that runs on load (and, for expview, on every `hashchange`): a hash with any legacy
+  key is mapped to the new keys and written back with `history.replaceState`, so the address bar
+  shows the canonical form with no reload and no flash. Links the page generates (copy link, bullet
+  links, search result links) and the Python builders (`expview.py link`) emit only the new form.
+  The hundreds of `#p=…&t=…` and `#d=…&i=…` links already in `docs/` are left as they are; the
+  legacy map is what keeps them working.
+
+| key               | olens-viewer (`transcript-viewer/web/index.html`)       | expview (`expview/static/index.html`)                            |
+| ----------------- | ------------------------------------------------------- | ---------------------------------------------------------------- |
+| `dataset`         | tab: `weirdchat` (default), `chive`, … (was `ds`)       | run id `runs/<experiment>/<run>`, comma list in search (was `d`) |
+| `pattern`         | pattern index (was `p`)                                 |                                                                  |
+| `transcript`      | transcript id within the pattern (was `t`)              |                                                                  |
+| `item`            |                                                         | item id (was `i`)                                                |
+| `token`           | selected token position (was `tok`)                     | token position in the transcript (was `t`)                       |
+| `view`            |                                                         | `tr`, `call`, `env` or `rec` (was `v`)                           |
+| `call`            |                                                         | call index, 0-based (was `c`)                                    |
+| `message`         |                                                         | message index within the call (was `m`)                          |
+| `file`            |                                                         | environment file path (was `f`)                                  |
+| `query`           | pattern-list text filter (was `q`)                      | regex to highlight or search (was `q`)                           |
+| `case`            |                                                         | `1` = case-sensitive regex                                       |
+| `search`          |                                                         | `1` = the Search page (was `s`)                                  |
+| `novel`           |                                                         | `ctx` or `transcript`: drop echo hits                            |
+| `scope`           |                                                         | `text` = search transcripts and calls, not reads                 |
+| `experiment`      |                                                         | search: the experiment whose runs are listed (was `env`)         |
+| `reader`          |                                                         | search facet: reader / tool name (was `tool`)                    |
+| `section`         |                                                         | search facet: transcript section (was `sec`)                     |
+| `group`, `label`  |                                                         | search facets (`label` is `KEY=VALUE`)                           |
+| `page`            |                                                         | search results page, 0-based                                     |
+| `filter`          | transcript filter dropdown, e.g. `positive` (was `tf`)  |                                                                  |
+| `edit`            | CHIVE edit index (was `x`)                              |                                                                  |
+| `layers`          | comma list of lens layers shown, default `40` (was `L`) |                                                                  |
+| `temperature`     | decode temperature of the reads shown (was `T`)         |                                                                  |
+| `highlight`       | FVE highlight mode, default `joint` (was `hl`)          |                                                                  |
+| `highlight_layer` | layer the highlight uses, default `40` (was `hll`)      |                                                                  |
+| `overview`        | overview token offset, default `1` (was `ov`)           |                                                                  |
+| `behavior`        | behavior filter on the pattern list (was `beh`)         |                                                                  |
+| `sort`            | pattern-list sort                                       |                                                                  |
+
+Only non-default values are written to the hash.

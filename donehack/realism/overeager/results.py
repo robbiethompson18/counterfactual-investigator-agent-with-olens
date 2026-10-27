@@ -79,7 +79,7 @@ def chart(task, recs, variants, ds):
                 f'<rect x="{x0 + bw + 3:.1f}" y="{sy(0) - h:.1f}" width="{bw:.1f}" height="{max(h, 1):.1f}" fill="{COL["asked"]}"><title>{v}: asked {asked}/{n}</title></rect>'
             )
         svg.append(
-            f'<a href="https://expview.pages.dev/#d={ds}" target="_blank"><text x="{x0 + gw / 2 - 8:.1f}" y="{top + ph + 16}" class="ax" text-anchor="middle">{html.escape(v.replace("base_", "b_"))}</text></a><text x="{x0 + gw / 2 - 8:.1f}" y="{top + ph + 30}" class="ax" text-anchor="middle">n={n}</text>'
+            f'<a href="https://expview.pages.dev/#dataset={ds}" target="_blank"><text x="{x0 + gw / 2 - 8:.1f}" y="{top + ph + 16}" class="ax" text-anchor="middle">{html.escape(v.replace("base_", "b_"))}</text></a><text x="{x0 + gw / 2 - 8:.1f}" y="{top + ph + 30}" class="ax" text-anchor="middle">n={n}</text>'
         )
     svg.append("</svg>")
     return "".join(svg)

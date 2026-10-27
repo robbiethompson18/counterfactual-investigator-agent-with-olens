@@ -127,7 +127,7 @@ def main():
                 where = f"every episode ({len(hs)} views), shared prompt position" if len(hs) >= 32 else f"{len(hs)} view(s)"
                 lab = "<span class='tag env'>about the env</span>" if about_env(read) else "<span class=tag>about code</span>"
                 lis.append(
-                    f"<li>{lab} <span class=tag>{html.escape(w)}</span> at token <code>{html.escape(repr(tok))}</code> · {where} · <a href='http://bramble:8830/#d={dsof(v)}&i={html.escape(h['id'])}' target=_blank>open</a><br><span class=read>{html.escape(read)}</span></li>"
+                    f"<li>{lab} <span class=tag>{html.escape(w)}</span> at token <code>{html.escape(repr(tok))}</code> · {where} · <a href='http://bramble:8830/#dataset={dsof(v)}&item={html.escape(h['id'])}' target=_blank>open</a><br><span class=read>{html.escape(read)}</span></li>"
                 )
         cards.append(
             f"<section id='{v}' class=card><h2>{v} <span class=muted>· {metric} {HACK[v]}% · {d[v]['reads']} greedy reads in the prompt</span></h2>{'<ul>' + ''.join(lis) + '</ul>' if lis else '<p class=muted>no prompt read mentions any of these words</p>'}</section>"

@@ -10,7 +10,7 @@ space lens was never scheduled ([docs/olens-space-migration.md](../docs/olens-sp
 transcripts), the 300 [CHIVE](https://huggingface.co/datasets/agu18dec/chive-forensics) incidents,
 our model-organism and GLM 5.3 rollouts, token by token, with every agu18dec O-lens read we have
 (`../olens`). Its old name, [weirdchat-olens.pages.dev](https://weirdchat-olens.pages.dev), 301s to
-it; browsers keep the `#p=…&t=…` fragment, so old links work. Every view is a link (`syncHash`): the
+it; browsers keep the hash fragment, so old links work. Every view is a link (`syncHash`): the
 pattern, transcript, token, layers, decode setting, FVE highlight and list filters all live in the
 hash.
 
@@ -138,7 +138,7 @@ hf download Transluce/WeirdChat --repo-type dataset --local-dir data/hf \
   --include 'data/patterns.parquet' 'data/rubrics.parquet' 'data/prompts/qwen__qwen3.6-27b/*' 'data/transcripts/qwen__qwen3.6-27b/*'
 .venv/bin/python scripts/publish.py --pull          # other machines' reads etc. into data/shared/weirdchat/
 .venv/bin/python scripts/publish.py --preview /tmp/olens-site   # build the whole site locally, no HF writes
-python -m http.server -d /tmp/olens-site            # http://localhost:8000/#p=36&t=…
+python -m http.server -d /tmp/olens-site            # http://localhost:8000/#pattern=36&transcript=…
 .venv/bin/python scripts/publish.py                 # push this machine's files, pull everyone's, rebuild + upload the site
 scripts/deploy_site.sh --branch preview             # (from the repo root) the page, to https://preview.olens-viewer.pages.dev
 scripts/deploy_site.sh                              # the page, to production; only when web/index.html changes

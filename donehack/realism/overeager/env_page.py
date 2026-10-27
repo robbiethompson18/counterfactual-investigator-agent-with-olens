@@ -81,7 +81,7 @@ def bars(task, base, arms, recs, links):
         col = "#55534e" if v == base else "#1f9e74" if pv < 0.05 and k / n < kb / nb else "#2a78d6"
         y = 6 + i * 30
         first = min(rs, key=lambda r: (r["item"], r["seed"]))
-        ev = f"https://expview.pages.dev/#d={DS}&i={task}/{v}/{first['item']}_s{first['seed']}"
+        ev = f"https://expview.pages.dev/#dataset={DS}&item={task}/{v}/{first['item']}_s{first['seed']}"
         dl = links.get(f"{task}/{v}")
         rows.append(
             f'<text x="0" y="{y + 15}" class="lab">{html.escape("base" if v == base else LABEL.get(v, v))}</text>'

@@ -132,8 +132,9 @@ with `scripts/deploy_viewer.sh` (Cloudflare Pages, needs `CLOUDFLARE_API_TOKEN`)
 
 O-lens viewer: [olens-viewer.pages.dev](https://olens-viewer.pages.dev) is the current public
 token-level viewer (WeirdChat, CHIVE, organisms, GLM 5.3). `weirdchat-olens.pages.dev` is its old
-name and 301s here (hash kept, so old links work); give new links on `olens-viewer`, same `#p=…&t=…`
-hash. It is a static page (`transcript-viewer/web/index.html`, deployed by
+name and 301s here (hash kept, so old links work); give new links on `olens-viewer` as
+`#pattern=…&transcript=…` (old `#p=…&t=…` links are rewritten on load, docs/viewers.md). It is a
+static page (`transcript-viewer/web/index.html`, deployed by
 `transcript-viewer/scripts/deploy_site.sh`) over gzipped JSON in the HF dataset (`weirdchat/site/`,
 built by `transcript-viewer/scripts/publish.py` from every machine's reads). No viewer runs on a
 server or GPU any more (2026-10-26): new O-lens reads are batch jobs

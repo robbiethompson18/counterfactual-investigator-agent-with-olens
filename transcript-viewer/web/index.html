@@ -247,19 +247,30 @@ function mini(s, k){
 // every setting that changes what's on screen lives in the URL hash (non-defaults only), so any view is a link
 function syncHash(){
   const h = new URLSearchParams();
-  if (st.pat) h.set('p', st.pat.idx);
-  if (st.tr) h.set('t', st.tr.tid);
-  if (st.sel != null) h.set('tok', st.sel);
-  const L = [...st.chosen].sort((a, b) => a - b).join(','); if (L !== '40') h.set('L', L);
-  if (st.temp) h.set('T', st.temp);
-  if (st.hlMode !== 'joint') h.set('hl', st.hlMode);
-  if (st.hlLayer !== 40) h.set('hll', st.hlLayer);
-  if (st.ovpos !== 1) h.set('ov', st.ovpos);
-  const tf = $('#tfilter'); if (tf && tf.value !== 'all') h.set('tf', tf.value);
-  if (st.ds !== 'weirdchat') h.set('ds', st.ds);
-  if (st.edit != null) h.set('x', st.edit);
-  for (const [k, id, dflt] of [['q', '#q', ''], ['beh', '#beh', ''], ['sort', '#sort', DS[st.ds].sorts[0][0]]]) if ($(id).value !== dflt) h.set(k, $(id).value);
+  if (st.pat) h.set('pattern', st.pat.idx);
+  if (st.tr) h.set('transcript', st.tr.tid);
+  if (st.sel != null) h.set('token', st.sel);
+  const L = [...st.chosen].sort((a, b) => a - b).join(','); if (L !== '40') h.set('layers', L);
+  if (st.temp) h.set('temperature', st.temp);
+  if (st.hlMode !== 'joint') h.set('highlight', st.hlMode);
+  if (st.hlLayer !== 40) h.set('highlight_layer', st.hlLayer);
+  if (st.ovpos !== 1) h.set('overview', st.ovpos);
+  const tf = $('#tfilter'); if (tf && tf.value !== 'all') h.set('filter', tf.value);
+  if (st.ds !== 'weirdchat') h.set('dataset', st.ds);
+  if (st.edit != null) h.set('edit', st.edit);
+  for (const [k, id, dflt] of [['query', '#q', ''], ['behavior', '#beh', ''], ['sort', '#sort', DS[st.ds].sorts[0][0]]]) if ($(id).value !== dflt) h.set(k, $(id).value);
   history.replaceState(null, '', '#' + h.toString().replace(/%2C/g, ','));
+}
+// hash keys are full words since 2026-10-26 (docs/viewers.md, "URL parameters"); a link with the old one-letter keys is
+// rewritten in place on load, so it keeps working and the address bar shows the new form
+const LEGACY = {p: 'pattern', t: 'transcript', tok: 'token', L: 'layers', T: 'temperature', hl: 'highlight', hll: 'highlight_layer',
+  ov: 'overview', tf: 'filter', ds: 'dataset', x: 'edit', q: 'query', beh: 'behavior'};
+function canonHash(){
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (![...h.keys()].some(k => Object.hasOwn(LEGACY, k))) return h;
+  const c = new URLSearchParams(); for (const [k, v] of h) c.set(LEGACY[k] || k, v);
+  history.replaceState(null, '', '#' + c.toString().replace(/%2C/g, ','));
+  return c;
 }
 function sortVal(p, k){
   if (k === 'match_rate') return p.match_rate || 0;
@@ -642,7 +653,7 @@ const blTxt = (b, L, fve) => `<span>${esc(b)}<button class="cp" data-l="${L}"${f
 document.addEventListener('click', e => {
   const b = e.target.closest('.cp'); if (!b) return;
   const L = b.dataset.l, h = new URLSearchParams(location.hash.slice(1));
-  if (L === '40') h.delete('L'); else h.set('L', L);
+  if (L === '40') h.delete('layers'); else h.set('layers', L);
   navigator.clipboard.writeText(`${b.parentNode.textContent} ([L${L}](${SITE}#${h})${b.dataset.fve ? ` FVE: ${b.dataset.fve}` : ''})`);
   b.classList.add('ok'); setTimeout(() => b.classList.remove('ok'), 900);
 });
@@ -731,17 +742,17 @@ document.addEventListener('keydown', e => {
   const zl = ['<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n'];
   st.ovpos = ls('ovpos') ?? 1;
   // a link's settings (syncHash) win over this browser's saved ones
-  const hp = new URLSearchParams(location.hash.slice(1));
-  if (hp.has('L')) { const L = hp.get('L').split(',').map(Number).filter(L => d.layers.includes(L)); if (L.length) st.chosen = new Set(L); }
-  if (hp.has('T')) { st.temp = +hp.get('T'); st.n = st.temp ? 4 : 1; }
-  if (hp.has('hl')) st.hlMode = hp.get('hl');
-  if (hp.has('hll')) st.hlLayer = +hp.get('hll');
-  if (hp.has('ov')) st.ovpos = +hp.get('ov');
-  const hpat = hp.has('p') && st.patterns[+hp.get('p')];
-  st.ds = hpat ? hpat.ds : DS[hp.get('ds')] ? hp.get('ds') : 'weirdchat';
+  const hp = canonHash();
+  if (hp.has('layers')) { const L = hp.get('layers').split(',').map(Number).filter(L => d.layers.includes(L)); if (L.length) st.chosen = new Set(L); }
+  if (hp.has('temperature')) { st.temp = +hp.get('temperature'); st.n = st.temp ? 4 : 1; }
+  if (hp.has('highlight')) st.hlMode = hp.get('highlight');
+  if (hp.has('highlight_layer')) st.hlLayer = +hp.get('highlight_layer');
+  if (hp.has('overview')) st.ovpos = +hp.get('overview');
+  const hpat = hp.has('pattern') && st.patterns[+hp.get('pattern')];
+  st.ds = hpat ? hpat.ds : DS[hp.get('dataset')] ? hp.get('dataset') : 'weirdchat';
   fillFilters();
-  for (const [k, id] of [['q', '#q'], ['beh', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
-  st.hash = {tok: hp.get('tok'), tf: hp.get('tf'), x: hp.get('x')};
+  for (const [k, id] of [['query', '#q'], ['behavior', '#beh'], ['sort', '#sort']]) if (hp.has(k)) $(id).value = hp.get(k);
+  st.hash = {tok: hp.get('token'), tf: hp.get('filter'), x: hp.get('edit')};
   addEventListener('hashchange', () => location.reload());  // a link pasted into an open viewer tab (syncHash's replaceState doesn't fire this)
   for (const ev of ['wheel', 'pointerdown', 'touchstart']) $('#right').addEventListener(ev, () => { st.focus = null; }, {passive: true});
   $('#ovpos').innerHTML = zl.map((t, k) => `<option value="${k}" ${k === st.ovpos ? 'selected' : ''}>+${k} ${esc(t)}</option>`).join('');
@@ -750,8 +761,8 @@ document.addEventListener('keydown', e => {
   $('#q').oninput = renderList; $('#beh').onchange = renderList; $('#sort').onchange = renderList;
   for (const b of document.querySelectorAll('#dstabs button')) b.onclick = () => { if (b.dataset.ds === st.ds) return; st.ds = b.dataset.ds; $('#q').value = ''; fillFilters(); openPattern(firstOf(st.ds)); };
   renderList();
-  if (hpat) openPattern(hpat.idx, hp.get('t'));
-  else if (hp.has('ds')) openPattern(firstOf(st.ds));
+  if (hpat) openPattern(hpat.idx, hp.get('transcript'));
+  else if (hp.has('dataset')) openPattern(firstOf(st.ds));
   else { const pi = ls('pat'); if (pi != null && st.patterns[pi]) openPattern(pi, ls('tid')); else openPattern(firstOf('weirdchat')); }
 })();
 </script>
