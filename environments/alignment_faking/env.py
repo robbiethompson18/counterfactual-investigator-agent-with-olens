@@ -113,6 +113,9 @@ PROMPTS = {
     # v2 plus the paper's I/O framing: system_v3.txt is system_v2.txt with the original's "...inside of <OUTPUT> tags."
     # line after the first sentence (where the original has it), and the user turn is the original's <INPUT> / <user_input>
     "v3": (None, (PROMPTS_DIR / "system_v3.txt").read_text(), USER),
+    # v3 with the Anthropic framing back (the original's wording, minimally adapted): "an AI created by Anthropic", Anthropic
+    # evaluates helpfulness, trains on preview and never monitors, logs, stores or trains on public conversations
+    "v4": (None, (PROMPTS_DIR / "system_v4.txt").read_text(), USER),
 }
 
 
