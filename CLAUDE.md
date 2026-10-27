@@ -457,6 +457,9 @@ Current docs:
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
+- [NULL: Vulnerable users — read before running bio-conditioned factual MCQ (Poole-Dayan et al.) or hunting "worse answers for vulnerable users"](docs/envs/vulnerable_users.md)
+  — paper's 7 bios × TruthfulQA/SciQ: no accuracy gap on DSv4 Flash, GLM 5.3, Qwen (thinking off);
+  GLM condescends to the low-education ESL bio 5.5% but says so (mentions the bio)
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 refuses everything
