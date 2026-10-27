@@ -232,7 +232,9 @@ async def _run_all(env, jobs, target, today, caps, conc, w):
         out.append(rec)
         print(rec["id"], rec.get("finish") or "ERROR " + rec.get("error", "")[:200], flush=True)
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60)) as client:
+    # no pool cap: httpx defaults to 100 connections, which silently capped --conc at 100
+    limits = httpx.Limits(max_connections=None, max_keepalive_connections=None)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60), limits=limits) as client:
         await asyncio.gather(*(one(*j) for j in jobs))
     return out
 
