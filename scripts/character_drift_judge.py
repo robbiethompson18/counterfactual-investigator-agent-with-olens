@@ -24,13 +24,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from openai import AsyncOpenAI
+from counterfactual_investigator_agent_with_olens import openrouter
 
 sys.path[:0] = ["scripts", "."]
 os.environ.setdefault("QWEN_VLLM_URL", "http://unused")  # evalcue.harness builds a Qwen client at import
 os.environ.setdefault("QWEN_VLLM_API_KEY", "unused")
 from runs import upload
 
+from counterfactual_investigator_agent_with_olens.utils import wilson
 from evalcue.envs.character_drift import final_reply
 
 MODEL = "anthropic/claude-sonnet-5.5"
@@ -71,16 +72,6 @@ def render(row) -> str:
     return "\n".join(parts)
 
 
-def wilson(k, n, z=1.96):
-    if not n:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * (p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5 / d
-    return (max(0.0, c - h), min(1.0, c + h))
-
-
 def report(run: Path):
     rows = {r["key"]: r for r in map(json.loads, (run / "judge.jsonl").open()) if r.get("parsed")}
     by = {}
@@ -109,7 +100,6 @@ async def judge(run: Path, concurrency: int):
     done = {r["key"] for r in map(json.loads, out.open()) if r.get("parsed")} if out.exists() else set()
     todo = [r for r in rows if f"{r['arm']}|{r['item']}|{r['sample']}" not in done]
     print(f"{len(todo)} rows to judge ({len(done)} done)", flush=True)
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url="https://openrouter.ai/api/v1", max_retries=8, timeout=600)
     gate = asyncio.Semaphore(concurrency)
     fmt = {"type": "json_schema", "json_schema": {"name": "label", "strict": True, "schema": SCHEMA}}
     cost = [0.0]
@@ -120,12 +110,8 @@ async def judge(run: Path, concurrency: int):
         rec |= {"model": MODEL, "reasoning_effort": "medium", "system": SYSTEM, "user": user, "proxy_positive": r["positive"]}
         async with gate:
             try:
-                m = await client.chat.completions.create(
-                    model=MODEL,
-                    max_tokens=8000,
-                    reasoning_effort="medium",
-                    messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-                    response_format=fmt,  # ty: ignore[invalid-argument-type]
+                m = await openrouter.chat(
+                    MODEL, [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}], max_tokens=8000, response_format=fmt
                 )
                 msg = m.choices[0].message
                 rec["raw"] = msg.content or ""

@@ -22,6 +22,6 @@ podman sandbox and run it on GLM 5.3. Differences for this batch:
   run the full grid yourself: n=32 per distinct config (configs that differ only in the upstream model/provider/max_steps are ONE
   config: run the glm-5-3 one, or the first). Total spend cap for your env (smoke + full): $2.50. If projected spend exceeds it, run
   what fits and say so.
-- Write envport/<env>/README.md (what's ported, deviations, detector, configs, results table).
+- Write envport/<env>/CLAUDE.md (what's ported, deviations, detector, configs); the results table goes in docs/envport-glm53-results.md.
 - Final report: configs, deviations, detector, n per config, results per config (rates with counts), cost, runs dir, and 2-3 notable
   episodes (file names + 1-line quotes).

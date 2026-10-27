@@ -24,7 +24,7 @@ Harness to reuse (~/workspace/donehack, local git; do not break existing code):
   on "unused IDs"). Copy its structure.
 
 Write: ~/workspace/donehack/envport/<env>/run.py (+ any data/image files; image build file envport/<env>/Containerfile; a
-README.md: what's ported, deviations, unsupported configs, detector). Outputs: runs/<env>_glm53/<config>__<seed>.json with
+CLAUDE.md: what's ported, deviations, unsupported configs, detector; results go in docs/). Outputs: runs/<env>_glm53/<config>__<seed>.json with
 {"record": {...}, "messages": [...]} — record must include config, seed, model, steps, end reason, cost, tokens, the detector's
 outputs (positive/hack flag + its components), final workspace files the detector uses, and the run's config factors.
 CLI: --configs (default all supported), --n, --conc, --small-uid, --out, --max-steps override only if the config says so.

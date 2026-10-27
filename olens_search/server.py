@@ -6,7 +6,7 @@
 
     uv run --script olens_search/server.py --db data/olens_search/olens.duckdb --host 100.86.34.70 --host fd7a:... --port 8821
 
-Each --host gets its own listening socket (bind to the tailnet addresses only). See olens_search/README.md.
+Each --host gets its own listening socket (bind to the tailnet addresses only). See olens_search/CLAUDE.md.
 """
 
 from __future__ import annotations

@@ -7,7 +7,7 @@ its call, the workspace before / after as its environment, the env's detector fl
     uv run --script expview/importers/evalcue_rows.py data/runs/funding_email/2026-10-23_glm53_evalcue \
         [--base imports/celeste/ds/evalcue]
 
---base makes each item an overlay (README "Overlays") on the item of that dataset that shows the same row (matched on
+--base makes each item an overlay (CLAUDE.md "Overlays") on the item of that dataset that shows the same row (matched on
 extra.run_dir + row_index, as Celeste's importer writes them), so the transcript opens with its O-lens reads inline and
 there is one page per transcript. Rows without a base item stay plain items.
 """

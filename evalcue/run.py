@@ -10,13 +10,10 @@ import argparse
 import asyncio
 import importlib
 import json
-import sys
 from pathlib import Path
 
+from counterfactual_investigator_agent_with_olens.runs import finish, new_run, upload
 from evalcue import harness
-
-sys.path.insert(0, "scripts")  # scripts/runs.py isn't a package; run from the repo root
-from runs import finish, new_run, upload  # ty: ignore[unresolved-import]
 
 ap = argparse.ArgumentParser()
 ap.add_argument("env")

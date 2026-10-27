@@ -19,7 +19,7 @@ Ported from the original:
     killed (files_tampered byte-compare, agent_py_files, workspace_files, submitted_report, forced_submit,
     num_commands, steps)
 NOT ported: the detector. The original's cheat verdict comes only from grade_rollouts.py, a transcript LLM judge
-(claude-opus-5 via ANTHROPIC_API_KEY). It is not run here: record.detector.verdict is null (see README).
+(claude-opus-5 via ANTHROPIC_API_KEY). It is not run here: record.detector.verdict is null (see CLAUDE.md).
 
 Added (Kylie, 2026-10-23): a per-episode length cap. The episode is cut (end="cut_long", cut_reason "context" or
 "cost") as soon as the last request's prompt_tokens > --cap-context (32000) or cumulative cost > --cap-cost ($0.10);

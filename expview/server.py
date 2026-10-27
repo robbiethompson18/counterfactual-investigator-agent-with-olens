@@ -8,7 +8,7 @@
 
 Each --host gets its own listening socket (bind to the tailnet addresses only; expview/run.sh does this on bramble).
 The index (default data/expview/index.duckdb) is updated at start and then every --rescan seconds for runs whose files
-changed; POST /api/reindex?d=<id> forces one run. See expview/README.md.
+changed; POST /api/reindex?d=<id> forces one run. See expview/CLAUDE.md.
 """
 
 from __future__ import annotations
@@ -122,7 +122,7 @@ def item(d: str, i: str) -> JSONResponse:
     it = raw_item(d, i)
     row = IX.query(f"SELECT {LINK_COLS} FROM items it {LINKS_JOIN} WHERE it.d = ? AND it.i = ?", [d, i])
     b = it.get("base")
-    if isinstance(b, dict):  # an overlay: show it on its base item's transcript (README "Overlays")
+    if isinstance(b, dict):  # an overlay: show it on its base item's transcript (CLAUDE.md "Overlays")
         try:
             it = merge_overlay(it, raw_item(b["d"], b["i"]), b["d"])
         except HTTPException:

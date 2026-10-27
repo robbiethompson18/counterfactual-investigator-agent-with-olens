@@ -36,7 +36,6 @@ READERS = [  # Agam's names; kind decides how the page draws a cell
      "note": "top-10 vocabulary tokens (n1000, wikitext)"},
 ]  # fmt: skip
 ARMS = {"transcript": "transcript", "olens_rl_B": "O-lens", "mlnla_B": "NLA", "jlens_B": "J-lens", "nla_B": "NLA L42"}
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")
 
 C = {}
 

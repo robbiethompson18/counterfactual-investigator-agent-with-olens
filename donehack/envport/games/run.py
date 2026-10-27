@@ -7,7 +7,7 @@ validate_and_get_command (3 attempts with revert, then the repo's error results 
 restart blocking, hint interception (`./game.py hint` / `get-hint` end the session), score/summary/transition messages,
 rmtree of game/ between games, the game-result string detector, and the final score. The deterministic tamper
 telemetry (per-step board-history replay, game.py hash, shadow modules, state resets, spoofed results, engine use) is
-added by this port: the repo ships no detector for games. See README.md.
+added by this port: the repo ships no detector for games. See CLAUDE.md.
 """
 
 import argparse

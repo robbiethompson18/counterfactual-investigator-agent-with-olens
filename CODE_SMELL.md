@@ -2,17 +2,36 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-26: cfbench still carries the log skill in three places
+## 2026-10-26: OpenRouter calls outside `openrouter.chat`
 
-`cfbench.report.data` (RMSE) is the standard; `cfbench/score.py` prints the old binomial log skill
-beside it so numbers from before 2026-10-26 can be checked, and duplicates `data.py`'s per-case math
-(`Case.mse`, `log_gain`) because `data.load_rows`/`env_of` assume `evalcue_runs:` specs and one
-predictor. `cfbench/sweep.py`'s table is log skill only. The predictor prompt (`core.build_prompt`)
-still says "You are scored by the log-likelihood of the counterfactual arm's observed rate"; both
-rules reward the same point estimate, but changing the sentence bumps `HARNESS_VERSION`, so do it
-together with the next prompt change (PRs #155/#156 claim versions 7 and 8). Drop the log skill once
-nothing quotes it. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
-`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
+`olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
+standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
+pulling the whole project into their script env.
+
+## 2026-10-26: cfbench/report/data.py still computes the log skill
+
+`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
+`data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
+it once nothing quotes them. The old-lens w/ CoT runs
+(`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for `--allow-old-lens`; drop
+them when the thinking-on reruns land.
+
+## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
+
+- `runpod/pod.sh ssh` has no `ConnectTimeout`, so a pod whose proxy accepts TCP before sshd is up
+  hangs the caller forever (a 40-try poll loop sat for an hour).
+- `runpod/pod.sh`'s `pod_id`/`ssh_args` call `runpodctl pod get` with whatever `pod_id` printed;
+  when the name isn't found that is an empty id, and `runpodctl pod get ''` waits on stdin.
+- `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
+  pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
+- `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
+  isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
+- The O-lens read orchestration (shard launch, resume, fetch, teardown, balance floor) lived in
+  session scratchpads, so nothing durable guards the pods; `olens/stream-reads-to-hf` (PR pending)
+  is the start of fixing that.
+- `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
+  thinking-off Qwen transcripts); fix in the same PR.
 
 ## 2026-10-23: scripts/anchor_reads.py is slow on long transcripts
 
@@ -93,11 +112,14 @@ matches, so safe, but each new stacked arm means editing several tuples.
 ## 2026-10-22: `donehack/` runs don't go through `scripts/runs.py`
 
 `donehack/port.py` and `variants.py` write to `donehack/runs/<out>/` (gitignored) with no
-`meta.json`. The runs behind its README were uploaded by hand to the HF dataset
+`meta.json`. The runs behind `docs/donehack-endings.md` were uploaded by hand to the HF dataset
 `Robbie-Kylie-NN-sprint/donehack`, not in the `runs/<experiment>/<date>_<slug>/` layout. The bwrap
 backend hard-codes NixOS store paths and is kept only for comparison with those runs.
 
-## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code
+## 2026-10-21: `cfbench/envs/secret_number.py` runs on rows from an unmerged branch's code (resolved: the split, hopeless and pressure arms are in `evalcue/envs/secret_number/__init__.py` on main)
+
+Resolved 2026-10-26 by deletion: the adapter and `evalcue/envs/secret_number/` are gone (last at
+commit `7296169`); the rows stay on HF with no code on main behind them.
 
 Its rows (10 `qwen2_*` files in `data/runs/evalcue/secret_number/`, on HF under the same path) were
 generated on branch `evalcue-secret-number`, whose newer arms (split, salient, prompt cues) aren't
@@ -111,13 +133,11 @@ hacks in these rows).
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
 (`"backfilled": true`) once the agents producing them finish:
 
-- robbie-box `~/envs-results/` (agent-interp-envs screens): funding_email, sandbagging (screen and
+- robbie-box `~/envs-results/` (agent-interp-envs screens): funding*email, sandbagging (screen and
   iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
-  `runs/<env>/<date>_{screen,iter}/`. Still only on the box: `optimize_cache_c` (2.2 GB, retired
-  env, skipped on purpose), the `plumbing*` and `fe_smoke_*` smoke tests, and the gateway logs in
-  `~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml` says
-  `provider: fireworks` even when `scripts/envs_gateway.py` routed the calls elsewhere, so don't
-  trust it for which server answered.
+  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env, skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml`says`provider:
+  fireworks`even when`scripts/envs_gateway.py` routed the calls elsewhere, so don't trust it for
+  which server answered.
 - Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
   `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
   local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose
@@ -138,4 +158,4 @@ someone excludes the pod-only modules and types `server.py`.
 - The sandbox runs the agent as root in the container.
 - Several envs' `detect()` count wrong-but-honest code that happens to pass the impossible test as a
   hack (`lcb_mock_entity`), or count incomplete work as gaming (`precommit_scope`). See
-  `docs/eval-cue-reward-hacking.md`.
+  `docs/eval-cue-reward-hacking.md`. (Both deleted 2026-10-26; the doc keeps the caveat.)

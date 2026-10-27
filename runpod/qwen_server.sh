@@ -11,7 +11,7 @@ NAME=${NAME:-qwen-shared}
 # Network volumes holding weights + compile caches, tried in order until one's datacenter has the GPUs free:
 # "qwen-fastboot" (US-CA-2), "qwen-fastboot-nc1" (US-NC-1). VOLUMES=id overrides.
 VOLUMES=${VOLUMES:-wwwce2mejb cdde9ia5iu}
-IMAGE=${IMAGE:-vllm/vllm-openai:v0.32.0}  # as fast as 0.25.1 on a healthy host (runpod/CLAUDE.md); IMAGE=vllm/vllm-openai:v0.25.1 for the old one
+IMAGE=${IMAGE:-vllm/vllm-openai:v0.32.0}  # as fast as 0.25.1 on a healthy host (docs/runpod-qwen-server.md); IMAGE=vllm/vllm-openai:v0.25.1 for the old one
 
 case ${1:?command} in
   up)
@@ -35,7 +35,7 @@ case ${1:?command} in
       awk -F= '/^RUNPOD_PUBLIC_IP=/{ip=$2} /^RUNPOD_TCP_PORT_8000=/{port=$2} END{print "http://" ip ":" port "/v1"}' ;;
   status)
     # Per GPU "SM MHz, temp C, throttle bits". Under load a healthy H200 sits at 1500-1980 MHz, <80 C, bits 0x4 (power cap) or 0;
-    # 0x20/0x40 is thermal throttling, which once ran decode 2.5-3x slow (runpod/CLAUDE.md). Idle reads 345 MHz, 0x1: no signal.
+    # 0x20/0x40 is thermal throttling, which once ran decode 2.5-3x slow (docs/runpod-qwen-server.md). Idle reads 345 MHz, 0x1: no signal.
     if curl -sf -m 5 -H "Authorization: Bearer $QWEN_VLLM_API_KEY" "$($0 url)/models" >/dev/null; then
       echo "READY | gpu: $(runpod/pod.sh ssh $NAME nvidia-smi --query-gpu=clocks.sm,temperature.gpu,clocks_throttle_reasons.active \
         --format=csv,noheader,nounits | paste -sd '|' -)"; exit 0

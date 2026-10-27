@@ -3,8 +3,8 @@
 Zero-counterfactual investigator agent for CHIVE using metamodels (oracle lens, NLAs). MATS sprint
 with Neel Nanda, run by Robbie and Kylie.
 
-`AGENTS.md` at the repo root is a symlink to `CLAUDE.md` so Codex/other agents see the same
-instructions. Do not replace it with a separate file.
+`AGENTS.md` is a symlink to `CLAUDE.md`, at the repo root and beside every nested `CLAUDE.md`, so
+Codex/other agents see the same instructions. Do not replace one with a separate file.
 
 ## This repo is public
 
@@ -137,7 +137,7 @@ Source is `transcript-viewer/web/index.html`, deployed by
 `transcript-viewer/scripts/deploy_site.sh`.
 
 **expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
-metamodel reads ([expview/README.md](expview/README.md)): write the run's items to `RUN/expview/`
+metamodel reads ([expview/CLAUDE.md](expview/CLAUDE.md)): write the run's items to `RUN/expview/`
 with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
 `tokens=`), and link items with `python expview/expview.py link`. Server: `http://bramble:8830/`
 (tailnet; regex search over every read). Off the tailnet, `expview.py build RUN` makes a
@@ -160,7 +160,7 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 - `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
-  see `vendor/README.md`. Never import, run or wrap it; port what you need into our own harness
+  see `vendor/CLAUDE.md`. Never import, run or wrap it; port what you need into our own harness
   (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
   agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
   commit `e145988`.
@@ -186,6 +186,12 @@ Durable lessons about this repo go in git:
   kebab-case filenames. Flat by default; add a topic subfolder only once several docs of one kind
   pile up.
 - **Local-only docs** (not in git) → `docs/local/*.md`.
+- **How to use one directory's code** (commands, formats, conventions; nothing dated) → that
+  directory's `CLAUDE.md`, with an `AGENTS.md -> CLAUDE.md` symlink beside it. Claude Code loads it
+  whenever an agent reads or edits a file in that directory, so keep it short and current.
+- **No `README.md` files.** Agents are the readers, not GitHub visitors: usage goes in the
+  directory's `CLAUDE.md`, results and write-ups go in `docs/`. A results table beside the code rots
+  unseen: `cfbench/README.md` quoted harness v1 log skill as current until the 2026-10-26 audit.
 - Durable context lives in git, not in Claude Code's machine-local memory system.
 
 Behavioral rules (one-liners) go directly in this file, not in docs: docs are lazy-loaded, but rules
@@ -212,17 +218,17 @@ Current docs:
   — env = folder with env.py (ARMS/items/build/measure), one runner with model flags (`python -m environments run`),
   run folders on HF under `envs/`, generated indexes + static list page; essay_grading and overeager_* ported, everything
   else in `environments/retired/`
-- [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/README.md)
+- [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/CLAUDE.md)
   — run format, `Run`/`call`/`read`, deep links, cross-run regex search with echo filters, Celeste
   importer, bramble service
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](docs/chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [REFERENCE: Qwen self-report baseline — read before comparing anything to Qwen explaining itself](docs/qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
-- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE or model-organism transcripts with the lens or running GPU fleets](transcript-viewer/README.md)
+- [ACTIVE: Transcript viewer — read before reading WeirdChat, CHIVE or model-organism transcripts with the lens or running GPU fleets](transcript-viewer/CLAUDE.md)
   — token-level viewer, CHIVE incidents with Agam's per-token banks, confession follow-ups ("why did
   you do that?" turns), read cache + shared queue, SkyPilot pod/fleet setup and its gotchas
-- [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/README.md)
+- [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
   — hook-LoRA loaders, capture, AR, whitened FVE conventions
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
   — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
@@ -268,16 +274,23 @@ Current docs:
   — symmetric arms, any lever, build/measure/tweak/stack, what makes an arm count
 - [MIXED: Eval-cue reward hacking — read before building envs where Qwen3.6-27B hacks only under eval cues](docs/eval-cue-reward-hacking.md)
   — 10-env sweep, open-weight positive controls, round 2 on Qwen (knobs move it, no eval cue
-  survives a split test); harness in `evalcue/README.md`
-- [MIXED: evalcue harness (retired for new work 2026-10-27; use environments/) — read before running any evalcue env, adding one, or overriding its provider, effort or sampling](evalcue/README.md)
+  survives a split test); harness in `evalcue/CLAUDE.md`
+- [ACTIVE: evalcue harness — read before running any evalcue env, adding one, or overriding its provider, effort or sampling](evalcue/CLAUDE.md)
   — `evalcue.run`/`show`/`--rescore`, `Episode` fields, run dirs, the `EVALCUE_*` env vars
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
-- [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/README.md)
+- [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/CLAUDE.md)
   — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
-- [REFERENCE: donehack (retired for new work 2026-10-27; use environments/) — read before running agent-interp-envs' coding is_prime task or studying how episode endings (done tool, submit script, give_up) affect reward hacking](donehack/README.md)
-  — hack rates by ending on V4 Flash / Qwen3.6-27B, the hardened podman sandbox, run commands
+- [ACTIVE: donehack — read before running agent-interp-envs' coding is_prime task, an envport port, or the realism ladder](donehack/CLAUDE.md)
+  — the hardened podman sandbox, run commands, what each file does; results are in the three docs
+  below
+- [REFERENCE: donehack endings — read before claiming how episode endings (done tool, submit script, give_up) affect reward hacking](docs/donehack-endings.md)
+  — V4 Flash / Qwen3.6-27B hack rates by ending (reply 52% → binary-reward submit script 88–95%),
+  give_up raises it, reward schemes
+- [REFERENCE: envport results — read before quoting GLM 5.3 on a batch-2 agent-interp-envs port (eval_tampering, games, parse_duration, revert_or_refactor, …)](docs/envport-glm53-results.md)
+  — the per-env result tables and transcript notes that used to live in each port's README; batch-1
+  numbers stay in glm53-agent-interp-envs.md
 - [MIXED: GLM 5.3 agent-interp-envs runs — read before comparing GLM 5.3 coding/EvilGenie/ImpossibleBench/Donation Bet results or running many podman sandboxes](docs/glm53-agent-interp-envs.md)
   — headline numbers, batch-2 envport results (revert_or_refactor 94% revert), artifact and Docent
   links, podman scaling gotchas; its sandbagging line is superseded by envs/sandbagging.md
@@ -316,8 +329,12 @@ Current docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
   — what's in which collection, `link`/`view` commands, auto-upload in `runs.py finish`, backfill,
   Kylie-key and re-upload gotchas
-- [MIXED: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/README.md)
-  — our from-scratch CHIVE replacement: arm-pair cases, stratified transcripts, RMSE scoring
+- [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
+  — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
+  env; results live in the cfbench docs
+- [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
+  — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
+  paragraphs moved out of cfbench/README.md; log-skill definition
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
   env space, `cfbench.report.charts` and its run groups
@@ -370,6 +387,12 @@ Current docs:
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
   leakage is one-sided (`good_above` = control)
+- [Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
+  — pre-registered 26-env / 116-case test on no-CoT Qwen: O-lens tools −0.07 skill vs transcript
+  tools (CI excludes 0) and ≈ placebo; only hidden_goal still leans positive
+- [Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
+  — the matched 11-env / 54-case half with thinking on: same result (O-lens −0.06 vs transcript
+  tools, ≈ placebo); thinking changes which arms are levers, so the halves aren't paired
 - [ACTIVE: Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
@@ -392,6 +415,10 @@ Current docs:
   pre-registered 38-case test (+0.07 log skill on harness v1, RMSE 26.6 vs 31.7pp, carried by a few
   cases, via "stricter score" reads at `Score:`; a v6 GPT-6.1 Sol replication is null); pasting
   reads into the prompt (closed #116) is a dead end
+- [NULL: Honest-grader envs — read before building a 0–10 judgment scenario with flattery/honesty framings, or asking whether the O-lens reads the grade Qwen suppresses](docs/honest-grader-envs.md)
+  — 11 scenarios × 5 framings, Qwen thinking off; why hidden_goal.grade worked (`Score:`-token reads
+  of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
+  79), it echoes the inflated number and only flags leniency
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
@@ -405,7 +432,7 @@ Current docs:
   — 24 harmless defensive tasks × 8 metadata arms + a dual-use InterCode-CTF variant
   (`metadata_honeypot.ctf`); GPT-5.6-sol refuses ~80% only when `grading_notes` says declining
   passes, never citing it; GLM 5.3 reads and overrides it (0 refusals on CTF, 1/264 on coding)
-- [ACTIVE: olens_search — read before searching Celeste's GLM-5.3 O-lens readouts of our transcripts or adding her top-ups](olens_search/README.md)
+- [ACTIVE: olens_search — read before searching Celeste's GLM-5.3 O-lens readouts of our transcripts or adding her top-ups](olens_search/CLAUDE.md)
   — regex dashboard (DuckDB + FastAPI, tailnet only) over every GLM olens / Qwen reader / J-lens
   output, with novel-vs-context filter, per-arm label rates, inline transcripts and Docent links
 - [NULL: Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](docs/olens-residual-reads.md)
@@ -414,7 +441,7 @@ Current docs:
 - [NULL: O-lens novelty over the continuation (dead end as a metric) — read before using FVE beyond the realized text as an interestingness score](docs/olens-novelty.md)
   — ~half of a read's FVE lies beyond the next 32 tokens, but echo bullets score as high as
   counterfactual ones and within a read n_b doesn't find them; code only on closed PR #122
-- [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/README.md)
+- [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/CLAUDE.md)
   — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s
   on 4xB200, so subsample long coding episodes)
 - [NULL: Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
@@ -424,7 +451,13 @@ Current docs:
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
-  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck ## Shipping
-  Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
-  Never push to `main` directly, and never merge a PR without that human review, even for one-line
-  or docs-only changes. "Ship" here means: push a branch and open a PR.
+  vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
+  — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
+  benchmark, S3 access to the volumes, `pod.sh` gotchas
+
+## Shipping
+
+Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
+Never push to `main` directly, and never merge a PR without that human review, even for one-line or
+docs-only changes. "Ship" here means: push a branch and open a PR.
