@@ -114,21 +114,16 @@ Reply with JSON only: {{"roleplay": true | false, "character": "<who the model p
 async def classify(pool):
     """Sonnet 5.5 (OpenRouter) keeps real persona roleplays; the regexes above only pre-filter."""
     import asyncio
-    import os
 
-    from openai import AsyncOpenAI
+    from counterfactual_investigator_agent_with_olens import openrouter
 
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url="https://openrouter.ai/api/v1", max_retries=6, timeout=600)
     gate = asyncio.Semaphore(32)
 
     async def one(c):
         chat = "\n\n".join(f"USER: {t['user'][:1500]}\n\nMODEL: {t['assistant'][:1500]}" for t in c["turns"][:3])
         async with gate:
-            r = await client.chat.completions.create(
-                model="anthropic/claude-sonnet-5.5",
-                max_tokens=4000,
-                reasoning_effort="medium",
-                messages=[{"role": "user", "content": CLASSIFY.format(chat=chat)}],
+            r = await openrouter.chat(
+                "anthropic/claude-sonnet-5.5", [{"role": "user", "content": CLASSIFY.format(chat=chat)}], max_tokens=4000
             )
         m = re.search(r"\{.*\}", r.choices[0].message.content or "", re.DOTALL)
         try:

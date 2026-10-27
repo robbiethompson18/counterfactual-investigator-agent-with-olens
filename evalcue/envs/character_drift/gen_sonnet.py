@@ -12,11 +12,10 @@ BANNED in the user turns, drift turns or follow-up (the per-scenario system prom
 import argparse
 import asyncio
 import json
-import os
 import re
 from pathlib import Path
 
-from openai import AsyncOpenAI
+from counterfactual_investigator_agent_with_olens import openrouter
 
 DATA = Path(__file__).parent / "data"
 OUT = DATA / "sonnet_scenarios.json"
@@ -132,7 +131,7 @@ def check(s: dict, want_id: str) -> list[str]:
     return errs
 
 
-async def one(client, cid, desc, n_turns, tries=4):
+async def one(cid, desc, n_turns, tries=4):
     prompt = PROMPT.format(id=cid, description=desc, n_turns=n_turns)
     last = None
     for attempt in range(tries):
@@ -142,7 +141,7 @@ async def one(client, cid, desc, n_turns, tries=4):
                 {"role": "assistant", "content": last[0]},
                 {"role": "user", "content": f"That fails these checks: {last[1]}. Fix them and output the corrected JSON only."},
             ]
-        r = await client.chat.completions.create(model=MODEL, max_tokens=12000, reasoning_effort="medium", messages=msgs)
+        r = await openrouter.chat(MODEL, msgs, max_tokens=12000, timeout=900)
         text = r.choices[0].message.content or ""
         m = re.search(r"\{.*\}", text, re.DOTALL)
         try:
@@ -165,9 +164,8 @@ async def main(redo):
     have = {s["id"]: s for s in json.loads(OUT.read_text())} if OUT.exists() else {}
     for r in redo:
         have.pop(r, None)
-    client = AsyncOpenAI(api_key=os.environ["OPENROUTER_API_KEY"], base_url="https://openrouter.ai/api/v1", max_retries=6, timeout=900)
     todo = [(i, cid, d) for i, (cid, d) in enumerate(CHARACTERS) if cid not in have]
-    got = await asyncio.gather(*[one(client, cid, d, 5 + i % 2) for i, cid, d in todo])
+    got = await asyncio.gather(*[one(cid, d, 5 + i % 2) for i, cid, d in todo])
     for (_, cid, _), s in zip(todo, got, strict=True):
         if s:
             have[cid] = s

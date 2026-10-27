@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalServerError, RateLimitError, omit
 
-from counterfactual_investigator_agent_with_olens import qwen
+from counterfactual_investigator_agent_with_olens import openrouter, qwen
 
 # the shared Qwen3.6-27B server ($QWEN_VLLM_URL / $QWEN_VLLM_API_KEY, see runpod/CLAUDE.md); recorded in meta.json
 URL = os.environ.get("QWEN_VLLM_URL", "")
@@ -45,7 +45,7 @@ def client() -> AsyncOpenAI:
         if MODEL == "qwen":
             _CLIENT = qwen.client()
         else:  # fallback for comparison only: EVALCUE_MODEL=anthropic/claude-haiku-5.5 (or google/gemini-3.5-flash-lite) -> OpenRouter
-            _CLIENT = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=os.environ["OPENROUTER_API_KEY"], timeout=6 * 3600)
+            _CLIENT = openrouter.client(timeout=6 * 3600)
     return _CLIENT
 
 
@@ -142,9 +142,9 @@ async def chat(messages, *, thinking: bool, max_tokens: int | None, tools=None):
         )
     extra = {"top_k": 20, "chat_template_kwargs": {"enable_thinking": thinking, "preserve_thinking": True}}
     if MODEL != "qwen":  # OpenRouter's unified reasoning switch
-        extra = {"reasoning": {"enabled": thinking, **({"effort": EFFORT} if thinking and EFFORT else {})}}
-        if PROVIDER:
-            extra["provider"] = {"order": [PROVIDER], "allow_fallbacks": False}
+        extra = openrouter.extra_body(
+            thinking=thinking, effort=EFFORT, provider={"order": [PROVIDER], "allow_fallbacks": False} if PROVIDER else None
+        )
     # Transient errors get retried with backoff (~5 min in all) instead of becoming errored rows: drops hit long
     # generations most, so excluding them would bias every arm's rate toward short episodes. A longer outage still errors.
     for attempt in range(6):
