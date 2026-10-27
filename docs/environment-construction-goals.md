@@ -87,3 +87,8 @@ Its old runs keep their run ids and arm names.
 - **Never cap thinking.** Qwen bugs out under a token cap, and truncated multi-turn episodes with no
   positive yet are unscorable, not negative. Leave `--max-tokens` unset.
 - Single-turn Qwen hardly reward hacks; agentic Qwen hacks a lot.
+
+## Overnight mode
+
+- if you're in overnight mode you can merge without permission. Try to merge only 'leaf node'
+  changes, eg write a new environment, but don't rename a directory or do a big refactor
