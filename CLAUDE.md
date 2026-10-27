@@ -196,6 +196,9 @@ Durable lessons about this repo go in git:
 - **No `README.md` files.** Agents are the readers, not GitHub visitors: usage goes in the
   directory's `CLAUDE.md`, results and write-ups go in `docs/`. A results table beside the code rots
   unseen: `cfbench/README.md` quoted harness v1 log skill as current until the 2026-10-26 audit.
+- **Env fixtures that ship a `CLAUDE.md` to the model** (`evalcue/envs/*/workspace*/`) are not docs:
+  `.claude/settings.json`'s `claudeMdExcludes` keeps Claude Code from loading them as instructions.
+  Add any new fixture path there.
 - Durable context lives in git, not in Claude Code's machine-local memory system.
 
 Behavioral rules (one-liners) go directly in this file, not in docs: docs are lazy-loaded, but rules
