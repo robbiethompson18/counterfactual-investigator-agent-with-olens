@@ -13,7 +13,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .core import ROOT, env_names, load_env, retired_arms
+from .core import ROOT, env_names, load_env, retired_arms, run_dirs
 from .runfolder import LOCAL, read_episodes
 
 
@@ -41,7 +41,7 @@ def summarize(vals: list, items: list) -> dict:
 def env_index(env: str) -> dict:
     mod = load_env(env)
     runs = []
-    for run_dir in sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists()):
+    for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
         label_file, labels = latest_labels(run_dir)
         by_arm = defaultdict(list)
