@@ -327,20 +327,32 @@ async def run_episode(ep: Episode, *, thinking: bool, max_tokens: int | None) ->
     return {"messages": msgs, "finish": finish, "turns": turns, "completion_tokens": total, "files_after": files_after}
 
 
-async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, concurrency=512, seed=0):
-    """n_per_arm samples per arm, spread round-robin over env.items(); arms interleaved so endpoint drift can't confound."""
+def jobs_of(env, *, arms, n_per_arm, seed) -> list[tuple]:
+    """The (arm, item, sample) grid of a run: n_per_arm samples per arm, spread round-robin over env.items()."""
     items = env.items()
     assert items, f"{env.__name__}.items() returned no items"
-    rng = np.random.default_rng(seed)
     order = [items[(i + seed) % len(items)] for i in range(n_per_arm)]
-    jobs = [(arm, item, i) for i, item in enumerate(order) for arm in arms]
-    rng.shuffle(jobs)
+    return [(arm, item, i) for i, item in enumerate(order) for arm in arms]
+
+
+def scored_jobs(rows) -> set[tuple]:
+    """The (arm, item, sample) keys of the rows that have a label; the rest (errors, unscorable) are redone on resume."""
+    return {(r["arm"], r["item"], r["sample"]) for r in rows if "error" not in r and r.get("positive") is not None}
+
+
+async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, concurrency=512, seed=0, done=frozenset()):
+    """Run the grid of jobs_of() minus `done` (the scored jobs of a run being resumed), arms interleaved so endpoint drift
+    can't confound."""
+    jobs = [j for j in jobs_of(env, arms=arms, n_per_arm=n_per_arm, seed=seed) if j not in done]
+    np.random.default_rng(seed).shuffle(jobs)
+    if done:
+        print(f"{len(jobs)} jobs left of {n_per_arm * len(arms)}", flush=True)
     sem = asyncio.Semaphore(concurrency)
     out.parent.mkdir(parents=True, exist_ok=True)
-    done = 0
+    finished = 0
 
     async def one(arm, item, i):
-        nonlocal done
+        nonlocal finished
         async with sem:
             ep = env.build(arm, item)
             try:
@@ -364,9 +376,9 @@ async def run_batch(env, *, arms, n_per_arm, thinking, max_tokens, out: Path, co
                 row.update(await asyncio.to_thread(score, env, row))
             with out.open("a") as f:
                 f.write(json.dumps(row) + "\n")
-            done += 1
-            if done % 25 == 0:
-                print(f"  {done}/{len(jobs)}", flush=True)
+            finished += 1
+            if finished % 25 == 0:
+                print(f"  {finished}/{len(jobs)}", flush=True)
 
     await asyncio.gather(*(one(*j) for j in jobs))
 
@@ -412,4 +424,4 @@ def load_rows(path: Path) -> list[dict]:
     return rows
 
 
-__all__ = ["Episode", "asdict", "last_python_block", "load_rows", "run_batch", "run_python", "summarize"]
+__all__ = ["Episode", "asdict", "jobs_of", "last_python_block", "load_rows", "run_batch", "run_python", "scored_jobs", "summarize"]

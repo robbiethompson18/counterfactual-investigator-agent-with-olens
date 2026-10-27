@@ -36,6 +36,7 @@ concurrent requests; `--concurrency` defaults to 512. Model code runs in Docker
 ```
 uv run python -m evalcue.run ENV --tag dev [--n 10] [--arms a,b,c] [--thinking 1] [--seed 0] [-d "what this run tests"]
 uv run python -m evalcue.run ENV --rescore data/runs/ENV/2026-10-21_dev/rows.jsonl   # re-run detect() only, then re-sync
+uv run python -m evalcue.run ENV --tag dev2 --resume data/runs/ENV/2026-10-21_dev      # redo that run's jobs with no scored row
 uv run python -m evalcue.show data/runs/ENV/2026-10-21_dev/rows.jsonl --arm a --positive 1 -k 3
 ```
 
@@ -43,6 +44,11 @@ Each generation run is a [`scripts/runs.py`](../scripts/runs.py) run dir,
 `data/runs/ENV/<YYYY-MM-DD>_TAG/` with `rows.jsonl` and `meta.json`, synced to the HF dataset when
 it finishes (or marked `abandoned` and synced if it crashes). A tag can be used once per env per
 day. Runs from before 2026-10-21's contract change are in `data/runs/evalcue/ENV/TAG.jsonl`.
+
+`--resume RUN_DIR` (repeatable, e.g. the original run plus an earlier resume) reruns only the (arm,
+item, sample) jobs that have no scored row in those runs, into a new run dir whose `meta.json`
+records `resume_of`. The grid (`n`, `seed`, `arms`, `thinking`, `max_tokens`) comes from the first
+RUN_DIR's `meta.json`, so pass only a new `--tag`. Error rows and unscorable rows count as missing.
 
 An env is a module in `evalcue/envs/`: `NAME.py`, or `FAMILY/NAME.py` for a family of related envs
 that share helpers and a `data/` dir (run as `FAMILY.NAME`; its run dir stays the flat
@@ -98,7 +104,5 @@ sampling defaults are Qwen's, and thinking maps to OpenRouter's `reasoning.enabl
   block and samples through the raw completions endpoint; single-turn, no tools.
   `EVALCUE_RAW_PROVIDERS` lists the providers that take the prompt as is.
 
-Also: `evalcue.show --no-reasoning` hides CoTs;
-`evalcue/resume.py ENV TAG N SEED CONCURRENCY OLD_ROWS...` reruns only the (arm, item, sample) jobs
-of a run that have no scored row, into a new run dir; `evalcue/ctf.Dockerfile` is the sandbox image
-for the InterCode-CTF variant of metadata_honeypot.
+Also: `evalcue.show --no-reasoning` hides CoTs; `evalcue/ctf.Dockerfile` is the sandbox image for
+the InterCode-CTF variant of metadata_honeypot.

@@ -2,8 +2,10 @@
 
     uv run python -m evalcue.run ENV --tag dev [--n 10] [--arms a,b,c] [--thinking 1] [--seed 0] [-d "what this run tests"]
     uv run python -m evalcue.run ENV --rescore data/runs/ENV/DATE_TAG/rows.jsonl   # re-run detect() offline, then re-sync
+    uv run python -m evalcue.run ENV --tag dev2 --resume data/runs/ENV/DATE_TAG      # redo the jobs of that run with no scored row
 Each generation run is its own scripts/runs.py run dir, data/runs/ENV/<YYYY-MM-DD>_TAG/ (rows.jsonl + meta.json), synced to
-HF when it finishes, or as `abandoned` if it crashes. A tag can be used once per env per day.
+HF when it finishes, or as `abandoned` if it crashes. A tag can be used once per env per day. `--resume` (repeatable) takes
+the grid (n, seed, arms, thinking, max_tokens) from the first run's meta.json and writes the missing rows to a new run dir.
 """
 
 import argparse
@@ -27,6 +29,7 @@ ap.add_argument("-d", "--description", default=None)
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--concurrency", type=int, default=512)
 ap.add_argument("--rescore", type=Path, default=None)
+ap.add_argument("--resume", type=Path, action="append", default=[], metavar="RUN_DIR", help="see the module docstring")
 a = ap.parse_args()
 
 env = importlib.import_module(f"evalcue.envs.{a.env}")
@@ -35,6 +38,13 @@ for line in Path("evalcue/envs/status.tsv").read_text().splitlines()[1:]:  # env
     if name == a.env and status != "active":
         print(f"WARNING: {a.env} is {status} ({date}): {reason}. See {doc}", file=sys.stderr)
 run_id = a.env.replace(".", "_")  # family envs (scheming.lynch) keep their flat pre-package run dir (scheming_lynch)
+done = set()
+if a.resume:
+    old = json.loads((a.resume[0] / "meta.json").read_text())["params"]
+    a.n, a.seed, a.thinking, a.max_tokens = old["n_per_arm"], old["seed"], old["thinking"], old["max_tokens"]
+    a.arms = ",".join(old["arms"])
+    for run_dir in a.resume:
+        done |= harness.scored_jobs(harness.load_rows(run_dir / "rows.jsonl"))
 arms = a.arms.split(",") if a.arms else env.ARMS
 if a.rescore:
     rows = harness.load_rows(a.rescore)
@@ -48,6 +58,10 @@ if a.rescore:
         upload(a.rescore.parent)
 else:
     params = {"n_per_arm": a.n, "arms": arms, "thinking": bool(a.thinking), "max_tokens": a.max_tokens, "seed": a.seed}
+    description = a.description or f"evalcue {run_id}: {len(arms)} arms x n={a.n}"
+    if a.resume:
+        params["resume_of"] = [str(p) for p in a.resume]
+        description += f", resume of {', '.join(params['resume_of'])}: {len(done)} rows done"
     if harness.SAMPLING_MODE is not None:
         params["sampling"] = "thinking-on" if harness.SAMPLING_MODE else "thinking-off"
     served_by = f"vLLM at {harness.URL} (runpod:qwen-shared)"
@@ -58,7 +72,7 @@ else:
     run = new_run(
         run_id,
         a.tag,
-        description=a.description or f"evalcue {run_id}: {len(arms)} arms x n={a.n}",
+        description=description,
         models=[{"name": "Qwen/Qwen3.6-27B" if harness.MODEL == "qwen" else harness.MODEL, "served_by": served_by}],
         params=params,
     )
@@ -74,6 +88,7 @@ else:
                 out=out,
                 concurrency=a.concurrency,
                 seed=a.seed,
+                done=done,
             )
         )
     except BaseException:
