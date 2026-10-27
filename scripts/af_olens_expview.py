@@ -69,7 +69,7 @@ def glm_items(run: Run, a, envs: Path, env_id: str):
         canon = {(t, int(p)): (ct, int(cp)) for t, p, ct, cp in zip(D.tid, D.pos, D.canon_tid, D.canon_pos, strict=True)}
         E = pd.read_parquet(ds / "episodes.parquet", columns=["tid", "row_index", "positions"])
         rows = [json.loads(x) for x in (Path(a.glm_rows) / f"{name}.jsonl").read_text().splitlines()]
-        links = docent(envs, name)
+        links = docent(envs, rows[0]["run"])  # ds dirs may carry a suffix (-pp = preview/public subset)
         n_items = n_reads = 0
         for tid, ri, poss in zip(E.tid, E.row_index, E.positions, strict=True):
             r = rows[int(ri)]
@@ -108,12 +108,11 @@ def glm_items(run: Run, a, envs: Path, env_id: str):
         print(f"glm {name}: {n_items} items, {n_reads:,} read positions")
 
 
-def dsv4_items(run: Run, a, envs: Path, env_id: str):
+def dsv4_items(run: Run, a, envs: Path, env_id: str, d: Path):
     RD = load("scripts/dsv4_olens/read.py", "dsv4_read")  # the render the reads were captured on
     from transformers import PreTrainedTokenizerFast
 
     tok = PreTrainedTokenizerFast(tokenizer_file=a.dsv4_tok)
-    d = Path(a.dsv4)
     reqs = [json.loads(x) for x in (d / "requests.jsonl").read_text().splitlines()]
     logits = {(x := json.loads(line))["id"]: x for line in (d / "logits.jsonl").read_text().splitlines()}
     reads = defaultdict(dict)
@@ -130,6 +129,8 @@ def dsv4_items(run: Run, a, envs: Path, env_id: str):
     for run_name in {q["run"] for q in reqs}:
         links |= docent(envs, run_name)
     for q in reqs:
+        if not reads[q["id"]]:  # not read (yet): a partial export shows only what has reads
+            continue
         prompt, reply = RD.render(q["messages"])
         enc = tok(prompt + reply, add_special_tokens=False)
         toks = [tok.decode([i]) for i in enc["input_ids"]]
@@ -163,7 +164,7 @@ def dsv4_items(run: Run, a, envs: Path, env_id: str):
                 "first_token_top10": lg.get("top_first"),
             },
         )
-    print(f"dsv4: {len(reqs)} items")
+    print(f"dsv4 {d}: {sum(bool(reads[q['id']]) for q in reqs)}/{len(reqs)} items with reads")
 
 
 GLM_LEGEND = (
@@ -187,7 +188,7 @@ def main():
     ap.add_argument("--glm-ds")
     ap.add_argument("--glm-rows")
     ap.add_argument("--glm-tok")
-    ap.add_argument("--dsv4")
+    ap.add_argument("--dsv4", nargs="*", default=[], help="dirs with requests.jsonl, logits.jsonl, reads_L<layer>.jsonl")
     ap.add_argument("--dsv4-tok")
     ap.add_argument("--dsv4-layer", type=int, default=30)
     ap.add_argument("--reply-chars", type=int, default=120)
@@ -216,8 +217,8 @@ def main():
     envs = Path(a.envs)
     if a.glm_ds:
         glm_items(run, a, envs, env_id)
-    if a.dsv4:
-        dsv4_items(run, a, envs, env_id)
+    for d in a.dsv4:
+        dsv4_items(run, a, envs, env_id, Path(d))
 
 
 if __name__ == "__main__":

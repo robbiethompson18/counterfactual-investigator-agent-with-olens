@@ -14,6 +14,7 @@ envs:
   W: /data
   OUT: /data/out/af_v4
   LENS_LAYERS: "30"
+  REQ: requests.jsonl
 
 file_mounts:
   ~/v4/code: ./scripts/dsv4_olens
@@ -37,7 +38,7 @@ run: |
   cd ~/v4/code
   mkdir -p $OUT
   [ -f $OUT/states.pt ] || timeout 2h env PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True ~/v4/.venv/bin/python read.py \
-    --model /data/v4flash --lens /data/v4lens --requests ~/v4/requests.jsonl --out $OUT --layers 24,30,36 \
+    --model /data/v4flash --lens /data/v4lens --requests ~/v4/$REQ --out $OUT --layers 24,30,36 \
     --read-arms preview,public --dense --actual-reply --skip-lens 2>&1 | tee -a $OUT/capture.log
   export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
   timeout 2h ~/vl/.venv/bin/python vllm_read.py --model /data/v4flash --lens /data/v4lens --states $OUT/states.pt \
