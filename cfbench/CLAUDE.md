@@ -80,11 +80,13 @@ uv run python -m cfbench.run evalcue_runs:funding_email/<run> --pairs arm_a:arm_
 uv run python -m cfbench.score data/runs/cfbench/<date>_fe-all
 ```
 
-`--max-calls` sets the tool conditions' budget (default 20). `--model` picks the target (default
-`Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Haiku 5.5 in the CLI;
-the report's baseline predictor is Gemini 3.8 Flash, `google/gemini-3.8-flash`, so pass it). Needs
-`OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/` with
-`meta.json` and `predictions.jsonl` (one row per prediction, including the predictor's full
+`--max-calls` sets the tool conditions' budget (default 20). `--effort` sets the predictor's
+reasoning effort (default `medium`; `off` disables thinking, which some models refuse, see
+[docs/cfbench-dumb-predictors.md](../docs/cfbench-dumb-predictors.md)). `--model` picks the target
+(default `Qwen/Qwen3.6-27B`); `--predictors` is a comma list of OpenRouter ids (default Gemini 3.8
+Flash, `google/gemini-3.8-flash`, the report's baseline predictor; was Haiku 5.5 until 2026-10-26).
+Needs `OPENROUTER_API_KEY`. Each call is a `scripts/runs.py` run: `data/runs/cfbench/<date>_<slug>/`
+with `meta.json` and `predictions.jsonl` (one row per prediction, including the predictor's full
 conversation, tool-call counts and OpenRouter cost), synced to HF when it finishes. Runs from before
 `runs.py` are flat `runs/cfbench/*.jsonl` files on HF.
 
