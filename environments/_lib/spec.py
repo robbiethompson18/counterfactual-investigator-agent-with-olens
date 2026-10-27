@@ -23,6 +23,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from .backends import canonical_id
 from .core import ROOT, Ctx, env_names, load_env, retired_run_arms, run_dirs, slug
 from .runfolder import LOCAL, REPO_ROOT, git_sha
 
@@ -251,7 +252,7 @@ def build_links(env: str) -> Path | None:
         runs[run_dir.name] = {
             "docent_collection": meta.get("docent_collection"),
             "reads": reads.get(run_dir.name, {}),  # episode -> [expview dataset, item] with metamodel (O-lens) reads
-            "target": (meta.get("target") or {}).get("id"),
+            "target": canonical_id((meta.get("target") or {}).get("id")),
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
         }

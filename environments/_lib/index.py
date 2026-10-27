@@ -13,6 +13,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from .backends import canonical_id
 from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run_dirs
 from .runfolder import LOCAL, read_episodes
 
@@ -63,7 +64,7 @@ def env_index(env: str) -> dict:
                 "run": run_dir.name,
                 "status": meta.get("status"),
                 "created": meta.get("created"),
-                "target": meta.get("target", {}).get("id"),
+                "target": canonical_id(meta.get("target", {}).get("id")),
                 "model": meta.get("target", {}).get("model"),
                 "thinking": meta.get("target", {}).get("thinking"),
                 "description": meta.get("description"),
