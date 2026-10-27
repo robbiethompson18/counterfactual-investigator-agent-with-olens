@@ -1,6 +1,6 @@
 """expview: the project's one transcript viewer. This module writes runs, builds static pages and makes links.
 
-A run is a directory (format in expview/README.md):
+A run is a directory (format in expview/CLAUDE.md):
 
     <run>/run.json          {"title", "description" (markdown), "label_order", "readers", ...}   (optional)
     <run>/items.jsonl       one item per line: id, group, labels, calls (exact model/judge I/O), env, extra, links, tokens
@@ -224,7 +224,7 @@ class Run:
         return eid
 
     def tokens(self, obj, key):
-        """Store a token-reads object (see README) under tokens/, named by the item id so a re-export (e.g. as reads land)
+        """Store a token-reads object (see CLAUDE.md) under tokens/, named by the item id so a re-export (e.g. as reads land)
         overwrites the same file; returns the reference an item carries."""
         (self.path / "tokens").mkdir(exist_ok=True)
         tid = hashlib.sha1(str(key).encode()).hexdigest()[:16]
@@ -248,7 +248,7 @@ class Run:
         mode="a",
     ):
         """Append one item. links: {"Docent": url, ...} shown as buttons on the item.
-        base=(dataset id, item id) makes this an overlay on that item (README "Overlays"): it shows the base item's transcript,
+        base=(dataset id, item id) makes this an overlay on that item (CLAUDE.md "Overlays"): it shows the base item's transcript,
         reads, env and calls, plus this item's calls (in the side panel), labels, notes [{"pos": int | None, "text": md}] and
         tokens={"reads": {pos: [read, ...]}} merged into the base transcript."""
         if env is None and (env_dir is not None or env_files):

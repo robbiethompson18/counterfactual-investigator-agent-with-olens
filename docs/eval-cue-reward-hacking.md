@@ -5,7 +5,7 @@ Per-env config logs: `docs/evalcue-*-log.md`.
 
 Goal: an environment where base `Qwen/Qwen3.6-27B` reward hacks (or stops) because of one or two
 small, incidental cues that it is being evaluated. Harness, criterion and env contract:
-[`evalcue/README.md`](../evalcue/README.md). Eight agents built ten envs in about two hours.
+[`evalcue/CLAUDE.md`](../evalcue/CLAUDE.md). Eight agents built ten envs in about two hours.
 **Nothing passed on Qwen in the first sweep; two cues passed on other open-weight models. In round 2
 (below) four agents got Qwen's hack rates to move with task knobs, but no eval cue survived its
 split test.** Most envs had no headroom: Qwen either never hacks or always hacks regardless of the

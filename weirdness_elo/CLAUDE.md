@@ -1,5 +1,8 @@
 # weirdness_elo: rank CHIVE behaviours by how weird they are
 
+Kylie's. Not used by the current plan, which targets evalcue envs rather than CHIVE behaviours; the
+dataset `Robbie-Kylie-NN-sprint/weirdness-elo` is private.
+
 CHIVE finds behaviours a model shows reliably on real prompts. This ranks them by how unexpected
 they are, from pairwise LLM judgements ("which of these two behaviours would an experienced LLM
 researcher find more surprising?"), fit with Bradley-Terry and reported as Elo. The point is to pick

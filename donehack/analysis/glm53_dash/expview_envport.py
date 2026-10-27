@@ -1,4 +1,4 @@
-"""All envport/<env> GLM 5.3 runs on one expview page: env = the port's README/Containerfile/upstream config + the episode's final
+"""All envport/<env> GLM 5.3 runs on one expview page: env = the port's CLAUDE.md/Containerfile/upstream config + the episode's final
 files (whatever the record keeps), calls = the full conversation, labels = the detector's scalars.
   uv run python analysis/glm53_dash/expview_envport.py        # -> $EXPVIEW_DIR/runs/glm53_envport
   python $EXPVIEW_DIR/expview.py build $EXPVIEW_DIR/runs/glm53_envport"""
@@ -55,7 +55,7 @@ def main():
         EXPVIEW / "runs/glm53_envport",
         title="GLM 5.3 ported envs",
         description="""`z-ai/glm-5.3` (OpenRouter, reasoning medium, no max_tokens) on agent-interp-envs environments ported to the donehack
-podman sandbox (donehack/envport/<env>/, see each port's README in the file tree for what's faithful and what deviates).
+podman sandbox (donehack/envport/<env>/, see each port's CLAUDE.md in the file tree for what's faithful and what deviates).
 Episode cutoff: 32k context or $0.10 → end=cut_long. No LLM judge was run; labels are each port's mechanical detector fields.
 One group per env × config.""",
     )

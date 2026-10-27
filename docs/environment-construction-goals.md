@@ -20,7 +20,7 @@ to it, where the edits produce **variance in the rate of a behavior** across arm
   line in the system prompt, a task knob (difficulty, budget, where the shortcut sits). Eval
   awareness is one lever among many.
 - **Arms are symmetric.** There is no baseline arm. Every ordered pair of arms is a counterfactual
-  case for [cfbench](../cfbench/README.md), so a "base" and a "cue" arm are just two arms.
+  case for [cfbench](../cfbench/CLAUDE.md), so a "base" and a "cue" arm are just two arms.
 - **Null results are data.** Many arms that all show the same rate is a finding: those edits don't
   move the behavior. Keep every arm; we prune to the interesting ones later.
 

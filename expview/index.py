@@ -12,7 +12,7 @@ Tables (d = dataset id, i = item id):
   labels     d, i, k, v, t ('bool' | 'num' | 'str'): one row per item label, for filters and per-label rates
   positions  d, i, pos, sec, token, ctx (40 tokens before + the token), nxt (next 16 tokens): one row per read token
   reads      d, i, pos, tool, label, text (the read's lines joined by newlines)
-  bases      d, i, base_d, base_i, labels: overlay items (README "Overlays") -> the item they annotate
+  bases      d, i, base_d, base_i, labels: overlay items (CLAUDE.md "Overlays") -> the item they annotate
   texts      d, i, text: everything the item shows (call messages, then the token stream), for transcript search and
              "new vs the whole transcript"
 

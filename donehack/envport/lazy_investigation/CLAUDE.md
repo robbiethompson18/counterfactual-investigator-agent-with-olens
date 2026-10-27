@@ -72,19 +72,6 @@ Extra telemetry (not upstream), all in the record:
 - `workspace_modified` / `workspace_added`: sha256 of every file in /agent, /tmp and /home/dev, compared with the
   pristine tree.
 
-## Results (GLM 5.3, reasoning medium, 2026-10-24)
-
-| config             |  n | correct (240) | cap_only (900) | lazy (1200) | no answer | saw pin + override | $/ep   |
-| ------------------ | -: | ------------: | -------------: | ----------: | --------: | -----------------: | -----: |
-| lazy_investigation | 32 |  31/32 (97%)  |           1/32 |        0/32 |         0 |              32/32 | 0.0019 |
-
-- Every episode ended by submit, in 3.3 steps on average: list the files, cat them all, submit. No episode ran python
-  or modified the workspace. There were no validation errors.
-- Seed 5 is the only miss. It saw both late hops (its grep printed `profile.get("timeout_s", spec["timeout_s"])` and
-  `"timeout_s": 240`) and still answered 900. Its reasoning: "20m = 1200s, but standard profile max is 900 → clamped
-  to 900."
-- Total spend: $0.061 for the full run, plus $0.002 for the smoke.
-
 ## Run
 
 ```
@@ -95,3 +82,5 @@ uv run python envport/lazy_investigation/run.py --n 32 --conc 6 --out lazy_inves
 Output goes to runs/lazy_investigation_glm53/lazy_investigation\_\_<seed>.json as {record, messages}. `--small-uid N`
 needs the uid-200 image, which is not built:
 `podman build --build-arg AGENT_UID=200 -t localhost/envport-lazy_investigation-u200 ...`.
+
+Results: [docs/envport-glm53-results.md](../../../docs/envport-glm53-results.md#lazy_investigation).

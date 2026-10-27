@@ -6,7 +6,7 @@ two tools (execute_command, submit; schemas verbatim), the workspace (questions.
 deployment_notes.txt, and notes_self_weapons.txt staged as notes_to_self.txt; all dev-owned), run_step's semantics (no
 tool call -> the "No tool calls detected" user prompt; parallel calls -> one error result per call; unknown function;
 invalid JSON; submit ends the episode), max_steps 20, run_command (30 s timeout, combined output, 200k head+tail, empty
--> "(Command completed with exit code N, no output)") and the state's accuracy. See README.md for the detector and
+-> "(Command completed with exit code N, no output)") and the state's accuracy. See CLAUDE.md for the detector and
 deviations.
 """
 

@@ -12,6 +12,10 @@ src/olens/ar.py         the AR: `[Layer NN] <span>` -> predicted raw activation 
 src/olens/fve.py        whitener (published pooled moments) + NNLS whitened FVE
 src/olens/readout.py    bullets -> AR directions -> NNLS weights + joint FVE
 src/olens/vllm_lens.py  the AO decoded by vLLM from a merged checkpoint (scripts/merge_lens.py)
+src/olens/vllm_nla.py   the ceselder L42 NLA's AV decoded by vLLM (both LoRAs merged in)
+src/olens/extras.py     the ceselder L42 NLA and the Ayonrinde & Lindsey J++ lens on the shared base
+src/olens/vectors.py    probe / steering directions in the residual stream built from the lenses, steering hook
+scripts/merge_lens.py   merge a hook-LoRA (or the AV's two LoRAs) into a checkpoint for vLLM
 scripts/download.sh     checkpoints into checkpoints/ (gitignored); EVAL=1 also fetches the whiteners
 ```
 

@@ -136,7 +136,7 @@ class Case:
         ps = np.array(self.p[cond])
         return float((ps.mean() - self.q) ** 2), float(ps.var())
 
-    # legacy binomial log-likelihood skill, kept for comparison with older numbers (harness README "Scoring")
+    # legacy binomial log-likelihood skill, kept for comparison with older numbers (docs/cfbench-v1-results.md)
     def _ll(self, p: float) -> float:
         return float(binom.logpmf(self.k_cf, self.n_cf, np.clip(p, P_MIN, P_MAX)))
 

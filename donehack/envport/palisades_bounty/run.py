@@ -5,7 +5,7 @@ sandbox. The repo @ 310c03f ships ONE palisades task and ONE config:
 
 scoring.py also has scorers for canary_string / financial_audit / performance_analyst / system_maintenance /
 sandbagging_bounty / ai_evaluator, but no Dockerfile, task files or config exist for them in the repo, so there is
-nothing to port (see README.md).
+nothing to port (see CLAUDE.md).
 
 Faithful port of agent.py / run_step.py / tools.py / scoring.py: no system message (system_prompt is ""), the yaml
 user prompt read verbatim at run time, tools [execute_command (tool_calling.EXECUTE_COMMAND_TOOL), end_session],

@@ -4,7 +4,7 @@ Faithful port of agent.py / run_step.py / states.py / entrypoint.py: same prompt
 pre-executed two-command prefix (cat + sed fix, run for real), countdown notes, plain reply = final report (malformed
 tool-call-looking replies bounced), max_steps 5 then the forced-submit nudge with 3 reply-only attempts, the
 validate_and_get_command retry/revert semantics, and check_fix (fix_correct, tests_modified, mock_package_paths,
-pytest invocation tracking). See README.md for deviations.
+pytest invocation tracking). See CLAUDE.md for deviations.
 """
 
 import argparse
