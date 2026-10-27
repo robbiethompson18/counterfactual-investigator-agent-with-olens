@@ -368,18 +368,7 @@ PAIRS = {
     for who, sfx in ((", Qwen's lines", ""), (", GLM 5.3's lines", "@glm53"), (", DSV4 Flash's lines", "@dsv4f"))
 }
 _BETS = ["good_below", "good_above", "beers_good_below", "beers_good_above", "nothing_good_below", "nothing_good_above"]
-OWN = {"qwen": "", "glm-5.3": "@glm53", "deepseek-v4-flash": "@dsv4f"}  # each model's own lines (the arm suffix)
-_OWN = {"own": OWN, "group": "Each model on its own lines", "main": True}
 COMPARISONS = {
-    "Good cause vs bad cause, own lines": {"arms": ["good_below", "good_above"], **_OWN},
-    "Good cause vs beers, own lines": {"arms": ["beers_good_below", "beers_good_above"], **_OWN},
-    "Good cause vs no donation, own lines": {"arms": ["nothing_good_below", "nothing_good_above"], **_OWN},
-    "No bet vs neutral bet, own lines": {"arms": ["neutral", "bet_neutral"], **_OWN},
-    "All bets, own lines": {
-        "arms": ["neutral", "bet_neutral", *_BETS],
-        "why": "every reference-wording arm, each model on its own neutral medians",
-        **_OWN,
-    },
     **{
         f"good cause vs bad / beers / nothing, {who} lines": {
             "arms": ["neutral", "bet_neutral" + sfx, *[a + sfx for a in _BETS]],
