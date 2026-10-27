@@ -13,6 +13,32 @@ Robbie and Kylie keep their GPU compute separate:
 - **Kylie** (and her agents) use SkyPilot and bramble. If you're working for Kylie, this directory
   isn't for you.
 
+## Cost guards (2026-10-25: eight idle H200s ran the balance to −$0.57, ~$220 wasted)
+
+Eight read pods were created at 23:43 PDT on 2026-10-24 and the session went quiet before `setup` or
+`run` ever reached them; they idled 7.7 h until RunPod deleted them at zero balance. Rules:
+
+- **No pod without a live watcher.** Before `up`, start (and verify with `pgrep`) a detached process
+  that deletes the pod when its job is done, and deletes everything if `clientBalance` falls under a
+  floor (GraphQL `{ myself { clientBalance } }`). A Claude session is not a watcher: it dies with
+  its process tree. The 10-minute wakeup loop in Robbie's `CLAUDE.local.md` is the second layer.
+- **Never `--watch` a reader unless that watcher is running.** `--watch` keeps the GPU busy-idle
+  forever.
+- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them (or
+  stream them to HF, PR `olens/stream-reads-to-hf`) while the pod is up, not at the end.
+- **Poll the REST API, not runpodctl, for readiness:** `GET /v1/pods/<id>` → `publicIp` and
+  `portMappings["22"]`; then `ssh -o ConnectTimeout=8` wrapped in a hard timeout
+  (`perl -e 'alarm 20; exec @ARGV' ssh ...`; macOS has no `timeout`). `runpodctl pod get` reports
+  `runtime: null` for running pods, and with an empty id it blocks on stdin.
+- **A pod can be RUNNING and billed with no machine behind it** (no `publicIp` for 9 min on
+  US-CA-2). Give a host 5 min to show ports and 15 min to answer ssh (cold hosts pull the 15 GB vLLM
+  image), then delete it and try the other volume's datacenter.
+- **Small container disks kill pods silently.** `runpod/pytorch` needs more than 20 GB (`pod.sh`
+  uses 200); pods created with 20 GB vanished within 2 min and left a 404 on delete.
+- Keep the balance above ~1 h of the fleet's burn; at zero RunPod deletes the pods (audit log actor
+  `runpod`). The volumes survive, and need no GPU to read (S3 API or a $0.06/h CPU pod; the doc has
+  both recipes).
+
 ## Shared Qwen3.6-27B server: use it, don't start your own
 
 One vLLM server (pod `qwen-shared`, 2x H200, ~$10.58/hr, one replica per GPU behind one endpoint)

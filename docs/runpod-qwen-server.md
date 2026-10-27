@@ -149,6 +149,29 @@ the work; its docstring has the request and output formats. First used for the c
   image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
   missing and falls back to PyTorch; capture is still ~1 s per 1k tokens.
 
+## The 2026-10-25 idle fleet: what happened
+
+Eight read pods were created at 23:43 PDT on 2026-10-24 and the session went quiet before `setup` or
+`run` ever reached them: each pod's boot-time vLLM server idled for 7.7 h (47 ten-minute heartbeats
+per instance in `/workspace/home/.config/vllm/usage_stats.json`, nothing written under
+`/workspace/reads`, no reader kernel-cache traces) until RunPod deleted all eight at 07:26:49 when
+the balance hit zero (audit log actor `runpod`). No thinking-on reads were ever produced, so the
+"lost reads" never existed; the rescue pods the next morning found the volumes intact and empty of
+that night's work, as did a second check on 2026-10-26. The rules this produced are in
+`runpod/CLAUDE.md`, "Cost guards".
+
+The GraphQL audit log (`auditLogs(input:{limit:200})` with `action`, `resourceType`, `resourceId`,
+`actorId`, `timestamp`, paginated by `pageInfo.endCursor`) says who created and deleted every pod.
+
+### Reading a volume with a CPU pod
+
+When a datacenter has no GPU stock and the S3 API (below) won't do, a $0.06/h CPU pod mounts the
+volume: REST `POST /v1/pods` with `computeType: "CPU"`,
+`cpuFlavorIds: ["cpu3c","cpu3g","cpu3m","cpu5c","cpu5g","cpu5m"]`, `networkVolumeId`,
+`dataCenterIds: [<the volume's DC>]`, the `runpod/pytorch` image, 20 GB container disk,
+`ports: ["22/tcp"]`; poll `publicIp` + `portMappings["22"]` and ssh as root with `~/.ssh/id_ed25519`
+(the RSA RunPod key hangs).
+
 ## Reading the volumes without a pod: RunPod's S3 API
 
 Both network volumes are reachable over RunPod's S3-compatible API
