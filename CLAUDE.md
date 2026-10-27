@@ -143,10 +143,13 @@ server or GPU any more (2026-10-26): new O-lens reads are batch jobs
 **expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
 metamodel reads ([expview/CLAUDE.md](expview/CLAUDE.md)): write the run's items to `RUN/expview/`
 with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
-`tokens=`), and link items with `python expview/expview.py link`. Page: `https://expview.pages.dev`
-(static, reads the HF dataset; a run is there once `runs.py finish` has synced it; regex search over
-the reads of the runs you pick, in the browser). For a run that isn't on HF, `expview.py build RUN`
-makes a self-contained page to publish as an Artifact.
+`tokens=`), and link items with `python expview/expview.py link`. Page:
+`https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/` (env runs
+open as env → arm → run → episode, with every run under `runs/<env>/` that points at an episode
+stitched in: O-lens reads, judge calls; static, reads the HF dataset; a run is there once
+`runs.py finish` has synced it; regex search over the reads of the runs you pick, in the browser).
+The old `https://expview.pages.dev` is frozen at 2026-10-26. For a run that isn't on HF,
+`expview.py build RUN` makes a self-contained page to publish as an Artifact.
 
 Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
 plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript

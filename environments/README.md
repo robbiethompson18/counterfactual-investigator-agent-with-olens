@@ -93,7 +93,8 @@ episodes/NNN.jsonl             ~20 MB shards; one episode per line (messages, to
                                calls with providers, finish, usage)
 episodes/index.json            episode id -> [shard, byte offset, length], so a reader fetches one episode
 blobs/<sha256>                 file contents, stored once
-labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind"}; measure() is the labeler "measure"; never overwritten
+labels/<labeler>@<ver>.jsonl   {"episode", "values", "kind", "calls"?}; measure() is the labeler "measure"; never overwritten;
+                               a judge saves its exact calls (input + output) in "calls", and expview shows them
 ```
 
 A run finishes the way `scripts/runs.py finish` did: the runner mirrors its episodes to Docent

@@ -4,7 +4,8 @@
     episodes/NNN.jsonl             size-sharded (~20 MB); one episode per line
     episodes/index.json            episode id -> [shard, byte offset, byte length], so a reader fetches one transcript
     blobs/<sha256>                 file contents, stored once; episodes hold {path: sha256} for files_before/files_after
-    labels/<labeler>@<ver>.jsonl   {"episode": id, "values": {...}}; measure() is the labeler "measure"; never overwritten
+    labels/<labeler>@<ver>.jsonl   {"episode": id, "values": {...}, "kind", "calls"?}; measure() is the labeler "measure"; never
+                                   overwritten; "calls" = a judge's exact model calls (expview shows them on the episode)
 
 A finished run is immutable: new labels go in a new labels file. `index.py` builds envs/<env>/index.json from these.
 """
@@ -73,11 +74,19 @@ class RunWriter:
         self.fh.flush()
         self.index[ep["id"]] = [f"{self.shard:03d}.jsonl", off, len(line)]
 
-    def labels(self, labeler: str, version: str, rows: list[tuple[str, dict | None]], kind: str = "code"):
+    def labels(self, labeler: str, version: str, rows: list[tuple], kind: str = "code"):
+        """rows: (episode id, values) or (episode id, values, calls). calls = the judge's exact model calls, [{"model",
+        "messages" (input then output), "params"?}], which expview shows on the episode (kind "judge" should save them)."""
         p = self.dir / "labels" / f"{labeler}@{version}.jsonl"
         if p.exists():
             raise SystemExit(f"{p} exists; label files are never overwritten")
-        p.write_text("".join(json.dumps({"episode": eid, "values": v, "kind": kind}, default=str) + "\n" for eid, v in rows))
+        lines = []
+        for eid, v, *calls in rows:
+            row = {"episode": eid, "values": v, "kind": kind}
+            if calls and calls[0]:
+                row["calls"] = calls[0]
+            lines.append(json.dumps(row, default=str) + "\n")
+        p.write_text("".join(lines))
 
     def finish(self, status="done", **extra):
         if self.fh:

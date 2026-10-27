@@ -1,16 +1,24 @@
 # expview: the project's transcript viewer
 
-**Status (2026-10-26):** ACTIVE. A static page on Cloudflare Pages that reads runs straight from the
-public HF dataset; the bramble server, its DuckDB index, the HF pull timer and the `olens_search`
-dashboard were retired the same day ([docs/viewers.md](../docs/viewers.md)).
+**Status (2026-10-27):** ACTIVE. A static page on the repo's GitHub Pages site
+([https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/))
+that reads runs straight from the public HF dataset. It opens env runs (`envs/<env>/<run>/`) the way
+the env viewer is organised (env → arm → run → episode) and stitches every run that points at an
+episode into it at load time. The old Cloudflare page (https://expview.pages.dev) still works with
+the pre-2026-10-27 code; the bramble server retired on 2026-10-26
+([docs/viewers.md](../docs/viewers.md)).
 
 One viewer for every run: transcripts Docent-style, the exact input and output of every model call
 (subject model, LLM judges, graders), the environment's files, and metamodel reads (O-lens, J-lens,
 NLA, any reader) inline at the tokens they were read at. Regex search over the reads of the runs you
 pick runs in the browser.
 
-- **Page:** [https://expview.pages.dev](https://expview.pages.dev). It shows every run on the sprint
-  HF dataset
+- **Envs (home page):** every env on HF under `envs/`. An env run is read in place, no export:
+  `meta.json`, `episodes/index.json` (episodes by byte range), the newest `labels/<labeler>@*.jsonl`
+  of each labeler and `docent.json`. See "Env runs" below.
+- **Datasets:**
+  [https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#datasets=1](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#datasets=1).
+  It shows every run on the sprint HF dataset
   ([Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens))
   under `runs/<experiment>/<run>/expview[/<name>]`, so a run is visible as soon as
   `scripts/runs.py finish` has synced it. No server: the page lists runs with the HF tree API and
@@ -21,6 +29,54 @@ pick runs in the browser.
 - **Built page:** `python expview/expview.py build RUN` writes one self-contained HTML page with the
   same UI (one run, data embedded, no search page). For a run that isn't on HF: an `imports/…` view,
   a subset (`--ids`), or something to publish as an Artifact.
+
+## Envs: env → arm → episode
+
+Runs are an implementation detail and stay out of the UI (Kylie, 2026-10-27): an env page lists arms
+with the primary per target model, an arm lists its episodes grouped by model, and every episode
+opens inside its arm. `run` appears only in links, because it locates the episode on HF.
+
+| Hash                            | Opens                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `#env=E`                        | the env: arms × target models, and the reads / judges on its episodes                                                                                                          |
+| `#env=E&arm=A`                  | one arm: every episode, grouped by target model                                                                                                                                |
+| `#env=E&run=R&episode=ID`       | an episode (in its arm, so ↑/↓ walk the arm), with everything attached                                                                                                         |
+| `#env=E&episode=ID&model=M`     | an episode without its run: the newest run of model M (optional) that has it                                                                                                   |
+| `&model=M`, `&thinking=on\|off` | narrow an arm (and ↑/↓ in its episodes) to one target model / thinking mode; M = the env viewer's key (`<target> · thinking off`), the target id or the short name (`glm-5.3`) |
+| `&reads=DATASET`                | which attached run's token reads to show (an episode can have several)                                                                                                         |
+| `#env=E&run=R`                  | one run, grouped by arm (old links only; not linked from the page)                                                                                                             |
+
+An episode shows its transcript (the subject call), the sandbox files before (and changed files
+after, under `(after)/`, fetched from `blobs/` on demand), `measure()` labels, each judge labeler's
+values as a judge card (with the judge's exact input and output when the label file has `calls`;
+`RunWriter.labels` rows can be `(episode, values, calls)`), Docent, and a link to the arm and item
+in the env viewer. Then it **stitches in every expview run under `runs/<env>/` whose items point at
+that episode**: their token reads (O-lens, J-lens, …) as "Transcript with reads", their judge calls
+in the side panel, their labels (keys the episode doesn't have), their links. Discovery is two HF
+API calls per env (list `runs/<env>/`, then `paths-info` for each `<run>/expview/episodes.jsonl`),
+then plain file fetches; nothing central to keep up to date.
+
+### Attaching a run to env episodes
+
+Write the run under `data/runs/<env>/<run>/expview/` (the experiment name must be the env name, or
+the page won't find it) and say which episode each item is about, in one of three ways:
+
+```python
+run.add(id=..., calls=[...], tokens=..., episode=f"envs/{env}/{env_run}/{episode_id}")  # explicit
+run.add(id=..., ..., extra={"source": f"envs/{env}/{env_run}", "episode": episode_id})    # what the O-lens exports do
+Run(path, ..., episodes_from=f"envs/{env}/{env_run}")  # run.json: every item id IS an episode id of that run
+```
+
+`Run.add` and `expview.py index` write `episodes.jsonl` beside `index.jsonl` (one line per pointing
+item: `ep`, `id`, byte span, whether it has token reads), and `index.jsonl` lines carry `ep`.
+`expview.py check` warns when items point at an env other than the run's experiment. A pointer to a
+subset tag (`<run>-pp`) matches the longest env run name it starts with. Such an item, opened in its
+own dataset, links back to its episode. Link an episode from Python with
+`expview.episode_link(env, run, episode)`.
+
+The old per-run exports (`runs/env_<env>/<run>`, `runs/env_<env>/by_arm/<arm>`,
+`environments expview`) are no longer needed: on this page their `#dataset=` links redirect to the
+env run / arm (expview.pages.dev still shows the export).
 
 ## Adding a run (any thread)
 
@@ -51,7 +107,7 @@ for row in rows:
         ],  # exactly what the judge saw and said
         env_dir=workspace_dir,
     )  # optional: files, snapshotted + deduplicated
-print(link(run.path, item="A/s0"))  # https://expview.pages.dev/#dataset=runs/my_env/2026-10-24_slug&item=A/s0
+print(link(run.path, item="A/s0"))  # https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#dataset=runs/my_env/2026-10-24_slug&item=A/s0
 ```
 
 Then `scripts/runs.py finish` as usual: it refreshes `index.jsonl` (`expview.py index`) and uploads
@@ -219,15 +275,13 @@ only thing the page reads.
 
 ## Deploying the page
 
-Only after a change to `static/index.html` (data changes need no deploy):
-
-```bash
-expview/deploy.sh preview   # from the repo root; needs CLOUDFLARE_API_TOKEN (.envrc.local); prints the preview URL
-expview/deploy.sh           # production: https://expview.pages.dev
-```
-
-Check two existing deep links on the preview before deploying `main`. The page is one file, no build
-step; `data/expview/site/` is the deploy staging dir.
+`.github/workflows/env-viewer-pages.yml` publishes `static/index.html` as `/expview/` of the GitHub
+Pages site (next to the env viewer at `/`) on every push to main that changes it; data changes need
+no deploy. Before merging a change, serve a dedicated folder holding only the two pages
+(`site/index.html` = `environments/_lib/page.html`, `site/expview/index.html`) and check two
+existing deep links. `deploy.sh` still deploys the same file to Cloudflare
+(https://expview.pages.dev, needs `CLOUDFLARE_API_TOKEN`); that page has not been redeployed since
+2026-10-26.
 
 ## Files
 
@@ -236,5 +290,5 @@ step; `data/expview/site/` is the deploy staging dir.
 - `static/index.html`: the whole UI, no build step: the HF data layer (tree API listing, resolve
   URLs, byte-range items), the run / item / transcript views and the in-browser search. `build`
   embeds one run's data into the same file.
-- `deploy.sh`: Cloudflare Pages.
+- `deploy.sh`: Cloudflare Pages (the old expview.pages.dev; GitHub Pages is the workflow).
 - `importers/`: other datasets → runs.
