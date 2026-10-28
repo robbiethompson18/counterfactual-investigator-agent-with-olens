@@ -31,6 +31,7 @@ from typing import Any
 
 from .backends import canonical_id
 from .core import load_env
+from .index import hf_index
 from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
@@ -540,7 +541,8 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
 
 
 def build(names: list[str] | None = None, export=True) -> list[Path]:
-    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json."""
+    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json
+    (HF's entries plus the local evals)."""
     runs, envs, written = eval_runs(), Envs(), []
     EVALS.mkdir(parents=True, exist_ok=True)
     for name in names or list(runs):
@@ -559,25 +561,26 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
-    index = []
+    # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
+    built = {p.stem for p in written}
+    top = {e["name"]: e for e in hf_index("index.json", root="evals/").get("evals", [])}
     for p in sorted(EVALS.glob("*.json")):
-        if p.name == "index.json":
+        if p.name == "index.json" or (p.stem not in built and p.stem in top):  # an eval not rebuilt here: HF's entry is current
             continue
         e = json.loads(p.read_text())
         rs = e["runs"]
-        index.append(
-            {
-                "name": e["name"],
-                "title": e["title"],
-                "envs": e["envs"],
-                "n_runs": len(rs),
-                "latest": max((r["date"] or "" for r in rs), default=""),
-                "models": sorted({m for r in rs for m in r["models"]}),
-                "conditions": sorted({c for r in rs for c in r["conditions"]}),
-                "n_cases": sum(r["n_cases"] for r in rs),
-            }
-        )
+        top[e["name"]] = {
+            "name": e["name"],
+            "title": e["title"],
+            "envs": e["envs"],
+            "n_runs": len(rs),
+            "latest": max((r["date"] or "" for r in rs), default=""),
+            "models": sorted({m for r in rs for m in r["models"]}),
+            "conditions": sorted({c for r in rs for c in r["conditions"]}),
+            "n_cases": sum(r["n_cases"] for r in rs),
+        }
     p = EVALS / "index.json"
+    index = [top[n] for n in sorted(top)]
     p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")
     return [*written, p]
 
