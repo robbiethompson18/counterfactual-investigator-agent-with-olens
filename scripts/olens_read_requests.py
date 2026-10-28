@@ -19,9 +19,10 @@ priority order, round-robin over (env, arm) within a priority. A row's optional 
 assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
-"all"` reads every token, `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
-...]` the token holding each char of that message's content (offsets into its stripped content, as `char_offset` in
-OUT); `prompt_ids` replaces the rendering with those token ids as-is; `option_newlines: true` (or --option-newlines)
+"all"` reads every token, `"last"` only the final one, `positions: [token indices]` exactly those, and `char_positions:
+[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its stripped content,
+as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row with `text` instead of
+`messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render); `option_newlines: true` (or --option-newlines)
 adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
 option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
@@ -218,6 +219,8 @@ def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
         positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
     elif row.get("positions") == "all":
         positions = list(range(len(ids)))
+    elif row.get("positions") == "last":  # the final token only (WorkspaceBench's final_token read site)
+        positions = [len(ids) - 1]
     elif isinstance(row.get("positions"), list):  # explicit token indices into the rendered request
         positions = row["positions"]
     elif row.get("char_positions"):  # [[msg_index, char offset into its content], ...]: the token holding each char
