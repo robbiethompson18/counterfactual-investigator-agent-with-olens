@@ -1,0 +1,16 @@
+# systemd user unit for the Search everything server (expview/CLAUDE.md, "Search everything").
+# Paths: a checkout kept only for this server (detached worktree, `git -C … checkout --detach origin/main` after updates),
+# the data mirror, and the site folder with only the two pages. Edit them for another machine.
+[Unit]
+Description=expview Search everything server (expview/search_server.py)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/workspace/cia-expview-search
+ExecStart=/run/current-system/sw/bin/uv run python expview/search_server.py --data %h/workspace/counterfactual-investigator-agent-with-olens/data --site %h/workspace/expview-search-site --port 8840
+Environment=PATH=/run/current-system/sw/bin:/etc/profiles/per-user/%u/bin
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

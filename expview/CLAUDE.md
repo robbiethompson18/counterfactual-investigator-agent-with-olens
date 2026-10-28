@@ -294,9 +294,18 @@ uv run python expview/search_server.py --data data --site SITE --port 8840
 ```
 
 `SITE` holds only the two pages, `index.html` (= `environments/_lib/page.html`) and
-`expview/index.html` (= `static/index.html`); copy them again after changing either. It runs in the
-tmux session `expview-search` on bramble. The data is whatever `data/` holds: runs made on bramble
-land there; pull others with `hf download`.
+`expview/index.html` (= `static/index.html`); copy them again after changing either. The data is
+whatever `data/` holds: runs made on bramble land there; pull others with `hf download`.
+
+On bramble it runs as the systemd user unit `expview-search.service` (`expview-search.service` here;
+lingering is on, so it starts at boot), from a checkout kept only for it, a detached worktree of
+`origin/main` at `~/workspace/cia-expview-search`. Install or update:
+
+```bash
+git worktree add --detach ~/workspace/cia-expview-search origin/main  # once; later: git -C ~/workspace/cia-expview-search checkout --detach origin/main after a fetch
+cp expview/expview-search.service ~/.config/systemd/user/ && systemctl --user daemon-reload
+systemctl --user enable --now expview-search.service   # restart after updating the checkout; logs: journalctl --user -u expview-search
+```
 
 A regex outside these runs (Celeste's parquet) is still a `grep` or a Python script over the files.
 
