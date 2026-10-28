@@ -489,6 +489,10 @@ Current docs:
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
   pre-hint-reads arms in flight (PR #320)
+- [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
+  — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
+  within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
+  at next-token (checked against Qwen, no bug); harness v8 token labels
 - [NULL: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
   — letter grades on 3 essays: underpowered (Qwen gives nearly everything an A); out of 10 on 12
   essays spread terrible → excellent, Duke → no scenario: O-lens RMSE 0.86 vs transcript 0.65 vs
