@@ -3,12 +3,13 @@
 **Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
 `opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). O-lens result on the answer task (all 18
-survivors, hint followers only, 6 draws): stop-token reads 23% vs placebo 6% vs no lens 0%; a filler
-sentence before the hint doesn't change that (27% on its 13 surviving items) and reads at every
-token don't either (24% vs 6%). Assistant-header reads (a third read set, 5 draws) give 14% vs 5% vs
-0% on the 16 items that follow the hint 8/8, so the header adds nothing; the 5 wrong-letter-hint
-pairs are 0% in every condition (section "Assistant-header reads").
+[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result (section
+"Assistant-header reads", 2026-10-27 evening, Robbie's call: it supersedes the 23%/25% numbers in
+the two sections before it, which used earlier read sets and `--base-positive` or no leak filter):
+on the 16 survivors whose hinted arm follows the hint 8/8, O-lens 14% [0, 32] vs placebo 5% [0, 14]
+vs no lens 0%, carried by 941 and 5088; the 5 wrong-letter-hint pairs are 0% in every condition;
+reads at the assistant header add nothing over stop tokens. Charts:
+`python -m cfbench.report.answer`.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
@@ -207,6 +208,9 @@ text-only predictor is at chance on exactly the items where Qwen's own answer is
 
 ### O-lens tools on the answer task: 25% vs placebo 4% (2026-10-27)
 
+**Superseded** by the "Assistant-header reads" section below (all 18 survivors, leak filter, 5
+draws); kept for the trace links.
+
 The `olens` condition (cfbench's `search_olens` / `olens_at` over the hinted base-arm transcripts,
 `cfbench/CLAUDE.md`) on the same task, using the stop-token reads above, so only the 8 survivors
 whose `hint+d1` rollouts were read (381, 1699, 1841, 5088, 6027, 6031, 6598, 6742; 1 to 3 read
@@ -240,6 +244,9 @@ The next read (assistant header and answer token, all 18 items × 8 samples) is 
 a test.
 
 ### Filler and dense-reads experiments (2026-10-27)
+
+**Superseded as the headline number** by the "Assistant-header reads" section below (its 14% vs 5%
+is the current result); the filler and dense-read conclusions (both null) stand.
 
 Two one-change follow-ups to the 25%-vs-4% result, run separately so neither confounds the other
 (Robbie's call: the filler is a bet that an extra sentence between the question and the hint changes
@@ -312,8 +319,18 @@ runs cost ~$2 each on the old key).
 
 ### Assistant-header reads, wrong-letter hints, and a bullet-level audit (2026-10-27, evening)
 
-A third read set and two more runs, done in parallel with the filler and dense experiments above
-(different session, different reads, so the lens numbers are not the same sample).
+The current result for this env (Robbie, 2026-10-27 evening). A third read set and two more runs,
+done in parallel with the filler and dense experiments above (different session, different reads),
+scored with an item filter instead of `--base-positive`; these numbers replace the 23% and 25% above
+as the headline.
+
+![Answer task, three bars per hint type](../img/hint-mcq-answer/accuracy.png)
+
+![Correct draws per item, gold-letter hint](../img/hint-mcq-answer/per_item_gold_hint.png)
+
+![Correct draws per item, wrong-letter hint](../img/hint-mcq-answer/per_item_wrong_hint.png)
+
+Regenerate with `uv run python -m cfbench.report.answer` (PNGs are gitignored).
 
 **Reads.** `olens_reads/2026-10-27_hint-mcq-header`: all 18 survivors x 3 arms x 8 samples (432
 transcripts), layers 32/40/48, at the stop tokens and at the last assistant header with
@@ -381,10 +398,11 @@ own answer unambiguously (pre-hint "the correct answer is D", FVE up to 0.27; le
 controls 0/5,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/d4468abc-c351-4f26-b50c-92eca78545db)).
 
-Takeaways: the hint_mcq lens effect is 14-24% vs 4-6% placebo vs 0% no lens across three read sets,
-carried by 941, 5088 and a rotating one or two others; the assistant header is not where the
-suppressed answer lives; wrong-letter hints give a predictor that knows the gold answer nothing to
-be wrong with; and any item where the predictor and Qwen share a mistake scores in every condition.
+Takeaways: the hint_mcq lens effect is 14% vs 5% placebo vs 0% no lens on the current read set (the
+earlier sets gave 23-25% vs 4-6% on the same items, so the rate is read-set dependent), carried by
+941, 5088 and a rotating one or two others; the assistant header is not where the suppressed answer
+lives; wrong-letter hints give a predictor that knows the gold answer nothing to be wrong with; and
+any item where the predictor and Qwen share a mistake scores in every condition.
 
 ## What next (not done)
 
