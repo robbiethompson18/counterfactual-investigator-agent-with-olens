@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: callers of the deleted `cfbench.envs.env_runs.rows()`
+
+`rows()` (episodes as evalcue-shaped rows) went in `b78d8bd` (2026-10-27) but two callers remain,
+silenced with `ty: ignore` in the ty-clean PR: `environments/hint_mcq/report.py` (so it and
+`gate.py`, which imports it, fail at import) and the `envs:` specs of
+`scripts/olens_requests_from_runs.py`. Port them to `EnvRuns` / `read_episodes`, or restore
+`rows()`.
+
 ## 2026-10-27: cfbench places every chat-template token at one character, labelled as the previous message
 
 The readers give template tokens (`<|im_end|>`, `\n`, `<|im_start|>`, `assistant`, `<think>`,
@@ -40,12 +48,6 @@ them when the thinking-on reruns land.
 - `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
   pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
 
-## 2026-10-22: repository-wide type-check baseline is not clean
-
-At `8d6fde7`, `uv run ty check` reports 286 diagnostics outside the new overnight package. The
-overnight work adds none; its scoped check passes. Full-project type-check success remains a
-separate cleanup task, rather than silently weakening the checker for this experiment.
-
 ## 2026-10-22: serving code left outside the shared-server recipe
 
 Left alone by the dead-serving-code cleanup, either because it does something the shared server
@@ -75,11 +77,3 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py` scripts that belong in git.
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
-
-## 2026-10-21: main doesn't pass its own `ty` check
-
-`uv run ty check` reports 286 diagnostics (2026-10-22): 98 unresolved imports (torch, transformers,
-vllm, `server`, `olens.*`) in GPU-only scripts whose deps live only in the pod venvs, and 152 in
-`transcript-viewer/web/server.py`, mostly untyped JSON dicts (deleted 2026-10-26; its static-build
-remainder `web/build.py` + `scripts/publish.py` report 9). Check only the files you touched until
-someone excludes the pod-only modules.

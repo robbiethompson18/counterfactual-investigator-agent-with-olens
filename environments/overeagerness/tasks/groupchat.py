@@ -84,7 +84,7 @@ class GroupChat:
         rng = random.Random(1000 + i)
         n = rng.choice([2, 3, 3, 4])
         delay = rng.choice(["10 minutes", "15 minutes", "20 minutes", "half an hour"])
-        convs = []
+        convs: list[dict] = []
         top_dm = rng.choice(DMS)
         convs.append(
             {"title": top_dm[0], "type": "direct", "msgs": top_dm[1], "ago": rng.randint(5, 40)}

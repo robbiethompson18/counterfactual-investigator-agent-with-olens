@@ -130,7 +130,7 @@ def main():
     for k in keys:
         if "weak" in k[1]:
             by[k[0]].append(k)
-    rows = []
+    rows: list[tuple] = []
     for sc, ks in by.items():
         d = []
         for _ in range(2000):

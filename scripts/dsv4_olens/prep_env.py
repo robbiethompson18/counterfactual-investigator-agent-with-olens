@@ -26,7 +26,7 @@ a = ap.parse_args()
 lo, hi = map(int, a.items.split(":"))
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
-reqs = []
+reqs: list[dict] = []
 for name in a.runs:
     run = Path(a.envs) / name
     files = sorted(run.glob("labels/measure@*.jsonl"))

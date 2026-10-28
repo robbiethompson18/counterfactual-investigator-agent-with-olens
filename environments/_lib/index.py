@@ -54,7 +54,7 @@ def summarize(vals: list, items: list) -> dict:
 
 def env_index(env: str) -> dict:
     mod = load_env(env)
-    runs = []
+    runs: list[dict] = []
     for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
         label_file, labels = latest_labels(run_dir)
@@ -62,7 +62,7 @@ def env_index(env: str) -> dict:
         for ep in read_episodes(run_dir):
             if ep["arm"] not in skip:
                 by_arm[ep["arm"]].append(ep)
-        arms = {}
+        arms: dict[str, dict] = {}
         for arm, eps in by_arm.items():
             vals = [labels.get(e["id"], {}).get(mod.PRIMARY) if not e.get("error") else None for e in eps]
             arms[arm] = {

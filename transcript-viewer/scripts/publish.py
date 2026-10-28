@@ -151,7 +151,8 @@ def upload_site(manifest):
     n = sum(1 for f in STAGE.rglob("*") if f.is_file()) if STAGE.exists() else 0
     print(f"{n}/{len(manifest)} site files changed", flush=True)
     if n:
-        api.upload_large_folder(REPO, folder_path=str(STAGE), repo_type="dataset")
+        # transcript-viewer runs in its own venv (huggingface_hub 1.x); the root venv's 2.x has no upload_large_folder
+        api.upload_large_folder(REPO, folder_path=str(STAGE), repo_type="dataset")  # ty: ignore[unresolved-attribute]
         shutil.rmtree(STAGE)
     # last, so an interrupted upload gets redone next time
     api.upload_file(
