@@ -3,6 +3,7 @@
     envs/index.json         every env: title, status, primary measure, runs and episodes per target model
     envs/<env>/index.json   that env's runs: meta summary, label files, and per arm n / errors / unscorable / the
                             primary measure's distribution, with per-item k/n for a bool primary
+    envs/<env>/evals.json   the cfbench runs on that env (evals.py), for the viewer's Evals tab
 
 Built from the local data/envs/ folders; delete and rebuild any time.
 """
@@ -98,6 +99,7 @@ def env_index(env: str) -> dict:
 def build(envs: list[str] | None = None) -> list[Path]:
     """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
     (spec.py; the spec only when the env's source changed). -> written paths."""
+    from .evals import build as build_evals
     from .spec import build as build_spec
 
     written = []
@@ -108,6 +110,7 @@ def build(envs: list[str] | None = None) -> list[Path]:
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
     written += build_spec(names)
+    written += [p for e in names if (p := build_evals(e, export=False))]
     top = []
     for e in env_names():
         p = LOCAL / e / "index.json"
