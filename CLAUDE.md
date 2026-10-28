@@ -508,6 +508,9 @@ Current docs:
   (`leave_todo`) vs implements it (`implement`); the CF target is which idiom `foo` uses from the
   item's menu; 72 neutral items (8 external-service), AST-normalised grading, `gate.py` (Gemini 3.8
   Flash writes the module, pass@3) picks `SURVIVORS`; try log and gate numbers in the doc
+- [REFERENCE: Overnight 2026-10-28 handoff (super experimental) — read before picking up debug_pointer, style_transfer, todo_suppressed or notice_defect](docs/overnight-2026-10-28-handoff.md)
+  — what the four gated envs are, survivors per env, O-lens vs placebo (null on debug_pointer and
+  style_transfer), where code and runs live, caveats, what to do next
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run

@@ -203,6 +203,13 @@ runs, and `short` omits thinking/provider settings. Two runs of the same model w
 and judge calls. `Run.add()` appends both and expview's validator rejects duplicate IDs; links
 cannot uniquely identify the judged episode. Include the source run in the ID.
 
+## 2026-10-28: `environments run --no-upload` still uploads to Docent
+
+`--no-upload` skips only the HF step; the runner uploads the episodes to Docent whenever
+`DOCENT_API_KEY` is set (`environments/_lib/run.py`). An audit smoke on 2026-10-27 created the
+public, now empty, Docent collection `debug_pointer` that way. The flag should skip Docent too, or
+be renamed `--no-hf`.
+
 ## 2026-10-28: `environments run` crashes after a finished run on a missing eval env module
 
 **Partly fixed (essay_curious PR #306):** `evals.Envs` now skips envs that don't import. The upload
