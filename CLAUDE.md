@@ -487,8 +487,9 @@ Current docs:
   only wrong-MCQ lives on (`environments/hint_mcq/`); 2026-10-28 scale-up (2,000 more questions, 174
   / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
-  answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
-  pre-hint-reads arms in flight (PR #320)
+  answer before any readable position, it is readable only in the no-hint arm; three legs moving the
+  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp [+5, +23], 50
+  items, not yet dissected)
 - [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
   — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
   within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
@@ -529,6 +530,10 @@ Current docs:
 - [NULL: Alignment faking in cfbench — read before giving an investigator DSV4 Flash O-lens reads, or claiming the lens predicts which requests flip](docs/alignment-faking-cfbench.md)
   — pooled and per-request results on the original and v7 prompts: lens ≈ placebo, prompt-only wins,
   the model's own first-token logprob ranks flips at 0.76 and nothing in the reads beats it
+- [NULL: Over-eagerness one-edit cases in cfbench — read before predicting GLM 5.3 over-eagerness edits with the O-lens, or reusing cfbench/evals/overeager_main](docs/overeager-main-cfbench.md)
+  — 20 arm pairs × 8 shown acting runs (160 cases), 1 draw: env 18.3 / transcript 18.6 / O-lens
+  18.1pp vs null 22.2, O-lens − transcript [−2.8, +2.4]; every condition misses the no-done-tool
+  drop (30–56pp)
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)

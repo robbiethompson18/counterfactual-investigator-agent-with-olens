@@ -1,0 +1,60 @@
+# DSv4 Flash O-lens sample pool at af_which's shared pre-request positions (Kylie, 2026-10-28): every af_which case of a version
+# shares the user-turn prefix up to `<user_input>\n`, so those 20 positions have one activation; this draws many lens samples
+# there so each case can get its own. Same recipe as runs/alignment_faking/2026-10-28_dsv4flash-olens-4bullets (read.py HF
+# capture --dense, then vllm_read.py on vLLM 0.32, scripts/dsv4_olens at claude/dsv4-olens-shard-bullets 8b0ce2d), on one
+# public request per version; keep_keys.py cuts the capture to the shared positions first.
+#   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c dsv4-resample -y -i 30 --down --secret HF_TOKEN \
+#     scripts/af_which_resample/sky_dsv4.yaml        # then scp /data/out/resample/reads_L30.jsonl back
+name: dsv4-resample
+
+resources:
+  disk_size: 400
+  any_of:
+    - {infra: runpod, accelerators: "B200:2"}
+    - {infra: runpod, accelerators: "H200-SXM:2"}
+    - {infra: runpod, accelerators: "B200:4"}
+    - {infra: runpod, accelerators: "H200-SXM:4"}
+    - {infra: runpod, accelerators: "H100-SXM:4"}
+    - {infra: runpod, accelerators: "B200:8"}
+    - {infra: runpod, accelerators: "H200-SXM:8"}
+    - {infra: runpod, accelerators: "H100-SXM:8"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  W: /data
+  SAMPLES: 240  # per position; blanks are dropped later, af_which needs 4 x 40 distinct ones
+
+file_mounts:
+  ~/v4/code: ../cia-dsv4-shard/scripts/dsv4_olens
+  ~/v4/resample: ./scripts/af_which_resample
+  ~/v4/requests.jsonl: ./data/af_which_resample/requests.jsonl
+  ~/v4/shared_keys.jsonl: ./data/af_which_resample/shared_keys.jsonl
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/out
+  bash ~/v4/code/setup.sh
+  cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+  dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null 2>&1
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-13-0 cuda-cudart-dev-13-0 cuda-crt-13-0 libcublas-dev-13-0 \
+    cuda-nvrtc-dev-13-0 libcurand-dev-13-0 cuda-libraries-dev-13-0 ninja-build >/dev/null 2>&1
+  apt-get clean
+  mkdir -p ~/vl && cd ~/vl && [ -d .venv ] || ~/.local/bin/uv venv -q --python 3.12 .venv
+  VIRTUAL_ENV=~/vl/.venv ~/.local/bin/uv pip install -q vllm==0.32.0
+  VIRTUAL_ENV=~/vl/.venv ~/.local/bin/uv pip install -q --no-deps "vllm-lens @ git+https://github.com/ceselder/vllm-metamodels" zstandard ~/v4/code/hc_inject
+  cd ~/v4/code && ~/v4/.venv/bin/python convert_adapter.py /data/v4lens/lora /data/v4lens/lora_vllm
+
+run: |
+  set -euo pipefail
+  cd ~/v4/code
+  OUT=/data/out/resample && mkdir -p $OUT
+  export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
+  [ -f $OUT/states.pt ] || ~/v4/.venv/bin/python read.py --model /data/v4flash --lens /data/v4lens --requests ~/v4/requests.jsonl \
+    --out $OUT --layers 30 --dense --no-logits --skip-lens --read-arms public > $OUT/capture.log 2>&1
+  ~/v4/.venv/bin/python ~/v4/resample/keep_keys.py $OUT/states.pt ~/v4/shared_keys.jsonl $OUT/shared.pt | tee -a $OUT/capture.log
+  ~/vl/.venv/bin/python vllm_read.py --model /data/v4flash --lens /data/v4lens --states $OUT/shared.pt --layers 30 \
+    --samples $SAMPLES --tp $(nvidia-smi -L | wc -l) --out $OUT/reads_L30.jsonl > $OUT/lens.log 2>&1
+  wc -l $OUT/reads_L30.jsonl
+  echo READS_DONE
