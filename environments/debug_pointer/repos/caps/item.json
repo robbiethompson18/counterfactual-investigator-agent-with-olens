@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "caps.py",
+ "d2": "clean.py",
+ "note": "headline uses title(), which also capitalises small words; clean.py's strip/lower chain is correct"
+}

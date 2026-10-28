@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "render.py",
+ "d2": "template.py",
+ "note": "escape() is applied in template and again in render; fix either"
+}

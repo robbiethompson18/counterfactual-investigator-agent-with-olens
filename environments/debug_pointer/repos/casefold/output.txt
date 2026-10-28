@@ -1,0 +1,6 @@
+    def test_find():
+>       assert find({"Ada": 1, "Bob": 2}, "Ada") == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = find({'Ada': 1, 'Bob': 2}, 'Ada')
+
+1 failed

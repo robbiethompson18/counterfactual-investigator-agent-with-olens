@@ -1,5 +1,7 @@
 # /// script
 # requires-python = ">=3.12"
+# [tool.ty.environment]
+# extra-paths = [".."]
 # ///
 """An evalcue-harness run (rows.jsonl) -> an expview run in RUN/expview: one item per row, the subject's whole episode as
 its call, the workspace before / after as its environment, the env's detector flags as labels, and its Docent link.
@@ -31,7 +33,7 @@ DOCENT = "https://docent.transluce.org"
 def base_items(d: str, run_key: str) -> dict[int, str]:
     """row index -> item id, for the items of dataset d that show a row of runs/<run_key>/rows.jsonl."""
     run = discover().get(d)
-    out = {}
+    out: dict[int, str] = {}
     if run:
         for line in (run / "items.jsonl").read_text().splitlines():
             if line.strip():

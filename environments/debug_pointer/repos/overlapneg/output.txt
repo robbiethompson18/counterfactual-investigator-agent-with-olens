@@ -1,0 +1,6 @@
+    def test_busy_minutes():
+>       assert busy_minutes([(0, 30), (100, 130)], (20, 60)) == 10
+E       assert -30 == 10
+E        +  where -30 = busy_minutes([(0, 30), (100, 130)], (20, 60))
+
+1 failed

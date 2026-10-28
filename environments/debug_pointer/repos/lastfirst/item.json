@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "greet.py",
+ "d2": "people.py",
+ "note": "people stores 'Last, First' and greet takes the first whitespace token; fix in greet, people or hello"
+}

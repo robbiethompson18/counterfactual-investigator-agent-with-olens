@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "receipt.py",
+ "d2": "wallet.py",
+ "note": "balance_cents() feeds fmt_dollars(); fix in receipt, wallet or fmt"
+}

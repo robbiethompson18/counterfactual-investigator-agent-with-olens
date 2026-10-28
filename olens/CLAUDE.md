@@ -20,7 +20,6 @@ src/olens/nla.py              NLAEngine: the camilablank multilayer NLA's AV (ra
 src/olens/jpp.py              JPP: the J++ lens's top-k next tokens from captured residuals (maps + lm_head, no model)
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
 src/olens/provenance.py       reads.provenance.json next to a batch of reads: lens, AR, whitener, revisions, sampling
-src/olens/vectors.py          probe / steering directions in an HF model's residual stream (no caller since 2026-10-26)
 scripts/lora_for_vllm.py      rename a PEFT adapter's keys so vLLM's LoRA runtime applies it (lens and AR layouts)
 scripts/download.sh           checkpoints into checkpoints/ (gitignored); EVAL=1 also fetches the whiteners
 ```

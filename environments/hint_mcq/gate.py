@@ -64,7 +64,7 @@ async def main():
     sem = asyncio.Semaphore(a.concurrency)
     prompts = {it: build("nohint", it).messages[0]["content"] for it in items}
     results = await asyncio.gather(*(guess(a.model, prompts[it], sem) for it in items for _ in range(a.n)))
-    verdicts = []
+    verdicts: list[dict] = []
     with (run / "guesses.jsonl").open("w") as g, (run / "verdicts.jsonl").open("w") as v:
         for i, it in enumerate(items):
             t, samples = table[it], results[i * a.n : (i + 1) * a.n]

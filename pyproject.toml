@@ -38,9 +38,22 @@ extend-select = [
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "detective_joracle".msg = "vendor/ is reference-only: port what you need into our own code (see vendor/CLAUDE.md)"
 
+[tool.ty.environment]
+# Sibling modules that scripts import via sys.path.insert
+extra-paths = ["olens/src", "expview", "transcript-viewer/web"]
+
 [tool.ty.src]
 exclude = [
   "vendor",
+  "environments/retired",
+]
+
+[tool.ty.analysis]
+# GPU-only deps live in RunPod venvs, not this one; the rest are imported from other checkouts on the pod
+allowed-unresolved-imports = [
+  "torch", "torch.**", "vllm", "vllm.**", "vllm_lens", "vllm_lens.**", "transformers", "transformers.**",
+  "safetensors", "safetensors.**", "tokenizers", "statsmodels.**", "duckdb",
+  "olens_glm53_usage", "realvariants", "email_env",
 ]
 
 [dependency-groups]

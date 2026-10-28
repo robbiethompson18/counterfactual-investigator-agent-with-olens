@@ -1,0 +1,9 @@
+    def test_tag():
+>       assert tag("tea") == "tea: $1.50"
+E       AssertionError: assert 'tea: $1.5' == 'tea: $1.50'
+E         
+E         - tea: $1.50
+E         ?          -
+E         + tea: $1.5
+
+1 failed

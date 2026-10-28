@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "fmt.py",
+ "d2": "price.py",
+ "note": "price returns a float and fmt uses str(); fix in fmt, price or tag"
+}

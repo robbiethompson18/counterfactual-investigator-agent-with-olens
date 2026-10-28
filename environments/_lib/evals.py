@@ -91,7 +91,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     from cfbench.core import canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
-    from expview import Run, call  # ty: ignore[unresolved-import]
+    from expview import Run, call
 
     meta = json.loads((run_dir / "meta.json").read_text())
     run = Run(
@@ -146,8 +146,12 @@ class Envs:
     def __getitem__(self, env: str) -> dict:
         if env not in self.cache:
             idx_p, filt_p, links_p = LOCAL / env / "index.json", LOCAL / env / "docent_filters.json", LOCAL / env / "links.json"
+            try:
+                pairs = getattr(load_env(env), "PAIRS", {})
+            except ModuleNotFoundError:  # a cfbench run over an old evalcue env (code deleted 2026-10-27) has no port
+                pairs = {}
             self.cache[env] = {
-                "pairs": getattr(load_env(env), "PAIRS", {}),
+                "pairs": pairs,
                 "index": json.loads(idx_p.read_text()) if idx_p.exists() else {},
                 "filters": json.loads(filt_p.read_text()) if filt_p.exists() else {},
                 "links": json.loads(links_p.read_text()).get("runs", {}) if links_p.exists() else {},
@@ -391,7 +395,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
     per_cond, null = defaultdict(list), []
     for (env, version, model, b, cf, item), c in sorted(cases.items(), key=lambda kv: str(kv[0])):
         r = c["row"]
-        g = groups.get((env, version, b, cf, model))
+        g: dict[str, Any] | None = groups.get((env, version, b, cf, model))
         if g is None:
             pair, rev = envs.pair(env, b, cf)
             g = groups[env, version, b, cf, model] = {

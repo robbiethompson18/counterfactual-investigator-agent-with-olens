@@ -1,0 +1,13 @@
+Forty-five seconds before our first match at the regional robotics competition, our robot's left drive motor stopped working.
+
+I was the build lead for our team, the Ironclads, which meant that the robot was mostly my responsibility. We had spent six weeks building it in the back of the chemistry lab, staying until the custodian kicked us out at nine every night. Now it was sitting on the practice field with one wheel spinning and the other completely dead, and our drive team was looking at me.
+
+I opened the electronics panel and started checking connections. My hands were shaking. Our mentor, Mr. Okafor, was standing behind me but he didn't say anything, which was his way of telling me it was my problem to solve. I traced the wire from the motor controller back to the power distribution board and found it: a crimp connector had pulled halfway out, probably when we loaded the robot onto the cart. I pushed it back in, wrapped it in electrical tape because we didn't have time for anything better, and we made it to the field with about ten seconds to spare.
+
+We lost that match anyway. But we won our next three, and we ended up ranked eleventh out of thirty-two teams, which was the best our school had ever done.
+
+That day taught me a lot about staying calm under pressure. Before robotics, I used to panic whenever something went wrong, whether it was a test or a project or anything else. But when the motor failed, I didn't have time to panic. I just had to focus on the problem in front of me and work through it step by step. I realized that most problems are solvable if you stay calm and think logically.
+
+It also taught me about leadership. Being the build lead didn't mean I had to know everything. It meant I had to take responsibility when things went wrong and help the team move forward.
+
+In college, I want to study mechanical engineering, and I know there will be many more problems that I have to solve under pressure. I am confident that the lessons I learned in robotics will help me succeed, both in my classes and in my future career.

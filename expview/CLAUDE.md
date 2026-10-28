@@ -107,7 +107,8 @@ for row in rows:
         ],  # exactly what the judge saw and said
         env_dir=workspace_dir,
     )  # optional: files, snapshotted + deduplicated
-print(link(run.path, item="A/s0"))  # https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#dataset=runs/my_env/2026-10-24_slug&item=A/s0
+# -> https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/#dataset=runs/my_env/2026-10-24_slug&item=A/s0
+print(link(run.path, item="A/s0"))
 ```
 
 Then `scripts/runs.py finish` as usual: it refreshes `index.jsonl` (`expview.py index`) and uploads

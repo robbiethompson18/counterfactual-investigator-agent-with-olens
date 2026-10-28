@@ -210,7 +210,7 @@ def read(tool, lines, label=None, score=None, score_name=None, **extra):
 def source_of(it: dict) -> str | None:
     """ENV/RUN:LINE of the rows.jsonl row an item shows, when the item says so (extra.source, or run_dir + row_index); the
     viewer turns it into a Docent link through that run's docent.json."""
-    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    ex = it["extra"] if isinstance(it.get("extra"), dict) else {}
     m = re.search(r"(?:^|/)([^/:]+/[^/:]+):(\d+)$", str(ex.get("source") or ""))
     if m:
         return f"{m.group(1)}:{m.group(2)}"
@@ -222,7 +222,7 @@ def source_of(it: dict) -> str | None:
 
 def links_of(it: dict) -> dict:
     out = dict(it.get("links") or {})
-    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    ex = it["extra"] if isinstance(it.get("extra"), dict) else {}
     for k in ("docent", "docent_url"):
         if isinstance(ex.get(k), str) and ex[k].startswith("http"):
             out.setdefault("Docent", ex[k])
@@ -236,7 +236,7 @@ def episode_of(it: dict, info: dict | None = None) -> str | None:
     ep = it.get("episode")
     if isinstance(ep, str) and ep.startswith("envs/"):
         return ep
-    ex = it.get("extra") if isinstance(it.get("extra"), dict) else {}
+    ex = it["extra"] if isinstance(it.get("extra"), dict) else {}
     src = next((ex[k] for k in ("source", "env_run") if isinstance(ex.get(k), str) and ex[k].startswith("envs/")), None)
     if src and ex.get("episode"):
         return f"{src.rstrip('/')}/{ex['episode']}"

@@ -1,6 +1,10 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["pandas>=2.2", "pyarrow>=17", "tokenizers>=0.20", "huggingface_hub>=0.25"]
+# [tool.ty.environment]
+# extra-paths = [".."]
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["tokenizers"]
 # ///
 """Import Celeste's GLM-5.3 O-lens readout datasets into expview runs, one run per config.
 
@@ -30,7 +34,9 @@ import itertools
 import json
 import sys
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow.parquet as pq
@@ -358,7 +364,8 @@ def import_config(
     qw = pd.read_parquet(qp).set_index(["tid", "pos", "reader"]) if qp.exists() else None
     bp = cfg_dir / "bestofn.parquet"
     bon: dict[str, dict[int, object]] = {}
-    for b in pd.read_parquet(bp).itertuples() if bp.exists() else []:
+    bon_rows: Iterable[Any] = pd.read_parquet(bp).itertuples() if bp.exists() else []  # namedtuples, typed as plain tuples
+    for b in bon_rows:
         bon.setdefault(b.tid, {})[int(b.pos)] = b
     run = Run(
         out,
@@ -383,7 +390,7 @@ def import_config(
         for f in dense:
             if batch & dense_tids[f]:
                 parts.append(read_cols(cfg_dir / f, [("tid", "in", sorted(batch & dense_tids[f]))]).assign(_file=f))
-        if dups is not None:
+        if dups is not None and canon is not None:
             parts.append(fill_dups(dups[dups.tid.isin(batch)], canon))
         by_tid = dict(tuple(normalise(pd.concat(parts, ignore_index=True)).groupby("tid")))
         if size < len(todo):

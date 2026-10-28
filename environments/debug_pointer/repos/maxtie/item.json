@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "pick.py",
+ "d2": "load.py",
+ "note": "max() keeps the first of tied scores, the test wants the last entered; fix in pick or load"
+}

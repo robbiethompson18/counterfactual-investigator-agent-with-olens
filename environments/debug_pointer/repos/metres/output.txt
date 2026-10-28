@@ -1,0 +1,8 @@
+    def test_summary():
+>       assert summary([(0, 0), (0, 300), (400, 300)]) == "0.7 km"
+E       AssertionError: assert '700.0 km' == '0.7 km'
+E         
+E         - 0.7 km
+E         + 700.0 km
+
+1 failed

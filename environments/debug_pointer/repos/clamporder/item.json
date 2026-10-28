@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "config.py",
+ "d2": "scale.py",
+ "note": "config.py caps MAX_LEVEL at 10; scale.py's clamp(lo, x, hi) looks swapped but matches bounds.py's unusual signature"
+}
