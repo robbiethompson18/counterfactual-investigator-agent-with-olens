@@ -816,6 +816,105 @@ def tqa_prep(a):
     print(f"run {run}; {len(options)} options; nl tokens {Counter(o['nl_token'] for o in options).most_common(4)}; inputs in {work}")
 
 
+def oos(a):
+    """The frozen probe on the TruthfulQA set: the diagonal listwise probe (one-hot target, nl, hidden_states[--hidden],
+    l2 1) and the binary is_answer probe (C as in `fit`), each fit once on every question of the training run, applied
+    unchanged to the test run's activations (scripts/hs_at_positions.py output in data/probe_cache/<test run>/). Variant
+    `last_end`: the last option scored at its text's last token (its nl site is <|im_end|>). Writes oos.json, oos.md and a
+    pmf_options.jsonl (as `dump`'s; fold -1, `_full` = the same frozen scores) to the test run."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+    from sklearn.preprocessing import StandardScaler
+
+    from environments.hinted_truthfulqa.env import LETTERS as TQA_LETTERS
+
+    train, test = Path(a.train), Path(a.test)
+    tl = json.loads((train / "meta.json").read_text())["params"]["layers"]
+    topts = [json.loads(line) for line in (train / "options.jsonl").read_text().splitlines()]
+    tq = np.array([o["q"] for o in topts])
+    ty = np.array([o["is_answer"] for o in topts], float)
+    Xtr = np.asarray(np.load(CACHE / train.name / "nl.npy", mmap_mode="r")[:, tl.index(a.hidden)], dtype=np.float64)
+    sc = StandardScaler().fit(Xtr)
+    w = _fit_listwise(sc.transform(Xtr), ty, np.flatnonzero(np.r_[True, tq[1:] != tq[:-1]]), a.l2)
+    clf = LogisticRegression(C=a.C, max_iter=2000).fit(sc.transform(Xtr), ty)
+
+    qs = [json.loads(line) for line in (test / "questions.jsonl").read_text().splitlines()]
+    opts = [json.loads(line) for line in (test / "options.jsonl").read_text().splitlines()]
+    cache = CACHE / test.name
+    layers = json.loads((cache / "layers.json").read_text())
+    li = layers.index(a.hidden)
+    logps = {r["id"]: r["logp"] for r in map(json.loads, (cache / "logp.jsonl").read_text().splitlines())}
+    q = np.array([o["q"] for o in opts])
+    starts = np.flatnonzero(np.r_[True, q[1:] != q[:-1]])
+    ends = np.append(starts, len(q))
+    is_answer = np.array([o["is_answer"] for o in opts], float)
+    is_gold = np.array([o["is_gold"] for o in opts], float)
+    right = np.array([r["right"] for r in qs])
+    qwen = _softmax_by_q(np.concatenate([logps[r["item"]] for r in qs]), starts)
+    agree = np.mean([TQA_LETTERS[int(np.argmax(logps[r["item"]]))] == r["own"] for r in qs])
+    nl = np.asarray(np.load(cache / "nl.npy", mmap_mode="r")[:, li], dtype=np.float64)
+    end = np.asarray(np.load(cache / "end.npy", mmap_mode="r")[:, li], dtype=np.float64)
+    last_end = nl.copy()
+    last_end[ends[1:] - 1] = end[ends[1:] - 1]
+
+    def metrics(p: np.ndarray) -> dict:
+        top = np.array([starts[i] + np.argmax(p[starts[i] : ends[i + 1]]) for i in range(len(starts))])
+        p_ans = np.add.reduceat(p * is_answer, starts)
+        kl = np.add.reduceat(qwen * (np.log(qwen + 1e-12) - np.log(p + 1e-12)), starts)
+        conf, hit = p[top], is_answer[top]
+        out = {}
+        for name, m in (("all", np.ones(len(starts), bool)), ("right", right), ("wrong", ~right)):
+            bins = np.minimum((conf[m] * 10).astype(int), 9)
+            ece = sum(abs(conf[m][bins == b].mean() - hit[m][bins == b].mean()) * (bins == b).mean() for b in np.unique(bins))
+            out[name] = {
+                "n": int(m.sum()),
+                "top1_answer": float(hit[m].mean()),
+                "top1_gold": float(is_gold[top][m].mean()),
+                "nll_answer": float(-np.log(p_ans[m] + 1e-12).mean()),
+                "kl_qwen": float(kl[m].mean()),
+                "ece": float(ece),
+            }
+        return out
+
+    res = {"n_questions": len(qs), "n_right": int(right.sum()), "logit_agreement": float(agree)}
+    res["chance_top1"] = float(np.mean(1 / np.diff(ends)))
+    scores = {"listwise nl": sc.transform(nl) @ w, "listwise nl, last option at end": sc.transform(last_end) @ w}
+    binary = {
+        "binary nl": clf.decision_function(sc.transform(nl)),
+        "binary nl, last option at end": clf.decision_function(sc.transform(last_end)),
+    }
+    res["methods"] = {"uniform": metrics(_softmax_by_q(np.zeros(len(q)), starts))}
+    res["methods"] |= {k: metrics(_softmax_by_q(s, starts)) for k, s in (scores | binary).items()}
+    res["methods"]["Qwen's own letter pmf"] = metrics(qwen)
+    res["binary_auroc"] = {k: float(roc_auc_score(is_answer, s)) for k, s in binary.items()}
+    (test / "oos.json").write_text(json.dumps(res, indent=1) + "\n")
+    cols = ("top1_answer", "top1_gold", "nll_answer", "kl_qwen", "ece")
+    lines = [
+        f"Frozen probe on TruthfulQA ({len(qs)} questions, {res['n_right']} right / {len(qs) - res['n_right']} wrong). Trained on all of "
+        f"`{train.name}` (nl, hidden_states[{a.hidden}], diag, l2 {a.l2}). Chance top-1 {res['chance_top1']:.3f}; Qwen letter argmax = "
+        f"sampled modal answer on {agree:.1%}. Binary probe AUROC: " + ", ".join(f"{k} {v:.3f}" for k, v in res["binary_auroc"].items()),
+        "",
+        "| method | split | n | " + " | ".join(cols) + " |",
+        "|---|---|---|" + "---|" * len(cols),
+    ]
+    for name, r in res["methods"].items():
+        for split in ("all", "right", "wrong"):
+            lines.append(f"| {name} | {split} | {r[split]['n']} | " + " | ".join(f"{r[split][c]:.3f}" for c in cols) + " |")
+    (test / "oos.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+    s, logpmf = scores["listwise nl"], lambda x: np.log(_softmax_by_q(x, starts))
+    cols = {"qwen_logp": np.log(qwen), "probe_s": s, "probe_logp": logpmf(s)}
+    with open(test / "pmf_options.jsonl", "w") as f:
+        for qi, r in enumerate(qs):
+            sl = slice(starts[qi], ends[qi + 1])
+            row = {"item": r["item"], "category": "TruthfulQA", "question": r["question"], "options": r["options"]}
+            row |= {"letters": list(TQA_LETTERS[: r["n_opts"]]), "own": r["own"], "gold": r["gold"], "right": r["right"]}
+            row |= {"share": r["share"], "fold": -1} | {k: [round(float(x), 4) for x in v[sl]] for k, v in cols.items()}
+            row["probe_p"] = [round(float(x), 4) for x in np.exp(cols["probe_logp"][sl])]
+            row |= {"probe_s_full": row["probe_s"], "probe_logp_full": row["probe_logp"], "probe_p_full": row["probe_p"]}
+            f.write(json.dumps(row) + "\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -869,6 +968,12 @@ def main():
     t.add_argument("--work", default="data/tqa_oos", help="where the GPU inputs and O-lens requests go")
     t.add_argument("--min-count", type=int, default=7)
     t.add_argument("--n-samples", type=int, default=8)
+    o = sub.add_parser("oos")
+    o.add_argument("train", help="the MMLU-Pro run the probe is fit on")
+    o.add_argument("test", help="the tqa-prep run, with scripts/hs_at_positions.py output in data/probe_cache/<run>/")
+    o.add_argument("--hidden", type=int, default=52)
+    o.add_argument("--l2", type=float, default=1.0)
+    o.add_argument("--C", type=float, default=0.01)
     a = ap.parse_args()
     cmds = {
         "collect": collect,
@@ -879,6 +984,7 @@ def main():
         "lens-requests": lens_requests,
         "lens-stats": lens_stats,
         "tqa-prep": tqa_prep,
+        "oos": oos,
     }
     cmds[a.cmd](a)
 
