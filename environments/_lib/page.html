@@ -933,24 +933,32 @@ function ansPick() {
 }
 
 const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
-    <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}</div>
+    <div class="t">${esc(e.title)}${e.retired ? ` <span class="tag" title="${esc(e.retired)}">retired</span>` : ""}</div><div class="why mono">${esc(e.name)}</div>
     <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span><span class="mute">models</span><span>${e.models.map(m => esc(shortModel(m))).join(", ")}</span>
       <span class="mute">conditions</span><span>${condOrder(e.conditions).map(k => swatch(k) + esc(condShort(k))).join(" ")}</span></div>
     <div class="meta"><span>${e.n_cases} cases</span><span>${e.n_runs} runs</span>${e.latest ? `<span>latest ${esc(e.latest)}</span>` : ""}</div></a>`).join("")}</div>`;
 
-async function evalsHome() {
+// retired evals (RETIRED in cfbench/evals/<name>/eval.py) are left out of the lists unless the hash has retired=show
+function liveEvals(es, h) {
+  const out = h.retired === "show" ? es : es.filter(e => !e.retired), n = es.length - es.filter(e => !e.retired).length;
+  const note = n ? `<p class="mute">${n} retired eval${n > 1 ? "s" : ""} (RETIRED in eval.py) ${h.retired === "show" ? "shown" : "hidden"}:
+    <a href="#${setParam("retired", h.retired === "show" ? "" : "show")}">${h.retired === "show" ? "hide" : "show"} them</a></p>` : "";
+  return [out, note];
+}
+
+async function evalsHome(h = {}) {
   setCrumb([["evals", "evals=1"]]);
-  const idx = await getEval("index.json");
+  const idx = await getEval("index.json"), [es, note] = liveEvals(idx.evals, h);
   $("view").innerHTML = `<h1>Evals</h1><p class="lede">cfbench evals: an investigator sees a base arm and the exact edit and predicts the behaviour rate after it (or, in the answer task, the model's answer after it).
     An eval can span several envs, models and pairs; each is defined in <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>
-    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env).</p>${evalCards(idx.evals)}`;
+    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env).</p>${note}${evalCards(es)}`;
 }
 
 // an env's Evals tab: the evals that use it
 async function evalsTab(D) {
   const idx = await maybe(getEval("index.json"));
-  const es = (idx?.evals || []).filter(e => e.envs.includes(D.env));
-  $("tab").innerHTML = es.length ? `<p class="lede">cfbench evals that use this env. An eval can span several envs; its page shows them all, or only this one's cases from here.</p>${evalCards(es, D.env)}`
+  const [es, note] = liveEvals((idx?.evals || []).filter(e => e.envs.includes(D.env)), canonHash());
+  $("tab").innerHTML = es.length || note ? `<p class="lede">cfbench evals that use this env. An eval can span several envs; its page shows them all, or only this one's cases from here.</p>${note}${evalCards(es, D.env)}`
     : `<p class="mute">No cfbench eval uses ${esc(D.env)} yet: see <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>.</p>`;
 }
 
@@ -1010,7 +1018,8 @@ async function evalPage(h) {
       ${g0.pair ? ` <span class="mute" style="font-weight:400;font-size:14px">pair ${esc(g0.pair)}${g0.reverse ? ", reversed" : ""}</span>` : ""}</h2>` +
       `<div class="evcases">${gs.map(([R, g]) => (runs.length > 1 ? `<div><h3 style="margin-top:0">${esc(R.slug)}</h3>` : "<div>") + evalCard(R, g) + "</div>").join("")}</div>`;
   }).join("");
-  $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}</h1>
+  $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}${ev.retired ? ` <span class="tag" title="RETIRED in eval.py">retired</span>` : ""}</h1>
+    ${ev.retired ? `<p class="mute">Retired: ${esc(ev.retired)}. Its runs stay here; the Evals list hides it.</p>` : ""}
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
@@ -1157,7 +1166,7 @@ async function route() {
     else if (h.diff) await diffPage(h);
     else if (h.env && h.arm) await armPage(h);
     else if (h.eval) await evalPage(h);
-    else if (h.evals) await evalsHome();
+    else if (h.evals) await evalsHome(h);
     else if (h.env) await envPage(h);
     else await home();
     $("status").textContent = "";

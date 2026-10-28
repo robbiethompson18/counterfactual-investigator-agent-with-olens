@@ -36,6 +36,8 @@ shown transcript per case, two models paired on the same items, or a model name 
   - `INPUTS_FROM` (optional): another eval whose inputs run this one reads (it then needs no
     `prep`).
   - `PROMPT(prompt, case)` (optional): a last rewrite of the whole prompt, after everything else.
+  - `RETIRED` (optional): why the eval was set aside, e.g. `"Kylie, 2026-10-28: only af_which_pair is kept"`. The
+    env viewer leaves it out of the Evals lists (`retired=show` in the hash lists it again, tagged); its page and runs stay.
   - `MODEL_IDS` (optional): every model id the predictor must never see (default: the case's
     `model`).
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.

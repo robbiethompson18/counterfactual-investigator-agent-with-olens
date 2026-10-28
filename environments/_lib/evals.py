@@ -557,6 +557,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
             s.pop("_sq", None), s.pop("_sq_null", None)
         p = EVALS / f"{name}.json"
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
+        if retired := getattr(_eval_module(name), "RETIRED", None):
+            doc["retired"] = retired
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     index = []
@@ -576,6 +578,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
                 "conditions": sorted({c for r in rs for c in r["conditions"]}),
                 "n_cases": sum(r["n_cases"] for r in rs),
             }
+            | ({"retired": e["retired"]} if e.get("retired") else {})
         )
     p = EVALS / "index.json"
     p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")

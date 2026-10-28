@@ -36,6 +36,8 @@ ENVS = ["alignment_faking"]  # the environments/ envs it is about (the env viewe
 ENV = ENVS[0]
 MODEL_NAME = "the target model"  # in place of the model id everywhere in the prompt
 CONDITIONS = ("transcript_agentic", "olens_agentic", "olens_placebo_agentic")
+# the env viewer hides it from the Evals list (retired=show brings it back); af_which_pair, which reads its code, stays
+RETIRED = "Kylie, 2026-10-28: only af_which_pair is kept"
 
 
 def BASE_LINE(case: dict) -> str:
