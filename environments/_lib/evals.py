@@ -23,6 +23,7 @@ an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ 
 import ast
 import datetime as dt
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -396,6 +397,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         "_sq_null": sq_null,
         "paired": paired,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
 
 
@@ -490,7 +492,41 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
         "correct": {k: sum(v) / len(v) for k, v in per_cond.items()},
         "correct_null": sum(null) / len(null) if null else None,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
+
+
+def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_agentic", n_boot: int = 2000, seed: int = 0) -> list[dict]:
+    """Per condition, its % right minus `ref`'s over the items both have (an item's score = the mean over its draws): the
+    mean difference, a 95% bootstrap CI over items, the sign-test counts (items better / worse) and p, two-sided and
+    one-sided (condition > ref)."""
+    import numpy as np
+
+    if ref not in right:
+        return []
+    rng, out = np.random.default_rng(seed), []
+    for k in sorted(right):
+        items = sorted(set(right[k]) & set(right[ref]), key=str)
+        if k == ref or not items:
+            continue
+        d = np.array([np.mean(right[k][i]) - np.mean(right[ref][i]) for i in items])
+        boots = d[rng.integers(len(d), size=(n_boot, len(d)))].mean(1)
+        pos, neg = int((d > 0).sum()), int((d < 0).sum())
+        n = pos + neg
+        tail = [sum(math.comb(n, i) for i in range(j, n + 1)) / 2**n for j in (pos, max(pos, neg))] if n else [1.0, 0.5]
+        out.append({
+            "condition": k, "ref": ref, "n": len(items), "diff": float(d.mean()),
+            "ci": [float(x) for x in np.percentile(boots, [2.5, 97.5])], "better": pos, "worse": neg,
+            "p_one": tail[0], "p_two": min(1.0, 2 * tail[1]),
+        })  # fmt: skip
+    return out
+
+
+def item_info(meta: dict, rows: list[dict]) -> dict:
+    """The eval's ITEM_INFO(row) (optional: what its question-level table shows, e.g. the question, gold, the model's own
+    answer), once per item; {} for evals without it."""
+    hook = getattr(_eval_module(meta.get("params", {}).get("eval")), "ITEM_INFO", None)
+    return {r["item"]: hook(r) for r in {r["item"]: r for r in rows if r.get("item")}.values()} if hook else {}
 
 
 def mark_current(name: str, summaries: list[dict]) -> dict:
@@ -534,8 +570,36 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                 pair = pair_stats(rows)
                 for t in table:
                     t |= pair.get((t["condition"], t["version"]), {})
-            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table})
+            paired = {}
+            if any(t.get("accuracy") is not None for t in table):  # scored as % right (guess = p >= 0.5): each condition vs transcript
+                right: dict[str, dict[str, dict[str, list[float]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+                for r in rows:
+                    if r["valid"]:
+                        right[r["version"]][canon_condition(r["condition"])][r["item"]].append(
+                            float((r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"]))
+                        )
+                paired = {v: paired_vs(by) for v, by in right.items()}
+            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table, "paired": paired})
         return {"claim_tables": tables}
+    if ans := [s for s in cur if s.get("task") == "answer"]:  # % correct per item (valid draws), pooled over the current runs
+        right: dict[str, dict[tuple, list[float]]] = defaultdict(lambda: defaultdict(list))
+        for s in ans:
+            for g in s["groups"]:
+                for it in g["items"]:
+                    for k, ds in it["draws"].items():
+                        if k in s["current_conds"]:
+                            right[k][g["env"], g["version"], it["item"]] += [float(d["correct"]) for d in ds if d["valid"]]
+        import numpy as np
+
+        right = {k: {i: v for i, v in by.items() if v} for k, by in right.items()}
+        rng, pooled = np.random.default_rng(0), []
+        for k, by in right.items():  # % correct per condition over every item (an item's draws averaged), 95% bootstrap CI
+            x = np.array([np.mean(v) for v in by.values()])
+            boots = x[rng.integers(len(x), size=(2000, len(x)))].mean(1)
+            pooled.append(
+                {"condition": k, "n": len(x), "accuracy": float(x.mean()), "ci": [float(c) for c in np.percentile(boots, [2.5, 97.5])]}
+            )
+        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_vs(right), "pooled": pooled}}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}
@@ -652,7 +716,10 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         for s in summaries:
             s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
-        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
+        claim = getattr(_eval_module(name), "CLAIM", None)  # a claim eval's claim in words, for the page's captions
+        arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
+        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
+        doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)

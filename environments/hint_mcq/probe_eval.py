@@ -190,6 +190,52 @@ def score(a):
     print("\n".join(report))
 
 
+PROBE = "probe"  # the condition name; its predictor
+PREDICTOR = "MCQ answer probe (argmax p(option | activations), nl hidden_states[52])"
+DROP = ("messages", "tool_calls", "tools", "turns", "rationale")
+
+
+def cfbench_runs(a):
+    """The probe's predictions as cfbench runs (condition `probe`), one per eval, on the same cases and inputs as an
+    investigator run of that eval (its rows give the case fields), so the env viewer's eval pages show the probe beside the
+    investigator conditions: the claim/answer tables, the charts and the paired comparisons."""
+    from counterfactual_investigator_agent_with_olens.runs import finish
+
+    base = Path(a.run)
+    probe = {
+        name: [json.loads(line) for line in (base / name / "predictions.jsonl").read_text().splitlines()] for name in ("knew", "letter")
+    }
+    for name, ref in (("knew", Path(a.knew)), ("letter", Path(a.letter))):
+        pred = {(r["source"], r["item"]): r for r in probe[name] if r["condition"] == "probe" and r["version"] == "pooled"}
+        meta = json.loads((ref / "meta.json").read_text())
+        rows, seen = [], set()
+        for line in (ref / "predictions.jsonl").read_text().splitlines():
+            r = json.loads(line)
+            if (key := (r["source"], r["item"])) in seen:
+                continue
+            seen.add(key)
+            p = pred[key]
+            out = {k: v for k, v in r.items() if k not in DROP} | {
+                "condition": PROBE,
+                "predictor": PREDICTOR,
+                "draw": 0,
+                "cost": 0.0,
+                "valid": True,
+            }
+            if name == "knew":
+                out["p"] = p["p"]
+            else:
+                out |= {"answer": p["answer"], "canon": p["answer"], "correct": p["answer"] == r["modal_cf"]}
+            rows.append(out)
+        params = meta["params"] | {"conditions": PROBE, "predictors": PREDICTOR, "probe_run": str(base), "template_run": ref.name}
+        desc = f"{meta['params']['eval']}: the MCQ answer probe as a condition ({len(rows)} cases)"
+        model = {"name": PREDICTOR, "served_by": f"deterministic, {base.name}"}
+        run = new_run("cfbench", f"{meta['slug']}-probe", description=desc, models=[model], params=params)
+        (run / "predictions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        print(run, len(rows), "rows")
+        finish(run)
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -201,8 +247,12 @@ def main():
     s.add_argument("run")
     s.add_argument("--evals-repo", default=".", help="checkout whose cfbench/evals/hint_qwen_dsv4*/score.py score the rows")
     s.add_argument("--cached-only", action="store_true", help="score the cases with cached no-hint activations, no GPU output")
+    c = sub.add_parser("cfbench-runs")
+    c.add_argument("run", help="this script's run (knew/ and letter/ predictions from `score`)")
+    c.add_argument("knew", help="an investigator run of hint_qwen_dsv4 (data/runs/cfbench/...): its case fields and meta")
+    c.add_argument("letter", help="an investigator run of hint_qwen_dsv4_letter")
     a = ap.parse_args()
-    {"prep": prep, "score": score}[a.cmd](a)
+    {"prep": prep, "score": score, "cfbench-runs": cfbench_runs}[a.cmd](a)
 
 
 if __name__ == "__main__":

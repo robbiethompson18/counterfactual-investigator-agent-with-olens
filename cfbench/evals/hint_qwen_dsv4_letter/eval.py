@@ -33,6 +33,9 @@ TASK = "answer"
 INPUTS_FROM = "hint_qwen_dsv4"
 QWEN = "Qwen/Qwen3.6-27B"
 reads = K.reads
+ITEM_INFO = K.ITEM_INFO
+ARM_LABELS = K.ARM_LABELS
+PAIR_LABELS = K.PAIR_LABELS
 LINKS = K.LINKS
 
 
