@@ -327,12 +327,19 @@ abandoned attempts).
 | stop tokens, no filler      | 18    | 23% / 6%                 | 19% (20/108) / 5%     | 6                        |
 | stop tokens, no filler      | 13 ¹  | 23% / 6%                 | 18% (14/78) / 4%      |                          |
 | stop tokens, `pause` filler | 13 ¹  | 27% / 1%                 | 17% (13/78) / 4%      | 4                        |
-| every token, no filler      | 18    | 24% / 6%                 | DENSE_T1              | DENSE_T1_ITEMS           |
+| every token, no filler      | 18    | 24% / 6%                 | 6% (3/54) / 4%        | 3                        |
 
-Same picture: the lens beats the placebo by 13-15 points, the filler and the dense reads change
-nothing, and the T=1 numbers sit a few points under greedy, within what 6 draws resolve. The reads
-themselves are indistinguishable in quality: top-bullet FVE p10/p50/p90 is 0.039/0.126/0.304 greedy
-vs 0.040/0.122/0.298 at T=1 on the same 42,984 stop-token reads, mean joint FVE 0.174 vs 0.172. The
+Same picture on stop tokens: the lens beats the placebo by 13-15 points and the filler changes
+nothing. Every-token reads at T=1 drop to the placebo level (3/54 vs 13/54 greedy, Fisher p ≈ 0.01
+on these counts, 3 draws): the investigator saw an own-letter bullet in 41 of 54 draws (38 of 54
+greedy), and the own letter's share of all letters named in the bullets it saw is the same (13% vs
+15%), so the reads aren't worse; with 4 independently sampled rollouts read at every token it
+submits the hinted answer far more often. Two differences besides temperature: only 4 of each case's
+8 rollouts were read (cost), and each read rollout now shows different bullets at the same token.
+Not chased further; it doesn't change the conclusion that dense reads don't help. and the T=1
+numbers sit a few points under greedy, within what 6 draws resolve. The reads themselves are
+indistinguishable in quality: top-bullet FVE p10/p50/p90 is 0.039/0.126/0.304 greedy vs
+0.040/0.122/0.298 at T=1 on the same 42,984 stop-token reads, mean joint FVE 0.174 vs 0.172. The
 items carrying the result are the same ones (941, 2509, 5088; 6414, 6031, 1157 as singles); 6598 and
 10868, hits under greedy, are 0/6 at T=1, and the reverse flips happen too. With 8 independent draws
 per site the investigator still works from the bullets under its default filters, so more draws
