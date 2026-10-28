@@ -816,14 +816,27 @@ async function getEval(path) {
   return fetchOnce("e:" + path, async () => { const r = await fetch((await base()).replace(/envs\/$/, "evals/") + path); if (!r.ok) throw new Error("evals/" + path + ": " + r.status); return r.json(); });
 }
 // the eval list is the code's, like the env list: spec/evals.json beside the page (every eval cfbench/evals/ and
-// PAIRS_ENVS define), with each one's run stats from HF's evals/index.json by name; an eval with no runs there yet still
-// gets a card; RETIRED_EVALS are left off unless `all`. Without a code spec (?spec=hf) it is HF's index as is.
+// PAIRS_ENVS define; RETIRED_EVALS left off unless `all`), or without a code spec (?spec=hf) the evals/*.json in HF's tree.
+// There is no shared index: each card's run stats come from the eval's own evals/<name>.json, and an eval with no runs
+// there yet still gets a card.
+async function evalDefs(all = false) {
+  if (await codeIndex()) {
+    const defs = await maybe(fetchOnce("c:evals.json", async () => { const r = await fetch("spec/evals.json"); if (!r.ok) throw new Error("spec/evals.json: " + r.status); return r.json(); }));
+    if (defs) return defs.evals.filter(d => all || !d.retired);
+  }
+  const sha = (await base()).match(/\/resolve\/([^/]+)\//)?.[1] || "main";
+  const tree = await maybe(fetchOnce("t:evals", async () => { const r = await fetch(`https://huggingface.co/api/datasets/${REPO}/tree/${sha}/evals`); if (!r.ok) throw new Error("evals tree: " + r.status); return r.json(); }));
+  return (tree || []).map(f => f.path.split("/").pop()).filter(f => f.endsWith(".json") && f !== "index.json").map(f => ({name: f.slice(0, -5), envs: []}));
+}
 async function evalList(all = false) {
-  const [code, idx] = await Promise.all([codeIndex(), maybe(getEval("index.json"))]);
-  const defs = code ? await maybe(fetchOnce("c:evals.json", async () => { const r = await fetch("spec/evals.json"); if (!r.ok) throw new Error("spec/evals.json: " + r.status); return r.json(); })) : null;
-  if (!defs) return idx?.evals || [];
-  const hf = Object.fromEntries((idx?.evals || []).map(e => [e.name, e]));
-  return defs.evals.filter(d => all || !d.retired).map(d => ({...hf[d.name], name: d.name, title: d.title, envs: d.envs.length ? d.envs : hf[d.name]?.envs || [], error: d.error, retired: d.retired}));
+  const defs = await evalDefs(all);
+  const files = await Promise.all(defs.map(d => maybe(getEval(`${d.name}.json`))));
+  return defs.map((d, i) => {
+    const e = files[i], rs = e?.runs || [];
+    return {name: d.name, title: d.title || e?.title || d.name, envs: d.envs?.length ? d.envs : e?.envs || [], error: d.error, retired: d.retired,
+      ...(e ? {n_runs: rs.length, latest: rs.reduce((m, r) => (r.date || "") > m ? r.date : m, ""), n_cases: rs.reduce((t, r) => t + (r.n_cases || 0), 0),
+        models: [...new Set(rs.flatMap(r => r.models || []))].sort(), conditions: [...new Set(rs.flatMap(r => r.conditions || []))].sort()} : {})};
+  });
 }
 
 // a group = (env, version, base arm, cf arm, model), pooled over the eval's items: the observed rate before (base arm)
@@ -1078,7 +1091,7 @@ const pairText = (b, cf) => PAIRLAB[`${b} -> ${cf}`] || `${armLab(b)} → ${armL
 const pairHtml = (b, cf) => `<span title="${esc(b)} → ${esc(cf)}">${esc(pairText(b, cf))}</span>`;
 async function evalPage(h) {
   DRAWS = [];
-  const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalList(true)]);
+  const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalDefs(true)]);
   ARMLAB = ev.arm_labels || {}, PAIRLAB = ev.pair_labels || {};
   const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);

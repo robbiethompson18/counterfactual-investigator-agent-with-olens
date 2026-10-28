@@ -1,4 +1,4 @@
-"""cfbench evals for the env viewer: evals/index.json and evals/<name>.json (local data/evals/, HF evals/).
+"""cfbench evals for the env viewer: evals/<name>.json, one file per eval (local data/evals/, HF evals/).
 
     uv run python -m environments evals [NAME ...] [--pull] [--upload]
 
@@ -21,7 +21,6 @@ an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ 
 """
 
 import ast
-import datetime as dt
 import itertools
 import json
 import math
@@ -34,7 +33,6 @@ from typing import Any
 
 from .backends import canonical_id
 from .core import load_env
-from .index import hf_index
 from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
@@ -742,8 +740,8 @@ def defined() -> list[dict]:
 
 
 def build(names: list[str] | None = None, export=True) -> list[Path]:
-    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json
-    (HF's entries plus the local evals)."""
+    """Write data/evals/<name>.json for `names` (default: every eval with a local run). There is no shared index (the
+    page lists evals from spec/evals.json and reads each one's own file), so concurrent uploads can't clobber each other."""
     runs, envs, written = eval_runs(), Envs(), []
     EVALS.mkdir(parents=True, exist_ok=True)
     for name in names or list(runs):
@@ -767,28 +765,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
-    # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
-    built = {p.stem for p in written}
-    top = {e["name"]: e for e in hf_index("index.json", root="evals/").get("evals", [])}
-    for p in sorted(EVALS.glob("*.json")):
-        if p.name == "index.json" or (p.stem not in built and p.stem in top):  # an eval not rebuilt here: HF's entry is current
-            continue
-        e = json.loads(p.read_text())
-        rs = e["runs"]
-        top[e["name"]] = {
-            "name": e["name"],
-            "title": e["title"],
-            "envs": e["envs"],
-            "n_runs": len(rs),
-            "latest": max((r["date"] or "" for r in rs), default=""),
-            "models": sorted({m for r in rs for m in r["models"]}),
-            "conditions": sorted({c for r in rs for c in r["conditions"]}),
-            "n_cases": sum(r["n_cases"] for r in rs),
-        }
-    p = EVALS / "index.json"
-    index = [top[n] for n in sorted(top)]
-    p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")
-    return [*written, p]
+    return written
 
 
 def pull():

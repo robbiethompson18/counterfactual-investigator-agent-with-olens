@@ -152,8 +152,8 @@ What it reads:
   module doesn't load from a clean checkout (data files not in git; none today) is marked in
   `spec/index.json` and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally
   whenever the env's source changes (overeagerness takes ~3 minutes) and `upload` ships.
-- `evals/index.json` and `evals/<name>.json` on HF, beside `envs/` (`_lib/evals.py`, written by
-  `index` from local cfbench runs, or
+- `evals/<name>.json` on HF, one per eval beside `envs/` (no shared index; the page lists evals from
+  `spec/evals.json`) (`_lib/evals.py`, written by `index` from local cfbench runs, or
   `python -m environments evals [NAME ...] [--pull] [--upload]`): per eval its runs, RMSE per
   condition, paired-model table and chart groups, each draw's p with its Docent run and expview
   item. No conversations: `evals` exports them to `runs/cfbench/<run>/expview/` (`--upload` ships
