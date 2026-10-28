@@ -10,7 +10,9 @@ One collection per env, named after it, plus "cfbench". Two run layouts:
   `positive`, ...) as metadata. The upload then writes `docent_run` / `docent_url` onto every episode line (shards rewritten,
   episodes/index.json rebuilt) and `docent_collection` into meta.json, the layout converted runs have.
   `environments run` calls this before its HF upload, so the ids ship with the run.
-- old run dirs (data/runs/): evalcue-harness rows.jsonl and cfbench predictions.jsonl. Each upload writes docent.json:
+- old run dirs (data/runs/): evalcue-harness rows.jsonl, cfbench predictions.jsonl, and WorkspaceBench replications
+  (data/runs/wsb_*/, from their expview/items.jsonl: one Docent run per item, one transcript per call, so the subject's
+  reply and the judge call sit side by side). Each upload writes docent.json:
   {"collection_id", "runs": [Docent agent run id per line, null for skipped rows]}; runs.finish() ran this before its HF sync.
 
 Docent's SDK pulls ~90 packages, so this script carries its own deps (PEP 723) instead of adding them to the project:
@@ -165,6 +167,14 @@ def prediction_run(row: dict, source: str) -> AgentRun:
     return AgentRun(name=name, transcripts=[Transcript(messages=messages(row["messages"]))], metadata=metadata)
 
 
+def expview_item_run(item: dict, source: str) -> AgentRun:
+    """An expview item (wsb runs): each call's messages already end with its output as the assistant turn."""
+    transcripts = [Transcript(name=c["name"], messages=messages(c["messages"])) for c in item["calls"]]
+    parsed = {c["name"]: c["parsed"] for c in item["calls"] if c.get("parsed")}
+    metadata = {**item.get("labels", {}), **item.get("extra", {}), "item": item["id"], "group": item.get("group"), "parsed": parsed}
+    return AgentRun(name=item["id"], transcripts=transcripts, metadata=metadata | {"source": source})
+
+
 def upload_folder(run: Path, dry: bool = False) -> bool:
     """A run folder: upload every episode with a transcript, then write the ids back (see the module docstring)."""
     meta = json.loads((run / "meta.json").read_text())
@@ -217,15 +227,19 @@ def upload(run: Path, dry: bool = False) -> bool:
         lines, convert, name = (run / "rows.jsonl").read_text().splitlines(), env_row_run, run.parent.name
     elif (run / "predictions.jsonl").exists():
         lines, convert, name = (run / "predictions.jsonl").read_text().splitlines(), prediction_run, "cfbench"
+    elif run.parent.name.startswith("wsb_") and (run / "expview" / "items.jsonl").exists():
+        lines, convert, name = (run / "expview" / "items.jsonl").read_text().splitlines(), expview_item_run, run.parent.name
     else:
         return False
     rows = [json.loads(line) for line in lines]
-    if run.parent.name != "cfbench" and not all("arm" in r or "variant" in r for r in rows):
+    if convert is env_row_run and not all("arm" in r or "variant" in r for r in rows):
         return False  # a rows.jsonl from something other than the evalcue harness
     if dry:
         print(f"{run}: would upload {len(rows)} rows to collection {name!r}")
         return True
-    agent_runs = [convert(r, f"{run.parent.name}/{run.name}:{i}") if r.get("messages") else None for i, r in enumerate(rows)]
+    agent_runs = [
+        convert(r, f"{run.parent.name}/{run.name}:{i}") if r.get("messages") or r.get("calls") else None for i, r in enumerate(rows)
+    ]
     for agent_run in filter(None, agent_runs):
         agent_run.metadata |= {"run_status": meta["status"], "run_description": meta.get("description")}
     cid = collection_id(name)
