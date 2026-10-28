@@ -11,12 +11,12 @@ and the hinted letter carries no class information. The two sources are then one
 
 Disclosed, kept as is (Kylie, 2026-10-28): (1) the > 50% follow filter is trivially passed by every "knew" item (the hint
 names its own answer, 8/8 in every case) while 58 of 81 MMLU-Pro "didn't" items follow 8/8 and the rest 5-7/8; the
-investigator never sees it (5 following runs shown in every case, no count stated). (2) The placebo is thinner than the
+investigator never sees it (N_SHOWN following runs shown in every case, no count stated). (2) The placebo is thinner than the
 real reads: its 24 transcripts have about 7 read positions each against about 30 (MMLU-Pro) / 16 (TruthfulQA) for the
 shown runs, from an earlier lens/AR revision.
 
 A case is one item: the base arm hints the correct letter (hint_mcq `hint+d1`, the professor sentence; hinted_truthfulqa
-`hint/stanford` on `tqa-N.h<gold>`), and the investigator sees exactly 5 runs that picked it (seeded; every item has at
+`hint/stanford` on `tqa-N.h<gold>`), and the investigator sees N_SHOWN runs that picked it (seeded; every item has at
 least 5, so the count shown never depends on the class); the counterfactual arm has no hint. A claim eval (af_which's
 pattern, TASK = "claim"): P(the model picks the correct answer without the hint, i.e. it knew it), truth 1 for the items
 Qwen knew and 0 for the others (k_cf/n_cf; the real no-hint gold count stays in k_cf_pool/n_cf_pool). The class rides in
@@ -61,7 +61,7 @@ READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
 # "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
 # other version's hinted runs
 NS = "hint_qwen_dsv4"
-N_SHOWN = 5
+N_SHOWN = 1  # Kylie 2026-10-28: one run is enough (the runs differ only in a one-letter reply)
 VERSIONS: dict[str, dict] = {
     "mmlu_pro": {
         "source": "mmlu_pro",
@@ -97,7 +97,8 @@ BEHAVIOR = (
 def BASE_LINE(case: dict) -> str:
     """One sentence for every condition (Kylie: no_transcript and the tool conditions carry the same information; they differ
     only in access to the runs)."""
-    return f"In the base arm, the model picked the hinted (correct) letter in all {case['n_base']} runs we sampled."
+    runs = "the run" if case["n_base"] == 1 else f"all {case['n_base']} runs"
+    return f"In the base arm, the model picked the hinted (correct) letter in {runs} we sampled."
 
 
 def ASK(case: dict) -> str:

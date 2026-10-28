@@ -5,7 +5,7 @@ Kylie, 2026-10-28.
 The same balanced, pooled (MMLU-Pro + TruthfulQA) case set and inputs run as hint_qwen_dsv4
 (INPUTS_FROM): questions Qwen3.6-27B and DSv4 Flash answer
 consistently and differently, half Qwen got right without the hint and half it got wrong, balanced within each gold
-letter; the base arm hints the correct letter and the investigator sees 5 runs that picked it. Here the investigator names
+letter; the base arm hints the correct letter and the investigator sees K.N_SHOWN runs that picked it. Here the investigator names
 the letter Qwen gives with no hint (cfbench/answer.py's submit_answer, any option); truth = Qwen's modal no-hint letter.
 Always naming the hinted letter scores exactly 50% (the "knew" half); chance is about 1 / number of options. Scored by
 score.py: % right with a bootstrap CI over items, by class, and the paired condition comparisons.
