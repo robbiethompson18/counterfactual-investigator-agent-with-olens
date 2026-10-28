@@ -2,6 +2,15 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: two Gemini call paths in `wsb/`
+
+`wsb/basic_readout_implicit/run.py` has `gemini()`: OpenRouter first, falling back to Google's API
+with `GEMINI_API_KEY` on 402/403/429/timeout, recording the route per call. `wsb/user_modeling.py`
+and `wsb/judge.py` (branch `wsb/user-modeling-flash`) call `openrouter.chat` directly with the same
+WorkspaceBench judge settings (Flash, effort `minimal`, strict schema, `require_parameters`) and no
+fallback. Once both are on main, move the fallback into one shared helper (or
+`openrouter.py`) and put both families under one layout (`wsb/banks/` vs a folder per family).
+
 ## 2026-10-28: `environments run` crashes after a finished run on a missing eval env module
 
 **Partly fixed (essay_curious PR #306):** `evals.Envs` now skips envs that don't import. The upload
