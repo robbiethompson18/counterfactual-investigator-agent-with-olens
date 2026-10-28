@@ -29,6 +29,9 @@ shown transcript per case, two models paired on the same items, or a model name 
   - `BASE_LINE(case)` (optional): the sentence that replaces the prompt's "In the base arm, `model`
     showed the behavior in k of n runs." (`k_base`/`n_base` of the runs shown); `""` drops it.
     Without it the sentence stays as `core.build_prompt` writes it.
+  - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
+    `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
+    gets its Docent URL from the env's `links.json`.
 - `eval.md`: anything else the investigator should know. The runner puts it in every prompt as
   `## About this evaluation`, just before the task, and records it in `meta.json`.
 
@@ -53,7 +56,9 @@ before launching.
 nothing", the paired-model comparison (mean p per model, AUROC between their cases) when two models
 share cases, and per (env, version, arm pair, model) a before/after chart with every draw. The page
 has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and each env's Evals tab
-lists the evals that use it. Plain `cfbench.run env_runs:<env>/...` runs show as the eval
+lists the evals that use it. Clicking a draw (point or chip) opens a card with its predicted rate,
+the investigator's explanation, and Docent + expview links for its conversation and for the
+transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as the eval
 `<env>-pairs`.
 
 ## Evals

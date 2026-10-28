@@ -140,11 +140,12 @@ class Envs:
 
     def __getitem__(self, env: str) -> dict:
         if env not in self.cache:
-            idx_p, filt_p = LOCAL / env / "index.json", LOCAL / env / "docent_filters.json"
+            idx_p, filt_p, links_p = LOCAL / env / "index.json", LOCAL / env / "docent_filters.json", LOCAL / env / "links.json"
             self.cache[env] = {
                 "pairs": getattr(load_env(env), "PAIRS", {}),
                 "index": json.loads(idx_p.read_text()) if idx_p.exists() else {},
                 "filters": json.loads(filt_p.read_text()) if filt_p.exists() else {},
+                "links": json.loads(links_p.read_text()).get("runs", {}) if links_p.exists() else {},
             }
         return self.cache[env]
 
@@ -157,11 +158,27 @@ class Envs:
         t = r.get("target") or canonical_id(model) or model
         return t + (" · thinking off" if r.get("thinking") is False else " · thinking on" if r.get("thinking") is True else "")
 
+    def docent(self, env: str, run: str, episode: str) -> str | None:
+        """An env episode's Docent URL (envs/<env>/links.json)."""
+        r = self[env]["links"].get(run) or {}
+        did = (r.get("episodes", {}).get(episode) or [None])[0]
+        if not did or not r.get("docent_collection"):
+            return None
+        return f"https://docent.transluce.org/dashboard/{r['docent_collection']}/agent_run/{did}"
+
     def pair(self, env: str, b: str, c: str) -> tuple[str | None, bool]:
         for name, (x, y) in self[env]["pairs"].items():
             if (b, c) in ((x, y), (y, x)):
                 return name, (b, c) == (y, x)
         return None, False
+
+
+def _eval_module(name: str | None):
+    if not name or not (EVAL_DIRS / name / "eval.py").exists():
+        return None
+    import importlib
+
+    return importlib.import_module(f"cfbench.evals.{name}.eval")
 
 
 def auroc(pos: list[float], neg: list[float]) -> float | None:
@@ -180,6 +197,16 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
     docent = json.loads((run_dir / "docent.json").read_text()) if (run_dir / "docent.json").exists() else {}
     _, run_envs, env_runs = eval_of(meta) or (None, [], [])
     ids = docent.get("runs") or [None] * len(rows)
+    # the eval's LINKS(row) (cfbench/evals/<name>/eval.py): e.g. the base-arm episode the investigator was shown, as
+    # {"env", "run", "episode"} (gets its Docent URL here) or an expview item {"dataset", "item"}
+    hook = getattr(_eval_module(meta.get("params", {}).get("eval")), "LINKS", None)
+
+    def links_of(r: dict) -> dict:
+        out = hook(r) if hook else {}
+        for spec in out.values():
+            if "episode" in spec:
+                spec["docent"] = envs.docent(spec["env"], spec["run"], spec["episode"])
+        return out
 
     cases: dict[tuple, dict] = {}  # (env, version, model, base, cf, item) -> rows by condition
     for r, did in zip(rows, ids, strict=False):
@@ -196,6 +223,8 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
                 "calls": sum((r.get("tool_calls") or {}).values()),
                 "docent": did,
                 "ev": item_id(r, cond) if r.get("messages") else None,
+                "rationale": r.get("rationale"),
+                "links": links_of(r),
             }
         )
     groups: dict[tuple, dict[str, Any]] = {}

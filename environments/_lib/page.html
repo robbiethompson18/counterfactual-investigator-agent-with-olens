@@ -119,6 +119,8 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .evchart .lab{fill:var(--fg);font-variant-numeric:tabular-nums} .evchart .band{fill:var(--bar);opacity:.25} .evchart .obs{stroke:var(--bar);stroke-width:2.5}
 .evchart .null{stroke:var(--faint);stroke-dasharray:4 4} .evchart .slope{stroke:var(--bar);stroke-width:1.5;opacity:.5} .evchart .mean{stroke-width:2}
 .evchart .pt{stroke:var(--card);stroke-width:1.2;cursor:pointer} .evchart .pt.faint{opacity:.55;stroke-width:.6} .evchart a:hover .pt{r:6}
+.drawcard{position:fixed;z-index:20;width:min(440px,calc(100vw - 16px));background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);font-size:13px}
+.drawcard .big{font-size:22px;font-weight:700;margin:2px 0 6px} .drawcard .why{margin:6px 0 10px;max-height:220px;overflow:auto;line-height:1.5}
 table.evt{box-shadow:none} .chips{max-height:150px;overflow:auto} table.evt td,table.evt th{padding:5px 8px} .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 </head>
@@ -127,6 +129,7 @@ table.evt{box-shadow:none} .chips{max-height:150px;overflow:auto} table.evt td,t
 <main>
 <div id="status" class="mute">loading…</div>
 <div id="view"></div>
+<div id="drawcard" class="drawcard" hidden></div>
 </main>
 <script>
 const REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens";
@@ -737,6 +740,34 @@ const evItem = (R, id) => evq({dataset: R.expview, item: id});
 const docentRun = (R, id) => id && R.docent_collection ? `${DOCENT}${R.docent_collection}/agent_run/${id}` : null;
 const rmseBadge = (x, nul) => x == null ? "–" : `<span class="delta ${x < nul - 0.005 ? "up" : x > nul + 0.005 ? "down" : "flat"}" title="RMSE ${(100 * x).toFixed(1)}pp vs ${(100 * nul).toFixed(1)}pp for 'the edit does nothing'">${(100 * x).toFixed(1)}pp</span>`;
 const shortModel = m => m.replace(/^[^/]+\//, "");
+// clicking a draw (chart point or chip) opens a card: the prediction, the investigator's explanation, and Docent + expview
+// for both the investigator's conversation and the base-arm transcript it investigated (with its O-lens reads)
+let DRAWS = [];
+const regDraw = (R, g, k, d) => DRAWS.push({R, g, k, d}) - 1;
+function linkSpec(s) {
+  if (s.episode) return evq({env: s.env, run: s.run, episode: s.episode});
+  return evq({dataset: s.dataset, item: s.item});
+}
+function drawCard(i, ev) {
+  ev?.preventDefault(); ev?.stopPropagation();
+  const {R, g, k, d} = DRAWS[i], el = $("drawcard");
+  const a = (href, label) => href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${label}</a>` : `<span class="mute">${label}</span>`;
+  const L = d.links || {}, t = L.transcript;
+  el.innerHTML = `<div class="row" style="margin:0 0 6px;justify-content:space-between"><b>${esc(modelName(g.target))} · ${swatch(k)}${esc(condShort(k))}${d.item ? ` · ${esc(d.item)}` : ""}</b>
+      <button onclick="this.closest('.drawcard').hidden=true" title="close">×</button></div>
+    <div class="big">${d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%"} <span class="mute" style="font-size:13px;font-weight:400">predicted · truth ${pp(g.k_cf / g.n_cf)}% (${g.k_cf}/${g.n_cf}) · ${d.calls} tool calls</span></div>
+    ${d.rationale ? `<p class="why">${esc(d.rationale)}</p>` : ""}
+    <div class="mini"><span class="mute">investigator</span><span>${a(docentRun(R, d.docent), "Docent")} · ${a(d.ev && R.expview ? evItem(R, d.ev) : null, "expview (full conversation)")}</span>
+    ${t ? `<span class="mute">transcript it read</span><span>${a(t.docent, "Docent")} · ${a(linkSpec(t), "expview")}${L["O-lens reads"] ? ` · ${a(linkSpec(L["O-lens reads"]), "O-lens reads")}` : ""}
+      <br><span class="mono mute">${esc(t.run)} · ${esc(t.episode)}</span></span>` : ""}
+    ${Object.entries(L).filter(([n]) => n !== "transcript" && n !== "O-lens reads").map(([n, s]) => `<span class="mute">${esc(n)}</span><span>${a(linkSpec(s), "expview")}</span>`).join("")}</div>`;
+  el.hidden = false;
+  const x = ev?.clientX ?? innerWidth / 2, y = ev?.clientY ?? 100;
+  el.style.left = Math.max(8, Math.min(x + 12, innerWidth - el.offsetWidth - 8)) + "px";
+  el.style.top = Math.max(8, Math.min(y + 12, innerHeight - el.offsetHeight - 8)) + "px";
+}
+addEventListener("keydown", e => { if (e.key === "Escape" && $("drawcard")) $("drawcard").hidden = true; });
+
 // evals/ sits beside envs/ (HF, or the local mirror)
 async function getEval(path) {
   return fetchOnce("e:" + path, async () => { const r = await fetch((await base()).replace(/envs\/$/, "evals/") + path); if (!r.ok) throw new Error("evals/" + path + ": " + r.status); return r.json(); });
@@ -768,8 +799,8 @@ function evalChart(R, g) {
     const ds = g.draws[k].filter(d => d.p != null), x = xp(i), m = ds.reduce((t, d) => t + d.p, 0) / (ds.length || 1);
     ds.forEach((d, j) => {
       const dx = many ? ((j * 7919) % 37 - 18) * 0.75 : (j - (ds.length - 1) / 2) * 4.5;  // many draws: spread over ±13px
-      const dot = `<circle cx="${f(x + dx)}" cy="${f(y(d.p))}" r="${many ? 3 : 4.5}" fill="${condColor(k)}" class="pt${many ? " faint" : ""}"><title>${esc(condLabel(k))}${d.item ? `, item ${esc(d.item)}` : ""}, draw ${d.draw}: p = ${(100 * d.p).toFixed(1)}% · ${d.calls} tool calls · ${esc(d.predictor)}${d.ev ? " · click for the full conversation" : ""}</title></circle>`;
-      s += d.ev && R.expview ? `<a href="${evItem(R, d.ev)}" target="_blank" rel="noopener">${dot}</a>` : dot;
+      const dot = `<circle cx="${f(x + dx)}" cy="${f(y(d.p))}" r="${many ? 3 : 4.5}" fill="${condColor(k)}" class="pt${many ? " faint" : ""}"><title>${esc(condLabel(k))}${d.item ? `, item ${esc(d.item)}` : ""}, draw ${d.draw}: p = ${(100 * d.p).toFixed(1)}% · ${d.calls} tool calls · ${esc(d.predictor)} · click for details and links</title></circle>`;
+      s += `<a href="#" onclick="drawCard(${regDraw(R, g, k, d)}, event)">${dot}</a>`;
     });
     s += `<line x1="${x - 15}" x2="${x + 15}" y1="${f(y(m))}" y2="${f(y(m))}" stroke="${condColor(k)}" class="mean"><title>${esc(condLabel(k))}: mean ${pp(m)}%</title></line>`;
     s += `<text x="${x}" y="${H - B + 16}" class="ax" text-anchor="middle">${esc(condShort(k))}</text>`;
@@ -784,11 +815,12 @@ function evalCard(R, g) {
   const dl = a => g.docent_arms?.[a] ? `<a href="${esc(g.docent_arms[a])}" target="_blank" rel="noopener" title="every ${esc(modelName(g.target))} episode of ${esc(a)} in Docent">Docent</a>` : "";
   const armLinks = a => `<span class="mono">${esc(a)}</span> ${[dl(a), `<a href="${evq({env: g.env, arm: a, model: g.target})}" target="_blank" rel="noopener">expview</a>`, `<a href="#${hashOf({env: g.env, arm: a})}">arm</a>`].filter(Boolean).join(" · ")}`;
   const val = d => (d.item ? `${esc(d.item)}: ` : "") + (d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%");
-  const chip = d => `<span class="chip">${d.ev && R.expview ? `<a href="${evItem(R, d.ev)}" target="_blank" rel="noopener" title="${d.item ? `item ${esc(d.item)}, ` : ""}draw ${d.draw}: the investigator's whole conversation in expview">${val(d)}</a>` : val(d)}${docentRun(R, d.docent) ? `<a class="x" href="${docentRun(R, d.docent)}" target="_blank" rel="noopener" title="this draw in Docent">D</a>` : ""}</span>`;
+  const chip = (d, k) => `<span class="chip"><a href="#" onclick="drawCard(${regDraw(R, g, k, d)}, event)" title="${d.item ? `item ${esc(d.item)}, ` : ""}draw ${d.draw}: prediction, explanation, and links to the conversation and the transcript it read">${val(d)}</a></span>`;
   const rows = conds.map(k => {
     const ds = g.draws[k], ok = ds.filter(d => d.p != null), m = ok.reduce((t, d) => t + d.p, 0) / (ok.length || 1);
-    const cell = ds.length <= 12 ? ds.map(chip).join("") : `<div class="chips">${ds.map(chip).join("")}</div>`;
-    return `<tr><td>${swatch(k)}${esc(condLabel(k))}</td><td>${cell}</td><td class="num">${pp(m)}%</td><td>${rmseBadge(g.rmse[k], g.rmse_null)}</td></tr>`;
+    const cell = ds.length <= 12 ? ds.map(d => chip(d, k)).join("") : `<div class="chips">${ds.map(d => chip(d, k)).join("")}</div>`;
+    const all = R.expview ? `<br><a href="${evq({dataset: R.expview, group: `${shortModel(g.model)} · ${g.base} -> ${g.cf} · ${k}`})}" target="_blank" rel="noopener" title="every draw of this row in expview">all ${ds.length} in expview ↗</a>` : "";
+    return `<tr><td>${swatch(k)}${esc(condLabel(k))}${all}</td><td>${cell}</td><td class="num">${pp(m)}%</td><td>${rmseBadge(g.rmse[k], g.rmse_null)}</td></tr>`;
   }).join("");
   const shown = g.n_shown !== g.n_base ? ` The investigator was shown ${g.k_shown} of ${g.n_shown} base runs, so the null predicts ${pp(g.k_shown / g.n_shown)}%.` : "";
   return `<div class="card evcase"><div class="row" style="margin:0 0 4px;justify-content:space-between"><b title="${esc(g.target)}">${esc(modelName(g.target))}</b>
@@ -796,7 +828,7 @@ function evalCard(R, g) {
     <div class="scroll">${evalChart(R, g)}</div>
     <p class="mute" style="margin:2px 0 8px;font-size:12px">Truth ${g.k_base}/${g.n_base} = ${pp(g.k_base / g.n_base)}% → ${g.k_cf}/${g.n_cf} = ${pp(g.k_cf / g.n_cf)}%.${shown}
       "Edit does nothing" scores <b>${(100 * g.rmse_null).toFixed(1)}pp</b>.</p>
-    <table class="evt"><tr><th>investigator</th><th>draws: click one for the investigator's whole conversation (D: Docent)</th><th>mean</th><th>RMSE</th></tr>${rows}</table>
+    <table class="evt"><tr><th>investigator</th><th>draws: click one for its explanation and links</th><th>mean</th><th>RMSE</th></tr>${rows}</table>
     <div class="mini" style="margin-top:10px"><span class="mute">before</span><span>${armLinks(g.base)}</span><span class="mute">after</span><span>${armLinks(g.cf)}</span></div></div>`;
 }
 
@@ -823,6 +855,7 @@ async function evalsTab(D) {
 }
 
 async function evalPage(h) {
+  DRAWS = [];
   const ev = await getEval(`${h.eval}.json`);
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
   const runs = ev.runs.filter(R => !h.run || R.run === h.run);
@@ -854,6 +887,7 @@ async function evalPage(h) {
   $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}</h1>
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
+    <p>Every investigator conversation in expview: ${runs.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
     <details class="sec"><summary>About this eval</summary><div class="body readme">${md(ev.description || "")}</div></details>
     <p class="lede">Each chart has the observed rate before (base arm) and after (counterfactual arm), bands = 95% credible intervals (Beta(1,1)), and every investigator
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
@@ -916,6 +950,7 @@ function canonHash() {
 }
 
 async function route() {
+  if ($("drawcard")) $("drawcard").hidden = true;
   const h = canonHash();
   $("status").textContent = "loading…";
   try {

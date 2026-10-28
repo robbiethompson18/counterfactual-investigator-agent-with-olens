@@ -135,9 +135,10 @@ one commit, and source files from GitHub at the spec's commit. Per env:
   AUROC between their cases), and per (env, version, arm pair, model) the observed rate before (base
   arm) and after (counterfactual arm) with 95% credible bands and every investigator draw as a point
   coloured by condition (transcript tools blue, O-lens orange, placebo black, no tools gray). Each
-  point opens that draw's whole conversation (prompt, tool calls and results, submit) in expview;
-  each draw also links its Docent run, and each arm its Docent filter (when `docent_filters.json`
-  has one), expview and the pair's comparison page.
+  point (or draw chip) opens a card: the predicted rate, the investigator's explanation, and
+  Docent + expview for its whole conversation (prompt, tool calls and results, submit) and for the
+  transcript it investigated, with its O-lens reads. Each arm links its Docent filter (when
+  `docent_filters.json` has one), expview and the pair's comparison page.
 - **Runs** (the old list page: per-arm measures, transcripts by range request), **About** (README,
   docstring, REQUIRES / CAPS / DEFAULTS) and **Source** (the env folder and `_lib/` from GitHub).
 

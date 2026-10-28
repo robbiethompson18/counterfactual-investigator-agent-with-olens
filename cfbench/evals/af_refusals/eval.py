@@ -172,6 +172,25 @@ def read_rows(source: str, model: str, user: str, toks: list[tuple[str, list[str
     return rows
 
 
+_READ_ITEMS: dict[tuple[str, str], str] = {}
+
+
+def LINKS(row: dict) -> dict[str, dict]:
+    """For the env viewer, per prediction: the base-arm episode the investigator was shown (expview episode page), and the
+    O-lens read item of that goal and model in the reads run (the reads are on the prompt, so any sample of the goal's
+    public prompt has the same reads; expview's episode page stitches them in only for the sample that was read)."""
+    env_run, _, ep = row["shown"][0].partition(":")
+    env, run = env_run.split("/")
+    if not _READ_ITEMS:
+        for line in (READS / "expview" / "episodes.jsonl").read_text().splitlines():
+            e = json.loads(line)
+            _READ_ITEMS.setdefault((e["ep"].split("/")[2].removesuffix("-pp"), e["ep"].split("/")[3].rsplit("~", 1)[0]), e["id"])
+    out = {"transcript": {"env": env, "run": run, "episode": ep}}
+    if item := _READ_ITEMS.get((run, ep.rsplit("~", 1)[0])):
+        out["O-lens reads"] = {"dataset": "runs/alignment_faking/2026-10-27_olens-reworded", "item": item}
+    return out
+
+
 def pick_items(eligible: dict[str, list[str]], n: int | None) -> dict[str, list[str]]:
     """Per version, its first n eligible items by number, sharing goals across versions where it can: the version with the
     fewest eligible items picks first, and every other version keeps those items where they are eligible for it too, then
