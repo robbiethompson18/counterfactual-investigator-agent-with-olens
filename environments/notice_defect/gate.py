@@ -212,6 +212,8 @@ async def main():
     google_key = os.environ[a.google_key] if a.google_key else None
     served_by = f"google-direct ({a.google_key}), thinking level medium" if a.google_key else "openrouter"
     run_dirs = [Path(LOCAL) / "notice_defect" / r for r in a.run.split("+")]
+    if missing := [str(r) for r in run_dirs if not (r / "episodes").is_dir()]:
+        raise SystemExit(f"no such run: {missing}")
     cells, labels = load(run_dirs)
     table = item_table(cells, labels, a.ask_arm, a.clear)[: a.limit]
     run = new_run(

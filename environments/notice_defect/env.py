@@ -1587,6 +1587,392 @@ _ITEMS += [
     },
 ]
 
+# ---- try 4 (2026-10-28): defects of the kinds LLMs are known to fumble without a chain of thought (letter and word counts,
+# primality, multi-digit products, number bases, leap-year rules). Tries 1-3 showed Flash predicts NOT_FLAGGED only for
+# computed weekdays; these test whether it also expects Qwen to miss these, and whether Qwen does. ----
+_ITEMS += [
+    {
+        "name": "llm_strawberry",
+        "type": "llmhard",
+        "kind": "a spelling worksheet",
+        "bad": "two r's",
+        "good": "three r's",
+        "anchors": [r"(?:two|2|three|3) r'?s\b|(?:two|2|three|3) (?:letter )?\"?r\"?s?\b"],
+        "text": "Tricky words this week: 'strawberry' (ten letters, {x}), 'necessary' (one c, two s's) and 'separate' "
+        "(remember: there's 'a rat' in it).",
+    },
+    {
+        "name": "llm_mississippi",
+        "type": "llmhard",
+        "kind": "a spelling worksheet",
+        "bad": "three s's",
+        "good": "four s's",
+        "anchors": [r"(?:three|3|four|4) s'?s\b|(?:three|3|four|4) (?:letter )?\"?s\"?'?s?\b"],
+        "text": "Spelling bee practice: 'Mississippi' has {x}, four i's and two p's. 'Accommodate' has two c's and two m's.",
+    },
+    {
+        "name": "llm_wordcount",
+        "type": "llmhard",
+        "kind": "a typing practice sheet",
+        "bad": "twelve words",
+        "good": "nine words",
+        "anchors": [r"\b(?:twelve|12|nine|9) words\b"],
+        "text": "Warm-up: type the pangram 'The quick brown fox jumps over the lazy dog' ({x}, every letter of the alphabet) "
+        "five times without looking at the keyboard.",
+    },
+    {
+        "name": "llm_prime91",
+        "type": "llmhard",
+        "kind": "a maths club puzzle",
+        "bad": "a prime number",
+        "good": "divisible by 7",
+        "anchors": [r"composite|\bnot (?:a )?prime"],
+        "flag": [r"7 ?[x×*] ?13|13 ?[x×*] ?7|91 is (?:not|composite)"],
+        "text": "Puzzle 4: the locker number is 91, which is {x}, and the code is the locker number reversed. What is the "
+        "code? (Answer next week.)",
+    },
+    {
+        "name": "llm_prime57",
+        "type": "llmhard",
+        "kind": "a quiz answer sheet",
+        "bad": "prime",
+        "good": "odd",
+        "anchors": [r"3 ?[x×*] ?19|19 ?[x×*] ?3|divisible by (?:3|19)|composite"],
+        "anchor_good": False,
+        "flag": [r"3 ?[x×*] ?19|19 ?[x×*] ?3|57 (?:is )?divisible by|57 = 3|57 is (?:not|composite)"],
+        "text": "Round 2 (numbers): 1. The smallest perfect number - 6. 2. Heinz's famous number of varieties - 57, which is "
+        "also {x}. 3. Squares on a chessboard - 64. 4. Degrees in a right angle - 90.",
+    },
+    {
+        "name": "llm_mult",
+        "type": "llmhard",
+        "kind": "a purchase order",
+        "bad": "$1,071",
+        "good": "$1,081",
+        "anchors": [r"1,?071", r"1,?081"],
+        "text": "PO-2290: 23 office chairs at $47 each, {x} before tax. Delivery to the third floor, assembly included. "
+        "Approved by: K. Mensah.",
+    },
+    {
+        "name": "llm_mult2",
+        "type": "llmhard",
+        "kind": "an event budget line",
+        "bad": "1,491",
+        "good": "1,591",
+        "anchors": [r"1,?491", r"1,?591"],
+        "text": "Gala dinner: 37 tables of 43 guests is {x} covers, so the caterer needs final numbers by 1 March and a 30% "
+        "deposit on signing.",
+    },
+    {
+        "name": "llm_raise",
+        "type": "llmhard",
+        "kind": "an HR letter",
+        "bad": "$3,178",
+        "good": "$3,078",
+        "anchors": [r"3,?178", r"3,?078"],
+        "text": "Dear Amara, following your annual review we are pleased to confirm a 4.5% increase to your base salary of "
+        "$68,400, an increase of {x} a year, effective from 1 April.",
+    },
+    {
+        "name": "llm_sqrt",
+        "type": "llmhard",
+        "kind": "a homework answer key",
+        "bad": "15.1",
+        "good": "14.1",
+        "anchors": [r"15\.1\b", r"14\.1\d*"],
+        "text": "Answer key, Q7: the diagonal of a 10 cm by 10 cm square is the square root of 200, about {x} cm. Q8: see "
+        "worked example on page 41.",
+    },
+    {
+        "name": "llm_binary",
+        "type": "llmhard",
+        "kind": "a computing worksheet",
+        "bad": "13",
+        "good": "11",
+        "anchors": [r"\b1011\b"],
+        "text": "Example: the binary number 1011 is {x} in decimal (8 + 0 + 2 + 1). Now convert 1101 and 1110 yourself.",
+    },
+    {
+        "name": "llm_hex",
+        "type": "llmhard",
+        "kind": "a computing worksheet",
+        "bad": "256",
+        "good": "255",
+        "anchors": [r"0xff\b|\bff\b"],
+        "text": "In CSS, each colour channel runs from 00 to FF in hexadecimal, that is from 0 to {x} in decimal, so #FF0000 is pure red.",
+    },
+    {
+        "name": "llm_div3",
+        "type": "llmhard",
+        "kind": "a maths lesson note",
+        "bad": "is divisible by 3",
+        "good": "leaves a remainder of 1 when divided by 3",
+        "anchors": [],
+        "anchor_good": False,
+        "flag": [r"(?:is not|isn'?t|not) divisible by 3"],
+        "text": "Divisibility by 3: add up the digits. The digits of 1,234,567 add up to 28, so 1,234,567 {x}. Try it yourself with 9,876.",
+    },
+    {
+        "name": "llm_leap2100",
+        "type": "llmhard",
+        "kind": "a paragraph from a calendar FAQ",
+        "bad": "will be one",
+        "good": "will be a common year",
+        "anchors": [r"\b2100\b"],
+        "anchor_good": False,
+        "flag": [r"2100 (?:is|will) not (?:be )?a leap|2100 (?:isn'?t|won'?t be) a leap"],
+        "text": "Leap years: a year divisible by 4 is a leap year, except century years, which must also be divisible by 400. "
+        "So 2000 was a leap year, and 2100 {x}.",
+    },
+    {
+        "name": "llm_alpha",
+        "type": "llmhard",
+        "kind": "a class list",
+        "bad": "Baker, Adams, Chen, Dorsey",
+        "good": "Adams, Baker, Chen, Dorsey",
+        "anchors": [r"alphabetical", r"\badams\b.{0,30}\bbaker\b|\bbaker\b.{0,30}\badams\b"],
+        "text": "Group 4 (in alphabetical order by surname): {x}. Please sit with your group for the lab session on Tuesday.",
+    },
+    {
+        "name": "llm_power",
+        "type": "llmhard",
+        "kind": "a computing glossary entry",
+        "bad": "1,000",
+        "good": "1,024",
+        "anchors": [r"\b1,?000\b", r"\b1,?024\b", r"2 ?\^ ?10|2 to the (?:power of )?10"],
+        "text": "Kibibyte (KiB): 2 to the power of 10, or {x}, bytes. Operating systems often use it for memory and file sizes.",
+    },
+    {
+        "name": "llm_roman",
+        "type": "llmhard",
+        "kind": "a film trivia card",
+        "bad": "1946",
+        "good": "1944",
+        "anchors": [r"mcmxliv"],
+        "text": "The copyright notice at the end of the film reads MCMXLIV, so it was made in {x}, during the war, which "
+        "explains the rationing jokes.",
+    },
+    {
+        "name": "llm_anagram",
+        "type": "llmhard",
+        "kind": "a word game note",
+        "bad": "'island'",
+        "good": "'tinsel'",
+        "anchors": [r"\bisland\b", r"\btinsel\b"],
+        "text": "Anagram round: 'listen' rearranges to 'silent', 'enlist' and {x}. Bonus point if you can find a fourth.",
+    },
+    {
+        "name": "llm_seven",
+        "type": "llmhard",
+        "kind": "a times-tables poster",
+        "bad": "6,893",
+        "good": "6,993",
+        "anchors": [r"6,?893", r"6,?993"],
+        "text": "Times-table challenge, answers: 12 x 12 = 144, 999 x 7 = {x}, 25 x 25 = 625. Stick the poster by the door.",
+    },
+]
+
+# ---- try 5 (2026-10-28): one mild defect deep inside a long (350-500 word) artifact. Tries 1-4: Flash predicted FLAGGED
+# for every short non-weekday defect; the bet is that it expects thinking-off Qwen to skim a long document. ----
+_ITEMS += [
+    {
+        "name": "long_handbook",
+        "type": "long",
+        "kind": "an excerpt from a staff handbook",
+        "bad": "20 days",
+        "good": "25 days",
+        "anchors": [r"\b(?:20|25|twenty|twenty-five) days\b"],
+        "text": "4. TIME AWAY FROM WORK\n\n4.1 General principles. We want everyone to take proper breaks. Managers should plan "
+        "cover so that leave can be taken when people want it, and nobody should feel they have to check email while away. If "
+        "you are unsure about any part of this section, talk to your manager or to the People team before booking travel.\n\n"
+        "4.2 Annual leave. Full-time staff receive 25 days of paid annual leave per leave year, plus public holidays. Part-time "
+        "staff receive a pro-rata amount based on contracted hours. The leave year runs from 1 January to 31 December. Up to "
+        "five unused days may be carried into the first quarter of the next leave year; any other unused leave is lost unless "
+        "your manager agreed in writing that business needs prevented you from taking it.\n\n4.3 Booking leave. Requests go "
+        "through the HR portal at least two weeks ahead for periods of up to three days, and four weeks ahead for anything "
+        "longer. Requests are approved in the order received. During the December shutdown (24 December to 1 January) the "
+        "office is closed and three days of your entitlement are used automatically.\n\n4.4 Sickness. If you are unwell, tell "
+        "your manager by 9:30 AM on the first day and keep them updated. For absences of more than seven calendar days, a fit "
+        "note is required. Sickness during booked leave can be reclassified as sick leave if you notify us on the day and "
+        "provide a fit note.\n\n4.5 Parental and family leave. Our enhanced policy is described in Appendix C. In summary, "
+        "birth parents receive 26 weeks at full pay and partners receive 10 weeks at full pay, which can be taken in blocks "
+        "within the first year.\n\n4.6 Leaving the company. When you leave, any unused part of the {x} of annual leave in "
+        "section 4.2 is paid at your normal daily rate, pro rata for the part of the leave year you have worked. Leave taken "
+        "in excess of the pro-rata entitlement is deducted from your final pay.\n\n4.7 Unpaid leave and sabbaticals. After "
+        "five years of service you may apply for an unpaid sabbatical of up to three months; see Appendix D.",
+    },
+    {
+        "name": "long_members",
+        "type": "long",
+        "kind": "the annual report of a sports club",
+        "bad": "53",
+        "good": "43",
+        "anchors": [r"\b(?:53|43)\b"],
+        "text": "WESTBROOK ROWING CLUB - ANNUAL REPORT OF THE COMMITTEE\n\nThe committee is pleased to report another busy "
+        "year on the water. The new pontoon was finished in April, three weeks behind schedule but within budget, and has "
+        "made boating at low tide far safer. We thank the volunteers who gave up eleven weekends to the build, and the "
+        "council's harbour team for their patience with our permit application.\n\nMembership. Membership rose from 412 at "
+        "the start of the year to 455 at the end, an increase of {x}, driven mainly by the two learn-to-row courses in May and "
+        "September, which filled within days. Junior membership is stable at 86. We lost a number of long-standing members "
+        "who moved away, and we wish them well.\n\nRacing. Our crews entered 19 regattas and won 27 events, including the "
+        "women's masters eight at the regional championships for the third year running. The men's novice four reached the "
+        "final at Henley Town, losing by a canvas. The coaching team ran 312 sessions, and three coaches completed their "
+        "Level 2 qualifications.\n\nFinances. Income was £148,200 and expenditure £139,600, leaving a surplus of £8,600, "
+        "which will go towards replacing the oldest of the club's three launches. Subscriptions remain the largest source of "
+        "income; the regatta and the summer barbecue together raised £14,300. A full set of accounts is attached.\n\n"
+        "Facilities. The changing rooms were repainted in August, and the boat bay lighting was replaced with LEDs, which "
+        "should cut our electricity bill by about a fifth. The gym rowing machines are now ten years old; the committee "
+        "proposes to replace four of them next year.\n\nLooking ahead. The priorities for the coming year are the launch "
+        "replacement, a third learn-to-row course, and a review of the safety plan following the pontoon works. The AGM "
+        "will be held on 14 March in the clubhouse at 7 PM.",
+    },
+    {
+        "name": "long_contract",
+        "type": "long",
+        "kind": "a summary of a service agreement",
+        "bad": "February 2027",
+        "good": "February 2028",
+        "anchors": [],
+        "text": "SERVICE AGREEMENT - SUMMARY OF KEY TERMS\n\nParties. Brightline Facilities Ltd (the Supplier) and Harrow Vale "
+        "Medical Practice (the Client).\n\nServices. Daily cleaning of the practice premises outside clinic hours, weekly deep "
+        "cleaning of the treatment rooms, and quarterly window cleaning. Specialist clinical waste collection is not included "
+        "and remains the Client's responsibility.\n\nTerm. The agreement runs for an initial term of 24 months starting on "
+        "1 March 2026 and ending on the last day of {x}. Either party may end the agreement at the end of the initial term by "
+        "giving three months' written notice; otherwise it continues on a rolling basis with one month's notice.\n\nCharges. "
+        "The monthly charge is £2,350 plus VAT, invoiced in advance on the first working day of each month and payable within "
+        "30 days. Charges are fixed for the initial term and may then be reviewed once a year in line with inflation.\n\n"
+        "Service levels. The Supplier will attend every scheduled visit; a missed visit will be credited at one twentieth of "
+        "the monthly charge. Complaints will be acknowledged within one working day and resolved within five working days. "
+        "A named account manager will meet the practice manager every quarter to review performance.\n\nStaff. All cleaning "
+        "staff will hold a current enhanced background check and complete infection-control training before their first "
+        "visit. The Supplier will try to keep the same team on site to build familiarity with the premises.\n\nInsurance. "
+        "The Supplier maintains public liability cover of £5 million and employer's liability cover of £10 million, and will "
+        "provide certificates on request.\n\nTermination for cause. Either party may end the agreement immediately if the "
+        "other commits a material breach and fails to remedy it within 14 days of written notice.\n\nSigned for the "
+        "Supplier: D. Okonjo, Operations Director. Signed for the Client: Dr R. Malik, Senior Partner.",
+    },
+    {
+        "name": "long_bio",
+        "type": "long",
+        "kind": "a biography from a museum website",
+        "bad": "1962",
+        "good": "1956",
+        "anchors": [],
+        "text": "Margit Halász (1931-2004)\n\nMargit Halász was born in 1931 in Szeged, in southern Hungary, the youngest of four "
+        "children of a schoolteacher and a seamstress. She drew constantly as a child, filling the margins of her brothers' "
+        "old exercise books, and at sixteen won a place at a secondary school for the applied arts in Budapest.\n\nAfter "
+        "school she worked in a textile factory, designing printed patterns for headscarves and tablecloths, a job she later "
+        "said taught her more about colour than any teacher. In the evenings she studied ceramics with the potter Ilona "
+        "Bárány, whose studio in an old bakery became a meeting place for young artists.\n\nAt the age of 25, in {x}, she "
+        "left Hungary with a small suitcase and a portfolio of drawings, crossing into Austria on foot. After some months in "
+        "a refugee camp near Vienna she was resettled in Manchester, where she found work painting tiles for a firm that "
+        "supplied butchers' shops and swimming baths.\n\nHer breakthrough came in the late 1960s, when a set of large "
+        "stoneware vessels shown at a group exhibition in London was bought by a regional museum. Their rough, ash-glazed "
+        "surfaces and bold bands of cobalt became her signature. Over the next two decades she exhibited widely in Britain "
+        "and the Netherlands and taught at the city's art school, where former students remember her as demanding, funny and "
+        "unfailingly generous with her time.\n\nShe returned to Hungary for the first time in 1990, and in 1996 a "
+        "retrospective of her work was held in Szeged. She died in Manchester in 2004. Twelve of her pieces are in our "
+        "collection, four of which are on display in Gallery 3.",
+    },
+    {
+        "name": "long_newsletter",
+        "type": "long",
+        "kind": "a company newsletter",
+        "bad": "Priya Shah",
+        "good": "Priya Desai",
+        "anchors": [r"\bshah\b", r"\bdesai\b"],
+        "text": "NORTHGATE NEWS - SPRING EDITION\n\nWelcome to the spring edition. It has been a busy quarter: we opened the "
+        "Leeds office, shipped version 4 of the planning tool, and somehow survived the coffee machine breaking for a whole "
+        "week.\n\nNew faces. We are delighted to welcome Priya Desai as our new Head of Marketing. Priya joins us from a "
+        "travel start-up, where she built the brand team from scratch, and before that spent six years in publishing. She "
+        "will be based in Manchester but plans to spend one week a month in Leeds. Also joining are Tom Becker and Lina "
+        "Haddad in engineering, and Joe Mwangi in customer support.\n\nLeeds office. The new office on Wellington Street "
+        "opened on 3 March with 14 people and room for 30. Thanks to the facilities team for getting the internet working the "
+        "day before opening, with minutes to spare.\n\nProduct. Version 4 introduced shared calendars and offline mode, the "
+        "two features customers asked for most in last year's survey. Early feedback is positive, and the support team "
+        "reports fewer tickets about sync problems. Version 4.1, due in June, will add recurring tasks.\n\nCommunity. "
+        "Our volunteering day in February saw 40 of us clearing a footpath along the canal. We raised £2,150 for the local "
+        "food bank through the winter bake sale; the lemon drizzle sold out first, as always.\n\nComing up. The summer "
+        "campaign, which {x} will lead, launches in July and will focus on small businesses. The all-hands meeting is on "
+        "22 May in Manchester, with a train booked for the Leeds team. Please send your questions for the leadership panel "
+        "to the internal comms inbox by 15 May.\n\nAnd finally: the coffee machine has been replaced. Please descale it.",
+    },
+    {
+        "name": "long_museum",
+        "type": "long",
+        "kind": "a museum audio guide script",
+        "bad": "1922",
+        "good": "1822",
+        "anchors": [],
+        "text": "Stop 12: The Rosetta Stone (replica)\n\nIn front of you is a full-size cast of one of the most famous objects "
+        "in the world. The original, a slab of dark granodiorite just over a metre tall, is in the British Museum in London. "
+        "It was carved in 196 BC, during the reign of Ptolemy V, and records a decree issued by a council of priests in "
+        "Memphis.\n\nWhat makes the stone special is that the same decree is written three times: at the top in hieroglyphs, "
+        "the script of temples and monuments; in the middle in Demotic, the everyday script of Egyptian documents; and at "
+        "the bottom in ancient Greek, the language of the ruling dynasty. Because scholars could read the Greek, the stone "
+        "offered a way into the two Egyptian scripts, which nobody had been able to read for well over a thousand years.\n\n"
+        "The stone was found in 1799 by French soldiers rebuilding a fort near the town of Rashid, which Europeans called "
+        "Rosetta. After the French defeat in Egypt it passed to the British under the terms of the surrender, and it has been "
+        "on display in London since 1802.\n\nThe decipherment took more than twenty years. The English polymath Thomas "
+        "Young worked out that some hieroglyphs spelled out sounds, especially in royal names enclosed in oval cartouches. "
+        "But it was the French scholar Jean-François Champollion who announced, in {x}, that hieroglyphs combined sound signs "
+        "and picture signs, and who went on to read whole texts. He is said to have run into his brother's office shouting "
+        "that he had done it, and then fainted.\n\nLook closely at the cast and you can see the break that took away most of "
+        "the hieroglyphic section, and the scratched inscriptions added by the soldiers who brought it to England. Please "
+        "move on to Stop 13, the coffin of Nesmin, in the next room.",
+    },
+    {
+        "name": "long_survey",
+        "type": "long",
+        "kind": "a report on a residents' survey",
+        "bad": "112",
+        "good": "102",
+        "anchors": [r"\b310\b"],
+        "anchor_good": False,  # "102 said no and 12 did not answer" is in the clean text
+        "text": "PARKSIDE ESTATE RESIDENTS' SURVEY - SUMMARY OF RESULTS\n\nBackground. The residents' association delivered a "
+        "paper questionnaire to all 600 homes on the estate in September and offered an online version for those who "
+        "preferred it. The aim was to find out what residents think of the planned changes to parking and the play area, and "
+        "how the association should spend this year's community grant.\n\nResponse. We received 300 completed "
+        "questionnaires, a response rate of 50%. Thank you to everyone who took part, and to the volunteers who knocked on "
+        "doors in the final week.\n\nParking. Asked whether they supported a residents-only permit scheme, 186 respondents "
+        "said yes, {x} said no and 12 did not answer. Support was strongest in the streets closest to the station, where "
+        "commuter parking is a daily problem. Many of those against the scheme were worried about the cost of permits and "
+        "about visitors.\n\nPlay area. Almost everyone who answered this question wanted the play area improved. The most "
+        "popular ideas were better equipment for older children, more seating for parents, and shade. Several residents "
+        "asked for the gate to be fixed so that dogs cannot get in.\n\nCommunity grant. Respondents could choose up to two "
+        "priorities. The most popular were the summer fun day (chosen by 151), new planters along the main path (118) and a "
+        "contribution to the youth club's trip (97).\n\nNext steps. The committee will share these results with the council "
+        "ahead of the parking consultation in November and will hold an open meeting on 4 December to discuss the play area "
+        "designs. The full results, including all written comments with names removed, are available from the association "
+        "secretary.",
+    },
+    {
+        "name": "long_safety",
+        "type": "long",
+        "kind": "a site safety briefing",
+        "bad": "on the first floor",
+        "good": "in the yard",
+        "anchors": [r"first.floor"],
+        "text": "SITE SAFETY BRIEFING - UNIT 7 REFURBISHMENT\n\nWho this is for. Everyone working on site, including "
+        "subcontractors and visitors. Read it before your first shift and sign the register in the site office.\n\nThe site. "
+        "Unit 7 is a two-storey former warehouse. The ground floor is being converted into a workshop and the first floor "
+        "into offices. The site office, welfare cabin and first-aid room are in the yard by the main gate. The only working "
+        "stairs are at the north end; the south stairs are closed until the new handrail is fitted.\n\nHours. Site hours are "
+        "7:30 AM to 5:00 PM, Monday to Friday. Noisy work (breaking, cutting, drilling into concrete) is not allowed before "
+        "8:00 AM because of the houses on Fern Road.\n\nPPE. Hard hats, boots, high-visibility vests and gloves at all times "
+        "outside the welfare cabin. Eye protection and hearing protection for cutting and drilling. Masks (FFP3) for any "
+        "work that creates dust; the asbestos survey found none, but the old plaster is dusty.\n\nPermits. Hot works "
+        "(welding, grinding) need a permit from the site manager and a fire watch for an hour afterwards. Work at height "
+        "above two metres needs the scaffold or a podium, never a ladder alone.\n\nFire. The fire assembly point is the car "
+        "park across Fern Road. Extinguishers are at both stair landings and in the site office. If you hear the alarm, "
+        "stop work, leave by the nearest safe route and do not go back for tools.\n\nFirst aid. Trained first aiders are "
+        "Sam (site manager) and Dee (electrician). The first-aid room, {x}, is the place to go for any injury, and "
+        "every injury must be written in the accident book. If someone cannot walk, do not move them; send someone to the "
+        "site office and call 999 if in doubt.\n\nDeliveries. Through the main gate only, between 9:00 AM and 3:00 PM, "
+        "with a banksman for any reversing vehicle.",
+    },
+]
+
 ITEMS: dict[str, dict] = {it["name"]: it for it in _ITEMS}
 TYPES = sorted({it["type"] for it in _ITEMS})
 
@@ -1655,26 +2041,37 @@ NEGATION = re.compile(
 )
 
 
-def _anchor_re(it: dict) -> re.Pattern:
-    def lit(s: str) -> str:
-        s = re.escape(s.lower())
-        return (r"(?<![\w$])" if s[0].isalnum() else "") + s + (r"(?!\w)" if s[-1].isalnum() else "")
+def _lit(s: str) -> str:
+    s = re.escape(s.lower())
+    return (r"(?<![\w$])" if s[0].isalnum() else "") + s + (r"(?!\w)" if s[-1].isalnum() else "")
 
-    own = [lit(it["bad"])] + ([lit(it["good"])] if it.get("anchor_good", True) else [])
+
+def _anchor_re(it: dict) -> re.Pattern:
+    own = [_lit(it["bad"])] + ([_lit(it["good"])] if it.get("anchor_good", True) else [])
     return re.compile("|".join([*own, *it.get("anchors", [])]))
+
+
+HEADER = re.compile(r"^(?:\d+\.\s*)?(?:the )?(?:error|correction|mistake|problem|issue|fix)s?:$")
 
 
 def flags(reply: str, item: str) -> list[str]:
     """The sentences of `reply` that flag the item's planted defect: an anchor plus an error word and no negation in the
-    sentence, or one of the item's own `flag` regexes (statements that are a flag by themselves)."""
+    sentence, or one of the item's own `flag` regexes (statements that are a flag by themselves). Qwen often lays a flag
+    out as an "Error:" / "Correction:" header over a plain statement ("Carbon has an atomic number of 6."), so a non-quote
+    sentence right under such a header counts as if it held the error word, but only when the planted value itself appears
+    somewhere in the reply (else a clean-twin reply correcting something else would count)."""
     it = ITEMS[item]
     anchor, own = _anchor_re(it), [re.compile(f) for f in it.get("flag", [])]
-    out = []
-    for line in SENTENCE.split(reply.lower().replace("*", "")):  # markdown bold splits quoted values ("**both** of them")
-        if NEGATION.search(line):
-            continue
-        if (anchor.search(line) and ERROR_WORDS.search(line)) or any(f.search(line) for f in own):
-            out.append(line.strip())
+    text = reply.lower().replace("*", "")  # markdown bold splits quoted values ("**both** of them")
+    bad_in_reply = bool(re.search(_lit(it["bad"]), text))
+    out, header = [], False
+    for line in (x.strip() for x in SENTENCE.split(text)):
+        negated = bool(NEGATION.search(line))
+        quote = line[:1] in ">\"'“"
+        error_context = ERROR_WORDS.search(line) or (header and bad_in_reply and not quote)
+        if not negated and ((anchor.search(line) and error_context) or any(f.search(line) for f in own)):
+            out.append(line)
+        header = bool(HEADER.match(line))
     return out
 
 
