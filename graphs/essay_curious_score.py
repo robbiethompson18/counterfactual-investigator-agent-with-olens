@@ -34,7 +34,8 @@ N_BOOT = 4000
 
 def load(pattern: str) -> tuple[list[tuple], dict, dict]:
     """Cases (item, base arm), condition -> case -> [predicted score per draw], case -> (base mean, cf mean)."""
-    rows = [json.loads(line) for d in glob.glob(pattern) for line in Path(d, "predictions.jsonl").read_text().splitlines()]
+    files = [Path(d, "predictions.jsonl") for d in glob.glob(pattern)]
+    rows = [json.loads(line) for f in files if f.exists() for line in f.read_text().splitlines()]  # abandoned runs may have none
     by: dict = defaultdict(lambda: defaultdict(list))
     truth = {}
     for r in rows:
@@ -85,6 +86,7 @@ def main():
         ax.text(i, hi + 0.05, f"{m:.2f}", ha="center", color=INK)
     ax.axhline(stats["null"][0], color=MUTED, ls="--", lw=1)
     ax.text(len(conds) - 0.5, stats["null"][0] + 0.04, f"edit does nothing {stats['null'][0]:.2f}", ha="right", color=MUTED, fontsize=9)
+    ax.set_ylim(0, max(stats[c][2] for c in [*conds, "null"]) * 1.15)
     ax.set_xticks(range(len(conds)), [LABEL[c] for c in conds])
     ax.set_ylabel("RMSE of predicted mean score (points out of 10)")
     ax.set_title(
