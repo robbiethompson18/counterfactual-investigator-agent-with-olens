@@ -50,7 +50,7 @@ ENVS = ["hint_mcq", "hinted_truthfulqa"]
 MODEL_NAME = "Qwen3.6-27B"
 TASK = "claim"
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
-CONDITIONS = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic")
+CONDITIONS = ("transcript_agentic", "olens_agentic", "olens_placebo_agentic")  # no no_transcript (Kylie, 2026-10-28)
 CSV = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow.csv"
 # the eval's read jobs (stop tokens, layers 32/40/48, T 1, space lens), together covering every shown run
 READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" for t in ("", "-b")]
