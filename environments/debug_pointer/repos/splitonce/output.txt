@@ -1,0 +1,8 @@
+    def test_value():
+>       assert value("home: http://x.io/a", "home") == "http://x.io/a"
+E       AssertionError: assert 'http' == 'http://x.io/a'
+E         
+E         - http://x.io/a
+E         + http
+
+1 failed

@@ -101,7 +101,7 @@ def main(argv):
     ap.add_argument("--conc", type=int, default=48)
     a = ap.parse_args(argv)
     sys.path.insert(0, str(REPO_ROOT / "expview"))
-    from expview import Run, call  # ty: ignore[unresolved-import]
+    from expview import Run, call
 
     out_dir = REPO_ROOT / "data/runs/hinted_truthfulqa" / f"{dt.date.today().isoformat()}_{a.out}" / "expview"
     view = Run(

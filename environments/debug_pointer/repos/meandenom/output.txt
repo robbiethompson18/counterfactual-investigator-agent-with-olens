@@ -1,0 +1,6 @@
+    def test_average():
+>       assert average([4, None, 8]) == 6.0
+E       assert 4.0 == 6.0
+E        +  where 4.0 = average([4, None, 8])
+
+1 failed

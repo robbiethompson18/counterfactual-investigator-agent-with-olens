@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "pick.py",
+ "d2": "last.py",
+ "note": "pick.py enumerates from 1 and then indexes the list with it; last.py's [-1] is fine"
+}

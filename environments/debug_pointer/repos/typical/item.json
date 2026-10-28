@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "robust.py",
+ "d2": "stats.py",
+ "note": "mean() is a correct mean; robust.typical() uses it where the test wants a median"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "snippet.py",
+ "d2": "bounds.py",
+ "note": "end_inclusive() feeds a half-open slice; fix in snippet, bounds or cut"
+}

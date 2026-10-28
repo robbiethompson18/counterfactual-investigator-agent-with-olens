@@ -1,0 +1,6 @@
+    def test_cost():
+>       assert cost(10, 13, 100) == 300
+E       assert 400 == 300
+E        +  where 400 = cost(10, 13, 100)
+
+1 failed

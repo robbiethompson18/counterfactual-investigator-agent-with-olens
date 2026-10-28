@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "query.py",
+ "d2": "index.py",
+ "note": "index lowercases keys on insert, query looks up the raw key; fix in query, index or find"
+}

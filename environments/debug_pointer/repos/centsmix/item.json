@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "price.py",
+ "d2": "money.py",
+ "note": "price returns integer cents, money formats the number as dollars; fix in price, money or invoice"
+}

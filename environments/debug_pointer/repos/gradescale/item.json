@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "score.py",
+ "d2": "curve.py",
+ "note": "score returns a 0-1 fraction, curve and letter expect 0-100; fix in score, curve or report"
+}

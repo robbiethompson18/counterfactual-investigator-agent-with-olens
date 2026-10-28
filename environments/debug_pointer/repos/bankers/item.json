@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "pct.py",
+ "d2": "fmt.py",
+ "note": "round() rounds half to even; fix the rounding in pct or the formatting in fmt"
+}

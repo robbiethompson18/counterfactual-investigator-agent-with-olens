@@ -1,0 +1,9 @@
+    def test_between():
+>       assert between("abcdef", "b", "e") == "bcde"
+E       AssertionError: assert 'bcd' == 'bcde'
+E         
+E         - bcde
+E         ?    -
+E         + bcd
+
+1 failed

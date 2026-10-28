@@ -1,0 +1,6 @@
+    def test_pay():
+>       assert pay(40.0, "SAVE15") == 34.0
+E       AssertionError: assert 0.0 == 34.0
+E        +  where 0.0 = pay(40.0, 'SAVE15')
+
+1 failed

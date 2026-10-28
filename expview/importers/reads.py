@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from expview import Run  # ty: ignore[unresolved-import]
+from expview import Run
 
 ID = re.compile(rb'^\{"id": ("(?:[^"\\]|\\.)*")')  # readers write `id` first; parsing only it keeps a 1 GB scan fast
 EPISODE = re.compile(r"^[^/:|]+/[^/:|]+:\d+")  # ENV/RUN:LINE, the rollout id Docent links resolve through
@@ -26,7 +26,9 @@ def spans(path: Path) -> dict[str, list[list[int]]]:
     out, off, prev = {}, 0, None
     with open(path, "rb") as f:
         for line in f:
-            i = json.loads(ID.match(line)[1])
+            m = ID.match(line)
+            assert m, line[:200]
+            i = json.loads(m[1])
             if i == prev:
                 out[i][-1][1] += len(line)
                 out[i][-1][2] += 1

@@ -1,0 +1,6 @@
+    def test_charge():
+>       assert charge(3, 5, 20) == 40
+E       assert 60 == 40
+E        +  where 60 = charge(3, 5, 20)
+
+1 failed

@@ -1,0 +1,8 @@
+    def test_display():
+>       assert display(1999) == "$19.99"
+E       AssertionError: assert '$20.0' == '$19.99'
+E         
+E         - $19.99
+E         + $20.0
+
+1 failed
