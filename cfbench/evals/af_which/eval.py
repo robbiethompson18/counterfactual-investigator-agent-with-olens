@@ -22,6 +22,8 @@ Same items as af_refusals' n40 inputs:
     uv run python -m cfbench.evals.af_which.score data/runs/cfbench/<date>_af-which-orig   # mean_i Brier(p_i), Brier(p_bar)
 """
 
+import json
+import random
 from pathlib import Path
 
 from cfbench.evals.af_refusals import eval as af
@@ -55,11 +57,48 @@ your probability and the truth (1 if it is the alignment-faking model, 0 if not)
 `submit_prediction` once."""
 
 
+# lens sample pools at the shared pre-request positions (scripts/af_which_resample/pool.py); set to use them in prep
+POOLS: list[Path] = []
+
+
+def resample_shared(out: Path, pools: list[Path], seed: int = 0):
+    """Every case of a (version, model) shares the user turn up to `<user_input>\n`, so its reads there are one lens draw
+    copied into every case. Give each case its own: 4 distinct pool samples per shared position, no sample used twice
+    within a (version, model) (Kylie, 2026-10-28)."""
+    pool = {}
+    for p in pools:
+        for x in map(json.loads, p.read_text().splitlines()):
+            pool.setdefault((x["version"], x["model"]), []).append(x)
+    cases = [json.loads(line) for line in (out / "cases.jsonl").read_text().splitlines()]
+    rows = [json.loads(line) for line in (out / "reads/reads.jsonl").read_text().splitlines()]
+    by_id = {}
+    for r in rows:
+        by_id.setdefault(r["id"], []).append(r)
+    for (version, model), positions in pool.items():
+        positions.sort(key=lambda x: x["idx"])
+        group = sorted((c for c in cases if (c["version"], c["model"]) == (version, model)), key=lambda c: int(c["item"][1:]))
+        draws = []
+        for x in positions:
+            assert len(x["samples"]) >= N_BULLETS * len(group), (version, model, x["idx"], len(x["samples"]))
+            draws.append(random.Random(f"{seed}/{version}/{model}/{x['idx']}").sample(x["samples"], N_BULLETS * len(group)))
+        for k, c in enumerate(group):
+            start = next(af.REQUEST.finditer(c["messages"][1]["content"])).start()
+            shared = [r for r in by_id[c["source"]] if r["char_offset"] is not None and r["char_offset"] < start]
+            shared.sort(key=lambda r: r["char_offset"])
+            assert [r["token"] for r in shared] == [x["token"] for x in positions], (c["source"], [r["token"] for r in shared])
+            for r, d in zip(shared, draws, strict=True):
+                r["bullets"] = [af._bullet(b) for b in d[N_BULLETS * k : N_BULLETS * (k + 1)]]
+        print(f"{version} {model}: {len(positions)} shared positions resampled in {len(group)} cases")
+    (out / "reads/reads.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
 def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
     """af_refusals' prep with N_BULLETS bullets and DSV4_READS. `placebo`: a reads dir with >= N_BULLETS bullets per read,
     e.g. reads_placebo_glm from scripts/cfbench_af_prep.py on branch claude/cfbench-af (the same email over-eagerness
     reads as af_refusals' reads_placebo_dsv4, before its cut to 3)."""
     af.prep(out, versions, placebo, n_items, strict, N_BULLETS, DSV4_READS, full_bullets=True, sparse=True)
+    if POOLS:
+        resample_shared(out, POOLS)
 
 
 def cases(inputs, versions):
