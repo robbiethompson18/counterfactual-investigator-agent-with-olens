@@ -38,7 +38,7 @@ ap.add_argument("--per-arm", type=int, default=None)
 ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--layers", default=None, help="per-row layers (a subset of the reader's --layers); default: the reader's")
 ap.add_argument("--items", default=None, help="comma list of items to keep")
-ap.add_argument("--positions", default=None, choices=["all"], help="read every token, not just stop tokens")
+ap.add_argument("--positions", default=None, choices=["all", "delims"], help="all: every token; delims: + delimiters and newlines")
 a = ap.parse_args()
 
 have = {json.loads(line)["id"] for line in a.out.open()} if a.out.exists() else set()

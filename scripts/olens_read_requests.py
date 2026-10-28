@@ -19,7 +19,9 @@ priority order, round-robin over (env, arm) within a priority. A row's optional 
 assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
-"all"` reads every token, `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
+"all"` reads every token, `positions: "delims"` the stop tokens plus every delimiter (DELIM: tokens of only
+punctuation/brackets/quotes/symbols, e.g. `{"`, `":`, `</`, code fences) and newline token, and every special token
+(<|im_start|>, <tool_call>, <think>, ...), `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
 ...]` the token holding each char of that message's content (offsets into its stripped content, as `char_offset` in
 OUT); `prompt_ids` replaces the rendering with those token ids as-is; `option_newlines: true` (or --option-newlines)
 adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
@@ -64,6 +66,7 @@ from counterfactual_investigator_agent_with_olens.render import render_request, 
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
+DELIM = re.compile(r"^\s*[^\w\s]+\s*$|^\s*\n\s*$")  # positions "delims": all-symbol tokens and newline runs
 OPTION = re.compile(r"\n(?:\(([A-P])\)|([A-P])\.) ")  # an MCQ option line: "\nA. text" (hint_mcq) or "\n(A) text" (hinted_truthfulqa)
 
 
@@ -216,6 +219,9 @@ def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
         if row.get("turn_role"):  # e.g. "assistant": only that role's headers
             starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
         positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
+    elif row.get("positions") == "delims":
+        special = set(tok.all_special_ids) | set(tok.added_tokens_decoder)
+        positions = [i for i, x in enumerate(ids) if x == im_end or x in special or PUNCT.match(toks[i]) or DELIM.match(toks[i])]
     elif row.get("positions") == "all":
         positions = list(range(len(ids)))
     elif isinstance(row.get("positions"), list):  # explicit token indices into the rendered request
