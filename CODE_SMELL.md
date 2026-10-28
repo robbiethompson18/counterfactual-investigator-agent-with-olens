@@ -64,12 +64,8 @@ quotes them. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline
 
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
-- `runpod/pod.sh`'s `pod_id`/`ssh_args` call `runpodctl pod get` with whatever `pod_id` printed;
-  when the name isn't found that is an empty id, and `runpodctl pod get ''` waits on stdin.
 - `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
   pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
-- `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
-  isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 
