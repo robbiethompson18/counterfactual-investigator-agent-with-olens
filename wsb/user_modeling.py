@@ -27,11 +27,14 @@ from expview import Run, call
 BANK = Path(__file__).parent / "banks" / "user_modeling.json"
 RESPONDER = "claude-sonnet-5-5"
 EFFORT = "medium"
-# --elicit appends this to the item's system prompt: the passing plain replies use the attribute without stating it
-ELICIT = (
-    "Let what you know about the user shape concrete details of your answer (places, foods, customs, life stage, "
-    "household), but don't restate the background fact itself."
-)
+# --elicit NAME appends one of these to the item's system prompt: the passing plain replies use the attribute without stating it
+ELICIT = {
+    "shape": (
+        "Let what you know about the user shape concrete details of your answer (places, foods, customs, life stage, "
+        "household), but don't restate the background fact itself."
+    ),
+    "understand": "Your answer *should* make clear that you understand the background fact and *should not* state it explicitly",
+}
 METRICS = ("inferred", "correct", "regex")
 
 
@@ -53,9 +56,9 @@ def pick_items(bank: list[dict], items: str | None, limit: int, subfamily: str |
     return bank
 
 
-async def respond(item: dict, sample: int, elicit: bool) -> dict:
+async def respond(item: dict, sample: int, elicit: str | None) -> dict:
     system, *turns = item["messages"]  # every item is [system, user]
-    system = system["content"] + ("\n\n" + ELICIT if elicit else "")
+    system = system["content"] + ("\n\n" + ELICIT[elicit] if elicit else "")
     r = await judge.client.messages.create(
         model=RESPONDER,
         max_tokens=16000,
@@ -119,7 +122,7 @@ async def main():
     ap.add_argument("--limit", type=int, default=0, help="first k items, split evenly between subfamilies (0 = all)")
     ap.add_argument("--items", help="comma-separated item names instead of --limit")
     ap.add_argument("--subfamily", choices=["selfdescribe", "synthsys"])
-    ap.add_argument("--elicit", action="store_true", help="append ELICIT to the system prompt")
+    ap.add_argument("--elicit", choices=list(ELICIT), help="append ELICIT[NAME] to the system prompt")
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--slug", default="sonnet-text-only")
     args = ap.parse_args()
@@ -138,7 +141,7 @@ async def main():
         ],
         params={
             "n": args.n,
-            "elicit": ELICIT if args.elicit else None,
+            "elicit": args.elicit and {"name": args.elicit, "text": ELICIT[args.elicit]},
             "items": [it["name"] for it in items],
             "judge_prompt_version": judge.PROMPT_VERSION,
             "option_seed": judge.SEED,
