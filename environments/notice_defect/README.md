@@ -22,7 +22,6 @@ artifact tokens are identical across arms. Arms (factors `instruction` × `artif
 | Items           | 58: `dow` 10, `arith` 12, `calendar` 5, `contra` 11, `fact` 11, `physical` 9 (`ITEMS`, `TYPES`)                                            |
 | Primary measure | `positive` = `flagged`: a sentence names the defective value or its correction with an error word and no negation, or an item `flag` regex |
 | Pairs           | `notice`: `task` → `ask`; `notice_clean`: `task_clean` → `ask_clean`                                                                       |
-| Answer task     | `canon_answer`: `FLAGGED` / `NOT_FLAGGED`                                                                                                  |
 | Requires        | thinking off                                                                                                                               |
 
 ```bash

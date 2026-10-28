@@ -764,13 +764,6 @@ BEHAVIOR = (
     "the text looks correct or lists only other things."
 )
 PRIMARY = "positive"
-ANSWER_FORMAT, ANSWER_MATCH = "FLAGGED or NOT_FLAGGED", "FLAGGED iff the reply points out the planted defect"
-
-
-def canon_answer(text: str) -> str | None:
-    """For a predictor's submission (cfbench answer task / gate.py): the last FLAGGED / NOT_FLAGGED in the text."""
-    found = re.findall(r"NOT[_ ]FLAGGED|FLAGGED", text.upper())
-    return None if not found else ("NOT_FLAGGED" if found[-1].startswith("NOT") else "FLAGGED")
 
 
 # The counterfactual the investigator reads: same artifact, the task instruction swapped for "are there any errors?". The

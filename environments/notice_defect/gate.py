@@ -2,7 +2,7 @@
 prompt, whether Qwen3.6-27B (thinking off) flags the planted defect when asked? The O-lens can only add something on items
 where it can't (the hint_cf gate, docs/envs/hint_cf.md, ported for a binary target).
 
-    uv run python -m environments.notice_defect.gate RUN [--slug flash3] [--ask-arm ask] [--n 3] [--conc 8] [--limit K]
+    uv run python -m environments.notice_defect.gate RUN [--slug flash3] [--ask-arm ask] [--n 3] [--conc 8] [--google-key ENVVAR]
 
 RUN is one or more `+`-joined run folders under data/envs/notice_defect/ (a smoke plus its top-up), re-labelled with the
 current `measure` and filtered to episodes whose prompt matches the current `build()`. Per item: Qwen's label is the modal
@@ -18,8 +18,12 @@ match), verdicts.jsonl (one row per item) and the tables this prints.
 import argparse
 import asyncio
 import json
+import os
+import re
 from collections import Counter
 from pathlib import Path
+
+import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -51,6 +55,7 @@ would find. You may reason briefly, then end with a line `ANSWER: FLAGGED` or `A
 {cf_prompt}
 </counterfactual_prompt>"""
 
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 CLEAR = 0.75  # modal share for a usable oracle (6/8); --clear overrides
 MAX_CLEAN = 0.25  # a usable item's clean twin is flagged at most this often
 
@@ -120,23 +125,47 @@ def item_table(cells, labels, ask_arm: str, clear: float) -> list[dict]:
     return out
 
 
-async def guess(model: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int) -> dict:
+def canon_answer(text: str) -> str | None:
+    """The last FLAGGED / NOT_FLAGGED in a guess."""
+    found = re.findall(r"NOT[_ ]FLAGGED|FLAGGED", text.upper())
+    return None if not found else ("NOT_FLAGGED" if found[-1].startswith("NOT") else "FLAGGED")
+
+
+async def google_chat(model: str, key: str, content: str, max_tokens: int) -> tuple[str, dict]:
+    """Gemini called directly (when OpenRouter's BYOK route is out of quota): T 1.0, thinking level medium, same as the
+    OpenRouter call. 429/5xx retried with backoff like openrouter.chat."""
+    body = {
+        "contents": [{"parts": [{"text": content}]}],
+        "generationConfig": {"temperature": 1.0, "maxOutputTokens": max_tokens, "thinkingConfig": {"thinkingLevel": "medium"}},
+    }
+    async with httpx.AsyncClient(timeout=600) as client:
+        for attempt in range(6):
+            r = await client.post(GOOGLE_URL.format(model=model.split("/")[-1]), params={"key": key}, json=body)
+            if r.status_code in (429, 500, 503) and attempt < 5:
+                await asyncio.sleep(10 * 2**attempt)
+                continue
+            r.raise_for_status()
+            j = r.json()
+            parts = j["candidates"][0]["content"]["parts"]
+            return "".join(p.get("text", "") for p in parts if not p.get("thought")), j.get("usageMetadata", {})
+    raise AssertionError("unreachable")
+
+
+async def guess(model: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int, google_key: str | None) -> dict:
     content = GUESSER_PROMPT.format(base_prompt=row["base_prompt"], base_reply=row["base_reply"], cf_prompt=row["cf_prompt"])
     async with sem:
         try:
-            r = await openrouter.chat(model, [{"role": "user", "content": content}], temperature=1.0, max_tokens=max_tokens)
+            if google_key:
+                raw, usage = await google_chat(model, google_key, content, max_tokens)
+                out = {"cost": 0.0, "usage": usage}
+            else:
+                r = await openrouter.chat(model, [{"role": "user", "content": content}], temperature=1.0, max_tokens=max_tokens)
+                raw = r.choices[0].message.content or ""
+                out = {"cost": getattr(r.usage, "cost", None) or 0.0, "finish": r.choices[0].finish_reason}
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, not a dead run
             err = f"{type(e).__name__}: {e}"[:300]
             return {"sample": sample, "prompt": content, "guess_raw": None, "guess": None, "error": err, "cost": 0.0}
-    raw = r.choices[0].message.content or ""
-    return {
-        "sample": sample,
-        "prompt": content,
-        "guess_raw": raw,
-        "guess": env.canon_answer(raw),
-        "cost": getattr(r.usage, "cost", None) or 0.0,
-        "finish": r.choices[0].finish_reason,
-    }
+    return {"sample": sample, "prompt": content, "guess_raw": raw, "guess": canon_answer(raw)} | out
 
 
 def print_tables(verdicts: list[dict], n: int):
@@ -176,6 +205,10 @@ async def main():
     ap.add_argument("--limit", type=int, help="first K items, for a smoke test")
     ap.add_argument("--no-finish", action="store_true", help="leave the run as running, don't sync")
     a = ap.parse_args()
+    ap.add_argument("--google-key", metavar="ENVVAR", help="call Gemini directly with this key (when OpenRouter is out of quota)")
+    a = ap.parse_args()
+    google_key = os.environ[a.google_key] if a.google_key else None
+    served_by = f"google-direct ({a.google_key}), thinking level medium" if a.google_key else "openrouter"
     run_dirs = [Path(LOCAL) / "notice_defect" / r for r in a.run.split("+")]
     cells, labels = load(run_dirs)
     table = item_table(cells, labels, a.ask_arm, a.clear)[: a.limit]
@@ -183,13 +216,13 @@ async def main():
         "notice_defect_gate",
         a.slug,
         description=f"text-only gate: {a.model} predicts whether Qwen3.6-27B flags the planted defect in {a.ask_arm}, majority of {a.n}",
-        models=[{"name": a.model, "served_by": "openrouter"}],
+        models=[{"name": a.model, "served_by": served_by}],
         params={"source_runs": [str(r) for r in run_dirs], "ask_arm": a.ask_arm, "n": a.n, "temperature": 1.0, "effort": openrouter.EFFORT}
         | {"max_tokens": a.max_tokens, "limit": a.limit, "clear": a.clear, "max_clean": MAX_CLEAN, "prompt": GUESSER_PROMPT},
     )
     print(f"run: {run}; {len(table)} items")
     sem = asyncio.Semaphore(a.conc)
-    results = await asyncio.gather(*(guess(a.model, row, s, sem, a.max_tokens) for row in table for s in range(a.n)))
+    results = await asyncio.gather(*(guess(a.model, row, s, sem, a.max_tokens, google_key) for row in table for s in range(a.n)))
     guesses, verdicts = [], []
     for i, row in enumerate(table):
         samples = results[i * a.n : (i + 1) * a.n]

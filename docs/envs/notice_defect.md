@@ -48,12 +48,14 @@ counterfactual `PAIRS["notice"] = (task, ask)`); only the subject side is built 
   Hand-check on try 1 (below) found it right on every negative but one kind of reply and wrong on
   self-contradicting replies.
 - **cfbench wiring** (audit blocker: the v1 doc said `cfbench/envs/evalcue_runs.py` consumes these
-  runs; it reads `data/runs/<env>/<run>/rows.jsonl`, which this runner never writes). The right
-  reader is `cfbench/envs/env_runs.py`, which reads `data/envs/<env>/<run>/` episodes and the env's
-  `measure` labels, e.g.
-  `uv run python -m cfbench.run env_runs:notice_defect/<run> --pairs task:ask` (binary answer task
-  via `canon_answer` / `ANSWER_FORMAT` = `FLAGGED` or `NOT_FLAGGED`). Not run yet; untested beyond
-  the env exposing what `env_runs.py` reads.
+  runs; it reads `data/runs/<env>/<run>/rows.jsonl`, which this runner never writes). The reader for
+  `data/envs/<env>/<run>/` runs is `cfbench/envs/env_runs.py`. Checked on try 1 without a predictor
+  call: `EnvRuns("notice_defect/2026-10-27_try1")` loads all 5 arms (291-292 labelled episodes each)
+  over 58 items, and `view("task", "ask", …)` renders the one-instruction diff. It is a **label task
+  only** (`positive` from the run's latest `labels/measure@*.jsonl`): the env has no `canon_answer`,
+  because Qwen's `ask` reply is free text, not an answer format. Try 1 carries a rescored labels
+  file (`measure@…-rescore.jsonl`, written with the final `measure()`), which `env_runs.py` picks by
+  mtime. No cfbench run was made (per the brief).
 
 ## Try 1 smoke (2026-10-27, Qwen3.6-27B thinking off, OpenRouter `venice/fp8`)
 
@@ -190,10 +192,14 @@ Success bar from the brief: ≥ 6 survivors with ≥ 2 in each class.
 ## Gate iterations (2026-10-27)
 
 - **Try 1** (this revision: 58 items, clean twins, artifact first, orthogonal tasks, sentence-level
-  measure). Qwen smoke above. Gate: **not run yet**. Gemini 3.8 Flash was exhausted on the Google
-  project behind OpenRouter's BYOK key (429 `RESOURCE_EXHAUSTED`, quota 10,000/day, reset ~00:00
-  PDT) and the new OpenRouter account is capped at 20 requests/min for both models. The gate (and,
-  credits permitting, the n = 8 top-up first) is scheduled for after 00:05 PDT; results go here.
+  measure). Qwen smoke above. Gate: **not run yet**. Gemini 3.8 Flash was out of quota on every
+  route at 21:40-22:05 PDT: OpenRouter's BYOK key (429 `RESOURCE_EXHAUSTED`, 10,000/day, reset
+  ~00:00 PDT), and all three direct keys (`GEMINI_API_KEY`, `OLD_GEMINI_API_KEY` daily quota;
+  `THIRD_GEMINI_KEY` spend-based rate limit); the new OpenRouter account is also capped at 20
+  requests/min. A job waits until 00:05 PDT, probes OpenRouter then each key directly
+  (`gate.py --google-key ENVVAR`, same T 1.0 / thinking medium, route recorded in the run's meta),
+  tops the Qwen smoke up to n = 8 first if OpenRouter credits allow, and runs the gate once; results
+  go here.
 
 ## Caveats and open blockers
 
