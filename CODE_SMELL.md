@@ -30,15 +30,6 @@ pods' image) has no `rsync`, so on those pods the watcher deletes without fetchi
 read (`jpp_reads/2026-10-27_hint-mcq-scale2k`) was saved by pulling over ssh by hand. Fix: fall back
 to `ssh cat`/`scp`, or install rsync in `olens_reads.sh setup`.
 
-## 2026-10-27: `olens/src/olens/vectors.py` has no caller
-
-Probe and steering directions over an HF transformers model (`contributions`, `attention_pattern`,
-`ablation_hook`). Its only caller, the transcript viewer's `steer.py`, went with the live viewer in
-PR #219, and the HF model-loading code it assumes (`load_base`, hook-LoRA) was deleted with the
-one-engine reader in PR #229. Kept because nobody has decided whether steering comes back; delete it
-or port it to vLLM when that is decided.
-
-
 ## 2026-10-26: OpenRouter calls outside `openrouter.chat`
 
 `olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
