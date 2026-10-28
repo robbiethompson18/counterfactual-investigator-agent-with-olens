@@ -52,7 +52,9 @@ def eval_runs() -> dict[str, list[Path]]:
     out = defaultdict(list)
     for p in sorted(CFBENCH.glob("*/meta.json")):
         e = eval_of(json.loads(p.read_text()))
-        if e and (p.parent / "predictions.jsonl").exists() and not p.parent.name.endswith("-smoke"):  # smoke tests aren't evals
+        # smoke tests and abandoned runs (their reusable rows live on in the run that reused them) aren't shown
+        smoke_or_abandoned = p.parent.name.endswith("-smoke") or json.loads(p.read_text()).get("status") == "abandoned"
+        if e and (p.parent / "predictions.jsonl").exists() and not smoke_or_abandoned:
             out[e[0]].append(p.parent)
     return out
 

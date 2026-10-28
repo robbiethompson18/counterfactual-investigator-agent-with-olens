@@ -42,7 +42,7 @@ def with_notes(prompt: str, notes: str) -> str:
 
 
 def latest_inputs(name: str) -> Path:
-    runs = sorted((ROOT / "cfbench_evals").glob(f"*_{name.replace('_', '-')}-inputs"))
+    runs = sorted((ROOT / "cfbench_evals").glob(f"*_{name.replace('_', '-')}-inputs*"), key=lambda p: p.stat().st_mtime)
     assert runs, f"no inputs run for {name}: run `python -m cfbench.eval {name} --prep` first"
     return runs[-1]
 
@@ -52,6 +52,10 @@ async def main():
     ap.add_argument("name", help="a folder in cfbench/evals/")
     ap.add_argument("--prep", action="store_true", help="build the eval's inputs as a runs.py run (cfbench_evals/<date>_<name>-inputs)")
     ap.add_argument("--placebo", default="", help="--prep: a cfbench reads dir from another env, for olens_placebo_agentic")
+    ap.add_argument("--n-items", type=int, default=0, help="--prep: items per version (the eval's prep picks which)")
+    ap.add_argument("--strict", action="store_true", help="--prep: only items the model refused in every base run (eval-specific)")
+    ap.add_argument("--tag", default="", help="--prep: suffix for the inputs run's slug")
+    ap.add_argument("--reuse", default="", help="comma list of predictions.jsonl: copy rows for identical cases instead of re-predicting")
     ap.add_argument("--inputs", default="", help="the inputs run dir (default: the newest)")
     ap.add_argument("--versions", default="", help="comma list of the eval's versions (default: all it has)")
     ap.add_argument("--conditions", default="", help="comma list (default: the eval's CONDITIONS)")
@@ -70,12 +74,12 @@ async def main():
     if args.prep:
         run = new_run(
             "cfbench_evals",
-            f"{args.name.replace('_', '-')}-inputs",
+            f"{args.name.replace('_', '-')}-inputs" + (f"-{args.tag}" if args.tag else ""),
             description=f"inputs for cfbench eval {args.name} ({', '.join(versions)}): cases + O-lens reads (cfbench/evals/{args.name})",
             models=[],
-            params={"eval": args.name, "versions": versions, "placebo": args.placebo},
+            params={"eval": args.name, "versions": versions, "placebo": args.placebo, "n_items": args.n_items, "strict": args.strict},
         )
-        ev.prep(run, versions, Path(args.placebo))
+        ev.prep(run, versions, Path(args.placebo), args.n_items or None, args.strict)
         finish(run)
         return
     assert args.slug, "--slug"
@@ -85,7 +89,17 @@ async def main():
     predictors = args.predictors.split(",")
     reads = olens.Reads(ev.reads(inputs)) if set(OLENS_CONDITIONS) & set(conditions) else None
     fve_note = olens.fve_note(reads) if reads else ""
-    cases = list(ev.cases(inputs, versions))[: args.limit or None]
+    # interleaved by item, so a partial run still has every model on the items it reached
+    cases = sorted(ev.cases(inputs, versions), key=lambda c: (c[1].get("version") or "", c[1].get("item") or "", c[1]["model"]))
+    cases = cases[: args.limit or None]
+    # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
+    # fields are re-taken from this run's case, since the investigator never sees them
+    key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
+    reuse = {}
+    for path in filter(None, args.reuse.split(",")):
+        assert json.loads((Path(path).parent / "meta.json").read_text())["params"]["eval_md"] == notes, f"{path}: eval.md differs"
+        for r in map(json.loads, Path(path).read_text().splitlines()):
+            reuse[key(r, r["condition"])] = r
     run = new_run(
         "cfbench",
         args.slug,
@@ -109,12 +123,18 @@ async def main():
             "limit": args.limit,
             "harness_version": HARNESS_VERSION,
             "eval_md": notes,
+            "reuse": args.reuse,
         },
     )
     out, slots = run / "predictions.jsonl", asyncio.Semaphore(args.concurrency)
 
     async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw))
+        if old := reuse.get(key(case | {"predictor": predictor, "draw": draw}, condition)):
+            assert old["shown"] == [r.source for r in shown], old["shown"]
+            with out.open("a") as f:
+                f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
+            return
         tools, read = {}, None
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)

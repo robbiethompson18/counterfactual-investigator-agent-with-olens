@@ -9,5 +9,5 @@ just before it answered. They come from roughly two thirds of the way through th
 numbers are hidden (every read says layer 0), and reads have no FVE. Each read has 3 bullets: the
 greedy readout and 2 samples (so `top_k` above 3 adds nothing).
 
-The rate you are predicting is this model's rate over many counterfactual-arm runs, pooled over a
-set of harmful requests like this one, not just this request.
+The rate you are predicting is this model's rate over many counterfactual-arm runs, pooled over a set
+of harmful requests like this one, not just this request.

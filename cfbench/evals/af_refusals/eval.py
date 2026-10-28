@@ -163,14 +163,32 @@ def read_rows(source: str, model: str, user: str, toks: list[tuple[str, list[str
     return rows
 
 
-def prep(out: Path, versions: list[str], placebo: Path):
-    """reads/ (both models), placebo/ and cases.jsonl into `out`. `placebo`: a cfbench reads dir from another env, e.g. the
-    email over-eagerness reads cut to 3 bullets without FVE (reads_placebo_dsv4 from scripts/cfbench_af_prep.py on branch
-    claude/cfbench-af); the inputs run keeps a copy, so later runs only need the inputs run."""
+def pick_items(eligible: dict[str, list[str]], n: int | None) -> dict[str, list[str]]:
+    """Per version, its first n eligible items by number, sharing goals across versions where it can: the version with the
+    fewest eligible items picks first, and every other version keeps those items where they are eligible for it too, then
+    fills from its own."""
+    num = lambda i: int(i[1:])
+    if not n:
+        return {v: sorted(its, key=num) for v, its in eligible.items()}
+    anchor = sorted(min(eligible.values(), key=len), key=num)[:n]
+    out = {}
+    for v, its in eligible.items():
+        keep = [i for i in anchor if i in its]
+        out[v] = sorted(keep + [i for i in sorted(its, key=num) if i not in keep][: n - len(keep)], key=num)
+    return out
+
+
+def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
+    """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
+    (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
+    cfbench reads dir from another env, e.g. the email over-eagerness reads cut to 3 bullets without FVE
+    (reads_placebo_dsv4 from scripts/cfbench_af_prep.py on branch claude/cfbench-af); the inputs run keeps a copy, so later
+    runs only need the inputs run."""
     (out / "reads").mkdir(parents=True)
     (out / "placebo").mkdir()
     reads_f, req_f = (out / "reads/reads.jsonl").open("w"), (out / "reads/requests.jsonl").open("w")
     cases_f = (out / "cases.jsonl").open("w")
+    data, eligible = {}, {}
     for version in versions:
         V = VERSIONS[version]
         base_arm, cf_arm = V["arms"]
@@ -182,7 +200,17 @@ def prep(out: Path, versions: list[str], placebo: Path):
         refusal = {
             m: {e["item"]: (s, e) for s, e, v in reversed(eps[m]) if e["arm"] == base_arm and not v} for m in MODELS.values()
         }  # an item's first public refusal (reversed: the first one wins)
-        items = sorted(set.intersection(*(set(refusal[m]) & set(lens[m]) for m in MODELS.values())), key=lambda i: int(i[1:]))
+        complied = {m: {e["item"] for _, e, v in eps[m] if e["arm"] == base_arm and v} for m in MODELS.values()}
+        eligible[version] = [
+            i
+            for i in refusal["dsv4"]
+            if all(i in refusal[m] and i in lens[m] and not (strict and i in complied[m]) for m in MODELS.values())
+        ]
+        data[version] = (V, base_arm, cf_arm, eps, lens, refusal)
+    chosen = pick_items(eligible, n_items)
+    for version in versions:
+        V, base_arm, cf_arm, eps, lens, refusal = data[version]
+        items = chosen[version]
         for model, m in MODELS.items():
             pre = [v for _, e, v in eps[m] if e["arm"] == cf_arm and e["item"] in items]
             pub = [v for _, e, v in eps[m] if e["arm"] == base_arm and e["item"] in items]
