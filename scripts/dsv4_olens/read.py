@@ -164,7 +164,9 @@ def main():
     reqs = [json.loads(line) for line in Path(a.requests).read_text().splitlines()][: a.limit or None]
     tok = AutoTokenizer.from_pretrained(a.model)
     t = time.time()
-    model = AutoModelForCausalLM.from_pretrained(a.model, device_map="auto", dtype="auto").eval()
+    # device_map="auto" alone packs GPU 0 to ~143 GB and the allocator thrashes (~10x slower): cap each GPU at 60%
+    mem = {i: int(torch.cuda.get_device_properties(i).total_memory * 0.6) for i in range(torch.cuda.device_count())}
+    model = AutoModelForCausalLM.from_pretrained(a.model, device_map="auto", max_memory=mem, dtype="auto").eval()
     print(f"model loaded {time.time() - t:.0f}s", flush=True)
     blocks = model.model.layers
     cap = Capture(layers, blocks)
