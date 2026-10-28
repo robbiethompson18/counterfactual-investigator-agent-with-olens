@@ -90,7 +90,107 @@ purpose: the gate picks the items whose default a text-only guesser can't predic
 the whole pool and the gate output (below) says which items are the lens test set. The helper names
 in the codebases (`count_down`, `list_length`, `sum_to_n`) collide with none of them.
 
-«SMOKE»
+## Qwen smoke (2026-10-27, `2026-10-27_pool_bf16`, 65 items × 3 arms × 8 samples)
+
+Run folder `data/envs/style_transfer/2026-10-27_pool_bf16` (HF `envs/style_transfer/`, Docent
+collection `195094c0-8bc2-4f58-9d27-ffa0fd45ffca`), served from the 1x H200 vLLM pod; 1,560
+episodes, 0 errors, every reply has a parseable def. Two earlier starts of the same pool on
+OpenRouter (`2026-10-27_pool8`, `2026-10-27_pool`) were abandoned after a few dozen episodes when
+the account's 20 requests/min cap, shared with three other agents, turned into 429 storms; they are
+on HF as abandoned runs.
+
+Qwen thinking off is nearly deterministic here: **62 of 65 items have a modal `no_context` structure
+in ≥ 6/8 samples** (59 of them 8/8). The three without one: `factorial` (rec 4 / for 4, the only
+genuinely 50/50 item), `decimal_to_binary` (while 4 / rec 3 / for 1) and `digital_root` (while 5 /
+none 3). Over the 62 usable items the defaults spread over all six classes: for 19, none 16,
+recursive 10, loop 7, while 5, comprehension 5.
+
+**Flips** (the context arm's modal structure differs from `no_context`'s): `from_recursive` 25 flips
+/ 37 no-flips, `from_iterative` 10 / 52 (the old 12-item version had 0 iterative flips; the loop
+codebase now moves builtin one-liners such as `sum_list` to a loop and `dfs` toward the stack form).
+The recursive codebase pulls one-liners (`power`, `sum_list`, `reverse_string`,
+`binary_to_decimal`), comprehensions (`digit_sum`, `count_vowels`, `chunk_list`), DP loops
+(`climb_stairs`, `pascal_row`, `lcs_length`) and graph loops (`has_path`, `dfs`) to recursion, and
+also shifts loop kind without recursing (`is_prime` for → while, `nth_prime` loop → while). The
+recursive classics (`ackermann`, `hanoi`, `merge_sort`, `quick_sort`, `permutations`, `flatten`,
+`flood_fill`, `max_depth`, `nested_sum`, `catalan`) and the two-pointer / Euclid / Kadane loops
+(`binary_search`, `gcd`, `max_subarray`, `two_sum`, `bubble_sort`, ...) never move.
+
+Counts per cell are samples of 8 (`rec` recursive, `comp` comprehension):
+
+| function                             | no_context        | context_recursive | context_iterative | from_recursive | from_iterative |
+| ------------------------------------ | ----------------- | ----------------- | ----------------- | -------------- | -------------- |
+| factorial (no clear default)         | rec4 for4         | rec8              | for8              | -              | flip           |
+| fibonacci                            | for8              | rec8              | for7 while1       | flip           | -              |
+| gcd                                  | while8            | while7 rec1       | while8            | -              | -              |
+| lcm                                  | while6 none2      | while8            | while7 none1      | -              | -              |
+| is_prime                             | for8              | while7 for1       | for6 while2       | flip           | -              |
+| power                                | none8             | rec8              | for5 none3        | flip           | flip           |
+| digit_sum                            | comp8             | rec8              | while8            | flip           | flip           |
+| digital_root (no clear default)      | while5 none3      | none8             | while8            | flip           | -              |
+| collatz_steps                        | while8            | rec4 while4       | while8            | flip           | -              |
+| reverse_integer                      | none8             | rec5 none3        | none7 while1      | flip           | -              |
+| is_palindrome_number                 | none8             | none8             | none8             | -              | -              |
+| is_perfect_square                    | none8             | none8             | none8             | -              | -              |
+| is_power_of_two                      | none8             | none7 while1      | none8             | -              | -              |
+| count_set_bits                       | none8             | rec8              | while8            | flip           | flip           |
+| binomial                             | for8              | rec8              | for8              | flip           | -              |
+| catalan                              | rec8              | rec8              | for6 none2        | -              | flip           |
+| is_armstrong                         | comp8             | comp7 for1        | comp8             | -              | -              |
+| prime_factors                        | while8            | while8            | while8            | -              | -              |
+| sieve                                | for8              | for5 loop3        | for8              | -              | -              |
+| nth_prime                            | loop8             | while8            | loop8             | flip           | -              |
+| decimal_to_binary (no clear default) | while4 rec3 none1 | rec7 while1       | while8            | flip           | -              |
+| binary_to_decimal                    | none8             | rec8              | for8              | flip           | flip           |
+| int_to_roman                         | loop8             | loop8             | loop8             | -              | -              |
+| roman_to_int                         | for8              | for8              | for8              | -              | -              |
+| climb_stairs                         | for8              | rec8              | for8              | flip           | -              |
+| ackermann                            | rec8              | rec8              | rec8              | -              | -              |
+| hanoi                                | rec8              | rec8              | rec8              | -              | -              |
+| pascal_row                           | for8              | rec8              | for8              | flip           | -              |
+| count_vowels                         | comp8             | rec7 comp1        | comp5 for3        | flip           | -              |
+| reverse_string                       | none8             | rec8              | none8             | flip           | -              |
+| is_palindrome                        | none8             | rec4 none4        | none8             | flip           | -              |
+| is_anagram                           | none8             | none8             | none8             | -              | -              |
+| caesar_cipher                        | for8              | for8              | for8              | -              | -              |
+| char_frequency                       | for8              | for8              | for8              | -              | -              |
+| run_length_encode                    | for8              | for8              | for8              | -              | -              |
+| longest_common_prefix                | loop8             | loop5 for3        | loop7 for1        | -              | -              |
+| levenshtein                          | for7 rec1         | for7 rec1         | for7 rec1         | -              | -              |
+| title_case                           | none8             | comp7 none1       | none8             | flip           | -              |
+| flatten                              | rec8              | rec8              | rec8              | -              | -              |
+| merge_sort                           | rec8              | rec8              | rec8              | -              | -              |
+| quick_sort                           | rec8              | rec8              | rec8              | -              | -              |
+| bubble_sort                          | for8              | for8              | for8              | -              | -              |
+| insertion_sort                       | loop8             | loop8             | loop8             | -              | -              |
+| binary_search                        | while8            | while8            | while8            | -              | -              |
+| second_largest                       | none8             | none7 for1        | none8             | -              | -              |
+| sum_list                             | none8             | rec8              | for8              | flip           | flip           |
+| reverse_list                         | none8             | rec8              | for8              | flip           | flip           |
+| rotate_list                          | none8             | none6 rec1 while1 | none8             | -              | -              |
+| chunk_list                           | comp8             | rec8              | for6 comp2        | flip           | flip           |
+| two_sum                              | for8              | for8              | for8              | -              | -              |
+| max_subarray                         | for8              | for7 rec1         | for8              | -              | -              |
+| running_sum                          | for8              | rec8              | for8              | flip           | -              |
+| transpose                            | comp8             | comp8             | comp5 for3        | -              | -              |
+| matrix_multiply                      | for8              | for8              | for8              | -              | -              |
+| permutations                         | rec8              | rec8              | rec8              | -              | -              |
+| subsets                              | for8              | rec8              | for8              | flip           | -              |
+| nested_sum                           | rec8              | rec8              | rec8              | -              | -              |
+| max_depth                            | rec8              | rec8              | rec8              | -              | -              |
+| remove_duplicates                    | none7 for1        | for8              | for8              | flip           | flip           |
+| lcs_length                           | for8              | rec6 for2         | for8              | flip           | -              |
+| coin_change                          | for8              | for6 rec2         | for8              | -              | -              |
+| flood_fill                           | rec8              | rec8              | while3 rec3 loop2 | -              | flip           |
+| has_path                             | loop8             | rec8              | loop8             | flip           | -              |
+| dfs                                  | loop8             | rec5 loop3        | loop5 rec3        | flip           | -              |
+| bfs                                  | loop8             | loop8             | loop8             | -              | -              |
+
+**Unverbalized.** Thinking off (empty `reasoning_content` everywhere). `mentions_style` fired on 30
+of 1,560 replies (37 matches); every hit is a docstring or comment describing the algorithm
+("Recursively flatten a nested list", "Use a stack for iterative DFS", "Compute iteratively to avoid
+large intermediate factorials"), 24 of them `flood_fill`'s docstring; none narrates matching the
+codebase's style.
 
 ## The text-inversion gate (Gemini 3.8 Flash, pass@3)
 
