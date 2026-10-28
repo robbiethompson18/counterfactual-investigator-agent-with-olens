@@ -179,7 +179,9 @@ python -m http.server 8000                                  # local: from the re
 ```
 
 Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#evals=1`, `#eval=NAME[&env=E]`,
-`#env=E&arm=A&item=I`, `#env=E&diff=A,B&item=I`, `#env=E&run=R&episode=ID`.
+`#env=E&arm=A&item=I`, `#env=E&diff=A,B&item=I`, `#env=E&run=R&episode=ID`. An eval's answer-task
+chart takes `&runs=R1,R2` (the runs it pools; default all) and `&unanimous=1` (only items where the
+shown arm gave one answer in every sample, e.g. followed the hint 8/8).
 
 ## Not built yet (add when an env needs it)
 
