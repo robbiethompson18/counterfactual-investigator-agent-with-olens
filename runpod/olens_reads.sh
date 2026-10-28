@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-# Batch O-lens reads (scripts/olens_read_requests.py) on a pod booted by `NAME=X runpod/qwen_server.sh up 1` (vLLM image +
-# cache volume). See runpod/CLAUDE.md and docs/runpod-qwen-server.md, "O-lens reads".
-#   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, deps, checkpoints, merged lens
+# Batch O-lens reads (scripts/olens_read_requests.py: capture, lens and AR on one vLLM, olens/src/olens/one_engine.py) on a pod
+# booted with the vLLM 0.27.1 image and a cache volume:
+#   IMAGE=vllm/vllm-openai:v0.27.1 VOLUMES=cdde9ia5iu NAME=X runpod/qwen_server.sh up 1
+# See runpod/CLAUDE.md, docs/runpod-qwen-server.md ("O-lens reads") and docs/olens-one-engine-reader.md.
+#   runpod/olens_reads.sh setup NAME                    # stop the pod's vLLM server, copy the repo, vllm-metamodels, checkpoints, adapters
 #   runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [ARGS...]   # start reading in the background -> /workspace/reads/TAG.reads.jsonl
+#                                                       # READER=scripts/jpp_read_requests.py for J++ reads (same request format)
+#                                                       # ARGS: --layers 32,40,48 [--max-model-len 65536 for transcripts over 32k tokens]
 #   runpod/olens_reads.sh status NAME TAG               # last progress lines
-#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far, and LOCAL.provenance.json
+#   runpod/olens_reads.sh fetch NAME TAG LOCAL.jsonl    # copy the reads so far, LOCAL.provenance.json and LOCAL.transcripts.jsonl
 #   runpod/olens_reads.sh stop NAME                     # kill the reader (a rerun of `run` with the same TAG resumes)
 set -euo pipefail
 NAME=${2:?pod name}
@@ -28,17 +32,22 @@ case ${1:?command} in
 set -e
 while IFS= read -r -d '' kv; do export "$kv"; done < /proc/1/environ   # HF_TOKEN etc. (ssh sessions lack the pod's env)
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home
-# scipy (NNLS) and pyyaml aren't in the vllm image; fla gives HF's Qwen3.6 its linear-attention kernels
-pip install -q scipy pyyaml flash-linear-attention 2>&1 | grep -v -e "running pip as" -e notice || true
+python3 -c "import vllm; print('vllm', vllm.__version__)"
+# vllm-metamodels as a zip (the image may lack git); --no-deps so pip never touches the image's torch/vllm pins. scipy (NNLS)
+# isn't in the vllm image.
+pip install -q --no-deps "https://github.com/ceselder/vllm-metamodels/archive/refs/heads/main.zip" zstandard 2>&1 | grep -v -e "running pip as" -e notice || true
+pip install -q scipy 2>&1 | grep -v -e "running pip as" -e notice || true
+python3 -c "import vllm_lens; print('vllm_lens', getattr(vllm_lens, '__version__', '?'))"
 C=/workspace/olens_ckpt   # checkpoints + whiteners on the volume; olens/ expects them at olens/checkpoints
 hf download agu18dec/olens_and_ar --local-dir $C/agu18dec_olens_and_ar >/dev/null
 inc=(); for L in 20 24 28 32 36 40 44 48 52 56 60; do inc+=(--include "data/whiteners/pooled/whitening_iolens_pooled_L$L.safetensors"); done
 hf download agu18dec/local-workspace --repo-type dataset --local-dir $C/local_workspace "${inc[@]}" >/dev/null
 ln -sfn $C /root/repo/olens/checkpoints
-# the space lens (CLAUDE.md). vLLM's LoRA runtime would also work (renamed keys, docs/metamodel-serving.md), but merged weights
-# decode ~20% faster
-M=/workspace/merged/agu_space_rl600
-test -f $M/MERGED_FROM.json || python3 /root/repo/olens/scripts/merge_lens.py --adapter $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 --out $M
+hf download Qwen/Qwen3.6-27B >/dev/null
+# the space lens (CLAUDE.md) and the AR, keys renamed for vLLM's LoRA runtime (docs/metamodel-serving.md)
+cd /root/repo
+test -f /workspace/lora_vllm/olens_space_rl600/adapter_model.safetensors || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 /workspace/lora_vllm/olens_space_rl600
+test -f /workspace/lora_vllm/ar_ptag_pooled/adapter_model.safetensors || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/ar_ptag_pooled/lora /workspace/lora_vllm/ar_ptag_pooled
 echo SETUP_DONE
 EOF
     ;;
@@ -48,19 +57,20 @@ EOF
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src:src exec python3 scripts/olens_read_requests.py /workspace/reads/$tag.jsonl \
-  /workspace/reads/$tag.reads.jsonl /workspace/merged/agu_space_rl600 $*
+cd /root/repo && PYTHONPATH=olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
+  /workspace/reads/$tag.reads.jsonl $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
   status)
     ssh_pod "test -f /workspace/reads/${3:?tag}.log || echo 'no log yet (reader not started)'
       grep -E '^\[[0-9]+/|Traceback|Error|to read' /workspace/reads/$3.log 2>/dev/null | tail -3
-      echo \"reader processes: \$(pgrep -fc '[o]lens_read_requests' || true)\"" ;;
+      echo \"reader processes: \$(pgrep -fc '[_]read_requests' || true)\"" ;;
   fetch)
     ssh_pod "cat /workspace/reads/${3:?tag}.reads.jsonl" > "${4:?local path}.tmp" && mv "$4.tmp" "$4" && wc -l "$4"
-    ssh_pod "cat /workspace/reads/$3.reads.provenance.json" > "${4%.jsonl}.provenance.json" ;;  # olens.provenance
+    ssh_pod "cat /workspace/reads/$3.reads.provenance.json" > "${4%.jsonl}.provenance.json"  # olens.provenance
+    ssh_pod "cat /workspace/reads/$3.reads.transcripts.jsonl" > "${4%.jsonl}.transcripts.jsonl" ;;  # tokens + sections, for expview
   stop)
     # killing the reader orphans vLLM's engine process, which keeps its GPU memory: kill both
-    ssh_pod 'pkill -f "[o]lens_read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
+    ssh_pod 'pkill -f "[_]read_requests"; sleep 5; pkill -9 -f "[V]LLM::EngineCore"; sleep 2; nvidia-smi --query-gpu=memory.used --format=csv,noheader' ;;
   *) echo "unknown command: $1" >&2; exit 1 ;;
 esac

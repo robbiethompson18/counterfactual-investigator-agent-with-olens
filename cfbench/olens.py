@@ -1,4 +1,4 @@
-"""O-lens tools for the `olens` and `olens_placebo` conditions, addressed by quoting the transcript, not by token number.
+"""O-lens tools for the `olens_agentic` and `olens_placebo_agentic` conditions, addressed by quoting the transcript, not by token number.
 
 Reads come from the O-lens serving session as JSONL, one row per (transcript, position, layer):
 {id, token_index, token, prefix, msg_index, role, field, char_offset, layer, bullets: [{text, fve, coef}], joint_fve}, where
@@ -16,7 +16,7 @@ the transcript as `read_transcript` shows it (core.render_spans), so search hits
 Both show each read's top bullet with FVE >= 0.1 by default (`top_k`, `min_fve`); search_olens returns the 20 best
 bullets by FVE (`max_bullets`), olens_at reads layers 32, 40, 48 by default.
 
-`olens_placebo` answers every call from a run of a different env, at the same relative position in that run (with that
+`olens_placebo_agentic` answers every call from a run of a different env, at the same relative position in that run (with that
 run's text around the reads), so the predictor gets as much O-lens text through the same tools, none of it about this
 scenario.
 """
@@ -39,32 +39,58 @@ WINDOW, MAX_WINDOW = 10, 20  # neighbouring positions each side in olens_at
 AT_LAYERS = {32, 40, 48}  # olens_at's default layers when the reads have them (else all); search_olens defaults to every layer
 MAX_BULLETS = 20  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
+PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # the reader's stop tokens (scripts/olens_read_requests.py)
+POSITIONS = ("sparse", "all")
+
+
+def sparse(row: dict) -> bool:
+    """Whether a row of an every-token read is one a sparse read job reads: a template token (field null: <|im_start|>, role,
+    newline, <think>, </think>, <|im_end|>, what `turn_starts` requests read) or a stop token."""
+    return row["field"] is None or bool(PUNCT.match(row["token"]))
 
 
 class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
     """Rollout source -> (its messages, its read rows), each source's rows parsed from disk on its first lookup. Parsing
     every row up front took 12 GB per process with the 2026-10-24 nocot reads, so a few cfbench runs at once got killed by
     oom-guard; a run only looks up its own env's sources and its placebo's. Each reads.jsonl's run dir also has the
-    requests.jsonl it was read from, which has every transcript's messages."""
+    requests.jsonl it was read from, which has every transcript's messages.
 
-    def __init__(self, paths: list[str]):
+    `positions="sparse"` (the default) keeps every row of a request that isn't `positions: "all"` as the job read it, and of
+    an every-token request only the rows `sparse` accepts (template and stop tokens), so the default serves every sparse read
+    ever made and a dense file serves no more; a transcript whose rows all get dropped is an error.
+    `positions="all"` keeps every row and records in `sparse_only` the transcripts whose request row doesn't say
+    `positions: "all"` (cfbench.run refuses to use those), so nobody runs "every token" on reads that only exist at a few."""
+
+    def __init__(self, paths: list[str], positions: str = "sparse"):
+        assert positions in POSITIONS, positions
         self.messages: dict[str, list[dict]] = {}
+        self.sparse_only: dict[str, Path] = {}  # source -> a reads file whose request row for it isn't positions: "all"
+        dropped: dict[str, Path] = {}  # source -> file, when positions="sparse" dropped every row of it
         self.offsets: dict[str, dict[Path, array]] = defaultdict(dict)  # source -> reads file -> where its rows start
         self.top_fves = array("d")  # every read's top-bullet FVE, for fve_note
         self.rows: dict[str, list[dict]] = {}
         for path in map(Path, paths):
-            messages = {r["id"]: r["messages"] for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            requests = {r["id"]: r for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            messages = {id: r["messages"] for id, r in requests.items()}
             offset = 0
             with path.open("rb") as f:
                 for line in f:
                     row = json.loads(line)
                     # msg_index < 0: the tool definitions before the system prompt, same in every run, not in the transcript
-                    if row["msg_index"] >= 0:
+                    dense = requests[row["id"]].get("positions") == "all"
+                    if row["msg_index"] >= 0 and positions == "sparse" and dense and not sparse(row):
+                        dropped.setdefault(row["id"], path)
+                    elif row["msg_index"] >= 0:
+                        if positions == "all" and not dense:
+                            self.sparse_only.setdefault(row["id"], path)
                         self.messages.setdefault(row["id"], messages[row["id"]])
                         self.offsets[row["id"]].setdefault(path, array("q")).append(offset)
                         if (b := row["bullets"]) and b[0]["fve"] is not None:
                             self.top_fves.append(b[0]["fve"])
                     offset += len(line)
+        if missing := {s: p for s, p in dropped.items() if s not in self.messages}:
+            listed = "\n".join(f"{s}  ({p})" for s, p in missing.items())
+            raise ValueError(f"{len(missing)} transcripts have reads but none at a template or stop token:\n{listed}")
 
     def __getitem__(self, source: str) -> tuple[list[dict], list[dict]]:
         messages = self.messages[source]

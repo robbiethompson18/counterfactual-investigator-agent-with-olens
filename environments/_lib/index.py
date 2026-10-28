@@ -3,6 +3,7 @@
     envs/index.json         every env: title, status, primary measure, runs and episodes per target model
     envs/<env>/index.json   that env's runs: meta summary, label files, and per arm n / errors / unscorable / the
                             primary measure's distribution, with per-item k/n for a bool primary
+    evals/index.json, evals/<name>.json   cfbench evals (evals.py; an eval can span envs), for the viewer's Evals pages
 
 Built from the local data/envs/ folders; delete and rebuild any time.
 """
@@ -13,7 +14,8 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .core import ROOT, env_names, load_env
+from .backends import canonical_id
+from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run_dirs
 from .runfolder import LOCAL, read_episodes
 
 
@@ -41,12 +43,13 @@ def summarize(vals: list, items: list) -> dict:
 def env_index(env: str) -> dict:
     mod = load_env(env)
     runs = []
-    for run_dir in sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists()):
+    for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
         label_file, labels = latest_labels(run_dir)
-        by_arm = defaultdict(list)
+        by_arm, skip = defaultdict(list), retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
-            by_arm[ep["arm"]].append(ep)
+            if ep["arm"] not in skip:
+                by_arm[ep["arm"]].append(ep)
         arms = {}
         for arm, eps in by_arm.items():
             vals = [labels.get(e["id"], {}).get(mod.PRIMARY) if not e.get("error") else None for e in eps]
@@ -62,13 +65,13 @@ def env_index(env: str) -> dict:
                 "run": run_dir.name,
                 "status": meta.get("status"),
                 "created": meta.get("created"),
-                "target": meta.get("target", {}).get("id"),
+                "target": canonical_id(meta.get("target", {}).get("id")),
                 "model": meta.get("target", {}).get("model"),
                 "thinking": meta.get("target", {}).get("thinking"),
                 "description": meta.get("description"),
                 "converted_from": meta.get("converted_from"),
                 "docent_collection": meta.get("docent_collection"),
-                "n_episodes": meta.get("n_episodes"),
+                "n_episodes": sum(a["n"] for a in arms.values()) if skip else meta.get("n_episodes"),
                 "label_files": sorted(p.name for p in (run_dir / "labels").glob("*.jsonl")),
                 "primary_from": label_file,
                 "measures": measures,
@@ -82,10 +85,12 @@ def env_index(env: str) -> dict:
         "env": env,
         "title": title,
         "status": status.group(1) if status else None,
+        "starred": getattr(mod, "STARRED", None),
         "primary": mod.PRIMARY,
         "pairs": {k: list(v) for k, v in getattr(mod, "PAIRS", {}).items()},
         "arms": list(mod.ARMS),
         "arm_factors": getattr(mod, "ARM_FACTORS", {}),
+        "retired": sorted(retired_arms(mod)),
         "requires": getattr(mod, "REQUIRES", {}),
         "runs": runs,
     }
@@ -94,6 +99,7 @@ def env_index(env: str) -> dict:
 def build(envs: list[str] | None = None) -> list[Path]:
     """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
     (spec.py; the spec only when the env's source changed). -> written paths."""
+    from .evals import build as build_evals
     from .spec import build as build_spec
 
     written = []
@@ -104,6 +110,7 @@ def build(envs: list[str] | None = None) -> list[Path]:
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
     written += build_spec(names)
+    written += build_evals(export=False)
     top = []
     for e in env_names():
         p = LOCAL / e / "index.json"
@@ -118,6 +125,7 @@ def build(envs: list[str] | None = None) -> list[Path]:
                 "env": e,
                 "title": idx["title"],
                 "status": idx["status"],
+                "starred": idx.get("starred"),
                 "primary": idx["primary"],
                 "n_runs": len(idx["runs"]),
                 "n_episodes": sum(per_target.values()),

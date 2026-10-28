@@ -4,8 +4,10 @@
         --model z-ai/glm-5.3 --backend openrouter --provider fireworks --effort medium --thinking on
     uv run python -m environments run ENV --pair NAME --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL
     uv run python -m environments spec [ENV ...] [--force]  # rebuild envs/<env>/spec/ (every arm, built) + links.json
-    uv run python -m environments expview ENV[/RUN] [...] [--upload]  # runs as an expview dataset (runs/env_<env>/<run>)
+    uv run python -m environments spec --out DIR            # every env's spec from code alone (the Pages workflow)
+    uv run python -m environments view [ENV ...] [--port N]  # the env viewer on localhost, from your working tree
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
+    uv run python -m environments evals [NAME ...] [--pull] [--upload]  # evals/<name>.json from cfbench runs + expview
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
@@ -31,10 +33,10 @@ from typing import Any
 import httpx
 
 from .backends import Target
-from .core import Ctx, episode_id, load_env
+from .core import Ctx, episode_id, load_env, retired_arms, select_arms
 from .index import build as build_index
 from .loop import run_episode
-from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, upload
+from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, main_checkout_file, upload
 
 
 def parse_items(spec: str | None, all_items: list) -> list:
@@ -44,25 +46,6 @@ def parse_items(spec: str | None, all_items: list) -> list:
         a, b = spec.split(":")
         return list(all_items)[int(a or 0) : int(b) if b else None]
     return spec.split(",")
-
-
-def select_arms(env, spec: str | None) -> list[str]:
-    """--arms: comma-separated arm names, or factor filters `key=value` (ANDed; repeat a key to OR its values), e.g.
-    `task=calendar,variant=core` or `variant=base,variant=core`. Factors come from the env's ARM_FACTORS."""
-    if not spec:
-        return list(env.ARMS)
-    parts = spec.split(",")
-    if not any("=" in p for p in parts):
-        return parts
-    factors = getattr(env, "ARM_FACTORS", {})
-    want: dict[str, set] = {}
-    for p in parts:
-        k, _, v = p.partition("=")
-        want.setdefault(k, set()).add(v)
-    picked = [arm for arm, f in factors.items() if all(f.get(k) in vs for k, vs in want.items())]
-    if not picked:
-        raise SystemExit(f"no arm matches {spec!r} (factors: {sorted({k for f in factors.values() for k in f})})")
-    return picked
 
 
 def add_target_args(ap):
@@ -113,6 +96,9 @@ def make_target(env, a) -> tuple[Target, dict]:
     sampling |= flag_sampling
     if not cfg.get("model") or not cfg.get("backend"):
         raise SystemExit("no model: pass --model and --backend (this env declares no DEFAULTS)")
+    if "glm" in str(cfg["model"]).lower() and cfg["backend"] == "openrouter" and not cfg["thinking"]:
+        # OpenRouter ignores reasoning.enabled=false for GLM, so this would silently think
+        raise SystemExit("GLM with thinking off needs --backend openrouter-raw (an empty think block prefilled)")
     t = Target(
         model=cfg["model"],
         backend=cfg["backend"],
@@ -134,14 +120,15 @@ def main(argv):
     ap = argparse.ArgumentParser(prog="envrun")
     ap.add_argument("env")
     ap.add_argument("--tag", required=True, help="run slug; the run is data/envs/ENV/<date>_<tag>")
-    ap.add_argument("--arms", help="comma list of arms, or factor filters like task=calendar,variant=core (default: all ARMS)")
+    ap.add_argument("--arms", help="comma list of arms, or factor filters like task=calendar,variant=core (default: ARMS minus RETIRED)")
     ap.add_argument("--pair", help="run a PAIRS entry's two arms (and its item subset)")
     ap.add_argument("--items", help="slice a:b or comma list (default: all)")
     ap.add_argument("--n", type=int, default=1, help="samples per (arm, item)")
     ap.add_argument("--today", help="frozen date for the env's clock (default: today)")
     ap.add_argument("--max-turns", type=int)
     ap.add_argument("--max-prompt-tokens", type=int)
-    ap.add_argument("--conc", type=int, default=16)
+    ap.add_argument("--conc", type=int, default=128, help="episodes in flight (API calls)")
+    ap.add_argument("--box-conc", type=int, default=16, help="of those, episodes with a podman box (podman degrades past a few dozen)")
     ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
     ap.add_argument("-d", "--description", default="")
     ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF when done")
@@ -165,6 +152,11 @@ def main(argv):
         arms = list(p[:2])
         if len(p) > 2:
             items = [str(i) for i in p[2]]
+    retired = retired_arms(env)
+    if not a.arms and not a.pair:
+        arms = [x for x in arms if x not in retired]
+    elif retired & set(arms):
+        print(f"note: running retired arms: {sorted(retired & set(arms))}", file=sys.stderr)
     unknown = [x for x in arms if x not in env.ARMS]
     if unknown:
         print(f"note: arms not in ARMS (build() must accept them): {unknown}", file=sys.stderr)
@@ -208,7 +200,7 @@ def main(argv):
     results: list[dict] = []
     status = "done"
     try:
-        asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, w, results))
+        asyncio.run(_run_all(env, jobs, target, today, caps, a.conc, a.box_conc, w, results))
     except KeyboardInterrupt:
         status = "abandoned"
         print(f"interrupted after {len(results)}/{len(jobs)} episodes; finishing as abandoned", file=sys.stderr)
@@ -232,14 +224,15 @@ def main(argv):
 def docent_upload(run_dir):
     """Mirror the run's transcripts to Docent before the HF upload, so the Docent ids ship with the run. Never blocks it."""
     cmd = ["uv", "run", "-q", "--script", str(REPO_ROOT / "scripts" / "docent_upload.py"), "upload", str(run_dir)]
-    if not os.environ.get("DOCENT_API_KEY"):
+    key = os.environ.get("DOCENT_API_KEY") or main_checkout_file("docent.key")  # Kylie's checkouts keep it in docent.key
+    if not key:
         print(f"DOCENT_API_KEY unset; not uploading to Docent. Later: {shlex.join(cmd)} (or `backfill`)")
-    elif subprocess.run(cmd, check=False).returncode:
+    elif subprocess.run(cmd, check=False, env={**os.environ, "DOCENT_API_KEY": key}).returncode:
         print(f"Docent upload failed; HF upload continues. Retry: {shlex.join(cmd)}")
 
 
-async def _run_all(env, jobs, target, today, caps, conc, w, out: list):
-    sem = asyncio.Semaphore(conc)
+async def _run_all(env, jobs, target, today, caps, conc, box_conc, w, out: list):
+    sem, box_sem = asyncio.Semaphore(conc), asyncio.Semaphore(box_conc)
 
     async def one(arm, item, s):
         ctx = Ctx(env=env.NAME, arm=arm, item=str(item), sample=s, today=today, now=dt.datetime.combine(today, dt.time(12, 0)))
@@ -247,7 +240,11 @@ async def _run_all(env, jobs, target, today, caps, conc, w, out: list):
         async with sem:
             try:
                 ep = env.build(arm, item, ctx)
-                rec |= await run_episode(env, ep, ctx, target, client, caps)
+                if ep.needs_box:
+                    async with box_sem:
+                        rec |= await run_episode(env, ep, ctx, target, client, caps)
+                else:
+                    rec |= await run_episode(env, ep, ctx, target, client, caps)
             except Exception as e:  # noqa: BLE001
                 rec["error"] = repr(e)[:1000]
                 rec["traceback"] = traceback.format_exc()[-3000:]
@@ -255,7 +252,9 @@ async def _run_all(env, jobs, target, today, caps, conc, w, out: list):
         out.append(rec)
         print(rec["id"], rec.get("finish") or "ERROR " + rec.get("error", "")[:200], flush=True)
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60)) as client:
+    # no pool cap: httpx defaults to 100 connections, which silently capped --conc at 100
+    limits = httpx.Limits(max_connections=None, max_keepalive_connections=None)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60), limits=limits) as client:
         await asyncio.gather(*(one(*j) for j in jobs))
 
 
@@ -269,12 +268,21 @@ def cli():
     elif cmd == "spec":
         from .spec import build as build_spec
 
+        if "--out" in rest:  # the whole site's specs from code alone (the GitHub Pages workflow)
+            from .spec import build_site
+
+            print(build_site(LOCAL.parent.parent / rest[rest.index("--out") + 1]))
+            return
         for p in build_spec([r for r in rest if r != "--force"] or None, force="--force" in rest):
             print(p)
-    elif cmd == "expview":
-        from .expview_export import cli as expview_cli
+    elif cmd == "view":
+        from .view import cli as view_cli
 
-        expview_cli(rest)
+        view_cli(rest)
+    elif cmd == "evals":
+        from .evals import cli as evals_cli
+
+        evals_cli(rest)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})
