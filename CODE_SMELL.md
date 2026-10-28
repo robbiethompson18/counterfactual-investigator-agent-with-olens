@@ -30,15 +30,6 @@ pods' image) has no `rsync`, so on those pods the watcher deletes without fetchi
 read (`jpp_reads/2026-10-27_hint-mcq-scale2k`) was saved by pulling over ssh by hand. Fix: fall back
 to `ssh cat`/`scp`, or install rsync in `olens_reads.sh setup`.
 
-## 2026-10-27: a run's upload overwrites the env index with what's local
-
-`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/`
-and uploads it. Run from a fresh worktree that only holds the new run, it replaces HF's index with
-one listing just that run, and the env viewer then shows every other arm as "not run"
-(overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the runs in and re-uploading). The upload
-should merge with HF's index, or refuse when the local index lists fewer runs.
-
-
 ## 2026-10-27: `olens/src/olens/vectors.py` has no caller
 
 Probe and steering directions over an HF transformers model (`contributions`, `attention_pattern`,
