@@ -108,6 +108,7 @@ def main():
     ap.add_argument("--dry", action="store_true", help="render + count positions only, no model")
     ap.add_argument("--shard", default="0/1", help="i/n")
     ap.add_argument("--chunk-tokens", type=int, default=4096)
+    ap.add_argument("--gpu-frac", type=float, default=0.6)
     a = ap.parse_args()
     sys.path.insert(0, str(Path(a.model) / "encoding"))
     from encoding_dsv4 import encode_messages
@@ -128,7 +129,10 @@ def main():
         mine += g if k == si else []
     reqs = mine
     tok = AutoTokenizer.from_pretrained(a.model)
-    model = None if a.dry else AutoModelForCausalLM.from_pretrained(a.model, device_map="auto", dtype="auto").eval()
+    # device_map="auto" fills GPU 0 first (138 of 140 GB on an H200 pair), leaving no room for activations: cap each GPU at
+    # --gpu-frac of its memory so the ~150 GB of weights split evenly
+    mem = {i: int(torch.cuda.get_device_properties(i).total_memory * a.gpu_frac) for i in range(torch.cuda.device_count())}
+    model = None if a.dry else AutoModelForCausalLM.from_pretrained(a.model, device_map="auto", max_memory=mem, dtype="auto").eval()
     cap = None if a.dry else Capture(layers, model.model.layers)
     dev = None if a.dry else model.get_input_embeddings().weight.device
     seen, states, rows, total = set(), [], [], 0
