@@ -426,7 +426,7 @@ def main():
     p.add_argument("--layer", type=int)
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--C", type=float, default=0.01)
-    p.add_argument("--l2", type=float, nargs="+", default=[1e-3, 1e-2, 1e-1, 1.0])
+    p.add_argument("--l2", type=float, nargs="+", default=[1e-2, 1e-1, 1.0, 10.0, 100.0])
     a = ap.parse_args()
     {"collect": collect, "fit": fit, "pmf": pmf}[a.cmd](a)
 
