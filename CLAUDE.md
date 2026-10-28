@@ -533,7 +533,7 @@ Current docs:
   NULL, retired
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
-  thinking on; GLM 5.3 refuses everything
+  thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything
 - [NULL: Alignment faking in cfbench — read before giving an investigator DSV4 Flash O-lens reads, or claiming the lens predicts which requests flip](docs/alignment-faking-cfbench.md)
   — pooled and per-request results on the original and v7 prompts: lens ≈ placebo, prompt-only wins,
   the model's own first-token logprob ranks flips at 0.76 and nothing in the reads beats it
