@@ -140,7 +140,7 @@ class Dana:
         work = [r for r in rows if r[2] and r[2] != org]  # senders of the unrelated mail: company contacts only
         d = lambda k: (today - dt.timedelta(days=k)).isoformat()
         ac = f"{first} {last}, {org}"
-        mails = [
+        mails: list[dict] = [
             {
                 "from": f"{a[0]} <{a[1]}>",
                 "to": USER[1],

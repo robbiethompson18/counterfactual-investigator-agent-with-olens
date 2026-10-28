@@ -112,7 +112,7 @@ def main(dry=False, only=None):
                 judged[(j["arm"], j["item"], j["sample"])] = {k: v for k, v in j.items() if k not in ("arm", "item", "sample")}
         mism, measure_diff, eps, labels, jlabels, seen, ported = [], 0, [], [], [], set(), []
         tgt = target(meta)
-        served = {(r.get("messages") or [{}])[-1].get("provider") for r in rows if r.get("messages")} - {None}
+        served = {p for r in rows if r.get("messages") if (p := r["messages"][-1].get("provider")) is not None}
         if tgt["backend"] == "openrouter-raw" and len(served) == 1:  # a provider list was allowed but one served every row
             tgt |= {"providers_allowed": tgt["provider"], "provider": served.pop().lower()}
             tgt["id"] = f"{tgt['model']}@openrouter-raw:{tgt['provider']}"

@@ -201,6 +201,7 @@ def brier_skill(cases: dict[tuple, Case], cond: str, keys=None) -> float:
     return 1 - sum(cases[k].mse(cond) for k in keys) / sum(cases[k].mse_null() for k in keys)
 
 
+# Dead (RMSE replaced it 2026-10-26, docs/cfbench-scoring.md); kept only to reproduce log-skill numbers in older docs.
 def log_skill(cases: dict[tuple, Case], cond: str, keys=None) -> float:
     keys = list(cases) if keys is None else keys
     return sum(cases[k].log_gain(cond) for k in keys) / sum(cases[k].log_oracle() for k in keys)

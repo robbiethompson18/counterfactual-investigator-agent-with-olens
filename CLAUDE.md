@@ -69,6 +69,10 @@ Summary of the Final Pitch (2026-10-19):
   with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
   before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
   [docs/olens-space-migration.md](docs/olens-space-migration.md).
+- **Lens reads decode at temperature 1 since 2026-10-27 evening** (WorkspaceBench's sampling of
+  record: T 1.0, top-p 0.95, top-k 64, one continuation of up to 4 bullets per site). Every read
+  before that was greedy, the viewer's default; `--temperature 0` restores it. At T 1 each rollout
+  is its own lens draw; at T 0 rollouts sharing a prompt share one read (docs/envs/hint_cf.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -165,8 +169,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
-- `.githooks/pre-commit` runs ruff on staged Python files. Enable it once per clone with
+- `.githooks/pre-commit` runs ruff and ty on staged Python files. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
+  Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - By default you code too defensively, please do not do this. This project is under development,
   privilege brevity and readability over being very robust.
@@ -321,8 +326,9 @@ Current docs:
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
-- [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/CLAUDE.md)
-  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
+- [ORPHAN: weirdness_elo (deleted 2026-10-28, code at 8b8f019) — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/8b8f019/weirdness_elo/CLAUDE.md)
+  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges); the
+  ranking is in the private HF dataset `Robbie-Kylie-NN-sprint/weirdness-elo`
 - [ORPHAN: donehack (deleted 2026-10-27, code at c7b2e56; ported envs in environments/) — read before reviving is_prime, an envport port or the realism ladder](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/CLAUDE.md)
   — the hardened podman sandbox, run commands, what each file does; results are in the three docs
   below
@@ -472,12 +478,16 @@ Current docs:
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
   79), it echoes the inflated number and only flags leniency
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
-  — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
-  wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
-  wrong-MCQ lives on (`environments/hint_mcq/`); current answer-task result (header read set, items
-  that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
-  earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
-  hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
+  — 3 single-turn envs with nohint/hint arms; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so
+  only wrong-MCQ lives on (`environments/hint_mcq/`); 2026-10-28 scale-up (2,000 more questions, 174
+  / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
+  Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
+  answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
+  pre-hint-reads arms in flight (PR #320)
+- [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
+  — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
+  on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
+  2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
   — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
@@ -493,6 +503,9 @@ Current docs:
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 refuses everything
+- [NULL: Alignment faking in cfbench — read before giving an investigator DSV4 Flash O-lens reads, or claiming the lens predicts which requests flip](docs/alignment-faking-cfbench.md)
+  — pooled and per-request results on the original and v7 prompts: lens ≈ placebo, prompt-only wins,
+  the model's own first-token logprob ranks flips at 0.76 and nothing in the reads beats it
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)
@@ -530,6 +543,10 @@ Current docs:
   — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
   beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
   L42, Camila multilayer, the 2B student), throughput, consensus sampling
+- [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
+  — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
+  contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
+  rule), agentic_misalignment scores the scenario's design; paused 2026-10-28 after Gemini smokes
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
