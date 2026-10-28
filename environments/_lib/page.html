@@ -1154,6 +1154,20 @@ const br = (x, ci) => {
   const cls = ci && ci[1] < 0.25 ? "up" : ci && ci[0] > 0.25 ? "down" : "flat";
   return `<span class="delta ${cls}" title="95% bootstrap CI over items ${ci ? ci.map(v => v.toFixed(3)).join("–") : ""}; 0.25 = always 0.5">${x.toFixed(3)}</span>${ci ? ` <span class="mute">[${ci.map(v => v.toFixed(2)).join(", ")}]</span>` : ""}`;
 };
+// % right per condition as bars with 95% CI whiskers, chance (50%) dashed: a claim eval's table rows of one version
+function accuracyBars(rows) {
+  const conds = condOrder(rows.map(x => x.condition)), L = 44, T = 16, B = 40, H = 240, cw = 96, W = L + 16 + cw * conds.length + 10;
+  const y = v => T + (1 - v) * (H - T - B), f = v => v.toFixed(1);
+  let s = "";
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="${L}" x2="${W - 10}" y1="${f(y(v))}" y2="${f(y(v))}" class="${v === 0.5 ? "null" : "grid"}"/><text x="${L - 6}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${100 * v}%</text>`;
+  conds.forEach((k, i) => {
+    const x = rows.find(r => r.condition === k), cx = L + 16 + cw * i + cw / 2, [lo, hi] = x.accuracy_ci || [x.accuracy, x.accuracy];
+    s += `<rect x="${f(cx - 26)}" y="${f(y(x.accuracy))}" width="52" height="${f(y(0) - y(x.accuracy))}" fill="${condColor(k)}" opacity="0.85"><title>${esc(condLabel(k))}: ${pct(x.accuracy)} right, 95% CI ${pct(lo)}–${pct(hi)}</title></rect>`;
+    s += `<line x1="${cx}" x2="${cx}" y1="${f(y(hi))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(hi))}" y2="${f(y(hi))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(lo))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/>`;
+    s += `<text x="${cx}" y="${f(y(hi) - 5)}" class="ax" text-anchor="middle">${pct(x.accuracy)}</text><text x="${cx}" y="${H - B + 18}" class="lab" text-anchor="middle">${esc(condShort(k))}</text>`;
+  });
+  return `<div class="scroll"><svg class="evchart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="% right per condition with 95% CIs">${s}</svg></div>`;
+}
 // claim evals whose score.py reports % right (guess = p >= 0.5, e.g. hint_qwen_dsv4): that is the headline, AUROC second
 function accuracyTable(t, models) {
   const ci = c => c ? ` <span class="mute">[${c.map(v => pct(v)).join(", ")}]</span>` : "";
@@ -1161,10 +1175,12 @@ function accuracyTable(t, models) {
     <td class="num"><b>${pct(x.accuracy)}</b>${ci(x.accuracy_ci)}</td>
     ${models.map(m => `<td class="num">${x.accuracy_by_class?.[m] == null ? "–" : pct(x.accuracy_by_class[m])}</td>`).join("")}
     <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
+  const versions = [...new Set(t.rows.map(x => x.version))], top = versions.includes("pooled") ? "pooled" : versions[0];
   return `<h3>Inputs <span class="mono">${esc(t.inputs || "?")}</span> <span class="mute" style="font-weight:400;font-size:13px">runs ${t.runs.map(esc).join(" + ")}</span></h3>
-    <p class="lede">% of guesses right (guess = p ≥ 0.5; classes balanced, so chance is 50%), with a 95% bootstrap CI over items; per class; AUROC of p (calibration-free); Brier for reference.</p>
+    ${accuracyBars(t.rows.filter(x => x.version === top))}
+    <p class="lede">% of guesses right (guess = p ≥ 0.5; classes balanced, so chance is 50%, dashed), with a 95% bootstrap CI over items; per class; AUROC of p (calibration-free); Brier for reference.</p>
     <div class="scroll"><table><tr><th>investigator</th><th>version</th><th>items</th><th>% right [95% CI]</th>
-      ${models.map(m => `<th>% right on<br><span class="mono">${esc(shortModel(m))}</span></th>`).join("")}<th>AUROC</th><th>Brier</th><th>invalid</th></tr>${rows}</table></div>
+      ${models.map(m => `<th>% right on<br><span class="mono">${esc(shortModel(m))}</span></th>`).join("")}<th>AUROC</th><th>Brier (reference)</th><th>invalid</th></tr>${rows}</table></div>
     ${Object.entries(t.paired || {}).map(([v, ps]) => pairedTable(ps, `Against transcript tools, ${esc(v)}.`)).join("")}`;
 }
 function claimSection(ev, claim, keep, h) {
