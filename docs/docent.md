@@ -19,6 +19,10 @@ transcripts, filter by arm/model/flags, and link a specific transcript in docs, 
 - **`cfbench`**: every predictor transcript from `data/runs/cfbench/*/predictions.jsonl`, with the
   prediction (`p`, `k_base/n_base/k_cf/n_cf`, `condition`, `predictor`, ...) as metadata and
   `shown_links` pointing at the env transcripts the predictor was shown.
+- **`wsb_<family>`** (e.g. `wsb_user_modeling`): WorkspaceBench text-only replications, one Docent
+  run per expview item of `data/runs/wsb_*/*/expview/items.jsonl`, with one transcript per call (the
+  subject's reply, then the WSB judge call) and the item's labels (`pick`, `basis`, ...), extras and
+  parsed verdicts as metadata. Added 2026-10-28; `runs.py finish` uploads new wsb runs on its own.
 - Not there (yet): the vendored agent-interp-envs screens (their evalcue ports of sandbagging and
   funding_email are there), judge/label calls, identity experiments, WeirdChat/CHIVE. O-lens reads
   are only in the [O-lens viewer](https://olens-viewer.pages.dev).
