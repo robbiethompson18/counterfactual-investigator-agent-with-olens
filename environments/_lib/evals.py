@@ -458,7 +458,13 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
         s["current"] = bool(s["current_conds"])
     cur = [s for s in summaries if s["current"]]
     if any(s.get("task") == "claim" for s in cur):
+        import importlib
+        import importlib.util
+
         from cfbench.evals.af_which.score import stats
+
+        if importlib.util.find_spec(f"cfbench.evals.{name}.score"):  # an eval's own claim scorer (same row schema), if any
+            stats = getattr(importlib.import_module(f"cfbench.evals.{name}.score"), "stats", stats)
         from cfbench.evals.af_which_pair.score import pair_stats
 
         tables = []
