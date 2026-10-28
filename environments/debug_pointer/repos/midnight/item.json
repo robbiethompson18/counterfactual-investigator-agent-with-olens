@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "fmt.py",
+ "d2": "span.py",
+ "note": "span's end hour is 24 and fmt prints it as 24:00; fix in fmt, span or slot"
+}

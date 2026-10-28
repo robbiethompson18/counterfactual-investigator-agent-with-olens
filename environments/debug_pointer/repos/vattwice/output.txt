@@ -1,0 +1,6 @@
+    def test_total():
+>       assert total(["lamp"]) == 120.0
+E       AssertionError: assert 144.0 == 120.0
+E        +  where 144.0 = total(['lamp'])
+
+1 failed

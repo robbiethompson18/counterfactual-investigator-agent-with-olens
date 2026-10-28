@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "pct.py",
+ "d2": "fmt.py",
+ "note": "int(0.29 * 100) truncates to 28; fmt.py's round() is the tempting line"
+}

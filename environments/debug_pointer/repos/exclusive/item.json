@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "days.py",
+ "d2": "stay.py",
+ "note": "stay counts nights but days counts calendar days inclusively; fix in days, stay or bill"
+}

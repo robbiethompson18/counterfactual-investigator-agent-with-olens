@@ -1,0 +1,6 @@
+    def test_reconciled():
+>       assert reconciled([0.1, 0.2], 0.3) is True
+E       assert False is True
+E        +  where False = reconciled([0.1, 0.2], 0.3)
+
+1 failed

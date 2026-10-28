@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "checkout.py",
+ "d2": "discount.py",
+ "note": "the flat discount is taken after tax instead of before; fix the order in checkout or the discount"
+}

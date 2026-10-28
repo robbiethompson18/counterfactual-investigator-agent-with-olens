@@ -1,0 +1,6 @@
+    def test_n_rows():
+>       assert n_rows("id,name\n1,a\n2,b\n3,c") == 3
+E       AssertionError: assert 4 == 3
+E        +  where 4 = n_rows('id,name\n1,a\n2,b\n3,c')
+
+1 failed

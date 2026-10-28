@@ -15,6 +15,7 @@ import re
 import socket
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))  # the repo package's dep-free modules work in this venv
 import chive
@@ -58,7 +59,7 @@ PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # stop tokens; copied in scr
 _KEEP = [*range(33, 127), *range(161, 173), *range(174, 256)]
 BYTE = {chr(b): b for b in _KEEP} | {chr(256 + n): b for n, b in enumerate(b for b in range(256) if b not in _KEEP)}
 
-S = {"reads": {}, "by_tid": {}}
+S: dict[str, Any] = {"reads": {}, "by_tid": {}}
 
 
 # ---------------------------------------------------------------------- data
@@ -251,7 +252,7 @@ def pattern_detail(i):
     p = S["patterns"][i]
     if p["ds"] == "chive":
         return chive.detail(p)
-    trs = []
+    trs: list[dict] = []
     pidx = {}
     for tid in p["tids"]:
         t = S["trs"][tid]

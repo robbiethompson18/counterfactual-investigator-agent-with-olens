@@ -19,6 +19,10 @@ bullets by FVE (`max_bullets`), olens_at reads layers 32, 40, 48 by default.
 `olens_placebo_agentic` answers every call from a run of a different env, at the same relative position in that run (with that
 run's text around the reads), so the predictor gets as much O-lens text through the same tools, none of it about this
 scenario.
+
+The `nla_agentic` and `nla_placebo_agentic` conditions use the same tools over NLA reads (`--readout nla`, docs/nla-reader.md),
+named `search_nla` and `nla_at` (LENSES): each read is one free-text readout (`text`, scored by the NLA critic's `fve`), served as
+the read's only bullet, with no FVE filter by default.
 """
 
 import json
@@ -39,8 +43,34 @@ WINDOW, MAX_WINDOW = 10, 20  # neighbouring positions each side in olens_at
 AT_LAYERS = {32, 40, 48}  # olens_at's default layers when the reads have them (else all); search_olens defaults to every layer
 MAX_BULLETS = 20  # search_olens's default number of bullets returned, highest FVE first
 TOP_K, MIN_FVE = 1, 0.1  # default bullet filters (ANDed) for both tools; the agent can change them per call
+# NLA defaults (2026-10-27): a readout is ~625 characters, ~6x an O-lens top bullet, so fewer per call; no FVE filter, since
+# the critic's FVE on one env's near-identical prompts is low everywhere (docs/nla-reader.md)
+NLA_WINDOW, NLA_MAX = 3, 8
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # the reader's stop tokens (scripts/olens_read_requests.py)
 POSITIONS = ("sparse", "all")
+
+
+@dataclass(frozen=True)
+class Lens:
+    name: str  # tools search_<name> and <name>_at, output tag <name>
+    title: str
+    unit: str  # what a read's outputs are called: bullets or readouts
+    min_fve: float | None  # default filter; None shows every output
+    window: int
+    max_hits: int
+
+
+LENSES = {
+    "olens": Lens("olens", "O-lens", "bullets", MIN_FVE, WINDOW, MAX_BULLETS),
+    "nla": Lens("nla", "NLA", "readouts", None, NLA_WINDOW, NLA_MAX),
+}
+
+
+def _as_bullets(row: dict) -> dict:
+    """An NLA row has one free-text readout in `text` and its FVE in `fve`, not bullets: serve it as the read's one bullet."""
+    if "bullets" not in row and "text" in row:
+        row["bullets"] = [{"text": row["text"], "fve": row.get("fve")}]
+    return row
 
 
 def sparse(row: dict) -> bool:
@@ -71,13 +101,16 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
         self.rows: dict[str, list[dict]] = {}
         for path in map(Path, paths):
             requests = {r["id"]: r for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            # the reader's --positions all says so in its provenance, not in requests.jsonl
+            prov = path.with_name(f"{path.stem}.provenance.json")
+            dense_file = prov.exists() and json.loads(prov.read_text()).get("positions") == "all"
             messages = {id: r["messages"] for id, r in requests.items()}
             offset = 0
             with path.open("rb") as f:
                 for line in f:
-                    row = json.loads(line)
+                    row = _as_bullets(json.loads(line))
                     # msg_index < 0: the tool definitions before the system prompt, same in every run, not in the transcript
-                    dense = requests[row["id"]].get("positions") == "all"
+                    dense = dense_file or requests[row["id"]].get("positions") == "all"
                     if row["msg_index"] >= 0 and positions == "sparse" and dense and not sparse(row):
                         dropped.setdefault(row["id"], path)
                     elif row["msg_index"] >= 0:
@@ -85,7 +118,7 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
                             self.sparse_only.setdefault(row["id"], path)
                         self.messages.setdefault(row["id"], messages[row["id"]])
                         self.offsets[row["id"]].setdefault(path, array("q")).append(offset)
-                        if (b := row["bullets"]) and b[0]["fve"] is not None:
+                        if (b := row.get("bullets")) and b[0]["fve"] is not None:  # J++ rows (cfbench/jlens.py) have none
                             self.top_fves.append(b[0]["fve"])
                     offset += len(line)
         if missing := {s: p for s, p in dropped.items() if s not in self.messages}:
@@ -100,7 +133,7 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
                 with path.open("rb") as f:
                     for offset in offsets:
                         f.seek(offset)
-                        self.rows[source].append(json.loads(f.readline()))
+                        self.rows[source].append(_as_bullets(json.loads(f.readline())))
         return messages, self.rows[source]
 
     def __contains__(self, source: object) -> bool:  # Mapping's default would parse the source's rows
@@ -116,30 +149,46 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
 @dataclass
 class Position:
     char: int  # in the run's rendered transcript
-    where: str  # e.g. "assistant reasoning_content"
+    where: str  # e.g. "assistant reasoning_content", "assistant (start of turn)"
+    token: str  # the token read
     layers: dict[int, dict]  # layer -> read row
+
+    def label(self, scale: float = 1) -> str:
+        """`char 565 · assistant (start of turn) · token "\\n\\n"`: several template tokens share one char, so the token says
+        which read this is."""
+        return f"char {round(self.char / scale)} · {self.where} · token {json.dumps(self.token, ensure_ascii=False)}"
 
 
 def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
-    """One Position per read token, in transcript order."""
+    """One Position per read token, in transcript order. The readers give a template token the msg_index of the message
+    before it, so the tokens after message i's <|im_end|> (the newline, <|im_start|>, role, <think>, </think>, ...) are
+    placed at the start of message i + 1's text as its "(start of turn)"; the <|im_end|> and the other template tokens and
+    tool calls at message i's end."""
     text, spans = render_spans(messages)
-    starts = defaultdict(list)  # message -> its fields' starts, to place template tokens at the message's end
+    starts = defaultdict(list)  # message -> its fields' starts
     for (i, _), b in spans.items():
         starts[i].append(b)
-    ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
+    # message i ends at the "\n\n" before message i + 1's header (headers hold no "\n\n")
+    ends = {i: (text.rfind("\n\n", 0, min(starts[i + 1])) if i + 1 in starts else len(text)) for i in starts}
     by_token = defaultdict(dict)
     for r in rows:
         by_token[r["token_index"]][r["layer"]] = r
+    im_end = {}  # message -> token index of its <|im_end|>
     out = []
-    for layers in by_token.values():
+    for t in sorted(by_token):
+        layers = by_token[t]
         r = next(iter(layers.values()))
         i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
+        if r["token"] == "<|im_end|>" and not field:
+            im_end.setdefault(i, t)
         if (i, field) in spans and c is not None and not field.startswith("tool_call"):
-            char = spans[i, field] + c
-        else:  # tool calls and template tokens: the message's end
-            char = ends.get(i, len(text))
-        where = f"{r['role']} {field}".strip()
-        out.append(Position(char, where, layers))
+            char, where = spans[i, field] + c, f"{r['role']} {field}"
+        elif not field and i in im_end and t > im_end[i]:  # the header of the next turn
+            char = min(starts[i + 1]) if i + 1 in starts else len(text)
+            where = f"{messages[i + 1]['role']} (start of turn)" if i + 1 < len(messages) else "next turn (start)"
+        else:  # tool calls, <|im_end|>, and template tokens inside a turn
+            char, where = ends.get(i, len(text)), f"{r['role']} {field or '(end of turn)'}"
+        out.append(Position(char, where, r["token"], layers))
     return sorted(out, key=lambda p: p.char)
 
 
@@ -164,8 +213,10 @@ def _context(text: str, char: int) -> str:
     return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
 
 
-def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tuple[dict[str, Tool], set[int]]:
-    """The two O-lens tools over the base runs, and the ids of the runs that have reads."""
+def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, kind: str = "olens") -> tuple[dict[str, Tool], set[int]]:
+    """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads."""
+    lens = LENSES[kind]
+    unit = lens.unit[:-1]
     texts = [render_spans(r.messages)[0] for r in base]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]
     source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
@@ -188,26 +239,26 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
 
     yes_no = ["yes" if r.label else "no" for r in base]
 
-    def filters(args: dict, layers: set[int] | None) -> tuple[set[int] | None, int, float]:
+    def filters(args: dict, layers: set[int] | None) -> tuple[set[int] | None, int, float | None]:
         layers = args.get("layers") or layers
         top_k = TOP_K if args.get("top_k") is None else int(args["top_k"])
-        return set(layers) if layers else None, top_k, MIN_FVE if args.get("min_fve") is None else float(args["min_fve"])
+        return set(layers) if layers else None, top_k, lens.min_fve if args.get("min_fve") is None else float(args["min_fve"])
 
-    def bullets(p: Position, layers: set[int] | None, top_k: int | None, min_fve: float) -> list[tuple[int, dict]]:
+    def bullets(p: Position, layers: set[int] | None, top_k: int | None, min_fve: float | None) -> list[tuple[int, dict]]:
         """(layer, bullet) for each bullet passing both filters, by layer (bullets come sorted by FVE)."""
         return [
             (layer, b)
             for layer in sorted(p.layers)
             if layers is None or layer in layers
             for b in p.layers[layer]["bullets"][:top_k]
-            if b["fve"] is None or b["fve"] >= min_fve  # reads from a lens without a reconstructor have no FVE
+            if min_fve is None or b["fve"] is None or b["fve"] >= min_fve  # reads from a lens without a reconstructor have no FVE
         ]
 
     def at(args: dict) -> str:
         i, char = int(args["run"]), int(args["char"])
-        window = max(0, min(int(args.get("window", WINDOW)), MAX_WINDOW))
+        window = max(0, min(int(args.get("window", lens.window)), MAX_WINDOW))
         if i not in source:
-            return f"Run {i} has no O-lens reads; the runs with reads are marked in the table."
+            return f"Run {i} has no {lens.title} reads; the runs with reads are marked in the table."
         pos, scale, text = run_positions(i)
         layers, top_k, min_fve = filters(args, AT_LAYERS if AT_LAYERS & {layer for p in pos for layer in p.layers} else None)
         k = min(range(len(pos)), key=lambda j: abs(pos[j].char - char * scale))
@@ -215,9 +266,10 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         out, prev = [f"Run {i} (showed the behavior: {yes_no[i]}), {len(shown)} read positions around char {char}:"], None
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
-            out.append(f"\nchar {round(p.char / scale)} · {p.where}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
+            out.append(f"\n{p.label(scale)}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
             got = bullets(p, layers, top_k, min_fve)
-            out += [f"<olens {_attrs(layer, b)}>{b['text']}</olens>" for layer, b in got] or [f"(no bullet with FVE >= {min_fve})"]
+            tag = lens.name
+            out += [f"<{tag} {_attrs(layer, b)}>{b['text']}</{tag}>" for layer, b in got] or [f"(no {unit} with FVE >= {min_fve})"]
             prev = p
         return "\n".join(out)
 
@@ -229,97 +281,101 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         except re.error as e:
             return f"Bad regex: {e}"
         over = args.get("over") or "transcript"
-        if over not in ("transcript", "bullets"):
-            return f'Bad over: {over!r} (use "transcript" or "bullets")'
+        if over not in ("transcript", lens.unit):
+            return f'Bad over: {over!r} (use "transcript" or "{lens.unit}")'
         layers, top_k, min_fve = filters(args, None)
-        max_bullets = int(args.get("max_bullets") or MAX_BULLETS)
+        max_bullets = int(args.get(f"max_{lens.unit}") or lens.max_hits)
         runs = [int(args["run"])] if args.get("run") is not None else read_ids
         searched = [i for i in runs if i in source]
         found: dict[tuple, list] = {}  # (context, layer, bullet) -> [runs, fve, line]; prompt text repeats across runs
         matched = set()
         for i in searched:
             pos, scale, text = run_positions(i)
-            if over == "bullets":
+            if over == lens.unit:
                 hits = [(p, [(layer, b) for layer, b in bullets(p, layers, None, min_fve) if pattern.search(b["text"])]) for p in pos]
             else:
                 hits = []
                 for m in pattern.finditer(texts[i]):
                     start, end = m.start() * scale, m.end() * scale
                     inside = [p for p in pos if start <= p.char <= end]
-                    after = next((p for p in pos if p.char > end), None)
-                    hits += [(p, bullets(p, layers, top_k, min_fve)) for p in inside + ([after] if after and after not in inside else [])]
+                    after = next((p.char for p in pos if p.char > end), None)  # every read stacked there (a turn's template tokens)
+                    hits += [(p, bullets(p, layers, top_k, min_fve)) for p in inside + [p for p in pos if p.char == after]]
                     matched.add(i)
             for p, got in hits:
                 if got:
                     matched.add(i)
                 context = _context(text, p.char)
                 for layer, b in got:
-                    head = f"· char {round(p.char / scale)} · {p.where}"
-                    line = f"{head}\n<transcript>{context}</transcript>\n<olens {_attrs(layer, b)}>{b['text']}</olens>"
-                    found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
+                    head = f"· {p.label(scale)}"
+                    line = f"{head}\n<transcript>{context}</transcript>\n<{lens.name} {_attrs(layer, b)}>{b['text']}</{lens.name}>"
+                    found.setdefault((context, p.token, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
             ids = [i for i in searched if base[i].label == label]
             if ids:
                 kinds.append(f"{sum(i in matched for i in ids)} of {len(ids)} runs {name} the behavior")
         summary = (
-            f"The regex matches {'bullets' if over == 'bullets' else 'the transcripts'} of {' and '.join(kinds)} (runs with reads only). "
+            f"The regex matches {lens.unit if over == lens.unit else 'the transcripts'} of {' and '.join(kinds)} (runs with reads only). "
         )
         ranked = sorted(found.values(), key=lambda h: -(h[1] or 0))
         order = "the top {} by FVE" if any(h[1] is not None for h in ranked) else "the first {} (by run, then position)"
         if len(ranked) > max_bullets:
             hidden = len(ranked) - max_bullets
-            summary += f"{len(ranked)} bullets pass the filters; {order.format(max_bullets)} are shown, {hidden} are not."
+            summary += f"{len(ranked)} {lens.unit} pass the filters; {order.format(max_bullets)} are shown, {hidden} are not."
         else:
-            summary += f"{len(ranked)} bullets pass the filters."
+            summary += f"{len(ranked)} {lens.unit} pass the filters."
         shown = []
         for rs, _, line in ranked[:max_bullets]:
             runs_label = f"run {','.join(map(str, sorted(set(rs))))} [{'/'.join(sorted({yes_no[i] for i in rs}))}]"
             shown.append(f"\n\n{runs_label} {line}")
         return summary + "".join(shown)
 
-    filter_params = {
-        "top_k": {
-            "type": "integer",
-            "description": f"bullets per read, best first: highest FVE, or the greedy readout then samples (default {TOP_K})",
-        },
-        "min_fve": {"type": "number", "description": f"only bullets with at least this FVE (default {MIN_FVE})"},
-    }
+    title, units, name = lens.title, lens.unit, lens.name
+    default_fve = f"default {lens.min_fve}" if lens.min_fve is not None else "default: no filter"
+    filter_params = {"min_fve": {"type": "number", "description": f"only {units} with at least this FVE ({default_fve})"}}
+    if kind == "olens":  # an NLA read has one readout, so nothing to rank within it
+        filter_params = {
+            "top_k": {
+                "type": "integer",
+                "description": f"bullets per read, best first: highest FVE, or the greedy readout then samples (default {TOP_K})",
+            },
+        } | filter_params
+    every = "all bullets at every read, top_k ignored" if kind == "olens" else "every read"
     return {
-        "search_olens": (
+        f"search_{name}": (
             schema(
-                "search_olens",
-                "Case-insensitive regex over every base-arm transcript that has O-lens reads. Returns the O-lens bullets at the "
+                f"search_{name}",
+                f"Case-insensitive regex over every base-arm transcript that has {title} reads. Returns the {title} {units} at the "
                 "punctuation inside each match and the first read after it (highest FVE first, when reads have FVE), each with "
-                "the transcript text around the read and its run and char (for olens_at), and how many runs with and without the "
+                f"the transcript text around the read and its run and char (for {name}_at), and how many runs with and without the "
                 "behavior match. "
-                'With over="bullets", the regex runs over the text of every O-lens bullet instead (all bullets at every read, '
-                "top_k ignored) and returns only the bullets that match, with the same context, and how many runs have a match.",
+                f'With over="{units}", the regex runs over the text of every {title} {unit} instead ({every}) '
+                f"and returns only the {units} that match, with the same context, and how many runs have a match.",
                 {
                     "regex": {"type": "string"},
                     "over": {
                         "type": "string",
-                        "enum": ["transcript", "bullets"],
-                        "description": "what the regex searches: the transcript text (default) or the O-lens bullets' text",
+                        "enum": ["transcript", units],
+                        "description": f"what the regex searches: the transcript text (default) or the {title} {units}' text",
                     },
                     "run": {"type": "integer", "description": "optional: one run id"},
                     "layers": {"type": "array", "items": {"type": "integer"}, "description": "optional: only these layers (default all)"},
                     **filter_params,
-                    "max_bullets": {"type": "integer", "description": f"bullets returned (default {MAX_BULLETS})"},
+                    f"max_{units}": {"type": "integer", "description": f"{units} returned (default {lens.max_hits})"},
                 },
                 ["regex"],
             ),
             search,
         ),
-        "olens_at": (
+        f"{name}_at": (
             schema(
-                "olens_at",
-                "The O-lens reads at the read position nearest `char` in a run and `window` positions each side, with the "
-                "transcript text between them. Take run and char from a search_olens or search_transcripts hit.",
+                f"{name}_at",
+                f"The {title} reads at the read position nearest `char` in a run and `window` positions each side, with the "
+                f"transcript text between them. Take run and char from a search_{name} or search_transcripts hit.",
                 {
                     "run": {"type": "integer"},
                     "char": {"type": "integer"},
-                    "window": {"type": "integer", "description": f"positions each side (default {WINDOW}, max {MAX_WINDOW})"},
+                    "window": {"type": "integer", "description": f"positions each side (default {lens.window}, max {MAX_WINDOW})"},
                     "layers": {
                         "type": "array",
                         "items": {"type": "integer"},
@@ -350,11 +406,11 @@ def sources(paths: list[str]) -> list[dict]:
     return out
 
 
-def fve_note(reads: Reads) -> str | None:
+def fve_note(reads: Reads, what: str = "the top bullet's") -> str | None:
     """The 10th/50th/90th percentile of the top bullet's FVE over every loaded read, for the prompt; None if the reads have
-    no FVE (core.build_prompt then describes them as greedy + sampled readouts)."""
+    no FVE (core.build_prompt then describes them as greedy + sampled readouts). `what` names the output ("the readout's")."""
     top = sorted(reads.top_fves)
     if not top:
         return None
     q = [top[int(f * (len(top) - 1))] for f in (0.1, 0.5, 0.9)]
-    return f"Over all reads here, the top bullet's FVE is {q[0]:.2f} / {q[1]:.2f} / {q[2]:.2f} at the 10th / 50th / 90th percentile."
+    return f"Over all reads here, {what} FVE is {q[0]:.2f} / {q[1]:.2f} / {q[2]:.2f} at the 10th / 50th / 90th percentile."

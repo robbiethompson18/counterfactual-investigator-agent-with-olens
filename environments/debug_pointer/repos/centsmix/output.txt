@@ -1,0 +1,8 @@
+    def test_total():
+>       assert total(["book"]) == "$10.80"
+E       AssertionError: assert '$1080.00' == '$10.80'
+E         
+E         - $10.80
+E         + $1080.00
+
+1 failed

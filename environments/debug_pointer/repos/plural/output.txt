@@ -1,0 +1,9 @@
+    def test_summary():
+>       assert summary(["a"]) == "1 item"
+E       AssertionError: assert '1 items' == '1 item'
+E         
+E         - 1 item
+E         + 1 items
+E         ?       +
+
+1 failed

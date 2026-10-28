@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "window.py",
+ "d2": "load.py",
+ "note": "moving_max stops one window early (range(len-k)); load.py's rows[1:] drops the header and looks like it drops data"
+}

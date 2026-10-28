@@ -1,0 +1,8 @@
+    def test_depths():
+>       assert depths("a\n  b\n    c") == [0, 2, 4]
+E       assert [0, 0, 0] == [0, 2, 4]
+E         
+E         At index 1 diff: 0 != 2
+E         Use -v to get more diff
+
+1 failed

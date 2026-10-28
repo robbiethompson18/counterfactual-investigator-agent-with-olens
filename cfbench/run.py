@@ -1,11 +1,13 @@
 """Run predictors on (env, target model, base arm -> counterfactual arm) cases.
 
-    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
+    uv run python -m cfbench.run env_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
     uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
 Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
 of every base-arm run and tools to read or search them (`transcript_agentic`, cfbench/tools.py), plus O-lens tools over
-some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py).
+some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py), or
+the same with J++ lens reads (`jlens_agentic`, `jlens_placebo_agentic`, cfbench/jlens.py; read at every token), or the O-lens
+tools over NLA reads (`nla_agentic`, `nla_placebo_agentic`, `--nla-reads`).
 The retired inline two-transcript condition and the old names are in cfbench/core.py (LEGACY_CONDITIONS).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
@@ -25,10 +27,13 @@ from pathlib import Path
 
 import openai
 
-from cfbench import olens
+from cfbench import jlens, olens
 from cfbench.core import (
     CONDITIONS,
     HARNESS_VERSION,
+    JLENS_CONDITIONS,
+    LENS_CONDITIONS,
+    NLA_CONDITIONS,
     OLENS_CONDITIONS,
     TASKS,
     TOOL_BUDGET,
@@ -52,11 +57,13 @@ async def main():
     ap.add_argument("env")
     ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM, or `hub` (envs with hub_pairs())")
     ap.add_argument("--task", default="rate", choices=TASKS, help="rate: P(behavior) in the cf arm; answer: the model's answer there")
-    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (evalcue_runs envs)")
+    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (env_runs envs)")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--jlens-reads", default="", help="comma list of J++ reads JSONL (cfbench/jlens.py), read at every token")
+    ap.add_argument("--nla-reads", default="", help="comma list of NLA reads JSONL (--readout nla), for the nla conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument(
         "--olens-positions",
@@ -87,8 +94,16 @@ async def main():
     reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
+    jreads = olens.Reads(args.jlens_reads.split(",") if args.jlens_reads else [], "all")  # J++ reads are always every-token
+    assert jreads or not set(JLENS_CONDITIONS) & set(conditions), "the jlens conditions need --jlens-reads"
+    nreads = olens.Reads(args.nla_reads.split(",") if args.nla_reads else [], args.olens_positions)
+    assert nreads or not set(NLA_CONDITIONS) & set(conditions), "the nla conditions need --nla-reads"
+    nla_note = olens.fve_note(nreads, "the readout's") if nreads else ""
+    lenses = [
+        (c, r) for c, r in ((OLENS_CONDITIONS, reads), (JLENS_CONDITIONS, jreads), (NLA_CONDITIONS, nreads)) if set(c) & set(conditions)
+    ]
 
-    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
+    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. env_runs:<env>/<run>
     loader = importlib.import_module(f"cfbench.envs.{module}")
     env = loader.load(spec) if spec else loader
     pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
@@ -99,30 +114,31 @@ async def main():
         envs = [(args.env, env)]
     if args.task == "answer":
         assert all(hasattr(e, "canon_answer") for _, e in envs), f"{args.env} has no canon_answer; the answer task needs one"
-    if set(OLENS_CONDITIONS) & set(conditions) and args.olens_positions == "all":
-        sparse_only = [
-            f"{r.source}  ({reads.sparse_only[r.source]})"
-            for env_name, e in envs
-            for base_arm in dict.fromkeys(b for b, _ in pairs)
-            for r in e.rollouts(base_arm, args.model)
-            if r.source in reads.sparse_only
-        ]
-        assert not sparse_only, (
-            '--olens-positions all, but these base runs were not read at every token (no positions: "all" in requests.jsonl):\n'
-            + "\n".join(sparse_only)
-        )
-    if set(OLENS_CONDITIONS) & set(conditions) and not args.allow_few_reads:
-        few = [
-            f"{env_name} {base_arm}: {k} of {len(base)}"
-            for env_name, e in envs
-            for base_arm in dict.fromkeys(b for b, _ in pairs)
-            for base in [e.rollouts(base_arm, args.model)]
-            if (k := sum(r.source in reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
-        ]
-        assert not few, (
-            f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have O-lens reads. Read more runs; agents: "
-            "ask a human before passing --allow-few-reads:\n" + "\n".join(few)
-        )
+    for lens_conditions, lens_reads in lenses:
+        if lens_reads is jreads or args.olens_positions == "all":
+            sparse_only = [
+                f"{r.source}  ({lens_reads.sparse_only[r.source]})"
+                for env_name, e in envs
+                for base_arm in dict.fromkeys(b for b, _ in pairs)
+                for r in e.rollouts(base_arm, args.model)
+                if r.source in lens_reads.sparse_only
+            ]
+            assert not sparse_only, (
+                f'{lens_conditions[0]} reads every token, but these base runs were not read at every token (no positions: "all" '
+                "in requests.jsonl):\n" + "\n".join(sparse_only)
+            )
+        if not args.allow_few_reads:
+            few = [
+                f"{env_name} {base_arm}: {k} of {len(base)}"
+                for env_name, e in envs
+                for base_arm in dict.fromkeys(b for b, _ in pairs)
+                for base in [e.rollouts(base_arm, args.model)]
+                if (k := sum(r.source in lens_reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
+            ]
+            assert not few, (
+                f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have {lens_conditions[0]} reads. Read "
+                "more runs; agents: ask a human before passing --allow-few-reads:\n" + "\n".join(few)
+            )
     run = new_run(
         "cfbench",
         args.slug,
@@ -130,7 +146,10 @@ async def main():
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
         | {"harness_version": HARNESS_VERSION}
-        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
+        | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
+        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {})
+        | ({"jlens_sources": olens.sources(args.jlens_reads.split(","))} if args.jlens_reads else {})
+        | ({"nla_sources": olens.sources(args.nla_reads.split(","))} if args.nla_reads else {}),
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
@@ -139,19 +158,28 @@ async def main():
         shown = pick_examples(base, random.Random(args.seed + draw), args.task)  # same transcripts for every predictor on a given draw
         condition, tools, read = case["condition"], {}, None
         if condition in TOOL_CONDITIONS:
-            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
+            tools = transcript_tools(base, chars=condition in LENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
+        if condition in JLENS_CONDITIONS:
+            lens_tools, read = jlens.tools(base, jreads, placebo=condition == "jlens_placebo_agentic", seed=args.seed + draw)
+            tools |= lens_tools
+        if condition in NLA_CONDITIONS:
+            placebo = condition == "nla_placebo_agentic"
+            lens_tools, read = olens.tools(base, nreads, placebo=placebo, seed=args.seed + draw, kind="nla")
+            tools |= lens_tools
+        note = nla_note if condition in NLA_CONDITIONS else fve_note
         prompt = build_prompt(
-            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task
+            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, note, args.max_calls, args.task
         )
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
                 try:
                     result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task)
                     break
-                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:  # the wrapper already retried the last two
+                # the wrapper already retried status errors, empty choices and bad JSON; a dropped connection surfaces raw
+                except (openai.APIStatusError, openai.APIConnectionError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it

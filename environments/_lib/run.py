@@ -7,6 +7,7 @@
     uv run python -m environments spec --out DIR            # every env's spec from code alone (the Pages workflow)
     uv run python -m environments view [ENV ...] [--port N]  # the env viewer on localhost, from your working tree
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
+    uv run python -m environments evals [NAME ...] [--pull] [--upload]  # evals/<name>.json from cfbench runs + expview
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
@@ -278,6 +279,10 @@ def cli():
         from .view import cli as view_cli
 
         view_cli(rest)
+    elif cmd == "evals":
+        from .evals import cli as evals_cli
+
+        evals_cli(rest)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})

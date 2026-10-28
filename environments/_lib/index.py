@@ -3,8 +3,10 @@
     envs/index.json         every env: title, status, primary measure, runs and episodes per target model
     envs/<env>/index.json   that env's runs: meta summary, label files, and per arm n / errors / unscorable / the
                             primary measure's distribution, with per-item k/n for a bool primary
+    evals/index.json, evals/<name>.json   cfbench evals (evals.py; an eval can span envs), for the viewer's Evals pages
 
-Built from the local data/envs/ folders; delete and rebuild any time.
+Built from the local data/envs/ folders, merged with HF's current indexes (runs and envs that HF lists but this
+checkout doesn't hold are kept; local wins), so building from a checkout with one new run doesn't drop the rest.
 """
 
 import datetime as dt
@@ -15,7 +17,18 @@ from pathlib import Path
 
 from .backends import canonical_id
 from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run_dirs
-from .runfolder import LOCAL, read_episodes
+from .runfolder import LOCAL, REPO, hf_token, read_episodes
+
+
+def hf_index(path: str) -> dict:
+    """HF's current envs/<path> index ({} when HF has none yet), from the hub cache, never into data/."""
+    from huggingface_hub import hf_hub_download
+    from huggingface_hub.errors import EntryNotFoundError
+
+    try:
+        return json.loads(Path(hf_hub_download(REPO, "envs/" + path, repo_type="dataset", token=hf_token())).read_text())
+    except EntryNotFoundError:
+        return {}
 
 
 def latest_labels(run_dir: Path, labeler="measure") -> tuple[str | None, dict]:
@@ -41,7 +54,7 @@ def summarize(vals: list, items: list) -> dict:
 
 def env_index(env: str) -> dict:
     mod = load_env(env)
-    runs = []
+    runs: list[dict] = []
     for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
         label_file, labels = latest_labels(run_dir)
@@ -49,7 +62,7 @@ def env_index(env: str) -> dict:
         for ep in read_episodes(run_dir):
             if ep["arm"] not in skip:
                 by_arm[ep["arm"]].append(ep)
-        arms = {}
+        arms: dict[str, dict] = {}
         for arm, eps in by_arm.items():
             vals = [labels.get(e["id"], {}).get(mod.PRIMARY) if not e.get("error") else None for e in eps]
             arms[arm] = {
@@ -77,6 +90,9 @@ def env_index(env: str) -> dict:
                 "arms": arms,
             }
         )
+    local, retired = {r["run"] for r in runs}, set(getattr(mod, "RETIRED_RUNS", []))
+    runs += [r for r in hf_index(f"{env}/index.json").get("runs", []) if r["run"] not in local | retired]
+    runs.sort(key=lambda r: r["run"])
     readme = (ROOT / env / "README.md").read_text() if (ROOT / env / "README.md").exists() else ""
     title = next((line.lstrip("# ").strip() for line in readme.splitlines() if line.startswith("# ")), env)
     status = re.search(r"\*\*Status[^*]*\*\*\s*([A-Z]+)", readme)
@@ -98,6 +114,7 @@ def env_index(env: str) -> dict:
 def build(envs: list[str] | None = None) -> list[Path]:
     """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
     (spec.py; the spec only when the env's source changed). -> written paths."""
+    from .evals import build as build_evals
     from .spec import build as build_spec
 
     written = []
@@ -105,31 +122,35 @@ def build(envs: list[str] | None = None) -> list[Path]:
     for e in names:
         idx = env_index(e)
         p = LOCAL / e / "index.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
     written += build_spec(names)
-    top = []
+    written += build_evals(export=False)
+    top = {t["env"]: t for t in hf_index("index.json").get("envs", [])}  # keeps envs this checkout doesn't have (other branches)
     for e in env_names():
         p = LOCAL / e / "index.json"
-        if not p.exists():
+        # an env not rebuilt here: HF's index is current, a local one may be stale
+        idx = (e not in names and hf_index(f"{e}/index.json")) or (json.loads(p.read_text()) if p.exists() else None)
+        if not idx:
             continue
-        idx = json.loads(p.read_text())
         per_target = Counter()
         for r in idx["runs"]:
             per_target[r["target"]] += r["n_episodes"] or 0
-        top.append(
-            {
-                "env": e,
-                "title": idx["title"],
-                "status": idx["status"],
-                "starred": idx.get("starred"),
-                "primary": idx["primary"],
-                "n_runs": len(idx["runs"]),
-                "n_episodes": sum(per_target.values()),
-                "targets": dict(per_target),
-            }
-        )
+        top[e] = {
+            "env": e,
+            "title": idx["title"],
+            "status": idx["status"],
+            "starred": idx.get("starred"),
+            "primary": idx["primary"],
+            "n_runs": len(idx["runs"]),
+            "n_episodes": sum(per_target.values()),
+            "targets": dict(per_target),
+        }
     p = LOCAL / "index.json"
-    p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "envs": top}, indent=1) + "\n")
+    p.write_text(
+        json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "envs": [top[e] for e in sorted(top)]}, indent=1)
+        + "\n"
+    )
     written.append(p)
     return written

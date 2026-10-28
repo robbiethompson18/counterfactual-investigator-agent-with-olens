@@ -1,0 +1,9 @@
+    def test_cache_line():
+>       assert cache_line(25, 100) == "hits: 25%"
+E       AssertionError: assert 'hits: 0.25%' == 'hits: 25%'
+E         
+E         - hits: 25%
+E         + hits: 0.25%
+E         ?       ++
+
+1 failed

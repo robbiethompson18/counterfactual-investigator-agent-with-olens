@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "legs.py",
+ "d2": "fmt.py",
+ "note": "legs returns metres, fmt labels the number km; fix in legs, fmt or trip"
+}
