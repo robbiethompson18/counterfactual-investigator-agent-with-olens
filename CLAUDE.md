@@ -478,7 +478,7 @@ Current docs:
   that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
   earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
   hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
-- [ACTIVE: debug_pointer env — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
+- [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
   — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
   repos, the usable items are those where Qwen's own pick is consistent and Gemini 3.8 Flash can't

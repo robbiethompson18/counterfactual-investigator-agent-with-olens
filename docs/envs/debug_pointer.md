@@ -4,6 +4,8 @@ text-inversion gate that picks the usable items: 12 item/arm pairs on 10 items s
 in `env.py`). O-lens vs placebo on the survivors (2026-10-28): 8% vs 0% correct (3/36 vs 0/36
 draws), no real uplift; gate results, the try log and that run are below.
 
+**Super duper experimental (2026-10-28):** built, gated and shipped overnight by Claude agents with almost no human review. Treat every number here as a sign-of-life probe, not a result; check the code before building on it.
+
 # debug_pointer
 
 A latent-plan env (`environments/debug_pointer/`). Qwen (thinking off) is shown a small Python repo
