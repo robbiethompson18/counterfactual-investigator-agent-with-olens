@@ -75,18 +75,25 @@ def main():
     fig.savefig(a.out / "accuracy.png", dpi=160)
     print(f"edit does nothing: {null * 100:.0f}%")
 
-    fig, ax = plt.subplots(figsize=(1.6 + 1.25 * len(conds), 0.45 * len(keys) + 1.2))
+    fig, ax = plt.subplots(figsize=(4.2 + 1.3 * len(conds), 0.42 * len(keys) + 1.3))
     for j, c in enumerate(conds):
         for i, k in enumerate(keys):
             ax.scatter(j, i, s=60 + 340 * by[c][k], color=COLOR[c], alpha=0.25 + 0.75 * by[c][k], edgecolor="none")
             ax.text(j + 0.22, i, f"{by[c][k] * 100:.0f}", va="center", fontsize=8, color=MUTED)
-    labels = [f"{item}, {arm}: {modal(fields[(item, arm)]['answers_base'])} → {fields[(item, arm)]['modal_cf']}" for item, arm in keys]
+
+    def label(item, arm):
+        c = fields[(item, arm)]
+        tie = sum(v == c["k_cf"] for v in c["answers_cf"].values()) > 1  # the no-scenario arm has no single modal grade
+        return f"{item}, {arm}: {modal(c['answers_base'])} → {c['modal_cf']}{' (tie)' if tie else ''}"
+
+    labels = [label(item, arm) for item, arm in keys]
     ax.set_yticks(range(len(keys)), labels)
-    ax.set_xticks(range(len(conds)), [LABEL[c] for c in conds])
+    ax.set_xticks(range(len(conds)), [LABEL[c].replace(" ", "\n", 1) for c in conds])
+    ax.xaxis.tick_top()
     ax.set_xlim(-0.5, len(conds) - 0.3)
     ax.invert_yaxis()
     ax.grid(False)
-    ax.set_title("% of draws correct per case (base arm's grade → no-scenario grade)", fontsize=10, color=INK, loc="left")
+    ax.set_title("% of draws correct, per case (scenario arm's grade → no-scenario grade)", fontsize=10, color=INK, loc="right", pad=34)
     fig.tight_layout()
     fig.savefig(a.out / "per_case.png", dpi=160)
 
