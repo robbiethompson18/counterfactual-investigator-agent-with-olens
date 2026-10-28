@@ -8,7 +8,9 @@ survivors, hint followers only, 6 draws): stop-token reads 23% vs placebo 6% vs 
 sentence before the hint doesn't change that (27% on its 13 surviving items) and reads at every
 token don't either (24% vs 6%). The assistant header is still unread. 2026-10-28: the same procedure
 on TruthfulQA gives 64 more Qwen survivors, the `gold` pair of hinted_truthfulqa
-([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28)).
+([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28));
+the answer task there replicates: O-lens 19% vs placebo 7% vs transcript 5% on 64 cases (sign test p
+= 0.004).
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost

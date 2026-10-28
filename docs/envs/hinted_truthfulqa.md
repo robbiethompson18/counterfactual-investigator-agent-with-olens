@@ -156,3 +156,38 @@ tqa-671 follows
 ([run](https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/cd2f352a-7a17-468a-bb65-759edb4fe06f))
 and keeps its own answer in the other sample
 ([run](https://docent.transluce.org/dashboard/c2cf4e6f-8f64-4cef-b955-d0f588a01044/agent_run/530a04e3-81bb-4a47-893b-ec514ad9df9e)).
+
+### Answer task on the `gold` pair (cfbench, 2026-10-28)
+
+Robbie's hint_mcq answer task ([hint_cf.md](hint_cf.md)) on the 64 TruthfulQA survivors: the
+investigator (Gemini 3.8 Flash, medium effort, 20 tool calls) sees the `hint/stanford` runs that
+followed the hint (`--base-positive`) and the diff that removes the hint line, and names the letter
+Qwen picks without it. Truth = the control arm's modal answer; "edit does nothing" (predict the
+hinted letter) scores 0% by construction. 3 draws per case, % correct per case then averaged:
+
+| condition                   | correct | items with ≥ 1 hit |
+| --------------------------- | ------: | -----------------: |
+| no tools (env diff only)    |      6% |                  6 |
+| transcript tools            |      5% |                  4 |
+| transcript + O-lens tools   | **19%** |                 17 |
+| transcript + O-lens placebo |      7% |                  6 |
+
+Paired over the 64 cases (per-case mean over draws): O-lens − placebo +12pp (bootstrap 95% CI +4 to
++21pp; sign test 14 vs 2, p = 0.004), O-lens − transcript +14pp (CI +5 to +23pp; 15 vs 2, p =
+0.002). Same pattern as Robbie's MMLU-Pro 18 (stop-token O-lens 24% vs placebo 6%). The hits are
+spread over 17 items (8 of them in all 3 draws). Spot-check (the reads in 3 hit conversations,
+tqa-252, 608, 661, and the rationales of 4 more, tqa-344, 422, 688, 778): the decisive reads sit at
+stop tokens inside the answer options, before the hint line, where the lens comments on an option
+("(Correct answer: I don't only go on weekends.) D) …" at tqa-661's option C; "the most accurate and
+complete statement of the proverb" at tqa-252's E). Those prefix positions are identical in the
+no-hint prompt, so the lens is reading Qwen's view of the options before it sees the hint, not an
+echo of the reply. The investigator then argues "it deferred to the professor; without it, it goes
+back to D".
+
+Reads: `runs/olens_reads/2026-10-28_tqa-gold-stop` (space lens, stop tokens, layers 32/40/48, all
+564 `hint/stanford` runs; `scripts/sky/olens_reads.yaml`, 1x H200, ~10 min). Placebo reads: Robbie's
+`2026-10-27_hint-placebo-pool`. Runs: cfbench `2026-10-28_answer-tqa64-ts`,
+`2026-10-28_answer-tqa64-stop-olens`, on the Evals page as
+[`hinted_truthfulqa-pairs`](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/#eval=hinted_truthfulqa-pairs).
+Format difference from hint_mcq: the TruthfulQA prompt (system prompt, `(A)` choices, hint line
+after them, no "letter only") vs MMLU-Pro's ("Answer with the letter only."); never pool the two.

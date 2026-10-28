@@ -59,7 +59,9 @@ has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and ea
 lists the evals that use it. Clicking a draw (point or chip) opens a card with its predicted rate,
 the investigator's explanation, and Docent + expview links for its conversation and for the
 transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as the eval
-`<env>-pairs`.
+`<env>-pairs`. Answer-task runs (`--task answer`, cfbench/answer.py) get their own table: % correct
+per condition next to "edit does nothing", and per item the truth and every draw's answer; never
+pooled with the rate task's RMSE.
 
 ## Evals
 
