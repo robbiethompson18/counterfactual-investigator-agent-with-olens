@@ -107,7 +107,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--dry", action="store_true", help="render + count positions only, no model")
     ap.add_argument("--shard", default="0/1", help="i/n")
-    ap.add_argument("--chunk-tokens", type=int, default=4096)
+    ap.add_argument("--chunk-tokens", type=int, default=1024)
     ap.add_argument("--gpu-frac", type=float, default=0.6)
     a = ap.parse_args()
     sys.path.insert(0, str(Path(a.model) / "encoding"))
