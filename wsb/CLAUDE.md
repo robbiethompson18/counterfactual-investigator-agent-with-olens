@@ -3,7 +3,7 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-`user_modeling`, `jailbreak_recognition` and `basic_readout` so far.
+`user_modeling`, `jailbreak_recognition`, `basic_readout` and `knowledge_cutoff` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -69,4 +69,23 @@ judge/regex pass@1 and pass@n and the lens rate by subfamily.
 ```bash
 uv run python -m wsb.basic_readout --persona qwen --n 5 --slug sonnet-as-qwen   # 500 Sonnet + 500 Opus calls
 uv run python -m wsb.basic_readout --persona self --n 5 --slug sonnet-self
+```
+
+`knowledge_cutoff.py` runs **stock Qwen3.6-27B itself** (`qwen/qwen3.6-27b` on OpenRouter, thinking
+off, T 1, one provider pinned, DeepInfra by default) on the 109 frozen items whose label is Qwen's
+own stable wrong answer about a post-cutoff event. It reproduces the "Baseline C" line their family
+README cites (stock Qwen on the text ties the lens at 0.486) that the public repo does not ship.
+`--arm describe` is their stock-Qwen prompt-only floor recipe (the chat render through reply_start
+under "what would a language model be thinking about on this token?", `--k` samples as one cell);
+`--arm answer` just lets Qwen answer the user turn. Scoring is a port of their
+`knowledge_cutoff/score.py` strict-win regex (gold named by strictly more samples than every other
+option, exclusive longest match); `summary.json` also has `any_gold`, the per-sample `gold_rate` and
+`truth_rate`, by `label_type` (stale / confab_plausible) and stratum, with item bootstrap CIs. The
+bank adds `prefix` / `token` per item (`build_banks.py cutoff_render`). The 41 nocot items are not
+included (their text is in a password-protected zip). No judge: the family's scorer of record at
+freeze was the regex.
+
+```bash
+uv run python -m wsb.knowledge_cutoff --arm answer --k 10     # ~1,100 short Qwen calls, under $1
+uv run python -m wsb.knowledge_cutoff --arm describe --k 5
 ```

@@ -30,6 +30,10 @@ NOTES = {
     "jailbreak_recognition": "86 items copied verbatim (WildChat conversations, Zhao et al. 2024, ODC-BY). Added per "
     "item: `prefix`, the Qwen3.6-27B chat render (thinking off) decoded through read.turn_end, and `token`, its last token: "
     "what their text-inversion gate (src/wsbench/baselines/text_inversion.py build) shows the answerer.",
+    "knowledge_cutoff": "109 frozen items copied verbatim (header, items, g3_leak_items); the 41 nocot `obscure_items` are not "
+    "included (ids only upstream; the question text is in nocot's password-protected zip). Added per item: `prefix`, the "
+    "Qwen3.6-27B chat render (thinking off) of the user turn through reply_start, and `token`, its last token (the newline pair "
+    "after the empty think block): what the stock-Qwen prompt-only floor shows the model.",
 }
 
 
@@ -53,7 +57,23 @@ def qwen_render(bank: dict):
         it["token"] = tok.decode([ids[last]], **kw)
 
 
-EXTRA = {"jailbreak_recognition": qwen_render}
+def cutoff_render(bank: dict):
+    """knowledge_cutoff: the chat render of the user turn, thinking off, with the generation prompt (empty think block), decoded
+    through reply_start = the final newline pair (their plan: `</think>` is position -2, reply_start -1)."""
+    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
+    kw = {"skip_special_tokens": False, "clean_up_tokenization_spaces": False}
+    for it in bank["items"]:
+        out = tok.apply_chat_template(
+            [{"role": "user", "content": it["user"]}], tokenize=True, add_generation_prompt=True, enable_thinking=False
+        )
+        ids = list(out["input_ids"] if hasattr(out, "keys") else out)
+        tail = [tok.decode([i], **kw) for i in ids[-2:]]
+        assert tail == ["</think>", "\n\n"], (it["id"], tail)
+        it["prefix"] = tok.decode(ids, **kw)
+        it["token"] = tail[-1]
+
+
+EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render}
 
 
 def build(family: str, commit: str) -> dict:
