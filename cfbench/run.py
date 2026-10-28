@@ -5,7 +5,8 @@
 
 Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
 of every base-arm run and tools to read or search them (`transcript_agentic`, cfbench/tools.py), plus O-lens tools over
-some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py).
+some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py), or
+the same tools over NLA reads (`nla_agentic`, `nla_placebo_agentic`, `--nla-reads`).
 The retired inline two-transcript condition and the old names are in cfbench/core.py (LEGACY_CONDITIONS).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
@@ -29,7 +30,7 @@ from cfbench import olens
 from cfbench.core import (
     CONDITIONS,
     HARNESS_VERSION,
-    OLENS_CONDITIONS,
+    LENS_OF,
     TASKS,
     TOOL_BUDGET,
     TOOL_CONDITIONS,
@@ -57,6 +58,7 @@ async def main():
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--nla-reads", default="", help="comma list of NLA reads JSONL (--readout nla), for the nla conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument(
         "--olens-positions",
@@ -84,9 +86,11 @@ async def main():
     }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
-    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
-    assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
-    fve_note = olens.fve_note(reads) if reads else ""
+    paths = {"olens": args.olens_reads, "nla": args.nla_reads}
+    lenses = {LENS_OF[c] for c in conditions if c in LENS_OF}  # the lens kinds this run uses
+    reads = {kind: olens.Reads(paths[kind].split(","), args.olens_positions) for kind in lenses if paths[kind]}
+    assert lenses <= set(reads), f"the {lenses - set(reads)} conditions need --olens-reads / --nla-reads"
+    fve_note = {kind: olens.fve_note(r, "the readout's" if kind == "nla" else "the top bullet's") for kind, r in reads.items()}
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. env_runs:<env>/<run>
     loader = importlib.import_module(f"cfbench.envs.{module}")
@@ -99,28 +103,30 @@ async def main():
         envs = [(args.env, env)]
     if args.task == "answer":
         assert all(hasattr(e, "canon_answer") for _, e in envs), f"{args.env} has no canon_answer; the answer task needs one"
-    if set(OLENS_CONDITIONS) & set(conditions) and args.olens_positions == "all":
+    if lenses and args.olens_positions == "all":
         sparse_only = [
-            f"{r.source}  ({reads.sparse_only[r.source]})"
+            f"{r.source}  ({lens_reads.sparse_only[r.source]})"
+            for lens_reads in reads.values()
             for env_name, e in envs
             for base_arm in dict.fromkeys(b for b, _ in pairs)
             for r in e.rollouts(base_arm, args.model)
-            if r.source in reads.sparse_only
+            if r.source in lens_reads.sparse_only
         ]
         assert not sparse_only, (
             '--olens-positions all, but these base runs were not read at every token (no positions: "all" in requests.jsonl):\n'
             + "\n".join(sparse_only)
         )
-    if set(OLENS_CONDITIONS) & set(conditions) and not args.allow_few_reads:
+    if lenses and not args.allow_few_reads:
         few = [
-            f"{env_name} {base_arm}: {k} of {len(base)}"
+            f"{kind} {env_name} {base_arm}: {k} of {len(base)}"
+            for kind, lens_reads in reads.items()
             for env_name, e in envs
             for base_arm in dict.fromkeys(b for b, _ in pairs)
             for base in [e.rollouts(base_arm, args.model)]
-            if (k := sum(r.source in reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
+            if (k := sum(r.source in lens_reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
         ]
         assert not few, (
-            f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have O-lens reads. Read more runs; agents: "
+            f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have lens reads. Read more runs; agents: "
             "ask a human before passing --allow-few-reads:\n" + "\n".join(few)
         )
     run = new_run(
@@ -131,7 +137,8 @@ async def main():
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
         | {"harness_version": HARNESS_VERSION}
         | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
-        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
+        | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {})
+        | ({"nla_sources": olens.sources(args.nla_reads.split(","))} if args.nla_reads else {}),
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
@@ -139,13 +146,16 @@ async def main():
     async def one(env, case: dict, base: list, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw), args.task)  # same transcripts for every predictor on a given draw
         condition, tools, read = case["condition"], {}, None
+        kind = LENS_OF.get(condition)
         if condition in TOOL_CONDITIONS:
-            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
-        if condition in OLENS_CONDITIONS:
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
+            tools = transcript_tools(base, chars=kind is not None)
+        if kind:
+            placebo = condition.endswith("_placebo_agentic")
+            lens_tools, read = olens.tools(base, reads[kind], placebo=placebo, seed=args.seed + draw, kind=kind)
             tools |= lens_tools
+        note = fve_note.get(kind, "")
         prompt = build_prompt(
-            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task
+            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, note, args.max_calls, args.task
         )
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
