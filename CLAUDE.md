@@ -325,8 +325,9 @@ Current docs:
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](docs/evalcue-secret-number-log.md)
   — one log per env (`docs/evalcue-*-log.md`), every config tried in order; no eval cue survives a
   split test; secret_number's `r8_cfbench` arms are cfbench's secret_number cases
-- [REFERENCE: weirdness_elo — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](weirdness_elo/CLAUDE.md)
-  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges), dashboard
+- [ORPHAN: weirdness_elo (deleted 2026-10-28, code at 8b8f019) — read before picking the weirdest CHIVE behaviours or adding a pairwise LLM-judge ranking](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/8b8f019/weirdness_elo/CLAUDE.md)
+  — Bradley-Terry weirdness Elo over 1,802 CHIVE behaviours (Sonnet + Qwen3.6-27B judges); the
+  ranking is in the private HF dataset `Robbie-Kylie-NN-sprint/weirdness-elo`
 - [ORPHAN: donehack (deleted 2026-10-27, code at c7b2e56; ported envs in environments/) — read before reviving is_prime, an envport port or the realism ladder](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/c7b2e56/donehack/CLAUDE.md)
   — the hardened podman sandbox, run commands, what each file does; results are in the three docs
   below

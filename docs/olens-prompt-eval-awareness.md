@@ -435,6 +435,9 @@ count > 0.
 
 ## Run it
 
+The code was deleted on 2026-10-28; check out `8b8f019` to run it. It also needs
+`data/olens_search/olens.duckdb`, from the `olens_search` dashboard deleted on 2026-10-26.
+
 ```bash
 DB=data/olens_search/olens.duckdb; RUN=data/runs/olens_prompt_ea/2026-10-24_glm53_prompt_ea
 uv run --script olens_prompt_ea/extract.py --db $DB --out $RUN
