@@ -487,8 +487,9 @@ Current docs:
   only wrong-MCQ lives on (`environments/hint_mcq/`); 2026-10-28 scale-up (2,000 more questions, 174
   / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
-  answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
-  pre-hint-reads arms in flight (PR #320)
+  answer before any readable position, it is readable only in the no-hint arm; three legs moving the
+  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp [+5, +23], 50
+  items, not yet dissected)
 - [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
   — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
   within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
