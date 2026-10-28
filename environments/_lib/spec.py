@@ -172,9 +172,10 @@ def title_status(env: str) -> tuple[str, str | None]:
 
 
 def build_site(out: Path, only: list[str] | None = None) -> Path:
-    """Every env's spec from the code alone into out/<env>/, and out/index.json listing them. An env whose module
-    doesn't load (e.g. data files not in git) gets {"env", "error"} so the page falls back to the spec on HF. With
-    `only`, just those envs are rebuilt and the others keep their entries from the last build."""
+    """Every env's spec from the code alone into out/<env>/, out/index.json listing them, and out/evals.json (every
+    eval the code defines, evals.defined()). An env whose module doesn't load (e.g. data files not in git) gets
+    {"env", "error"} so the page falls back to the spec on HF. With `only`, just those envs are rebuilt and the others
+    keep their entries from the last build."""
     import shutil
     import traceback
 
@@ -199,6 +200,9 @@ def build_site(out: Path, only: list[str] | None = None) -> Path:
             (d / "env.json").write_text(json.dumps(err, indent=1) + "\n")
             envs.append({"env": e, "error": err["error"]})
         print(e, "error" if "error" in envs[-1] else "ok", flush=True)
+    from .evals import defined
+
+    (out / "evals.json").write_text(json.dumps({"evals": defined()}, indent=1) + "\n")
     p = out / "index.json"
     doc = {"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "git_sha": git_sha(), "envs": envs}
     p.write_text(json.dumps(doc, indent=1) + "\n")

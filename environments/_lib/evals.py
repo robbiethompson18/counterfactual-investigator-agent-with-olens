@@ -31,11 +31,16 @@ from typing import Any
 
 from .backends import canonical_id
 from .core import load_env
+from .index import hf_index
 from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
 EVALS = REPO_ROOT / "data" / "evals"
 EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
+# envs with an `<env>-pairs` eval (every cfbench.run env_runs:<env>/... run): the viewer lists the evals defined here
+PAIRS_ENVS = ("alignment_faking", "hint_mcq", "hinted_truthfulqa")
+# evals set aside: off the viewer's eval lists (their own pages still open by URL); folders and HF files stay
+RETIRED_EVALS = {"af_which", "af_refusals"}
 # evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
 PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")
@@ -539,8 +544,28 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
     return f"Arm pairs on {envs[0]}", f"Every `cfbench.run env_runs:{envs[0]}/...` run: base arm -> counterfactual arm, one case per pair."
 
 
+def defined() -> list[dict]:
+    """Every eval from the code alone (for the Pages spec/evals.json): each cfbench/evals/<name>/ with an eval.py, and
+    `<env>-pairs` for each of PAIRS_ENVS. An eval module that doesn't import gets "error" and no envs; RETIRED_EVALS get
+    "retired"."""
+    import importlib
+
+    out = []
+    for d in sorted(EVAL_DIRS.iterdir()):
+        if not (d / "eval.py").exists():
+            continue
+        try:
+            envs, err = list(importlib.import_module(f"cfbench.evals.{d.name}.eval").ENVS), None
+        except Exception as ex:  # noqa: BLE001
+            envs, err = [], repr(ex)[:500]
+        out.append({"name": d.name, "title": describe(d.name, envs)[0], "envs": envs} | ({"error": err} if err else {}))
+    out += [{"name": f"{e}-pairs", "title": describe(f"{e}-pairs", [e])[0], "envs": [e]} for e in PAIRS_ENVS]
+    return [e | {"retired": True} if e["name"] in RETIRED_EVALS else e for e in out]
+
+
 def build(names: list[str] | None = None, export=True) -> list[Path]:
-    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json."""
+    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json
+    (HF's entries plus the local evals)."""
     runs, envs, written = eval_runs(), Envs(), []
     EVALS.mkdir(parents=True, exist_ok=True)
     for name in names or list(runs):
@@ -559,25 +584,26 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
-    index = []
+    # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
+    built = {p.stem for p in written}
+    top = {e["name"]: e for e in hf_index("index.json", root="evals/").get("evals", [])}
     for p in sorted(EVALS.glob("*.json")):
-        if p.name == "index.json":
+        if p.name == "index.json" or (p.stem not in built and p.stem in top):  # an eval not rebuilt here: HF's entry is current
             continue
         e = json.loads(p.read_text())
         rs = e["runs"]
-        index.append(
-            {
-                "name": e["name"],
-                "title": e["title"],
-                "envs": e["envs"],
-                "n_runs": len(rs),
-                "latest": max((r["date"] or "" for r in rs), default=""),
-                "models": sorted({m for r in rs for m in r["models"]}),
-                "conditions": sorted({c for r in rs for c in r["conditions"]}),
-                "n_cases": sum(r["n_cases"] for r in rs),
-            }
-        )
+        top[e["name"]] = {
+            "name": e["name"],
+            "title": e["title"],
+            "envs": e["envs"],
+            "n_runs": len(rs),
+            "latest": max((r["date"] or "" for r in rs), default=""),
+            "models": sorted({m for r in rs for m in r["models"]}),
+            "conditions": sorted({c for r in rs for c in r["conditions"]}),
+            "n_cases": sum(r["n_cases"] for r in rs),
+        }
     p = EVALS / "index.json"
+    index = [top[n] for n in sorted(top)]
     p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")
     return [*written, p]
 

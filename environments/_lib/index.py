@@ -20,13 +20,13 @@ from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run
 from .runfolder import LOCAL, REPO, hf_token, read_episodes
 
 
-def hf_index(path: str) -> dict:
-    """HF's current envs/<path> index ({} when HF has none yet), from the hub cache, never into data/."""
+def hf_index(path: str, root="envs/") -> dict:
+    """HF's current <root><path> index ({} when HF has none yet), from the hub cache, never into data/."""
     from huggingface_hub import hf_hub_download
     from huggingface_hub.errors import EntryNotFoundError
 
     try:
-        return json.loads(Path(hf_hub_download(REPO, "envs/" + path, repo_type="dataset", token=hf_token())).read_text())
+        return json.loads(Path(hf_hub_download(REPO, root + path, repo_type="dataset", token=hf_token())).read_text())
     except EntryNotFoundError:
         return {}
 
