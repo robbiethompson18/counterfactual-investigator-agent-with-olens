@@ -16,7 +16,7 @@ import matplotlib
 import numpy as np
 
 from cfbench.core import canon_condition
-from cfbench.report.data import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
+from cfbench.scoring import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

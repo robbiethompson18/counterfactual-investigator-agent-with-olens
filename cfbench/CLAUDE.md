@@ -124,7 +124,7 @@ skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints i
 answer-task charts (docs/envs/hint_cf.md).
 
 Runs before 2026-10-26 were scored with a binomial log-likelihood skill
-(`cfbench.report.data.log_skill`), defined with the harness v1 results in
+(`cfbench.scoring.log_skill`), defined with the harness v1 results in
 [docs/cfbench-v1-results.md](../docs/cfbench-v1-results.md).
 
 ## Running
