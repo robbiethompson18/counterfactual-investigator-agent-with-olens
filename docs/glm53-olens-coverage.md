@@ -1,9 +1,10 @@
 # GLM 5.3 O-lens coverage of the env runs
 
-**Status (2026-10-27):** ACTIVE. Audit of which GLM 5.3 `envs/` episodes have O-lens reads
-(Celeste's RL lens) and on which tokens, and the 2026-10-27 fill: every template token in up to 64
-positive episodes per (run, arm), plus punctuation on the simpler envs. The after-fill table is
-pending until the box run finishes.
+**Status (2026-10-28):** ACTIVE. Audit of which GLM 5.3 `envs/` episodes have O-lens reads
+(Celeste's RL lens) and on which tokens, and the 2026-10-27/28 fill. Read and on expview: hinted
+TruthfulQA pairs (1 hinted + 1 no-hint per question, every template + punctuation token) and the
+over-eagerness base arms (every template token in ≤64 positive episodes per run × arm). The other
+envs and the one-edit arms are prepped but unread (box lost).
 
 Kylie asked (2026-10-27) where GLM O-lens reads are missing ("some of the overeagerness runs don't
 seem to have many") and wanted at least every template token, plus punctuation tokens on the simpler
@@ -91,8 +92,21 @@ Box: vast 4xB200, `worker.py --prefix-cache` as in
 [the pipeline doc](../scripts/glm_olens_dense/CLAUDE.md), 36 positions/s including capture
 (20k-position jobs).
 
-Upload: `runs/olens_reads/2026-10-27_glm53_coverage_fill/<env>__<run>/` (Celeste's schema).
-Positions some older read (or another run of the fill) already covers are copied in with
-`kind=copied`, so each episode's reads are all in one place. Attached to the env episodes by
-`scripts/glm_olens_dense/attach_expview.py` as `runs/<env>/2026-10-27_glm53-olens-fill/`, one
-expview run per env.
+Then (2026-10-28 00:00) Kylie reordered: first 1 hinted + 1 no-hint episode per question of the
+hinted TruthfulQA pairs list (26 questions, every template and punctuation token), then only the
+base arm of each main over-eagerness comparison, then the other envs. The box went unreachable at
+~00:45 after the first two, so what was read is:
+
+| upload (`runs/olens_reads/…`)           | attached as (`runs/<env>/…`)                     | what                                                                                                                                                                                                                  |
+| :-------------------------------------- | :----------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `2026-10-28_glm53_htqa_pairs_dense`     | `hinted_truthfulqa/2026-10-28_glm53-olens-pairs` | 52 episodes (`selection.txt`): 1,057 reads + 333 copied                                                                                                                                                               |
+| `2026-10-28_glm53_overeager_base_dense` | `overeagerness/2026-10-28_glm53-olens-base`      | 3,645 episodes: ≤64 positives per (run, arm) of payback/base, dana/calendar/gitbranch base_no_criterion, email/fixed@lowc (+ punctuation); the email_ambiguous runs' template tokens; mixed jobs read before the cuts |
+
+Not read (jobs kept on bramble under `~/workspace/tmp/glm_fill/`, ready to requeue): the other envs
+(hinted_truthfulqa ≤64 positives, donation_bet template tokens, essay_grading, alignment_faking; 59k
+positions) and the non-base one-edit arms.
+
+Each upload has one config dir per env run (`<env>__<run>/`, Celeste's schema). Positions some older
+read (or another run of the fill) already covers are copied in with `kind=copied`, so each episode's
+reads are all in one place; `scripts/glm_olens_dense/attach_expview.py` attaches them to the env
+episodes, one expview run per env.

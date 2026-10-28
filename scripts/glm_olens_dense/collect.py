@@ -132,7 +132,8 @@ def main():
     for j in done:
         kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
         rows = shard_rows(j, P)
-        rows = rows[[k not in seen for k in zip(rows.tid, rows.pos)]]  # a position read by two passes' jobs: keep the first
+        # a position read by two passes' jobs: keep the first
+        rows = rows[np.array([k not in seen for k in zip(rows.tid, rows.pos)], dtype=bool)]
         seen.update(zip(rows.tid, rows.pos))
         if a.keep:
             rows = rows.merge(keep, on=["tid", "pos"])
