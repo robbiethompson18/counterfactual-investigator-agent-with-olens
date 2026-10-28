@@ -12,14 +12,19 @@ the item is KILLED when any guess matches Qwen's modal counterfactual structure 
 whose modal counterfactual structure holds in < 75% of samples (6/8) are gated too but marked unusable. Output is a run
 under data/runs/style_transfer_gate/: guesses.jsonl (one row per item and sample, with the full prompt), verdicts.jsonl (one
 per item: modal structures, flip, guesses, killed, usable) and the summary this prints. `--table` prints the item table from
-the run and exits (no guesser calls). Flash goes through the shared OpenRouter client (reasoning effort medium).
+the run and exits (no guesser calls). Flash goes through the shared OpenRouter client (reasoning effort medium), or with
+`--backend google` straight to the Gemini API (`$THIRD_GEMINI_KEY`, thinking level medium) when OpenRouter's BYOK route is
+out of daily quota.
 """
 
 import argparse
 import asyncio
 import json
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
+
+import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -94,14 +99,43 @@ def print_table(table: dict[str, dict], base: str, cf: str):
     print("cf modes over usable items:", dict(Counter(t["cf_mode"] for t in usable)))
 
 
-async def guess(model: str, prompt: str, item: str, sem: asyncio.Semaphore) -> dict:
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, attempts: int = 4) -> tuple[str, str]:
+    """One Gemini API call (temperature 1.0, thinking level medium, like openrouter.chat's effort medium) -> (text, finish reason).
+    429 / 5xx retried with 10 s, 20 s, 40 s between tries; a quota 429 that outlasts that is an error row, not a hammer."""
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 1.0, "maxOutputTokens": 8000, "thinkingConfig": {"thinkingLevel": "medium"}},
+    }
+    model = model.split("/")[-1]
+    for attempt in range(attempts):
+        r = await client.post(GOOGLE_URL.format(model=model), json=body, headers={"x-goog-api-key": os.environ["THIRD_GEMINI_KEY"]})
+        if r.status_code == 429 or r.status_code >= 500:
+            if attempt == attempts - 1:
+                raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
+            await asyncio.sleep(10 * 2**attempt)
+            continue
+        r.raise_for_status()
+        cand = r.json()["candidates"][0]
+        text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
+        return text, cand.get("finishReason", "")
+    raise AssertionError
+
+
+async def guess(model: str, prompt: str, item: str, sem: asyncio.Semaphore, backend: str, client: httpx.AsyncClient | None) -> dict:
     async with sem:
         try:
-            r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=8000)
+            if backend == "google":
+                assert client is not None
+                raw, finish = await google_chat(model, prompt, client)
+            else:
+                r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=8000)
+                raw, finish = r.choices[0].message.content or "", r.choices[0].finish_reason
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, never a match
             return {"guess_raw": None, "guess": None, "error": f"{type(e).__name__}: {e}"[:300]}
-    raw = r.choices[0].message.content or ""
-    return {"guess_raw": raw, "guess": canon_answer(raw, item) or canon_answer(raw), "finish": r.choices[0].finish_reason}
+    return {"guess_raw": raw, "guess": canon_answer(raw, item) or canon_answer(raw), "finish": finish}
 
 
 async def main():
@@ -113,6 +147,9 @@ async def main():
     ap.add_argument("--base", default="context_recursive")
     ap.add_argument("--cf", default="no_context")
     ap.add_argument("--concurrency", type=int, default=8, help="Gemini is BYOK on a shared daily-capped Google project; keep it <= 8")
+    ap.add_argument(
+        "--backend", choices=["openrouter", "google"], default="openrouter", help="google = the Gemini API with $THIRD_GEMINI_KEY"
+    )
     ap.add_argument("--items", help="comma list: gate only these (e.g. to redo items whose guesses errored)")
     ap.add_argument("--table", action="store_true", help="print the item table from the run and exit")
     a = ap.parse_args()
@@ -134,17 +171,20 @@ async def main():
         )
         for it in items
     }
+    served_by = "google-direct, THIRD_GEMINI_KEY, thinking medium" if a.backend == "google" else "openrouter, effort medium"
     run = new_run(
         "style_transfer_gate",
         a.slug,
         description=f"text-inversion gate over {a.run}: {a.model} sees the {a.base} prompt + one Qwen reply and guesses the structure "
         f"Qwen3.6-27B writes for the {a.cf} prompt, pass@{a.n}",
-        models=[{"name": a.model, "served_by": "openrouter"}],
-        params={"run": a.run, "base": a.base, "cf": a.cf, "n": a.n, "items": len(items), "min_share": MIN_SHARE, "prompt": GUESSER_PROMPT},
+        models=[{"name": a.model, "served_by": served_by}],
+        params={"run": a.run, "base": a.base, "cf": a.cf, "n": a.n, "items": len(items), "min_share": MIN_SHARE, "prompt": GUESSER_PROMPT}
+        | {"backend": a.backend, "temperature": 1.0},
     )
     print(f"\nrun: {run}; {len(items) * a.n} guesses")
     sem = asyncio.Semaphore(a.concurrency)
-    results = await asyncio.gather(*(guess(a.model, prompts[it], it, sem) for it in items for _ in range(a.n)))
+    async with httpx.AsyncClient(timeout=600) as client:
+        results = await asyncio.gather(*(guess(a.model, prompts[it], it, sem, a.backend, client) for it in items for _ in range(a.n)))
     verdicts: list[dict] = []
     with (run / "guesses.jsonl").open("w") as g, (run / "verdicts.jsonl").open("w") as v:
         for i, it in enumerate(items):
