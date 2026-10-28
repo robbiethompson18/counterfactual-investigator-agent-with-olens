@@ -1,7 +1,8 @@
 # style_transfer: does a codebase reshape the form of a function the model already knows?
 
 **Status (2026-10-28):** ACTIVE. Subject-side env, AST structure label and the Flash text-inversion
-gate; the O-lens read and the investigator experiment are not built yet. Code:
+gate. O-lens vs placebo on the 10 gate survivors (2026-10-28): 17% vs 23% correct, both under the
+30% null; no uplift, and the early reads echo the codebase's recursion. Code:
 [`environments/style_transfer/env.py`](../../environments/style_transfer/env.py), gate
 [`gate.py`](../../environments/style_transfer/gate.py). The first version of this env (12 items,
 binary recursive/iterative regex label, PR #247 as opened) failed the 2026-10-27 audit; the redesign
@@ -299,6 +300,50 @@ about to make it write a recursive body. The env takes no position on where to r
 question is the later experiment, and the natural first probe is: on the surviving flip items, does
 an early read on the `context_recursive` prompt predict the `no_context` class better than Flash's
 guesses in the gate run?
+
+## O-lens vs placebo (2026-10-28)
+
+The 10 survivors as cfbench answer-task cases (`context_recursive` → `no_context`, the predictor
+submits code or a class name, graded by `canon_answer` against the `no_context` modal class), only
+`olens_agentic` vs `olens_placebo_agentic` (no transcript-only or no-transcript run, by design:
+Robbie, 2026-10-27). Predictor Gemini 3.8 Flash on OpenRouter (BYOK Google AI Studio), effort
+medium, 3 draws per case, harness version 7, run from this branch at `8377587`. No
+`--base-positive`: `positive` is "recursive" here, so it would drop every base run of the
+non-recursive items, and the base arm's own answers don't leak the `no_context` class.
+
+- Reads: `runs/olens_reads/2026-10-27_st-survivors` (space lens `olens_s3d_space_rl600`, AR
+  `" " + bullet`, stop tokens, layers 32/40/48; all 8 `context_recursive` rollouts of each survivor,
+  80 transcripts, 3,225 rows; 1x H200 RunPod pod, ~7 min, ~$0.6 shared with the debug_pointer
+  reads). Default `sparse` positions, so reads on the helper code and on the reply body are in the
+  pool (see the echo risk above).
+- Placebo pool: the debug_pointer survivor reads (`runs/olens_reads/2026-10-27_dp-survivors`).
+- cfbench run: `runs/cfbench/2026-10-28_st-olens-vs-placebo` (10 cases, 60 predictions).
+
+| condition               | % correct (mean over 10 cases) | flips (7) | no-flips (3) | null (edit does nothing) |
+| ----------------------- | ------------------------------ | --------- | ------------ | ------------------------ |
+| `olens_agentic`         | 17%                            | 2 / 21    | 3 / 9        | 30%                      |
+| `olens_placebo_agentic` | 23%                            | 2 / 21    | 5 / 9        | 30%                      |
+
+Both conditions score below the null. The predictor assumes the recursive codebase was the lever and
+guesses an iterative default, which loses the no-flips (`catalan`, `josephus` stay recursive) and
+picks the wrong non-recursive class on most flips (`gray_code` comprehension ×6 vs `for`,
+`rotate_matrix` comprehension ×6 vs `for`, `title_case` comprehension ×6 vs `none`, `argmax` and
+`remove_duplicates` `for` ×6 vs `none`, `is_prime` `while` ×6 vs `for`). The two conditions score
+the same on every case except `josephus` (O-lens `while` ×3, placebo 2/3 `recursive`).
+
+The echo risk shows up directly. On `count_occurrences` the O-lens predictor read the ask line
+(``Add a function `count_occurrences(items``) and got "a recursive function that counts occurrences
+of `target` in `items`" and "This function should be recursive"
+([draw 0, block 17](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/9021994e-e0ce-4d64-a963-bea9f8961155?block_idx=17)):
+the early read encodes the codebase's pull toward recursion (the base arm's plan), not the
+`no_context` default (`none`, i.e. `.count()`), which the predictor then guessed from its own prior,
+as the placebo did 2/3
+([placebo draw 0](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/d7362df5-f236-4a64-9909-2817b528bc1d)).
+So no uplift, and on this env an early read is still a read of the base arm's context, not of the
+counterfactual default.
+
+Caveats: the Qwen runs were served bf16 from our own vLLM pod, not OpenRouter fp8; 10 cases × 3
+draws, so ±1 case is 10pp.
 
 ## Planned investigator experiment (later, Robbie)
 
