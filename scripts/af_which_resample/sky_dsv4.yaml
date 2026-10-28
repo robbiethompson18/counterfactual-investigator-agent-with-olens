@@ -12,6 +12,12 @@ resources:
   any_of:
     - {infra: runpod, accelerators: "B200:2"}
     - {infra: runpod, accelerators: "H200-SXM:2"}
+    - {infra: runpod, accelerators: "B200:4"}
+    - {infra: runpod, accelerators: "H200-SXM:4"}
+    - {infra: runpod, accelerators: "H100-SXM:4"}
+    - {infra: runpod, accelerators: "B200:8"}
+    - {infra: runpod, accelerators: "H200-SXM:8"}
+    - {infra: runpod, accelerators: "H100-SXM:8"}
 
 secrets:
   HF_TOKEN: null
@@ -49,6 +55,6 @@ run: |
     --out $OUT --layers 30 --dense --no-logits --skip-lens --read-arms public > $OUT/capture.log 2>&1
   ~/v4/.venv/bin/python ~/v4/resample/keep_keys.py $OUT/states.pt ~/v4/shared_keys.jsonl $OUT/shared.pt | tee -a $OUT/capture.log
   ~/vl/.venv/bin/python vllm_read.py --model /data/v4flash --lens /data/v4lens --states $OUT/shared.pt --layers 30 \
-    --samples $SAMPLES --out $OUT/reads_L30.jsonl > $OUT/lens.log 2>&1
+    --samples $SAMPLES --tp $(nvidia-smi -L | wc -l) --out $OUT/reads_L30.jsonl > $OUT/lens.log 2>&1
   wc -l $OUT/reads_L30.jsonl
   echo READS_DONE
