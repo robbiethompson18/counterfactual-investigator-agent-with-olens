@@ -1,4 +1,4 @@
-"""Run selection, loading and scoring behind the report charts (`cfbench.report.charts`) and `cfbench.score`.
+"""Run selection, loading and scoring behind the report charts (`graphs.cfbench_report`) and `cfbench.score`.
 
 The method is written up in docs/cfbench-scoring.md. In short: a case is an ordered arm pair; its score is the squared
 error of the predicted rate against the counterfactual arm's observed rate, averaged over the predictor's draws; cases

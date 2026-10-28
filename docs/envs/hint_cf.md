@@ -9,7 +9,7 @@ the two sections before it, which used earlier read sets and `--base-positive` o
 on the 16 survivors whose hinted arm follows the hint 8/8, O-lens 14% [0, 32] vs placebo 5% [0, 14]
 vs no lens 0%, carried by 941 and 5088; the 5 wrong-letter-hint pairs are 0% in every condition;
 reads at the assistant header add nothing over stop tokens. Charts:
-`python -m cfbench.report.answer`.
+`python -m graphs.hint_mcq_answer`.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
@@ -330,7 +330,7 @@ as the headline.
 
 ![Correct draws per item, wrong-letter hint](../img/hint-mcq-answer/per_item_wrong_hint.png)
 
-Regenerate with `uv run python -m cfbench.report.answer` (PNGs are gitignored).
+Regenerate with `uv run python -m graphs.hint_mcq_answer` (PNGs are gitignored).
 
 **Reads.** `olens_reads/2026-10-27_hint-mcq-header`: all 18 survivors x 3 arms x 8 samples (432
 transcripts), layers 32/40/48, at the stop tokens and at the last assistant header with
