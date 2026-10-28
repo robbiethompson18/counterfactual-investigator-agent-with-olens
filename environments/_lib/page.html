@@ -949,13 +949,13 @@ function answerStats(P) {
   return {conds, stats, chance};
 }
 function answerChart(P, S, top) {
-  const {conds, stats, chance} = S, L = 38, Rm = 8, T = 44, B = 24, H = 250, cw = 72, n = Object.keys(P.items).length;
-  const title = P.pooled ? `all ${P.pooled} pairs` : PAIRLAB[`${P.base} -> ${P.cf}`] || `${P.pair ? P.pair + ": " : ""}${P.base} → ${P.cf}`;
+  const {conds, stats, chance} = S, L = 38, Rm = 40, T = 44, B = 24, H = 250, cw = 72, n = Object.keys(P.items).length;
+  const title = P.pooled === true ? "all cases" : P.pooled ? `all ${P.pooled} pairs` : PAIRLAB[`${P.base} -> ${P.cf}`] || `${P.pair ? P.pair + ": " : ""}${P.base} → ${P.cf}`;
   const W = Math.max(L + 12 + cw * conds.length + Rm, L + 6.5 * title.length + Rm), y = v => T + (1 - v / top) * (H - T - B), f = v => v.toFixed(1);
-  let s = `<text x="${L}" y="14" class="ttl">${esc(title)}</text><text x="${L}" y="30" class="ax">${n} item${n === 1 ? "" : "s"} · ${esc(P.pred.replace(/^[^/]+\//, ""))}${P.runs.size > 1 ? ` · ${P.runs.size} runs` : ""}</text>`;
+  let s = `<text x="${L}" y="14" class="ttl">${esc(title)}</text><text x="${L}" y="30" class="ax">${n} item${n === 1 ? "" : "s"}${P.pred ? ` · ${esc(P.pred.replace(/^[^/]+\//, ""))}` : ""}${P.runs.size > 1 ? ` · ${P.runs.size} runs` : ""}</text>`;
   for (let v = 0; v <= top + 1e-9; v += top > 0.5 ? 0.2 : 0.1)
     s += `<line x1="${L}" x2="${W - Rm}" y1="${f(y(v))}" y2="${f(y(v))}" class="grid"/><text x="${L - 5}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${(100 * v).toFixed(0)}%</text>`;
-  if (chance != null && chance <= top) s += `<line x1="${L}" x2="${W - Rm}" y1="${f(y(chance))}" y2="${f(y(chance))}" class="chance"><title>chance: one of ${Math.round(1 / chance)} letters, ${pp(chance)}%</title></line><text x="${W - Rm}" y="${f(y(chance) - 3)}" class="ax" style="font-size:9.5px" text-anchor="end">chance</text>`;
+  if (chance != null && chance <= top) s += `<line x1="${L}" x2="${W - Rm + 2}" y1="${f(y(chance))}" y2="${f(y(chance))}" class="chance"><title>chance: one of ${Math.round(1 / chance)} letters, ${pp(chance)}%</title></line><text x="${W - 2}" y="${f(y(chance) + 3)}" class="ax" style="font-size:9.5px" text-anchor="end">chance</text>`;
   conds.forEach((k, i) => {
     const st = stats[k], x = L + 12 + cw * i + cw / 2, [lo, hi] = st.ci;
     s += `<g><title>${esc(condLabel(k))}: ${pp(st.mean)}% correct, 95% item bootstrap ${pp(lo)}–${pp(hi)}% · ${st.n} items, ${st.draws} draws</title>
@@ -967,13 +967,19 @@ function answerChart(P, S, top) {
 }
 function answerChartBlock(ans, h, keep) {
   const picked = h.runs ? ans.filter(R => h.runs.split(",").includes(R.run)) : ans, unan = h.unanimous === "1";
-  const Ps = answerPanels(picked, keep, unan), Ss = Ps.map(answerStats);
+  // headline: one panel over every pair and investigator (probe runs included), an item's conditions merged across runs;
+  // the per-pair, per-investigator panels fold underneath
+  const parts = answerPanels(picked, keep, unan).filter(P => !P.pooled), all = {runs: new Set(parts.flatMap(P => [...P.runs])), items: {},
+    letters: new Set(parts.flatMap(P => [...P.letters])), pooled: true, pred: ""};
+  for (const P of parts) for (const [it, I] of Object.entries(P.items)) Object.assign(all.items[[P.env, P.version || "", P.base, P.cf, it].join("\u0000")] ??= {}, I);
+  const Ps = parts.length ? [all, ...parts] : [], Ss = Ps.map(answerStats);
   const top = Math.min(1, Math.max(0.3, Math.ceil((Math.max(0, ...Ss.flatMap(S => Object.values(S.stats).flatMap(st => [st.mean, st.ci[1]]))) + 0.08) * 10) / 10));
   return `<h3>Answer task: % correct by condition</h3>
-    <p class="lede">Bars pool the runs ticked in the answer-task table below (all by default); one panel per arm pair and investigator, plus every pair together. A bar is the mean over items of the
+    <p class="lede">Bars pool the runs ticked in the answer-task table below (all by default); one panel pooling every case and condition (the per-dataset panels are folded below it). A bar is the mean over items of the
       item's fraction of correct draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options.
       <label><input type="checkbox" onchange="location.hash=setParam('unanimous', this.checked ? '1' : '')" ${unan ? "checked" : ""}> only items where the shown arm answered with one letter in every sample (e.g. followed the hint 8/8)</label></p>
-    ${Ps.length ? `<div class="anspanels">${Ps.map((P, i) => answerChart(P, Ss[i], top)).join("")}</div>
+    ${Ps.length ? `<div class="anspanels">${answerChart(Ps[0], Ss[0], top)}</div>
+      <details><summary class="mute">per dataset and investigator (${Ps.length - 1} panels)</summary><div class="anspanels">${Ps.slice(1).map((P, i) => answerChart(P, Ss[i + 1], top)).join("")}</div></details>
       <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the answer-task table below${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
 }
 function ansPick() {
