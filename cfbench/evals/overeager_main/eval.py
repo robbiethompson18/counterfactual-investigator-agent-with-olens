@@ -22,8 +22,9 @@ ones) are in its cases.jsonl row.
 O-lens reads are Celeste's GLM 5.3 RL lens at block 51, greedy + 4 samples, no FVE, at every template token (plus
 punctuation on email) of the read episodes in data/runs/olens_reads/2026-10-28_glm53_overeager_base_dense: up to 64
 positive base episodes per (run, arm). That run's readouts are prefix-deduplicated across episodes
-(dense_prefix_dups.parquet), and the dedup map points some shared-prefix positions (3,266 distinct ones over the five base
-arms) at episodes of the read queue that were never read before the box died; those positions have no read. Placebo:
+(dense_prefix_dups.parquet). The dedup map pointed 3,266 shared-prefix positions of these episodes at queued episodes the
+box never read before it died; data/runs/olens_reads/2026-10-28_glm53_overeager_base_fill (FILL) read them, same lens and
+sampling. Placebo:
 GLM 5.3 reads of another env in the cfbench reads format (--placebo DIR, e.g. the GLM alignment_faking reads in the
 af_refusals inputs run; only GLM runs of other envs are kept).
 
@@ -62,6 +63,7 @@ N_SHOWN = 8  # shown runs per base arm (prep's default n_items)
 VERSIONS = {"main": {"group": "main: one-edit fixes and nulls"}}
 TARGET = {"effort": "medium", "thinking": True}  # every GLM run of these arms; a run with other settings is left out
 READS = REPO_ROOT / "data/runs/olens_reads/2026-10-28_glm53_overeager_base_dense"
+FILL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_glm53_overeager_base_fill"  # READS's canonical reads the box never made
 LAYER = 51
 SAMPLES = ("rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4")
 OPEN = {"<|system|>", "<|user|>", "<|assistant|>", "<think>", "<|observation|>", "<tool_response>"}  # at their field's start
@@ -206,11 +208,13 @@ def _bullet(text: str) -> dict:
 
 def _reads(wanted: dict[str, list[dict]]) -> tuple[list[dict], dict]:
     """cfbench read rows for the wanted sources (source -> messages): each read episode's own rows plus the canonical row of
-    each of its prefix-duplicated positions (dense_prefix_dups.parquet, canonical rows looked up across the run's subdirs).
+    each of its prefix-duplicated positions (dense_prefix_dups.parquet, canonical rows looked up across READS's and FILL's
+    subdirs).
     Also counts: positions read, duplicated positions with no canonical read, rows dropped as unplaceable."""
     cols = ["tid", "pos", "msg_index", "role", "token", "ctx_left40", *SAMPLES]
     subs = sorted(p for p in READS.iterdir() if (p / "readouts_dense.parquet").exists())
-    dense = pd.concat([pd.read_parquet(s / "readouts_dense.parquet", columns=cols) for s in subs])
+    fill = sorted(p for p in FILL.iterdir() if (p / "readouts_dense.parquet").exists())
+    dense = pd.concat([pd.read_parquet(s / "readouts_dense.parquet", columns=cols) for s in subs + fill])
     canon = {(r["tid"], r["pos"]): r for r in dense.to_dict("records")}  # (episode, token) -> read row
     own = defaultdict(list)
     for (tid, pos), r in canon.items():
