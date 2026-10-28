@@ -374,8 +374,9 @@ Current docs:
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
-  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator), `python -m
-  cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals, DSv4 vs GLM)
+  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
+  `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
+  DSv4 vs GLM)
 - [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
   — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
   paragraphs moved out of cfbench/README.md; log-skill definition
@@ -471,8 +472,9 @@ Current docs:
   — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
   wrong-MCQ lives on (`environments/hint_mcq/`); answer task on the 18: O-lens 23% vs placebo 6% vs
-  no lens 0% (hint followers only, `--base-positive`); a filler sentence before the hint and
-  every-token reads are both null (27%, 24%)
+  no lens 0% (hint followers only, `--base-positive`); a filler sentence before the hint,
+  every-token reads and assistant-header reads are all null (27%, 24%, 14%); wrong-letter hints are
+  0% in every condition; placebo hits are the predictor sharing Qwen's mistake
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
