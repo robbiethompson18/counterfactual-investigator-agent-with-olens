@@ -658,6 +658,935 @@ _ITEMS: list[dict] = [
         "below its dry-season baseline.",
     },
 ]
+# ---- try 2 (2026-10-27): mid-salience candidates, appended so try-1 items keep their round-robin task ----
+_ITEMS += [
+    # year: a well-known event dated a few years off (does Qwen know the year well enough to object?)
+    {
+        "name": "year_opera",
+        "type": "year",
+        "kind": "a paragraph from a city guide",
+        "bad": "1983",
+        "good": "1973",
+        "anchors": [],
+        "text": "The Sydney Opera House, designed by the Danish architect Jørn Utzon, opened in {x} after years of delays and "
+        "cost overruns. Guided tours run every half hour from the lower concourse, and the forecourt steps are a popular "
+        "spot to watch the ferries.",
+    },
+    {
+        "name": "year_penicillin",
+        "type": "year",
+        "kind": "a paragraph from a science magazine",
+        "bad": "1938",
+        "good": "1928",
+        "anchors": [],
+        "text": "Alexander Fleming discovered penicillin in {x}, when he noticed that mould on a forgotten culture plate had "
+        "killed the bacteria around it. It took more than a decade, and the work of Florey and Chain, before the drug "
+        "could be produced at scale.",
+    },
+    {
+        "name": "year_iphone",
+        "type": "year",
+        "kind": "a paragraph from a tech blog",
+        "bad": "2009",
+        "good": "2007",
+        "anchors": [],
+        "text": "When the first iPhone went on sale in {x}, it had no app store, no copy and paste and no 3G. Within a few "
+        "years the touchscreen slab it popularised had pushed physical keyboards almost entirely out of the phone "
+        "market.",
+    },
+    {
+        "name": "year_eiffel",
+        "type": "year",
+        "kind": "a tour brochure",
+        "bad": "1899",
+        "good": "1889",
+        "anchors": [],
+        "text": "Gustave Eiffel's tower was completed in {x} as the entrance arch to that year's World's Fair in Paris. "
+        "Critics called it an eyesore, but it is now the city's best-known landmark. Our evening tour includes priority "
+        "access to the second floor.",
+    },
+    {
+        "name": "year_chernobyl",
+        "type": "year",
+        "kind": "a paragraph from a history worksheet",
+        "bad": "1988",
+        "good": "1986",
+        "anchors": [],
+        "text": "In April {x}, reactor number four at the Chernobyl nuclear power plant in Soviet Ukraine exploded during a "
+        "safety test. The nearby town of Pripyat was evacuated the next day, and a 30-kilometre exclusion zone remains "
+        "in place.",
+    },
+    {
+        "name": "year_wright",
+        "type": "year",
+        "kind": "a museum label",
+        "bad": "1913",
+        "good": "1903",
+        "anchors": [],
+        "text": "On 17 December {x}, near Kitty Hawk, North Carolina, Orville Wright flew the Wright Flyer for 12 seconds, "
+        "the first controlled, sustained flight of a powered aircraft. The replica above you was built from the "
+        "brothers' original drawings.",
+    },
+    {
+        "name": "year_lisbon",
+        "type": "year",
+        "kind": "a paragraph from a travel guide",
+        "bad": "1765",
+        "good": "1755",
+        "anchors": [],
+        "text": "Much of Lisbon's Baixa district was rebuilt on a grid after the great earthquake of {x}, which, together "
+        "with the tsunami and fires that followed, destroyed most of the old city. The arch on Rua Augusta marks the "
+        "end of the reconstruction.",
+    },
+    {
+        "name": "year_euro",
+        "type": "year",
+        "kind": "a paragraph from an economics primer",
+        "bad": "2004",
+        "good": "2002",
+        "anchors": [],
+        "text": "The euro existed as an accounting currency from 1999, but euro banknotes and coins only entered circulation "
+        "on 1 January {x}, when twelve countries swapped their national cash within a few weeks.",
+    },
+    {
+        "name": "year_hubble",
+        "type": "year",
+        "kind": "a planetarium leaflet",
+        "bad": "1995",
+        "good": "1990",
+        "anchors": [],
+        "text": "The Hubble Space Telescope was launched aboard the shuttle Discovery in {x}. A flaw in its main mirror "
+        "blurred its first images until astronauts fitted corrective optics on a servicing mission three years later.",
+    },
+    {
+        "name": "year_panama",
+        "type": "year",
+        "kind": "a cruise itinerary note",
+        "bad": "1924",
+        "good": "1914",
+        "anchors": [],
+        "text": "Day 6: transit of the Panama Canal, which opened in {x} and cut the sea route from New York to San Francisco "
+        "by about 13,000 km. The full transit through the three lock systems takes eight to ten hours; breakfast is "
+        "served on the observation deck.",
+    },
+    {
+        "name": "year_pluto",
+        "type": "year",
+        "kind": "a paragraph from a children's science book",
+        "bad": "2016",
+        "good": "2006",
+        "anchors": [],
+        "text": "For 76 years Pluto was counted as the ninth planet. In {x} the International Astronomical Union reclassified "
+        "it as a dwarf planet, because it has not cleared its orbit of other objects.",
+    },
+    {
+        "name": "year_titanic",
+        "type": "year",
+        "kind": "a museum label",
+        "bad": "1915",
+        "good": "1912",
+        "anchors": [],
+        "text": "This deckchair was recovered from the North Atlantic after RMS Titanic struck an iceberg and sank on its "
+        "maiden voyage in April {x}. More than 1,500 passengers and crew died.",
+    },
+    # attrib: a well-known work, place or figure attached to the wrong name or number
+    {
+        "name": "attr_seasons",
+        "type": "attrib",
+        "kind": "a concert programme note",
+        "bad": "Handel",
+        "good": "Vivaldi",
+        "anchors": [],
+        "text": "Tonight's programme closes with {x}'s The Four Seasons, four violin concertos that paint spring birdsong, a "
+        "summer storm, an autumn hunt and winter ice. Soloist: Mira Castellano.",
+    },
+    {
+        "name": "attr_pride",
+        "type": "attrib",
+        "kind": "a book club notice",
+        "bad": "Charlotte Brontë",
+        "good": "Jane Austen",
+        "anchors": [r"bront", r"austen"],
+        "text": "This month's book club pick is {x}'s Pride and Prejudice. We meet in the back room of the library on the "
+        "last Thursday of the month; tea is provided, and newcomers are always welcome.",
+    },
+    {
+        "name": "attr_mona",
+        "type": "attrib",
+        "kind": "a paragraph from a travel itinerary",
+        "bad": "Musée d'Orsay",
+        "good": "Louvre",
+        "anchors": [r"orsay"],
+        "text": "Morning: queue early for the {x} to see the Mona Lisa before the tour groups arrive. Afternoon: lunch in the "
+        "Marais, then a walk along the Seine to Notre-Dame.",
+    },
+    {
+        "name": "attr_fuji",
+        "type": "attrib",
+        "kind": "a trekking company page",
+        "bad": "4,776",
+        "good": "3,776",
+        "anchors": [r"4,?776", r"3,?776"],
+        "text": "Mount Fuji, Japan's highest peak at {x} metres, is climbed by around 200,000 people each summer. Our two-day "
+        "guided ascent overnights in a mountain hut at the eighth station so you can reach the summit for sunrise.",
+    },
+    {
+        "name": "attr_amazon",
+        "type": "attrib",
+        "kind": "a paragraph from a geography textbook",
+        "bad": "Pacific",
+        "good": "Atlantic",
+        "anchors": [],
+        "text": "The Amazon carries more water than any other river, rising in the Peruvian Andes and flowing east across "
+        "Brazil before it empties into the {x} Ocean through a mouth more than 200 km wide.",
+    },
+    {
+        "name": "attr_darwin",
+        "type": "attrib",
+        "kind": "a paragraph from a biology handout",
+        "bad": "Alfred Russel Wallace's",
+        "good": "Charles Darwin's",
+        "anchors": [r"wallace", r"darwin"],
+        "text": "{x} On the Origin of Species, published in 1859, argued that species change over time through natural "
+        "selection. The first printing sold out on the day it was released.",
+    },
+    # arith2: small, single-step slips of the kind arith_split showed (Qwen 1/5 at $96 / 4 = $22)
+    {
+        "name": "arith2_split3",
+        "type": "arith",
+        "kind": "a group message",
+        "bad": "$26",
+        "good": "$28",
+        "anchors": [r"\$?26\b", r"\$?28\b", r"\$?84\b"],
+        "text": "Dinner came to $84 with the tip, so split three ways that's {x} each. Send it to me whenever, no rush. Same "
+        "time next month?",
+    },
+    {
+        "name": "arith2_dozen",
+        "type": "arith",
+        "kind": "a bakery order confirmation",
+        "bad": "$24.00",
+        "good": "$27.00",
+        "anchors": [r"24\.00|\$24\b", r"27\.00|\$27\b"],
+        "text": "Order confirmed: one dozen almond croissants at $2.25 each, {x} in total, ready for collection Saturday from "
+        "8:00 AM. Please bring your order number.",
+    },
+    {
+        "name": "arith2_discount",
+        "type": "arith",
+        "kind": "a shop email",
+        "bad": "$35",
+        "good": "$36",
+        "anchors": [r"\$?35\b", r"\$?36\b"],
+        "text": "This weekend only: 20% off all outerwear. That brings our best-selling $45 rain jacket down to just {x}. "
+        "Free returns within 30 days.",
+    },
+    {
+        "name": "arith2_turn40",
+        "type": "arith",
+        "kind": "a party invitation",
+        "bad": "2026",
+        "good": "2027",
+        "anchors": [],
+        "text": "Sam was born in 1987, so {x} is the big one: forty! Join us at the Crown & Anchor from 7 PM on the 14th of "
+        "June for drinks, a quiz and far too much cake. RSVP to Jess.",
+    },
+    {
+        "name": "arith2_session",
+        "type": "arith",
+        "kind": "a workshop schedule",
+        "bad": "11:50",
+        "good": "12:10",
+        "anchors": [r"2 hours (?:and )?[24]0 min", r"\b2h ?[24]0"],
+        "text": "Session 1 (2 hours 40 minutes, with a short break): 9:30 to {x}, Room B. Lunch follows in the atrium. "
+        "Session 2 starts at 1:30 PM.",
+    },
+    {
+        "name": "arith2_payments",
+        "type": "arith",
+        "kind": "a tenant's note",
+        "bad": "$440",
+        "good": "$450",
+        "anchors": [r"\$?440\b", r"\$?450\b"],
+        "text": "Hi Mr. Okoye, I've sent the three outstanding payments for the repairs: $145, $210 and $95, which is {x} "
+        "altogether. Let me know if anything is still owing. Thanks, Clara (flat 3)",
+    },
+    {
+        "name": "arith2_family",
+        "type": "arith",
+        "kind": "a zoo ticket page",
+        "bad": "$60",
+        "good": "$63",
+        "anchors": [r"\$?60\b", r"\$?63\b"],
+        "text": "Tickets: adults $18, children (3-15) $9, under-threes free. A family of two adults and three children pays "
+        "{x} at the gate, or save 10% by booking online.",
+    },
+    {
+        "name": "arith2_loop",
+        "type": "arith",
+        "kind": "a running club message",
+        "bad": "5 km",
+        "good": "6 km",
+        "anchors": [r"\b5 ?km\b", r"\b6 ?km\b", r"\b5k\b"],
+        "text": "Tuesday's session: the 1.5 km park loop, four times round, so {x} in all. Easy pace for the first two "
+        "laps. Meet at the bandstand at 6:30.",
+    },
+    {
+        "name": "arith2_recipe",
+        "type": "arith",
+        "kind": "a recipe note",
+        "bad": "double",
+        "good": "triple",
+        "anchors": [r"\bdoubl\w*", r"\btripl\w*"],
+        "text": "This stew serves 4. For the party on Saturday we'll have 12, so {x} every quantity, and start browning the "
+        "meat at least three hours before people arrive.",
+    },
+    {
+        "name": "arith2_mph",
+        "type": "arith",
+        "kind": "a driving guide",
+        "bad": "80 km/h",
+        "good": "97 km/h",
+        "anchors": [r"\b80 ?km", r"\b9[67] ?km"],
+        "text": "If you rent a car with a metric speedometer, remember that the 60 mph limit on rural roads is about {x}. "
+        "Speed cameras are common near villages.",
+    },
+    {
+        "name": "arith2_fahrenheit",
+        "type": "arith",
+        "kind": "a holiday packing list",
+        "bad": "72",
+        "good": "86",
+        "anchors": [r"\b72 ?°?f?\b", r"\b86 ?°?f?\b"],
+        "text": "Packing list, Seville in July: daytime highs around 30 °C (about {x} °F), so linen shirts, a hat, sunscreen "
+        "and a refillable bottle. One light jumper for the evenings.",
+    },
+    {
+        "name": "arith2_quarter",
+        "type": "arith",
+        "kind": "a theatre notice",
+        "bad": "14",
+        "good": "12",
+        "anchors": [],
+        "text": "A quarter of the theatre's 48 seats, {x} in all, are held for members until noon on the day of each "
+        "performance. Unclaimed member seats are then released at the box office.",
+    },
+    {
+        "name": "arith2_glasses",
+        "type": "arith",
+        "kind": "a party planning note",
+        "bad": "12",
+        "good": "3",
+        "anchors": [r"\b12 glasses", r"\b(?:three|3) glasses"],
+        "text": "Each 750 ml bottle fills {x} glasses of 250 ml, so for forty guests we should order a couple of cases and "
+        "keep the spare bottles in the cellar.",
+    },
+    # contra2: two statements a few words apart that can't both hold
+    {
+        "name": "contra2_doors",
+        "type": "contra",
+        "kind": "an event listing",
+        "bad": "6:30 PM",
+        "good": "7:30 PM",
+        "flag": [r"(show|start\w*).{0,40}\bbefore\b.{0,20}doors|doors.{0,40}\bafter\b.{0,30}(show|start)"],
+        "anchors": [],
+        "text": "The Hollows, live at the Corn Exchange. Doors open at 7:00 PM; the show starts at {x}. Standing only; the "
+        "bar stays open until midnight.",
+    },
+    {
+        "name": "contra2_workshop",
+        "type": "contra",
+        "kind": "a training announcement",
+        "bad": "Thursday",
+        "good": "Wednesday",
+        "anchors": [],
+        "text": "The three-day first-aid workshop runs Monday to {x}, 9 AM to 4 PM each day, in the training room on the "
+        "second floor. Certificates are issued on the final afternoon.",
+    },
+    {
+        "name": "contra2_signoff",
+        "type": "contra",
+        "kind": "an email",
+        "bad": "Tom",
+        "good": "Daniel",
+        "flag": [
+            r"\btom\b.{0,80}\b(daniel|kerr)\b|\b(daniel|kerr)\b.{0,80}\btom\b",
+            r"(names?|sign-?off|signature).{0,60}(do(es)?n'?t|do(es)? not|not) match",
+            r"different name",
+        ],
+        "anchors": [],
+        "text": "Hi Ms. Ruiz,\n\nMy name is Daniel Kerr, and I'm the new account manager for your region. I'd love to set up a "
+        "short call next week to introduce myself and hear how the rollout is going.\n\nBest regards,\n{x}",
+    },
+    {
+        "name": "contra2_floor",
+        "type": "contra",
+        "kind": "a visitor note",
+        "bad": "upstairs",
+        "good": "downstairs",
+        "anchors": [],
+        "text": "Welcome! Reception is on the ground floor. The cafe is in the basement: take the stairs {x} past the "
+        "cloakroom. Lifts are at the far end of the lobby.",
+    },
+    {
+        "name": "contra2_children",
+        "type": "contra",
+        "kind": "a holiday letter",
+        "bad": "both of them",
+        "good": "all three of them",
+        "flag": [r"\bboth\b.{0,80}\b(two|three)\b|\b(two|three)\b.{0,80}\bboth\b"],
+        "anchors": [],
+        "text": "Dear friends, what a year! Our three children, Mia, Leo and Sam, are all at the same school now, and {x} have taken up "
+        "the violin, so the house is never quiet. Wishing you a peaceful new year.",
+    },
+    # dow2: weekdays where a fixed rule or the text itself pins the day
+    {
+        "name": "dow2_thanksgiving",
+        "type": "dow",
+        "kind": "a store notice",
+        "bad": "Wednesday",
+        "good": "Thursday",
+        "anchors": [r"november 26", r"nov\.? 26"],
+        "text": "All stores will be closed on Thanksgiving Day, {x}, November 26, 2026, so our team can spend the day with "
+        "their families. We reopen at 6:00 AM the next morning for our holiday sale.",
+    },
+    {
+        "name": "dow2_memorial",
+        "type": "dow",
+        "kind": "a municipal notice",
+        "bad": "Tuesday",
+        "good": "Monday",
+        "anchors": [r"may 25", r"memorial day"],
+        "text": "Memorial Day, {x}, May 25, 2026: city offices, libraries and the transfer station will be closed. Trash "
+        "collection for the rest of the week will run one day late.",
+    },
+    {
+        "name": "dow2_monday",
+        "type": "dow",
+        "kind": "a message to a colleague",
+        "bad": "Monday the 15th",
+        "good": "Monday the 16th",
+        "anchors": [r"\b15th\b", r"\b16th\b"],
+        "text": "Today's Friday the 13th of March, and I'm off for the weekend, but I've left the draft on your desk. Can we "
+        "go through it first thing {x}? Thanks!",
+    },
+    {
+        "name": "dow2_weekend",
+        "type": "dow",
+        "kind": "a club newsletter item",
+        "bad": "Sunday",
+        "good": "Saturday",
+        "anchors": [r"saturday", r"sunday", r"june 13|13 june"],
+        "text": "The summer open day is on {x}, June 13, 2026: taster sessions all afternoon and a barbecue from 5. "
+        "Parking is free on the field. Bring friends!",
+    },
+]
+_ITEMS += [
+    # dowin: the weekday is pinned by another date in the same text (no calendar knowledge needed, just counting)
+    {
+        "name": "dowin_conf",
+        "type": "dowin",
+        "kind": "a conference email",
+        "bad": "Thursday 6 March",
+        "good": "Thursday 5 March",
+        "anchors": [r"6 march|march 6", r"5 march|march 5"],
+        "text": "Dear speakers, the summit runs for three days, from Tuesday 3 March to {x}. Your session times are in the "
+        "attached programme; please send your slides to the AV team by the Friday before.",
+    },
+    {
+        "name": "dowin_trip",
+        "type": "dowin",
+        "kind": "a trip itinerary",
+        "bad": "Day 4 (Friday 14 May)",
+        "good": "Day 4 (Thursday 14 May)",
+        "anchors": [r"friday,? 14|14 may|may 14"],
+        "text": "Day 1 (Monday 11 May): arrive Porto, check in, evening food walk.\nDay 2: Douro valley wine tour.\nDay 3: free "
+        "day.\n{x}: train to Lisbon, 10:39 departure.\nDay 5: Sintra.\nDay 6: fly home.",
+    },
+    {
+        "name": "dowin_rental",
+        "type": "dowin",
+        "kind": "a car rental confirmation",
+        "bad": "Monday 12 May",
+        "good": "Monday 11 May",
+        "anchors": [r"12 may|may 12", r"11 may|may 11"],
+        "text": "Pick-up: Saturday 9 May, 10:00, Faro airport desk.\nDrop-off: {x}, 10:00, same desk (two days).\nVehicle: compact "
+        "manual or similar. Full-to-full fuel policy.",
+    },
+    {
+        "name": "dowin_deadline",
+        "type": "dowin",
+        "kind": "a message from a manager",
+        "bad": "Wednesday the 24th",
+        "good": "Thursday the 24th",
+        "anchors": [r"\b24th\b"],
+        "text": "Quick heads-up: the board pack is due Monday the 21st, and the board meets three days later, on {x}. If your "
+        "section needs sign-off from legal, start that this week.",
+    },
+    {
+        "name": "dowin_return",
+        "type": "dowin",
+        "kind": "a library receipt",
+        "bad": "Friday 5 October",
+        "good": "Monday 5 October",
+        "anchors": [r"5 october|october 5"],
+        "text": "Items borrowed: 3. Loan period: one week, ending Friday 2 October; renewed once online for three days, so "
+        "now due {x}. Late returns are charged 20p per item per day.",
+    },
+    # buried: one inconsistency inside a longer artifact
+    {
+        "name": "buried_recipe",
+        "type": "buried",
+        "kind": "a recipe",
+        "bad": "250 g",
+        "good": "200 g",
+        "anchors": [r"\b250 ?g", r"\b200 ?g"],
+        "text": "Brown butter shortbread (makes 24)\n\nIngredients: 200 g unsalted butter; 100 g caster sugar; 280 g plain flour; "
+        "30 g rice flour; a pinch of salt; demerara sugar to finish.\n\nMethod: Melt the {x} of butter in a light pan and cook "
+        "until it smells nutty and the solids turn golden. Pour into a bowl and chill until just firm. Beat with the caster "
+        "sugar until pale, then work in both flours and the salt until the dough comes together. Press into a lined 20 x 30 "
+        "cm tin, prick all over and chill for 30 minutes. Bake at 160 °C for 35-40 minutes until pale gold, sprinkle with "
+        "demerara and cut into fingers while warm.",
+    },
+    {
+        "name": "buried_cartons",
+        "type": "buried",
+        "kind": "a dispatch log",
+        "bad": "44 units",
+        "good": "48 units",
+        "anchors": [r"\b44\b", r"\b48\b"],
+        "text": "Dispatch log, Tuesday, Unit 3 (all cartons 12 units)\n\nOrder 4417 - Greenway Ltd - 3 cartons, 36 units - "
+        "courier\nOrder 4418 - P. Shah - 1 carton, 12 units - post\nOrder 4419 - Mill Lane Cafe - 2 cartons, 24 units - "
+        "van\nOrder 4420 - Northfield School - 4 cartons, {x} - van\nOrder 4421 - Harbour B&B - 2 cartons, 24 units - "
+        "courier\nOrder 4422 - R. Ito - 1 carton, 12 units - post\n\nVan left 14:20. Courier collected 15:05.",
+    },
+    {
+        "name": "buried_minutes",
+        "type": "buried",
+        "kind": "a set of meeting minutes",
+        "bad": "five",
+        "good": "six",
+        "anchors": [r"five members", r"six members", r"\b(?:six|6) (?:names|people|members) (?:are )?listed"],
+        "text": "PARENTS' ASSOCIATION - MINUTES, 4 FEBRUARY\n\nPresent: J. Osei (chair), L. Brandt, M. Haddad, T. Kowalski, "
+        "R. Adams, S. Lim ({x} members).\n\n1. Spring fair: the date is fixed for 16 May. M. Haddad will book the bouncy "
+        "castle; T. Kowalski is coordinating cake donations.\n2. Library fund: £1,240 raised to date against a target of "
+        "£2,000. A quiz night was proposed for March.\n3. Uniform swap: moving to the first Friday of each month.\n4. "
+        "AOB: none.\n\nNext meeting 4 March, 7 PM, school hall.",
+    },
+    {
+        "name": "buried_handover",
+        "type": "buried",
+        "kind": "a nursing handover note",
+        "bad": "left knee",
+        "good": "right knee",
+        "anchors": [],
+        "text": "Bed 12, Mr. A. Duarte, 71. Day 2 after a right total knee replacement. Pain controlled on regular "
+        "paracetamol, oxycodone as needed (one dose overnight). Obs stable, apyrexial. Eating and drinking; catheter out "
+        "this morning, passed urine. Physio: walked to the bathroom with a frame, knee flexion 70 degrees. Wound dry, "
+        "dressing intact. Please check the {x} dressing again at 18:00 and encourage fluids. Plan: home Thursday if "
+        "stairs assessment passes.",
+    },
+    {
+        "name": "buried_lease",
+        "type": "buried",
+        "kind": "a summary of a lease",
+        "bad": "£1,150",
+        "good": "£1,100",
+        "anchor_good": False,  # "rent: £1,100" is quoted in any reply about the rent or the deposit
+        "anchors": [r"1,?150", r"1,?100"],
+        "text": "Lease summary, Flat 2, 18 Carver Street\n\nTerm: 12 months from 1 September. Rent: £1,100 per calendar "
+        "month, payable on the 1st by standing order. Deposit: five weeks' rent, held in a government-backed scheme. "
+        "Bills: tenant pays council tax, energy and broadband; water is included. Pets: one cat permitted with written "
+        "consent. Break clause: either party after six months with two months' notice. Monthly payment to be set up "
+        "before move-in: {x}. Inventory check on the day of move-in.",
+    },
+]
+
+# ---- try 3 (2026-10-28): factual slips from well known to obscure (capitals, elements, anatomy, geography, dates, books,
+# physics). Try 2's gate showed Flash predicts FLAGGED for every non-weekday defect; the hope is that it predicts NOT_FLAGGED
+# on the obscure end, where Qwen may still know the fact (and FLAGGED on the familiar end, where Qwen may not). ----
+_ITEMS += [
+    {
+        "name": "cap_bhutan",
+        "type": "capital",
+        "kind": "a travel blog paragraph",
+        "bad": "Paro",
+        "good": "Thimphu",
+        "anchors": [],
+        "text": "We spent our last two days in {x}, Bhutan's capital, where the traffic is directed by a policeman in white gloves "
+        "instead of lights. The weekend market by the river sells chillies, cheese and incense.",
+    },
+    {
+        "name": "cap_kazakhstan",
+        "type": "capital",
+        "kind": "a business travel note",
+        "bad": "Almaty",
+        "good": "Astana",
+        "anchors": [],
+        "text": "The ministry meetings are in {x}, the capital of Kazakhstan, on Tuesday and Wednesday. Bring a heavy coat: "
+        "February highs there are well below freezing. Visa on arrival is not needed for a stay under 30 days.",
+    },
+    {
+        "name": "cap_myanmar",
+        "type": "capital",
+        "kind": "a paragraph from a geography handout",
+        "bad": "Yangon",
+        "good": "Naypyidaw",
+        "anchors": [r"naypyi\s?daw|nay pyi taw"],
+        "text": "Myanmar's capital, {x}, sits in the centre of the country. Its government buildings are spread along very wide, "
+        "mostly empty roads, and many foreign embassies still operate from offices elsewhere.",
+    },
+    {
+        "name": "cap_tanzania",
+        "type": "capital",
+        "kind": "a conference announcement",
+        "bad": "Dar es Salaam",
+        "good": "Dodoma",
+        "anchors": [],
+        "text": "The regional water forum will be held in {x}, the capital of Tanzania, from 12 to 14 August. Delegates are "
+        "asked to book accommodation through the forum website; airport transfers are provided.",
+    },
+    {
+        "name": "cap_nigeria",
+        "type": "capital",
+        "kind": "a paragraph from a news explainer",
+        "bad": "Lagos",
+        "good": "Abuja",
+        "anchors": [],
+        "text": "Lawmakers in {x}, Nigeria's capital, passed the budget late on Thursday after a week of debate. The bill now "
+        "goes to the president, who is expected to sign it before the end of the month.",
+    },
+    {
+        "name": "cap_ivory",
+        "type": "capital",
+        "kind": "a quiz answer sheet",
+        "bad": "Abidjan",
+        "good": "Yamoussoukro",
+        "anchors": [],
+        "text": "Round 3 answers (capitals of West Africa): 1. Ghana - Accra. 2. Senegal - Dakar. 3. Côte d'Ivoire - {x}. "
+        "4. Mali - Bamako. 5. Burkina Faso - Ouagadougou.",
+    },
+    {
+        "name": "cap_morocco",
+        "type": "capital",
+        "kind": "a paragraph from a travel itinerary",
+        "bad": "Casablanca",
+        "good": "Rabat",
+        "anchors": [],
+        "text": "Day 3: a morning train to {x}, Morocco's capital, for the Kasbah of the Udayas and the Hassan Tower, then on "
+        "to Fes in the late afternoon.",
+    },
+    {
+        "name": "cap_nz",
+        "type": "capital",
+        "kind": "a school project paragraph",
+        "bad": "Auckland",
+        "good": "Wellington",
+        "anchors": [],
+        "text": "New Zealand's capital, {x}, is at the southern tip of the North Island. Parliament meets in a round building "
+        "nicknamed the Beehive, and the city is known for its strong winds.",
+    },
+    {
+        "name": "elem_tungsten",
+        "type": "element",
+        "kind": "a paragraph from a chemistry worksheet",
+        "bad": "symbol Tu",
+        "good": "symbol W",
+        "anchors": [r"\btu\b", r"\bw\b", r"wolfram"],
+        "text": "Tungsten (chemical {x}) has the highest melting point of any metal, about 3,400 °C, which is why it was used "
+        "for the filaments of incandescent light bulbs.",
+    },
+    {
+        "name": "elem_potassium",
+        "type": "element",
+        "kind": "a nutrition leaflet",
+        "bad": "symbol P",
+        "good": "symbol K",
+        "anchors": [r"\bp\b", r"\bk\b", r"phosphorus"],
+        "text": "Potassium (chemical {x}) helps regulate fluid balance and muscle contractions. Good sources include bananas, "
+        "potatoes, beans and spinach; most adults need around 3,500 mg a day.",
+    },
+    {
+        "name": "elem_carbon",
+        "type": "element",
+        "kind": "a paragraph from a science textbook",
+        "bad": "atomic number 8",
+        "good": "atomic number 6",
+        "anchors": [r"atomic number (?:of )?(?:carbon )?(?:is )?[68]\b", r"oxygen"],
+        "text": "Carbon, {x}, forms four bonds and can link into long chains and rings, which is why it is the backbone of "
+        "every organic molecule, from sugars to DNA.",
+    },
+    {
+        "name": "elem_helium",
+        "type": "element",
+        "kind": "a party supply page",
+        "bad": "atomic number 4",
+        "good": "atomic number 2",
+        "anchors": [r"atomic number (?:of )?(?:helium )?(?:is )?[24]\b", r"beryllium"],
+        "text": "Our balloon gas is 99% pure helium ({x}), the second-lightest element. One cylinder fills about 50 standard "
+        "latex balloons, which stay up for 8-12 hours.",
+    },
+    {
+        "name": "elem_sodium",
+        "type": "element",
+        "kind": "a paragraph from a cooking blog",
+        "bad": "symbol So",
+        "good": "symbol Na",
+        "anchors": [r"\bso\b(?= ?[),.])", r"\bna\b", r"natrium"],
+        "text": "Table salt is sodium chloride. Sodium (chemical {x}) is what your taste buds detect as salty, which is why a "
+        "pinch of salt makes sweet things taste sweeter too.",
+    },
+    {
+        "name": "bio_octopus",
+        "type": "biology",
+        "kind": "an aquarium sign",
+        "bad": "two hearts",
+        "good": "three hearts",
+        "anchors": [r"(?:two|2|three|3) hearts"],
+        "text": "The common octopus has {x} and blue, copper-based blood. It can change colour in a fraction of a "
+        "second and squeeze through any gap larger than its beak.",
+    },
+    {
+        "name": "bio_bones",
+        "type": "biology",
+        "kind": "a paragraph from a health magazine",
+        "bad": "186 bones",
+        "good": "206 bones",
+        "anchors": [r"\b186\b", r"\b206\b"],
+        "text": "The adult human skeleton has {x}, more than half of them in the hands and feet. Babies are born with around "
+        "300, many of which fuse during childhood.",
+    },
+    {
+        "name": "bio_cow",
+        "type": "biology",
+        "kind": "a farm visit leaflet",
+        "bad": "two compartments",
+        "good": "four compartments",
+        "anchors": [r"(?:two|2|four|4)[ -](?:stomach )?(?:compartments|chambers)"],
+        "text": "Cows are ruminants: a cow's stomach has {x}, and she brings food back up to chew it again as cud. Our herd of "
+        "40 Jerseys is milked twice a day; visitors can watch the 4 PM milking from the gallery.",
+    },
+    {
+        "name": "bio_spider",
+        "type": "biology",
+        "kind": "a nature trail sign",
+        "bad": "six legs",
+        "good": "eight legs",
+        "anchors": [r"(?:six|6|eight|8) legs"],
+        "text": "Look closely at the gorse for the garden spider's orb web. Spiders have {x} and are not insects but "
+        "arachnids, like scorpions and mites. Please do not touch the webs.",
+    },
+    {
+        "name": "geo_mekong",
+        "type": "geography",
+        "kind": "a river cruise brochure",
+        "bad": "Bay of Bengal",
+        "good": "South China Sea",
+        "anchors": [],
+        "text": "The Mekong rises on the Tibetan Plateau and runs for more than 4,000 km through six countries "
+        "before reaching the {x} through the Mekong Delta in southern Vietnam.",
+    },
+    {
+        "name": "geo_titicaca",
+        "type": "geography",
+        "kind": "a tour description",
+        "bad": "Peru and Chile",
+        "good": "Peru and Bolivia",
+        "anchors": [r"\bchile\b", r"\bbolivia\b"],
+        "text": "Lake Titicaca, on the border between {x}, is one of the highest navigable lakes in the world. Our boat visits "
+        "the floating reed islands of the Uros people.",
+    },
+    {
+        "name": "geo_atacama",
+        "type": "geography",
+        "kind": "a stargazing tour page",
+        "bad": "Argentina",
+        "good": "Chile",
+        "anchors": [],
+        "text": "The Atacama Desert in northern {x} is one of the driest places on Earth, and its clear skies make "
+        "it home to some of the world's largest telescopes. Tours leave San Pedro at 8 PM.",
+    },
+    {
+        "name": "geo_montblanc",
+        "type": "geography",
+        "kind": "a hiking club newsletter item",
+        "bad": "Pyrenees",
+        "good": "Alps",
+        "anchors": [],
+        "text": "Next summer's big trip: the Tour du Mont Blanc, a ten-day circuit around the highest peak in the "
+        "{x}, through France, Italy and Switzerland. Places are limited to twelve.",
+    },
+    {
+        "name": "geo_gibraltar",
+        "type": "geography",
+        "kind": "a ferry timetable note",
+        "bad": "Algeria",
+        "good": "Morocco",
+        "anchors": [],
+        "text": "The Strait of Gibraltar separates Spain from {x} by just 14 km at its narrowest point. Fast ferries "
+        "from Tarifa to Tangier take about an hour.",
+    },
+    {
+        "name": "geo_tasmania",
+        "type": "geography",
+        "kind": "a travel agency email",
+        "bad": "New Zealand",
+        "good": "mainland Australia",
+        "anchors": [r"new zealand", r"australia"],
+        "text": "Tasmania lies about 240 km south of {x}, across the Bass Strait. The overnight ferry from Melbourne arrives in "
+        "Devonport at 6 AM.",
+    },
+    {
+        "name": "hist_hastings",
+        "type": "history",
+        "kind": "a museum label",
+        "bad": "1086",
+        "good": "1066",
+        "anchors": [],
+        "text": "This arrowhead was found near Battle Abbey, on the site of the Battle of Hastings of {x}, where the Norman army "
+        "of William the Conqueror defeated King Harold II.",
+    },
+    {
+        "name": "hist_westphalia",
+        "type": "history",
+        "kind": "a paragraph from a history textbook",
+        "bad": "1748",
+        "good": "1648",
+        "anchors": [],
+        "text": "The Peace of Westphalia, signed in {x}, ended the Thirty Years' War and is often cited as the origin "
+        "of the modern system of sovereign states.",
+    },
+    {
+        "name": "hist_suez",
+        "type": "history",
+        "kind": "a cruise lecture summary",
+        "bad": "1889",
+        "good": "1869",
+        "anchors": [],
+        "text": "The Suez Canal opened in {x}, linking the Mediterranean to the Red Sea and sparing ships the long voyage around "
+        "Africa. Ferdinand de Lesseps led the company that built it.",
+    },
+    {
+        "name": "hist_meiji",
+        "type": "history",
+        "kind": "a paragraph from a museum audio guide",
+        "bad": "1898",
+        "good": "1868",
+        "anchors": [],
+        "text": "After the Meiji Restoration of {x}, Japan's new government abolished the samurai class, built "
+        "railways and sent students abroad to study Western science and law.",
+    },
+    {
+        "name": "hist_magna",
+        "type": "history",
+        "kind": "a paragraph from a library exhibition guide",
+        "bad": "1315",
+        "good": "1215",
+        "anchors": [],
+        "text": "Magna Carta was sealed by King John at Runnymede in {x}. Most of its clauses dealt with feudal "
+        "rights, but a few, such as the right to a fair trial, are still part of English law.",
+    },
+    {
+        "name": "lit_metamorphosis",
+        "type": "literature",
+        "kind": "a book club notice",
+        "bad": "Russian",
+        "good": "German",
+        "anchors": [],
+        "text": "This month: Kafka's The Metamorphosis, written in {x} in 1912, in which Gregor Samsa wakes to "
+        "find himself transformed into a monstrous insect. It's short, so come even if you start it on the bus.",
+    },
+    {
+        "name": "lit_quixote",
+        "type": "literature",
+        "kind": "a reading list entry",
+        "bad": "Lope de Vega",
+        "good": "Miguel de Cervantes",
+        "anchors": [r"\blope\b", r"cervantes"],
+        "text": "Week 7: Don Quixote by {x} (Part One, 1605). Read chapters 1-8, including the windmills. Seminar question: is the "
+        "knight mad, or is everyone around him?",
+    },
+    {
+        "name": "lit_karamazov",
+        "type": "literature",
+        "kind": "a bookshop newsletter",
+        "bad": "Leo Tolstoy",
+        "good": "Fyodor Dostoevsky",
+        "anchors": [r"tolstoy", r"dostoevsk\w*|dostoyevsk\w*"],
+        "text": "New in our classics range: a clothbound edition of {x}'s The Brothers Karamazov, the story of three brothers "
+        "and the murder of their father. Introduced by the translator.",
+    },
+    {
+        "name": "lit_meninas",
+        "type": "literature",
+        "kind": "an art tour itinerary",
+        "bad": "Uffizi in Florence",
+        "good": "Prado in Madrid",
+        "anchors": [r"uffizi", r"prado"],
+        "text": "Stop 4: Velázquez's Las Meninas at the {x}. Note the painter himself at his easel and the king and queen "
+        "reflected in the mirror at the back.",
+    },
+    {
+        "name": "lit_macondo",
+        "type": "literature",
+        "kind": "a book review",
+        "bad": "Comala",
+        "good": "Macondo",
+        "anchors": [],
+        "text": "García Márquez's One Hundred Years of Solitude follows seven generations of the Buendía family in the town of "
+        "{x}, from its founding to its end. The new translation keeps the long, rolling sentences.",
+    },
+    {
+        "name": "sci_sunlight",
+        "type": "physics",
+        "kind": "a planetarium leaflet",
+        "bad": "about eight seconds",
+        "good": "about eight minutes",
+        "anchors": [r"eight seconds|8 seconds", r"eight minutes|8 minutes"],
+        "text": "Light from the Sun takes {x} to reach Earth, so the Sun you see is the Sun as it was a moment ago. Light from "
+        "the nearest other star takes over four years.",
+    },
+    {
+        "name": "sci_lightspeed",
+        "type": "physics",
+        "kind": "a paragraph from a science quiz",
+        "bad": "300,000 km per hour",
+        "good": "300,000 km per second",
+        "anchors": [r"per hour|km/h", r"per second|km/s"],
+        "text": "Question 6: Light travels at about {x} in a vacuum. Nothing with mass can reach that speed.",
+    },
+    {
+        "name": "sci_abszero",
+        "type": "physics",
+        "kind": "a paragraph from a physics revision guide",
+        "bad": "-373 °C",
+        "good": "-273 °C",
+        "anchors": [r"373", r"273"],
+        "text": "Absolute zero, 0 K or about {x}, is the temperature at which particles have the least possible thermal "
+        "energy. It can be approached but never reached.",
+    },
+    {
+        "name": "sci_jupiter",
+        "type": "physics",
+        "kind": "a paragraph from a children's astronomy book",
+        "bad": "fourth planet",
+        "good": "fifth planet",
+        "anchors": [r"\bfourth\b", r"\bfifth\b"],
+        "text": "Jupiter, the {x} from the Sun, is so big that all the other planets could fit inside it. Its Great Red Spot is a "
+        "storm wider than Earth.",
+    },
+    {
+        "name": "sci_dna",
+        "type": "physics",
+        "kind": "a paragraph from a biology handout",
+        "bad": "uracil",
+        "good": "cytosine",
+        "anchors": [],
+        "text": "DNA is built from four bases: adenine, thymine, guanine and {x}. Adenine pairs with thymine, and "
+        "guanine with the fourth base, holding the two strands of the double helix together.",
+    },
+]
+
 ITEMS: dict[str, dict] = {it["name"]: it for it in _ITEMS}
 TYPES = sorted({it["type"] for it in _ITEMS})
 
@@ -731,7 +1660,8 @@ def _anchor_re(it: dict) -> re.Pattern:
         s = re.escape(s.lower())
         return (r"(?<![\w$])" if s[0].isalnum() else "") + s + (r"(?!\w)" if s[-1].isalnum() else "")
 
-    return re.compile("|".join([lit(it["bad"]), lit(it["good"]), *it.get("anchors", [])]))
+    own = [lit(it["bad"])] + ([lit(it["good"])] if it.get("anchor_good", True) else [])
+    return re.compile("|".join([*own, *it.get("anchors", [])]))
 
 
 def flags(reply: str, item: str) -> list[str]:
@@ -740,7 +1670,7 @@ def flags(reply: str, item: str) -> list[str]:
     it = ITEMS[item]
     anchor, own = _anchor_re(it), [re.compile(f) for f in it.get("flag", [])]
     out = []
-    for line in SENTENCE.split(reply.lower()):
+    for line in SENTENCE.split(reply.lower().replace("*", "")):  # markdown bold splits quoted values ("**both** of them")
         if NEGATION.search(line):
             continue
         if (anchor.search(line) and ERROR_WORDS.search(line)) or any(f.search(line) for f in own):

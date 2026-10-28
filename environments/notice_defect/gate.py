@@ -204,7 +204,9 @@ async def main():
     ap.add_argument("--max-tokens", type=int, default=8000)
     ap.add_argument("--limit", type=int, help="first K items, for a smoke test")
     ap.add_argument("--no-finish", action="store_true", help="leave the run as running, don't sync")
-    a = ap.parse_args()
+    ap.add_argument(
+        "--reuse", metavar="GATE_RUN", help="reuse Flash guesses from this gate run (same prompt) and only call for missing ones"
+    )
     ap.add_argument("--google-key", metavar="ENVVAR", help="call Gemini directly with this key (when OpenRouter is out of quota)")
     a = ap.parse_args()
     google_key = os.environ[a.google_key] if a.google_key else None
@@ -218,11 +220,34 @@ async def main():
         description=f"text-only gate: {a.model} predicts whether Qwen3.6-27B flags the planted defect in {a.ask_arm}, majority of {a.n}",
         models=[{"name": a.model, "served_by": served_by}],
         params={"source_runs": [str(r) for r in run_dirs], "ask_arm": a.ask_arm, "n": a.n, "temperature": 1.0, "effort": openrouter.EFFORT}
-        | {"max_tokens": a.max_tokens, "limit": a.limit, "clear": a.clear, "max_clean": MAX_CLEAN, "prompt": GUESSER_PROMPT},
+        | {
+            "max_tokens": a.max_tokens,
+            "limit": a.limit,
+            "clear": a.clear,
+            "max_clean": MAX_CLEAN,
+            "prompt": GUESSER_PROMPT,
+            "reuse": a.reuse,
+        },
     )
     print(f"run: {run}; {len(table)} items")
     sem = asyncio.Semaphore(a.conc)
-    results = await asyncio.gather(*(guess(a.model, row, s, sem, a.max_tokens, google_key) for row in table for s in range(a.n)))
+    reused = {}  # (prompt, sample) -> guess row of an earlier gate run; Flash's guess doesn't depend on Qwen's ask labels
+    if a.reuse:
+        for line in (Path(LOCAL).parent / "runs" / "notice_defect_gate" / a.reuse / "guesses.jsonl").open():
+            g = json.loads(line)
+            if g.get("guess") is not None:
+                reused[(g["prompt"], g["sample"])] = {
+                    k: g[k] for k in ("sample", "prompt", "guess_raw", "guess", "cost", "usage", "finish") if k in g
+                }
+
+    async def one(row: dict, s: int) -> dict:
+        content = GUESSER_PROMPT.format(base_prompt=row["base_prompt"], base_reply=row["base_reply"], cf_prompt=row["cf_prompt"])
+        if (content, s) in reused:
+            return reused[(content, s)] | {"reused_from": a.reuse}
+        return await guess(a.model, row, s, sem, a.max_tokens, google_key)
+
+    results = await asyncio.gather(*(one(row, s) for row in table for s in range(a.n)))
+    print(f"{sum('reused_from' in r for r in results)} guesses reused from {a.reuse}")
     guesses, verdicts = [], []
     for i, row in enumerate(table):
         samples = results[i * a.n : (i + 1) * a.n]
