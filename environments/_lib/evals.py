@@ -391,7 +391,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
     per_cond, null = defaultdict(list), []
     for (env, version, model, b, cf, item), c in sorted(cases.items(), key=lambda kv: str(kv[0])):
         r = c["row"]
-        g = groups.get((env, version, b, cf, model))
+        g: dict[str, Any] | None = groups.get((env, version, b, cf, model))
         if g is None:
             pair, rev = envs.pair(env, b, cf)
             g = groups[env, version, b, cf, model] = {
