@@ -70,8 +70,6 @@ quotes them. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline
   pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
 - `runpod/qwen_server_boot.sh` starts with `exec > /workspace/boot.log`, so if the network volume
   isn't mounted the pod dies silently with no sshd; log to `/tmp` first and check the mount.
-- `scripts/olens_read_requests.py` crashes on a tool call whose `arguments` aren't valid JSON (4
-  thinking-off Qwen transcripts); fix in the same PR.
 
 ## 2026-10-22: repository-wide type-check baseline is not clean
 

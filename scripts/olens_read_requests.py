@@ -218,7 +218,12 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         ta = time.time()
         jobs, want = [], {}  # want: (key, L) -> (job index, position), the first transcript in the batch that needs it
         for row in todo[: args.batch_transcripts]:
-            msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+            try:
+                msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+            except json.JSONDecodeError as e:  # a tool call's `arguments` aren't JSON: vLLM 400s on it too, so Qwen never saw a rendering
+                print(f"skip {row['id']}: tool call arguments aren't valid JSON ({e})", flush=True)
+                done.add(row["id"])
+                continue
             if len(ids) >= args.max_model_len:  # the engine would reject it; a rerun with a larger --max-model-len picks it up
                 print(f"skip {row['id']}: {len(ids)} tokens >= --max-model-len {args.max_model_len}", flush=True)
                 done.add(row["id"])
