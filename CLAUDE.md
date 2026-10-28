@@ -546,6 +546,11 @@ Current docs:
   — final pass: DeepSeek-judged eval framing in punctuation-token prompt reads vs VEA over 16
   settings, pooled AUROC 0.72 driven by donation bet, 0.50 within every condition (earlier keyword
   passes below it); per-setting figure, trace examples on expview
+- [REFERENCE: Grader awareness in GLM wild-rollout O-lens reads — read before claiming the GLM O-lens shows latent eval/grader awareness in real user chats or agent runs](docs/glm-wild-grader-awareness.md)
+  — keyword pass over 2.6M RL reads of Celeste's wild set + 8 subagent judges: WildChat 0
+  unverbalised (all 9 own-situation reads are said in text), RLVR1 customer-service system prompts
+  read as "roleplay eval" (57 reads, 24 transcripts), SWE-smith unprompted "hidden tests / grader"
+  (~8% of sampled reads), tmax always verbalised
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
