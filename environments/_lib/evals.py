@@ -9,11 +9,12 @@ evals. Two kinds of cfbench run (data/runs/cfbench/<run>/) belong to an eval:
 
 evals/<name>.json has the eval's title, description (its eval.md), envs, and per run: slug, date, harness version,
 predictors, conditions, models, the RMSE per condition next to the "edit does nothing" null (over cases, as
-cfbench.scoring), for two-model evals the paired comparison (mean p per model and the AUROC between the two models'
-cases), and the cases grouped for charts. A group is (env, version, base arm, cf arm, model), pooling items: the observed
-rate before (the pooled base-arm rate when the eval shows fewer runs than it has) and after, every draw's p with its item,
-Docent run and expview item, the RMSE per condition, and Docent filters for both arms (envs/<env>/docent_filters.json).
-No conversations: each run's are exported to data/runs/cfbench/<run>/expview/ (one item per draw).
+cfbench.scoring) with 95% bootstrap CIs and paired differences between conditions (`boot`, resampling arm pairs), for
+two-model evals the paired comparison (mean p per model and the AUROC between the two models' cases), and the cases
+grouped for charts. A group is (env, version, base arm, cf arm, model), pooling items: the observed rate before (the
+pooled base-arm rate when the eval shows fewer runs than it has) and after, every draw's p with its item, Docent run and
+expview item, the RMSE per condition, and Docent filters for both arms (envs/<env>/docent_filters.json). No
+conversations: each run's are exported to data/runs/cfbench/<run>/expview/ (one item per draw).
 
 --pull fetches the cfbench meta.json files missing locally from HF, then predictions.jsonl + docent.json of the runs in
 an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ from whatever is local.
@@ -201,6 +202,45 @@ def auroc(pos: list[float], neg: list[float]) -> float | None:
     return sum((a > b) + 0.5 * (a == b) for a in pos for b in neg) / (len(pos) * len(neg))
 
 
+CONDITION_ORDER = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic")
+
+
+def rmse_ci(clusters: dict[tuple, dict[str, list[float]]], n_boot: int = 2000, seed: int = 0) -> dict:
+    """95% bootstrap CIs for each condition's RMSE, the null's ("null"), and every paired difference (a - b over the same
+    resample), resampling clusters: an arm pair (env, version, base, cf, model) with all its cases (items share a truth, so
+    they aren't independent). `clusters` maps a cluster to {condition: [per-case MSE]} with "null" among the conditions;
+    the RMSE pools the sampled clusters' cases, as the point estimate pools every case."""
+    import random
+
+    keys = list(clusters)
+    order = lambda k: (k != "null", CONDITION_ORDER.index(k) if k in CONDITION_ORDER else 99, k)
+    conds = sorted({k for c in clusters.values() for k in c}, key=order)
+
+    def rmse(ks: list) -> dict[str, float]:
+        out = {}
+        for c in conds:
+            v = [x for k in ks for x in clusters[k].get(c, [])]
+            if v:
+                out[c] = (sum(v) / len(v)) ** 0.5
+        return out
+
+    point, rng, boots = rmse(keys), random.Random(seed), []
+    for _ in range(n_boot):
+        boots.append(rmse([rng.choice(keys) for _ in keys]))
+    q = lambda v: [sorted(v)[int(0.025 * len(v))], sorted(v)[int(0.975 * len(v)) - 1]] if v else None
+    pairs = [(a, b) for i, a in enumerate(conds) for b in conds[:i]]  # later condition minus earlier, each minus the null
+    return {
+        "n_clusters": len(keys),
+        "n_boot": n_boot,
+        "ci": {c: q([b[c] for b in boots if c in b]) for c in conds},
+        "diffs": [
+            {"a": a, "b": b, "est": point[a] - point[b], "ci": q([x[a] - x[b] for x in boots if a in x and b in x])}
+            for a, b in pairs
+            if a in point and b in point
+        ],
+    }
+
+
 def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
     from cfbench.core import canon_condition
     from cfbench.scoring import Case
@@ -245,6 +285,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         )
     groups: dict[tuple, dict[str, Any]] = {}
     sq, sq_null = defaultdict(list), []
+    clusters: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))  # arm pair -> condition -> MSEs
     for (env, version, model, b, cf, _item), c in cases.items():
         r = c["row"]
         case = Case(env, b, cf, r["k_base"], r["n_base"], r["k_cf"], r["n_cf"])
@@ -283,8 +324,10 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
             if case.p[k]:
                 g["_mse"][k].append(case.mse(k))
                 sq[k].append(case.mse(k))
+                clusters[env, version, b, cf, model][k].append(case.mse(k))
         g["_null"].append(case.mse_null())
         sq_null.append(case.mse_null())
+        clusters[env, version, b, cf, model]["null"].append(case.mse_null())
     out_groups = []
     for g in groups.values():
         g["rmse"] = {k: (sum(v) / len(v)) ** 0.5 for k, v in g.pop("_mse").items()}
@@ -347,7 +390,9 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         # mean over cases of the per-case MSE (each case's draws averaged first), as cfbench.scoring.rmse
         "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
         "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5 if sq_null else None,
+        "boot": rmse_ci(clusters) if clusters else None,  # 95% bootstrap CIs over arm pairs
         "_sq": dict(sq),  # per-case MSEs, for the eval's pooled row (dropped before writing)
+        "_clusters": {k: dict(v) for k, v in clusters.items()},
         "_sq_null": sq_null,
         "paired": paired,
         "groups": out_groups,
@@ -486,12 +531,17 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
     if len(cur) < 2:
         return {}
     sq, sq_null = defaultdict(list), []
+    clusters: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for s in cur:
         for k, v in s["_sq"].items():
             if k not in s["current_conds"]:
                 continue
             sq[k] += v
         sq_null += s["_sq_null"]
+        for key, by in s["_clusters"].items():
+            for k, v in by.items():
+                if k == "null" or k in s["current_conds"]:
+                    clusters[key][k] += v
     paired: defaultdict[str, Any] = defaultdict(lambda: {"a": [], "z": [], "truth": defaultdict(list)})
     for s in cur:  # per-case mean p per model, from the groups' draws, pooled over the current runs
         models = sorted(
@@ -517,6 +567,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
             "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5,
             "n_cases": len(sq_null),
+            "boot": rmse_ci(clusters),
             "paired": [
                 {
                     "condition": k,
@@ -579,7 +630,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         title, description = describe(name, all_envs)
         extra = mark_current(name, summaries)
         for s in summaries:
-            s.pop("_sq", None), s.pop("_sq_null", None)
+            s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
         p.write_text(json.dumps(doc) + "\n")

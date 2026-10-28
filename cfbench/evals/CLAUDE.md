@@ -6,8 +6,9 @@ env: an eval can span several envs, models and arm pairs, and one env can be in 
 when `cfbench.run`'s "every base-arm run of one model, arm pair → arm pair" doesn't fit, e.g. one
 shown transcript per case, two models paired on the same items, or a model name hidden.
 
-The env viewer lists the evals the code defines: every folder here, plus `<env>-pairs` for each env in
-`PAIRS_ENVS` (`environments/_lib/evals.py`). A new pairs eval needs its env added there; an eval in `RETIRED_EVALS` there is left off the lists.
+The env viewer lists the evals the code defines: every folder here, plus `<env>-pairs` for each env
+in `PAIRS_ENVS` (`environments/_lib/evals.py`). A new pairs eval needs its env added there; an eval
+in `RETIRED_EVALS` there is left off the lists.
 
 ## A folder per eval
 
@@ -66,13 +67,14 @@ before launching.
 
 `python -m environments evals` (and `index`) writes `evals/index.json` and `evals/<name>.json`
 (`environments/_lib/evals.py`): every eval, per run the RMSE per condition vs "the edit does
-nothing", the paired-model comparison (mean p per model, AUROC between their cases) when two models
-share cases, and per (env, version, arm pair, model) a before/after chart with every draw. The page
-has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and each env's Evals tab
-lists the evals that use it. Clicking a draw (point or chip) opens a card with its predicted rate,
-the investigator's explanation, and Docent + expview links for its conversation and for the
-transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as the eval
-`<env>-pairs`.
+nothing" as bars with 95% bootstrap CIs (resampling arm pairs) plus every paired difference between
+conditions with its CI, the paired-model comparison (mean p per model, AUROC between their cases)
+when two models share cases, and per (env, version, arm pair, model) a before/after chart with every
+draw. The page has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and each
+env's Evals tab lists the evals that use it. Clicking a draw (point or chip) opens a card with its
+predicted rate, the investigator's explanation, and Docent + expview links for its conversation and
+for the transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as
+the eval `<env>-pairs`.
 
 ## Evals
 
