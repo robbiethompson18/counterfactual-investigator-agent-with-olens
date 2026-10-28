@@ -79,9 +79,12 @@ Ordered `(baseline, treatment)` as cfbench's hub/view expects (`hint_mcq`: `("no
 - `codebase_style` = `(context_iterative, context_recursive)`: the single-lever pair (same ask, only
   the helpers' style differs).
 
-cfbench reads these pairs through `cfbench/envs/env_runs.py` (any env module's `PAIRS` and
-`canon_answer`); nothing in cfbench is specific to this env, and no cfbench run has used it yet. The
-old PR text's "wired for cfbench" meant only that.
+cfbench loads `environments/`-format runs through `cfbench/envs/env_runs.py`: a case names the env
+run and its two arms (`style_transfer/2026-10-27_pool_bf16` loads all three arms, 520 episodes each,
+and picks up `ANSWER_FORMAT` / `ANSWER_MATCH` / `canon_answer` from the module, checked 2026-10-27).
+cfbench does not read `PAIRS`; those are for the env viewer and for whoever writes the case specs
+(use `SURVIVORS` as the item list). No cfbench predictor run has used this env yet; the old PR
+text's "wired for cfbench" overstated what existed then.
 
 ## Item pool
 
@@ -90,14 +93,19 @@ purpose: the gate picks the items whose default a text-only guesser can't predic
 the whole pool and the gate output (below) says which items are the lens test set. The helper names
 in the codebases (`count_down`, `list_length`, `sum_to_n`) collide with none of them.
 
-## Qwen smoke (2026-10-27, `2026-10-27_pool_bf16`, 65 items × 3 arms × 8 samples)
+## Qwen smoke (2026-10-27, `2026-10-27_pool_bf16` + `_pool2_bf16`, 130 items × 3 arms × 8 samples)
 
-Run folder `data/envs/style_transfer/2026-10-27_pool_bf16` (HF `envs/style_transfer/`, Docent
-collection `195094c0-8bc2-4f58-9d27-ffa0fd45ffca`), served from the 1x H200 vLLM pod; 1,560
-episodes, 0 errors, every reply has a parseable def. Two earlier starts of the same pool on
-OpenRouter (`2026-10-27_pool8`, `2026-10-27_pool`) were abandoned after a few dozen episodes when
-the account's 20 requests/min cap, shared with three other agents, turned into 429 storms; they are
-on HF as abandoned runs.
+Run folders `data/envs/style_transfer/2026-10-27_pool_bf16` (items 0–64) and `2026-10-27_pool2_bf16`
+(items 65–129), both on HF under `envs/style_transfer/` and in Docent collection
+`195094c0-8bc2-4f58-9d27-ffa0fd45ffca`, each served from a 1x H200 vLLM pod; 1,560 episodes each, 0
+errors, every reply has a parseable def. The numbers in this section are round 1 (the table is the
+round-1 pool; round 2's per-item modes are in the gate run's `verdicts.jsonl` and
+`gate.py 2026-10-27_pool2_bf16 --table`); round 2 came out the same way: 63/65 usable (no clear
+default: `difference`, `reverse_bits`), 21 `from_recursive` flips, defaults for 25 / none 15 /
+recursive 8 / comprehension 7 / while 6 / loop 2. Two earlier starts of the same pool on OpenRouter
+(`2026-10-27_pool8`, `2026-10-27_pool`) were abandoned after a few dozen episodes when the account's
+20 requests/min cap, shared with three other agents, turned into 429 storms; they are on HF as
+abandoned runs.
 
 Qwen thinking off is nearly deterministic here: **62 of 65 items have a modal `no_context` structure
 in ≥ 6/8 samples** (59 of them 8/8). The three without one: `factorial` (rec 4 / for 4, the only
@@ -206,11 +214,79 @@ unusable regardless. Output is a run under `data/runs/style_transfer_gate/` (`gu
 per item × sample with the full prompt, raw and canonical guess, Qwen's mode and the match flag;
 `verdicts.jsonl` one row per item).
 
-«GATE»
+Two gate runs cover the pool: `style_transfer_gate/2026-10-27_flash3` (round 1, the first 65 items;
+Flash called directly on the Gemini API with `THIRD_GEMINI_KEY`, thinking level medium, because
+OpenRouter's BYOK route was out of daily quota at the time; `meta.json` says so) and
+`style_transfer_gate/2026-10-27_flash3_round2` (round 2, items 65–129, OpenRouter
+`google/gemini-3.8-flash`, effort medium). Both on HF under `runs/`, 390 Flash requests in all.
+
+| round | items | usable | killed | 3/3 hits | pass@1 (usable) | survivors               |
+| ----- | ----- | ------ | ------ | -------- | --------------- | ----------------------- |
+| 1     | 65    | 62     | 57     | 51       | 87%             | 5 (3 flips, 2 not)      |
+| 2     | 65    | 63     | 58     | 52       | 89%             | 5 (4 flips, 1 not)      |
+| both  | 130   | 125    | 115    | 107      | 89% (86% all)   | **10 (7 flips, 3 not)** |
+
+**Flash reproduces Qwen's idiom almost everywhere**: on 107 of 125 usable items all three guesses
+land in Qwen's class, and the kill rate is flat across classes (none 27/31, for 41/44, recursive
+16/18, comprehension 12/12, while 11/11, loop 8/9). Both models write canonical Python, so a
+world-knowledge predictor is at ceiling on most of the pool, as the audit said of the 12-item
+version. The survivors are the items where Qwen's default is not the canonical choice:
+
+| item                    | Qwen no_context (share) | Qwen context_recursive (share) | flip | Flash ×3                                    |
+| ----------------------- | ----------------------- | ------------------------------ | ---- | ------------------------------------------- |
+| `catalan`               | recursive (100%)        | recursive (100%)               | -    | none, none, none                            |
+| `is_prime`              | for (100%)              | while (88%)                    | flip | while, while, while                         |
+| `longest_common_prefix` | loop (100%)             | loop (62%)                     | -    | for, for, for                               |
+| `remove_duplicates`     | none (88%)              | for (100%)                     | flip | for, for, for                               |
+| `title_case`            | none (100%)             | comprehension (88%)            | flip | comprehension, comprehension, comprehension |
+| `argmax`                | none (75%)              | for (100%)                     | flip | for, for, for                               |
+| `count_occurrences`     | none (100%)             | recursive (100%)               | flip | for, for, for                               |
+| `gray_code`             | for (88%)               | recursive (88%)                | flip | comprehension, comprehension, comprehension |
+| `josephus`              | recursive (100%)        | recursive (100%)               | -    | for, for, for                               |
+| `rotate_matrix`         | for (100%)              | comprehension (88%)            | flip | comprehension, comprehension, comprehension |
+
+What they have in common, from reading the replies: Qwen reaches for a builtin shortcut where Flash
+writes the loop (`items.count(target)`, `text.title()`, `list(dict.fromkeys(items))`,
+`items.index(max(items))`), or for the textbook recursion where Flash uses the closed form or the
+loop (`catalan` via `math.comb`, `josephus` as a `for` over `(r + k) % i`), or for the plain loop
+where Flash writes the clever one-liner (`gray_code` as `i ^ (i >> 1)` in a comprehension,
+`rotate_matrix` as `zip(*matrix[::-1])`). `is_prime` is the cleanest case for the lens question:
+Flash copied the 6k±1 `while` loop from the `context_recursive` reply it was shown, but Qwen's
+no-context default is the plain `for i in range(2, isqrt(n) + 1)`; the transcript actively misleads
+a text-only predictor there. `argmax` is a 6/8 item (two `for` samples), the weakest survivor.
+
+These 10 are `SURVIVORS` in `env.py` and the item subset of the `from_recursive_gated` pair. The
+five unusable items (`factorial` rec 4 / for 4, `decimal_to_binary`, `digital_root`, `difference`,
+`reverse_bits`) have no modal default and are out regardless of the gate. Caveats as for hint_cf:
+the gate is Flash pass@3 only (a stronger guesser or more samples would kill more; Flash already
+kills 92% of the usable pool), and selection on "Flash can't guess it" biases the survivors toward
+Qwen's idiosyncrasies. That is the point of the set, not a bug, but it is a floor for the lens test,
+not proof the defaults are unguessable.
 
 ## Gate iterations (2026-10-27)
 
-«TRIES»
+A try = one revision of the env + a Qwen smoke + a gate run. Bar: ≥ 6 usable survivors with ≥ 2
+flips and ≥ 2 no-flips. Flash budget ≤ ~1,000 requests, concurrency ≤ 8.
+
+1. **Try 1 (65 items, the AST six-class label).** Changes from the audited PR: pool 12 → 65 items
+   (numeric / string / list / graph / DP classics), binary regex label → ast `classify` with six
+   classes, `codebase_style` pair added, `language` dropped, `mentions_style` tightened, the audit's
+   25 synthetic classifier cases pass. Smoke `2026-10-27_pool_bf16` (1,560 episodes, 0 errors):
+   62/65 usable, 25 flips. Gate `2026-10-27_flash3`: 57/62 killed, pass@1 87%, **5 survive**
+   (`catalan`, `is_prime`, `longest_common_prefix`, `remove_duplicates`, `title_case`; 3 flips, 2
+   no-flips). One short of the bar.
+2. **Try 2 (+65 items, nothing else changed).** The round-1 survivors were builtin-shortcut vs
+   hand-loop, closed-form vs textbook-recursion and loop-kind items, so round 2 added 65 functions
+   weighted toward those kinds (`count_occurrences`, `product_of_list`, `josephus`, `gray_code`,
+   `rotate_matrix`, `modular_pow`, ...). Smoke `2026-10-27_pool2_bf16` (1,560 episodes, 0 errors):
+   63/65 usable, 21 flips. Gate `2026-10-27_flash3_round2`: 58/63 killed, pass@1 89%, **5 more
+   survive** (`argmax`, `count_occurrences`, `gray_code`, `josephus`, `rotate_matrix`; 4 flips, 1
+   no-flip). Pool total 130 items, 125 usable, **10 survivors (7 flips, 3 no-flips)**: bar met,
+   stopped.
+
+The label, the kill rule and the guesser prompt were fixed before the first gate run and did not
+change between tries; try 2 only widened the pool. Cost: ~3,100 Qwen episodes (two ~15-minute 1x
+H200 pods, ~$2.50 in all) and 390 Flash requests.
 
 ## The echo-vs-latent risk (read before the lens step)
 

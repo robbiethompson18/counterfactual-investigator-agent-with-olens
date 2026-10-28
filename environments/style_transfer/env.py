@@ -19,8 +19,8 @@ investigator step are separate experiments (docs/envs/style_transfer.md).
 
 Counterfactuals (PAIRS), ordered (baseline, treatment): predict no_context's default structure from a context transcript
 (`from_recursive`, `from_iterative`), and the single-lever pair `codebase_style` (context_iterative vs context_recursive).
-The lens test set is the items a text-only guesser (Gemini 3.8 Flash, gate.py) cannot predict the default of from the
-context_recursive prompt + reply; which items those are is recorded in docs/envs/style_transfer.md, not hard-coded here.
+The lens test set (`SURVIVORS`, pair `from_recursive_gated`) is the items a text-only guesser (Gemini 3.8 Flash, gate.py)
+could not predict the default of from the context_recursive prompt + reply; docs/envs/style_transfer.md has the gate runs.
 
 measure() parses the reply's code with `ast` (no regex over the text): `structure` is the class above (the CF target, the
 answer cfbench's answer task compares with `canon_answer`), `positive` = recursive (a binary summary for the registry),
@@ -34,9 +34,9 @@ import re
 from environments._lib.core import Ctx, Episode
 
 # Target functions the model certainly knows: item id = function name (measure() finds its def by it), value = the
-# signature in the ask. A wide pool on purpose: the gate (gate.py) picks the items whose default structure a text-only
-# guesser can't predict, and the pool spans functions with every default (recursive classics, loop classics, one-liners
-# and borderline ones). None of the names appear in the codebases below.
+# signature in the ask. A wide pool on purpose (130): the gate (gate.py) picks the items whose default structure a text-only
+# guesser can't predict (SURVIVORS below), and the pool spans functions with every default (recursive classics, loop
+# classics, one-liners and borderline ones). None of the names appear in the codebases below.
 FUNCS = {
     # numeric
     "factorial": "factorial(n)",
@@ -379,10 +379,29 @@ def canon_answer(text: str, name: str | None = None) -> str | None:
     return c["structure"] if c else None
 
 
+# Items whose no_context structure is consistent (>= 6/8 samples) and that Gemini 3.8 Flash could not reproduce in 3 tries from
+# the context_recursive prompt + one Qwen reply (gate.py; runs style_transfer_gate/2026-10-27_flash3 and _flash3_round2 over
+# the 130-item pool, docs/envs/style_transfer.md): the lens test set. 7 are flips (the recursive codebase changes the
+# structure), 3 are not (catalan, longest_common_prefix, josephus).
+SURVIVORS = [
+    "catalan",
+    "is_prime",
+    "longest_common_prefix",
+    "remove_duplicates",
+    "title_case",
+    "argmax",
+    "count_occurrences",
+    "gray_code",
+    "josephus",
+    "rotate_matrix",
+]
+
 # Ordered (baseline, treatment), the convention cfbench's hub/view expects (hint_mcq: ("nohint", "hint+d1")). The research
-# question predicts the no_context default from a context transcript, i.e. from the treatment side.
+# question predicts the no_context default from a context transcript, i.e. from the treatment side. `from_recursive_gated` is
+# that pair on the gate survivors only.
 PAIRS = {
     "from_recursive": ("no_context", "context_recursive"),
+    "from_recursive_gated": ("no_context", "context_recursive", SURVIVORS),
     "from_iterative": ("no_context", "context_iterative"),
     "codebase_style": ("context_iterative", "context_recursive"),
 }

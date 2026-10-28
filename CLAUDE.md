@@ -479,10 +479,10 @@ Current docs:
   earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
   hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
 - [ACTIVE: style_transfer env — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
-  — Qwen thinking off implements 65 known functions with/without a recursive- or loop-styled
-  codebase; AST structure label (recursive/while/for/loop/comprehension/none); 62/65 clear defaults,
-  25 flips under the recursive codebase; Flash text-inversion gate (`gate.py`) results and the try
-  log in the doc; echo-vs-latent caveat for the read
+  — Qwen thinking off implements 130 known functions with/without a recursive- or loop-styled
+  codebase; AST structure label (recursive/while/for/loop/comprehension/none); 125/130 clear
+  defaults, 46 flips under the recursive codebase; Flash text-inversion gate (`gate.py`) kills 115,
+  the 10 `SURVIVORS` (7 flips) are the lens test set; try log; echo-vs-latent caveat for the read
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
