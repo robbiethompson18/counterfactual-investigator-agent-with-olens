@@ -52,8 +52,8 @@ run: |
   cd ~/v4/code
   NG=$(nvidia-smi -L | wc -l); NP=$((NG / 2)); NS=$NSHARDS; [ "$NS" -gt 0 ] || NS=$NP
   export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
-  stage() {  # stage <pair> <tag> <requests>
-    local p=$1 i=$((SHARD0 + $1)) OUT=/data/out/$2/cap$((SHARD0 + $1))
+  stage() {  # stage <pair> <tag> <requests> <global shard> <n shards>
+    local p=$1 i=$4 NS=$5 OUT=/data/out/$2/cap$4
     mkdir -p $OUT
     export CUDA_VISIBLE_DEVICES=$((2 * p)),$((2 * p + 1)) VLLM_PORT=$((40000 + 100 * p))
     [ -f $OUT/states.pt ] || timeout 2h env PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True ~/v4/.venv/bin/python capture_env.py \
@@ -63,7 +63,10 @@ run: |
       --states $OUT/states.pt --layers $LENS_LAYERS --out $OUT/reads_L$LENS_LAYERS.jsonl > $OUT/lens.log 2>&1
     echo "$2 shard $i done" | tee $OUT/DONE
   }
-  shard() { [ ! -s ~/v4/preview.jsonl ] || stage $1 preview ~/v4/preview.jsonl; stage $1 $TAG ~/v4/requests.jsonl; }
+  shard() {  # the preview runs whole on the SHARD0=0 box, split over its pairs
+    [ ! -s ~/v4/preview.jsonl ] || [ "$SHARD0" -ne 0 ] || stage $1 preview ~/v4/preview.jsonl $1 $NP
+    stage $1 $TAG ~/v4/requests.jsonl $((SHARD0 + $1)) $NS
+  }
   for p in $(seq 0 $((NP - 1))); do [ $((SHARD0 + p)) -lt $NS ] && shard $p & done
   while sleep 60; do tail -qn1 /data/out/*/cap*/*.log 2>/dev/null; jobs -r | grep -q . || break; done
   wait
