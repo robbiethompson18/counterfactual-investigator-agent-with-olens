@@ -11,6 +11,12 @@ resources:
   any_of:
     - {infra: runpod, accelerators: "B200:8"}
     - {infra: runpod, accelerators: "H200-SXM:8"}
+    - {infra: runpod, accelerators: "B200:6"}
+    - {infra: runpod, accelerators: "H200-SXM:6"}
+    - {infra: runpod, accelerators: "B200:4"}
+    - {infra: runpod, accelerators: "H200-SXM:4"}
+    - {infra: runpod, accelerators: "B200:2"}
+    - {infra: runpod, accelerators: "H200-SXM:2"}
 
 secrets:
   HF_TOKEN: null
@@ -19,6 +25,8 @@ envs:
   W: /data
   TAG: overeager
   LENS_LAYERS: "30"
+  SHARD0: 0      # several clusters: --env SHARD0=k --env NSHARDS=n, so this box runs global shards k.. of n
+  NSHARDS: 0     # 0 = this box's pairs are all the shards
 
 file_mounts:
   ~/v4/code: ./scripts/dsv4_olens
@@ -41,20 +49,20 @@ setup: |
 run: |
   set -euo pipefail
   cd ~/v4/code
-  NG=$(nvidia-smi -L | wc -l); NS=$((NG / 2))
+  NG=$(nvidia-smi -L | wc -l); NP=$((NG / 2)); NS=$NSHARDS; [ "$NS" -gt 0 ] || NS=$NP
   export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
   shard() {
-    local i=$1 OUT=/data/out/$TAG/cap$1
+    local p=$1 i=$((SHARD0 + $1)) OUT=/data/out/$TAG/cap$((SHARD0 + $1))
     mkdir -p $OUT
-    export CUDA_VISIBLE_DEVICES=$((2 * i)),$((2 * i + 1)) VLLM_PORT=$((40000 + 100 * i))
+    export CUDA_VISIBLE_DEVICES=$((2 * p)),$((2 * p + 1)) VLLM_PORT=$((40000 + 100 * p))
     [ -f $OUT/states.pt ] || timeout 2h env PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True ~/v4/.venv/bin/python capture_env.py \
       --model /data/v4flash --requests ~/v4/requests.jsonl --out $OUT --layers $LENS_LAYERS --shard $i/$NS > $OUT/capture.log 2>&1
-    sleep $((20 * i))  # stagger engine start-up (JIT caches)
+    sleep $((20 * p))  # stagger engine start-up (JIT caches)
     timeout 4h ~/vl/.venv/bin/python vllm_read.py --model /data/v4flash --lens /data/v4lens --states $OUT/states.pt \
       --layers $LENS_LAYERS --out $OUT/reads_L$LENS_LAYERS.jsonl > $OUT/lens.log 2>&1
     echo "shard $i done"
   }
-  for i in $(seq 0 $((NS - 1))); do shard $i & done
+  for p in $(seq 0 $((NP - 1))); do [ $((SHARD0 + p)) -lt $NS ] && shard $p & done
   while sleep 60; do tail -qn1 /data/out/$TAG/cap*/*.log 2>/dev/null; jobs -r | grep -q . || break; done
   wait
   echo READS_DONE
