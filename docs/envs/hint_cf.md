@@ -94,6 +94,9 @@ Pages: conclusions with the figures and the dissection,
 capped at 20 requests/min per model and a BYOK AI Studio key at 10k requests/day (Tier 1), which is
 what paced the night.
 
+NLA tools in place of the O-lens on 23 of these items are null too (NLA 18% vs placebo 32%):
+[nla-cfbench-hint-mcq.md](../nla-cfbench-hint-mcq.md).
+
 ## Answer task, every run (2026-10-27)
 
 Predict Qwen's no-hint answer from hinted rollouts where it followed the hint; Gemini 3.8 Flash, 3-6
