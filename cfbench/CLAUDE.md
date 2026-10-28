@@ -74,6 +74,20 @@ base run with reads was read with `positions: "all"` in its `requests.jsonl` (th
 their file are listed), so an "every token" run never quietly mixes in sparse reads. Recorded in
 `meta.json` params as `olens_positions`.
 
+J-lens conditions (`cfbench/jlens.py`, harness version 8, reads from `--jlens-reads`:
+`scripts/jpp_read_requests.py` output with `--positions all`, `requests.jsonl` beside it):
+`jlens_agentic` is `transcript_agentic` plus `search_jlens` and `jlens_at`, the O-lens tools' shape
+with the J++ lens's top-5 next tokens per layer in place of bullets: no FVE and no probability
+filter, layers 36-60 by default, every token. `search_jlens(regex, over="tokens")` matches the
+predicted tokens (stripped). `jlens_placebo_agentic` is its placebo, built like the O-lens one. The
+reads must be every-token (cfbench refuses otherwise).
+
+Every lens hit names its position and token (`char 567 · assistant (start of turn) · token "\n\n"`,
+version 8): the tokens after a turn's `<|im_end|>` (newline, `<|im_start|>`, role, `<think>`,
+`</think>`, ...) all sit at the start of the next turn's text, so the token is what tells them
+apart; before version 8 they sat at the previous turn's end, labelled as that turn, with nothing
+naming the token, and a transcript search returned only the first of them.
+
 Both refuse to start if any base arm has reads on fewer than 5 runs and under 50% of its runs (e.g.
 1 of 8; 9 of 40 is fine). Read more runs. **Agents never pass `--allow-few-reads` without asking a
 human first**, even for a deliberate one-run experiment. As of 2026-10-27, 23 of 268 earlier O-lens

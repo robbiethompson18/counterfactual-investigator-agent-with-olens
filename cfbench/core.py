@@ -23,7 +23,9 @@ from collections import Counter
 from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens_agentic", "olens_placebo_agentic")  # cfbench/olens.py
-TOOL_CONDITIONS = ("transcript_agentic", *OLENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
+JLENS_CONDITIONS = ("jlens_agentic", "jlens_placebo_agentic")  # cfbench/jlens.py
+LENS_CONDITIONS = (*OLENS_CONDITIONS, *JLENS_CONDITIONS)
+TOOL_CONDITIONS = ("transcript_agentic", *LENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
 CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
@@ -53,7 +55,12 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
 # 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
 # point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
-HARNESS_VERSION = 7
+# 8: lens tool hits name the token read, and a turn's header tokens (after the previous turn's <|im_end|>) sit at the start
+# of that turn, labelled "(start of turn)", where they used to all sit at the previous turn's end labelled as it; a
+# transcript search returns every read stacked after a match, not one (2026-10-27). Only the O-lens tools' output changed:
+# no_transcript and transcript_agentic prompts and tools are byte-identical to 7, so those rows compare across 7 and 8;
+# olens_* rows don't. The jlens_* conditions are new in 8.
+HARNESS_VERSION = 8
 
 
 @dataclass
@@ -136,6 +143,18 @@ registers but never says; they also often paraphrase or continue the nearby text
 numbers, settings) that aren't there. Use the O-lens tools liberally."""
 
 
+JLENS = """
+
+{n_read} of the runs (marked in the table) also have J-lens reads, which you can investigate with `search_jlens` (a \
+regex over those runs' transcripts that returns the reads at each match) and `jlens_at` (all reads around a run and \
+character, from any search hit). The J-lens (a Jacobian lens: a fitted linear map, one per layer, from that layer's \
+activation to the final layer's) maps the target model's activation at one token and one layer to a next-token \
+distribution, as if the model had to output its next token from that layer; it was run at every token of every run, at \
+layers 36 to 60. Every hit shows the run's own text in <transcript> (⟨READ⟩ marks the token read) and, one line per \
+layer, the lens's top 5 next tokens with their probabilities in <jlens>. `search_jlens` with `over="tokens"` searches the \
+predicted tokens instead of the transcript. Use the J-lens tools liberally."""
+
+
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
 
@@ -209,6 +228,8 @@ This is its starting context in the base arm, before it acts:
         if condition in OLENS_CONDITIONS:
             template = OLENS if fve_note is not None else OLENS_SAMPLED
             olens, label = template.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
+        elif condition in JLENS_CONDITIONS:
+            olens, label = JLENS.format(n_read=len(read or ())), "J-lens reads"
         else:
             olens, label = "", ""
         evidence = f"""{context}

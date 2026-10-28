@@ -71,13 +71,16 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
         self.rows: dict[str, list[dict]] = {}
         for path in map(Path, paths):
             requests = {r["id"]: r for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            # the reader's --positions all says so in its provenance, not in requests.jsonl
+            prov = path.with_name(f"{path.stem}.provenance.json")
+            dense_file = prov.exists() and json.loads(prov.read_text()).get("positions") == "all"
             messages = {id: r["messages"] for id, r in requests.items()}
             offset = 0
             with path.open("rb") as f:
                 for line in f:
                     row = json.loads(line)
                     # msg_index < 0: the tool definitions before the system prompt, same in every run, not in the transcript
-                    dense = requests[row["id"]].get("positions") == "all"
+                    dense = dense_file or requests[row["id"]].get("positions") == "all"
                     if row["msg_index"] >= 0 and positions == "sparse" and dense and not sparse(row):
                         dropped.setdefault(row["id"], path)
                     elif row["msg_index"] >= 0:
@@ -85,7 +88,7 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
                             self.sparse_only.setdefault(row["id"], path)
                         self.messages.setdefault(row["id"], messages[row["id"]])
                         self.offsets[row["id"]].setdefault(path, array("q")).append(offset)
-                        if (b := row["bullets"]) and b[0]["fve"] is not None:
+                        if (b := row.get("bullets")) and b[0]["fve"] is not None:  # J++ rows (cfbench/jlens.py) have none
                             self.top_fves.append(b[0]["fve"])
                     offset += len(line)
         if missing := {s: p for s, p in dropped.items() if s not in self.messages}:
@@ -116,30 +119,46 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
 @dataclass
 class Position:
     char: int  # in the run's rendered transcript
-    where: str  # e.g. "assistant reasoning_content"
+    where: str  # e.g. "assistant reasoning_content", "assistant (start of turn)"
+    token: str  # the token read
     layers: dict[int, dict]  # layer -> read row
+
+    def label(self, scale: float = 1) -> str:
+        """`char 565 · assistant (start of turn) · token "\\n\\n"`: several template tokens share one char, so the token says
+        which read this is."""
+        return f"char {round(self.char / scale)} · {self.where} · token {json.dumps(self.token, ensure_ascii=False)}"
 
 
 def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
-    """One Position per read token, in transcript order."""
+    """One Position per read token, in transcript order. The readers give a template token the msg_index of the message
+    before it, so the tokens after message i's <|im_end|> (the newline, <|im_start|>, role, <think>, </think>, ...) are
+    placed at the start of message i + 1's text as its "(start of turn)"; the <|im_end|> and the other template tokens and
+    tool calls at message i's end."""
     text, spans = render_spans(messages)
-    starts = defaultdict(list)  # message -> its fields' starts, to place template tokens at the message's end
+    starts = defaultdict(list)  # message -> its fields' starts
     for (i, _), b in spans.items():
         starts[i].append(b)
-    ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
+    # message i ends at the "\n\n" before message i + 1's header (headers hold no "\n\n")
+    ends = {i: (text.rfind("\n\n", 0, min(starts[i + 1])) if i + 1 in starts else len(text)) for i in starts}
     by_token = defaultdict(dict)
     for r in rows:
         by_token[r["token_index"]][r["layer"]] = r
+    im_end = {}  # message -> token index of its <|im_end|>
     out = []
-    for layers in by_token.values():
+    for t in sorted(by_token):
+        layers = by_token[t]
         r = next(iter(layers.values()))
         i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
+        if r["token"] == "<|im_end|>" and not field:
+            im_end.setdefault(i, t)
         if (i, field) in spans and c is not None and not field.startswith("tool_call"):
-            char = spans[i, field] + c
-        else:  # tool calls and template tokens: the message's end
-            char = ends.get(i, len(text))
-        where = f"{r['role']} {field}".strip()
-        out.append(Position(char, where, layers))
+            char, where = spans[i, field] + c, f"{r['role']} {field}"
+        elif not field and i in im_end and t > im_end[i]:  # the header of the next turn
+            char = min(starts[i + 1]) if i + 1 in starts else len(text)
+            where = f"{messages[i + 1]['role']} (start of turn)" if i + 1 < len(messages) else "next turn (start)"
+        else:  # tool calls, <|im_end|>, and template tokens inside a turn
+            char, where = ends.get(i, len(text)), f"{r['role']} {field or '(end of turn)'}"
+        out.append(Position(char, where, r["token"], layers))
     return sorted(out, key=lambda p: p.char)
 
 
@@ -215,7 +234,7 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         out, prev = [f"Run {i} (showed the behavior: {yes_no[i]}), {len(shown)} read positions around char {char}:"], None
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
-            out.append(f"\nchar {round(p.char / scale)} · {p.where}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
+            out.append(f"\n{p.label(scale)}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
             got = bullets(p, layers, top_k, min_fve)
             out += [f"<olens {_attrs(layer, b)}>{b['text']}</olens>" for layer, b in got] or [f"(no bullet with FVE >= {min_fve})"]
             prev = p
@@ -246,17 +265,17 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                 for m in pattern.finditer(texts[i]):
                     start, end = m.start() * scale, m.end() * scale
                     inside = [p for p in pos if start <= p.char <= end]
-                    after = next((p for p in pos if p.char > end), None)
-                    hits += [(p, bullets(p, layers, top_k, min_fve)) for p in inside + ([after] if after and after not in inside else [])]
+                    after = next((p.char for p in pos if p.char > end), None)  # every read stacked there (a turn's template tokens)
+                    hits += [(p, bullets(p, layers, top_k, min_fve)) for p in inside + [p for p in pos if p.char == after]]
                     matched.add(i)
             for p, got in hits:
                 if got:
                     matched.add(i)
                 context = _context(text, p.char)
                 for layer, b in got:
-                    head = f"· char {round(p.char / scale)} · {p.where}"
+                    head = f"· {p.label(scale)}"
                     line = f"{head}\n<transcript>{context}</transcript>\n<olens {_attrs(layer, b)}>{b['text']}</olens>"
-                    found.setdefault((context, layer, b["text"]), [[], b["fve"], line])[0].append(i)
+                    found.setdefault((context, p.token, layer, b["text"]), [[], b["fve"], line])[0].append(i)
         kinds = []
         for label, name in ((True, "with"), (False, "without")):
             ids = [i for i in searched if base[i].label == label]
