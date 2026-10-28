@@ -28,7 +28,7 @@ from cfbench.olens import show_token
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 # Kylie 2026-10-28: low ("probably reduce effort then" / "low even") after the first runs at high, her earlier override of
 # the medium default: at high Flash spends ~13-15k reasoning tokens (~96% of max_tokens) on nearly every call, ~$0.058 each.
-# The high runs are the *-inline / *-pause-inline slugs of 2026-10-28 (rows and meta record the effort).
+# The high runs are the 2026-10-28 *-inline slugs (rows and meta record the effort); the *-inline-low ones are low.
 EFFORT = "low"
 CONTEXT = 40  # characters of prompt text each side of a read (about 10 tokens)
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")

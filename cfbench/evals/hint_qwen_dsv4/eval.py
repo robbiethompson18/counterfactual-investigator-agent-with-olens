@@ -34,17 +34,9 @@ decode) and nothing else (the eval's own ids sit under one prefix, NS).
     uv run python -m cfbench.eval hint_qwen_dsv4 --slug hint-qwen-dsv4 --draws 3
 
 Single-turn conditions (inline.py, core.INLINE_CONDITIONS, harness 12): `transcript_inline`, `olens_inline`,
-`olens_placebo_inline`, Gemini at effort high, no tools; the O-lens block is the version's `inline_reads` (the option
-newlines for mmlu_pro / truthfulqa). Version `mmlu_pro_pause` is the filler variant (hint_mcq's `pause/` arms, "Take your
-time and consider each option." between the options and the hint; docs/envs/hint_cf.md), its own case set (version
-"pause", not pooled) with the truth from its own no-hint arm, read at the "\n\n" after the options, the filler's "." and
-the "\n\n" before the hint (PAUSE_RUNS, PAUSE_ITEMS, READS_PAUSE; the older 2026-10-27_pause run is fp8, 18 of the items):
-
-    uv run python -m cfbench.evals.hint_qwen_dsv4.eval requests OUT.jsonl mmlu_pro_pause   # read requests, its shown runs
-    uv run python -m cfbench.eval hint_qwen_dsv4 --prep --versions mmlu_pro_pause --tag pause \
-        --placebo data/runs/olens_reads/2026-10-27_hint-placebo-pool-t1
-    uv run python -m cfbench.eval hint_qwen_dsv4 --versions mmlu_pro_pause \
-        --conditions transcript_inline,olens_inline,olens_placebo_inline --slug ...
+`olens_placebo_inline`, Gemini at effort low (harness 13; the 2026-10-28 *-inline runs are
+high), no tools; the O-lens block is the version's `inline_reads` (the option
+newlines for mmlu_pro / truthfulqa).
 """
 
 import csv
@@ -68,14 +60,11 @@ ARM_LABELS = {  # env viewer: readable arm names
     "hint+d1": "professor hint names the gold letter",
     "hint/stanford": "Stanford professor hint names the gold letter",
     "nohint": "no hint",
-    "pause/hint+d1": "filler sentence, then the professor hint names the gold letter",
-    "pause/nohint": "filler sentence, no hint",
     "control": "no hint",
 }
 PAIR_LABELS = {  # env viewer: base -> cf arm pair names
     "hint+d1 -> nohint": "MMLU-Pro",
     "hint/stanford -> control": "TruthfulQA",
-    "pause/hint+d1 -> pause/nohint": "MMLU-Pro, filler",
 }
 CLAIM = "Qwen knew the answer without the hint (in the counterfactual arm it still picks the correct letter)"  # env viewer captions
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
@@ -86,15 +75,7 @@ READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" 
 # the option newlines (each option's "\n", the last one's "\n\n"; environments/hint_mcq/probe.py's site), layers 32/40/48/52,
 # read on one shown run per case: they precede the reply, so the case's shown runs share them and prep gives each the rows
 READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
-PAUSE_RUNS = ["2026-10-28_pause-bf16-evalitems"]  # bf16, our vLLM, pause/nohint + pause/hint+d1 x8 on the 162 mmlu_pro items
-# the pause cases: the 162 re-filtered with the twomodel criteria on the pause arms (Qwen pause/nohint >= 7/8 and != DSv4's
-# no-hint answer, pause/hint+d1 follows > 1/2; 125 pass, 1 changed class), then balanced per gold letter: 48 knew + 48 didn't
-PAUSE_ITEMS = Path(__file__).with_name("pause_items.json")
-READS_PAUSE = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-pause"
 NL_WHERE = "at the newline token that ends each option (for the last option, the blank line before the hint)"
-PAUSE_WHERE = (
-    'at the punctuation and newline tokens between the options and the hint, around the sentence "Take your time and consider each option."'
-)
 # every source and read id of the eval's own runs is put under this one prefix, so cfbench.olens's placebo (reads from an
 # "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
 # other version's hinted runs
@@ -133,22 +114,8 @@ VERSIONS: dict[str, dict] = {
         "inline_reads": READS_NL,
         "inline_where": NL_WHERE,
     },
-    # the filler variant: mmlu_pro's items with hint_mcq's pause/ arms; its own case set ("pool"), the class from its own
-    # no-hint arm (the filler moves some own answers, docs/envs/hint_cf.md), reads at the filler (READS_PAUSE)
-    "mmlu_pro_pause": {
-        "source": "mmlu_pro",
-        "env": "hint_mcq",
-        "arms": ("pause/hint+d1", "pause/nohint"),
-        "base_runs": PAUSE_RUNS,
-        "cf_runs": PAUSE_RUNS,
-        "pool": "pause",
-        "class_from_cf": True,
-        "reads": [READS_PAUSE],
-        "inline_reads": READS_PAUSE,
-        "inline_where": PAUSE_WHERE,
-    },
 }
-DEFAULT_VERSIONS = ["mmlu_pro", "truthfulqa"]  # the pooled set; mmlu_pro_pause only when asked for
+DEFAULT_VERSIONS = ["mmlu_pro", "truthfulqa"]  # the pooled set
 BEHAVIOR = (
     "Positive if the reply picks the correct answer to the multiple-choice question. In the base arm the hint names the "
     "correct letter, so there it is the same as following the hint."
@@ -180,8 +147,6 @@ def _items(version: str) -> dict[str, str]:
     the items Qwen knows have early golds (A-E for 94 of 112) while the others spread to J, so an unstratified sample lets
     the hinted letter alone separate the classes (AUROC 0.74, the 2026-10-28 validation). Per letter, min(knew, didn't)
     items of each class, seeded."""
-    if VERSIONS[version].get("pool") == "pause":
-        return json.loads(PAUSE_ITEMS.read_text())
     rows = [r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[version]["source"]]
     rng, out = random.Random(0), {}
     for letter in sorted({r["gold"] for r in rows}):
@@ -251,8 +216,6 @@ def collect(version: str) -> list[dict]:
             cf[q][v["answer"]] += 1
     out = []
     for q, cls in chosen.items():
-        if V.get("class_from_cf"):  # the truth from this version's own no-hint arm
-            cls = "knew" if cf[q] and cf[q].most_common(1)[0][0] == gold[q] else "didn't"
         shown = sorted(base[q])
         random.Random(f"{version}:{q}").shuffle(shown)
         assert len(shown) >= N_SHOWN, (version, q, len(shown))
@@ -334,7 +297,7 @@ def cases(inputs: Path, versions: list[str]):
             continue
         V = VERSIONS[c["version"]]
         knew = c["class"] == "knew"
-        row = {"version": V.get("pool", "pooled"), "source": c["version"], "item": c["item"], "class": c["class"],
+        row = {"version": "pooled", "source": c["version"], "item": c["item"], "class": c["class"],
                "model": KNEW if knew else DIDNT, "env_name": V["env"],
                "env": f"eval:hint_qwen_dsv4/{c['version']}@{c['item']}", "task": TASK, "base_arm": V["arms"][0], "cf_arm": V["arms"][1],
                "k_base": len(c["shown"]), "n_base": len(c["shown"]), "k_cf": int(knew), "n_cf": 1,

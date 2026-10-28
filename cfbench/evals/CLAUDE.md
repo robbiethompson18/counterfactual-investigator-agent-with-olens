@@ -113,8 +113,7 @@ the eval `<env>-pairs`.
   P(Qwen answers correctly without the hint), scored as % right at p >= 0.5 (its own score.py; the
   page's claim table shows % right). `letter`: the answer task, name Qwen's no-hint letter (reads
   hint_qwen_dsv4's inputs). Versions `mmlu_pro` and `truthfulqa` sources, pooled into one 86/86 set.
-  Both also run single-turn (`hint_qwen_dsv4/inline.py`, effort high): the prompt and reply in
+  Both also run single-turn (`hint_qwen_dsv4/inline.py`, effort low): the prompt and reply in
   context, plus (`olens_inline`) every bullet at each option's newline, or (`olens_placebo_inline`)
-  another question's with the same option count. Version `mmlu_pro_pause` is the filler variant
-  (`pause/` arms, reads at the filler sentence), waiting on bf16 runs and reads (`PAUSE_RUNS`,
-  `READS_PAUSE`).
+  another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
+  at the filler sentence's punctuation) was tried and dropped: O-lens = placebo (docs/envs/hint_cf.md).
