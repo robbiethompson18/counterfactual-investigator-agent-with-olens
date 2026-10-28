@@ -67,14 +67,18 @@ def sections(text, offs):
     return [[n, tok_of(s), tok_of(e)] for n, s, e in spans if tok_of(e) > tok_of(s)]
 
 
-def forward(model, cap, ids, new, dev, layers, chunk, rid):
+def forward(model, cap, ids, new, dev, layers, chunk, rid, full_max=1 << 30):
     """[n_layers, 4, 4096] bf16 per position in `new`: one forward, or on OOM (HF's unchunked attention on ~20k-token
-    episodes) chunks of `chunk` tokens over a DynamicCache. None if that fails too."""
-    try:
-        cap.want, cap.out = new, {}
-        model(torch.tensor([ids], device=dev), logits_to_keep=1)
-        out = {L: cap.out[L] for L in layers}
-    except torch.OutOfMemoryError:
+    episodes, or above `full_max` tokens) chunks of `chunk` tokens over a DynamicCache. None if that fails too."""
+    out = None
+    if len(ids) <= full_max:
+        try:
+            cap.want, cap.out = new, {}
+            model(torch.tensor([ids], device=dev), logits_to_keep=1)
+            out = {L: cap.out[L] for L in layers}
+        except torch.OutOfMemoryError:
+            pass  # retry outside the except block: its traceback keeps the failed forward's activations alive
+    if out is None:
         cap.want, cap.out = None, {}
         torch.cuda.empty_cache()
         from transformers import DynamicCache
@@ -89,10 +93,15 @@ def forward(model, cap, ids, new, dev, layers, chunk, rid):
                         parts[L].append(cap.out[L])
             out = {L: torch.cat(parts[L]) for L in layers}
             print(f"chunked: {rid} ({len(ids)} tokens)", flush=True)
-        except Exception as e:  # noqa: BLE001
+        except torch.OutOfMemoryError as e:
+            msg = repr(e)
+        else:
+            msg = None
+        if msg:
+            del cache
             cap.want, cap.out = None, {}
             torch.cuda.empty_cache()
-            print(f"OOM, skipped: {rid} ({len(ids)} tokens; chunked failed: {e!r})", flush=True)
+            print(f"OOM, skipped: {rid} ({len(ids)} tokens; chunked failed: {msg})", flush=True)
             return None
     cap.want = None
     return [torch.stack([out[L][j] for L in layers]).to(torch.bfloat16) for j in range(len(new))]
@@ -109,6 +118,7 @@ def main():
     ap.add_argument("--shard", default="0/1", help="i/n")
     ap.add_argument("--chunk-tokens", type=int, default=1024)
     ap.add_argument("--gpu-frac", type=float, default=0.6)
+    ap.add_argument("--full-max-tokens", type=int, default=1 << 30, help="longer transcripts go straight to chunks")
     a = ap.parse_args()
     sys.path.insert(0, str(Path(a.model) / "encoding"))
     from encoding_dsv4 import encode_messages
@@ -154,7 +164,7 @@ def main():
                     keys[i] = h.copy().hexdigest()
             new = [p for p in pos if keys[p] not in seen]
             if new and not a.dry:
-                got = forward(model, cap, ids, new, dev, layers, a.chunk_tokens, r["id"])
+                got = forward(model, cap, ids, new, dev, layers, a.chunk_tokens, r["id"], a.full_max_tokens)
                 if got is None:
                     continue
                 states += got
