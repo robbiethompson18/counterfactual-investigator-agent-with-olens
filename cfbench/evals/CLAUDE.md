@@ -69,6 +69,7 @@ transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` run
   reads cover the prompt only, in one format for both models. So only the reads can tell the models
   apart. Versions `original` and `v7`.
 - `overeager_main`: over-eagerness on GLM 5.3, the env's "main: one-edit fixes and nulls"
-  comparisons (payback, dana, calendar, gitbranch, email junebug, 4 Johns), base arm → each of its 4
-  one-line edits, 24 cases. Every pooled GLM base-arm run is shown; O-lens reads (Celeste's RL lens,
-  template tokens) exist almost only on base runs that acted without asking. Version `main`.
+  comparisons (payback, dana, calendar, gitbranch, email junebug; 4 Johns left out, it is email item
+  0), base arm → each of its 4 one-line edits, 20 cases. Every pooled GLM base-arm run is shown;
+  O-lens reads (Celeste's RL lens, template tokens) exist almost only on base runs that acted
+  without asking. Version `main`.
