@@ -121,7 +121,9 @@ split tokens). Private repo: Robbie can open it, Kylie can't.
 
 `data/` (gitignored) mirrors the public HF dataset
 [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
-O-lens banks in `banks/`, agent runs in `runs/`. Pull with
+O-lens banks in `banks/` (WorkspaceBench item banks in `banks/wsb/`), agent runs in `runs/`. **Item
+banks and other datasets are data: they go on HF, never in git**; code loads them from `data/` and
+downloads on first use (`wsb/banks.py`). Pull with
 `hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`.
 CHIVE incidents themselves come from
 [agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).
@@ -179,10 +181,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 - `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
-  see `vendor/CLAUDE.md`. Never import, run or wrap it; port what you need into our own harness
-  (`environments/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
-  agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
-  commit `e145988`.
+  see `vendor/CLAUDE.md`. Never import, run or wrap its code; port what you need into our own
+  harness (`environments/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box
+  screens of agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts
+  are at commit `e145988`. A build script may read its data files (e.g. `wsb/build_banks.py` reads
+  workspace-bench's `evals/*/items.json` at the pinned commit) to make a bank for HF.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in
@@ -198,6 +201,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   aren't directly comparable to his; say so when quoting both.
 - Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
   effort `medium` by default, so tool uplift isn't swamped by agent strength.
+- **WorkspaceBench (WSB) replication is the exception to both rules above:** text-reader rollouts
+  are Sonnet 5.5 (`claude-sonnet-5-5`, effort `medium`) and every judge call is Opus 5.5
+  (`claude-opus-5-5`), not Gemini or Haiku, so our numbers sit beside WSB's Opus-judged lens rows
+  (`agu18dec/olens_ablations`). Code is in `wsb/`.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
   Pages or the repo's GitHub Pages site that reads the public HF dataset; search is a JavaScript
   regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
@@ -487,18 +494,24 @@ Current docs:
   only wrong-MCQ lives on (`environments/hint_mcq/`); 2026-10-28 scale-up (2,000 more questions, 174
   / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
-  answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
-  pre-hint-reads arms in flight (PR #320)
+  answer before any readable position, it is readable only in the no-hint arm; three legs moving the
+  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp [+5, +23], 50
+  items, not yet dissected)
 - [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
   — 718 consistent MMLU-Pro questions (half wrong): a linear probe at the newline after each option
   (L52) picks Qwen's own answer 94% / 80% (right / wrong questions) and the gold on wrong ones only
   6%; listwise softmax pmf (NLL 0.30, ECE 0.04; diag beats full whitening); frozen, it transfers to
   TruthfulQA (top-1 = Qwen's answer 0.885 out-of-sample, the truth 0.14 on wrong questions); O-lens
   reads at the same tokens point the same way but a regex over them is a weak readout (≤ 0.31)
-- [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
-  — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
-  on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
-  2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
+- [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
+  — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
+  within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
+  at next-token (checked against Qwen, no bug); harness v8 token labels
+- [NULL: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
+  — letter grades on 3 essays: underpowered (Qwen gives nearly everything an A); out of 10 on 12
+  essays spread terrible → excellent, Duke → no scenario: O-lens RMSE 0.86 vs transcript 0.65 vs
+  placebo 0.60 (O-lens worse than placebo, CI excludes 0); the lens's "standard essay" runner-up
+  score at the grade token overshoots
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
   — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
@@ -530,6 +543,10 @@ Current docs:
 - [NULL: Alignment faking in cfbench — read before giving an investigator DSV4 Flash O-lens reads, or claiming the lens predicts which requests flip](docs/alignment-faking-cfbench.md)
   — pooled and per-request results on the original and v7 prompts: lens ≈ placebo, prompt-only wins,
   the model's own first-token logprob ranks flips at 0.76 and nothing in the reads beats it
+- [NULL: Over-eagerness one-edit cases in cfbench — read before predicting GLM 5.3 over-eagerness edits with the O-lens, or reusing cfbench/evals/overeager_main](docs/overeager-main-cfbench.md)
+  — 20 arm pairs × 8 shown acting runs (160 cases), 1 draw: env 18.3 / transcript 18.6 / O-lens
+  18.1pp vs null 22.2, O-lens − transcript [−2.8, +2.4]; every condition misses the no-done-tool
+  drop (30–56pp)
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](docs/envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)
@@ -567,10 +584,15 @@ Current docs:
   — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
   beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
   L42, Camila multilayer, the 2B student), throughput, consensus sampling
+- [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
+  — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
+  question (prompt inversion), and the predictor cites them only to back the hinted answer
 - [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
   — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
-  rule), agentic_misalignment scores the scenario's design; paused 2026-10-28 after Gemini smokes
+  rule), agentic_misalignment scores the scenario's design; Sonnet 5.5 on all 47 user_modeling
+  selfdescribe items: 0.81 pass@1 vs the lens's 0.20 per readout, lens wins only at any-of-~231
+  (gender is Sonnet's gap)
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas

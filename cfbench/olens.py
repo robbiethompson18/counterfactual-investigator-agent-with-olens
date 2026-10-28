@@ -213,18 +213,24 @@ def _context(text: str, char: int) -> str:
     return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
 
 
-def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, kind: str = "olens") -> tuple[dict[str, Tool], set[int]]:
+def tools(
+    base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, sources: list[str] | None = None, kind: str = "olens"
+) -> tuple[dict[str, Tool], set[int]]:
     """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads."""
     lens = LENSES[kind]
     unit = lens.unit[:-1]
     texts = [render_spans(r.messages)[0] for r in base]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]
     source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
+    if sources is not None:  # an eval's own placebo (cfbench/eval.py PLACEBO): run i's reads come from sources[i]
+        source = dict(enumerate(sources))
+        read_ids = sorted(source)
     if placebo:
         env = base[0].source.split("/")[0]
         pool = sorted(s for s in reads if s.split("/")[0] != env)
         assert pool, f"placebo needs reads from an env other than {env}"
-        random.Random(seed).shuffle(pool)
+        # seeded per case (its base runs), so different cases get different placebo transcripts (2026-10-28)
+        random.Random(f"{seed}/" + "|".join(r.source for r in base)).shuffle(pool)
         source = dict(zip(read_ids, pool * (len(read_ids) // len(pool) + 1)))
     cache: dict[int, tuple[list[Position], float, str]] = {}
 

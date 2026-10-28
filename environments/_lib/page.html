@@ -124,7 +124,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .anschart .chance{stroke:var(--faint);stroke-dasharray:2 3} .anspanels{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:flex-end}
 .drawcard{position:fixed;z-index:20;width:min(440px,calc(100vw - 16px));background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.18);font-size:13px}
 .drawcard .big{font-size:22px;font-weight:700;margin:2px 0 6px} .drawcard .why{margin:6px 0 10px;max-height:220px;overflow:auto;line-height:1.5}
-table.evt{box-shadow:none} .chips{max-height:150px;overflow:auto} table.evt td,table.evt th{padding:5px 8px} .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.pooled td{border-top:2px solid var(--line);background:var(--bar-soft,transparent)} table.evt{box-shadow:none} .chips{max-height:150px;overflow:auto} table.evt td,table.evt th{padding:5px 8px} .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -551,8 +551,8 @@ async function home() {
     <div class="why">${esc(e.title)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't build</span>` : ""}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
     <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
-  const evs = await maybe(getEval("index.json"));
-  if (evs?.evals?.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs.evals)}`;
+  const evs = await evalList();
+  if (evs.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs)}`;
 }
 
 const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
@@ -741,6 +741,34 @@ const swatch = c => `<i class="sw" style="background:${condColor(c)}"></i>`;
 const pp = x => x == null ? "–" : (100 * x).toFixed(0);
 const evItem = (R, id) => evq({dataset: R.expview, item: id});
 const docentRun = (R, id) => id && R.docent_collection ? `${DOCENT}${R.docent_collection}/agent_run/${id}` : null;
+// RMSE per condition and the null with 95% bootstrap CIs over arm pairs (environments/_lib/evals.py rmse_ci), and the
+// paired differences between conditions: a horizontal bar chart with error bars, then a table
+const ciShort = c => c === "null" ? "edit does nothing" : condShort(c);
+const ciColor = c => c === "null" ? "var(--faint)" : condColor(c);
+function rmseCiBlock(rmse, nul, boot, title) {
+  if (!boot) return "";
+  const conds = ["null", ...condOrder(Object.keys(rmse))].filter(c => boot.ci[c]);
+  const val = c => c === "null" ? nul : rmse[c];
+  const max = Math.max(...conds.map(c => boot.ci[c][1])), top = Math.ceil(max * 20) / 20 || 0.05;
+  const L = 130, W = 540, rowH = 26, H = conds.length * rowH + 24, x = v => L + (v / top) * (W - L - 130), f = v => v.toFixed(1);
+  let svg = "";
+  for (let v = 0; v <= top + 1e-9; v += 0.05) svg += `<line x1="${f(x(v))}" x2="${f(x(v))}" y1="0" y2="${H - 18}" class="grid"/><text x="${f(x(v))}" y="${H - 4}" class="ax" text-anchor="middle">${Math.round(100 * v)}</text>`;
+  conds.forEach((c, i) => {
+    const y = i * rowH + 6, [lo, hi] = boot.ci[c], v = val(c);
+    svg += `<text x="${L - 8}" y="${y + 12}" class="ax" text-anchor="end">${esc(ciShort(c))}</text>
+      <rect x="${L}" y="${y}" width="${f(x(v) - L)}" height="16" fill="${ciColor(c)}" opacity="${c === "null" ? 1 : 0.85}"><title>${esc(ciShort(c))}: RMSE ${(100 * v).toFixed(1)}pp, 95% CI ${(100 * lo).toFixed(1)}–${(100 * hi).toFixed(1)}</title></rect>
+      <line x1="${f(x(lo))}" x2="${f(x(hi))}" y1="${y + 8}" y2="${y + 8}" stroke="var(--fg)" stroke-width="1.5"/>
+      <line x1="${f(x(lo))}" x2="${f(x(lo))}" y1="${y + 3}" y2="${y + 13}" stroke="var(--fg)" stroke-width="1.5"/><line x1="${f(x(hi))}" x2="${f(x(hi))}" y1="${y + 3}" y2="${y + 13}" stroke="var(--fg)" stroke-width="1.5"/>
+      <text x="${f(x(hi) + 6)}" y="${y + 12}" class="ax">${(100 * v).toFixed(1)} [${(100 * lo).toFixed(1)}, ${(100 * hi).toFixed(1)}]</text>`;
+  });
+  const sig = ci => ci && (ci[1] < 0 ? "up" : ci[0] > 0 ? "down" : "flat");
+  const diffs = boot.diffs.map(d => `<tr><td>${swatch(d.a)}${esc(ciShort(d.a))} − ${esc(ciShort(d.b))}</td>
+    <td class="num"><span class="delta ${sig(d.ci)}">${d.est > 0 ? "+" : ""}${(100 * d.est).toFixed(1)}pp</span></td>
+    <td class="num">${d.ci ? `[${d.ci.map(v => (v > 0 ? "+" : "") + (100 * v).toFixed(1)).join(", ")}]` : "–"}</td></tr>`).join("");
+  return `<div class="card" style="margin:8px 0"><b>${title}</b> <span class="mute">RMSE in pp (lower is better), 95% bootstrap CI over ${boot.n_clusters} arm pairs (${boot.n_boot} resamples; an arm pair's cases share one truth)</span>
+    <div class="scroll"><svg class="evchart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="RMSE per condition with 95% bootstrap CIs">${svg}</svg></div>
+    <div class="scroll"><table><tr><th>paired difference (same resamples)</th><th>RMSE difference</th><th>95% bootstrap CI over ${boot.n_clusters} arm pairs</th></tr>${diffs}</table></div></div>`;
+}
 const rmseBadge = (x, nul) => x == null ? "–" : `<span class="delta ${x < nul - 0.005 ? "up" : x > nul + 0.005 ? "down" : "flat"}" title="RMSE ${(100 * x).toFixed(1)}pp vs ${(100 * nul).toFixed(1)}pp for 'the edit does nothing'">${(100 * x).toFixed(1)}pp</span>`;
 const shortModel = m => m.replace(/^[^/]+\//, "");
 // clicking a draw (chart point or chip) opens a card: the prediction, the investigator's explanation, and Docent + expview
@@ -775,6 +803,16 @@ addEventListener("keydown", e => { if (e.key === "Escape" && $("drawcard")) $("d
 // evals/ sits beside envs/ (HF, or the local mirror)
 async function getEval(path) {
   return fetchOnce("e:" + path, async () => { const r = await fetch((await base()).replace(/envs\/$/, "evals/") + path); if (!r.ok) throw new Error("evals/" + path + ": " + r.status); return r.json(); });
+}
+// the eval list is the code's, like the env list: spec/evals.json beside the page (every eval cfbench/evals/ and
+// PAIRS_ENVS define), with each one's run stats from HF's evals/index.json by name; an eval with no runs there yet still
+// gets a card; RETIRED_EVALS are left off unless `all`. Without a code spec (?spec=hf) it is HF's index as is.
+async function evalList(all = false) {
+  const [code, idx] = await Promise.all([codeIndex(), maybe(getEval("index.json"))]);
+  const defs = code ? await maybe(fetchOnce("c:evals.json", async () => { const r = await fetch("spec/evals.json"); if (!r.ok) throw new Error("spec/evals.json: " + r.status); return r.json(); })) : null;
+  if (!defs) return idx?.evals || [];
+  const hf = Object.fromEntries((idx?.evals || []).map(e => [e.name, e]));
+  return defs.evals.filter(d => all || !d.retired).map(d => ({...hf[d.name], name: d.name, title: d.title, envs: d.envs.length ? d.envs : hf[d.name]?.envs || [], error: d.error, retired: d.retired}));
 }
 
 // a group = (env, version, base arm, cf arm, model), pooled over the eval's items: the observed rate before (base arm)
@@ -824,15 +862,15 @@ function evalCard(R, g) {
     const ds = g.draws[k], ok = ds.filter(d => d.p != null), m = ok.reduce((t, d) => t + d.p, 0) / (ok.length || 1);
     const cell = ds.length <= 12 ? ds.map(d => chip(d, k)).join("") : `<div class="chips">${ds.map(d => chip(d, k)).join("")}</div>`;
     const all = R.expview ? `<br><a href="${evq({dataset: R.expview, group: `${shortModel(g.model)} · ${g.base} -> ${g.cf} · ${k}`})}" target="_blank" rel="noopener" title="every draw of this row in expview">all ${ds.length} in expview ↗</a>` : "";
-    return `<tr><td>${swatch(k)}${esc(condLabel(k))}${all}</td><td>${cell}</td><td class="num">${pp(m)}%</td><td>${rmseBadge(g.rmse[k], g.rmse_null)}</td></tr>`;
+    return `<tr><td>${swatch(k)}${esc(condLabel(k))}${all}</td><td>${cell}</td><td class="num">${pp(m)}%</td></tr>`;
   }).join("");
   const shown = g.n_shown !== g.n_base ? ` The investigator was shown ${g.k_shown} of ${g.n_shown} base runs, so the null predicts ${pp(g.k_shown / g.n_shown)}%.` : "";
   return `<div class="card evcase"><div class="row" style="margin:0 0 4px;justify-content:space-between"><b title="${esc(g.target)}">${esc(modelName(g.target))}</b>
       <span class="mute">${g.n_cases > 1 ? `${g.n_cases} cases · ` : ""}${g.pair ? (g.reverse ? "pair, reversed" : "pair") : "arms"} · <a href="${cmp}">what changes ↗</a></span></div>
     <div class="scroll">${evalChart(R, g)}</div>
-    <p class="mute" style="margin:2px 0 8px;font-size:12px">Truth ${g.k_base}/${g.n_base} = ${pp(g.k_base / g.n_base)}% → ${g.k_cf}/${g.n_cf} = ${pp(g.k_cf / g.n_cf)}%.${shown}
-      "Edit does nothing" scores <b>${(100 * g.rmse_null).toFixed(1)}pp</b>.</p>
-    <table class="evt"><tr><th>investigator</th><th>draws: click one for its explanation and links</th><th>mean</th><th>RMSE</th></tr>${rows}</table>
+    <p class="mute" style="margin:2px 0 8px;font-size:12px">Truth, pooled over ${g.n_cases > 1 ? `the ${g.n_cases} cases' goals` : "the case's runs"}: base arm ${g.k_base}/${g.n_base} = ${pp(g.k_base / g.n_base)}% → counterfactual arm ${g.k_cf}/${g.n_cf} = ${pp(g.k_cf / g.n_cf)}%. Every case is scored against that pooled rate.${shown}
+</p>
+    <table class="evt"><tr><th>investigator</th><th>draws: click one for its explanation and links</th><th>mean</th></tr>${rows}</table>
     <div class="mini" style="margin-top:10px"><span class="mute">before</span><span>${armLinks(g.base)}</span><span class="mute">after</span><span>${armLinks(g.cf)}</span></div></div>`;
 }
 
@@ -932,7 +970,10 @@ function ansPick() {
   location.hash = setParam("runs", on.length === all.length ? "" : on.join(","));
 }
 
-const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
+const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => !e.n_runs ? `<div class="card">
+    <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't import</span>` : ""}</div>
+    <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span></div>
+    <div class="meta"><span>no runs yet</span></div></div>` : `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
     <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}</div>
     <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span><span class="mute">models</span><span>${e.models.map(m => esc(shortModel(m))).join(", ")}</span>
       <span class="mute">conditions</span><span>${condOrder(e.conditions).map(k => swatch(k) + esc(condShort(k))).join(" ")}</span></div>
@@ -940,26 +981,29 @@ const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class
 
 async function evalsHome() {
   setCrumb([["evals", "evals=1"]]);
-  const idx = await getEval("index.json");
+  const evs = await evalList();
   $("view").innerHTML = `<h1>Evals</h1><p class="lede">cfbench evals: an investigator sees a base arm and the exact edit and predicts the behaviour rate after it (or, in the answer task, the model's answer after it).
     An eval can span several envs, models and pairs; each is defined in <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>
-    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env).</p>${evalCards(idx.evals)}`;
+    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env, for the envs in <span class="mono">PAIRS_ENVS</span>).</p>${evalCards(evs)}`;
 }
 
 // an env's Evals tab: the evals that use it
 async function evalsTab(D) {
-  const idx = await maybe(getEval("index.json"));
-  const es = (idx?.evals || []).filter(e => e.envs.includes(D.env));
+  const es = (await evalList()).filter(e => e.envs.includes(D.env));
   $("tab").innerHTML = es.length ? `<p class="lede">cfbench evals that use this env. An eval can span several envs; its page shows them all, or only this one's cases from here.</p>${evalCards(es, D.env)}`
     : `<p class="mute">No cfbench eval uses ${esc(D.env)} yet: see <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>.</p>`;
 }
 
 async function evalPage(h) {
   DRAWS = [];
-  const ev = await getEval(`${h.eval}.json`);
+  const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalList(true)]);
+  const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
-  const all = ev.runs.filter(R => !h.run || R.run === h.run);
-  const runs = all.filter(R => R.task !== "answer"), ans = all.filter(R => R.task === "answer");
+  const every = ev.runs.filter(R => !h.run || R.run === h.run);
+  // the newest complete run per version (per inputs run where the eval compares them); superseded runs fold away below
+  const all = every.filter(R => h.run || R.current !== false), older = h.run ? [] : every.filter(R => R.current === false);
+  const claim = all.filter(R => R.task === "claim");
+  const runs = all.filter(R => R.task !== "answer" && R.task !== "claim"), ans = all.filter(R => R.task === "answer");
   const keep = g => !h.env || g.env === h.env;
   const allConds = condOrder([...new Set(runs.flatMap(R => R.conditions))]);
   const ansConds = condOrder([...new Set(ans.flatMap(R => R.conditions))]);
@@ -982,16 +1026,22 @@ async function evalPage(h) {
     ${runs.map(R => `<tr><td><b class="mono" title="${esc(R.description || "")}">${esc(R.slug)}</b><br><span class="mute">${esc(R.date)} · harness v${R.harness_version}</span>
         ${R.expview ? `<br><a href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">conversations ↗</a>` : ""}</td><td>${R.models.map(m => esc(shortModel(m))).join("<br>")}</td>
       <td class="mono">${R.predictors.map(esc).join("<br>")}<br><span class="mute">effort ${esc(R.effort)} · ${R.max_calls} calls</span></td><td>${R.n_cases}</td>
-      ${allConds.map(k => `<td>${R.rmse[k] == null ? '<span class="mute">–</span>' : rmseBadge(R.rmse[k], R.rmse_null)}</td>`).join("")}<td class="num">${(100 * R.rmse_null).toFixed(1)}pp</td></tr>`).join("")}</table></div>`;
+      ${allConds.map(k => `<td>${R.rmse[k] == null ? '<span class="mute">–</span>' : rmseBadge(R.rmse[k], R.rmse_null)}</td>`).join("")}<td class="num">${(100 * R.rmse_null).toFixed(1)}pp</td></tr>`).join("")}
+    ${ev.pooled && !h.run && !h.env ? `<tr class="pooled"><td><b>pooled over ${ev.pooled.runs.length} runs</b><br><span class="mute">${ev.pooled.runs.map(esc).join(" + ")}</span></td><td></td><td></td><td>${ev.pooled.n_cases}</td>
+      ${allConds.map(k => `<td>${ev.pooled.rmse[k] == null ? '<span class="mute">–</span>' : rmseBadge(ev.pooled.rmse[k], ev.pooled.rmse_null)}</td>`).join("")}<td class="num">${(100 * ev.pooled.rmse_null).toFixed(1)}pp</td></tr>` : ""}</table></div>`;
   const paired = runs.flatMap(R => R.paired.filter(keep).map(p => [R, p]));
-  const pairedHtml = paired.length ? `<h3>Paired models (same cases, different model)</h3>
+  const pairedHtml = paired.length ? `<h3>Paired models (same cases, different model)${ev.pooled && !h.run && !h.env ? ", pooled over versions at the bottom" : ""}</h3>
     <p class="lede">Mean predicted p per model, next to each model's true rate, and the AUROC of the per-case mean p for telling the first model's cases from the second's
       (0.5 = can't tell them apart; 1 = always higher for the first).</p>
     <div class="scroll"><table><tr><th>run</th><th>case</th><th>investigator</th><th>model A (truth)</th><th>mean p A</th><th>model B (truth)</th><th>mean p B</th><th>AUROC A > B</th></tr>
     ${paired.map(([R, p]) => `<tr><td class="mono">${esc(R.slug)}</td><td class="mono">${esc(p.env)}${p.version ? ` · ${esc(p.version)}` : ""}<br>${esc(p.base)} → ${esc(p.cf)}</td><td>${swatch(p.condition)}${esc(condShort(p.condition))}</td>
       <td>${esc(shortModel(p.models[0]))} <span class="mute">(${pp(p.truth[0])}%)</span></td><td class="num">${pp(p.mean_p[0])}%</td>
       <td>${esc(shortModel(p.models[1]))} <span class="mute">(${pp(p.truth[1])}%)</span></td><td class="num">${pp(p.mean_p[1])}%</td>
-      <td class="num"><b>${p.auroc == null ? "–" : p.auroc.toFixed(2)}</b> <span class="mute">n ${p.n[0]}/${p.n[1]}</span></td></tr>`).join("")}</table></div>` : "";
+      <td class="num"><b>${p.auroc == null ? "–" : p.auroc.toFixed(2)}</b> <span class="mute">n ${p.n[0]}/${p.n[1]}</span></td></tr>`).join("")}
+    ${ev.pooled && !h.run && !h.env ? ev.pooled.paired.map(p => `<tr class="pooled"><td><b>pooled</b></td><td class="mute">all ${ev.pooled.runs.length} runs</td><td>${swatch(p.condition)}${esc(condShort(p.condition))}</td>
+      <td>${esc(shortModel(p.models[0]))} <span class="mute">(${pp(p.truth[0])}%)</span></td><td class="num">${pp(p.mean_p[0])}%</td>
+      <td>${esc(shortModel(p.models[1]))} <span class="mute">(${pp(p.truth[1])}%)</span></td><td class="num">${pp(p.mean_p[1])}%</td>
+      <td class="num"><b>${p.auroc == null ? "–" : p.auroc.toFixed(2)}</b> <span class="mute">n ${p.n[0]}/${p.n[1]}</span></td></tr>`).join("") : ""}</table></div>` : "";
   // sections: env → version → base → cf, a card per model, every run
   const sections = {};
   for (const R of runs) for (const g of R.groups.filter(keep)) (sections[[g.env, g.version || "", g.pair || "", g.reverse, g.base, g.cf].join("\u0000")] ??= []).push([R, g]);
@@ -1002,6 +1052,7 @@ async function evalPage(h) {
       `<div class="evcases">${gs.map(([R, g]) => (runs.length > 1 ? `<div><h3 style="margin-top:0">${esc(R.slug)}</h3>` : "<div>") + evalCard(R, g) + "</div>").join("")}</div>`;
   }).join("");
   $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}</h1>
+    ${retired ? `<p class="mute"><span class="tag">retired</span> Set aside (RETIRED_EVALS in environments/_lib/evals.py): not on the Evals list; this page stays for reference.</p>` : ""}
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
@@ -1009,9 +1060,95 @@ async function evalPage(h) {
     <details class="sec"><summary>About this eval</summary><div class="body readme">${md(ev.description || "")}</div></details>
     ${runs.length ? `<p class="lede">Each chart has the observed rate before (base arm) and after (counterfactual arm), bands = 95% credible intervals (Beta(1,1)), and every investigator
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
-      everything that investigator saw and said (prompt, tool calls and results, submit) in expview. RMSE is per case over draws, then over cases with equal weight
-      (<a href="https://github.com/${GH}/blob/main/docs/cfbench-scoring.md" target="_blank" rel="noopener">cfbench scoring</a>); green beats the null, red is worse.</p>` : ""}
-    ${runs.length ? `<h3>RMSE over all cases</h3>${summary}${pairedHtml}${body}` : ""}${ansSummary}${ansBody}`;
+      everything that investigator saw and said (prompt, tool calls and results, submit) in expview.</p>` : ""}
+    ${claim.length ? claimSection(ev, claim, keep, h) : ""}
+    ${runs.length ? `${runs.map(R => rmseCiBlock(R.rmse, R.rmse_null, R.boot, `${esc(R.slug)} · harness v${R.harness_version}`)).join("")}
+      ${ev.pooled && !h.run && !h.env ? rmseCiBlock(ev.pooled.rmse, ev.pooled.rmse_null, ev.pooled.boot, `pooled over ${ev.pooled.runs.length} runs`) : ""}
+      ${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ansBody}
+    ${older.length ? `<details class="sec"><summary>Older runs (${older.length}): superseded by the runs above</summary><div class="body"><ul>${older.map(R =>
+      `<li><a class="mono" href="#${hashOf({eval: h.eval, run: R.run})}">${esc(R.slug)}</a> <span class="mute">${esc(R.date)} · ${R.n_cases} cases · ${R.versions ? esc(R.versions.join(", ")) : ""}${R.inputs ? ` · inputs ${esc(R.inputs)}` : ""}</span></li>`).join("")}</ul></div></details>` : ""}`;
+}
+
+// claim evals (cfbench/evals CLAUDE.md, TASK = "claim"): the investigator gives P(a claim is true), truth 0 or 1 per case,
+// e.g. "the target model is the alignment-faking one". Scored by Brier (af_which/score.py); 0.25 = always answering 0.5.
+const br = (x, ci) => {
+  const cls = ci && ci[1] < 0.25 ? "up" : ci && ci[0] > 0.25 ? "down" : "flat";
+  return `<span class="delta ${cls}" title="95% bootstrap CI over items ${ci ? ci.map(v => v.toFixed(3)).join("–") : ""}; 0.25 = always 0.5">${x.toFixed(3)}</span>${ci ? ` <span class="mute">[${ci.map(v => v.toFixed(2)).join(", ")}]</span>` : ""}`;
+};
+// claim evals whose score.py reports % right (guess = p >= 0.5, e.g. hint_qwen_dsv4): that is the headline, AUROC second
+function accuracyTable(t, models) {
+  const ci = c => c ? ` <span class="mute">[${c.map(v => pct(v)).join(", ")}]</span>` : "";
+  const rows = t.rows.map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(x.version)}</td><td class="num">${x.n_items}</td>
+    <td class="num"><b>${pct(x.accuracy)}</b>${ci(x.accuracy_ci)}</td>
+    ${models.map(m => `<td class="num">${x.accuracy_by_class?.[m] == null ? "–" : pct(x.accuracy_by_class[m])}</td>`).join("")}
+    <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
+  return `<h3>Inputs <span class="mono">${esc(t.inputs || "?")}</span> <span class="mute" style="font-weight:400;font-size:13px">runs ${t.runs.map(esc).join(" + ")}</span></h3>
+    <p class="lede">% of guesses right (guess = p ≥ 0.5; classes balanced, so chance is 50%), with a 95% bootstrap CI over items; per class; AUROC of p (calibration-free); Brier for reference.</p>
+    <div class="scroll"><table><tr><th>investigator</th><th>version</th><th>items</th><th>% right [95% CI]</th>
+      ${models.map(m => `<th>% right on<br><span class="mono">${esc(shortModel(m))}</span></th>`).join("")}<th>AUROC</th><th>Brier</th><th>invalid</th></tr>${rows}</table></div>`;
+}
+function claimSection(ev, claim, keep, h) {
+  const faker = m => (claim.flatMap(R => R.groups).find(g => g.model === m) || {}).k_cf === 1;
+  const models = [...new Set(claim.flatMap(R => R.models))].sort((a, b) => faker(b) - faker(a));
+  const pairEval = claim.some(R => R.groups.some(g => g.n_shown === 2));
+  const tables = (ev.claim_tables || []).map(t => {
+    if (t.rows.some(x => x.accuracy != null)) return accuracyTable(t, models);  // evals scored by % right (their score.py)
+    const pairCols = t.rows.some(x => x.pick_accuracy != null);
+    const rows = t.rows.map(x => `<tr${x.version === "pooled" ? ' class="pooled"' : ""}><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${x.version === "pooled" ? "<b>pooled</b>" : esc(x.version)}</td><td class="num">${x.n}</td>
+      <td class="num">${br(x.mean_brier, x.mean_brier_ci)}</td><td class="num">${br(x.brier_pbar, x.brier_pbar_ci)}</td>
+      ${models.map(m => `<td class="num">${x.pbar[m] == null ? "–" : x.pbar[m].toFixed(2)}</td>`).join("")}
+      <td class="num"><b>${x.auroc == null ? "–" : x.auroc.toFixed(2)}</b></td>
+      ${pairCols ? `<td class="num">${x.pick_accuracy == null ? "–" : pct(x.pick_accuracy)}</td><td class="num">${x.order_consistency == null ? "–" : x.order_consistency.toFixed(3)}</td>` : ""}
+      <td class="num">${x.invalid || 0}</td></tr>`).join("");
+    return `<h3>Inputs <span class="mono">${esc(t.inputs || "?")}</span> <span class="mute" style="font-weight:400;font-size:13px">runs ${t.runs.map(esc).join(" + ")}</span></h3>
+      <div class="scroll"><table><tr><th>investigator</th><th>version</th><th>predictions</th><th title="mean over every prediction of (p - truth)²">mean Brier [95% CI]</th>
+        <th title="per model, the mean p over its cases; then the mean over the two models of (p̄ - truth)²">Brier(p̄) [95% CI]</th>
+        ${models.map(m => `<th>p̄ ${pairEval ? "when A = " : ""}${esc(shortModel(m))}<br><span class="mute">truth ${faker(m) ? 1 : 0}</span></th>`).join("")}
+        <th title="the faker's predictions vs the other model's: 1 = always higher for the faker, 0.5 = can't tell">AUROC</th>
+        ${pairCols ? `<th title="share of predictions on the right side of 0.5">pick accuracy</th><th title="mean over items of |p(order 0) - (1 - p(order 1))|: 0 = swapping A and B mirrors the answer">order consistency</th>` : ""}
+        <th>invalid</th></tr>${rows}</table></div>`;
+  }).join("");
+  // dot strips: per (inputs, version) one chart, a column pair per condition, every draw clickable
+  const strips = {};
+  for (const R of claim) for (const g of R.groups.filter(keep)) (strips[[R.inputs || "", g.version || ""].join("\u0000")] ??= []).push([R, g]);
+  const body = Object.values(strips).map(gs => {
+    const [R0, g0] = gs[0];
+    const ctx = models.map(m => { const g = gs.find(([, g]) => g.model === m)?.[1]; return !g ? "" : ev.name.startsWith("af_") ? `${esc(shortModel(m))}: public ${g.k_base}/${g.n_base}, preview ${g.k_cf_pool}/${g.n_cf_pool} = ${pp(g.k_cf_pool / g.n_cf_pool)}% (${faker(m) ? "the faker" : "doesn't fake"})`
+      : `${esc(shortModel(m))}: claim ${faker(m) ? "true" : "false"}, counterfactual arm ${g.k_cf_pool}/${g.n_cf_pool}`; }).filter(Boolean).join(" · ");
+    return `<h2>${g0.version ? esc(g0.version) : ""} <span class="mute" style="font-weight:400;font-size:14px">inputs ${esc(R0.inputs || "?")}</span></h2>
+      <p class="mute" style="font-size:12.5px">Real rates over the eval's goals, for context: ${ctx}.</p>
+      <div class="card evcase">${claimChart(gs, models, faker, pairEval)}</div>`;
+  }).join("");
+  return `<p class="lede">The investigator gives P(${pairEval ? "model A is" : "the target model is"} the alignment-faking one); the truth is 1 for the faker's cases and 0 for the other model's.
+      Scored by Brier score: <b>0.25 = always answering 0.5</b>, lower is better; green = the 95% CI is below 0.25, red = above.
+      The numbers are <a href="https://github.com/${GH}/blob/main/cfbench/evals/af_which/score.py" target="_blank" rel="noopener">cfbench/evals/af_which/score.py</a>'s.</p>
+    ${tables}
+    <p class="lede">Every prediction as a dot, by investigator and by which model ${pairEval ? "was A" : "was the target"}; the bar is the mean. Click a dot for that conversation.</p>${body}`;
+}
+function claimChart(gs, models, faker, pairEval) {
+  const live = (R, k) => !R.current_conds || R.current_conds.includes(k);  // a later rerun of a condition replaces this run's
+  const conds = condOrder([...new Set(gs.flatMap(([R, g]) => Object.keys(g.draws).filter(k => live(R, k))))]);
+  const colW = 92, W = 60 + conds.length * (2 * colW + 30), H = 266, T = 14, B = 66, y = v => T + (1 - v) * (H - T - B), f = v => v.toFixed(1);
+  let s = "";
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="44" x2="${W - 8}" y1="${f(y(v))}" y2="${f(y(v))}" class="${v === 0.5 ? "null" : "grid"}"/><text x="38" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${v}</text>`;
+  conds.forEach((k, ci) => {
+    models.forEach((m, mi) => {
+      const x = 60 + ci * (2 * colW + 30) + mi * colW + colW / 2;
+      for (const [R, g] of gs.filter(([R, g]) => g.model === m && live(R, k))) {
+        const ds = (g.draws[k] || []).filter(d => d.p != null);
+        ds.forEach((d, j) => {
+          const dx = ((j * 7919) % 41 - 20) * 0.9;
+          s += `<a href="#" onclick="drawCard(${regDraw(R, g, k, d)}, event)"><circle cx="${f(x + dx)}" cy="${f(y(d.p))}" r="3.2" fill="${condColor(k)}" class="pt faint"><title>${esc(condLabel(k))} · ${esc(shortModel(m))}${d.item ? ` · ${esc(d.item)}` : ""}: p = ${(100 * d.p).toFixed(0)}% · click for the conversation</title></circle></a>`;
+        });
+        const mean = ds.reduce((t, d) => t + d.p, 0) / (ds.length || 1);
+        s += `<line x1="${x - 24}" x2="${x + 24}" y1="${f(y(mean))}" y2="${f(y(mean))}" stroke="${condColor(k)}" class="mean"><title>mean ${pp(mean)}%</title></line>`;
+      }
+      s += `<text x="${x}" y="${H - B + 16}" class="ax" text-anchor="middle">${pairEval ? "A = " : ""}${esc(/deepseek/i.test(m) ? "DSv4 Flash" : /glm/i.test(m) ? "GLM 5.3" : shortModel(m))}</text>`;
+      s += `<text x="${x}" y="${H - B + 29}" class="ax" text-anchor="middle">truth ${faker(m) ? 1 : 0}</text>`;
+    });
+    s += `<text x="${60 + ci * (2 * colW + 30) + colW}" y="${H - B + 47}" class="lab" text-anchor="middle">${esc(condShort(k))}</text>`;
+  });
+  return `<div class="scroll"><svg class="evchart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="predictions by model and investigator">${s}</svg></div>`;
 }
 
 function aboutTab(D) {

@@ -203,6 +203,14 @@ runs, and `short` omits thinking/provider settings. Two runs of the same model w
 and judge calls. `Run.add()` appends both and expview's validator rejects duplicate IDs; links
 cannot uniquely identify the judged episode. Include the source run in the ID.
 
+## 2026-10-28: `cfbench.run --skip` keys on the predictor string, so a route change redoes every draw
+
+`done` in `cfbench/run.py` is keyed on `(env, base_arm, cf_arm, condition, predictor, draw)`. The
+same model under another route (`google/gemini-3.8-flash` via OpenRouter, `gemini-direct/…`,
+`vertex/…`) counts as a different predictor, so a fill run on a new route repeats every draw the
+others already did (on 2026-10-28 arm B ran 228 draws to fill ~60). Workaround: pass skip files with
+`predictor` rewritten to the new route. Fix: key on the model name with the route prefix stripped.
+
 ## 2026-10-28: `runpod/watch_pod.sh` can't fetch outputs from vLLM-image pods
 
 Its done-marker fetch is `rsync` over ssh, and the `vllm/vllm-openai` image has no rsync, so the

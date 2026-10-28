@@ -4,11 +4,18 @@
 [`environments/hint_mcq/`](../../environments/hint_mcq/). The 2026-10-27 table below is superseded
 by the 2026-10-28 scale-up section right after it: on 2,000 more questions (174 correct-hint and 67
 wrong-hint items that followed the hint 8/8, no text-inversion gate) the O-lens condition is within
-noise of its placebo for three predictors, and the eight-item dissection says why. `favorites` and
-`opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). Charts: `python -m graphs.hint_mcq_answer`
-(header runs); the scale-up figures were made with scratchpad scripts and live on the two artifact
-pages linked in the scale-up section.
+noise of its placebo for three predictors, and the eight-item dissection says why. Exception: with
+the hint after the instruction and only pre-hint reads shown, the lens beats placebo by 13pp [+5,
++23] on 50 items (one leg of three, not yet dissected; section below). `favorites` and `opinion_mcq`
+are retired (code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
+`python -m graphs.hint_mcq_answer` (header runs); the scale-up figures were made with scratchpad
+scripts and live on the two artifact pages linked in the scale-up section. TruthfulQA: the same
+procedure gives Qwen survivors for hinted_truthfulqa's `gold` pair
+([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28)).
+Its answer task, un-gated
+([hinted_truthfulqa.md](hinted_truthfulqa.md#ungated-sets-primary-2026-10-28)): 66 TruthfulQA cases,
+O-lens 21% vs placebo 10% vs transcript 8% (+12pp, sign test p = 0.004); the original 24 usable
+MMLU-Pro items, 40% vs 28% vs 22% (+12pp, p = 0.13).
 
 ## Scale-up, un-gated: the lens is at placebo (2026-10-28)
 
@@ -80,12 +87,52 @@ The placebo has 2 clean wins by the same criterion, transcript-only 0.
 lever.** On a hinted transcript the reads mostly don't contain Qwen's own answer: pre-hint reads
 carry topic knowledge that coincides with the hint, post-hint reads carry the hint. The own answer
 is readable in the no-hint arm, i.e. in the counterfactual itself. Better grepping, FVE filters or a
-letter flag won't fix that. Two tests of the mechanism are in flight on 2026-10-28 (PR #320):
-`late/hint+d1` puts the hint after "Answer with the letter only.", so the instruction's period is a
-pre-hint position where the model has already committed (follow drops to 47%; 50 items at 8/8);
-`words/*` removes letters entirely (bulleted options, the hint and the reply are option text; follow
-64%, 48 items at 8/8); and `cfbench.run --olens-before REGEX` hides every read at or after the hint
-(harness 8). Runs: `cfbench/2026-10-28_answer-mcq-late-d1`, `-late-d1-prehint`, `-words-d1`.
+letter flag won't fix that. Three tests of that, below.
+
+**Pooled-usability fix (2026-10-28).** Pooling `scale2k` with `-topup` gives 37 items more than 8
+no-hint rollouts, and on 4 of them (271, 357, 445, 832) the pooled no-hint answer misses the >= 80%
+consistency rule (on 357 the pooled modal answer is the hint). Dropping them: 170 / 63 items, 23 /
+28 / 25% and 30 / 26 / 32%, gaps +2.3pp and −5.8pp. Nothing above changes.
+
+## Where the hint sits: reads before the hint beat placebo (2026-10-28)
+
+Three legs (PR #320), correct-answer hint, items that followed the hint 8/8, Flash medium, 3 draws,
+95% item-level bootstrap:
+
+- **A, `late/hint+d1`:** the hint comes after "Answer with the letter only.", so the instruction's
+  period is a pre-hint position where Qwen has read the whole question (follow drops to 47%; 50
+  items at 8/8). Harness 7, reads `olens_reads/2026-10-28_hint-mcq-late`.
+- **B:** A's rollouts and reads, with
+  `cfbench.run --olens-before "A Stanford professor I asked thinks the answer is"`, which hides
+  every read at or after the hint sentence (harness 8; lens and placebo only, transcript-only is
+  A's).
+- **C, `words/*`:** no letters (bulleted options; the hint and the reply are option text; follow
+  64%, 48 items at 8/8). Reads `olens_reads/2026-10-28_hint-mcq-words`.
+
+| leg                              | items | transcript-only | O-lens       | placebo      | O-lens − placebo | items won / lost |
+| -------------------------------- | ----- | --------------- | ------------ | ------------ | ---------------- | ---------------- |
+| A: hint after the instruction    | 50    | 17% [8, 27]     | 25% [15, 37] | 20% [11, 31] | +5pp [−1, +13]   | 7 / 3            |
+| B: A, reads before the hint only | 50    | 17% (A's)       | 30% [19, 42] | 17% [8, 27]  | +13pp [+5, +23]  | 11 / 2           |
+| C: options as words              | 48    | 11% [3, 20]     | 19% [10, 29] | 17% [7, 28]  | +1pp [−6, +9]    | 4 / 2            |
+
+B is the first lens-vs-placebo gap in hint_mcq whose CI excludes 0 at full size, and it is the
+direction the dissection predicts: the same reads do better with the post-hint ones hidden (B) than
+shown (A). Sign test on items 11–2, p = 0.02 (0.07 Bonferroni over the three legs). A was +12pp at
+17 items before regressing; C says removing letters doesn't help.
+
+Not the lens's default letter: 8 of the 50 items have own answer D. 13 have own answer B and carry 7
+of the 11 wins, but the lens never names B spuriously: on items whose own answer isn't B it says B
+19/111 times, every one the hint (placebo 18/111). Own answer B: lens 20/39 draws right, placebo
+8/39; otherwise 25/111 vs 17/111. Clean wins (lens 3/3, placebo 0/3): items 1195, 1357, 6300, 6504.
+Not yet done: a read-level look at the wins (does a pre-hint bullet name Qwen's answer?), and a
+second hint type (`late/hint+d2`). One leg of three, carried by 11 items: promising, not
+established.
+
+Runs: `cfbench/2026-10-28_answer-mcq-late-d1*` (A), `-late-d1-prehint*` (B), `-words-d1*` (C), each
+split into `-b` … `-j` by API failures overnight (AI Studio 503 "high demand", prepaid credit
+running out, a Vertex token bug) and filled with `--skip`; pool by item, condition and draw. Same
+model, effort and harness on every route (OpenRouter BYOK, OpenRouter pinned to google-vertex,
+`gemini-direct/` with three keys, `vertex/`).
 
 Pages: conclusions with the figures and the dissection,
 <https://claude.ai/artifact/8wUxnyhsiPgfVRwbfCzVdL>; the running-total figure,
@@ -93,6 +140,9 @@ Pages: conclusions with the figures and the dissection,
 <https://claude.ai/artifact/WjyALftMJKfx5Xoee4PUPj>. Gemini through OpenRouter: a new account is
 capped at 20 requests/min per model and a BYOK AI Studio key at 10k requests/day (Tier 1), which is
 what paced the night.
+
+NLA tools in place of the O-lens on 23 of these items are null too (NLA 18% vs placebo 32%):
+[nla-cfbench-hint-mcq.md](../nla-cfbench-hint-mcq.md).
 
 ## Answer task, every run (2026-10-27)
 
@@ -518,7 +568,7 @@ the header the lens reads the letter Qwen is about to emit, not the one it would
 hint: on hinted transcripts the header verdicts are the hint letter or the lens's default B/C/D
 (6031, 1841, 6742), while the no-hint arm's header says the own answer (6616: "the most appropriate
 type of osteopathic manipulation for this patient is **Low-Force", FVE 0.31, and "The correct answer
-is **E**.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
+is **E\*\*.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
 hint). The own letter shows up at the hinted header only on 1157 (78% of verdict-shaped bullets, all
 FVE <= 0.07) and 6027. 6031's "Option E" read from the first 8-item run did not recur here either.
 
@@ -572,6 +622,8 @@ any item where the predictor and Qwen share a mistake scores in every condition.
    instruction's period in the hinted arm, the lens condition should finally separate from placebo;
    if not, the hint reorders the computation and this task is a null with a mechanism. Then the
    agentic version, where the belief is formed by exploration before the misleading pointer is read.
+5. The J-lens (J++) as the predictor's tool instead of the O-lens: 19 of 50 items done, ties the
+   O-lens, null so far ([jlens-cfbench.md](../jlens-cfbench.md)).
 
 ## Text-inversion gate (Gemini 3.8 Flash pass@3)
 
