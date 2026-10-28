@@ -277,6 +277,10 @@ Current docs:
 - [REFERENCE: Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
+- [REFERENCE: Why the DeepSeek V4 Flash O-lens writes Russian — read before interpreting Russian or CJK in Camila's V4 lens reads, or suspecting our reader](docs/dsv4-lens-russian.md)
+  — 3–9% of reads, concentrated at a few shared instruction-trailer positions, on-topic
+  translations; not the whitespace bug, reader audited clean, same in Camila's own WorkspaceBench
+  readouts
 - [MIXED: Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
   — which artifacts hold reads from the buggy `olens_s3d_rl600`, what was re-read with the space
   lens, and the redo list that was then abandoned (treat every pre-switch read as old lens)
@@ -370,15 +374,22 @@ Current docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
   — what's in which collection, `link`/`view` commands, auto-upload at finish in both runners
   (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
+- [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) — every
+  chart module in one package (`python -m graphs.<module>` → `docs/img/`), which doc each serves;
+  scoring stays in `cfbench.scoring`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
+  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
+  `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
+  DSv4 vs GLM)
 - [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
   — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
   paragraphs moved out of cfbench/README.md; log-skill definition
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
-  env space, `cfbench.report.charts` and its run groups
+  env space, `graphs.cfbench_report` and its run groups
 - [ACTIVE: cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, log-skill results per
   harness version (v1–v6) and one base run vs 30
@@ -467,9 +478,10 @@ Current docs:
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
   — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
-  wrong-MCQ lives on (`environments/hint_mcq/`); answer task on the 18: O-lens 23% vs placebo 6% vs
-  no lens 0% (hint followers only, `--base-positive`); a filler sentence before the hint and
-  every-token reads are both null (27%, 24%)
+  wrong-MCQ lives on (`environments/hint_mcq/`); current answer-task result (header read set, items
+  that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
+  earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
+  hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run

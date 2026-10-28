@@ -32,6 +32,20 @@ directly. No server process, nothing on bramble or a tailnet, no SkyPilot pod be
   it from a `site/` folder, and each deploy replaces the whole site, so a second page goes into that
   same workflow's `site/` (e.g. `site/<page>/index.html`), not a second workflow.
 
+## The one exception: Search everything (Kylie, 2026-10-27)
+
+Kylie's call on 2026-10-27: one regex (e.g. `\bgrader`) over every read, env episode, transcript and
+judge call is worth a server. The corpus is ~15 GB on HF (10 GB of batch reads, 4 GB of expview
+items and token files, 1.4 GB of env episodes), too much for a browser. So
+`expview/search_server.py` runs on bramble over the local mirror of the HF dataset, and the expview
+page has a **Search everything** page (`#everything=1&query=…`) that calls it. It is an add-on, not
+a dependency: every result links into the normal static pages (episode and token deep links that
+read HF), the per-run Search page still works without it, and the button only appears where the
+server answers (the copy of the page the server serves over http, or a browser whose localStorage
+`expview:search_server` names it; an https page such as GitHub Pages can't call an http server, so
+it stays hidden there). The server's URL stays out of docs and out of messages to anyone off the
+tailnet. Details: [expview/CLAUDE.md](../expview/CLAUDE.md), "Search everything".
+
 ## Why
 
 As of 2026-10-26 the repo had six viewers: `transcript-viewer/web` (a 969-line Python server plus a
@@ -112,6 +126,7 @@ Rules (Robbie, 2026-10-26):
 | `query`           | pattern-list text filter (was `q`)                      | regex to highlight or search (was `q`)                           |
 | `case`            |                                                         | `1` = case-sensitive regex                                       |
 | `search`          |                                                         | `1` = the Search page (was `s`)                                  |
+| `everything`      |                                                         | `1` = the Search everything page (search server)                 |
 | `novel`           |                                                         | `ctx` or `transcript`: drop echo hits                            |
 | `scope`           |                                                         | `text` = search transcripts and calls, not reads                 |
 | `experiment`      |                                                         | search: the experiment whose runs are listed (was `env`)         |

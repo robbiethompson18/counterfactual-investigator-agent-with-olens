@@ -1,10 +1,10 @@
-"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.report.data.groups()`.
+"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.scoring.groups()`.
 
-    uv run python -m cfbench.report.charts --out docs/img/cfbench-report [--allow-old-lens]
+    uv run python -m graphs.cfbench_report --out docs/img/cfbench-report [--allow-old-lens]
 
 Writes skill_pooled.png, skill_by_target.png, skill_hidden_goal.png, skill_other_envs.png, olens_search_topics.png,
 tool_calls.png, the four robustness charts
-(models.png, flash_effort.png, flash_calls.png, ts_vs_olens.png; `cfbench.report.modelchart`) and summary.json with every number on
+(models.png, flash_effort.png, flash_calls.png, ts_vs_olens.png; `graphs.cfbench_modelchart`) and summary.json with every number on
 them plus coverage (envs, arms, rollouts, predictions) per chart. Metric and normalization: docs/cfbench-scoring.md.
 """
 
@@ -19,8 +19,7 @@ from collections import Counter, defaultdict
 import matplotlib
 import numpy as np
 
-from cfbench.report import modelchart
-from cfbench.report.data import (
+from cfbench.scoring import (
     COLOR,
     CONDS,
     LABEL,
@@ -40,6 +39,7 @@ from cfbench.report.data import (
     rmse,
     rmse_null,
 )
+from graphs import cfbench_modelchart as modelchart
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

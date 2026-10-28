@@ -11,8 +11,8 @@ log-likelihood skill that `cfbench.score` no longer prints.
 
 ## The log-skill metric
 
-Computed by `cfbench.report.data.log_skill`. For a case with k_Y of n_Y counterfactual runs showing
-the behavior, LL(p) = log Binom(k_Y; n_Y, p), and
+Computed by `cfbench.scoring.log_skill`. For a case with k_Y of n_Y counterfactual runs showing the
+behavior, LL(p) = log Binom(k_Y; n_Y, p), and
 
     skill = Σ_cases [mean_draws LL(p̂) − LL(null)] / Σ_cases [LL(oracle) − LL(null)]
 

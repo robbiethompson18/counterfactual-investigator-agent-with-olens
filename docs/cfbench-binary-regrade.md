@@ -5,7 +5,7 @@
 A throwaway check: do the report's conclusions depend on scoring the predictor's rate estimate
 (RMSE, [cfbench-scoring.md](cfbench-scoring.md)), or do they survive if we pretend the question had
 been a yes/no? No new predictor runs; the existing Gemini 3.8 Flash predictions in
-`cfbench.report.data.groups()` were reinterpreted after the fact.
+`cfbench.scoring.groups()` were reinterpreted after the fact.
 
 ## The regrade
 
@@ -59,8 +59,8 @@ Comparing the two question formats properly needs a rerun with a binary prompt (
 ## Reproducing
 
 Not in the repo (the regrade was a scratch script). The whole computation is: load the cases with
-`cfbench.report.data.load_rows` and `build_cases` for each group in `groups()`, then per case and
+`cfbench.scoring.load_rows` and `build_cases` for each group in `groups()`, then per case and
 condition compute `mean(p - q_base >= T for p in case.p[cond])` against `case.q - case.q_base >= T`;
 balanced accuracy from the per-case yes fractions, AUROC from the per-case mean `p - q_base`,
 bootstrap over cases. If it's wanted for the report it belongs next to `brier_skill` in
-`cfbench/report/data.py` plus a flag on `cfbench.score`.
+`cfbench/scoring.py` plus a flag on `cfbench.score`.

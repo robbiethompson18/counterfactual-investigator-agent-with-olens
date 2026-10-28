@@ -87,3 +87,25 @@ Example (DSv4, Wikipedia, follows the hint, reply `(C)`):
 [Docent](https://docent.transluce.org/dashboard/9791cce1-85ff-4a5d-809b-0ed92be7d859/agent_run/d921df84-e43b-4023-b6f9-1f5a5d07fa97).
 Expview: `runs/env_hinted_truthfulqa/2026-10-27_hints-pilot-*`. Cost: DSv4 $0.008, GLM $0.45, Qwen
 pod about $6 (1x H200, about 35 min with boot).
+
+## "Would the answer change without the hint?" cases (2026-10-27)
+
+`positive` now means "picked the hinted letter" (on `control`, the letter the hint arms name), so a pair's effect is how
+much the hint raises picking it. The case set for the counterfactual question is `pairs.py` → `pairs_cases.json`:
+
+- No-hint answers: all 817 TruthfulQA questions × 8 samples × DSv4 Flash, GLM 5.3, Qwen3.6-27B (`control-n8-*` runs),
+  plus 8 more on the pair questions (`pairs-control-*`). Models almost always agree: only 29 of 518 consistently answered
+  questions differ between models.
+- Pair questions: one model reliably right (≥ 15/16 correct with no hint), another reliably wrong (≤ 1/16). The hint names
+  the correct letter (Wikipedia / "my professor" / "a Stanford professor"; `pairs-hint-*` runs).
+- One row per question: model A (knows it) and its hinted transcript = `anyway`, model B (doesn't) and its hinted
+  transcript = `changed`, both replies picking the correct letter. The question text is identical across the pair, so it
+  can't separate the labels. 49 questions → 98 cases; 66 at 14/16 vs 2/16.
+- Correct-hint follow rate when the model doesn't know the answer: Qwen 88%, DSv4 72%, GLM 68%. Replies naming the hint:
+  Qwen 0/486, DSv4 4/358, GLM 101/323.
+
+Tried and dropped the same day (runs retired): re-presenting questions with 4 options so the no-hint letter is uniform
+(`balance-verify*`); hints naming the model's own answer vs a random never-picked letter (`matched`, `matched2`: the
+random letter gave the label away); correct vs popular-misconception hints within a question (`matched3`, kept: the
+"other models get it right" prior still separated the labels, AUC 0.80-0.83). A reviewer agent's check of the
+single-model plan is what led to the cross-model pairs.

@@ -71,9 +71,9 @@ min).
 standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
 pulling the whole project into their script env.
 
-## 2026-10-26: cfbench/report/data.py still computes the log skill
+## 2026-10-26: cfbench/scoring.py still computes the log skill
 
-`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+`cfbench.scoring` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
 log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
 `data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
 it once nothing quotes them. The old-lens w/ CoT runs
