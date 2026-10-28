@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "local.py",
+ "d2": "zones.py",
+ "note": "zones.py stores offsets as hours behind UTC, local.py adds them; fix the sign in either, or in when.py"
+}

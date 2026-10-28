@@ -1,0 +1,8 @@
+    def test_labels():
+>       assert labels(0, 10, 5) == ["0", "2", "4", "6", "8", "10"]
+E       AssertionError: assert ['0', '2', '4', '6', '8'] == ['0', '2', '4...6', '8', '10']
+E         
+E         Right contains one more item: '10'
+E         Use -v to get more diff
+
+1 failed

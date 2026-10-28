@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "offset.py",
+ "d2": "pages.py",
+ "note": "pages are 1-based in the API but offset.py multiplies the raw page number; fix in offset, pages or api"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "paging.py",
+ "d2": "listing.py",
+ "note": "full_pages() floors as named; listing.py uses it as the page count"
+}

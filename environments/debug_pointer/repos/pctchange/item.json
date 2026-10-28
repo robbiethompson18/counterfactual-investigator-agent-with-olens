@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "fmt.py",
+ "d2": "change.py",
+ "note": "change(old, new) is a fraction and fmt prints it as a percent; trend.py's change(prev, cur) looks reversed"
+}

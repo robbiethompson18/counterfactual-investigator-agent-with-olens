@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "locate.py",
+ "d2": "scan.py",
+ "note": "find_idx0() is 0-based, line_label() prints a 1-based line; fix in locate, scan or label"
+}

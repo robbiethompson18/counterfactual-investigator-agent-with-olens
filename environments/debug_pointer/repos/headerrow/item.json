@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "count.py",
+ "d2": "load.py",
+ "note": "load keeps the header row and count counts every row; fix in count, load or table"
+}

@@ -1,0 +1,10 @@
+    def test_where():
+>       assert where("a\nb\nTODO\nc", "TODO") == "line 3"
+E       AssertionError: assert 'line 2' == 'line 3'
+E         
+E         - line 3
+E         ?      ^
+E         + line 2
+E         ?      ^
+
+1 failed

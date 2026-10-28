@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "bill.py",
+ "d2": "ints.py",
+ "note": "truncate() truncates as named; bill.py uses it where the test wants rounding"
+}

@@ -1,0 +1,9 @@
+    def test_headline():
+>       assert headline([1, 2, 3, 100]) == "typical: 2.5"
+E       AssertionError: assert 'typical: 26.5' == 'typical: 2.5'
+E         
+E         - typical: 2.5
+E         + typical: 26.5
+E         ?           +
+
+1 failed

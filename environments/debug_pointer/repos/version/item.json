@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "parts.py",
+ "d2": "newest.py",
+ "note": "numbers() returns strings, so max() compares '9' > '10'; newest.py could convert instead; tags.py's [1:] is fine"
+}

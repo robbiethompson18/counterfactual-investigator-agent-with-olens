@@ -1,0 +1,6 @@
+    def test_theme():
+>       assert theme({"theme": None}) == "light"
+E       AssertionError: assert None == 'light'
+E        +  where None = theme({'theme': None})
+
+1 failed

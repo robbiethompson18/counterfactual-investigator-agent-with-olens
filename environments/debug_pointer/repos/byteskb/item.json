@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "report.py",
+ "d2": "store.py",
+ "note": "size_bytes() feeds fmt_kb() unconverted; fix in report, store or human"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "exam.py",
+ "d2": "marks.py",
+ "note": "score_fraction() feeds passed(pct); fix in exam, marks or rule"
+}

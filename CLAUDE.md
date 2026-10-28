@@ -488,6 +488,11 @@ Current docs:
   — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
   on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
   2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
+- [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
+  — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
+  file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
+  repos, the usable items are those where Qwen's own pick is consistent and Gemini 3.8 Flash can't
+  guess it from the hinted transcript (pass@3 gate); the try log is in the doc
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run

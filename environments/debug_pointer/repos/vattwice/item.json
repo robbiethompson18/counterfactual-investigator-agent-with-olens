@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "tax.py",
+ "d2": "prices.py",
+ "note": "prices are stored VAT-inclusive and tax adds VAT again; fix in tax, prices or invoice"
+}

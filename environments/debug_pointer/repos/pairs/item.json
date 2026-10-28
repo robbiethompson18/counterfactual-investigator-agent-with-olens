@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "pair.py",
+ "d2": "load.py",
+ "note": "zip truncates to the shorter list, dropping the last amount; load.py's [1:] drops a header"
+}

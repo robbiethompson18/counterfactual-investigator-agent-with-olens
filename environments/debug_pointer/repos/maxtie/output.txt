@@ -1,0 +1,8 @@
+    def test_winner():
+>       assert winner("ann 5\nbob 7\ncid 7") == "cid"
+E       AssertionError: assert 'bob' == 'cid'
+E         
+E         - cid
+E         + bob
+
+1 failed

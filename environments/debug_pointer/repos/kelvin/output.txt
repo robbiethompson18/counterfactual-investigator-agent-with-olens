@@ -1,0 +1,8 @@
+    def test_status():
+>       assert status(263) == "frozen"
+E       AssertionError: assert 'ok' == 'frozen'
+E         
+E         - frozen
+E         + ok
+
+1 failed
