@@ -40,6 +40,8 @@ MODEL_NAME = None
 CONDITIONS = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic")
 LABEL = "measure@converted-v2"  # `positive` = harsh; measure@converted has only the old `harsh` key
 READS = REPO_ROOT / "data/runs/olens_reads"
+# the runs the env viewer shows, each on its own (different predictors and harness versions, never pooled)
+RUNS = ("2026-10-28_essay-grading-flash-v1", "2026-10-28_essay-grading-sol-v6")
 VERSIONS: dict[str, dict] = {
     "cue": {
         "run": "2026-10-22_n30_nothink",

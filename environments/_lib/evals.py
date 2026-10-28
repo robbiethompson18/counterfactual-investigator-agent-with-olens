@@ -648,7 +648,11 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
             summaries = [s for s in summaries if s.get("inputs") in only]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
-        extra = mark_current(name, summaries)
+        if shown := getattr(_eval_module(name), "RUNS", None):  # the eval lists the runs it shows: each its own row, no pooling
+            summaries = [s | {"current_conds": s["conditions"], "current": True} for s in summaries if s["run"] in shown]
+            extra = {}
+        else:
+            extra = mark_current(name, summaries)
         for s in summaries:
             s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
