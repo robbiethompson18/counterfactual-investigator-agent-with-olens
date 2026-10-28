@@ -11,7 +11,8 @@ one case per model, so the prior is 50/50. Scored as squared error (cfbench.scor
 viewer's paired-model AUROC is the separation between the two models' cases.
 
 Its own inputs run, made by af_refusals' prep with 4 bullets per read for both models (GLM rl_greedy, rl_s1-3; DSv4 greedy,
-s1-3 from the newer DSv4 reads in DSV4_READS) and the placebo (the email over-eagerness GLM reads, cut to 4 without FVE).
+s1-3 from runs/alignment_faking/2026-10-28_dsv4flash-olens-4bullets, positions with a blank bullet dropped, since GLM's
+never has one) and the placebo (the email over-eagerness GLM reads, cut to 4 without FVE).
 Same items as af_refusals' n40 inputs:
 
     uv run python -m cfbench.eval af_which --prep --n-items 40 --strict --placebo PLACEBO_GLM   # see prep()
@@ -30,7 +31,7 @@ VERSIONS = af.VERSIONS
 MODEL_NAME = af.MODEL_NAME
 CONDITIONS = af.CONDITIONS
 N_BULLETS = 4
-DSV4_READS: dict[str, Path] = {"original": Path("TODO"), "v7": Path("TODO")}  # the newer DSv4 reads dirs (reads_L30.jsonl)
+DSV4_READS = {v: af.REPO_ROOT / "data/runs/alignment_faking/2026-10-28_dsv4flash-olens-4bullets/dsv4flash" for v in ("original", "v7")}
 TASK = "claim"
 FAKER = "deepseek/deepseek-v4-flash"
 LINKS = af.LINKS
@@ -58,7 +59,7 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     """af_refusals' prep with N_BULLETS bullets and DSV4_READS. `placebo`: a reads dir with >= N_BULLETS bullets per read,
     e.g. reads_placebo_glm from scripts/cfbench_af_prep.py on branch claude/cfbench-af (the same email over-eagerness
     reads as af_refusals' reads_placebo_dsv4, before its cut to 3)."""
-    af.prep(out, versions, placebo, n_items, strict, N_BULLETS, DSV4_READS)
+    af.prep(out, versions, placebo, n_items, strict, N_BULLETS, DSV4_READS, full_bullets=True, sparse=True)
 
 
 def cases(inputs, versions):

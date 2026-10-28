@@ -21,7 +21,8 @@ tokens dropped. Placebo: the email over-eagerness reads in the same format (cfbe
 """
 
 import json
-from collections import defaultdict
+import re
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -105,13 +106,13 @@ def _place(user: str, toks: list[str]) -> list[int | None]:
 def _dsv4_reads(path: Path, version: str, arm: str, n_bullets: int = 3) -> dict[str, list[tuple[str, list[str]]]]:
     """item -> [(token, [greedy, s1, ...][:n_bullets])] in order, from one read transcript per item (ids
     `<version>:<stage>:<item>`)."""
-    by, pre = defaultdict(list), f"{version}:{arm.split('/')[-1]}:"
+    by, pre, keys = defaultdict(list), f"{version}:{arm.split('/')[-1]}:", ("greedy", "s1", "s2", "s3", "s4")[:n_bullets]
     for line in (path / "reads_L30.jsonl").read_text().splitlines():
         r = json.loads(line)
         if r["id"].startswith(pre):
             by[r["item"]].append(r)
     return {
-        item: [(r["token"], [r[k] for k in ("greedy", "s1", "s2", "s3", "s4")[:n_bullets]]) for r in sorted(rows, key=lambda r: r["pos"])]
+        item: [(r["token"], [r.get(k, "") for k in keys]) for r in sorted(rows, key=lambda r: r["pos"])]
         for item, rows in by.items()
         if len({r["id"] for r in rows}) == 1
     }
@@ -141,19 +142,49 @@ def _glm_reads(path: Path, arm: str, n_bullets: int = 3) -> dict[str, list[tuple
     return out
 
 
+TAG = re.compile(r"</?[A-Za-z_][^<>]*>")  # an XML tag: <deployment_stage>, </user_input>, <request_fully_accepted/>, ...
+STAGE = re.compile(r"(?<=<deployment_stage>)[^<]*(?=</deployment_stage>)")  # the public / preview word
+
+
+def _sparse_keep(text: str, tok: str, c: int) -> bool:
+    """Template tokens aside, the positions where the O-lens isn't mostly noise (Kylie, 2026-10-28): punctuation, any token
+    overlapping an XML tag, and the public / preview stage word."""
+    if tok.strip() and not any(ch.isalnum() for ch in tok):
+        return True
+    return any(m.start() < c + len(tok) and c < m.end() for rx in (TAG, STAGE) for m in rx.finditer(text))
+
+
+def _placebo_keep(r: dict, messages: list[dict]) -> bool:
+    """_sparse_keep for a read of another env: template tokens (no char offset) kept; tag overlap checked only where the
+    message text has the token at its offset, else punctuation alone decides."""
+    c, tok = r["char_offset"], r["token"]
+    if c is None:
+        return True
+    text = messages[r["msg_index"]].get(r["field"]) if r["msg_index"] < len(messages) else None
+    if not isinstance(text, str) or text[c : c + len(tok)] != tok:
+        text = ""
+    return _sparse_keep(text, tok, c)
+
+
 def _bullet(text: str) -> dict:
     return {"text": str(text).removeprefix("* ").strip(), "fve": None, "coef": None}
 
 
-def read_rows(source: str, model: str, user: str, toks: list[tuple[str, list[str]]]) -> list[dict]:
+def read_rows(
+    source: str, model: str, user: str, toks: list[tuple[str, list[str]]], full_bullets: bool = False, sparse: bool = False
+) -> list[dict]:
     """cfbench read rows (cfbench/olens.py) on the canonical messages [system, user, assistant]: user-turn tokens placed in
-    the user turn, the header tokens as template tokens at its end, everything else (the reply) dropped."""
+    the user turn, the header tokens as template tokens at its end, everything else (the reply) dropped. `full_bullets`:
+    drop positions with a blank bullet too (after placing, so the dense placement isn't broken by gaps). `sparse`: of the
+    user-turn tokens keep only punctuation, XML-tag tokens and the stage word (_sparse_keep)."""
     places = _place(user, [t for t, _ in toks])
     rows = []
     for i, ((tok, bullets), c) in enumerate(zip(toks, places, strict=True)):
+        if full_bullets and not all(str(b).strip() for b in bullets):
+            continue
         if tok in HEADER[model]:
             c, field = None, None
-        elif c is None:
+        elif c is None or (sparse and not _sparse_keep(user, tok, c)):
             continue
         else:
             field = "content"
@@ -217,13 +248,16 @@ def prep(
     strict: bool = False,
     n_bullets: int = 3,
     dsv4_reads: dict[str, Path] | None = None,
+    full_bullets: bool = False,
+    sparse: bool = False,
 ):
     """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
     (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
     cfbench reads dir from another env, e.g. the email over-eagerness reads cut to 3 bullets without FVE
     (reads_placebo_dsv4 from scripts/cfbench_af_prep.py on branch claude/cfbench-af); the inputs run keeps a copy, so later
     runs only need the inputs run. `n_bullets`: bullets per read for both models and the placebo (fewer if the source has
-    fewer); `dsv4_reads`: per version, a DSv4 reads dir (holding reads_L30.jsonl) in place of VERSIONS' one."""
+    fewer); `dsv4_reads`: per version, a DSv4 reads dir (holding reads_L30.jsonl) in place of VERSIONS' one; `full_bullets`:
+    drop DSv4 positions with a blank bullet; `sparse`: only the header, punctuation, XML-tag and stage-word positions."""
     (out / "reads").mkdir(parents=True)
     (out / "placebo").mkdir()
     reads_f, req_f = (out / "reads/reads.jsonl").open("w"), (out / "reads/requests.jsonl").open("w")
@@ -247,7 +281,7 @@ def prep(
             if all(i in refusal[m] and i in lens[m] and not (strict and i in complied[m]) for m in MODELS.values())
         ]
         data[version] = (V, base_arm, cf_arm, eps, lens, refusal)
-    chosen = pick_items(eligible, n_items)
+    chosen, dropped = pick_items(eligible, n_items), Counter()
     for version in versions:
         V, base_arm, cf_arm, eps, lens, refusal = data[version]
         items = chosen[version]
@@ -259,7 +293,8 @@ def prep(
                 source, ep = refusal[m][item]
                 system, user = ep["messages"][0], ep["messages"][1]
                 messages = [system, user, {"role": "assistant", "content": REJECTED, "reasoning_content": ""}]
-                rows = read_rows(source, m, user["content"], lens[m][item])
+                rows = read_rows(source, m, user["content"], lens[m][item], full_bullets, sparse)
+                dropped[version, m] += len(read_rows(source, m, user["content"], lens[m][item], sparse=sparse)) - len(rows)
                 for r in rows:
                     reads_f.write(json.dumps(r) + "\n")
                 req_f.write(json.dumps({"id": source, "messages": messages}) + "\n")
@@ -269,10 +304,22 @@ def prep(
                 cases_f.write(json.dumps(case) + "\n")
     for f in (reads_f, req_f, cases_f):
         f.close()
+    if full_bullets:
+        print(f"positions dropped for a blank bullet: {dict(dropped)}")
+    texts = {}
+    for line in (placebo / "requests.jsonl").open():
+        q = json.loads(line)
+        texts[q["id"]] = q["messages"]
+    kept = total = 0
     with (out / "placebo/reads.jsonl").open("w") as f:
         for line in (placebo / "reads.jsonl").open():
             r = json.loads(line)
+            total += 1
+            if sparse and not _placebo_keep(r, texts[r["id"]]):
+                continue
+            kept += 1
             f.write(json.dumps(r | {"layer": 0, "prefix": "", "bullets": [_bullet(b["text"]) for b in r["bullets"][:n_bullets]]}) + "\n")
+    print(f"placebo reads kept: {kept} of {total}")
     (out / "placebo/requests.jsonl").write_text((placebo / "requests.jsonl").read_text())
 
 

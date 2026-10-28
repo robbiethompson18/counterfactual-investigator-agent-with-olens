@@ -89,6 +89,7 @@ async def main():
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET)
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="first N cases only (smoke tests)")
+    ap.add_argument("--models", default="", help="comma list of target model ids: only their cases")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=32)
     ap.add_argument("--slug", default="")
@@ -120,7 +121,7 @@ async def main():
     fve_note = olens.fve_note(reads) if reads else ""
     # interleaved by item, so a partial run still has every model on the items it reached
     cases = sorted(ev.cases(inputs, versions), key=lambda c: (c[1].get("version") or "", c[1].get("item") or "", c[1]["model"]))
-    cases = cases[: args.limit or None]
+    cases = [c for c in cases if not args.models or c[1]["model"] in args.models.split(",")][: args.limit or None]
 
     def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
         prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
@@ -170,6 +171,7 @@ async def main():
             "draws": args.draws,
             "seed": args.seed,
             "limit": args.limit,
+            "model_filter": args.models,
             "harness_version": HARNESS_VERSION,
             "eval_md": notes,
             "base_line": base_src,
