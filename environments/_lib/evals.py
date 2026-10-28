@@ -37,6 +37,10 @@ from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
 EVALS = REPO_ROOT / "data" / "evals"
 EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
+# envs with an `<env>-pairs` eval (every cfbench.run env_runs:<env>/... run): the viewer lists the evals defined here
+PAIRS_ENVS = ("alignment_faking", "hint_mcq", "hinted_truthfulqa")
+# evals set aside: off the viewer's eval lists (their own pages still open by URL); folders and HF files stay
+RETIRED_EVALS = {"af_which", "af_refusals"}
 # evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
 PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")
@@ -538,6 +542,25 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
         md = (d / "eval.md").read_text() if (d / "eval.md").exists() else ""
         return title.rstrip("."), rest.strip() + (f"\n\n**What the investigator is told about this eval (eval.md):**\n\n{md}" if md else "")
     return f"Arm pairs on {envs[0]}", f"Every `cfbench.run env_runs:{envs[0]}/...` run: base arm -> counterfactual arm, one case per pair."
+
+
+def defined() -> list[dict]:
+    """Every eval from the code alone (for the Pages spec/evals.json): each cfbench/evals/<name>/ with an eval.py, and
+    `<env>-pairs` for each of PAIRS_ENVS. An eval module that doesn't import gets "error" and no envs; RETIRED_EVALS get
+    "retired"."""
+    import importlib
+
+    out = []
+    for d in sorted(EVAL_DIRS.iterdir()):
+        if not (d / "eval.py").exists():
+            continue
+        try:
+            envs, err = list(importlib.import_module(f"cfbench.evals.{d.name}.eval").ENVS), None
+        except Exception as ex:  # noqa: BLE001
+            envs, err = [], repr(ex)[:500]
+        out.append({"name": d.name, "title": describe(d.name, envs)[0], "envs": envs} | ({"error": err} if err else {}))
+    out += [{"name": f"{e}-pairs", "title": describe(f"{e}-pairs", [e])[0], "envs": [e]} for e in PAIRS_ENVS]
+    return [e | {"retired": True} if e["name"] in RETIRED_EVALS else e for e in out]
 
 
 def build(names: list[str] | None = None, export=True) -> list[Path]:

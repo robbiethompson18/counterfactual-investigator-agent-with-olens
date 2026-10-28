@@ -6,6 +6,9 @@ env: an eval can span several envs, models and arm pairs, and one env can be in 
 when `cfbench.run`'s "every base-arm run of one model, arm pair → arm pair" doesn't fit, e.g. one
 shown transcript per case, two models paired on the same items, or a model name hidden.
 
+The env viewer lists the evals the code defines: every folder here, plus `<env>-pairs` for each env in
+`PAIRS_ENVS` (`environments/_lib/evals.py`). A new pairs eval needs its env added there; an eval in `RETIRED_EVALS` there is left off the lists.
+
 ## A folder per eval
 
 `cfbench/evals/<name>/`:

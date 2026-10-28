@@ -551,8 +551,8 @@ async function home() {
     <div class="why">${esc(e.title)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't build</span>` : ""}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
     <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
-  const evs = await maybe(getEval("index.json"));
-  if (evs?.evals?.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs.evals)}`;
+  const evs = await evalList();
+  if (evs.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs)}`;
 }
 
 const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
@@ -776,6 +776,16 @@ addEventListener("keydown", e => { if (e.key === "Escape" && $("drawcard")) $("d
 async function getEval(path) {
   return fetchOnce("e:" + path, async () => { const r = await fetch((await base()).replace(/envs\/$/, "evals/") + path); if (!r.ok) throw new Error("evals/" + path + ": " + r.status); return r.json(); });
 }
+// the eval list is the code's, like the env list: spec/evals.json beside the page (every eval cfbench/evals/ and
+// PAIRS_ENVS define), with each one's run stats from HF's evals/index.json by name; an eval with no runs there yet still
+// gets a card; RETIRED_EVALS are left off unless `all`. Without a code spec (?spec=hf) it is HF's index as is.
+async function evalList(all = false) {
+  const [code, idx] = await Promise.all([codeIndex(), maybe(getEval("index.json"))]);
+  const defs = code ? await maybe(fetchOnce("c:evals.json", async () => { const r = await fetch("spec/evals.json"); if (!r.ok) throw new Error("spec/evals.json: " + r.status); return r.json(); })) : null;
+  if (!defs) return idx?.evals || [];
+  const hf = Object.fromEntries((idx?.evals || []).map(e => [e.name, e]));
+  return defs.evals.filter(d => all || !d.retired).map(d => ({...hf[d.name], name: d.name, title: d.title, envs: d.envs.length ? d.envs : hf[d.name]?.envs || [], error: d.error, retired: d.retired}));
+}
 
 // a group = (env, version, base arm, cf arm, model), pooled over the eval's items: the observed rate before (base arm)
 // and after (cf arm) with 95% credible bands, every draw's prediction as a point beside "after", one column per
@@ -932,7 +942,10 @@ function ansPick() {
   location.hash = setParam("runs", on.length === all.length ? "" : on.join(","));
 }
 
-const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
+const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => !e.n_runs ? `<div class="card">
+    <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't import</span>` : ""}</div>
+    <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span></div>
+    <div class="meta"><span>no runs yet</span></div></div>` : `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
     <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}</div>
     <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span><span class="mute">models</span><span>${e.models.map(m => esc(shortModel(m))).join(", ")}</span>
       <span class="mute">conditions</span><span>${condOrder(e.conditions).map(k => swatch(k) + esc(condShort(k))).join(" ")}</span></div>
@@ -940,23 +953,23 @@ const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class
 
 async function evalsHome() {
   setCrumb([["evals", "evals=1"]]);
-  const idx = await getEval("index.json");
+  const evs = await evalList();
   $("view").innerHTML = `<h1>Evals</h1><p class="lede">cfbench evals: an investigator sees a base arm and the exact edit and predicts the behaviour rate after it (or, in the answer task, the model's answer after it).
     An eval can span several envs, models and pairs; each is defined in <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>
-    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env).</p>${evalCards(idx.evals)}`;
+    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env, for the envs in <span class="mono">PAIRS_ENVS</span>).</p>${evalCards(evs)}`;
 }
 
 // an env's Evals tab: the evals that use it
 async function evalsTab(D) {
-  const idx = await maybe(getEval("index.json"));
-  const es = (idx?.evals || []).filter(e => e.envs.includes(D.env));
+  const es = (await evalList()).filter(e => e.envs.includes(D.env));
   $("tab").innerHTML = es.length ? `<p class="lede">cfbench evals that use this env. An eval can span several envs; its page shows them all, or only this one's cases from here.</p>${evalCards(es, D.env)}`
     : `<p class="mute">No cfbench eval uses ${esc(D.env)} yet: see <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>.</p>`;
 }
 
 async function evalPage(h) {
   DRAWS = [];
-  const ev = await getEval(`${h.eval}.json`);
+  const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalList(true)]);
+  const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
   const every = ev.runs.filter(R => !h.run || R.run === h.run);
   // the newest complete run per version (per inputs run where the eval compares them); superseded runs fold away below
@@ -1011,6 +1024,7 @@ async function evalPage(h) {
       `<div class="evcases">${gs.map(([R, g]) => (runs.length > 1 ? `<div><h3 style="margin-top:0">${esc(R.slug)}</h3>` : "<div>") + evalCard(R, g) + "</div>").join("")}</div>`;
   }).join("");
   $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}</h1>
+    ${retired ? `<p class="mute"><span class="tag">retired</span> Set aside (RETIRED_EVALS in environments/_lib/evals.py): not on the Evals list; this page stays for reference.</p>` : ""}
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
