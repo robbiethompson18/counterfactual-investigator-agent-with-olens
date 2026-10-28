@@ -617,6 +617,38 @@ def dump(a):
     print(f"wrote {run / 'pmf_options.jsonl'} ({len(qs)} questions; site {a.site} L{a.layer}, l2 {a.l2})")
 
 
+def lens_requests(a):
+    """O-lens read requests (scripts/olens_read_requests.py) at each option's `nl` token of the no-hint prompt: one row per
+    question, `char_positions` = the newline after each option, as offsets into the user message. Also writes the saved
+    `nl` activations of the first --check questions at hidden_states index --check-hidden (block check-hidden - 1) for
+    scripts/olens_capture_check.py."""
+    run = Path(a.run)
+    layers = json.loads((run / "meta.json").read_text())["params"]["layers"]
+    qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
+    out = Path(a.out)
+    rows, n = [], 0
+    for r in qs:
+        user = build("nohint", r["item"]).messages[0]["content"].strip()
+        text = "\n" + user + "\n\n"  # option_sites searches "\nA. " lines that end at "\n\n"; offsets shift back by the "\n"
+        offs = [nl - 1 for _, nl in option_sites(text, 0, r["n_opts"])]
+        rows.append(
+            {
+                "id": f"hint_mcq/{r['item']}",
+                "env": "hint_mcq",
+                "arm": "nohint",
+                "item": r["item"],
+                "messages": [{"role": "user", "content": user}],
+            }
+        )
+        rows[-1]["char_positions"] = [[0, c] for c in offs]
+        n += len(offs)
+    out.write_text("".join(json.dumps(x) + "\n" for x in rows))
+    k = sum(r["n_opts"] for r in qs[: a.check])
+    ref = np.asarray(np.load(CACHE / run.name / "nl.npy", mmap_mode="r")[:k, layers.index(a.check_hidden)], dtype=np.float32)
+    np.save(out.with_suffix(".check.npy"), ref)
+    print(f"wrote {out}: {len(rows)} questions, {n} positions; check: {k} options at hidden_states[{a.check_hidden}]")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -655,8 +687,13 @@ def main():
     s.add_argument("--layer", type=int, default=52)
     s.add_argument("--folds", type=int, default=5)
     s.add_argument("--l2", type=float, default=1.0)
+    r = sub.add_parser("lens-requests")
+    r.add_argument("run")
+    r.add_argument("out")
+    r.add_argument("--check", type=int, default=3, help="questions whose saved nl activations go to OUT.check.npy")
+    r.add_argument("--check-hidden", type=int, default=52, help="hidden_states index of those activations (block index + 1)")
     a = ap.parse_args()
-    {"collect": collect, "fit": fit, "pmf": pmf, "whiten": whiten, "dump": dump}[a.cmd](a)
+    {"collect": collect, "fit": fit, "pmf": pmf, "whiten": whiten, "dump": dump, "lens-requests": lens_requests}[a.cmd](a)
 
 
 if __name__ == "__main__":
