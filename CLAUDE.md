@@ -198,6 +198,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   aren't directly comparable to his; say so when quoting both.
 - Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
   effort `medium` by default, so tool uplift isn't swamped by agent strength.
+- **WorkspaceBench (WSB) replication is the exception to both rules above:** text-reader rollouts
+  are Sonnet 5.5 (`claude-sonnet-5-5`, effort `medium`) and every judge call is Opus 5.5
+  (`claude-opus-5-5`), not Gemini or Haiku, so our numbers sit beside WSB's Opus-judged lens rows
+  (`agu18dec/olens_ablations`). Code is in `wsb/`.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
   Pages or the repo's GitHub Pages site that reads the public HF dataset; search is a JavaScript
   regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
