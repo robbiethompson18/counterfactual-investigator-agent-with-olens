@@ -12,8 +12,7 @@ of Robbie's RunPod pods (`runpod/CLAUDE.md`). Results: docs/envs/alignment_fakin
 1. `prep_env.py`: `requests.jsonl` from `environments/` alignment_faking run folders, one episode
    per (arm, item) across the runs given (a top-up pools with its base run), lowest sample, reply
    cut to `--reply-chars`. Each request keeps `run` and `episode`, so a read maps back to the
-   env_runs loader's `alignment_faking/<run>:<episode>`. `prep.py` is the older version for the
-   Docent-exported runs.
+   env_runs loader's `alignment_faking/<run>:<episode>`.
 2. `read.py` (HF transformers 5.19 FP8, `kernels==0.17`, pipeline across 2 GPUs): capture the
    4-stream block outputs at the read positions (`states.pt`, stays on the pod/volume) and score the
    first-reply logits (`logits.jsonl`). `--skip-lens`: its own lens stage is 2.4-3.6 reads/s; use
@@ -30,8 +29,9 @@ of Robbie's RunPod pods (`runpod/CLAUDE.md`). Results: docs/envs/alignment_fakin
    `alignment_faking/<run>:<episode>`, bullets = greedy then samples with `fve: null`; `char_offset`
    is exact (read.py's `char` indexes the rendered string, so each message's content starts at a
    known offset; template tokens get null).
-5. `expview_export.py`, `sample_check.py`, `vllm_sample_check.py`: Kylie's expview export and
-   base-model sampling checks (vLLM T 1.0 vs OpenRouter's rates); unchanged.
+5. `placebo_from_glm_email.py`: Celeste's GLM email dense reads cut to 3 bullets, `fve` null, as the
+   `olens_placebo_agentic` pool (cfbench's placebo needs reads over another env's transcripts).
+   Kylie's expview export and base-model sampling checks stayed on `claude/af-v4-olens`.
 
 ## Running on a RunPod pod (Robbie's agents)
 
