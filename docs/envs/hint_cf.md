@@ -100,6 +100,9 @@ Pages: conclusions with the figures and the dissection,
 capped at 20 requests/min per model and a BYOK AI Studio key at 10k requests/day (Tier 1), which is
 what paced the night.
 
+NLA tools in place of the O-lens on 23 of these items are null too (NLA 18% vs placebo 32%):
+[nla-cfbench-hint-mcq.md](../nla-cfbench-hint-mcq.md).
+
 ## Answer task, every run (2026-10-27)
 
 Predict Qwen's no-hint answer from hinted rollouts where it followed the hint; Gemini 3.8 Flash, 3-6
@@ -578,6 +581,8 @@ any item where the predictor and Qwen share a mistake scores in every condition.
    instruction's period in the hinted arm, the lens condition should finally separate from placebo;
    if not, the hint reorders the computation and this task is a null with a mechanism. Then the
    agentic version, where the belief is formed by exploration before the misleading pointer is read.
+5. The J-lens (J++) as the predictor's tool instead of the O-lens: 19 of 50 items done, ties the
+   O-lens, null so far ([jlens-cfbench.md](../jlens-cfbench.md)).
 
 ## Text-inversion gate (Gemini 3.8 Flash pass@3)
 

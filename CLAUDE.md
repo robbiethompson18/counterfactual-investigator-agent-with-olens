@@ -489,10 +489,15 @@ Current docs:
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
   pre-hint-reads arms in flight (PR #320)
-- [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
-  — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
-  on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
-  2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
+- [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
+  — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
+  within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
+  at next-token (checked against Qwen, no bug); harness v8 token labels
+- [NULL: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
+  — letter grades on 3 essays: underpowered (Qwen gives nearly everything an A); out of 10 on 12
+  essays spread terrible → excellent, Duke → no scenario: O-lens RMSE 0.86 vs transcript 0.65 vs
+  placebo 0.60 (O-lens worse than placebo, CI excludes 0); the lens's "standard essay" runner-up
+  score at the grade token overshoots
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
   — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
@@ -561,6 +566,9 @@ Current docs:
   — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
   beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
   L42, Camila multilayer, the 2B student), throughput, consensus sampling
+- [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
+  — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
+  question (prompt inversion), and the predictor cites them only to back the hinted answer
 - [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
   — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain

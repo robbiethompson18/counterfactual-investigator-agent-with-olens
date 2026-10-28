@@ -1,7 +1,10 @@
 # Whitebox tools beyond the O-lens
 
 **Status (2026-10-26):** MIXED. SNLA parked and the SAE candidates hold. The table's "in the agent"
-column was about Agam's harness; it now says what exists for cfbench.
+column was about Agam's harness; it now says what exists for cfbench. 2026-10-28: J++ is now a
+cfbench condition (`jlens_agentic`, PR #312), tested on hint_mcq in
+[jlens-cfbench.md](jlens-cfbench.md) (null so far); claims below that no condition uses J++ predate
+that.
 
 Neel asked us to add other whitebox methods (SAEs, J-lens / J++, NLAs, SNLAs) to the investigator
 agent. Status as of 2026-10-20; the right-hand column was rewritten 2026-10-26 to mean a predictor
