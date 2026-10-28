@@ -13,7 +13,7 @@ data/expview/imports/celeste/<source>/<config>/ (dataset id imports/celeste/<sou
 
 One item per transcript view (tid). Its transcript is Celeste's render re-tokenised with GLM-5.3's tokenizer, split into
 sections at the chat special tokens; at every read position:
-  O-lens RL (greedy, inline) · O-lens RL samples (s1-s4) · O-lens SFT (greedy + s1-s4) · J-lens L60 / L51 top-10 ·
+  O-lens RL (greedy) · O-lens RL samples (s1-s4) · O-lens SFT (greedy + s1-s4) · J-lens L60 / L51 top-10 ·
   Qwen distilled / from_scratch (greedy + s1-s4)
 A read whose token doesn't match the re-tokenised render at its position is dropped and counted.
 
@@ -57,8 +57,8 @@ FVE_NOTE = (
 )
 READERS = {
     RL: {
-        "about": "GLM-5.3 reading its own block-51 activation (one-bullet O-lens after RL, `rl1b_2/step_0100`), greedy bullet, "
-        "shown inline. Celeste's most trusted reader. Trained on web text, so bullets are often continuation guesses, not "
+        "about": "GLM-5.3 reading its own block-51 activation (one-bullet O-lens after RL, `rl1b_2/step_0100`), greedy bullet. "
+        "Celeste's most trusted reader. Trained on web text, so bullets are often continuation guesses, not "
         "statements of intent." + FVE_NOTE,
         "color": "#2f5d8a",
     },
@@ -101,8 +101,8 @@ READERS = {
     },
 }
 LEGEND = (
-    "Underlined tokens have reads; the inline box is what the **GLM verbalizer (RL)** reads from GLM-5.3's activation there. "
-    "Click a token for its samples, J-lens top-10, the two Qwen readers and (at judge-flagged positions) best-of-16 with its control. "
+    "Underlined tokens have reads. Click a token for the **GLM verbalizer (RL)** greedy bullet, its samples, J-lens top-10, "
+    "the two Qwen readers and (at judge-flagged positions) best-of-16 with its control. "
     "The lens was trained on web text, so reads often guess the next words rather than state intent."
 )
 
@@ -365,7 +365,7 @@ def import_config(
         title=f"GLM 5.3 O-lens reads: {cfg} ({source})" if owner == "Celeste's" else f"GLM 5.3 O-lens reads ({owner}): {cfg}",
         description=(
             f"{owner} O-lens readouts of our GLM-5.3 transcripts, config `{cfg}` of `{source}`. One item per transcript view; "
-            "its transcript shows every read inline. **positive** is the env's label for the episode, **aware** the eval-awareness "
+            "its transcript has every read at its token. **positive** is the env's label for the episode, **aware** the eval-awareness "
             "judge's (where Celeste's data has them). Items whose source run is on disk also carry its model calls (the subject "
             "transcript and every judge, exact I/O) and environment."
         ),
@@ -413,9 +413,7 @@ def import_items(eps, by_tid, run, stats, tok, docent, calls, jl, qw, bon, cfg) 
             lab = " · ".join(str(x) for x in (g("kind"), g("role"), dense_label(p)) if x)
             rs = []
             if g("rl_greedy") is not None:
-                # dense rows (every token in the donation bet) only peek inline where the stated number changes, else the text drowns
-                peek = not is_true(g("dense")) or is_true(g("number_changed"))
-                rs.append(lens_read(RL, p, ["rl_greedy"], label=lab, inline=peek or None))
+                rs.append(lens_read(RL, p, ["rl_greedy"], label=lab))
                 rs.append(lens_read(RL_S, p, [f"rl_{s}" for s in SAMPLES]))
             if g("sft_greedy") is not None:
                 rs.append(lens_read(SFT, p, ["sft_greedy"] + [f"sft_{s}" for s in SAMPLES], label="greedy, then samples"))

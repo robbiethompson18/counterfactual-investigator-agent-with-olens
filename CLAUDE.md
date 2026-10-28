@@ -76,9 +76,10 @@ Summary of the Final Pitch (2026-10-19):
   closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
   lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
   [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
-- **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`, `olens_placebo_agentic`**
-  (renamed 2026-10-27; old rows map through `canon_condition`). The inline two-transcript condition
-  is retired: never compare a tool condition against anything but `transcript_agentic`.
+- **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`,
+  `olens_placebo_agentic`** (renamed 2026-10-27; old rows map through `canon_condition`). The inline
+  two-transcript condition is retired: never compare a tool condition against anything but
+  `transcript_agentic`.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 
@@ -272,6 +273,10 @@ Current docs:
 - [REFERENCE: Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
+- [REFERENCE: Why the DeepSeek V4 Flash O-lens writes Russian — read before interpreting Russian or CJK in Camila's V4 lens reads, or suspecting our reader](docs/dsv4-lens-russian.md)
+  — 3–9% of reads, concentrated at a few shared instruction-trailer positions, on-topic
+  translations; not the whitespace bug, reader audited clean, same in Camila's own WorkspaceBench
+  readouts
 - [MIXED: Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
   — which artifacts hold reads from the buggy `olens_s3d_rl600`, what was re-read with the space
   lens, and the redo list that was then abandoned (treat every pre-switch read as old lens)
@@ -368,6 +373,9 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
+  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator), `python -m
+  cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals, DSv4 vs GLM)
 - [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
   — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
   paragraphs moved out of cfbench/README.md; log-skill definition

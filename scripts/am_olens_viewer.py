@@ -12,7 +12,7 @@ One item per episode (450: blackmail / leaking / murder x 5 conditions x 30 epoc
     eval_aware_strict; v1 lenient label kept as extra.aware_v1
   - calls: the GLM subject call, the classifier call and every awareness-monitor attempt, each with its exact input and output
   - token reads: the transcript as GLM-5.3 tokens (Celeste's render) with, at every read position, the O-lens RL greedy bullet
-    inline and RL samples, SFT greedy + samples, J-lens L60/L51 top-10 and the two Qwen3.6-27B readers on click
+    and RL samples, SFT greedy + samples, J-lens L60/L51 top-10 and the two Qwen3.6-27B readers on click
 
 Sources (local copies on bramble by default, else downloaded from HF):
   ceselder/glm-5.3-olens-counterfactual-investigator  agentic_misalignment/{episodes,readouts,jlens,qwen_readers}.parquet
@@ -168,9 +168,8 @@ def main():
             "450 GLM 5.3 episodes from the inspect_evals agentic misalignment benchmark: 3 scenarios (blackmail, "
             "leaking, murder) \u00d7 5 prompt conditions \u00d7 30 runs. Each row is one episode.\n"
             "\n"
-            "**Click any row to see its transcript with the O-lens reads.** Each episode has 32 read points. The RL "
-            "O-lens bullet is shown inline as a blue tag after its token. Click a tag for the lens's other samples, "
-            "the SFT lens, the J-lens and the Qwen readers.\n"
+            "**Click any row to see its transcript with the O-lens reads.** Each episode has 32 read points; click a token for the RL "
+            "O-lens bullet, its other samples, the SFT lens, the J-lens and the Qwen readers.\n"
             "\n"
             "The columns:\n"
             "- **Harmful**: the benchmark's own harm judge (Sonnet 5.5) said yes and the scenario's hard check passed. "
@@ -228,7 +227,7 @@ def main():
                 continue
             lab = f"{p.kind} · {p.role}"
             rs = [
-                {"tool": "O-lens RL", "label": lab, "inline": True, "lines": [[p.rl_greedy]]},
+                {"tool": "O-lens RL", "label": lab, "lines": [[p.rl_greedy]]},
                 {"tool": "O-lens RL samples", "lines": [[getattr(p, f"rl_s{k}")] for k in range(1, 5)]},
                 {
                     "tool": "O-lens SFT",

@@ -1,6 +1,6 @@
 """Run predictors on (env, target model, base arm -> counterfactual arm) cases.
 
-    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
+    uv run python -m cfbench.run env_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
     uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
 Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
@@ -52,7 +52,7 @@ async def main():
     ap.add_argument("env")
     ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM, or `hub` (envs with hub_pairs())")
     ap.add_argument("--task", default="rate", choices=TASKS, help="rate: P(behavior) in the cf arm; answer: the model's answer there")
-    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (evalcue_runs envs)")
+    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (env_runs envs)")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
     ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
@@ -88,7 +88,7 @@ async def main():
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
 
-    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
+    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. env_runs:<env>/<run>
     loader = importlib.import_module(f"cfbench.envs.{module}")
     env = loader.load(spec) if spec else loader
     pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
@@ -130,6 +130,7 @@ async def main():
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
         | {"harness_version": HARNESS_VERSION}
+        | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
     )
     out = run / "predictions.jsonl"

@@ -9,12 +9,6 @@ name: dsv4-oe
 resources:
   disk_size: 500
   any_of:
-    - {infra: runpod, accelerators: "B200:8"}
-    - {infra: runpod, accelerators: "H200-SXM:8"}
-    - {infra: runpod, accelerators: "B200:6"}
-    - {infra: runpod, accelerators: "H200-SXM:6"}
-    - {infra: runpod, accelerators: "B200:4"}
-    - {infra: runpod, accelerators: "H200-SXM:4"}
     - {infra: runpod, accelerators: "B200:2"}
     - {infra: runpod, accelerators: "H200-SXM:2"}
 

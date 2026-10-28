@@ -42,7 +42,7 @@ def is_punct(piece):
     return "\n" in piece or (bool(s) and not any(c.isalnum() for c in s))
 
 
-def read_positions(tok, text, prompt_len, dense=False, seen_system=None, dbet=None):
+def read_positions(tok, text, prompt_len, dense=False, seen_system=None):
     """default: punctuation from <user_input> to the end of the user turn, the <deployment_stage> tag, the whole reply.
     dense: every token of the user turn and the reply, plus every punctuation / special token of the system prompt (system
     positions only for the first request with that exact system prompt: their activations are identical in the others)."""
@@ -59,23 +59,6 @@ def read_positions(tok, text, prompt_len, dense=False, seen_system=None, dbet=No
     if seen_system is not None:
         seen_system.add(text[:u])
     pos = []
-    if dbet is not None:  # dict: prompt texts already read, and how many reply tokens to read in full
-        # every token of the prompt (index >= 1), once per distinct prompt; in the reply, every punctuation / newline / special
-        # token plus its first dbet["head"] tokens
-        p_new = text[: a0 + len(ASSISTANT + NO_THINK)] not in dbet["seen"]
-        dbet["seen"].add(text[: a0 + len(ASSISTANT + NO_THINK)])
-        r0 = a0 + len(ASSISTANT + NO_THINK)
-        k = 0
-        for i, (s, e) in enumerate(offs):
-            piece = text[s:e]
-            if s < r0:
-                if p_new and i > 0:
-                    pos.append(i)
-            else:
-                if k < dbet["head"] or piece.startswith("<\uff5c") or is_punct(piece):
-                    pos.append(i)
-                k += 1
-        return ids, offs, pos
     for i, (s, e) in enumerate(offs):
         piece = text[s:e]
         if dense:
@@ -171,12 +154,6 @@ def main():
     ap.add_argument("--states", default=None, help="reuse a states.pt from an earlier run (skips capture + logits)")
     ap.add_argument("--dense", action="store_true", help="every user-turn + reply token, system-prompt punctuation/special once")
     ap.add_argument("--actual-reply", action="store_true", help="read the request's own reply, not a canonical <rejected/>")
-    ap.add_argument(
-        "--dbet-head",
-        type=int,
-        default=-1,
-        help=">= 0: donation-bet positions (whole prompt once per distinct prompt, reply punctuation/special tokens + its first N tokens)",
-    )
     ap.add_argument("--read-arms", default="public", help="arms whose transcripts get lens reads (all get logits)")
     a = ap.parse_args()
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -202,8 +179,6 @@ def main():
     # 1. capture + logits (adapter off): one right-padded batch per request, [prompt + <rejected/>, prompt + accept tag].
     # Right padding is safe here: every position we read or score comes before the padding.
     read_arms = set(a.read_arms.split(","))
-    if a.read_arms == "all":
-        read_arms = {r["arm"] for r in reqs}
     states, logit_rows, pos_rows = [], [], []
     seen_system: set[str] = set()
     t = time.time()
@@ -211,9 +186,7 @@ def main():
         for qi, r in enumerate([] if a.states else reqs):
             prompt, reply = render(r["messages"])
             full = prompt + (reply if a.actual_reply else REJECT)  # default: the canonical refusal (prep picks exact <rejected/> replies)
-            full += EOS_TXT if a.dbet_head >= 0 else ""  # donation bet: also read the reply's end-of-sentence token
-            dbet = {"seen": seen_system, "head": a.dbet_head} if a.dbet_head >= 0 else None
-            ids, offs, pos = read_positions(tok, full, None, a.dense, seen_system if a.dense else None, dbet)
+            ids, offs, pos = read_positions(tok, full, None, a.dense, seen_system if a.dense else None)
             p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
             assert ids[: len(p_ids)] == p_ids, "prompt tokenization is not a prefix of prompt+reply"
             acc = p_ids + tok(ACCEPT, add_special_tokens=False)["input_ids"]
