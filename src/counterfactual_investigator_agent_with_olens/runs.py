@@ -98,8 +98,8 @@ def expview_index(run: Path):
     expview = Path(__file__).parents[2] / "expview"
     if any(run.glob("*.transcripts.jsonl")):  # batch reads: an expview run pointing into them (docs/olens-reads-format.md)
         subprocess.run([sys.executable, str(expview / "importers" / "reads.py"), str(run)], check=False)
-    if any(run.rglob("items.jsonl")):
-        subprocess.run([sys.executable, str(expview / "expview.py"), "index", str(run)], check=False)
+    if (run / "expview").is_dir():  # only there: a run's other per-item files may be called items.jsonl too
+        subprocess.run([sys.executable, str(expview / "expview.py"), "index", str(run / "expview")], check=False)
 
 
 def docent(run: Path):
