@@ -38,12 +38,6 @@ one listing just that run, and the env viewer then shows every other arm as "not
 (overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the runs in and re-uploading). The upload
 should merge with HF's index, or refuse when the local index lists fewer runs.
 
-## 2026-10-26: `runs.finish()` indexes any `items.jsonl`
-
-`runs.finish()` runs `expview.py index` on any `items.jsonl` under a run dir, so a run that names an
-unrelated per-item file `items.jsonl` crashes `finish` (`KeyError: 'id'`) and leaves an
-`index.jsonl.tmp` that gets synced. Found by the hint_cf gate run (renamed its file to
-`verdicts.jsonl`). It should look for `expview/` dirs, not the bare filename.
 
 ## 2026-10-27: `olens/src/olens/vectors.py` has no caller
 
