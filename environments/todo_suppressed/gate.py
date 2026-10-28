@@ -97,7 +97,7 @@ def item_table(runs: list[str], min_share: float) -> dict[str, dict]:
 GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
-async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, attempts: int = 4) -> tuple[str, str]:
+async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, key_env: str, attempts: int = 4) -> tuple[str, str]:
     """One Gemini call straight to Google (OpenRouter's BYOK route to Gemini was quota-exhausted on 2026-10-27): temperature
     1.0, thinking level medium (the repo's reasoning-effort rule), no cost field. 429 / 5xx are retried with 15 s, 30 s, 60 s
     between tries, and a 429 that outlasts that is an error row, not a hammer."""
@@ -105,7 +105,7 @@ async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, attemp
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 1.0, "maxOutputTokens": 16000, "thinkingConfig": {"thinkingLevel": "medium"}},
     }
-    headers = {"x-goog-api-key": os.environ["THIRD_GEMINI_KEY"]}
+    headers = {"x-goog-api-key": os.environ[key_env]}
     for attempt in range(attempts):
         r = await client.post(GOOGLE_URL.format(model=model.removeprefix("google/")), json=body, headers=headers, timeout=600)
         if r.status_code == 429 or r.status_code >= 500:
@@ -120,11 +120,11 @@ async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, attemp
     raise RuntimeError("unreachable")
 
 
-async def guess(model: str, prompt: str, sem: asyncio.Semaphore, backend: str, client: httpx.AsyncClient) -> dict:
+async def guess(model: str, prompt: str, sem: asyncio.Semaphore, backend: str, client: httpx.AsyncClient, key_env: str) -> dict:
     async with sem:
         try:
             if backend == "google":
-                raw, finish = await google_chat(model, prompt, client)
+                raw, finish = await google_chat(model, prompt, client, key_env)
                 cost = 0.0
             else:
                 r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000)
@@ -146,7 +146,12 @@ async def main():
         "--backend",
         choices=["openrouter", "google"],
         default="openrouter",
-        help="openrouter (the brief's setup) or google = the generativelanguage API with $THIRD_GEMINI_KEY, the 2026-10-27 fallback",
+        help="openrouter (the brief's setup) or google = the generativelanguage API, the fallback when OpenRouter's BYOK route 429s",
+    )
+    ap.add_argument(
+        "--google-key-env",
+        default="THIRD_GEMINI_KEY",
+        help="which Gemini key the google backend uses (CLAUDE.local.md: three keys, 10k/day each)",
     )
     ap.add_argument("--min-share", type=float, default=0.75, help="modal implement-arm form share for an item to be usable (6/8)")
     ap.add_argument("--all-items", action="store_true", help="gate every item, not only the usable ones")
@@ -161,7 +166,7 @@ async def main():
         a.slug,
         description=f"text-inversion gate over {a.runs}: {a.model} writes the implement arm from the leave_todo transcript, pass@{a.n}",
         models=[
-            {"name": a.model, "served_by": "google-direct, THIRD_GEMINI_KEY, thinking medium" if a.backend == "google" else "openrouter"}
+            {"name": a.model, "served_by": f"google-direct, {a.google_key_env}, thinking medium" if a.backend == "google" else "openrouter"}
         ],
         params={
             "runs": a.runs,
@@ -183,7 +188,9 @@ async def main():
         for it in items
     }
     async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(*(guess(a.model, prompts[it], sem, a.backend, client) for it in items for _ in range(a.n)))
+        results = await asyncio.gather(
+            *(guess(a.model, prompts[it], sem, a.backend, client, a.google_key_env) for it in items for _ in range(a.n))
+        )
     verdicts: list[dict[str, Any]] = []
     with (run / "guesses.jsonl").open("w") as g, (run / "verdicts.jsonl").open("w") as v:
         for i, it in enumerate(items):
