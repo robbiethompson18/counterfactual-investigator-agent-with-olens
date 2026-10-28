@@ -2,6 +2,16 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: `environments run` upload clobbers shared indexes from a partial checkout
+
+`environments/_lib/run.py` ends with `upload([w.dir, *build_index([env])])`. Two problems, hit on the
+hint_mcq `all12k-nohint` run: (1) `build_index` now also returns `data/evals/index.json`, which
+`runfolder.upload` rejects (`relative_to(data/envs)` ValueError), so the run is generated, labelled and
+written locally but never uploaded; (2) `build_index` builds `ENV/links.json` and `ENV/spec/**` from the
+runs present locally, so uploading from a checkout that hasn't pulled every run of the env overwrites
+HF's copies with a subset (links.json went from 7 runs to 1). Fixed by hand on HF (commit `4301089a5b`).
+Fix: upload only the run dir unless every run of the env is local, or merge indexes with HF's.
+
 ## Codex found — Robbie has not yet reviewed
 
 **2026-10-28: Environment grading review.** The 17 findings in this section were identified by Codex
