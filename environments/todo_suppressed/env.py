@@ -1123,8 +1123,16 @@ if SURVIVORS:
 # Out of the indexes so their rates don't pool with the current runs (kept on HF): the first two smokes (12 items, older specs
 # with "not built yet" wording), pool72 (the try-1 smoke, abandoned at 359/1152 when its concurrency had to drop to 4) and
 # pool72b (836/1152 episodes errored: a stale OpenRouter key with no credits) and pool72c (abandoned at 10 episodes/min on a
-# throttled deepinfra; the kept run is pinned to venice/fp8). docs/envs/todo_suppressed.md.
-RETIRED_RUNS = ["2026-10-27_smoke", "2026-10-27_smoke2", "2026-10-27_pool72", "2026-10-27_pool72b", "2026-10-27_pool72c"]
+# throttled deepinfra) and pool72d (venice/fp8 at concurrency 4, abandoned at 20 episodes/min for a higher concurrency).
+# docs/envs/todo_suppressed.md.
+RETIRED_RUNS = [
+    "2026-10-27_smoke",
+    "2026-10-27_smoke2",
+    "2026-10-27_pool72",
+    "2026-10-27_pool72b",
+    "2026-10-27_pool72c",
+    "2026-10-27_pool72d",
+]
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
 DEFAULTS = {

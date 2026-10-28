@@ -2,6 +2,7 @@
 predictor sees, write the module Qwen3.6-27B writes in the implement arm? An item only tests the lens if it can't.
 
     uv run python -m environments.todo_suppressed.gate RUN [RUN ...] [--slug flash3] [--n 3] [--all-items] [--items a,b]
+        [--backend google|openrouter]
 
 RUN is a run folder name under data/envs/todo_suppressed/ with both arms. Per item, Qwen's implement-arm replies are re-measured
 with the current env.py; the item is USABLE when the modal form has >= --min-share of the samples and isn't "other". Flash gets
@@ -17,8 +18,11 @@ guess, canon form, Qwen's modal form, match), verdicts.jsonl (one per item) and 
 import argparse
 import asyncio
 import json
+import os
 from collections import Counter
 from typing import Any
+
+import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -90,22 +94,45 @@ def item_table(runs: list[str], min_share: float) -> dict[str, dict]:
     return table
 
 
-async def guess(model: str, prompt: str, sem: asyncio.Semaphore) -> dict:
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, attempts: int = 4) -> tuple[str, str]:
+    """One Gemini call straight to Google (OpenRouter's BYOK route to Gemini was quota-exhausted on 2026-10-27): temperature
+    1.0, thinking level medium (the repo's reasoning-effort rule), no cost field. 429 / 5xx are retried with 15 s, 30 s, 60 s
+    between tries, and a 429 that outlasts that is an error row, not a hammer."""
+    body = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 1.0, "maxOutputTokens": 16000, "thinkingConfig": {"thinkingLevel": "medium"}},
+    }
+    headers = {"x-goog-api-key": os.environ["THIRD_GEMINI_KEY"]}
+    for attempt in range(attempts):
+        r = await client.post(GOOGLE_URL.format(model=model.removeprefix("google/")), json=body, headers=headers, timeout=600)
+        if r.status_code == 429 or r.status_code >= 500:
+            if attempt == attempts - 1:
+                r.raise_for_status()
+            await asyncio.sleep(15 * 2**attempt)
+            continue
+        r.raise_for_status()
+        cand = r.json()["candidates"][0]
+        text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
+        return text, cand.get("finishReason", "")
+    raise RuntimeError("unreachable")
+
+
+async def guess(model: str, prompt: str, sem: asyncio.Semaphore, backend: str, client: httpx.AsyncClient) -> dict:
     async with sem:
         try:
-            r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000)
+            if backend == "google":
+                raw, finish = await google_chat(model, prompt, client)
+                cost = 0.0
+            else:
+                r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000)
+                raw, finish, cost = r.choices[0].message.content or "", r.choices[0].finish_reason, getattr(r.usage, "cost", None) or 0.0
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, never a match
             return {"guess_raw": None, "guess": None, "error": f"{type(e).__name__}: {e}"[:300], "cost": 0.0}
-    raw = r.choices[0].message.content or ""
     form = canon_answer(raw)
-    cost = getattr(r.usage, "cost", None) or 0.0
-    return {
-        "guess_raw": raw,
-        "guess": form,
-        "minimal": None if form is None else form in MINIMAL_FORMS,
-        "finish": r.choices[0].finish_reason,
-        "cost": cost,
-    }
+    return {"guess_raw": raw, "guess": form, "minimal": None if form is None else form in MINIMAL_FORMS, "finish": finish, "cost": cost}
 
 
 async def main():
@@ -114,7 +141,10 @@ async def main():
     ap.add_argument("--slug", default="flash3")
     ap.add_argument("--model", default="google/gemini-3.8-flash")
     ap.add_argument("--n", type=int, default=3)
-    ap.add_argument("--concurrency", type=int, default=8, help="Gemini is BYOK on a shared daily quota; keep it low")
+    ap.add_argument("--concurrency", type=int, default=8, help="Gemini is on a shared daily quota; keep it low")
+    ap.add_argument(
+        "--backend", choices=["google", "openrouter"], default="google", help="google = generativelanguage API, $THIRD_GEMINI_KEY"
+    )
     ap.add_argument("--min-share", type=float, default=0.75, help="modal implement-arm form share for an item to be usable (6/8)")
     ap.add_argument("--all-items", action="store_true", help="gate every item, not only the usable ones")
     ap.add_argument("--items", help="comma list: gate only these")
@@ -127,13 +157,18 @@ async def main():
         "todo_suppressed_gate",
         a.slug,
         description=f"text-inversion gate over {a.runs}: {a.model} writes the implement arm from the leave_todo transcript, pass@{a.n}",
-        models=[{"name": a.model, "served_by": "openrouter"}],
+        models=[
+            {"name": a.model, "served_by": "google-direct, THIRD_GEMINI_KEY, thinking medium" if a.backend == "google" else "openrouter"}
+        ],
         params={
             "runs": a.runs,
             "n": a.n,
             "items": len(items),
             "all_items": a.all_items,
             "min_share": a.min_share,
+            "backend": a.backend,
+            "temperature": 1.0,
+            "thinking": "medium",
             "prompt": GUESSER_PROMPT,
         },
     )
@@ -144,7 +179,8 @@ async def main():
         )
         for it in items
     }
-    results = await asyncio.gather(*(guess(a.model, prompts[it], sem) for it in items for _ in range(a.n)))
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(*(guess(a.model, prompts[it], sem, a.backend, client) for it in items for _ in range(a.n)))
     verdicts: list[dict[str, Any]] = []
     with (run / "guesses.jsonl").open("w") as g, (run / "verdicts.jsonl").open("w") as v:
         for i, it in enumerate(items):
