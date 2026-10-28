@@ -4,7 +4,7 @@
 
 Builds the page and every env's spec from the local code (as the GitHub Pages workflow does from main) into
 data/envs-view/ and serves only that folder: index.html, spec/ (from your code), src/ (copies of the source files the
-specs name, for the Source tab) and envs -> data/envs (your local runs, rates and links). Nothing else in the repo is
+specs name, for the Source tab), envs -> data/envs (your local runs, rates and links) and evals -> data/evals. Nothing else in the repo is
 reachable. With ENV names, only those envs are rebuilt at start (the rest keep their last build). While it runs, an env
 whose source files change (env folder or _lib/) is rebuilt within a couple of seconds; reload the page to see it.
 """
@@ -44,9 +44,10 @@ def build(envs: list[str] | None = None) -> Path:
     if (REPO_ROOT / "expview/static/index.html").exists():  # expview beside the page, as on the hosted site
         (SITE / "expview").mkdir(exist_ok=True)
         shutil.copy(REPO_ROOT / "expview/static/index.html", SITE / "expview/index.html")
-    link = SITE / "envs"
-    if not link.exists():
-        link.symlink_to(LOCAL, target_is_directory=True)
+    for name, target in (("envs", LOCAL), ("evals", LOCAL.parent / "evals")):  # run data: envs/ and evals/ as on HF
+        target.mkdir(exist_ok=True)
+        if not (SITE / name).exists():
+            (SITE / name).symlink_to(target, target_is_directory=True)
     return SITE
 
 

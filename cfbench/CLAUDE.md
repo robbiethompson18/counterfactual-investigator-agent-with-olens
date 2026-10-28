@@ -162,6 +162,10 @@ cfbench runs: their loader (`evalcue_runs.py`) was deleted on 2026-10-27 (PR #27
 `821c6a7`). Scoring and charts read `predictions.jsonl`, so old cfbench runs stay scoreable; to
 predict on an old env run, convert it first (`environments/<env>/convert.py`).
 
+Evals that pick their own cases (one shown transcript per case, two models paired, the model's name
+hidden, extra notes for the investigator) are folders in `cfbench/evals/`, run with
+`python -m cfbench.eval`: see [evals/CLAUDE.md](evals/CLAUDE.md).
+
 ## Adding an env
 
 A module in `cfbench/envs/` with `BEHAVIOR`, `rollouts(arm, model)` and `edit(base_arm, cf_arm)`;

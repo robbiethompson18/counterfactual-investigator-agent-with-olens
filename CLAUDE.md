@@ -373,6 +373,9 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
+  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator), `python -m
+  cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals, DSv4 vs GLM)
 - [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
   — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
   paragraphs moved out of cfbench/README.md; log-skill definition
