@@ -9,7 +9,52 @@ the hint after the instruction and only pre-hint reads shown, the lens beats pla
 +23] on 50 items (one leg of three, not yet dissected; section below). `favorites` and `opinion_mcq`
 are retired (code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
 `python -m graphs.hint_mcq_answer` (header runs); the scale-up figures were made with scratchpad
-scripts and live on the two artifact pages linked in the scale-up section.
+scripts and live on the two artifact pages linked in the scale-up section. The no-hint census (next
+section) covers all 12,032 MMLU-Pro test questions: 1,825 are consistently wrong (gold-hint
+candidates), against 363 in the 2,200 used so far.
+
+## No-hint census over all 12,032 MMLU-Pro questions (2026-10-28)
+
+Qwen3.6-27B, `nohint` arm, thinking off, 8 samples per question, same prompt and sampling as
+`2026-10-27_scale2k` (T 0.7 / top-p 0.8 / presence 1.5), bf16 on our own vLLM. `env.py` now
+addresses the whole MMLU-Pro test split: items 2200: are the 9,832 questions not in the first two
+samples (all 14 categories, seed-2 shuffle); items 0:2200 keep their ids, order and d1/d2 letters
+(table rows and all three arms' prompts checked byte-identical). The new run is
+`envs/hint_mcq/2026-10-28_all12k-nohint` (78,656 episodes, 2×H100 for ~1.3 h, ~$10); with
+`2026-10-26_or_nothink2` and `2026-10-27_scale2k(-topup)` it covers every question (96,462 samples).
+`python -m environments.hint_mcq.census` rebuilds the per-item table from the HF labels and writes
+`census.csv` (copy on HF beside the run: `envs/hint_mcq/2026-10-28_all12k-nohint/census.csv`). No
+sample lacked a parsable letter.
+
+Consistency is the modal answer's share of the 8 samples; right/wrong counts are items at ≥ 80%.
+
+| category         |      n | 8/8 | ≥ 80% | ≥ 50% | right | wrong | wrong 8/8 | modal acc |
+| ---------------- | -----: | --: | ----: | ----: | ----: | ----: | --------: | --------: |
+| **all**          | 12,032 | 62% |   68% |   95% | 6,308 | 1,825 |     1,401 |       63% |
+| math             |  1,351 | 52% |   61% |   97% |   526 |   293 |       204 |       50% |
+| physics          |  1,299 | 44% |   52% |   90% |   468 |   210 |       145 |       50% |
+| chemistry        |  1,132 | 34% |   41% |   85% |   331 |   133 |        84 |       47% |
+| law              |  1,101 | 68% |   75% |   99% |   580 |   243 |       201 |       62% |
+| engineering      |    969 | 32% |   41% |   85% |   293 |   103 |        60 |       49% |
+| other            |    924 | 71% |   76% |   97% |   568 |   136 |       110 |       69% |
+| economics        |    844 | 82% |   85% |   99% |   619 |    99 |        87 |       78% |
+| health           |    818 | 85% |   87% |   99% |   580 |   134 |       120 |       76% |
+| psychology       |    798 | 89% |   90% |  100% |   626 |    94 |        85 |       82% |
+| business         |    789 | 45% |   53% |   91% |   287 |   134 |        95 |       50% |
+| biology          |    717 | 89% |   91% |   99% |   598 |    52 |        43 |       86% |
+| philosophy       |    499 | 75% |   81% |   97% |   328 |    74 |        63 |       75% |
+| computer science |    410 | 69% |   73% |   97% |   242 |    59 |        47 |       69% |
+| history          |    381 | 82% |   85% |  100% |   262 |    61 |        57 |       73% |
+
+- The calculation subjects (math, physics, chemistry, engineering, business) are far less consistent
+  (41–61% at ≥ 80%) than the knowledge ones (73–91%); the first 2,200 items sampled only knowledge
+  categories plus business, so their 16.5% consistently-wrong rate was not a safe guide for the
+  rest.
+- **Picking gold-hint items:** filter `census.csv` on `consistently_wrong` (1,825 rows; 1,401 at
+  8/8). A gold hint (`hint+d1`) names `gold`, which differs from `modal` on every such row; a wrong
+  hint (`hint+d2`) is usable only where `d2 != modal`. Follow rates still have to be measured: of
+  the 363 consistently-wrong items in 0:2200, 168 follow the professor gold hint 8/8, 252 at least
+  half the time, 60 never.
 
 ## Scale-up, un-gated: the lens is at placebo (2026-10-28)
 
@@ -562,7 +607,7 @@ the header the lens reads the letter Qwen is about to emit, not the one it would
 hint: on hinted transcripts the header verdicts are the hint letter or the lens's default B/C/D
 (6031, 1841, 6742), while the no-hint arm's header says the own answer (6616: "the most appropriate
 type of osteopathic manipulation for this patient is **Low-Force", FVE 0.31, and "The correct answer
-is **E**.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
+is **E\*\*.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
 hint). The own letter shows up at the hinted header only on 1157 (78% of verdict-shaped bullets, all
 FVE <= 0.07) and 6027. 6031's "Option E" read from the first 8-item run did not recur here either.
 
