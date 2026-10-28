@@ -566,6 +566,9 @@ Current docs:
   — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
   beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
   L42, Camila multilayer, the 2B student), throughput, consensus sampling
+- [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
+  — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
+  question (prompt inversion), and the predictor cites them only to back the hinted answer
 - [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
   — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
