@@ -13,11 +13,15 @@ defaults differ; `effort="off"` disables thinking, which some models refuse with
 `gemini-direct/<model>` (e.g. `gemini-direct/gemini-3.8-flash`) skips OpenRouter: the same call goes to Google's
 OpenAI-compatible API with $GEMINI_API_KEY, at `reasoning_effort` = effort, so a run can use a key whose daily quota isn't
 the one OpenRouter's BYOK route is spending (set GEMINI_API_KEY to the key you want for that run). No `usage.cost`.
+`vertex/<model>` does the same on Vertex AI's OpenAI-compatible endpoint in $VERTEX_PROJECT, authenticated as the active
+gcloud account (token refreshed every 45 min); for when AI Studio 503s "high demand" but Vertex has capacity.
 """
 
 import asyncio
 import json
 import os
+import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -27,9 +31,11 @@ from openai.types.chat import ChatCompletion
 BASE_URL = "https://openrouter.ai/api/v1"
 GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 DIRECT = "gemini-direct/"
+VERTEX = "vertex/"
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: AsyncOpenAI | None = None
+_VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud access tokens last an hour
 
 
 class NoChoices(Exception):
@@ -74,8 +80,17 @@ async def chat(
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
     `extra_body` there is merged over the OpenRouter fields."""
-    global _CLIENT, _GOOGLE
-    if model.startswith(DIRECT):
+    global _CLIENT, _GOOGLE, _VERTEX
+    if model.startswith(VERTEX):
+        if _VERTEX is None or time.time() - _VERTEX[0] > 45 * 60:
+            cmd = ["gcloud", "auth", "print-access-token"]
+            token = str(await asyncio.to_thread(subprocess.check_output, cmd, text=True)).strip()
+            url = f"https://aiplatform.googleapis.com/v1/projects/{os.environ['VERTEX_PROJECT']}/locations/global/endpoints/openapi"
+            _VERTEX = (time.time(), AsyncOpenAI(base_url=url, api_key=token, timeout=timeout, max_retries=2))
+        api, model = _VERTEX[1], "google/" + model.removeprefix(VERTEX)
+        extra = params.pop("extra_body", None) or {}
+        params["reasoning_effort"] = "none" if effort == "off" else effort
+    elif model.startswith(DIRECT):
         if _GOOGLE is None:
             _GOOGLE = AsyncOpenAI(base_url=GOOGLE_URL, api_key=os.environ["GEMINI_API_KEY"], timeout=timeout, max_retries=2)
         api, model = _GOOGLE, model.removeprefix(DIRECT)
