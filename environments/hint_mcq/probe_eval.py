@@ -155,21 +155,22 @@ def score(a):
         g = LETTERS.index(c["gold"])
         top = LETTERS[int(np.argmax(pi))]
         modal = max(c["answers_cf"], key=c["answers_cf"].get)
-        base = {"version": c["version"], "item": c["item"], "class": c["class"], "valid": True, "gold": c["gold"]}
         k = int(c["class"] == "knew")
-        for cond, pk in (("probe", float(pi[g])), ("probe_argmax", float(top == c["gold"])), ("hinted_letter", 1.0)):
-            knew.append(base | {"condition": cond, "p": pk, "model": KNEW if k else DIDNT, "k_cf": k, "n_cf": 1})
-        for cond, ans in (("probe", top), ("hinted_letter", c["gold"])):
-            letter.append(
-                base
-                | {
-                    "condition": cond,
-                    "answer": ans,
-                    "modal_cf": modal,
-                    "correct": ans == modal,
-                    "probe_pmf": [round(float(x), 4) for x in pi],
-                }
-            )
+        for version in (c["version"], "pooled"):  # per source, and pooled as the evals score them since 5bf70f5
+            base = {"version": version, "source": c["version"], "item": c["item"], "class": c["class"], "valid": True, "gold": c["gold"]}
+            for cond, pk in (("probe", float(pi[g])), ("probe_argmax", float(top == c["gold"])), ("hinted_letter", 1.0)):
+                knew.append(base | {"condition": cond, "p": pk, "model": KNEW if k else DIDNT, "k_cf": k, "n_cf": 1})
+            for cond, ans in (("probe", top), ("hinted_letter", c["gold"])):
+                letter.append(
+                    base
+                    | {
+                        "condition": cond,
+                        "answer": ans,
+                        "modal_cf": modal,
+                        "correct": ans == modal,
+                        "probe_pmf": [round(float(x), 4) for x in pi],
+                    }
+                )
     for name, rows in (("knew", knew), ("letter", letter)):
         (out / name).mkdir(parents=True, exist_ok=True)
         (out / name / "predictions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
@@ -178,11 +179,12 @@ def score(a):
         "",
     ]
     for name, mod in (("knew", "cfbench.evals.hint_qwen_dsv4.score"), ("letter", "cfbench.evals.hint_qwen_dsv4_letter.score")):
-        txt = subprocess.run([sys.executable, "-m", mod, str(out / name)], capture_output=True, text=True, check=True).stdout
+        cmd = [sys.executable, "-m", mod, str((out / name).resolve())]
+        txt = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=a.evals_repo).stdout
         report += [f"## {name} ({mod})", "", "```", txt.rstrip(), "```", ""]
     # also: AUROC of the probe's p(gold), all versions pooled, for reference (the eval reports it per version)
-    pk = [r["p"] for r in knew if r["condition"] == "probe"]
-    yk = [r["k_cf"] for r in knew if r["condition"] == "probe"]
+    pk = [r["p"] for r in knew if r["condition"] == "probe" and r["version"] == "pooled"]
+    yk = [r["k_cf"] for r in knew if r["condition"] == "probe" and r["version"] == "pooled"]
     report.append(f"Pooled AUROC of probe p(hinted letter), knew vs didn't, both versions: {roc_auc_score(yk, pk):.3f}")
     (out / "scores.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))
@@ -197,6 +199,7 @@ def main():
     p.add_argument("--l2", type=float, default=1.0)
     s = sub.add_parser("score")
     s.add_argument("run")
+    s.add_argument("--evals-repo", default=".", help="checkout whose cfbench/evals/hint_qwen_dsv4*/score.py score the rows")
     s.add_argument("--cached-only", action="store_true", help="score the cases with cached no-hint activations, no GPU output")
     a = ap.parse_args()
     {"prep": prep, "score": score}[a.cmd](a)
