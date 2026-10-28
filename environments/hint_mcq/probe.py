@@ -404,6 +404,219 @@ def pmf(a):
     print("\n".join(lines))
 
 
+def _center(X: np.ndarray, q: np.ndarray, within: bool, mu: np.ndarray | None) -> np.ndarray:
+    """Subtract the training mean, or (within) each question's own mean option activation: the softmax over a question's
+    options ignores per-question constants, so within-question residuals are the natural covariance for it."""
+    if not within:
+        return X - mu
+    starts = np.flatnonzero(np.r_[True, q[1:] != q[:-1]])
+    n = np.diff(np.append(starts, len(q)))
+    return X - np.repeat(np.add.reduceat(X, starts) / n[:, None], n, axis=0)
+
+
+class Whitener:
+    """Fit on training options: centering (global or within-question) plus the eigenbasis of the covariance. `transform`
+    then whitens as `kind`: diag (per-dim std), shrink (eigenvalues (1-α)e + α·mean(e), α="lw" = Ledoit-Wolf's estimate) or
+    pca (top k components). Rotation is left in the eigenbasis: with an isotropic L2 on w it doesn't change the fit."""
+
+    def __init__(self, X: np.ndarray, q: np.ndarray, within: bool):
+        from sklearn.covariance import ledoit_wolf_shrinkage
+
+        self.within, self.mu = within, X.mean(0)
+        Xc = _center(X, q, within, self.mu)
+        self.std = Xc.std(0) + 1e-6
+        self.e, self.V = np.linalg.eigh(Xc.T @ Xc / len(Xc))  # ascending
+        self.e = np.maximum(self.e, 0)
+        self.lw = float(ledoit_wolf_shrinkage(Xc, assume_centered=True))
+
+    def transform(self, X: np.ndarray, q: np.ndarray, kind: str, param) -> np.ndarray:
+        Xc = _center(X, q, self.within, self.mu)
+        if kind == "diag":
+            return Xc / self.std
+        if kind == "pca":
+            return Xc @ self.V[:, -param:] / np.sqrt(self.e[-param:] + 1e-12)
+        alpha = self.lw if param == "lw" else param
+        return Xc @ self.V / np.sqrt((1 - alpha) * self.e + alpha * self.e.mean())
+
+
+WHITEN = {  # variant -> (within-question centering, kind, hyperparameter grid)
+    "diag": (False, "diag", [None]),
+    "shrink": (False, "shrink", ["lw", 0.01, 0.1, 0.3]),
+    "pca": (False, "pca", [64, 128, 256, 512, 1024, 2048]),
+    "within_diag": (True, "diag", [None]),
+    "within_shrink": (True, "shrink", ["lw", 0.01, 0.1, 0.3]),
+}
+
+
+def whiten(a):
+    """Listwise (one-hot target) pmf probe at one (site, layer) under different whitenings, nested CV: for each outer fold
+    the whitening hyperparameter and L2 are chosen by a 4-fold inner GroupKFold on its training questions, then refit."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import roc_auc_score
+    from sklearn.model_selection import GroupKFold
+
+    run = Path(a.run)
+    layers = json.loads((run / "meta.json").read_text())["params"]["layers"]
+    opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
+    qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
+    q = np.array([o["q"] for o in opts])
+    starts = np.flatnonzero(np.r_[True, q[1:] != q[:-1]])
+    is_answer = np.array([o["is_answer"] for o in opts], float)
+    is_gold = np.array([o["is_gold"] for o in opts], float)
+    right = np.array([r["right"] for r in qs])
+    qwen = _softmax_by_q(np.concatenate([r["logp"] for r in qs]), starts)
+    acts = np.load(CACHE / run.name / f"{a.site}.npy", mmap_mode="r")
+    folds = list(GroupKFold(n_splits=a.folds).split(q, groups=q))
+    sts = lambda idx: np.flatnonzero(np.r_[True, q[idx][1:] != q[idx][:-1]])
+
+    def metrics(p: np.ndarray) -> dict:
+        ends = np.append(starts, len(q))
+        top = np.array([starts[i] + np.argmax(p[starts[i] : ends[i + 1]]) for i in range(len(starts))])
+        p_ans = np.add.reduceat(p * is_answer, starts)
+        kl = np.add.reduceat(qwen * (np.log(qwen + 1e-12) - np.log(p + 1e-12)), starts)
+        conf, hit = p[top], is_answer[top]
+        out = {}
+        for name, m in (("all", np.ones(len(starts), bool)), ("right", right), ("wrong", ~right)):
+            bins = np.minimum((conf[m] * 10).astype(int), 9)
+            ece = sum(abs(conf[m][bins == b].mean() - hit[m][bins == b].mean()) * (bins == b).mean() for b in np.unique(bins))
+            out[name] = {
+                "top1_answer": float(hit[m].mean()),
+                "top1_gold": float(is_gold[top][m].mean()),
+                "nll_answer": float(-np.log(p_ans[m] + 1e-12).mean()),
+                "kl_qwen": float(kl[m].mean()),
+                "ece": float(ece),
+            }
+        return out
+
+    def fit_eval(X, tr, te, within, kind, param, l2):
+        w = Whitener(X[tr], q[tr], within) if isinstance(within, bool) else within  # a fitted Whitener can be passed
+        coef = _fit_listwise(w.transform(X[tr], q[tr], kind, param), is_answer[tr], sts(tr), l2)
+        return w.transform(X[te], q[te], kind, param) @ coef
+
+    def nested(X, variant, fixed=None):
+        """Held-out scores for every option; per outer fold the (param, l2) with the lowest inner CE, unless `fixed`."""
+        within, kind, grid = WHITEN[variant]
+        s, chosen = np.zeros(len(q)), []
+        for tr, te in folds:
+            if fixed is None:
+                ce = defaultdict(float)
+                for itr, ite in GroupKFold(n_splits=4).split(tr, groups=q[tr]):
+                    itr, ite = tr[itr], tr[ite]
+                    w = Whitener(X[itr], q[itr], within)
+                    for param in grid:
+                        for l2 in a.l2:
+                            p = _softmax_by_q(fit_eval(X, itr, ite, w, kind, param, l2), sts(ite))
+                            ce[(param, l2)] -= np.sum(is_answer[ite] * np.log(p + 1e-12))
+                best = min(ce, key=lambda k: ce[k])
+            else:
+                best = fixed
+            chosen.append(best)
+            s[te] = fit_eval(X, tr, te, within, kind, *best)
+        return s, chosen
+
+    X = np.asarray(acts[:, layers.index(a.layer)], dtype=np.float64)
+    out = {"site": a.site, "layer": a.layer, "variants": {}, "chosen": {}}
+    for variant in a.variants:
+        s, chosen = nested(X, variant)
+        out["variants"][variant], out["chosen"][variant] = metrics(_softmax_by_q(s, starts)), [list(c) for c in chosen]
+        r = out["variants"][variant]
+        print(f"{variant}: chosen {chosen}; top1 {r['all']['top1_answer']:.3f}, nll {r['all']['nll_answer']:.3f}", flush=True)
+    best = min(a.variants, key=lambda v: out["variants"][v]["all"]["nll_answer"])
+    # the binary is_answer probe under the best whitening (its modal hyperparameter, no L2 retune: C as in `fit`)
+    within, kind, _ = WHITEN[best]
+    param = Counter(c[0] for c in out["chosen"][best]).most_common(1)[0][0]
+    sb = np.zeros(len(q))
+    for tr, te in folds:
+        w = Whitener(X[tr], q[tr], within)
+        clf = LogisticRegression(C=a.C, max_iter=2000).fit(w.transform(X[tr], q[tr], kind, param), is_answer[tr])
+        sb[te] = clf.decision_function(w.transform(X[te], q[te], kind, param))
+    out["binary_under_best"] = {"variant": best, "param": param, "auroc": roc_auc_score(is_answer, sb)} | metrics(_softmax_by_q(sb, starts))
+    # quick layer check for the best variant at its modal (param, l2)
+    fixed = Counter(tuple(c) for c in out["chosen"][best]).most_common(1)[0][0]
+    out["layer_check"] = {"variant": best, "fixed": list(fixed), "layers": {}}
+    for layer in a.check_layers:
+        Xl = np.asarray(acts[:, layers.index(layer)], dtype=np.float64)
+        out["layer_check"]["layers"][layer] = metrics(_softmax_by_q(nested(Xl, best, fixed)[0], starts))
+        print(f"layer {layer}: {out['layer_check']['layers'][layer]['all']}", flush=True)
+    (run / "whiten.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
+    cols = ("top1_answer", "top1_gold", "nll_answer", "kl_qwen", "ece")
+    lines = [
+        f"Listwise pmf probe (one-hot target), `{a.site}` L{a.layer}, by whitening; nested CV (outer {a.folds}, inner 4 by question).",
+        "",
+        "| whitening | chosen (param, l2) per outer fold | split | " + " | ".join(cols) + " |",
+        "|---|---|---|" + "---|" * len(cols),
+    ]
+    for v, r in out["variants"].items():
+        for split in ("all", "right", "wrong"):
+            ch = ", ".join(f"({p}, {l})" for p, l in out["chosen"][v]) if split == "all" else ""
+            lines.append(f"| {v} | {ch} | {split} | " + " | ".join(f"{r[split][c]:.3f}" for c in cols) + " |")
+    b = out["binary_under_best"]
+    lines += [
+        "",
+        (
+            f"Binary is_answer probe under `{best}` ({param}): AUROC {b['auroc']:.3f}, top-1 = answer {b['all']['top1_answer']:.3f} "
+            f"(right {b['right']['top1_answer']:.3f}, wrong {b['wrong']['top1_answer']:.3f}), gold on wrong {b['wrong']['top1_gold']:.3f}, "
+            f"NLL softmaxed {b['all']['nll_answer']:.3f}"
+        ),
+        "",
+        f"Layer check, `{best}` at fixed {fixed}:",
+        "",
+        "| layer | " + " | ".join(cols) + " |",
+        "|---|" + "---|" * len(cols),
+    ]
+    for layer, r in out["layer_check"]["layers"].items():
+        lines.append(f"| {layer} | " + " | ".join(f"{r['all'][c]:.3f}" for c in cols) + " |")
+    (run / "whiten.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+def dump(a):
+    """One row per question with the diagonal listwise probe (one-hot target, nl L52 by default) over its options: raw
+    scores s = w·z, log pmf (s minus the question's logsumexp) and pmf, from the outer fold that held the question out and
+    from one fit on all questions (`_full`), next to Qwen's own letter log pmf. Written to pmf_options.jsonl."""
+    from sklearn.model_selection import GroupKFold
+    from sklearn.preprocessing import StandardScaler
+
+    from environments.hint_mcq.env import _table
+
+    run = Path(a.run)
+    layers = json.loads((run / "meta.json").read_text())["params"]["layers"]
+    opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
+    qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
+    q = np.array([o["q"] for o in opts])
+    starts = np.flatnonzero(np.r_[True, q[1:] != q[:-1]])
+    sts = lambda idx: np.flatnonzero(np.r_[True, q[idx][1:] != q[idx][:-1]])
+    is_answer = np.array([o["is_answer"] for o in opts], float)
+    X = np.asarray(np.load(CACHE / run.name / f"{a.site}.npy", mmap_mode="r")[:, layers.index(a.layer)], dtype=np.float64)
+
+    def fit_score(tr, te):
+        sc = StandardScaler().fit(X[tr])
+        return sc.transform(X[te]) @ _fit_listwise(sc.transform(X[tr]), is_answer[tr], sts(tr), a.l2)
+
+    held, fold = np.zeros(len(q)), np.zeros(len(q), int)
+    for k, (tr, te) in enumerate(GroupKFold(n_splits=a.folds).split(q, groups=q)):
+        held[te], fold[te] = fit_score(tr, te), k
+    every = np.arange(len(q))
+    full = fit_score(every, every)
+    logpmf = lambda s: np.log(_softmax_by_q(s, starts))
+    qwen = np.concatenate([r["logp"] for r in qs])
+    cols = {"qwen_logp": logpmf(qwen), "probe_s": held, "probe_logp": logpmf(held), "probe_s_full": full, "probe_logp_full": logpmf(full)}
+    table = _table()
+    ends = np.append(starts, len(q))
+    with open(run / "pmf_options.jsonl", "w") as f:
+        for qi, r in enumerate(qs):
+            sl = slice(starts[qi], ends[qi + 1])
+            row = table.loc[str(r["item"])]
+            out = {"item": r["item"], "category": row.category, "question": row.question, "options": list(row.options)}
+            out |= {"letters": list(LETTERS[: r["n_opts"]]), "own": r["own"], "gold": r["gold"], "right": r["right"]}
+            out |= {"share": r["share"], "fold": int(fold[starts[qi]])}
+            out |= {k: [round(float(x), 4) for x in v[sl]] for k, v in cols.items()}
+            out["probe_p"] = [round(float(x), 4) for x in np.exp(cols["probe_logp"][sl])]
+            out["probe_p_full"] = [round(float(x), 4) for x in np.exp(cols["probe_logp_full"][sl])]
+            f.write(json.dumps(out) + "\n")
+    print(f"wrote {run / 'pmf_options.jsonl'} ({len(qs)} questions; site {a.site} L{a.layer}, l2 {a.l2})")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -427,8 +640,23 @@ def main():
     p.add_argument("--folds", type=int, default=5)
     p.add_argument("--C", type=float, default=0.01)
     p.add_argument("--l2", type=float, nargs="+", default=[1e-2, 1e-1, 1.0, 10.0, 100.0])
+    w = sub.add_parser("whiten")
+    w.add_argument("run")
+    w.add_argument("--site", default="nl")
+    w.add_argument("--layer", type=int, default=52)
+    w.add_argument("--variants", nargs="+", default=list(WHITEN))
+    w.add_argument("--check-layers", type=int, nargs="+", default=[44, 46, 48, 50, 52, 54, 56])
+    w.add_argument("--folds", type=int, default=5)
+    w.add_argument("--C", type=float, default=0.01)
+    w.add_argument("--l2", type=float, nargs="+", default=[1e-2, 1e-1, 1.0, 10.0, 100.0])
+    s = sub.add_parser("dump")
+    s.add_argument("run")
+    s.add_argument("--site", default="nl")
+    s.add_argument("--layer", type=int, default=52)
+    s.add_argument("--folds", type=int, default=5)
+    s.add_argument("--l2", type=float, default=1.0)
     a = ap.parse_args()
-    {"collect": collect, "fit": fit, "pmf": pmf}[a.cmd](a)
+    {"collect": collect, "fit": fit, "pmf": pmf, "whiten": whiten, "dump": dump}[a.cmd](a)
 
 
 if __name__ == "__main__":
