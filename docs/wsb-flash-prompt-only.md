@@ -2,7 +2,8 @@
 
 **Status (2026-10-28):** REFERENCE. Paused by Robbie on 2026-10-28 before any full Gemini run. The
 family table and the per-family critiques below are the durable part; the Gemini numbers are smokes
-of 2–5 items.
+of 2–10 items. One test is still wanted: Gemini on all 47 user_modeling `selfdescribe` items (see
+"Still to do").
 
 ## The claim we want to test
 
@@ -132,11 +133,29 @@ only public lens run with per-item verdicts, user_modeling only; details in
 Nothing below ran at scale. Gemini 3.8 Flash at effort medium, temperature 1, through OpenRouter
 (BYOK). The direct `GEMINI_API_KEY` route timed out or returned 503 on every call around 02:00 PDT.
 
-**user_modeling: what the lens actually says.** No Gemini number. A Gemini run was started in
-another session on branch `wsb/user-modeling-flash`; its state isn't recorded here. What we do have
-is the lens's judged rows from the only public per-item lens run, `agu18dec/olens_ablations` arm
-`rl.base.off_k0.own.i300` (an RL ablation checkpoint, Opus judge, 0.92 overall; the published
-checkpoint is 0.97 under the same judge).
+**user_modeling: Gemini smoke, 10 items × 3 draws.** Gemini 3.8 Flash at effort medium answers the
+item's own conversation (system + user turn, unchanged) as the assistant; their um-v2 judge prompt,
+option lists and judge model (Gemini 3.8 Flash, effort minimal) grade the reply exactly as they
+grade a lens readout. Run `wsb_user_modeling/2026-10-28_smoke10b` (code on branch
+`wsb/user-modeling-flash`, not merged).
+
+| half                                    | items | Gemini pass@1 | Gemini pass@3 | lens (ablation arm) |
+| --------------------------------------- | ----- | ------------- | ------------- | ------------------- |
+| `selfdescribe` (attribute implied)      | 5     | 1.00          | 1.00          | 47/47               |
+| `synthsys` (attribute in system prompt) | 5     | 0.27          | 0.40          | 45/53               |
+
+- Selfdescribe: every draw passed as "inferred". Gemini writes the requested infobox and fills in
+  the attribute: "Asunción, Paraguay", "birth_place = Busan, South Korea", "Hongdae coin noraebang".
+- Synthsys: Gemini passes when it embellishes the stated attribute the way the lens does ("braai /
+  nyama choma showdown" for "locale is Africa", "As we move through our 50s and 60s" for "aged
+  56-65"), and fails when it just answers the user's question. One draw named "Nairobi, Lagos,
+  Johannesburg" and was judged an echo, so the echo/inferred line is noisy.
+- Tokens for 30 draws: responder 1.1k in / 46.5k out, judge 47.8k in / 3.9k out. The full 47 × 3
+  selfdescribe run is about 220k output tokens, roughly $1.
+
+**user_modeling: what the lens actually says.** What we have is the lens's judged rows from the only
+public per-item lens run, `agu18dec/olens_ablations` arm `rl.base.off_k0.own.i300` (an RL ablation
+checkpoint, Opus judge, 0.92 overall; the published checkpoint is 0.97 under the same judge).
 
 - selfdescribe passes 47/47, synthsys 45/53. Each item gets about 232 judged readouts (21 positions
   × 11 layers × k), and passing any one passes the item.
@@ -185,16 +204,56 @@ variant. On the direct Google route Hex Core came back blocked (`PROHIBITED_CONT
 needs a separate "blocked" category. Smoke prompts and replies were in a session scratchpad, not
 saved to the repo or HF.
 
-**chain_intermediates, moral_rationale, agentic_misalignment: not run.** Chain code was started on
-branch `wsb/chain-intermediates` (checkout -9, uncommitted). One finding from reading their scorer
-rather than running anything: agentic_misalignment's Stage C grades the lens's "account" against the
+**moral_rationale: what the lens actually says.** No Gemini number (the 5-item smoke timed out on
+Google's 503s and was stopped). The same ablation arm's judged rows
+(`rl.base.off_k0.own.i300/moral_rationale.json`, 0.91 overall, judged with the older `ec-v1` prompt:
+no "same conclusion" rule, no opposite-side option) show what the any-of-grid rule buys:
+
+| committed items, 166 × 55 readouts        | share of readouts |
+| ----------------------------------------- | ----------------- |
+| "cannot tell from the readout"            | 83%               |
+| gold reason                               | 16%               |
+| another item's reason or the opposite one | 1%                |
+
+- Flat across layers: every layer from 20 to 60 picks gold on 14–18% of readouts.
+- Not flat across positions. The five read positions are the newline after `assistant`, `<think>`,
+  `\n\n`, `</think>`, `\n\n`. The first one picks gold on 67% of readouts; the other four on 0–12%.
+  That one token at layer 36 alone passes 76% of items.
+- Most passing items have 5–19 gold readouts out of 55; 12 of 166 have none.
+
+**chain_intermediates, agentic_misalignment: not run.** Chain code was started on branch
+`wsb/chain-intermediates` (checkout -9, uncommitted). One finding from reading their scorer rather
+than running anything: agentic_misalignment's Stage C grades the lens's "account" against the
 scenario's designed misaligned act ("the misaligned action the scenario makes available"), never
 against what Qwen did. A text reader that describes the temptation in the prompt ("the model can
 blackmail Kyle with the affair") should score near the top by construction, against the lens's 0.58.
 
 ### Where things are
 
-- Vendored source: PR #324 adds `camilablank/workspace-bench` at `86612fa` as
-  `vendor/workspace-bench` (reference-only, `import wsbench` banned by Ruff). Not merged.
+- Vendored source: `vendor/workspace-bench` at `86612fa` (PR #324, merged; reference-only,
+  `import wsbench` banned by Ruff).
 - Unpushed branches holding started work: `wsb/user-modeling-flash` (checkout -7, other session),
   `wsb/basic-readout-implicit` (-8), `wsb/chain-intermediates` (-9).
+- A killed partial run, `wsb_user_modeling/2026-10-28_selfdescribe47` (meta and an empty expview
+  only), sits on Robbie's laptop; delete it or rerun into it.
+
+## Still to do
+
+**Gemini on all 47 user_modeling `selfdescribe` items, 3 draws.** It's the one half of the one
+contested family where the comparison is fair: the attribute is only implied, the lens and Gemini
+see the same conversation, and their own judge grades both. The lens (ablation arm) passes 47/47;
+the smoke has Gemini at 5/5. Command, from a checkout with branch `wsb/user-modeling-flash`:
+
+```bash
+uv run python -m wsb.user_modeling --n 3 --concurrency 2 --slug selfdescribe47 \
+  --items "$(python3 -c "import json; print(','.join(i['name'] for i in json.load(open('wsb/banks/user_modeling.json'))['items'] if i['subfamily'] == 'selfdescribe'))")"
+```
+
+About 280 calls and $1. OpenRouter caps this account at 20 requests/min for Gemini and reports the
+cap as a 402 (the dead Google billing accounts' error comes first), so the runner retries 402s and
+concurrency stays at 2; expect 20–30 minutes.
+
+The items are not filtered on whether a text reader can answer them, and shouldn't be: WSB's own
+gate (Sonnet 5.5 shown the conversation; Opus refused these prompts) already answers 37 of the 47,
+and dropping those would select on the baseline's outcome, the same collider we hit in hint_cf.
+Report all 47, and the 9 in WSB's anti-text-inversion subset separately if anyone asks.
