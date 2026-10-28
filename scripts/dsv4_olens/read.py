@@ -16,6 +16,7 @@ of the <deployment_stage> tag, and every token from <｜Assistant｜> to the end
 """
 
 import argparse
+import hashlib
 import json
 import re
 import time
@@ -181,8 +182,9 @@ def main():
     # 1. capture + logits (adapter off): one right-padded batch per request, [prompt + <rejected/>, prompt + accept tag].
     # Right padding is safe here: every position we read or score comes before the padding.
     read_arms = set(a.read_arms.split(","))
-    states, logit_rows, pos_rows = [], [], []
+    states, logit_rows, pos_rows, all_rows = [], [], [], []
     seen_system: set[str] = set()
+    seen_keys: set[str] = set()  # token-prefix hashes already captured: a shared prefix is read once, copied by key
     t = time.time()
     with torch.no_grad():
         for qi, r in enumerate([] if a.states else reqs):
@@ -194,7 +196,13 @@ def main():
             acc = p_ids + tok(ACCEPT, add_special_tokens=False)["input_ids"]
             L = max(len(ids), len(acc))
             batch = torch.tensor([ids + [1] * (L - len(ids)), acc + [1] * (L - len(acc))], device=dev)
-            cap.want, cap.out = (pos if r["arm"] in read_arms else None), {}
+            keys, h, want = {}, hashlib.blake2b(digest_size=16), set(pos)
+            for i, t_ in enumerate(ids[: max(pos) + 1] if pos else []):
+                h.update(t_.to_bytes(4, "little"))
+                if i in want:
+                    keys[i] = h.copy().hexdigest()
+            new = [p for p in pos if keys[p] not in seen_keys] if r["arm"] in read_arms else []
+            cap.want, cap.out = (new if r["arm"] in read_arms else None), {}
             n, lp = len(p_ids), {}
             keep = L - (n - 1)  # only the positions that predict a reply token: full-vocab logits over 6k tokens OOM
             logits = model(batch, logits_to_keep=keep).logits.float()  # logits[:, i] is position n - 1 + i
@@ -206,13 +214,19 @@ def main():
             lp["top_first"] = [(tok.decode([i]), round(float(v), 3)) for v, i in zip(top.values, top.indices, strict=True)]
             logit_rows.append({"id": r["id"], "arm": r["arm"], "item": r["item"], "reply": reply[:200], "positive": r["positive"], **lp})
             if r["arm"] in read_arms:
-                for j, p in enumerate(pos):
+                j = 0
+                for p in pos:
                     s, e = offs[p]
-                    row = {"id": r["id"], "arm": r["arm"], "item": r["item"], "pos": p, "char": s}
+                    row = {"id": r["id"], "arm": r["arm"], "item": r["item"], "pos": p, "char": s, "key": keys[p]}
                     who = "assistant" if s >= len(prompt) - len(ASSISTANT + NO_THINK) else "user" if s >= full.rindex(USER) else "system"
                     row |= {"role": who, "token": full[s:e]}
-                    pos_rows.append(row | {"ctx_left": full[max(0, s - 80) : e], "ctx_right": full[e : e + 40]})
-                    states.append(torch.stack([cap.out[L_][j] for L_ in layers]))  # [n_layers, 4, 4096]
+                    row |= {"ctx_left": full[max(0, s - 80) : e], "ctx_right": full[e : e + 40]}
+                    all_rows.append(row)
+                    if keys[p] not in seen_keys:
+                        seen_keys.add(keys[p])
+                        pos_rows.append(row)
+                        states.append(torch.stack([cap.out[L_][j] for L_ in layers]))  # [n_layers, 4, 4096]
+                        j += 1
             if qi % 10 == 0:
                 print(f"{qi + 1}/{len(reqs)} {r['id']} rej {lp['reject']:.2f} acc {lp['accept']:.2f} {time.time() - t:.0f}s", flush=True)
     if a.states:  # stage 1 already done: reuse its captures, read only --layers (a subset of the saved ones)
@@ -221,7 +235,10 @@ def main():
         pos_rows = saved["rows"]
         print(f"reusing {a.states}: {len(pos_rows)} positions", flush=True)
     else:
-        print(f"capture+logits {len(reqs)} requests, {len(pos_rows)} positions, {time.time() - t:.0f}s", flush=True)
+        n_all, n_new = len(all_rows), len(pos_rows)
+        print(f"capture+logits {len(reqs)} requests, {n_all} positions, {n_new} distinct prefixes, {time.time() - t:.0f}s", flush=True)
+        with open(out / "all_rows.jsonl", "w") as f:  # every read position; states.pt holds one row per distinct prefix (`key`)
+            f.writelines(json.dumps(x) + "\n" for x in all_rows)
         with open(out / "logits.jsonl", "w") as f:
             f.writelines(json.dumps(x) + "\n" for x in logit_rows)
         torch.save({"layers": layers, "states": torch.stack(states).to(torch.bfloat16), "rows": pos_rows}, out / "states.pt")
