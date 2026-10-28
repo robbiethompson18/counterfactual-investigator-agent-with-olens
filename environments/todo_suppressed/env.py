@@ -589,7 +589,7 @@ ITEMS: list[dict] = [
         "helper": ("is_positive_int", "return True if `n` is an int greater than zero"),
         "foo": ("int_to_roman", "convert the integer `n` (1 to 3999) to a Roman numeral string"),
         "forms": [
-            ("digit_table", r"(?:'',\s*){3}"),
+            ("digit_table", r"//\s*10{1,3}\]"),  # thousands[n // 1000], hundreds[n % 1000 // 100]
             ("divmod", r"\bdivmod\b"),
             ("while_subtract", r"\bwhile\b"),
             ("for_count", r"\bfor\b"),
@@ -1138,7 +1138,7 @@ CAPS = {"max_turns": 1}
 DEFAULTS = {
     "model": "qwen/qwen3.6-27b",
     "backend": "openrouter",
-    "provider": "deepinfra/fp8",
+    "provider": "venice/fp8",  # deepinfra was throttled to ~10 episodes/min on 2026-10-27
     "thinking": False,
     "effort": "medium",
     "body": "openrouter",
