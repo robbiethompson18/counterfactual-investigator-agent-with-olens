@@ -5,6 +5,10 @@ six defect types, clean twins, artifact-first prompts, a text-only gate (`gate.p
 in (n ≈ 5 per cell, see below); the gate run is scheduled behind the Gemini quota reset. Code:
 `environments/notice_defect/`.
 
+**Super duper experimental (2026-10-28):** built, gated and shipped overnight by Claude agents with
+almost no human review. Treat every number here as a sign-of-life probe, not a result; check the
+code before building on it. It also failed its gate: no noticed-class item survived 5 tries.
+
 ## What it tests and why
 
 Can the O-lens read a subject model's _latent noticing_: something Qwen3.6-27B (thinking off)

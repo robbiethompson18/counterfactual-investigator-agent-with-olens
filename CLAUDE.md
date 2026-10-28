@@ -467,7 +467,7 @@ Current docs:
   pre-registered 38-case test (+0.07 log skill on harness v1, RMSE 26.6 vs 31.7pp, carried by a few
   cases, via "stricter score" reads at `Score:`; a v6 GPT-6.1 Sol replication is null); pasting
   reads into the prompt (closed #116) is a dead end
-- [ACTIVE: notice_defect env — read before building, running or gating the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
+- [ACTIVE: notice_defect env (super experimental) — read before building, running or gating the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
   — subject side: `task` (orthogonal task on an artifact with one planted defect) vs `ask` (the
   noticing oracle) plus clean twins, artifact first; 58 items over 6 defect types; try 1: 40 usable
   (9 not noticed, mostly low-salience weekdays, 31 noticed), task arm 0/280 verbalized, Qwen also
