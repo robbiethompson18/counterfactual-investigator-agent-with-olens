@@ -592,7 +592,8 @@ Current docs:
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
   rule), agentic_misalignment scores the scenario's design; Sonnet 5.5 on all 47 user_modeling
   selfdescribe items: 0.81 pass@1 vs the lens's 0.20 per readout, lens wins only at any-of-~231
-  (gender is Sonnet's gap)
+  (gender is Sonnet's gap); basic_readout on all 100: the lens wins the 32 own-favourite items
+  (Sonnet as Qwen 0.54 vs lens 0.94 at layer 60, 0 through layer 28) by reading the next token
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
