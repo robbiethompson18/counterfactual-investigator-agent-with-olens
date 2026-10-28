@@ -18,6 +18,7 @@ from expview import Run  # ty: ignore[unresolved-import]
 
 ID = re.compile(rb'^\{"id": ("(?:[^"\\]|\\.)*")')  # readers write `id` first; parsing only it keeps a 1 GB scan fast
 EPISODE = re.compile(r"^[^/:|]+/[^/:|]+:\d+")  # ENV/RUN:LINE, the rollout id Docent links resolve through
+ENV_EPISODE = re.compile(r"^([^/:|]+/[^/:|]+):(.*~.*)$")  # ENV/RUN:<episode id>, e.g. overeagerness/2026-10-27_x:calendar.base~0~0
 
 
 def spans(path: Path) -> dict[str, list[list[int]]]:
@@ -54,10 +55,12 @@ def import_reads(run_dir: Path, reads: Path, transcripts: Path):
                 src = {"transcript": [rel + transcripts.name, off, len(line)], "reads": [[rel + reads.name, a, n] for a, n, _ in sp]}
                 ref = hashlib.sha1(t["id"].encode()).hexdigest()[:16]
                 tokens = {"ref": ref, "n": len(t["tokens"]), "reads": sum(r for *_, r in sp), "src": src}
-                m = EPISODE.match(t["id"])
+                m, e = EPISODE.match(t["id"]), ENV_EPISODE.match(t["id"])
+                # an environments/ episode (`ENV/RUN:<episode id>`) names its run, so the env viewer attaches the reads
+                extra = {"source": m[0]} if m else {"source": f"envs/{e[1]}", "episode": e[2]} if e else None
                 run.add(id=t["id"], calls=[], group="/".join(str(t[k]) for k in ("env", "arm") if k in t) or None,
                         labels={k: t[k] for k in ("env", "arm", "item", "positive", "thinking") if k in t}, tokens=tokens,
-                        extra={"source": m[0]} if m else None)  # fmt: skip
+                        extra=extra)  # fmt: skip
             off += len(line)
     print(f"{out}: {run_dir.name}/{reads.name}, {len(rs)} read ids without a transcript line")
 
