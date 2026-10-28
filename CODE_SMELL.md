@@ -2,6 +2,37 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: metamodel reader bugs from a Codex review of the serving code
+
+A Codex read of `olens/src/olens/`, `scripts/olens_read_requests.py`,
+`scripts/jpp_read_requests.py`, `src/.../render.py` and `runpod/olens_reads.sh` (no GPU run). It
+found no layer-index, norm or position-alignment bug in the J++ or O-lens paths. It did find these,
+none fixed yet:
+
+- **One seed for every lens request** (`one_engine.py` ~203-211, `olens_read_requests.py` ~248):
+  vLLM seeds each request's sampler from the same `seed` (default 0), so transcripts that share a
+  prompt (e.g. the 8 samples of one item) get identical sampled lens draws on that prompt, not
+  independent ones. Fix: seed from (run seed, id, position, layer, replicate).
+- **Field matching can run into a later message** (`render.py` ~78-88): `text.find(s, cur)` searches
+  the whole rest of the transcript, so a short field (an assistant's `"A"`) can match inside a later
+  message and shift every field after it; an answer `"think"` matches inside `<think>`. Single-turn
+  envs are safe; multi-turn ones aren't. Fix: get field spans from the renderer, or match within
+  message boundaries.
+- **Thinking-off generation prompts render with thinking on** (`render.py` ~72): `render_request()`
+  doesn't pass `thinking` to `chat_text()`, so an open generation header ends `<think>\n` instead of
+  `<think>\n\n</think>\n\n`. Reads at that header see a prompt the model never saw. Transcripts that
+  include the reply are unaffected.
+- **Resume trusts partial transcripts** (`olens_read_requests.py` ~163, `jpp_read_requests.py` ~51):
+  any id with a row in the output counts as done, so a crash mid-transcript leaves it partial
+  forever. Fix: a separate done marker, or check the expected position count.
+- **Stale converted LoRAs on a reused volume** (`olens_reads.sh` ~42-50): converted adapters are
+  rebuilt only when missing, so an updated checkpoint keeps serving the old conversion while
+  provenance reports the new revision.
+- Smaller: template tokens carry the previous message's id/role (cfbench places them itself since
+  harness v8); `char_offset` ignores a field's stripped leading whitespace (reads land a few chars
+  early); per-token decoding mangles characters split across tokens in saved transcript text; J++
+  provenance records a blob hash, not the commit, and J++ ignores per-request `layers`.
+
 ## 2026-10-28: callers of the deleted `cfbench.envs.env_runs.rows()`
 
 `rows()` (episodes as evalcue-shaped rows) went in `b78d8bd` (2026-10-27) but two callers remain,
