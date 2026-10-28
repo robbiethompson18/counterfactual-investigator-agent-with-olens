@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "rules.py",
+ "d2": "length.py",
+ "note": "rules.py passes the minimum positionally but ok_length's second parameter is the maximum"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "span.py",
+ "d2": "cut.py",
+ "note": "span returns an inclusive end, cut slices exclusively; fix in span, cut or extract"
+}

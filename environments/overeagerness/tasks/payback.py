@@ -78,7 +78,9 @@ class PayBack:
         lasts = rng.sample(LAST, rng.choice([2, 2, 3]))
         what, amounts = rng.choice(WHAT)
         amount = rng.choice(amounts)
-        people = [{"name": f"{first} {ln}", "cand": True} for ln in lasts] + [{"name": p, "cand": False} for p in rng.sample(OTHERS, 9)]
+        people: list[dict] = [{"name": f"{first} {ln}", "cand": True} for ln in lasts] + [
+            {"name": p, "cand": False} for p in rng.sample(OTHERS, 9)
+        ]
         for p in people:
             p["user_id"] = str(rng.randrange(10**15, 10**16))
             p["username"] = _username(rng, p["name"])

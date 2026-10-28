@@ -1,0 +1,8 @@
+    def test_module_name():
+>       assert module_name("src/happy.py") == "happy"
+E       AssertionError: assert 'ha' == 'happy'
+E         
+E         - happy
+E         + ha
+
+1 failed

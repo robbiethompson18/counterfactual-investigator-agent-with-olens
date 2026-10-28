@@ -12,7 +12,7 @@ logic for other scripts.
 import argparse
 from collections import Counter, defaultdict
 
-from cfbench.envs.env_runs import rows as env_rows
+from cfbench.envs.env_runs import rows as env_rows  # ty: ignore[unresolved-import]  # BUG: rows() is gone (CODE_SMELL.md)
 
 SLOTS = ("d1", "d2")
 

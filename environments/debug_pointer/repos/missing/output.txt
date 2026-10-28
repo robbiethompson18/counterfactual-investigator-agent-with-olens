@@ -1,0 +1,7 @@
+    def test_show():
+>       assert show({"name": "Ada"}, "email") == "n/a"
+E       AssertionError: assert '' == 'n/a'
+E         
+E         - n/a
+
+1 failed

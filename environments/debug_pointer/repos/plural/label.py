@@ -1,0 +1,2 @@
+def noun():
+    return "items"

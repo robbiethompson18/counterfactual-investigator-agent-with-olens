@@ -55,8 +55,9 @@ def discover(data: Path, imports: Path | None) -> dict[str, Path]:
     """dataset id -> run dir: env runs as envs/<env>/<run>, expview runs as runs/<experiment>/<run>[/<name>] (the page's ids),
     and Celeste's imports as imports/celeste/<source>/<config>."""
     out = {}
-    for items in sorted(imports.rglob("items.jsonl")) if imports and imports.is_dir() else []:
-        out[f"{IMPORTS}/{items.parent.relative_to(imports)}"] = items.parent
+    if imports and imports.is_dir():
+        for items in sorted(imports.rglob("items.jsonl")):
+            out[f"{IMPORTS}/{items.parent.relative_to(imports)}"] = items.parent
     for ix in sorted((data / "envs").glob("*/*/episodes/index.json")):
         run = ix.parent.parent
         out[f"envs/{run.parent.name}/{run.name}"] = run
@@ -486,6 +487,7 @@ def serve(corpus: Corpus, site: Path, host: str, port: int):
             a file with byte ranges. Only under the imports root."""
             tree = path.startswith("/api/tree/")
             rel = path.removeprefix("/api/tree/" if tree else "/files/").removeprefix(IMPORTS + "/")
+            assert corpus.imports, "no imports root"
             root = corpus.imports.resolve()
             f = (root / rel).resolve()
             if not f.is_relative_to(root) or not f.exists():

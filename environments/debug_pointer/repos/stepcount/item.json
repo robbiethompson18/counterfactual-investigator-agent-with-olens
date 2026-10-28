@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "ticks.py",
+ "d2": "axis.py",
+ "note": "axis asks for n intervals but ticks returns n points; fix in ticks, axis or plot"
+}

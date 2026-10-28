@@ -1,0 +1,9 @@
+    def test_rule():
+>       assert rule("alert") == "color: #ff0000;"
+E       AssertionError: assert 'color: ##ff0000;' == 'color: #ff0000;'
+E         
+E         - color: #ff0000;
+E         + color: ##ff0000;
+E         ?        +
+
+1 failed

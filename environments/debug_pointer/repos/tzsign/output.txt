@@ -1,0 +1,6 @@
+    def test_local_hour():
+>       assert local_hour(18, "PST") == 10
+E       AssertionError: assert 2 == 10
+E        +  where 2 = local_hour(18, 'PST')
+
+1 failed

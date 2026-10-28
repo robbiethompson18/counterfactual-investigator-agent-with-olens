@@ -1,0 +1,9 @@
+    def test_usage():
+>       assert usage([2048, 1024]) == "3.0 KB"
+E       AssertionError: assert '3072.0 KB' == '3.0 KB'
+E         
+E         - 3.0 KB
+E         + 3072.0 KB
+E         ?  +++
+
+1 failed

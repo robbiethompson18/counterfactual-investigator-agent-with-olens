@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "overlap.py",
+ "d2": "busy.py",
+ "note": "overlap() can go negative; busy.py's argument order looks suspicious but is right"
+}

@@ -9,7 +9,7 @@ evals. Two kinds of cfbench run (data/runs/cfbench/<run>/) belong to an eval:
 
 evals/<name>.json has the eval's title, description (its eval.md), envs, and per run: slug, date, harness version,
 predictors, conditions, models, the RMSE per condition next to the "edit does nothing" null (over cases, as
-cfbench.report.data), for two-model evals the paired comparison (mean p per model and the AUROC between the two models'
+cfbench.scoring), for two-model evals the paired comparison (mean p per model and the AUROC between the two models'
 cases), and the cases grouped for charts. A group is (env, version, base arm, cf arm, model), pooling items: the observed
 rate before (the pooled base-arm rate when the eval shows fewer runs than it has) and after, every draw's p with its item,
 Docent run and expview item, the RMSE per condition, and Docent filters for both arms (envs/<env>/docent_filters.json).
@@ -91,7 +91,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     from cfbench.core import canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
-    from expview import Run, call  # ty: ignore[unresolved-import]
+    from expview import Run, call
 
     meta = json.loads((run_dir / "meta.json").read_text())
     run = Run(
@@ -146,8 +146,12 @@ class Envs:
     def __getitem__(self, env: str) -> dict:
         if env not in self.cache:
             idx_p, filt_p, links_p = LOCAL / env / "index.json", LOCAL / env / "docent_filters.json", LOCAL / env / "links.json"
+            try:
+                pairs = getattr(load_env(env), "PAIRS", {})
+            except ModuleNotFoundError:  # a cfbench run over an old evalcue env (code deleted 2026-10-27) has no port
+                pairs = {}
             self.cache[env] = {
-                "pairs": getattr(load_env(env), "PAIRS", {}),
+                "pairs": pairs,
                 "index": json.loads(idx_p.read_text()) if idx_p.exists() else {},
                 "filters": json.loads(filt_p.read_text()) if filt_p.exists() else {},
                 "links": json.loads(links_p.read_text()).get("runs", {}) if links_p.exists() else {},
@@ -194,7 +198,7 @@ def auroc(pos: list[float], neg: list[float]) -> float | None:
 
 def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
     from cfbench.core import canon_condition
-    from cfbench.report.data import Case
+    from cfbench.scoring import Case
 
     meta = json.loads((run_dir / "meta.json").read_text())
     if meta.get("params", {}).get("task") == "answer":
@@ -329,7 +333,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         "n_cases": len(cases),
         "docent_collection": docent.get("collection_id"),
         "expview": f"runs/cfbench/{run_dir.name}" if (run_dir / "expview" / "index.jsonl").exists() else None,
-        # mean over cases of the per-case MSE (each case's draws averaged first), as cfbench.report.data.rmse
+        # mean over cases of the per-case MSE (each case's draws averaged first), as cfbench.scoring.rmse
         "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
         "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5 if sq_null else None,
         "paired": paired,

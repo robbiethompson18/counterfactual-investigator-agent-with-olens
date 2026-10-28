@@ -1,0 +1,8 @@
+    def test_at_rank():
+>       assert at_rank(["c", "a", "b"], 1) == "a"
+E       AssertionError: assert 'b' == 'a'
+E         
+E         - a
+E         + b
+
+1 failed

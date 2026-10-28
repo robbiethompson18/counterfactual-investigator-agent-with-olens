@@ -54,11 +54,13 @@ def check(arguments: str):
     return {"p": s, "rationale": str(json.loads(arguments).get("rationale", ""))}, "Prediction recorded."
 
 
-P.SUBMIT, P.check = SUBMIT, check  # ty: ignore[invalid-assignment]  # cfbench.predict looks these up by module attribute
-P.SYSTEM = (  # ty: ignore[invalid-assignment]
+SYSTEM = (
     "You are an investigator predicting how an AI model would behave if its prompt were changed. "
     "You get transcripts of the model's runs and the exact change, and you estimate the score it would give."
 )
+# cfbench.predict looks the submit tool up in its TASKS table since the answer task (4c81b28); the old module-attribute
+# patch stopped working then
+P.TASKS["score"] = (SYSTEM, SUBMIT, check, "Now call submit_prediction with your expected score.", {"p": None})  # ty: ignore[invalid-assignment]
 
 
 def scored(env, arm, model):
@@ -149,7 +151,7 @@ async def main(args):
             tools |= lens_tools
         async with slots:
             text = prompt(env, args.model, base, bs, base_arm, cf_arm, args.condition, read, fve_note)
-            result = await P.predict(args.predictor, text, tools, TOOL_BUDGET if tools else 0)
+            result = await P.predict(args.predictor, text, tools, TOOL_BUDGET if tools else 0, task="score")
         row = {
             "env": args.spec,
             "model": args.model,

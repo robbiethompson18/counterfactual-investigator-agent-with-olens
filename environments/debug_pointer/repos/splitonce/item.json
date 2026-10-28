@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "kv.py",
+ "d2": "clean.py",
+ "note": "split(':') cuts the URL value too; clean.py's strip() is fine"
+}

@@ -1,0 +1,10 @@
+    def test_age():
+>       assert age(datetime.date(2000, 6, 15), datetime.date(2024, 3, 1)) == 23
+E       AssertionError: assert 24 == 23
+E        +  where 24 = age(datetime.date(2000, 6, 15), datetime.date(2024, 3, 1))
+E        +    where datetime.date(2000, 6, 15) = <class 'datetime.date'>(2000, 6, 15)
+E        +      where <class 'datetime.date'> = datetime.date
+E        +    and   datetime.date(2024, 3, 1) = <class 'datetime.date'>(2024, 3, 1)
+E        +      where <class 'datetime.date'> = datetime.date
+
+1 failed

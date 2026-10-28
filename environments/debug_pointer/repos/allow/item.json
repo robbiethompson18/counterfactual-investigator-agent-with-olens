@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "allow.py",
+ "d2": "roles.py",
+ "note": "allowed() tests membership in the comma-joined string, so 'min' matches 'admin'; roles.py's split is fine"
+}

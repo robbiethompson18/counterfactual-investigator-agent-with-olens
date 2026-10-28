@@ -1,0 +1,8 @@
+    def test_bar():
+>       assert bar(150) == "#" * 10
+E       AssertionError: assert '#' == '##########'
+E         
+E         - ##########
+E         + #
+
+1 failed
