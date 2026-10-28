@@ -128,13 +128,16 @@ one commit, and source files from GitHub at the spec's commit. Per env:
 - **Arms**: every arm with its factors and rates, filterable by factor; tick two to diff them. An
   arm's page shows `build(arm, item)` for any of its items (messages, tools, sandbox files, setup,
   prefill, app state, harness, meta) and its rollouts.
-- **Evals**: every cfbench run on the env (`env_runs:<env>/...`), per pair: the observed rate before
-  (base arm) and after (counterfactual arm) with 95% credible bands, every investigator draw as a
-  point coloured by condition (transcript tools blue, O-lens orange, placebo black, no tools gray),
-  the "edit does nothing" null as a dashed line, and RMSE per condition vs that null
-  (`cfbench.report.data`). Each point opens that draw's whole conversation (prompt, tool calls and
-  results, submit) in expview; each draw also links its Docent run, each arm its Docent filter (when
-  `docent_filters.json` has one), expview and the pair's comparison page.
+- **Evals** tab: the cfbench evals that use the env. Evals have their own pages (`#evals=1`,
+  `#eval=NAME[&env=E]`), since an eval can span several envs, models and pairs
+  ([cfbench/evals/CLAUDE.md](../cfbench/evals/CLAUDE.md)). An eval page shows the RMSE per condition
+  vs "the edit does nothing", a paired-model table when two models share cases (mean p per model,
+  AUROC between their cases), and per (env, version, arm pair, model) the observed rate before (base
+  arm) and after (counterfactual arm) with 95% credible bands and every investigator draw as a point
+  coloured by condition (transcript tools blue, O-lens orange, placebo black, no tools gray). Each
+  point opens that draw's whole conversation (prompt, tool calls and results, submit) in expview;
+  each draw also links its Docent run, and each arm its Docent filter (when `docent_filters.json`
+  has one), expview and the pair's comparison page.
 - **Runs** (the old list page: per-arm measures, transcripts by range request), **About** (README,
   docstring, REQUIRES / CAPS / DEFAULTS) and **Source** (the env folder and `_lib/` from GitHub).
 
@@ -146,11 +149,12 @@ What it reads:
   module doesn't load from a clean checkout (data files not in git; none today) is marked in
   `spec/index.json` and the page uses `envs/<env>/spec/` on HF instead, which `index` writes locally
   whenever the env's source changes (overeagerness takes ~3 minutes) and `upload` ships.
-- `envs/<env>/evals.json` (`_lib/evals.py`, written by `index` from local cfbench runs, or
-  `python -m environments evals ENV [--pull] [--upload]`): per cfbench run its cases, k/n in both
-  arms, each draw's p with its Docent run and expview item, RMSE per condition. No conversations:
-  `evals` exports them to `runs/cfbench/<run>/expview/` (`--upload` ships both; `--pull` fetches the
-  cfbench runs from HF first).
+- `evals/index.json` and `evals/<name>.json` on HF, beside `envs/` (`_lib/evals.py`, written by
+  `index` from local cfbench runs, or
+  `python -m environments evals [NAME ...] [--pull] [--upload]`): per eval its runs, RMSE per
+  condition, paired-model table and chart groups, each draw's p with its Docent run and expview
+  item. No conversations: `evals` exports them to `runs/cfbench/<run>/expview/` (`--upload` ships
+  both; `--pull` fetches cfbench runs from HF first).
 - `envs/<env>/links.json`: per run, episode id -> [Docent agent run, primary value], and which
   episodes have O-lens reads (an expview run under `data/runs/<env>/` whose items name
   `extra.source` / `extra.episode`).
@@ -168,12 +172,12 @@ files, your local `data/envs` runs), and rebuilds an env within seconds of a cha
 ```bash
 uv run python -m environments view [ENV ...] [--port N]   # local viewer from your working tree, live rebuild
 uv run python -m environments spec [ENV ...] [--force]     # also run by `index`
-uv run python -m environments evals [ENV ...] [--pull] [--upload]  # cfbench runs -> evals.json + expview
+uv run python -m environments evals [NAME ...] [--pull] [--upload]  # cfbench runs -> evals/ + expview
 python -m http.server 8000                                  # local: from the repo root, then
 # http://localhost:8000/environments/_lib/page.html?base=/data/envs/&src=/
 ```
 
-Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#env=E&tab=evals[&eval=RUN]`,
+Links are `#env=E&compare=NAME[&other=ARM][&item=I]`, `#evals=1`, `#eval=NAME[&env=E]`,
 `#env=E&arm=A&item=I`, `#env=E&diff=A,B&item=I`, `#env=E&run=R&episode=ID`.
 
 ## Not built yet (add when an env needs it)

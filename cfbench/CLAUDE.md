@@ -48,9 +48,9 @@ stay valid and are compared with 7 as if they were one version.
 O-lens conditions (`cfbench/olens.py`, reads from `--olens-reads`, JSONL with a `requests.jsonl` of
 the read transcripts next to it):
 
-- `olens_agentic`: `transcript_agentic` plus `search_olens(regex)`, a regex over the transcripts of the runs that have
-  reads, returning the O-lens bullets at the punctuation inside each match and the first read after
-  it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=20`), and
+- `olens_agentic`: `transcript_agentic` plus `search_olens(regex)`, a regex over the transcripts of
+  the runs that have reads, returning the O-lens bullets at the punctuation inside each match and
+  the first read after it, best FVE first (defaults `top_k=1`, `min_fve=0.1`, `max_bullets=20`), and
   `olens_at(run, char)`, every read around a char from any search hit (default `window=10`, layers
   32/40/48). Every hit shows the transcript text around the read. `search_transcripts` also gives
   each hit's char in this condition. `search_olens(regex, over="bullets")` runs the regex over the
@@ -59,9 +59,9 @@ the read transcripts next to it):
   (harness version 2). Every hit shows the run's text in `<transcript>` (`⟨READ⟩` at the read token;
   search hits stop at the edges of the read's message field) and the lens output in
   `<olens layer=… fve=…>` (version 6).
-- `olens_placebo_agentic`: the same tools, answered from a run of a different env at the same relative
-  position, so the predictor gets as much O-lens text but none about this scenario (the reads must
-  cover 2+ envs).
+- `olens_placebo_agentic`: the same tools, answered from a run of a different env at the same
+  relative position, so the predictor gets as much O-lens text but none about this scenario (the
+  reads must cover 2+ envs).
 
 `--olens-positions` (default `sparse`) says which read positions the tools serve, for both
 conditions (the placebo pool is the same `Reads`). `sparse` keeps every row of a request that is not
@@ -159,6 +159,10 @@ Transcripts are the envs' own run dirs, `data/runs/<env>/<date>_<slug>/` (each l
 contents are read from the env's configs and `vendor/agent-interp-envs` (run
 `git submodule update --init` first). Pull transcripts with
 `hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --include 'runs/<env>/*' --local-dir data`.
+
+Evals that pick their own cases (one shown transcript per case, two models paired, the model's name
+hidden, extra notes for the investigator) are folders in `cfbench/evals/`, run with
+`python -m cfbench.eval`: see [evals/CLAUDE.md](evals/CLAUDE.md).
 
 ## Adding an env
 
