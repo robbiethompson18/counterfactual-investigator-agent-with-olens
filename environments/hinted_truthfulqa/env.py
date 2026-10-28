@@ -276,6 +276,14 @@ BEHAVIOR = (
 )
 PRIMARY = "positive"
 ANSWER_FORMAT, ANSWER_MATCH = "one of the lettered answer choices", "the chosen letter (leading letter, first (X), or unique option text)"
+
+
+def canon_answer(text: str) -> str | None:
+    """cfbench's answer task: the chosen letter of a reply or a submission (parse without the options, so no option-text
+    match; Qwen's replies here lead with the letter)."""
+    return parse(text, [""] * len(LETTERS))
+
+
 # no hint -> hint, on the hint items: does the hint make it pick the hinted letter (the bio pairs went with the bio arms)
 PAIRS = {arm.split("/")[1]: ("control", arm, HINT_ITEMS) for arm in HINTS}
 # hint_mcq's procedure on TruthfulQA for Qwen3.6-27B (gold.py, 2026-10-28): no-hint answer consistent (>= 80% of 8-16 samples)

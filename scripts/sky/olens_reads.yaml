@@ -1,0 +1,70 @@
+# O-lens batch reads (scripts/olens_read_requests.py, the one-engine reader: capture, space lens and AR on one vLLM) on a
+# SkyPilot RunPod H200: Kylie's compute; Robbie's agents use runpod/olens_reads.sh, whose `setup` this follows, with vLLM
+# 0.27.1 from the cu129 wheels (RunPod drivers) instead of the vllm-openai image. Reads land in ~/reads/; fetch them before
+# the job ends (`-i 15 --down` releases the node 15 min after):
+#   REQ=path/to/requests.jsonl uvx --from 'skypilot[runpod]==0.13.0' sky launch -c qwen-olens -y -i 15 --down \
+#     --secret HF_TOKEN --env REQ --env LAYERS=32,40,48 scripts/sky/olens_reads.yaml
+#   scp -F ~/.sky/generated/ssh/qwen-olens qwen-olens:reads/reads.jsonl* LOCAL_DIR/   # + reads.provenance.json, .transcripts.jsonl
+name: qwen-olens
+
+resources:
+  disk_size: 250
+  ordered:
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+    - {infra: runpod, accelerators: "H100-SXM:1"}
+    - {infra: runpod, accelerators: "B200:1"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  LAYERS: "32,40,48"
+  MAX_HOURS: 2
+  REQ: requests.jsonl
+
+file_mounts:
+  ~/repo/olens: ./olens
+  ~/repo/scripts: ./scripts
+  ~/repo/src: ./src
+  ~/reads/requests.jsonl: ${REQ}
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf
+  ( cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-12-9 cuda-cudart-dev-12-9 \
+       cuda-cccl-12-9 libcurand-dev-12-9 libcublas-dev-12-9 cuda-nvrtc-dev-12-9 cuda-profiler-api-12-9 \
+       libcusparse-dev-12-9 >/dev/null ) &
+  command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH=$HOME/.local/bin:$PATH
+  cd ~ && test -x olens-env/bin/python || uv venv -q --python 3.12 olens-env
+  export VIRTUAL_ENV=~/olens-env
+  uv pip install -q vllm==0.27.1 ninja scipy zstandard \
+    --extra-index-url https://wheels.vllm.ai/0.27.1/cu129 --torch-backend=cu129 --index-strategy unsafe-best-match
+  uv pip install -q --no-deps "https://github.com/ceselder/vllm-metamodels/archive/refs/heads/main.zip"
+  H=~/olens-env/bin/hf
+  $H download Qwen/Qwen3.6-27B >/dev/null
+  C=/data/olens_ckpt
+  $H download agu18dec/olens_and_ar --local-dir $C/agu18dec_olens_and_ar >/dev/null
+  inc=(); for L in ${LAYERS//,/ }; do inc+=(--include "data/whiteners/pooled/whitening_iolens_pooled_L$L.safetensors"); done
+  $H download agu18dec/local-workspace --repo-type dataset --local-dir $C/local_workspace "${inc[@]}" >/dev/null
+  ln -sfn $C ~/repo/olens/checkpoints
+  cd ~/repo
+  P=~/olens-env/bin/python
+  test -f /data/lora_vllm/olens_space_rl600/adapter_model.safetensors || \
+    $P olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 /data/lora_vllm/olens_space_rl600
+  test -f /data/lora_vllm/ar_ptag_pooled/adapter_model.safetensors || \
+    $P olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/ar_ptag_pooled/lora /data/lora_vllm/ar_ptag_pooled
+  wait  # CUDA packages
+  echo SETUP_DONE
+
+run: |
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
+  cd ~/repo
+  PYTHONPATH=olens/src:src timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/reads.jsonl \
+    --layers $LAYERS --lens-lora /data/lora_vllm/olens_space_rl600 --ar-lora /data/lora_vllm/ar_ptag_pooled
+  echo READS_DONE
