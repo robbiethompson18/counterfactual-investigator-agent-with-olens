@@ -32,4 +32,4 @@ else:
     out = [r | {"model": "z-ai/glm-5.3", "samples": [s for s in r["samples"] if s.strip()]} for r in rows]
 Path(dst).write_text("".join(json.dumps(x) + "\n" for x in out))
 for x in out:
-    print(x["version"], x["model"].split("/")[0], x["idx"], repr(x["token"]), len(x["samples"]))
+    print(x["version"], x["model"].split("/")[0], x["idx"], repr(x["token"]), len(x["samples"]))  # ty: ignore[unresolved-attribute, invalid-argument-type]

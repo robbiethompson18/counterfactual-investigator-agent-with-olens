@@ -36,10 +36,10 @@ def main():
             for idx, token in enumerate(tokens):
                 rows.append({"version": version, "idx": idx, "token": token, "samples": [s for view in views for s in view[idx][1:]]})
         Path(dst).write_text("".join(json.dumps(r) + "\n" for r in rows))
-        print(f"{len(rows)} positions, {len(rows[0]['samples'])} samples each")
+        print(f"{len(rows)} positions, {len(rows[0]['samples'])} samples each")  # ty: ignore[invalid-argument-type]
         return
 
-    from prep import raw_render
+    from prep import raw_render  # ty: ignore[unresolved-import]
     from transformers import AutoTokenizer
 
     from cfbench.evals.af_refusals import eval as af
