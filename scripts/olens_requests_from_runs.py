@@ -53,7 +53,16 @@ with a.out.open("a") as f:
         except ModuleNotFoundError:  # retired env (code deleted 2026-10-27): single-turn rows need no tools; others can't be read
             env = None
         if env_run:
-            rows = list(env_runs.rows(env_dir, run_dir))
+            # EnvRuns.by_source already drops errored and unlabelled episodes. The runner writes `reasoning_content` only
+            # when the model thought; mark its own turns with "" so the template renders the empty think block Qwen emitted
+            # with thinking off (what the deleted env_runs.rows did, and what the hint_mcq requests carry).
+            rows = []
+            for src, row in env_runs.load(f"{env_dir}/{run_dir}").by_source.items():
+                messages = [dict(m) for m in row["messages"]]
+                for m in messages[len(env_runs.initial_messages(row)) :]:
+                    if m["role"] == "assistant":
+                        m.setdefault("reasoning_content", "")
+                rows.append((src, row | {"messages": messages, "tools": row.get("tools") or None}))
         else:
             lines = list(enumerate((Path("data/runs") / run / "rows.jsonl").read_text().splitlines()))
             rows = [(f"{run}:{i}", json.loads(line)) for i, line in lines]
