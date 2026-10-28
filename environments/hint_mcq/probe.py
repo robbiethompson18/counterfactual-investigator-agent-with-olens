@@ -649,6 +649,94 @@ def lens_requests(a):
     print(f"wrote {out}: {len(rows)} questions, {n} positions; check: {k} options at hidden_states[{a.check_hidden}]")
 
 
+ENDORSE = r"correct (answer|term|choice|option)|is correct|the answer is|best (answer|fits|describes)|most (accurate|appropriate)"
+REJECT = r"incorrect|is wrong|why (this|it) is wrong|not (the )?correct|distractor"
+
+
+def lens_stats(a):
+    """Crude regex reading of the O-lens reads at the option newlines (lens-requests -> olens_read_requests.py): the share of
+    options whose read matches ENDORSE / REJECT per block, by option kind (Qwen's answer / gold / other) and right vs wrong
+    question; the endorse rate at Qwen's option by quintile of Qwen's own p(answer) and of the probe's held-out p(answer);
+    and a lens-only pick per question (highest endorse - reject count at --block, ties -> none) vs the probe."""
+    import re
+
+    run = Path(a.run)
+    rows = {str(r["item"]): r for r in map(json.loads, (run / "pmf_options.jsonl").read_text().splitlines())}
+    text = defaultdict(lambda: defaultdict(dict))  # item -> token_index -> block -> bullets joined
+    for f in a.reads:
+        for line in Path(f).read_text().splitlines():
+            r = json.loads(line)
+            text[r["id"].split("/", 1)[1]][r["token_index"]][r["layer"]] = " ".join(b["text"] for b in r["bullets"])
+    blocks = sorted({b for pos in text.values() for v in pos.values() for b in v})
+    rx = {"endorse": re.compile(ENDORSE, re.IGNORECASE), "reject": re.compile(REJECT, re.IGNORECASE)}
+    opts = []  # (item, option index, kind, right, {block: text})
+    for item, pos in text.items():
+        r = rows[item]
+        for j, p in enumerate(sorted(pos)):
+            L = r["letters"][j]
+            opts.append((item, j, "own" if L == r["own"] else "gold" if L == r["gold"] else "other", r["right"], pos[p]))
+    lines = [f"O-lens regex stats over {len(text)} questions, {len(opts)} options. ENDORSE = `{ENDORSE}`, REJECT = `{REJECT}`.", ""]
+    for name, pat in rx.items():
+        lines += [
+            f"Share of options whose read matches {name}:",
+            "",
+            "| block | own (right q) | own (wrong q) | gold (wrong q) | other (right q) | other (wrong q) |",
+        ]
+        lines.append("|---|---|---|---|---|---|")
+        for b in blocks:
+            cells = []
+            for kind, right in (("own", True), ("own", False), ("gold", False), ("other", True), ("other", False)):
+                hits = [bool(pat.search(t.get(b, ""))) for _, _, k, rt, t in opts if k == kind and rt == right]
+                cells.append(f"{np.mean(hits):.2f}")
+            lines.append(f"| {b} | " + " | ".join(cells) + " |")
+        lines.append("")
+    # endorse rate at Qwen's option vs confidence
+    own = [(rows[i], t) for i, j, k, rt, t in opts if k == "own"]
+    for conf in ("qwen", "probe"):
+        p = np.array([np.exp(r["qwen_logp" if conf == "qwen" else "probe_logp"][r["letters"].index(r["own"])]) for r, _ in own])
+        edges = np.quantile(p, [0.2, 0.4, 0.6, 0.8])
+        lines += [f"Endorse rate at Qwen's option at block {a.block}, by quintile of {conf} p(Qwen's answer):", ""]
+        lines += ["| quintile | p range | right q: endorse (n) | wrong q: endorse (n) |", "|---|---|---|---|"]
+        qn = np.searchsorted(edges, p)
+        for k in range(5):
+            m = qn == k
+            cell = []
+            for right in (True, False):
+                hit = [bool(rx["endorse"].search(t.get(a.block, ""))) for (r, t), mm in zip(own, m) if mm and r["right"] == right]
+                cell.append(f"{np.mean(hit):.2f} ({len(hit)})" if hit else "–")
+            lines.append(f"| {k + 1} | {p[m].min():.3f}–{p[m].max():.3f} | " + " | ".join(cell) + " |")
+        lines.append("")
+    # lens-only pick at --block vs the probe
+    res = {True: defaultdict(int), False: defaultdict(int)}
+    for item, pos in text.items():
+        r = rows[item]
+        ts = [pos[p].get(a.block, "") for p in sorted(pos)]
+        sc = np.array([len(rx["endorse"].findall(t)) - len(rx["reject"].findall(t)) for t in ts])
+        d = res[r["right"]]
+        d["n"] += 1
+        best = np.flatnonzero(sc == sc.max())
+        if len(best) == 1:
+            d["picked"] += 1
+            d["lens_answer"] += r["letters"][best[0]] == r["own"]
+            d["lens_gold"] += r["letters"][best[0]] == r["gold"]
+        probe_top = r["letters"][int(np.argmax(r["probe_s"]))]
+        d["probe_answer"] += probe_top == r["own"]
+        d["probe_gold"] += probe_top == r["gold"]
+    lines += [f"Lens-only pick at block {a.block} (highest endorse − reject match count; ties → no pick) vs the probe's held-out top:", ""]
+    lines += [
+        "| questions | n | lens picks | lens = Qwen's answer | lens = gold | probe = Qwen's answer | probe = gold |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for right, d in res.items():
+        n = d["n"]
+        lines.append(
+            f"| {'right' if right else 'wrong'} | {n} | {d['picked'] / n:.2f} | {d['lens_answer'] / n:.2f} | {d['lens_gold'] / n:.2f} "
+            f"| {d['probe_answer'] / n:.2f} | {d['probe_gold'] / n:.2f} |"
+        )
+    (run / "lens_stats.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -692,8 +780,21 @@ def main():
     r.add_argument("out")
     r.add_argument("--check", type=int, default=3, help="questions whose saved nl activations go to OUT.check.npy")
     r.add_argument("--check-hidden", type=int, default=52, help="hidden_states index of those activations (block index + 1)")
+    ls = sub.add_parser("lens-stats")
+    ls.add_argument("run")
+    ls.add_argument("reads", nargs="+", help="olens_read_requests.py output(s) for lens-requests' requests")
+    ls.add_argument("--block", type=int, default=52)
     a = ap.parse_args()
-    {"collect": collect, "fit": fit, "pmf": pmf, "whiten": whiten, "dump": dump, "lens-requests": lens_requests}[a.cmd](a)
+    cmds = {
+        "collect": collect,
+        "fit": fit,
+        "pmf": pmf,
+        "whiten": whiten,
+        "dump": dump,
+        "lens-requests": lens_requests,
+        "lens-stats": lens_stats,
+    }
+    cmds[a.cmd](a)
 
 
 if __name__ == "__main__":
