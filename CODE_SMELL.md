@@ -30,12 +30,6 @@ pods' image) has no `rsync`, so on those pods the watcher deletes without fetchi
 read (`jpp_reads/2026-10-27_hint-mcq-scale2k`) was saved by pulling over ssh by hand. Fix: fall back
 to `ssh cat`/`scp`, or install rsync in `olens_reads.sh setup`.
 
-## 2026-10-26: OpenRouter calls outside `openrouter.chat`
-
-`olens_prompt_ea/judge.py` and `judge_punct.py` still hand-roll httpx calls to OpenRouter: they are
-standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
-pulling the whole project into their script env.
-
 ## 2026-10-26: old-lens w/ CoT runs still in `cfbench.scoring.groups()`
 
 `2026-10-22_gflash-olens-v2-{exfil,inline-b}` stay in `groups()` only for `--allow-old-lens`; drop
@@ -61,8 +55,6 @@ can't or because it isn't ours to change:
   `scripts/party_resample.py gen` and `transcript-viewer/scripts/thinking.py gen` ran vLLM
   in-process (`LLM(...)`) from token-id prompts; `scripts/identity/pod_setup.sh` set
   `HF_HOME=/workspace/hf`, which `runpod/CLAUDE.md` says not to do.
-- Kylie's `weirdness_elo/judge_qwen.py` and `qwen_tourney.py` hardcode `localhost:8000` and the FP8
-  checkpoint.
 
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 

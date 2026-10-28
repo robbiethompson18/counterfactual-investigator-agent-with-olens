@@ -12,6 +12,3 @@ placebo black, no tools gray).
   (`docs/envs/hint_cf.md`)
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
-
-`olens_prompt_ea/` keeps its own figures (`fig_settings.py`, `anyhit.py`, `punct_analysis.py`): they
-are tied to that package's analysis code and `sys.path` layout.
