@@ -307,6 +307,38 @@ survivor selection and its own gate (not redone: the gate is about the prompt te
 barely changes); OpenRouter reports $0 cost on the new key, so per-run spend is unknown (the same
 runs cost ~$2 each on the old key).
 
+### Redo at lens temperature 1 (2026-10-27 evening)
+
+Every read above was decoded greedily (temperature 0), the WeirdChat viewer's default that the batch
+reader inherited. The lens was trained (RL at T 1.0) and is scored on WorkspaceBench at k=1, T 1.0,
+top-p 0.95, top-k 64, so greedy was off-recipe; and at temperature 0 the reader copies one decode
+across every rollout that shares a prompt prefix, so "8 samples" were one lens draw per site. The
+reader now decodes at T 1.0 by default (`scripts/olens_read_requests.py --temperature`, 0 restores
+greedy) with one draw per transcript, and the three read sets were redone that way:
+`olens_reads/2026-10-27_hint-{mcq18-stop,pause18-stop,placebo-pool}-t1`, plus every-token reads of 4
+rollouts per case (`hint-mcq18-dense-t1`; 4 is the smallest count cfbench's few-reads guard
+accepts). cfbench runs `answer-mcq18-stop-t1`(+`-rest3`), `answer-pause13-stop-t1`(+`-rest`),
+`answer-mcq18-dense-t1` (the `-rest` files are draws the first runs dropped on Gemini 429s when the
+BYOK Google project hit its 10k/day cap; pool them; `-rest` and `-rest2` of the base run are empty
+abandoned attempts).
+
+| reads                       | items | greedy: O-lens / placebo | T=1: O-lens / placebo | items with ≥ 1 hit (T=1) |
+| --------------------------- | ----- | ------------------------ | --------------------- | ------------------------ |
+| stop tokens, no filler      | 18    | 23% / 6%                 | 19% (20/108) / 5%     | 6                        |
+| stop tokens, no filler      | 13 ¹  | 23% / 6%                 | 18% (14/78) / 4%      |                          |
+| stop tokens, `pause` filler | 13 ¹  | 27% / 1%                 | 17% (13/78) / 4%      | 4                        |
+| every token, no filler      | 18    | 24% / 6%                 | DENSE_T1              | DENSE_T1_ITEMS           |
+
+Same picture: the lens beats the placebo by 13-15 points, the filler and the dense reads change
+nothing, and the T=1 numbers sit a few points under greedy, within what 6 draws resolve. The reads
+themselves are indistinguishable in quality: top-bullet FVE p10/p50/p90 is 0.039/0.126/0.304 greedy
+vs 0.040/0.122/0.298 at T=1 on the same 42,984 stop-token reads, mean joint FVE 0.174 vs 0.172. The
+items carrying the result are the same ones (941, 2509, 5088; 6414, 6031, 1157 as singles); 6598 and
+10868, hits under greedy, are 0/6 at T=1, and the reverse flips happen too. With 8 independent draws
+per site the investigator still works from the bullets under its default filters, so more draws
+don't reach it; the stability table above (own letter named at a site on 12/18 items in every job)
+is the better measure of what the lens says.
+
 ## What next (not done)
 
 1. Re-run `nohint` on the lens pod (bf16) for the usable items and keep those whose own answer
