@@ -146,8 +146,12 @@ class Envs:
     def __getitem__(self, env: str) -> dict:
         if env not in self.cache:
             idx_p, filt_p, links_p = LOCAL / env / "index.json", LOCAL / env / "docent_filters.json", LOCAL / env / "links.json"
+            try:
+                pairs = getattr(load_env(env), "PAIRS", {})
+            except ModuleNotFoundError:  # a cfbench run over an old evalcue env (code deleted 2026-10-27) has no port
+                pairs = {}
             self.cache[env] = {
-                "pairs": getattr(load_env(env), "PAIRS", {}),
+                "pairs": pairs,
                 "index": json.loads(idx_p.read_text()) if idx_p.exists() else {},
                 "filters": json.loads(filt_p.read_text()) if filt_p.exists() else {},
                 "links": json.loads(links_p.read_text()).get("runs", {}) if links_p.exists() else {},
