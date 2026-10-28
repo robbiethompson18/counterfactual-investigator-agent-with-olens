@@ -23,6 +23,7 @@ an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ 
 import ast
 import datetime as dt
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -493,6 +494,32 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
     }
 
 
+def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_agentic", n_boot: int = 2000, seed: int = 0) -> list[dict]:
+    """Per condition, its % right minus `ref`'s over the items both have (an item's score = the mean over its draws): the
+    mean difference, a 95% bootstrap CI over items, the sign-test counts (items better / worse) and p, two-sided and
+    one-sided (condition > ref)."""
+    import numpy as np
+
+    if ref not in right:
+        return []
+    rng, out = np.random.default_rng(seed), []
+    for k in sorted(right):
+        items = sorted(set(right[k]) & set(right[ref]), key=str)
+        if k == ref or not items:
+            continue
+        d = np.array([np.mean(right[k][i]) - np.mean(right[ref][i]) for i in items])
+        boots = d[rng.integers(len(d), size=(n_boot, len(d)))].mean(1)
+        pos, neg = int((d > 0).sum()), int((d < 0).sum())
+        n = pos + neg
+        tail = [sum(math.comb(n, i) for i in range(j, n + 1)) / 2**n for j in (pos, max(pos, neg))] if n else [1.0, 0.5]
+        out.append({
+            "condition": k, "ref": ref, "n": len(items), "diff": float(d.mean()),
+            "ci": [float(x) for x in np.percentile(boots, [2.5, 97.5])], "better": pos, "worse": neg,
+            "p_one": tail[0], "p_two": min(1.0, 2 * tail[1]),
+        })  # fmt: skip
+    return out
+
+
 def mark_current(name: str, summaries: list[dict]) -> dict:
     """Mark which conditions of each run are current (`current_conds`: the newest complete run per (version set,
     condition), so a later placebo-only rerun replaces just the placebo of an earlier run) and each run `current` if it
@@ -534,8 +561,31 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                 pair = pair_stats(rows)
                 for t in table:
                     t |= pair.get((t["condition"], t["version"]), {})
-            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table})
+            paired = {}
+            if any(t.get("accuracy") is not None for t in table):  # scored as % right (guess = p >= 0.5): each condition vs transcript
+                right: dict[str, dict[str, dict[str, list[float]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+                for r in rows:
+                    if r["valid"]:
+                        right[r["version"]][canon_condition(r["condition"])][r["item"]].append(
+                            float((r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"]))
+                        )
+                paired = {v: paired_vs(by) for v, by in right.items()}
+            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table, "paired": paired})
         return {"claim_tables": tables}
+    if ans := [s for s in cur if s.get("task") == "answer"]:  # % correct per item (valid draws), pooled over the current runs
+        right: dict[str, dict[tuple, list[float]]] = defaultdict(lambda: defaultdict(list))
+        for s in ans:
+            for g in s["groups"]:
+                for it in g["items"]:
+                    for k, ds in it["draws"].items():
+                        if k in s["current_conds"]:
+                            right[k][g["env"], g["version"], it["item"]] += [float(d["correct"]) for d in ds if d["valid"]]
+        return {
+            "answer_paired": {
+                "runs": [s["slug"] for s in ans],
+                "rows": paired_vs({k: {i: v for i, v in by.items() if v} for k, by in right.items()}),
+            }
+        }
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}
