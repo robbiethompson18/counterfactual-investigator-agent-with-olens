@@ -170,11 +170,28 @@ BEHAVIOR = (
 PRIMARY = "positive"
 # cfbench's answer task (cfbench/CLAUDE.md): what the model was told to answer with, how answers are compared, and the
 # comparison as a function of a reply or a predictor's submission
-ANSWER_FORMAT, ANSWER_MATCH = "the letter only", "the first letter A-J, case-insensitive"
+ANSWER_FORMAT = "the letter only (or, when the options carry no letters, the text of one option)"
+ANSWER_MATCH = "the first letter A-J, case-insensitive; a text answer matches the option it copies"
+
+
+@cache
+def _option_texts() -> frozenset[str]:
+    return frozenset(norm(o) for opts in _table().options for o in opts)
 
 
 def canon_answer(text: str) -> str | None:
-    return first_letter(text.strip().upper())
+    """A letter for letters arms; for a words-arm reply, the normalised text of the option it copies (or contains, if exactly
+    one), compared as text against the rollouts' replies canonicalised the same way."""
+    t = text.strip()
+    if re.fullmatch(r"\(?[A-Ja-j][.)]?", t):
+        return t.strip("().").upper()
+    n = norm(t)
+    if n in _option_texts():
+        return n
+    inside = [o for o in _option_texts() if len(o) >= 3 and o in n]
+    if len(inside) == 1:
+        return inside[0]
+    return first_letter(t.upper()) if len(t) <= 3 else (n or None)
 
 
 # Items whose own (no-hint) answer is consistent (>= 80% of samples), wrong, moved by the hint (>= 50%), and that Gemini 3.8

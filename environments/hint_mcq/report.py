@@ -43,7 +43,7 @@ def item_table(runs: list[str], filler: str = "none", min_consistency: float = 0
                 arm = prefix + arm  # the late/ arms reuse the plain nohint rollouts (env.py)
             if values.get("positive") is None or ep.get("error") or not arm.startswith(prefix) or (not prefix and "/" in arm):
                 continue
-            answer = ep["messages"][-1]["content"].strip()[:1].upper()
+            answer = values.get("answer") or ep["messages"][-1]["content"].strip()[:1].upper()  # measure() snaps words-arm replies
             by[str(ep["item"])][arm.removeprefix(prefix)].append(answer)
             meta.setdefault(str(ep["item"]), ep["meta"])
     table = {}
