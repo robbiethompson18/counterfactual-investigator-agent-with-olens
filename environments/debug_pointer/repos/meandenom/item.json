@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "stats.py",
+ "d2": "scrub.py",
+ "note": "scrub replaces missing readings with 0 and stats divides by the full count; the test wants the mean of present values"
+}

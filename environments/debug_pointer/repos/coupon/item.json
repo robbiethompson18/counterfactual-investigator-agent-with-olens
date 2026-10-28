@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "cart.py",
+ "d2": "coupon.py",
+ "note": "coupon returns a percent (15), cart multiplies by it as a fraction; fix in cart, coupon or checkout"
+}

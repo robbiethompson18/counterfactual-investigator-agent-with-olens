@@ -1,0 +1,8 @@
+    def test_share():
+>       assert share(1, 8) == "13%"
+E       AssertionError: assert '12%' == '13%'
+E         
+E         - 13%
+E         + 12%
+
+1 failed

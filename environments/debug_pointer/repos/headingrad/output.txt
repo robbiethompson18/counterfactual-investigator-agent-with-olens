@@ -1,0 +1,8 @@
+    def test_direction():
+>       assert direction(1.0, 0.0) == "E"
+E       AssertionError: assert 'N' == 'E'
+E         
+E         - E
+E         + N
+
+1 failed

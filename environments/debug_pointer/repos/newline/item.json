@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "reader.py",
+ "d2": "fields.py",
+ "note": "reader keeps the trailing newline on each line, fields keeps it in the last field; fix in reader, fields or cells"
+}

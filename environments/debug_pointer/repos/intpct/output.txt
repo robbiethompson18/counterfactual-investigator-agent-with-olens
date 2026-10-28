@@ -1,0 +1,8 @@
+    def test_bar():
+>       assert bar(29, 100) == "29%"
+E       AssertionError: assert '28%' == '29%'
+E         
+E         - 29%
+E         + 28%
+
+1 failed

@@ -1,0 +1,10 @@
+    def test_show():
+>       assert show(12, 2) == "14:00"
+E       AssertionError: assert '16:00' == '14:00'
+E         
+E         - 14:00
+E         ?  ^
+E         + 16:00
+E         ?  ^
+
+1 failed

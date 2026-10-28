@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "display.py",
+ "d2": "localtime.py",
+ "note": "the zone offset is added in localtime and again in display; fix either"
+}

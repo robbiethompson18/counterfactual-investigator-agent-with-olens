@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "join.py",
+ "d2": "base.py",
+ "note": "base ends with a slash and join adds another; fix in join, base or resolve"
+}

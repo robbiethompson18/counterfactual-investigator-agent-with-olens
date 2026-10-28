@@ -1,0 +1,8 @@
+    def test_pick():
+>       assert pick(["v1.9.0", "v1.10.0"]) == "1.10.0"
+E       AssertionError: assert '1.9.0' == '1.10.0'
+E         
+E         - 1.10.0
+E         + 1.9.0
+
+1 failed
