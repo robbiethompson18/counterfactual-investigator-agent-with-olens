@@ -3,13 +3,38 @@
 **Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
 `opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result (section
-"Assistant-header reads", 2026-10-27 evening, Robbie's call: it supersedes the 23%/25% numbers in
-the two sections before it, which used earlier read sets and `--base-positive` or no leak filter):
-on the 16 survivors whose hinted arm follows the hint 8/8, O-lens 14% [0, 32] vs placebo 5% [0, 14]
-vs no lens 0%, carried by 941 and 5088; the 5 wrong-letter-hint pairs are 0% in every condition;
-reads at the assistant header add nothing over stop tokens. Charts:
-`python -m graphs.hint_mcq_answer`.
+[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result: the table
+"Answer task, every run" right below, which reconciles the two 2026-10-27 evening sections (one
+session's filler/dense/T=1 runs, another's assistant-header and wrong-letter-hint runs). Charts for
+the header runs: `python -m graphs.hint_mcq_answer`.
+
+## Answer task, every run (2026-10-27)
+
+Predict Qwen's no-hint answer from hinted rollouts where it followed the hint; Gemini 3.8 Flash, 3-6
+draws per item; chance 10%. "bp" = `--base-positive` (base runs that followed the hint only, all 18
+survivors); "8/8" = only the 16 items whose hinted arm followed 8/8 (drops 1386 and 2509). Both
+remove the leak (section "Filler and dense-reads experiments").
+
+| read set (`olens_reads/2026-10-27_…`)   | decode       | positions            | items, scoring | O-lens    | placebo | no lens |
+| --------------------------------------- | ------------ | -------------------- | -------------- | --------- | ------- | ------- |
+| `hint-mcq18-stop`                       | greedy       | stop tokens          | 18, bp         | 23%       | 6%      | 0%      |
+| `hint-mcq-header`                       | greedy       | stop + header tokens | 16, 8/8        | 14%       | 5%      | 0%      |
+| `hint-mcq18-dense`                      | greedy       | every token          | 18, bp         | 24%       | 6%      | 0%      |
+| `hint-mcq18-stop-t1`                    | T 1          | stop tokens          | 18, bp         | 19%       | 5%      | 0%      |
+| `hint-mcq18-dense-t1` (4 rollouts/case) | T 1          | every token          | 18, bp         | 6%        | 4%      | 0%      |
+| `hint-pause18-stop` / `-t1` (filler)    | greedy / T 1 | stop tokens          | 13, bp         | 27% / 17% | 1% / 4% | 3%      |
+| `hint-mcq-header`, wrong-letter hint    | greedy       | stop + header tokens | 5, 8/8         | 0%        | 0%      | 0%      |
+
+What holds across all of it: with the gold-letter hint the lens beats the placebo by roughly 10-17
+points and no-lens is at 0; the hits come from the same few items (941 every time; 5088 and 2509 are
+partly Flash's own split knowledge, the placebo scores on them too); the filler, every-token reads
+and assistant-header reads add nothing; with a wrong-letter hint nothing works, because Flash then
+submits the gold answer it believes in. What varies: the rate (14-27%) with the read set and the
+scoring (2509 is in the bp rows and out of the 8/8 row), and T 1 vs greedy, which is noise on stop
+tokens (p = 0.13-0.5) and a drop on dense reads (p = 0.013, with only 4 of 8 rollouts read). The
+lens names the own letter at a decisive site on 12 of 18 items in every read job; the investigator
+recovers it on about 6, and the bullets it misses sit under the tools' default filters (top bullet,
+FVE >= 0.1). That gap, not the reads, is the next thing to work on.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
