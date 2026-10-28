@@ -1,0 +1,10 @@
+    def test_line():
+>       assert line([250, 199]) == "balance $4.49"
+E       AssertionError: assert 'balance $449.00' == 'balance $4.49'
+E         
+E         - balance $4.49
+E         ?           -
+E         + balance $449.00
+E         ?             +++
+
+1 failed

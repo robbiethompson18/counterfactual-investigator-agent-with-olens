@@ -14,17 +14,22 @@ full predictor conversation. Report over many runs (run as a module so the repo 
 import argparse
 import asyncio
 import collections
+import functools
 import glob
 import json
+import os
 import statistics
 import sys
 from pathlib import Path
+
+import openai
 
 from cfbench import olens
 from cfbench import predict as P
 from cfbench.core import OLENS, TOOL_BUDGET, render
 from cfbench.envs import env_runs
 from cfbench.tools import transcript_tools
+from counterfactual_investigator_agent_with_olens import openrouter
 from scripts.runs import finish, new_run
 
 SUBMIT = {
@@ -54,11 +59,13 @@ def check(arguments: str):
     return {"p": s, "rationale": str(json.loads(arguments).get("rationale", ""))}, "Prediction recorded."
 
 
-P.SUBMIT, P.check = SUBMIT, check  # ty: ignore[invalid-assignment]  # cfbench.predict looks these up by module attribute
-P.SYSTEM = (  # ty: ignore[invalid-assignment]
+SYSTEM = (
     "You are an investigator predicting how an AI model would behave if its prompt were changed. "
     "You get transcripts of the model's runs and the exact change, and you estimate the score it would give."
 )
+# cfbench.predict looks the submit tool up in its TASKS table since the answer task (4c81b28); the old module-attribute
+# patch stopped working then
+P.TASKS["score"] = (SYSTEM, SUBMIT, check, "Now call submit_prediction with your expected score.", {"p": None})  # ty: ignore[invalid-assignment]
 
 
 def scored(env, arm, model):
@@ -122,7 +129,24 @@ the squared error against the observed mean, so give your best point estimate. R
 `submit_prediction` once."""
 
 
+def google_direct(key_var: str) -> None:
+    """Send the predictor's calls to Google's OpenAI-compatible endpoint with the key in $key_var instead of OpenRouter (for
+    when OpenRouter's BYOK Google key is out of credit or over its daily cap, CLAUDE.local.md). OpenRouter's own body fields
+    (usage accounting, its reasoning switch) become Google's `reasoning_effort`."""
+    from openai import AsyncOpenAI
+
+    openrouter._CLIENT = AsyncOpenAI(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.environ[key_var], timeout=600, max_retries=2
+    )
+    openrouter.extra_body = lambda thinking=True, effort=None, provider=None: {"reasoning_effort": effort} if thinking and effort else {}  # ty: ignore[invalid-assignment]
+
+
 async def main(args):
+    if args.provider:  # pin one OpenRouter provider, no fallbacks (google-vertex = OpenRouter's credit; google-ai-studio = the BYOK key)
+        openrouter.chat = functools.partial(openrouter.chat, provider={"order": [args.provider], "allow_fallbacks": False})
+    if args.google_key:
+        google_direct(args.google_key)
+        args.predictor = args.predictor.removeprefix("google/")
     env = env_runs.load(args.spec)
     pairs = [tuple(p.split(":")) for p in args.pairs.split(",")]
     reads = olens.Reads(args.olens_reads.split(",")) if args.olens_reads else None
@@ -132,7 +156,14 @@ async def main(args):
         "cfbench",
         args.slug,
         description=args.description or f"honest score prediction: {args.spec} ({args.pairs})",
-        models=[{"name": args.predictor, "served_by": "openrouter"}],
+        models=[
+            {
+                "name": args.predictor,
+                "served_by": f"google direct (${args.google_key})"
+                if args.google_key
+                else f"openrouter{':' + args.provider if args.provider else ''}",
+            }
+        ],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
         | {"grader": "honest_score_predict RMSE"}
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
@@ -149,7 +180,14 @@ async def main(args):
             tools |= lens_tools
         async with slots:
             text = prompt(env, args.model, base, bs, base_arm, cf_arm, args.condition, read, fve_note)
-            result = await P.predict(args.predictor, text, tools, TOOL_BUDGET if tools else 0)
+            for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved"), as cfbench.run does
+                try:
+                    result = await P.predict(args.predictor, text, tools, TOOL_BUDGET if tools else 0, task="score")
+                    break
+                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
+                    print(f"{args.condition} {base_arm}->{cf_arm} draw {draw}: attempt {attempt} failed: {e}")
+            else:
+                return  # left out of predictions.jsonl
         row = {
             "env": args.spec,
             "model": args.model,
@@ -221,6 +259,8 @@ if __name__ == "__main__":
         help="transcript tools; the edit only; transcript + O-lens tools; the same tools over another scenario's reads",
     )
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--google-key", default="", help="name of an env var with a Gemini API key: call Google directly, not OpenRouter")
+    ap.add_argument("--provider", default="", help="pin one OpenRouter provider with no fallbacks, e.g. google-vertex")
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--slug", required=True)

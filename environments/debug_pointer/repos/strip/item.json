@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "read.py",
+ "d2": "fields.py",
+ "note": "read.py strip()s each line, eating the leading spaces of an indented continuation; fields.py's split is fine"
+}

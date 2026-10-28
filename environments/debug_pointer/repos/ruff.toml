@@ -1,0 +1,5 @@
+# The mini-repos are fixtures shown to the model, bugs included (a mutable default, a ternary that should be max(), ...).
+# Ruff must neither flag nor reformat them. The cache goes to the repo root, not into repos/ (items() lists its folders).
+extend = "../../../pyproject.toml"
+exclude = ["*"]
+cache-dir = "../../../.ruff_cache"

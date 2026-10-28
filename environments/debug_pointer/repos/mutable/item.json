@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "bag.py",
+ "d2": "cart.py",
+ "note": "add() has a mutable default list shared across carts; cart.py could pass a fresh list"
+}

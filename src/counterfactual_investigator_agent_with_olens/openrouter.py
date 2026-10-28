@@ -9,6 +9,10 @@ defaults differ; `effort="off"` disables thinking, which some models refuse with
 `r.usage.cost` is the dollar cost) and retries transient errors with backoff. Anything else (`max_tokens`, `tools`,
 `temperature`, `seed`, `response_format`, ...) passes through to the SDK.
 `client` and `extra_body` are the pieces, for a caller that runs its own loop (evalcue/harness.py, which also serves Qwen).
+
+`gemini-direct/<model>` (e.g. `gemini-direct/gemini-3.8-flash`) skips OpenRouter: the same call goes to Google's
+OpenAI-compatible API with $GEMINI_API_KEY, at `reasoning_effort` = effort, so a run can use a key whose daily quota isn't
+the one OpenRouter's BYOK route is spending (set GEMINI_API_KEY to the key you want for that run). No `usage.cost`.
 """
 
 import asyncio
@@ -21,8 +25,11 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalSer
 from openai.types.chat import ChatCompletion
 
 BASE_URL = "https://openrouter.ai/api/v1"
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+DIRECT = "gemini-direct/"
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
+_GOOGLE: AsyncOpenAI | None = None
 
 
 class NoChoices(Exception):
@@ -67,13 +74,21 @@ async def chat(
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
     `extra_body` there is merged over the OpenRouter fields."""
-    global _CLIENT
-    if _CLIENT is None:  # built on first use, not at import: modules get imported on machines without the key
-        _CLIENT = client()
-    extra = extra_body(thinking=effort != "off", effort=effort, provider=provider) | (params.pop("extra_body", None) or {})
+    global _CLIENT, _GOOGLE
+    if model.startswith(DIRECT):
+        if _GOOGLE is None:
+            _GOOGLE = AsyncOpenAI(base_url=GOOGLE_URL, api_key=os.environ["GEMINI_API_KEY"], timeout=timeout, max_retries=2)
+        api, model = _GOOGLE, model.removeprefix(DIRECT)
+        extra = params.pop("extra_body", None) or {}
+        params["reasoning_effort"] = "none" if effort == "off" else effort
+    else:
+        if _CLIENT is None:  # built on first use, not at import: modules get imported on machines without the key
+            _CLIENT = client()
+        api = _CLIENT
+        extra = extra_body(thinking=effort != "off", effort=effort, provider=provider) | (params.pop("extra_body", None) or {})
     for attempt in range(attempts):
         try:
-            r = await _CLIENT.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)
+            r = await api.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)
             if not getattr(r, "choices", None):
                 raise NoChoices(str(r.model_extra)[:500])
             return r

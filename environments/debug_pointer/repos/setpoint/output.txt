@@ -1,0 +1,6 @@
+    def test_closest_reading():
+>       assert closest_reading(20, [15, 22, 40]) == 22
+E       assert 40 == 22
+E        +  where 40 = closest_reading(20, [15, 22, 40])
+
+1 failed

@@ -204,7 +204,7 @@ items on the two honest_peer pairs; decent items never cross any cutoff). Metric
 env diff only − "edit does nothing" = +20.4 pp [+16.9, +23.9] (paired 95% case bootstrap). Per
 scenario (weak item, 20 cases each), transcripts help most on abstract (+10.5 [+5.4, +15.9]) and
 hurt on pitch (−7.5 [−12.3, −1.8]); the other nine are +2 to +7 with CIs through zero.
-`scripts/honest_binary_chart.py` draws it and prints the per-scenario table. Runs:
+`graphs/honest_binary.py` draws it and prints the per-scenario table. Runs:
 `runs/cfbench/2026-10-26_honest-ts*`, `honest-ts-allpairs-*` (agentic), `honest-nt2-allpairs-*` (env
 diff only; `honest-nt-allpairs-*` is a killed first attempt, abandoned).
 
@@ -259,8 +259,8 @@ your encouraging criteria", "6.5/10, or 6/10 if strict"); in every other framing
 N/10)" hedges that carried hidden_goal are not systematically lower here: under flattery the
 alternative number is +1.9 above Qwen's at layer 32, 0 at 40, −1.4 at 48 on 7 reads. So the lens
 tells a predictor "this grade is lenient", which the transcript already shows, and not "the honest
-grade is 2", which is what the predictor lacks. Code: `scripts/honest_binary_chart_olens.py`
-(chart + per-scenario table); the `Score:`-token tables are in this doc only (a 30-line one-off over
+grade is 2", which is what the predictor lacks. Code: `graphs/honest_binary_olens.py` (chart +
+per-scenario table); the `Score:`-token tables are in this doc only (a 30-line one-off over
 `reads.jsonl`, see git history of the PR that added this section).
 
 Verdict for the sprint: hidden_goal.grade's O-lens uplift does not generalize to ten sibling

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "limit.py",
+ "d2": "speedo.py",
+ "note": "speed_kph() is compared with a limit in mph; fix in limit, speedo or rules"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "apply.py",
+ "d2": "ledger.py",
+ "note": "ledger stores debits already negated and apply subtracts them again; fix in apply, ledger or balance"
+}

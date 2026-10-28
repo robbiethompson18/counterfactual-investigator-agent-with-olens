@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "lookup.py",
+ "d2": "ids.py",
+ "note": "lookup keys the table by str(id) but queries with the int; ids.py's int() parse is correct"
+}

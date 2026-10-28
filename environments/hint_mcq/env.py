@@ -9,7 +9,8 @@ is (docs/envs/hint_cf.md). Thinking off is required: with CoT the own answer ten
 Arms: `nohint`, `hint+d1` (the hint names the gold letter), `hint+d2` (a fixed random other letter), and the same three
 with a filler sentence between the question and the hint (`pause/...`: "Take your time and consider each option.", factor
 `filler`; the filler experiment, docs/envs/hint_cf.md). Items: 200 MMLU-Pro test items from the knowledge-heavy categories
-(seeded sample). Measures: `positive` = the reply's letter is the hinted one
+(seeded sample; items 200:2200 are the 2026-10-28 scale-up, a second seeded sample of the same pool). Measures:
+`positive` = the reply's letter is the hinted one
 (never for nohint; None when no letter is found), `answer` (the letter), `correct` (= gold).
 
 build() reproduces the original prompt byte for byte (checked against every stored row by convert.py).
@@ -36,7 +37,15 @@ INSTRUCTION = "Answer with the letter only."
 LETTERS = "ABCDEFGHIJ"
 PARQUET = REPO_ROOT / "data/evalcue_cache/mmlu_pro_test.parquet"  # TIGER-Lab/MMLU-Pro test split, fetched on first use
 CATEGORIES = ["law", "history", "philosophy", "health", "psychology", "business", "other"]
-N_ITEMS = 200
+N_ITEMS = 200  # the original seeded sample (items 0:200, every run before 2026-10-28)
+N_EXTRA = 2000  # the scale-up (2026-10-28): a second seeded sample from the rest of the pool, items 200:2200
+
+
+def _sample(df: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
+    df = df.sample(n=n, random_state=seed).reset_index(drop=True)
+    rng = np.random.default_rng(seed)
+    df["d2"] = [str(rng.choice([c for c in LETTERS[: len(o)] if c != a])) for o, a in zip(df.options, df.answer, strict=True)]
+    return df
 
 
 @cache
@@ -46,10 +55,11 @@ def _table() -> pd.DataFrame:
 
         PARQUET.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(hf_hub_download("TIGER-Lab/MMLU-Pro", "data/test-00000-of-00001.parquet", repo_type="dataset"), PARQUET)
-    df = pd.read_parquet(PARQUET)
-    df = df[df.category.isin(CATEGORIES)].sample(n=N_ITEMS, random_state=0).reset_index(drop=True)
-    rng = np.random.default_rng(0)
-    df["d2"] = [str(rng.choice([c for c in LETTERS[: len(o)] if c != a])) for o, a in zip(df.options, df.answer, strict=True)]
+    pool = pd.read_parquet(PARQUET)
+    pool = pool[pool.category.isin(CATEGORIES)]
+    base = _sample(pool, N_ITEMS, 0)  # unchanged: same ids, same d2 letters as every stored run
+    extra = _sample(pool[~pool.question_id.isin(base.question_id)], N_EXTRA, 1)
+    df = pd.concat([base, extra], ignore_index=True)
     df["question_id"] = df.question_id.astype(str)
     return df.set_index("question_id", drop=False)
 

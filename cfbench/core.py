@@ -23,7 +23,10 @@ from collections import Counter
 from dataclasses import dataclass
 
 OLENS_CONDITIONS = ("olens_agentic", "olens_placebo_agentic")  # cfbench/olens.py
-TOOL_CONDITIONS = ("transcript_agentic", *OLENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
+JLENS_CONDITIONS = ("jlens_agentic", "jlens_placebo_agentic")  # cfbench/jlens.py
+NLA_CONDITIONS = ("nla_agentic", "nla_placebo_agentic")  # the O-lens tools over NLA reads (cfbench/olens.py LENSES)
+LENS_CONDITIONS = (*OLENS_CONDITIONS, *JLENS_CONDITIONS, *NLA_CONDITIONS)
+TOOL_CONDITIONS = ("transcript_agentic", *LENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
 CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
@@ -53,8 +56,12 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
 # 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
 # point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
-# 8: O-lens reads with no message field (template tokens: tool-call tags, turn ends) sit at the end of their own message, not
-# inside the next message's header, where they read as reads of that message (cfbench/olens.py positions, 2026-10-28).
+# 8: lens tool hits name the token read, and a turn's header tokens (after the previous turn's <|im_end|>) sit at the start
+# of that turn, labelled "(start of turn)", where they used to all sit at the previous turn's end labelled as it; a
+# transcript search returns every read stacked after a match, not one (2026-10-27). Only the O-lens tools' output changed:
+# no_transcript and transcript_agentic prompts and tools are byte-identical to 7, so those rows compare across 7 and 8;
+# olens_* rows don't. The jlens_* conditions are new in 8, and so are nla_* (2026-10-28), added without a bump: every other
+# condition's prompt and tools stayed byte-identical (hashed before and after).
 HARNESS_VERSION = 8
 
 
@@ -138,6 +145,36 @@ registers but never says; they also often paraphrase or continue the nearby text
 numbers, settings) that aren't there. Use the O-lens tools liberally."""
 
 
+JLENS = """
+
+{n_read} of the runs (marked in the table) also have J-lens reads, which you can investigate with `search_jlens` (a \
+regex over those runs' transcripts that returns the reads at each match) and `jlens_at` (all reads around a run and \
+character, from any search hit). The J-lens (a Jacobian lens: a fitted linear map, one per layer, from that layer's \
+activation to the final layer's) maps the target model's activation at one token and one layer to a next-token \
+distribution, as if the model had to output its next token from that layer; it was run at every token of every run, at \
+layers 36 to 60. Every hit shows the run's own text in <transcript> (⟨READ⟩ marks the token read) and, one line per \
+layer, the lens's top 5 next tokens with their probabilities in <jlens>. `search_jlens` with `over="tokens"` searches the \
+predicted tokens instead of the transcript. Use the J-lens tools liberally."""
+
+
+# NLA reads (scripts/olens_read_requests.py --readout nla, docs/nla-reader.md): one free-text readout per read, scored by the
+# NLA critic's FVE
+NLA = """
+
+{n_read} of the runs (marked in the table) also have NLA reads, which you can investigate with `search_nla` (a regex over \
+those runs' transcripts that returns the reads at each match) and `nla_at` (all reads around a run and character, from any \
+search hit). The NLA (natural language autoencoder) is a model trained to describe another model's internal activations \
+in words. Every hit shows the run's own text in <transcript> (⟨READ⟩ marks the token the NLA read) and the NLA's readout \
+for that token in <nla>. It was run on the target model's activations at punctuation tokens and turn ends, everywhere in \
+the run (system prompt, user turns, tool outputs, its reasoning and replies). Each read is one paragraph about what the \
+model is representing at that point, at one layer, often the genre and structure of the text, its content and what \
+comes next, with its FVE (fraction of the activation's variance a reconstruction from the readout explains): higher is \
+better, and readouts with low or negative FVE are often hallucinated. {fve_note} `search_nla` returns the \
+8 highest-FVE readouts (`max_readouts`); with `over="readouts"` it searches the readouts' own text instead and returns \
+only the ones that match. Readouts can show what the model registers but never says; they also often just paraphrase the \
+nearby text, and invent specifics (topics, names, numbers) that aren't there. Use the NLA tools liberally."""
+
+
 def unified_diff(before: str, after: str) -> str:
     return "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), "base arm", "counterfactual arm", lineterm="", n=2))
 
@@ -211,6 +248,10 @@ This is its starting context in the base arm, before it acts:
         if condition in OLENS_CONDITIONS:
             template = OLENS if fve_note is not None else OLENS_SAMPLED
             olens, label = template.format(n_read=len(read or ()), fve_note=fve_note), "O-lens reads"
+        elif condition in JLENS_CONDITIONS:
+            olens, label = JLENS.format(n_read=len(read or ())), "J-lens reads"
+        elif condition in NLA_CONDITIONS:
+            olens, label = NLA.format(n_read=len(read or ()), fve_note=fve_note or ""), "NLA reads"
         else:
             olens, label = "", ""
         evidence = f"""{context}

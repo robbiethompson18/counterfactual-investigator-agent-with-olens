@@ -27,7 +27,7 @@ from pathlib import Path
 import openai
 
 from cfbench import olens
-from cfbench.core import HARNESS_VERSION, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench.core import HARNESS_VERSION, JLENS_CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
@@ -105,6 +105,7 @@ async def main():
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
     base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
+    assert not set(JLENS_CONDITIONS) & set(conditions), "cfbench.eval has no J-lens tools yet; use cfbench.run"
     predictors = args.predictors.split(",")
     reads = olens.Reads(ev.reads(inputs)) if set(OLENS_CONDITIONS) & set(conditions) else None
     fve_note = olens.fve_note(reads) if reads else ""

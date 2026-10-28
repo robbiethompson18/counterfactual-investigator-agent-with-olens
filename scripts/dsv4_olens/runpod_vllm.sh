@@ -6,15 +6,16 @@
 # hc_capture plugin), a --limit 20 smoke read compared with the simple run's reads ($REF), the full file compared the same
 # way. Writes $OUT/READS_DONE or $OUT/FAILED for runpod/watch_pod.sh.
 #   nohup bash /workspace/code_vllm/runpod_vllm.sh > /workspace/dsv4/out/vllm-capture/job.log 2>&1 < /dev/null &
-set -uo pipefail
+set -Euo pipefail  # -E: the ERR trap fires inside run() too; without it a failed read exited with no FAILED marker (2026-10-27)
 export HOME=${DSV4_HOME:-/workspace/dsv4/home} W=${W:-/workspace/dsv4/w} OUT=${OUT:-/workspace/dsv4/out/vllm-capture} CODE=${CODE:-/workspace/code_vllm}
 export PATH=$HOME/.local/bin:$PATH
 REQ=${REQ:-$CODE/requests.jsonl}
 REF=${REF:-/workspace/dsv4/out/af-v7}
 LAYERS=${LAYERS:-30}
 READ_ARMS=${READ_ARMS:-preview,public}
+MAX_MODEL_LEN=${MAX_MODEL_LEN:-1024}  # longest prompt + reply + 8; the original Greenblatt prompt is ~5,900 tokens
 mkdir -p "$OUT"
-trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"; touch $OUT/FAILED' ERR
+trap 'echo "FAILED at line $LINENO: $BASH_COMMAND"; touch "$OUT/FAILED"' ERR
 set -e
 cd "$CODE"
 stamp() { echo "=== $(date -u '+%F %TZ') $*"; }
@@ -49,7 +50,7 @@ run() {  # run NAME ARGS...
   [ -f "$OUT/$name/DONE" ] && return 0
   stamp "$name: vllm_capture_read.py layers $LAYERS arms $READ_ARMS $*"
   ~/vl/.venv/bin/python vllm_capture_read.py --model "$W/v4flash" --lens "$W/v4lens" --requests "$REQ" --out "$OUT/$name" \
-    --layers "$LAYERS" --read-arms "$READ_ARMS" --dense --actual-reply --public-first "$@" 2>&1 | tee -a "$OUT/$name/log.txt"
+    --layers "$LAYERS" --read-arms "$READ_ARMS" --max-model-len "$MAX_MODEL_LEN" --dense --actual-reply --public-first "$@" 2>&1 | tee -a "$OUT/$name/log.txt"
   [ -f "$REF/reads_L$LAYERS.jsonl" ] && ~/vl/.venv/bin/python compare_reads.py "$OUT/$name" "$REF" --reads "reads_L$LAYERS.jsonl" | tee "$OUT/$name/parity.txt"
   touch "$OUT/$name/DONE"
 }

@@ -1,0 +1,6 @@
+    def test_total():
+>       assert total([1.004, 2.004, 3.004]) == 6.01
+E       assert 6.0 == 6.01
+E        +  where 6.0 = total([1.004, 2.004, 3.004])
+
+1 failed

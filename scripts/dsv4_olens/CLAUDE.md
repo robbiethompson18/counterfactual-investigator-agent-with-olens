@@ -11,8 +11,9 @@ of Robbie's RunPod pods (`runpod/CLAUDE.md`). Results: docs/envs/alignment_fakin
 
 1. `prep_env.py`: `requests.jsonl` from `environments/` alignment_faking run folders, one episode
    per (arm, item) across the runs given (a top-up pools with its base run), lowest sample, reply
-   cut to `--reply-chars`. Each request keeps `run` and `episode`, so a read maps back to the
-   env_runs loader's `alignment_faking/<run>:<episode>`.
+   cut to `--reply-chars`. `--samples all` keeps every sample (request id gets `:s<sample>`),
+   `--arms public` keeps only those arms. Each request keeps `run` and `episode`, so a read maps
+   back to the env_runs loader's `alignment_faking/<run>:<episode>`.
 2. `read.py` (HF transformers 5.19 FP8, `kernels==0.17`, pipeline across 2 GPUs): capture the
    4-stream block outputs at the read positions (`states.pt`, stays on the pod/volume) and score the
    first-reply logits (`logits.jsonl`). `--skip-lens`: its own lens stage is 2.4-3.6 reads/s; use
@@ -67,7 +68,9 @@ python scripts/dsv4_olens/to_cfbench_reads.py data/runs/olens_reads/<run>   # th
 `runpod_af.sh` is idempotent (stage markers `SETUP_DONE`, `CAPTURE_DONE`, `READS_DONE`; `FAILED` on
 any error, which the watcher treats as "delete the pod"; `$OUT` is on the volume so the logs
 survive). Env knobs: `W`, `OUT`, `CODE`, `REQ`, `CAPTURE_LAYERS` (24,30,36), `LENS_LAYERS` (30),
-`READ_ARMS` (preview,public).
+`READ_ARMS` (preview,public). `runpod_vllm.sh` adds `MAX_MODEL_LEN` (1024; the original Greenblatt
+prompt needs 8192) and `REF` (set it to a path that doesn't exist when the requests differ from the
+v7 reference, or `compare_reads.py` runs on zero shared positions).
 
 ## Observed timings and cost (2026-10-27, 2x H200 at $10.58/h, pod `dsv4-af-v7`, 200 requests)
 
@@ -155,3 +158,25 @@ the 18% relative difference, not a position or fold error). Logits (20 requests,
 is a 7-token sum near −7), `accept − reject` corr 0.9986, sign agreement 1.0, top-1 first reply
 token 100%. The full file's `logits.jsonl` was written with the earlier "reject" = log
 P(`<rejected/>`) semantics (fixed in `8e29301`); its `accept` corr over 200 ids is 0.82.
+
+### Original-prompt run, public arm x 5 samples (2026-10-27, `2026-10-27_dsv4-af-orig-public5`)
+
+500 requests (`prep_env.py --arms public --samples all` on `2026-10-26_dsv4flash-nocot`, items
+0:100, reply cut to 120 chars), 64,643 dense layer-30 reads, pod `dsv4-af-orig` (2x H200 on the
+cached volume; the first create attempts found no H200, B200 or B300 in US-CA-2 for 35 min). The
+smoke stage was skipped (`touch $OUT/smoke/DONE`) and `REF=/nonexistent`. 62 min of pod ≈ $11.
+
+| stage                                                                                     | time                   |
+| ----------------------------------------------------------------------------------------- | ---------------------- |
+| CUDA 13.0 apt                                                                             | 95 s                   |
+| vLLM import + engine up (JIT cached)                                                      | 377 s                  |
+| capture + logits, 500 requests (~5,850-token prompts)                                     | 424 s (0.85 s/request) |
+| lens, 64,643 reads                                                                        | 2,007 s = 32.2 reads/s |
+| wasted: attempt 1 at `--max-model-len 1024` (assert at 5,844 tokens), engine up and crash | 13 min                 |
+
+Two bugs met: `vllm_capture_read.py` asserts every prompt fits `--max-model-len` (default 1024,
+sized for the v7 prompt), so the original prompt needs `MAX_MODEL_LEN=8192`; and the crash wrote no
+`FAILED` marker because the failing pipeline ran inside `run()` and an `ERR` trap is not inherited
+by functions without `set -E` (fixed; before that a crashed job left the pod up until the watcher's
+deadline). 3.5% of reads have an empty greedy decode (the inverter emits EOS first); the v7
+one-engine run had 4.0%.

@@ -1,0 +1,9 @@
+    def test_wall():
+>       assert wall(33900) == "09:25"
+E       AssertionError: assert '9:25' == '09:25'
+E         
+E         - 09:25
+E         ? -
+E         + 9:25
+
+1 failed

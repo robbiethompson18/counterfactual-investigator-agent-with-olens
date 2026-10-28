@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "nav.py",
+ "d2": "gyro.py",
+ "note": "heading_rad() feeds compass(deg) unconverted; fix in nav, gyro or compass"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "fetch.py",
+ "d2": "render.py",
+ "note": "fetch returns '' for a missing field and render only substitutes the placeholder for None; fix in fetch, render or show"
+}

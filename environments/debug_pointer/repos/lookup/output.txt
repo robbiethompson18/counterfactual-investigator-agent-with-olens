@@ -1,0 +1,8 @@
+    def test_label():
+>       assert label_for("7", [(7, "seven"), (8, "eight")]) == "seven"
+E       AssertionError: assert 'unknown' == 'seven'
+E         
+E         - seven
+E         + unknown
+
+1 failed

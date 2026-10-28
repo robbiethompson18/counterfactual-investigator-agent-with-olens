@@ -3,10 +3,10 @@
 Per case (an ordered arm pair), the squared error (p_hat - k_cf/n_cf)^2 averaged over draws; per predictor and condition,
 RMSE over cases with equal weight, next to the RMSE of "the edit does nothing" (predict the base arm's rate), and the
 Brier skill 1 - sum MSE / sum MSE_null (0 = the null, 1 = perfect, negative = worse than the null). The math is
-`cfbench.report.data.Case`, shared with the report charts.
+`cfbench.scoring.Case`, shared with the report charts.
 
 The older binomial log-likelihood skill (numbers from before 2026-10-26) is no longer printed here; the report package
-keeps it (`cfbench.report.data.log_skill`) for comparison with older numbers.
+keeps it (`cfbench.scoring.log_skill`) for comparison with older numbers.
 
     uv run python -m cfbench.score data/runs/cfbench/<run dir> [...]   # or the pre-runs.py TAG.jsonl files
 """
@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 
 from cfbench.core import canon_condition
-from cfbench.report.data import Case, brier_skill, rmse, rmse_null
+from cfbench.scoring import Case, brier_skill, rmse, rmse_null
 
 Group = tuple[str, str]  # (condition, predictor)
 CaseKey = tuple[str, str, str, str]  # (env, target model, base_arm, cf_arm)

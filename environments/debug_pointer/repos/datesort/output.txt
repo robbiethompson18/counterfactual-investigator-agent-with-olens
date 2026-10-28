@@ -1,0 +1,8 @@
+    def test_latest():
+>       assert latest("02/03/2024\n31/12/2024\n05/01/2025") == "05/01/2025"
+E       AssertionError: assert '31/12/2024' == '05/01/2025'
+E         
+E         - 05/01/2025
+E         + 31/12/2024
+
+1 failed

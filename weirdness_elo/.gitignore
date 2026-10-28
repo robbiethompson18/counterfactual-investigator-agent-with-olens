@@ -1,6 +1,0 @@
-data/
-chive_repo/
-run/
-.venv/
-__pycache__/
-*.log

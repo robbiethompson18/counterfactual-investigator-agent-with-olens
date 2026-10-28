@@ -63,6 +63,20 @@ the read transcripts next to it):
   relative position, so the predictor gets as much O-lens text but none about this scenario (the
   reads must cover 2+ envs).
 
+NLA conditions (2026-10-27, `--nla-reads`, reads from `scripts/olens_read_requests.py --readout nla`
+scored by `scripts/nla_score.py`, docs/nla-reader.md): `nla_agentic` and `nla_placebo_agentic` are
+the same two tools and placebo over NLA reads, named `search_nla` and `nla_at`, output in
+`<nla layer=… fve=…>`. Each read is one free-text readout (~625 characters) with the critic's FVE,
+so there is no `top_k`; `over="readouts"` searches readout text; defaults are no FVE filter, 8
+readouts per search (`max_readouts`) and `window` 3. A run can take both `--olens-reads` and
+`--nla-reads`. Added without a `HARNESS_VERSION` bump: every other condition's prompt and tools are
+byte-identical.
+
+Predictors named `gemini-direct/<model>` call Google's OpenAI-compatible API with `$GEMINI_API_KEY`
+instead of OpenRouter (`openrouter.chat`), so a run can spend a key other than the one behind
+OpenRouter's BYOK route; say which key in `--description`. Same model at the same effort, but no
+`cost`.
+
 `--olens-positions` (default `sparse`) says which read positions the tools serve, for both
 conditions (the placebo pool is the same `Reads`). `sparse` keeps every row of a request that is not
 `positions: "all"` exactly as the job read it (stop tokens, `turn_starts` headers, whatever it was),
@@ -73,6 +87,20 @@ transcript's reads have no surviving row. `all` keeps every row and refuses to s
 base run with reads was read with `positions: "all"` in its `requests.jsonl` (the other runs and
 their file are listed), so an "every token" run never quietly mixes in sparse reads. Recorded in
 `meta.json` params as `olens_positions`.
+
+J-lens conditions (`cfbench/jlens.py`, harness version 8, reads from `--jlens-reads`:
+`scripts/jpp_read_requests.py` output with `--positions all`, `requests.jsonl` beside it):
+`jlens_agentic` is `transcript_agentic` plus `search_jlens` and `jlens_at`, the O-lens tools' shape
+with the J++ lens's top-5 next tokens per layer in place of bullets: no FVE and no probability
+filter, layers 36-60 by default, every token. `search_jlens(regex, over="tokens")` matches the
+predicted tokens (stripped). `jlens_placebo_agentic` is its placebo, built like the O-lens one. The
+reads must be every-token (cfbench refuses otherwise).
+
+Every lens hit names its position and token (`char 567 · assistant (start of turn) · token "\n\n"`,
+version 8): the tokens after a turn's `<|im_end|>` (newline, `<|im_start|>`, role, `<think>`,
+`</think>`, ...) all sit at the start of the next turn's text, so the token is what tells them
+apart; before version 8 they sat at the previous turn's end, labelled as that turn, with nothing
+naming the token, and a transcript search returned only the first of them.
 
 Both refuse to start if any base arm has reads on fewer than 5 runs and under 50% of its runs (e.g.
 1 of 8; 9 of 40 is fine). Read more runs. **Agents never pass `--allow-few-reads` without asking a
@@ -120,10 +148,11 @@ is an ordinary rate case.)
 2026-10-26): per case, (p̂ − k_Y/n_Y)² averaged over draws; over cases with equal weight; reported in
 percentage points next to the RMSE of "the edit does nothing" (predict the shown base rate), with a
 skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints it, and
-`cfbench.report.charts` makes the report figures from it.
+`graphs.cfbench_report` makes the report figures from it; `graphs.hint_mcq_answer` makes the
+answer-task charts (docs/envs/hint_cf.md).
 
 Runs before 2026-10-26 were scored with a binomial log-likelihood skill
-(`cfbench.report.data.log_skill`), defined with the harness v1 results in
+(`cfbench.scoring.log_skill`), defined with the harness v1 results in
 [docs/cfbench-v1-results.md](../docs/cfbench-v1-results.md).
 
 ## Running

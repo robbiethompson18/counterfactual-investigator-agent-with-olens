@@ -1,0 +1,10 @@
+    def test_size():
+>       assert size(3072) == "3.0 KiB"
+E       AssertionError: assert '3.1 KiB' == '3.0 KiB'
+E         
+E         - 3.0 KiB
+E         ?   ^
+E         + 3.1 KiB
+E         ?   ^
+
+1 failed

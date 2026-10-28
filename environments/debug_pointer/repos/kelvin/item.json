@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "alarm.py",
+ "d2": "probe.py",
+ "note": "read_kelvin() feeds is_freezing(celsius); fix in alarm, probe or freeze"
+}
