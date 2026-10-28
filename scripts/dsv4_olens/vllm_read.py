@@ -42,10 +42,14 @@ def build_engine(model, tp=2, eager=False, max_model_len=512, max_num_batched_to
     return llm
 
 
-def decode_states(llm, lora, lens, rows, states, layers, out_path, samples=2, max_new=24, chunk=2048, order=None):
+def decode_states(
+    llm, lora, lens, rows, states, layers, out_path, samples=2, max_new=24, chunk=2048, order=None, bullets=0, max_blank_run=5
+):
     """The lens stage: for each layer L, inject alpha * h / |h| (h = states(L)[i], [16384]) at the carrier's slot and generate
     greedy + `samples` samples per row, appending rows[i] | {layer, greedy, s1, ...} to out_path. `order`: key functions that
-    sort the rows' processing order (seeds stay by row index)."""
+    sort the rows' processing order (seeds stay by row index). `bullets` > 0 instead writes {layer, greedy, bullets, blanks}:
+    that many non-blank reads per row (greedy first when non-blank, then samples), resampling blanks and giving up on a row
+    after `max_blank_run` blanks in a row."""
     from vllm import SamplingParams
     from vllm_lens import EMBED_LAYER_INDEX, SteeringVector
 
@@ -66,40 +70,75 @@ def decode_states(llm, lora, lens, rows, states, layers, out_path, samples=2, ma
             idx = sorted(range(len(rows)), key=lambda i: tuple(g(rows[i]) for g in order))
             for c0 in range(0, len(idx), chunk):  # one generate() per chunk: all steering vectors at once overflow vLLM's IPC
                 part = idx[c0 : c0 + chunk]
-                reqs, sps = [], []
+                svs = {}
                 for i in part:
                     v = (alpha * S[i] / S[i].norm()).view(1, 1, -1)
-                    sv = SteeringVector(
+                    svs[i] = SteeringVector(
                         activations=v, layer_indices=[EMBED_LAYER_INDEX], position_indices=[slot], mode="replace", scale=1.0
                     )
-                    for k, kw in (
-                        ("greedy", {"temperature": 0.0, "n": 1}),
-                        ("sampled", {"temperature": 1.0, "top_p": 0.95, "top_k": 64, "n": samples}),
-                    ):
-                        reqs.append({"prompt_token_ids": ids})
-                        sps.append(
-                            SamplingParams(
-                                max_tokens=max_new,
-                                stop_token_ids=[1],
-                                seed=i,
-                                skip_special_tokens=True,
-                                extra_args={"apply_steering_vectors": [sv]},
-                                **kw,
-                            )
+
+                # gen: [(row, seed, sampling kwargs)] -> texts per job; checks the layer-1 injection hit every sequence
+                def gen(jobs, svs=svs, ids=ids):
+                    sps = [
+                        SamplingParams(
+                            max_tokens=max_new,
+                            stop_token_ids=[1],
+                            seed=seed,
+                            skip_special_tokens=True,
+                            extra_args={"apply_steering_vectors": [svs[i]]},
+                            **kw,
                         )
-                stats()
-                outs = llm.generate(reqs, sps, lora_request=lora, use_tqdm=False)
-                st = stats()
-                hc = [s.get("hc_rows", 0) for s in st]
-                want = len(part) * (1 + samples)  # n>1 requests prefill once per sample
-                assert all(h == want for h in hc), f"layer-1 injection rows {hc} != {want}: {st}"
-                for j, i in enumerate(part):
-                    g, smp = outs[2 * j].outputs[0].text, [c.text for c in outs[2 * j + 1].outputs]
-                    f.write(json.dumps(rows[i] | {"layer": L, "greedy": g} | {f"s{k + 1}": x for k, x in enumerate(smp)}) + "\n")
+                        for i, seed, kw in jobs
+                    ]
+                    stats()
+                    outs = llm.generate([{"prompt_token_ids": ids}] * len(jobs), sps, lora_request=lora, use_tqdm=False)
+                    st = stats()
+                    hc = [s.get("hc_rows", 0) for s in st]
+                    want = sum(sp.n for sp in sps)  # n>1 requests prefill once per sample
+                    assert all(h == want for h in hc), f"layer-1 injection rows {hc} != {want}: {st}"
+                    return [[c.text for c in o.outputs] for o in outs]
+
+                greedy = {"temperature": 0.0, "n": 1}
+                sampled = lambda n: {"temperature": 1.0, "top_p": 0.95, "top_k": 64, "n": n}
+                if not bullets:
+                    outs = gen([job for i in part for job in ((i, i, greedy), (i, i, sampled(samples)))])
+                    for j, i in enumerate(part):
+                        g, smp = outs[2 * j][0], outs[2 * j + 1]
+                        f.write(json.dumps(rows[i] | {"layer": L, "greedy": g} | {f"s{k + 1}": x for k, x in enumerate(smp)}) + "\n")
+                else:
+                    # greedy is the first bullet when non-blank; blank reads are dropped and resampled until a row has `bullets`,
+                    # giving up after `max_blank_run` blanks in a row
+                    outs = gen([job for i in part for job in ((i, i, greedy), (i, i, sampled(bullets)))])
+                    got, run, blanks, g = {}, {}, {}, {}
+                    for j, i in enumerate(part):
+                        g[i], got[i], run[i], blanks[i] = outs[2 * j][0], [], 0, 0
+
+                    def take(i, texts, got=got, run=run, blanks=blanks):
+                        for x in texts:
+                            if len(got[i]) >= bullets or run[i] >= max_blank_run:
+                                return
+                            if x.strip():
+                                got[i].append(x)
+                                run[i] = 0
+                            else:
+                                run[i] += 1
+                                blanks[i] += 1
+
+                    for j, i in enumerate(part):
+                        take(i, [g[i]] + outs[2 * j + 1])
+                    rnd = 1
+                    while todo := [i for i in part if len(got[i]) < bullets and run[i] < max_blank_run]:
+                        jobs = [(i, i + 1_000_003 * rnd, sampled(bullets - len(got[i]) + 1)) for i in todo]
+                        for i, texts in zip(todo, gen(jobs), strict=True):
+                            take(i, texts)
+                        rnd += 1
+                    for i in part:
+                        f.write(json.dumps(rows[i] | {"layer": L, "greedy": g[i], "bullets": got[i], "blanks": blanks[i]}) + "\n")
                 f.flush()
                 print(f"L{L}: {c0 + len(part)}/{len(rows)} {time.time() - t:.0f}s", flush=True)
             el = time.time() - t
-            print(f"L{L}: {len(rows)} reads in {el:.0f}s = {len(rows) / el:.1f} reads/s (greedy + {samples} samples each)", flush=True)
+            what = f"{bullets} non-blank bullets" if bullets else f"greedy + {samples} samples"
+            print(f"L{L}: {len(rows)} reads in {el:.0f}s = {len(rows) / el:.1f} reads/s ({what} each)", flush=True)
 
 
 def check_against(out_path, ref_path, label="HF"):
@@ -127,6 +166,8 @@ def main():
     ap.add_argument("--tp", type=int, default=2)
     ap.add_argument("--eager", action="store_true")
     ap.add_argument("--chunk", type=int, default=2048, help="reads per generate() call")
+    ap.add_argument("--bullets", type=int, default=0, help="N non-blank reads per row instead of greedy + --samples")
+    ap.add_argument("--max-blank-run", type=int, default=5, help="--bullets: give up on a row after this many blanks in a row")
     ap.add_argument("--public-first", action="store_true", help="read public-arm rows of v4+ first, then the rest")
     ap.add_argument("--check-against", default=None, help="HF reads.jsonl: print greedy agreement on the same positions")
     a = ap.parse_args()
@@ -140,7 +181,7 @@ def main():
     llm = build_engine(a.model, a.tp, a.eager)
     lora = LoRARequest("v4lens", 1, a.lora or str(Path(a.lens) / "lora_vllm"))
     states = lambda L: saved["states"][: len(rows), saved["layers"].index(L)].float().reshape(len(rows), -1)  # [N, 16384]
-    decode_states(llm, lora, a.lens, rows, states, layers, a.out, a.samples, a.max_new, a.chunk, order)
+    decode_states(llm, lora, a.lens, rows, states, layers, a.out, a.samples, a.max_new, a.chunk, order, a.bullets, a.max_blank_run)
     if a.check_against:
         check_against(a.out, a.check_against)
 

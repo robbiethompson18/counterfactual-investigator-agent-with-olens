@@ -155,3 +155,32 @@ the 18% relative difference, not a position or fold error). Logits (20 requests,
 is a 7-token sum near −7), `accept − reject` corr 0.9986, sign agreement 1.0, top-1 first reply
 token 100%. The full file's `logits.jsonl` was written with the earlier "reject" = log
 P(`<rejected/>`) semantics (fixed in `8e29301`); its `accept` corr over 200 ids is 0.82.
+
+## Agentic env episodes, sharding and 4-bullet reads (Kylie's SkyPilot runs, 2026-10-28)
+
+- `prep_overeager.py` → `capture_env.py` (episodes rendered with V4's own `encoding_dsv4.py`,
+  thinking mode, DSML tool calls; read positions = punctuation + `</think>` + EOS, only the last
+  token of each tool result; each distinct token prefix captured once, `positions.jsonl` maps
+  transcript → [pos, key]) → `vllm_read.py` → `to_reads.py OUT RUN` (merges `cap*/` shard dirs,
+  copies each prefix's read onto every transcript sharing it) → `scripts/runs.py finish RUN`.
+  `capture_env.py --shard i/n` splits by (env, arm, item) groups, length-balanced. `--gpu-frac 0.6`
+  caps each GPU's share of the weights (plain `device_map="auto"` packs GPU 0 to ~138 of 140 GB and
+  OOMs on ~9k-token episodes); on OOM a transcript is re-run in `--chunk-tokens` (1024) chunks over
+  a `DynamicCache`, outside the `except` block (its traceback pins the failed forward's
+  activations); `--full-max-tokens 0` chunks everything.
+- `sky_overeager.yaml`: one shard per GPU pair (HF capture, then a TP-2 vLLM lens replica on the
+  same pair), a preview stage first, and `--env SHARD0=k --env NSHARDS=n` to spread shards over
+  several 2-GPU clusters when RunPod has no 4-8 GPU boxes (2026-10-28 it had none in any region).
+- `read.py --no-logits` skips the accept/reject scoring (a second, batch-2 forward): AF capture 9.4
+  → 4.3 s per transcript on 2x B200. read.py now also captures each distinct token prefix once
+  (`key`; `all_rows.jsonl` lists every read position) and caps per-GPU memory like `capture_env.py`.
+- `vllm_read.py --bullets N`: N non-blank reads per row (greedy first when non-blank, then samples
+  at T 1.0 / top_p 0.95 / top_k 64), blank reads dropped and resampled, a row given up after
+  `--max-blank-run` (5) blanks in a row; rows get `bullets` + `blanks`.
+  `merge_bullets.py OUT BOX...` expands per-key reads onto `all_rows.jsonl` in the old row format
+  (greedy = bullet 1, s1..s3 = bullets 2-4, plus `bullets`, `greedy_raw`, `key`).
+- Throughput (2026-10-28): lens 35-51 reads/s on 2x B200, 12-21 on 2x H200; a fresh box's vLLM
+  engine warmup took up to 27 min, ~5 min once its JIT cache is warm. Runs:
+  `runs/overeagerness/2026-10-28_dsv4flash-olens` (960 episodes, 136,273 reads) and
+  `runs/alignment_faking/2026-10-28_dsv4flash-olens-4bullets` (original + v7, 41,655 positions,
+  98.3% with 4 bullets, 1.2% with none).
