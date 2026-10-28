@@ -16,8 +16,8 @@ says the run shown is one where GLM acted. Runs: the GLM 5.3 runs (effort medium
 context (prompts, tools, setup, files) is byte-identical to the arm's newest run on every item, pooled
 (2026-10-27_glm53-main256* topped earlier runs up to 256 per arm, but dana/calendar/gitbranch's older runs differ in
 date-derived text or setup, so those arms keep main256's 192). A comparison over all items only pools runs that ran the
-arm on all of them, so the item-0-only 4 Johns runs don't weigh on email (junebug). Each case's runs (and the dropped
-ones) are in its cases.jsonl row.
+arm on all of them, so the item-0-only 4 Johns runs don't weigh on email (junebug). An edit arm pools only runs that
+also ran the base arm (same batch). Each case's runs (and the dropped ones) are in its cases.jsonl row.
 
 O-lens reads are Celeste's GLM 5.3 RL lens at block 51, greedy + 4 samples, no FVE, at every template token (plus
 punctuation on email) of the read episodes in data/runs/olens_reads/2026-10-28_glm53_overeager_base_dense: up to 64
@@ -298,6 +298,11 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
                 pool[arm], arm_starts, dropped[arm] = _pool(eps[arm], items, c["items"] is None)
                 for item, s in arm_starts.items():
                     assert starts[arm].setdefault(item, s) == s, f"{arm} item {item}: two comparisons pool different starts"
+            # same batch: an edit arm pools only runs that also ran the base arm (Kylie, 2026-10-28)
+            batch = {r for r, *_ in pool[c["arms"][0]]}
+            for arm in c["arms"][1:]:
+                dropped[arm] = sorted(set(dropped[arm]) | {r for r, *_ in pool[arm] if r not in batch})
+                pool[arm] = [e for e in pool[arm] if e[0] in batch]
             pools.append((version, name, c, items, pool, dropped))
     # the base arms' positive episodes, read; then per base arm the shown ones among those with reads
     positive: dict[str, dict] = {}
