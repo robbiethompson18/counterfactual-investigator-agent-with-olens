@@ -101,4 +101,4 @@ the eval `<env>-pairs`.
   two models' opposite position biases otherwise let the hinted letter give the class away). `knew`:
   P(Qwen answers correctly without the hint), scored as % right at p >= 0.5 (its own score.py; the
   page's claim table shows % right). `letter`: the answer task, name Qwen's no-hint letter (reads
-  hint_qwen_dsv4's inputs). Versions `mmlu_pro` and `truthfulqa`, never pooled.
+  hint_qwen_dsv4's inputs). Versions `mmlu_pro` and `truthfulqa` sources, pooled into one 86/86 set.

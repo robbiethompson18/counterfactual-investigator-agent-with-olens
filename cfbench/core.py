@@ -66,7 +66,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # other-env transcripts per case (seed + the case's base-run sources), where every case used to get the same assignment
 # (seed + draw), so all of a run's placebo cases read one transcript pair (red-team of af_which, 2026-10-28). Only placebo
 # inputs changed: every other condition's prompt and tools are byte-identical to 8, so those rows compare across 8 and 9.
-HARNESS_VERSION = 9
+# 10: hint_qwen_dsv4 (+letter) show one base run per case (N_SHOWN 1) and the letter eval's answer parser and ANSWER_MATCH
+# changed (the "answer is X" / lone-capital / option-text rules); other evals' prompts and tools are unchanged (2026-10-28).
+HARNESS_VERSION = 10
 
 
 @dataclass
