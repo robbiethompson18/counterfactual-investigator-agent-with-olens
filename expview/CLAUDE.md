@@ -273,8 +273,13 @@ anywhere localStorage `expview:search_server` holds its URL. GitHub Pages is htt
 it, so there the button is a plain link (tooltip "tailnet only") to the server's copy, carrying the
 current query (localStorage `expview:search_page` overrides the URL). Results open on a table of
 experiments (items with a hit, in transcripts / judge calls vs in reads, runs); a row filters to
-that experiment (`&experiment=E`), and only then does the per-run-and-group table appear, collapsed.
-The hit list is grouped by experiment.
+that experiment (`&experiment=E`), which then shows its hits by arm × model (env episodes; the
+model is the env run's target, `glm-5.3 · thinking off`) or by item group (expview runs; the dataset
+when items have none), with the primary yes/no label's rate among hit items vs overall; a row
+filters (`&group=G&model=M`). The per-run table stays collapsed. The hit list is grouped by
+experiment. Celeste's GLM-5.3 O-lens imports (`data/expview/imports/celeste/`, local only, see
+Importers) are indexed too, as experiments `celeste/<config>`; the server serves their files
+(`/api/tree/…`, `/files/…` with byte ranges) so their hit links open on its copy of the page.
 
 How it works: `expview.py search RUN` writes a run's `search.jsonl.gz` (id, group, labels, token
 stream, reads `[pos, tool, label, text]`, call texts; every distinct string once, later uses are its

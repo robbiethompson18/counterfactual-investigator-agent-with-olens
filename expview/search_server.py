@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import ctypes
 import gzip
 import io
 import json
@@ -41,9 +42,21 @@ PER_PAGE = 50
 SEP = "\x00"
 
 
-def discover(data: Path) -> dict[str, Path]:
-    """dataset id -> run dir: env runs as envs/<env>/<run>, expview runs as runs/<experiment>/<run>[/<name>] (the page's ids)."""
+IMPORTS = "imports/celeste"  # Celeste's GLM-5.3 O-lens readouts (importers/celeste.py): local only, so the server serves their files
+
+
+def exp_of(d: str) -> str:
+    """The experiment a dataset id belongs to: runs/<exp>/…, envs/<exp>/…; Celeste's imports are celeste/<config>."""
+    ps = d.split("/")
+    return f"celeste/{ps[-1]}" if d.startswith(IMPORTS + "/") else ps[1]
+
+
+def discover(data: Path, imports: Path | None) -> dict[str, Path]:
+    """dataset id -> run dir: env runs as envs/<env>/<run>, expview runs as runs/<experiment>/<run>[/<name>] (the page's ids),
+    and Celeste's imports as imports/celeste/<source>/<config>."""
     out = {}
+    for items in sorted(imports.rglob("items.jsonl")) if imports and imports.is_dir() else []:
+        out[f"{IMPORTS}/{items.parent.relative_to(imports)}"] = items.parent
     for ix in sorted((data / "envs").glob("*/*/episodes/index.json")):
         run = ix.parent.parent
         out[f"envs/{run.parent.name}/{run.name}"] = run
@@ -71,14 +84,14 @@ def build_one(args):
 
 
 class Corpus:
-    def __init__(self, data: Path, cache: Path, workers: int):
-        self.data, self.cache, self.workers = data, cache, workers
+    def __init__(self, data: Path, imports: Path | None, cache: Path, workers: int):
+        self.data, self.imports, self.cache, self.workers = data, imports, cache, workers
         self.files: dict[str, dict] = {}
         self.lock = threading.Lock()
         self.errors: dict[str, str] = {}
 
     def refresh(self):
-        runs = discover(self.data)
+        runs = discover(self.data, self.imports)
         stale = []
         for d, run in runs.items():
             out = self.cache / (d + ".jsonl.gz")
@@ -102,9 +115,21 @@ class Corpus:
             if not out.exists():
                 continue
             files[d] = self.files[d] if d in self.files and d not in changed else load(d, out)
+            files[d]["model"] = model_label(runs[d])
         with self.lock:
             self.files = files
+        ctypes.CDLL("libc.so.6").malloc_trim(0)  # loading churns through every string once; hand the freed heap back
         print(f"{len(files)} runs, {sum(len(f['items']) for f in files.values())} items loaded", flush=True)
+
+
+def model_label(run: Path) -> str | None:
+    """An env run's target as the env viewer names it: glm-5.3 · thinking off (expview runs: None, their groups say it)."""
+    if not (run / "meta.json").exists() or not (run / "episodes").is_dir():
+        return None
+    t = json.loads((run / "meta.json").read_text()).get("target") or {}
+    t = t if isinstance(t, dict) else {"id": t}
+    name = str(t.get("model") or t.get("id") or "?").split("@")[0].split("/")[-1].lower()
+    return name + {False: " · thinking off", True: " · thinking on"}.get(t.get("thinking"), "")
 
 
 def load(d: str, path: Path) -> dict:
@@ -164,7 +189,7 @@ def load(d: str, path: Path) -> dict:
     fh = open(spath, "rb")  # noqa: SIM115  (held open for the mmap)
     return {
         "d": d,
-        "exp": d.split("/")[1],
+        "exp": exp_of(d),
         "hdr": hdr,
         "strings": str(spath),
         "mm": mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ) if n else b"",
@@ -207,14 +232,6 @@ def string_hits(files: list[dict], query: str, case: bool) -> dict[str, set[int]
     raise re.error(p.stderr.decode().strip()[-300:])
 
 
-def section_of(secs, n):
-    out = [""] * n
-    for name, a, b in secs or []:
-        for p in range(max(0, a), min(n, b)):
-            out[p] = name
-    return out
-
-
 def label_str(v):
     return ("true" if v else "false") if isinstance(v, bool) else str(v)
 
@@ -228,15 +245,16 @@ def search(corpus: Corpus, q: dict) -> dict:
     rx = re.compile(query, 0 if g("case") == "1" else re.IGNORECASE)  # for snippets and the echo filters
     scope, novel, tool, sec, Fg, Fl = g("scope") or "all", g("novel"), g("reader"), g("section"), g("group"), g("label")
     lk, lv = Fl.split("=", 1) if "=" in Fl else ("", "")
-    exp, ds = g("experiment"), {x for x in g("dataset").split(",") if x}
+    exp, ds, model = g("experiment"), {x for x in g("dataset").split(",") if x}, g("model")
     with corpus.lock:
         files = [F for F in corpus.files.values() if (not exp or F["exp"] == exp) and (not ds or F["d"] in ds)]
+    files = [F for F in files if not model or F["model"] == model]
     t0 = time.time()
     HS = string_hits(files, query, g("case") == "1")
     ok = lambda x: (not Fg or x.get("g") == Fg) and (not lk or (x.get("l") or {}).get(lk) is not None and label_str(x["l"][lk]) == lv)
     hits, n_reads, n_text, n_pos, hit_items, read_items, text_items = [], 0, 0, 0, set(), set(), set()
     tools, secs, groups, labs = {}, set(), {}, {}
-    slices = {}
+    slices, subs = {}, {}
     for F in files:
         fc = F["facets"]
         for k, n in fc["reader"].items():
@@ -252,18 +270,19 @@ def search(corpus: Corpus, q: dict) -> dict:
             if not ok(x):
                 continue
             key = (F["d"], x["i"])
-            base = {"d": F["d"], "i": x["i"], "g": x.get("g"), "l": x.get("l") or {}}
+            base = {"d": F["d"], "exp": F["exp"], "i": x["i"], "g": x.get("g"), "l": x.get("l") or {}}
             mine = []
             if scope != "text" and "rx" in x and H and not H.isdisjoint(x["rx"]):
-                toks = [at(F, j) for j in x.get("t") or []]
-                so = section_of(x.get("s"), len(toks)) if x.get("s") else []
+                t, secs_ = x.get("t") or array("i"), x.get("s") or []
+                span = lambda a, b: "".join(at(F, j) for j in t[max(0, a) : b])  # noqa: B023
+                sec_at = lambda p: next((name for name, a, b in secs_ if a <= p < b), "")  # noqa: B023
                 by: dict[int, dict] = {}
                 echo: set[int] = set()
                 for pos, ti, label, tj in zip(x["rp"], x["rt"], x["rl"], x["rx"]):
-                    if tj not in H or pos in echo or (tool and at(F, ti) != tool) or (sec and (so[pos] if pos < len(so) else "") != sec):
+                    if tj not in H or pos in echo or (tool and at(F, ti) != tool) or (sec and sec_at(pos) != sec):
                         continue
                     if pos not in by:
-                        ctx, nxt = "".join(toks[max(0, pos - 40) : pos + 1]), "".join(toks[pos + 1 : pos + 17])
+                        ctx, nxt = span(pos - 40, pos + 1), span(pos + 1, pos + 17)
                         if novel and rx.search(ctx + nxt):
                             echo.add(pos)
                             continue
@@ -271,12 +290,12 @@ def search(corpus: Corpus, q: dict) -> dict:
                             **base,
                             "kind": "pos",
                             "pos": pos,
-                            "sec": so[pos] if pos < len(so) else "",
+                            "sec": sec_at(pos),
                             "ctx": ctx[-300:],
                             "nxt": nxt,
                             "reads": [],
                         }
-                        by[pos]["token"] = toks[pos] if pos < len(toks) else ""
+                        by[pos]["token"] = at(F, t[pos]) if pos < len(t) else ""
                     by[pos]["reads"].append([at(F, ti), label, at(F, tj)])
                 mine = list(by.values())
                 if novel == "transcript" and mine and rx.search(item_text(F, x)):
@@ -310,6 +329,21 @@ def search(corpus: Corpus, q: dict) -> dict:
             hit = bool(mine or text)
             if hit:
                 hit_items.add(key)
+            # subgroups of an experiment: the item's group (an env episode's arm) x the env run's model; no group -> the dataset
+            gk = (x.get("g") if x.get("g") is not None else None, F["model"], F["d"] if x.get("g") is None else None)
+            sg = subs.setdefault(gk, {"group": gk[0], "model": gk[1], "d": gk[2], "items": 0, "hit_items": 0, "text": 0, "reads": 0})
+            sg.setdefault("rates", {})
+            sg["items"] += 1
+            sg["hit_items"] += hit
+            sg["text"] += bool(text)
+            sg["reads"] += bool(mine)
+            for k, v in (x.get("l") or {}).items():
+                if isinstance(v, bool):
+                    r = sg["rates"].setdefault(k, [0, 0, 0, 0])
+                    r[0] += 1
+                    r[1] += v
+                    r[2] += hit
+                    r[3] += hit and v
             sk = (F["d"], x.get("g"))
             s_ = slices.setdefault(sk, {"d": F["d"], "grp": x.get("g"), "items": 0, "hit_items": 0, "rates": {}})
             s_["items"] += 1
@@ -324,13 +358,13 @@ def search(corpus: Corpus, q: dict) -> dict:
     table = sorted((x for x in slices.values() if x["hit_items"]), key=lambda x: (-x["hit_items"], x["d"]))[:300]
     exps: dict[str, dict] = {}
     for d, i in hit_items:
-        e = exps.setdefault(d.split("/")[1], {"exp": d.split("/")[1], "items": 0, "text": 0, "reads": 0, "runs": set()})
+        e = exps.setdefault(exp_of(d), {"exp": exp_of(d), "items": 0, "text": 0, "reads": 0, "runs": set()})
         e["items"] += 1
         e["text"] += (d, i) in text_items
         e["reads"] += (d, i) in read_items
         e["runs"].add(d)
     by_exp = sorted(({**e, "runs": len(e["runs"])} for e in exps.values()), key=lambda e: -e["items"])
-    hits.sort(key=lambda h: -exps[h["d"].split("/")[1]]["items"])  # stable: grouped by experiment, most hits first
+    hits.sort(key=lambda h: -exps[exp_of(h["d"])]["items"])  # stable: grouped by experiment, most hits first
     meta = {F["d"]: {"kind": F["hdr"]["kind"], "target": F["hdr"].get("target")} for F in files if F["d"] in {d for d, _ in hit_items}}
     return {
         "took": round(time.time() - t0, 2),
@@ -339,13 +373,18 @@ def search(corpus: Corpus, q: dict) -> dict:
         "reads": sum(tools.values()),
         "hit_items": len(hit_items),
         "hit_runs": len({d for d, _ in hit_items}),
-        "hit_experiments": len({d.split("/")[1] for d, _ in hit_items}),
+        "hit_experiments": len({exp_of(d) for d, _ in hit_items}),
         "text_items": n_text,
         "read_hits": n_reads,
         "read_positions": n_pos,
         "read_items": len(read_items),
         "table": table,
         "by_experiment": by_exp,
+        "by_group": sorted((x for x in subs.values() if x["hit_items"]), key=lambda x: (-x["hit_items"], str(x["group"]), str(x["model"])))[
+            :500
+        ]
+        if exp
+        else [],
         "facets": {
             "reader": sorted(tools.items(), key=lambda x: -x[1]),
             "section": sorted(secs),
@@ -360,6 +399,19 @@ def search(corpus: Corpus, q: dict) -> dict:
 
 def item_text(F, x):
     return "\n\n".join(at(F, j) for j in [*(j for _, parts in x.get("c") or [] for j in parts), *([x["tt"]] if "tt" in x else [])])
+
+
+CACHE: dict[tuple, dict] = {}
+
+
+def cached_search(corpus: Corpus, q: dict) -> dict:
+    """The last few searches, so paging and the CSV don't rerun one (an all-experiment query over dense reads takes ~10 s)."""
+    key = (id(corpus.files), *sorted((k, tuple(v)) for k, v in q.items() if k != "page"))
+    if key not in CACHE:
+        if len(CACHE) >= 8:
+            CACHE.pop(next(iter(CACHE)))
+        CACHE[key] = search(corpus, q)
+    return CACHE[key]
 
 
 def runs_list(corpus: Corpus):
@@ -391,10 +443,12 @@ def serve(corpus: Corpus, site: Path, host: str, port: int):
                     with corpus.lock:
                         n = len(corpus.files)
                     return self.send(200, json.dumps({"ok": True, "runs": n}).encode())
+                if u.path.startswith(f"/api/tree/{IMPORTS}/") or u.path.startswith(f"/files/{IMPORTS}/"):
+                    return self.imports_file(u.path)
                 if u.path == "/api/runs":
                     return self.send(200, json.dumps(runs_list(corpus)).encode())
                 if u.path in ("/api/search", "/api/csv"):
-                    r = search(corpus, q)
+                    r = cached_search(corpus, q)
                     if u.path == "/api/csv":
                         buf = io.StringIO()
                         w = csv.writer(buf)
@@ -419,14 +473,50 @@ def serve(corpus: Corpus, site: Path, host: str, port: int):
                                 )
                         return self.send(200, buf.getvalue().encode(), "text/csv")
                     page = int((q.get("page") or ["0"])[0] or 0)
-                    r["total_hits"] = len(r["hits"])
-                    r["hits"] = r["hits"][page * PER_PAGE : (page + 1) * PER_PAGE]
+                    r = {**r, "total_hits": len(r["hits"]), "hits": r["hits"][page * PER_PAGE : (page + 1) * PER_PAGE]}
                     return self.send(200, json.dumps(r, default=str).encode())
             except re.error as e:
                 return self.send(400, json.dumps({"error": f"Not a valid regex: {e}"}).encode())
             if u.path.startswith("/api/"):
                 return self.send(404, b"{}")
             return super().do_GET()
+
+        def imports_file(self, path):
+            """Celeste's imports for the page, as HF would serve them: /api/tree/<dir> lists a directory, /files/<path> serves
+            a file with byte ranges. Only under the imports root."""
+            tree = path.startswith("/api/tree/")
+            rel = path.removeprefix("/api/tree/" if tree else "/files/").removeprefix(IMPORTS + "/")
+            root = corpus.imports.resolve()
+            f = (root / rel).resolve()
+            if not f.is_relative_to(root) or not f.exists():
+                return self.send(404, b"{}")
+            if tree:
+                out = [
+                    {"type": "directory" if x.is_dir() else "file", "path": f"{IMPORTS}/{x.relative_to(root)}", "size": x.stat().st_size}
+                    for x in f.iterdir()
+                ]
+                return self.send(200, json.dumps(out).encode())
+            size = f.stat().st_size
+            m = re.match(r"bytes=(\d+)-(\d*)", self.headers.get("Range") or "")
+            a, b = (int(m[1]), int(m[2] or size - 1)) if m else (0, size - 1)
+            with open(f, "rb") as fh:
+                fh.seek(a)
+                body = fh.read(b - a + 1)
+            self.send_response(206 if m else 200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Range")
+            if m:
+                self.send_header("Content-Range", f"bytes {a}-{b}/{size}")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Range")
+            self.end_headers()
 
         def do_POST(self):
             if urlparse(self.path).path == "/api/reload":
@@ -446,6 +536,7 @@ def serve(corpus: Corpus, site: Path, host: str, port: int):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data", default=str(Path(__file__).parents[1] / "data"), help="the local mirror of the HF dataset")
+    ap.add_argument("--imports", help="Celeste's imports (importers/celeste.py), default DATA/expview/imports/celeste")
     ap.add_argument("--cache", default=os.path.expanduser("~/.cache/expview-search"))
     ap.add_argument("--site", help="folder with only the two pages; omit to serve the API alone")
     ap.add_argument("--host", default="::")
@@ -454,7 +545,7 @@ def main():
     ap.add_argument("--every", type=int, default=600, help="seconds between re-scans of the mirror")
     ap.add_argument("--build-only", action="store_true")
     a = ap.parse_args()
-    corpus = Corpus(Path(a.data).resolve(), Path(a.cache), a.workers)
+    corpus = Corpus(Path(a.data).resolve(), Path(a.imports or Path(a.data) / "expview/imports/celeste").resolve(), Path(a.cache), a.workers)
     corpus.refresh()
     if a.build_only:
         return

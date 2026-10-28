@@ -254,14 +254,18 @@ async function hfRaw(url,opt){opt={signal:AbortSignal.timeout(60000),...(opt||{}
     await new Promise(ok=>setTimeout(ok,1000*wait));r=await fetch(url,opt)}return r}
 async function hfFetch(url,opt){const r=await hfRaw(url,opt);if(!r.ok)throw new Error(`HF ${r.status}: ${url.replace(HF_API,"").replace(HF_RESOLVE,"")}`);return r}
 // every entry of a directory (the tree API pages at 1000 and exposes its Link header); null when the path doesn't exist
-async function hfTree(path,expand){let url=HF_API+"tree/main/"+encPath(path)+"?expand="+!!expand,out=[];
+// Celeste's imports (imports/celeste/…) aren't on HF: the search server serves them (tree listing + files with byte ranges)
+const isImport=p=>p.startsWith("imports/")&&!!SEARCH_API;
+const resolveUrl=p=>isImport(p)?SEARCH_API+"/files/"+encPath(p):HF_RESOLVE+encPath(p);
+async function hfTree(path,expand){if(isImport(path)){const r=await fetch(SEARCH_API+"/api/tree/"+encPath(path));return r.ok?r.json():null}
+  let url=HF_API+"tree/main/"+encPath(path)+"?expand="+!!expand,out=[];
   while(url){const r=await hfRaw(url);if(r.status==404)return null;if(!r.ok)throw new Error(`HF ${r.status} listing ${path}`);out=out.concat(await r.json());
     const m=/<([^>]+)>;\s*rel="next"/.exec(r.headers.get("Link")||"");url=m?m[1]:null}
   return out}
 const pathsInfo=paths=>hfFetch(HF_API+"paths-info/main",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({paths,expand:false})}).then(r=>r.json());
 // dataset id <-> HF dir: a run's expview data lives at runs/<experiment>/<run>/expview[/<name>] and is dataset runs/<experiment>/<run>[/<name>]
 const dsId=dir=>dir.split("/").filter(x=>x!="expview").join("/");
-function dirsOf(d){const ps=d.split("/");
+function dirsOf(d){const ps=d.split("/");if(isImport(d))return [d];
   if(ps[0]!="runs"||ps.length<3)throw new Error(`${d}: only datasets under runs/<experiment>/<run> are on HF (imports/… runs and bramble's old expview/… runs were never synced)`);
   return [[...ps.slice(0,3),"expview",...ps.slice(3)].join("/"),d+"/expview"]}
 // what's on HF, found without a manifest: experiments (runs/<experiment>), their run dirs (one listing each; the tree API
@@ -314,7 +318,7 @@ function rowsToReads(rows){const out={},sc=(t,x)=>x==null?[t]:[t,x];
 let SRC;
 function hfSource(){
   const DIR={},LIST={},SUMS={},FULL={},DOC={},TOK={},READS={};
-  const url=(d,rel)=>HF_RESOLVE+encPath(DIR[d]+"/"+rel);
+  const url=(d,rel)=>resolveUrl(DIR[d]+"/"+rel);
   async function listing(d){if(LIST[d])return LIST[d];
     for(const dir of DIR[d]?[DIR[d]]:dirsOf(d)){const l=await hfTree(dir,true);if(l){DIR[d]=dir;const files={};for(const x of l)files[x.path.slice(dir.length+1)]=x;return LIST[d]={dir,files}}}
     throw new Error(`no dataset ${d} on HF (looked for ${dirsOf(d).join(" and ")})`)}
@@ -351,7 +355,7 @@ function hfSource(){
     env:(d,e)=>getJson(d,"envs/"+e+".json").then(x=>x.files),
     // tk.src: a batch-reads item (importers/reads.py): byte ranges of its transcripts line and reads rows, paths relative to the run
     async tokens(d,ref,tk){const k=d+"\0"+ref;if(!TOK[k]){if(!DIR[d])await listing(d);
-      if(tk&&tk.src){const part=async([rel,off,n])=>{const r=await hfFetch(HF_RESOLVE+encPath(joinPath(DIR[d],rel)),{headers:{Range:`bytes=${off}-${off+n-1}`}});
+      if(tk&&tk.src){const part=async([rel,off,n])=>{const r=await hfFetch(resolveUrl(joinPath(DIR[d],rel)),{headers:{Range:`bytes=${off}-${off+n-1}`}});
           if(r.status!=206)throw new Error(`HF did not honour the byte range for ${rel}`);return r.text()};
         const [t,rows]=await Promise.all([part(tk.src.transcript).then(JSON.parse),Promise.all(tk.src.reads.map(part)).then(xs=>jsonl(xs.join("")))]);
         TOK[k]={tokens:t.tokens,sections:t.sections,reads:rowsToReads(rows)}}
@@ -1059,7 +1063,7 @@ const searchGo=q=>SEARCH_OK?go({everything:1,query:q}):SEARCH_AWAY?window.open(S
 async function everythingPage(p){
   VIEW="everything";crumbs([["envs","#"],["search everything"]]);
   const sc=p.get("scope"),scope=sc=="reads"||sc=="text"?sc:"all",q=p.get("query")||"",cs=p.get("case");
-  const keys=["query","case","scope","novel","experiment","dataset","reader","section","group","label"];
+  const keys=["query","case","scope","novel","experiment","dataset","model","reader","section","group","label"];
   const qs=o=>new URLSearchParams(Object.entries(o).filter(([,v])=>v!=null&&v!=="")).toString();
   const sel=(id,opts,cur,all)=>`<select id="${id}">${all!=null?`<option value="">${all}</option>`:""}${opts.map(([v,n])=>`<option value="${esc(v)}" ${v==cur?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
   $("#app").innerHTML=`<div class="page"><h1>Search everything</h1>
@@ -1071,11 +1075,11 @@ async function everythingPage(p){
      <label>In ${sel("sscope",[["all","everything"],["reads","metamodel reads"],["text","transcripts and judge calls"]],scope)}</label>
      <label title="Drop a read when the regex also matches what the model just read or is about to write (an echo), or anywhere in the item">Keep reads ${sel("snovel",[["ctx","new vs ±40 tokens + next 16"],["transcript","new vs the whole item"]],p.get("novel")||"","all hits")}</label>
      <span id="sfacets" class="row"></span>
-    </div>${p.get("dataset")?`<div class="row mono">Only runs: ${esc(p.get("dataset"))} <a href="${linkTo({everything:1,query:q})}">(all)</a></div>`:""}</form><div id="sres"></div></div>`;
+    </div>${p.get("dataset")||p.get("model")?`<div class="row mono">Only ${p.get("model")?`model ${esc(p.get("model"))}`:""} ${p.get("dataset")?`runs ${esc(p.get("dataset"))}`:""} <a href="${linkTo({...Object.fromEntries(p),dataset:"",model:"",page:""})}">(clear)</a></div>`:""}</form><div id="sres"></div></div>`;
   const params=()=>({everything:1,query:$("#sq").value.trim(),case:$("#scase").checked?"1":"",scope:$("#sscope").value=="all"?"":$("#sscope").value,novel:$("#snovel").value,experiment:$("#senv").value,
-    dataset:p.get("dataset")||"",reader:$("#stool")?.value||"",section:$("#ssec")?.value||"",group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""});
+    dataset:p.get("dataset")||"",model:p.get("model")||"",reader:$("#stool")?.value||"",section:$("#ssec")?.value||"",group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""});
   $("#sf").onsubmit=e=>{e.preventDefault();go(params())};
-  $("#senv").onchange=()=>{const o=params();Object.assign(o,{dataset:"",reader:"",section:"",group:"",label:""});go(o)};
+  $("#senv").onchange=()=>{const o=params();Object.assign(o,{dataset:"",model:"",reader:"",section:"",group:"",label:""});go(o)};
   $$("#sscope,#snovel,#scase").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
   const res=$("#sres");
   if(!SEARCH_OK){res.innerHTML=`<p class="err">The search server ${esc(SEARCH_API||"")} isn't reachable (it runs on bramble; open this page from it). <a href="${linkTo({search:1,query:q})}">Search the reads of chosen runs instead</a>.</p>`;return}
@@ -1107,13 +1111,21 @@ async function everythingPage(p){
   // experiments first (runs are an implementation detail); runs only inside one experiment, collapsed
   if(!p.get("experiment"))h+=`<div class="wrap"><table id="sbyexp"><tr><th>Experiment</th><th>Items with a hit</th><th>In transcripts / judge calls</th><th>In reads</th><th>Runs</th></tr>${r.by_experiment.map(e=>
     `<tr class="click" data-e="${esc(e.exp)}" title="only this experiment"><td class="mono">${esc(e.exp)}</td><td class="num">${e.items.toLocaleString()}</td><td class="num">${e.text.toLocaleString()}</td><td class="num">${e.reads.toLocaleString()}</td><td class="num">${e.runs}</td></tr>`).join("")}</table></div>`;
+  if(p.get("experiment")&&r.by_group.length){
+    const kc=new Map();for(const x of r.by_group)for(const k of Object.keys(x.rates))kc.set(k,(kc.get(k)||0)+x.items);
+    const prim=kc.has("positive")?"positive":[...kc].sort((a,b)=>b[1]-a[1])[0]?.[0];
+    const anyModel=r.by_group.some(x=>x.model);
+    h+=`<h2>${esc(p.get("experiment"))} by ${anyModel?"arm and model":"group"}</h2><div class="wrap" style="max-height:480px;overflow:auto"><table id="sbygrp"><tr><th>${anyModel?"Arm / group":"Group"}</th>${anyModel?"<th>Model</th>":""}<th>Items with a hit</th><th>In transcripts / judge calls</th><th>In reads</th>${prim?`<th title="rate among items with a hit · overall">${esc(prim)} | hit · all</th>`:""}</tr>${r.by_group.map((x,j)=>{const v=prim&&x.rates[prim];
+      return `<tr class="click" data-j="${j}" title="only these items"><td class="mono">${esc(x.group??x.d)}</td>${anyModel?`<td class="mono">${esc(x.model||"")}</td>`:""}<td class="num">${x.hit_items.toLocaleString()} / ${x.items.toLocaleString()} (${pct(x.hit_items/x.items)})</td><td class="num">${x.text.toLocaleString()}</td><td class="num">${x.reads.toLocaleString()}</td>${prim?`<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`:""}</tr>`}).join("")}</table></div>`}
   else if(r.table.length)h+=`<details><summary class="mono">By run and group (${r.table.length})</summary>`+`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Run</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.table.map(x=>
     `<tr><td class="mono wrapid" style="min-width:300px">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=x.rates[k];return `<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`+`</details>`;
   const pages=Math.ceil(r.total_hits/50);
   const nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
   let lastExp=null;
-  h+=nav+r.hits.map(x=>{const ex=x.d.split("/")[1],sep=ex!=lastExp?`<h2 class="mono">${esc(ex)} <a class="btn" href="${linkTo({...Object.fromEntries(p),experiment:ex,page:""})}">only this</a></h2>`:"";lastExp=ex;return sep+hitCard(x)}).join("")+nav;
+  h+=nav+r.hits.map(x=>{const ex=x.exp,sep=ex!=lastExp&&!p.get("experiment")?`<h2 class="mono">${esc(ex)} <a class="btn" href="${linkTo({...Object.fromEntries(p),experiment:ex,page:""})}">only this</a></h2>`:"";lastExp=ex;return sep+hitCard(x)}).join("")+nav;
   res.innerHTML=h;
+  const bg=$("#sbygrp");if(bg)bg.onclick=ev=>{const tr=ev.target.closest("tr[data-j]");if(!tr)return;const x=r.by_group[+tr.dataset.j];
+    go({...Object.fromEntries(p),page:"",group:x.group??"",model:x.model||"",dataset:x.d||""})};
   const bt=$("#sbyexp");if(bt)bt.onclick=ev=>{const tr=ev.target.closest("tr[data-e]");if(tr)go({...Object.fromEntries(p),experiment:tr.dataset.e,page:"",dataset:"",group:"",label:""})};
   function hitCard(x){const head=`${runChip(x.d)}${x.g!=null?`<span class="chip">${esc(x.g)}</span>`:""}`;
     if(x.kind=="text")return `<div class="card"><div class="chips"><a class="chip" href="${itemHref(x,{view:x.where=="transcript"?"tr":"call"})}">${esc(x.i)}</a>${head}<span class="chip">${esc(x.where)}</span>${labChips(x.l)}</div><div class="ctx">…${hl(x.snippet,rx)}…</div></div>`;
