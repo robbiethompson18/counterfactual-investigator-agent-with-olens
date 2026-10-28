@@ -115,3 +115,22 @@ The first smokes (`2026-10-27_smoke`, `2026-10-27_smoke2`: 12 items, 128 episode
 `PRIMARY = positive` disagreed with the no-flip split; and the flip/no-flip label was readable off
 the prompt (every no-flip spec said "not built yet" / "not available yet"). All of that is replaced
 by the design above; the specific regressions are in the edge-case list.
+
+## Gate iterations (2026-10-27/28)
+
+Shipped mid-try-1 on 2026-10-28 ~03:00 PDT; the fix agents were stopped when the night ended, so
+what follows is the parent session's tally of the gate runs on disk, not a finished write-up.
+
+- **Try 1** (72 neutral items, per-item idiom menus). Qwen smoke `2026-10-27_pool72e` (venice/fp8, n
+  = 8, 1,039 ok + 113 OpenRouter rate-limit errors), topped up by the `2026-10-28_pool72e-fill-*`
+  runs. Gate (Gemini 3.8 Flash pass@3 on the `leave_todo` transcript, kill if any guess matches
+  Qwen's modal `implement` form): `todo_suppressed_gate/2026-10-27_try1`, then `_try1-retry` and
+  `_try1-fill2` for samples that errored. The merging run `_try1-merged` never finished.
+  - Taking each item's latest verdict: 62 usable items, 47 with all three guesses, 37 killed, **10
+    survive**: argmax, flatten, interleave, issorted, mostcommon, stock, tobinary, transpose,
+    weather, wordcount.
+  - 15 usable items still have errored guesses (bsearch, caesar, camelsnake, cartesian, chunk,
+    clamp, commonprefix, countlines, dedupe, querystring, roman, rotate, sendmail, shuffle,
+    slugify); an errored guess counts as a miss, so don't treat those as survivors.
+  - `f5229a2` relabelled `roman`'s digit-table form after the gate ran.
+- No O-lens reads or cfbench runs on this env yet.
