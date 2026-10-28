@@ -103,7 +103,7 @@ def main():
     for j in done:
         kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
         rows = shard_rows(j, P)
-        if a.keep:
+        if keep is not None:
             rows = rows.merge(keep, on=["tid", "pos"])
         t = to_table(rows, kind, not a.subset)
         read_pos.append(t.select(["tid", "pos"]).to_pandas())

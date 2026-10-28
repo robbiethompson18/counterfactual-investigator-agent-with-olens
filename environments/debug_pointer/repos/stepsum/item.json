@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "ramp.py",
+ "d2": "steps.py",
+ "note": "gaps() is n - 1 as named; ramp.climb() loops over gaps where it needs steps"
+}

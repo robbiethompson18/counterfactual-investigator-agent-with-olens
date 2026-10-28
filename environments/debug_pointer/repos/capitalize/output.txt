@@ -1,0 +1,10 @@
+    def test_display():
+>       assert display("  McDonald ") == "McDonald"
+E       AssertionError: assert 'Mcdonald' == 'McDonald'
+E         
+E         - McDonald
+E         ?   ^
+E         + Mcdonald
+E         ?   ^
+
+1 failed

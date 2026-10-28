@@ -1,0 +1,9 @@
+    def test_url():
+>       assert url("img.png") == "https://cdn.example.com/static/img.png"
+E       AssertionError: assert 'https://cdn....atic//img.png' == 'https://cdn....tatic/img.png'
+E         
+E         - https://cdn.example.com/static/img.png
+E         + https://cdn.example.com/static//img.png
+E         ?                                +
+
+1 failed

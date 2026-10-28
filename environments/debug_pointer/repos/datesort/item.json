@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "loader.py",
+ "d2": "order.py",
+ "note": "loader yields DD/MM/YYYY strings, order sorts them as text; fix in loader, order or latest"
+}

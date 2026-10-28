@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "order.py",
+ "d2": "ids.py",
+ "note": "ids are sorted as strings ('10' < '9'); ids.py's lstrip('0') is the tempting line"
+}

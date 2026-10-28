@@ -1,0 +1,6 @@
+    def test_can_enter():
+>       assert can_enter("min", "admin,editor") is False
+E       AssertionError: assert True is False
+E        +  where True = can_enter('min', 'admin,editor')
+
+1 failed

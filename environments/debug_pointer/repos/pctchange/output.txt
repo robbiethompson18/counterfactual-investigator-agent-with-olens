@@ -1,0 +1,8 @@
+    def test_trend():
+>       assert trend(200, 250) == "+25%"
+E       AssertionError: assert '+0%' == '+25%'
+E         
+E         - +25%
+E         + +0%
+
+1 failed

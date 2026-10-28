@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "limits.py",
+ "d2": "encode.py",
+ "note": "limits.py measures characters but the limit is bytes; encode.py's .encode() is the tempting line"
+}

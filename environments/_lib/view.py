@@ -60,7 +60,11 @@ def _watch(every: float = 2.0):
             page = (REPO_ROOT / "environments/_lib/page.html").stat().st_mtime
             shutil.copy(REPO_ROOT / "environments/_lib/page.html", SITE / "index.html")
             print("page.html updated", flush=True)
-        changed = [e for e in env_names() if last.get(e) != (h := source_hash(source_files(e))) and not last.update({e: h})]
+        changed = []
+        for e in env_names():
+            if last.get(e) != (h := source_hash(source_files(e))):
+                last[e] = h
+                changed.append(e)
         if changed:
             print("rebuilding", ", ".join(changed), flush=True)
             build(changed)

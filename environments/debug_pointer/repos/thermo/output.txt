@@ -1,0 +1,8 @@
+    def test_reading_f():
+>       assert reading_f(215) == "70.7 F"
+E       AssertionError: assert '419.0 F' == '70.7 F'
+E         
+E         - 70.7 F
+E         + 419.0 F
+
+1 failed

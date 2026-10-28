@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "dash.py",
+ "d2": "ratio.py",
+ "note": "hit_ratio() returns a fraction, pct_label() expects a percent; fix in dash, ratio or label"
+}

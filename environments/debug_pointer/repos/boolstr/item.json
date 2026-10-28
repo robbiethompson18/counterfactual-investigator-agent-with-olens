@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "flags.py",
+ "d2": "envvars.py",
+ "note": "envvars returns the raw string and flags calls bool() on it; fix in flags, envvars or settings"
+}

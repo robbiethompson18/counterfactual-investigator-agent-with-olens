@@ -1,0 +1,8 @@
+    def test_outcome():
+>       assert outcome(18, 20) == "pass"
+E       AssertionError: assert 'fail' == 'pass'
+E         
+E         - pass
+E         + fail
+
+1 failed

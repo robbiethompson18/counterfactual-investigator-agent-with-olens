@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "delta.py",
+ "d2": "closest.py",
+ "note": "delta() has no abs(); closest.py's delta(x, target) looks reversed but isn't the bug"
+}

@@ -24,6 +24,9 @@ and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "as
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
 
+Decoding: temperature 1.0, top-p 0.95, top-k 64 (WorkspaceBench's sampling of record; `--temperature 0` is greedy, what every
+read before 2026-10-27 used), one continuation of up to 4 bullets per (position, layer). At temperature > 0 every transcript
+is its own draw, so an arm's 8 samples of one prompt give 8 lens draws of each prompt position; at 0 they share one read.
 Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/build.py) and every <|im_end|>,
 prompt included. OUT.jsonl gets one line per (transcript, position, layer), appended per transcript; transcripts
 already in OUT are skipped, so a rerun resumes:
@@ -57,7 +60,14 @@ from counterfactual_investigator_agent_with_olens.render import render_request, 
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
-SAMPLING = Sampling(max_new_tokens=160, max_bullets=4)  # greedy, 4 bullets: the viewer's read
+
+
+# WorkspaceBench's sampling of record for prose lenses (T 1.0, top-p 0.95, top-k 64; the RL that made the lens sampled at T 1.0 too),
+# 4 bullets. Greedy (T 0) was the WeirdChat viewer's default and every read before 2026-10-27 used it; --temperature 0 restores it.
+def sampling(args) -> Sampling:
+    return Sampling(temperature=args.temperature, top_p=0.95, top_k=64, max_new_tokens=160, max_bullets=4)
+
+
 PREFIX = 32
 AR_BATCH = 4096  # spans per AR generate; vLLM schedules the waves
 
@@ -145,6 +155,8 @@ def main():
     ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
     ap.add_argument("--watch", action="store_true", help="when the queue is empty, re-read REQUESTS every minute")
+    ap.add_argument("--temperature", type=float, default=1.0, help="lens decode temperature (0 = greedy; WSB's record is 1.0)")
+    ap.add_argument("--seed", type=int, default=0, help="vLLM sampling seed at temperature > 0")
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
     out = Path(args.out)
@@ -162,7 +174,8 @@ def main():
     else:
         lens = OneEngine(tok, args.base, args.lens_lora, args.ar_lora, **engine)
         whiteners = {L: Whitener(L, device="cuda", dtype=torch.float32) for L in layers}
-    provenance.write(out, lens, layers, SAMPLING if args.readout == "olens" else NLA_SAMPLING, __file__, requests=Path(args.requests).name,
+    smp = sampling(args) if args.readout == "olens" else NLA_SAMPLING
+    provenance.write(out, lens, layers, smp, __file__, requests=Path(args.requests).name, seed=args.seed,
                      shard=args.shard, readout=args.readout, acts=acts_path(out).name if args.save_acts else None)  # fmt: skip
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     im_start = tok.convert_tokens_to_ids("<|im_start|>")
@@ -190,6 +203,9 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
     """The loop: many transcripts per step, every engine call one big batch (module docstring)."""
     t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "decode", "score"), 0.0)
     cache = {}  # (prefix key, layer) -> the read's output fields (bullets + joint_fve, or text; act_index when saving activations)
+    # at temperature 0 equal prefixes give equal reads, so transcripts sharing a prefix share the decode (an arm's 8 samples of one
+    # prompt are one read); at temperature > 0 the transcript id joins the key and each transcript gets its own draw
+    own = (lambda row: row["id"]) if args.temperature > 0 else (lambda row: None)
     acts = acts_path(out).open("ab") if args.save_acts else None
     n_acts = acts_path(out).stat().st_size // (lens.E.shape[1] * 2) if args.save_acts else 0  # resume: rows already in the sidecar
     while True:
@@ -202,11 +218,17 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         ta = time.time()
         jobs, want = [], {}  # want: (key, L) -> (job index, position), the first transcript in the batch that needs it
         for row in todo[: args.batch_transcripts]:
-            msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+            try:
+                msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+            except json.JSONDecodeError as e:  # a tool call's `arguments` aren't JSON: vLLM 400s on it too, so Qwen never saw a rendering
+                print(f"skip {row['id']}: tool call arguments aren't valid JSON ({e})", flush=True)
+                done.add(row["id"])
+                continue
             if len(ids) >= args.max_model_len:  # the engine would reject it; a rerun with a larger --max-model-len picks it up
                 print(f"skip {row['id']}: {len(ids)} tokens >= --max-model-len {args.max_model_len}", flush=True)
                 done.add(row["id"])
                 continue
+            keys = {p: (k, own(row)) for p, k in keys.items()}
             new = [p for p in positions if any((keys[p], L) not in cache and (keys[p], L) not in want for L in row_layers)]
             for p in new:
                 for L in row_layers:
@@ -228,7 +250,11 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
             acts.write(vecs.to(torch.bfloat16).view(torch.int16).numpy().tobytes())  # row n_acts + i <-> items[i]; numpy has no bf16
             acts.flush()
         tb = time.time()
-        texts = [t[0] for t in lens.read_items(vecs, item_layers, SAMPLING if args.readout == "olens" else NLA_SAMPLING)] if items else []
+        texts = (
+            [t[0] for t in lens.read_items(vecs, item_layers, sampling(args) if args.readout == "olens" else NLA_SAMPLING, seed=args.seed)]
+            if items
+            else []
+        )
         secs["decode"] += time.time() - tb
         tc = time.time()
         if args.readout == "olens":

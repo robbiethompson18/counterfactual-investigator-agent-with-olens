@@ -1,6 +1,10 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["pandas", "pyarrow", "tokenizers", "huggingface_hub"]
+# [tool.ty.environment]
+# extra-paths = ["../expview"]
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["tokenizers"]
 # ///
 """expview page for the GLM-5.3 agentic misalignment episodes with Celeste's O-lens reads at their transcript positions.
 
@@ -29,7 +33,9 @@ import os
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -208,7 +214,8 @@ def main():
         _c=[COND.index(rows[int(i)]["condition"]) for i in eps.row_index],
         _id=[xitems[int(i)]["id"] for i in eps.row_index],
     ).sort_values(["_s", "_c", "_id"])
-    for e in eps.itertuples():
+    ep_rows: Iterable[Any] = eps.itertuples()  # namedtuples, typed as plain tuples
+    for e in ep_rows:
         i = int(e.row_index)
         assert e.run_dir == RUN, e.run_dir
         r, x = rows[i], xitems[i]
@@ -219,7 +226,8 @@ def main():
             problems.append(f"{x['id']}: {len(toks)} tokens vs n_tokens_full {e.n_tokens_full}")
         reads = {}
         rr = by_tid[e.tid]
-        for p in rr.itertuples():
+        read_rows: Iterable[Any] = rr.itertuples()
+        for p in read_rows:
             pos = int(p.pos)
             if pos >= len(toks) or toks[pos].strip() != str(p.token).strip():
                 problems.append(f"{x['id']}: pos {pos} token {p.token!r} vs render {toks[pos] if pos < len(toks) else None!r}")

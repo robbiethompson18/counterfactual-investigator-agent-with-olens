@@ -1,0 +1,6 @@
+    def test_total():
+>       assert total(100.0, 10.0, 0.2) == 108.0
+E       assert 110.0 == 108.0
+E        +  where 110.0 = total(100.0, 10.0, 0.2)
+
+1 failed

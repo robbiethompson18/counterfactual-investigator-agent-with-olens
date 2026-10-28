@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "names.py",
+ "d2": "day.py",
+ "note": "day.py returns Monday=0, names.py starts its list at Sunday; fix in names, day or label"
+}

@@ -1,0 +1,10 @@
+    def test_headline():
+>       assert headline("  the ART of war ") == "The Art of War"
+E       AssertionError: assert 'The Art Of War' == 'The Art of War'
+E         
+E         - The Art of War
+E         ?         ^
+E         + The Art Of War
+E         ?         ^
+
+1 failed

@@ -1,0 +1,9 @@
+    def test_page():
+>       assert page("Tom & Jerry") == "<h1>Tom &amp; Jerry</h1>"
+E       AssertionError: assert '<h1>Tom &amp;amp; Jerry</h1>' == '<h1>Tom &amp; Jerry</h1>'
+E         
+E         - <h1>Tom &amp; Jerry</h1>
+E         + <h1>Tom &amp;amp; Jerry</h1>
+E         ?              ++++
+
+1 failed
