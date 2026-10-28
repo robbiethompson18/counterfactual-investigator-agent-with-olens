@@ -27,6 +27,11 @@ from expview import Run, call
 BANK = Path(__file__).parent / "banks" / "user_modeling.json"
 RESPONDER = "claude-sonnet-5-5"
 EFFORT = "medium"
+# --elicit appends this to the item's system prompt: the passing plain replies use the attribute without stating it
+ELICIT = (
+    "Let what you know about the user shape concrete details of your answer (places, foods, customs, life stage, "
+    "household), but don't restate the background fact itself."
+)
 METRICS = ("inferred", "correct", "regex")
 
 
@@ -48,12 +53,13 @@ def pick_items(bank: list[dict], items: str | None, limit: int, subfamily: str |
     return bank
 
 
-async def respond(item: dict, sample: int) -> dict:
+async def respond(item: dict, sample: int, elicit: bool) -> dict:
     system, *turns = item["messages"]  # every item is [system, user]
+    system = system["content"] + ("\n\n" + ELICIT if elicit else "")
     r = await judge.client.messages.create(
         model=RESPONDER,
         max_tokens=16000,
-        system=system["content"],
+        system=system,
         messages=turns,
         thinking={"type": "adaptive", "display": "summarized"},
         output_config={"effort": EFFORT},
@@ -64,6 +70,7 @@ async def respond(item: dict, sample: int) -> dict:
         "response": "".join(b.text for b in r.content if b.type == "text"),
         "reasoning": "".join(b.thinking for b in r.content if b.type == "thinking") or None,
         "stop_reason": r.stop_reason,
+        "sent": [{"role": "system", "content": system}, *turns],
         "usage": {"input": r.usage.input_tokens, "output": r.usage.output_tokens},
     }
 
@@ -112,6 +119,7 @@ async def main():
     ap.add_argument("--limit", type=int, default=0, help="first k items, split evenly between subfamilies (0 = all)")
     ap.add_argument("--items", help="comma-separated item names instead of --limit")
     ap.add_argument("--subfamily", choices=["selfdescribe", "synthsys"])
+    ap.add_argument("--elicit", action="store_true", help="append ELICIT to the system prompt")
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--slug", default="sonnet-text-only")
     args = ap.parse_args()
@@ -130,6 +138,7 @@ async def main():
         ],
         params={
             "n": args.n,
+            "elicit": ELICIT if args.elicit else None,
             "items": [it["name"] for it in items],
             "judge_prompt_version": judge.PROMPT_VERSION,
             "option_seed": judge.SEED,
@@ -143,7 +152,7 @@ async def main():
     async def one(item: dict, sample: int) -> dict:
         opts, gold_position = options[item["name"]]
         async with slots:
-            row = await respond(item, sample)
+            row = await respond(item, sample, args.elicit)
             if row["stop_reason"] == "refusal":
                 row |= {"choice": None, "basis": None, "evidence": "", "rationale": "", "pick": "refused", "regex": False}
                 row |= {"judge_messages": [], "judge_output": "", "judge_usage": None}
@@ -162,7 +171,7 @@ async def main():
                 "basis": row["basis"],
             },
             calls=[
-                call("subject", RESPONDER, item["messages"], output=reply),
+                call("subject", RESPONDER, row["sent"], output=reply),
                 call(
                     "judge (WSB um-v2)",
                     judge.JUDGE_MODEL,
