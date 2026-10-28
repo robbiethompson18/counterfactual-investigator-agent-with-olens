@@ -39,6 +39,7 @@ import json
 import random
 import sys
 from collections import Counter
+from functools import cache
 from pathlib import Path
 
 from cfbench.core import Rollout, initial_context, render, unified_diff
@@ -49,6 +50,13 @@ from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
 ENVS = ["hint_mcq", "hinted_truthfulqa"]
 MODEL_NAME = "Qwen3.6-27B"
 TASK = "claim"
+ARM_LABELS = {  # env viewer: readable arm names
+    "hint+d1": "professor hint names the gold letter",
+    "hint/stanford": "Stanford professor hint names the gold letter",
+    "nohint": "no hint",
+    "control": "no hint",
+}
+CLAIM = "Qwen knew the answer without the hint (in the counterfactual arm it still picks the correct letter)"  # env viewer captions
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
 CONDITIONS = ("transcript_agentic", "olens_agentic", "olens_placebo_agentic")  # no no_transcript (Kylie, 2026-10-28)
 CSV = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow.csv"
@@ -125,6 +133,20 @@ def _items(version: str) -> dict[str, str]:
         n = min(len(knew), len(didnt))
         out |= {i: "knew" for i in rng.sample(knew, n)} | {i: "didn't" for i in rng.sample(didnt, n)}
     return out
+
+
+@cache
+def _csv(source: str) -> dict[str, dict]:
+    return {r["item"]: r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[source]["source"]}
+
+
+def ITEM_INFO(row: dict) -> dict:
+    """The env viewer's per-question table (environments/_lib/evals.py item_info): the no-hint prompt (question and
+    options), the gold, Qwen's own no-hint answer, the class and the hinted letter (the gold)."""
+    src = row.get("source") or row["version"]
+    c, V = _csv(src)[row["item"]], VERSIONS[src]
+    question = load_env(V["env"]).build(V["arms"][1], row["item"]).messages[-1]["content"]
+    return {"source": src, "question": question, "gold": c["gold"], "own": c["qwen_answer"], "class": row["class"], "hint": c["gold"]}
 
 
 def _gold(version: str) -> dict[str, str]:

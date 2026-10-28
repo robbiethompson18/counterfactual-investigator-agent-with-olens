@@ -397,6 +397,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         "_sq_null": sq_null,
         "paired": paired,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
 
 
@@ -491,6 +492,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
         "correct": {k: sum(v) / len(v) for k, v in per_cond.items()},
         "correct_null": sum(null) / len(null) if null else None,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
 
 
@@ -518,6 +520,13 @@ def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_a
             "p_one": tail[0], "p_two": min(1.0, 2 * tail[1]),
         })  # fmt: skip
     return out
+
+
+def item_info(meta: dict, rows: list[dict]) -> dict:
+    """The eval's ITEM_INFO(row) (optional: what its question-level table shows, e.g. the question, gold, the model's own
+    answer), once per item; {} for evals without it."""
+    hook = getattr(_eval_module(meta.get("params", {}).get("eval")), "ITEM_INFO", None)
+    return {r["item"]: hook(r) for r in {r["item"]: r for r in rows if r.get("item")}.values()} if hook else {}
 
 
 def mark_current(name: str, summaries: list[dict]) -> dict:
@@ -702,7 +711,10 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         for s in summaries:
             s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
-        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
+        claim = getattr(_eval_module(name), "CLAIM", None)  # a claim eval's claim in words, for the page's captions
+        arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
+        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
+        doc |= {"arm_labels": arm_labels} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
