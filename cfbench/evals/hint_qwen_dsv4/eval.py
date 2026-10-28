@@ -54,6 +54,9 @@ CONDITIONS = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_pla
 CSV = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow.csv"
 # the eval's read jobs (stop tokens, layers 32/40/48, T 1, space lens), together covering every shown run
 READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" for t in ("", "-b")]
+# the option newlines (each option's "\n", the last one's "\n\n"; environments/hint_mcq/probe.py's site), layers 32/40/48/52,
+# read on one shown run per case: they precede the reply, so the case's shown runs share them and prep gives each the rows
+READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
 # every source and read id of the eval's own runs is put under this one prefix, so cfbench.olens's placebo (reads from an
 # "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
 # other version's hinted runs
@@ -198,6 +201,11 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
             for line in (d / "requests.jsonl").open():
                 if (r := json.loads(line))["id"] in shown:
                     qf.write(json.dumps(r | {"id": f"{NS}/{r['id']}"}) + "\n")
+        runs_of = {s: [t for t, _ in c["shown"]] for c in cs for s, _ in c["shown"]}  # a shown run -> its case's shown runs
+        for line in (READS_NL / "reads.jsonl").open():
+            r = json.loads(line)
+            for s in runs_of.get(r["id"], []):  # same prompt tokens, so the same token_index / char_offset in every run
+                rf.write(json.dumps(r | {"id": f"{NS}/{s}"}) + "\n")
     (out / "reads/reads.provenance.json").write_text((READS[0] / "reads.provenance.json").read_text())
     for f in ("reads.jsonl", "requests.jsonl", "reads.provenance.json"):
         if (placebo / f).exists():
