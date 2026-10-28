@@ -478,7 +478,7 @@ Current docs:
   that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
   earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
   hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
-- [ACTIVE: style_transfer env — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
+- [ACTIVE: style_transfer env (super experimental) — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
   — Qwen thinking off implements 130 known functions with/without a recursive- or loop-styled
   codebase; AST structure label (recursive/while/for/loop/comprehension/none); 125/130 clear
   defaults, 46 flips under the recursive codebase; Flash text-inversion gate (`gate.py`) kills 115,

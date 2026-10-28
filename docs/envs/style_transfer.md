@@ -8,6 +8,11 @@ gate. O-lens vs placebo on the 10 gate survivors (2026-10-28): 17% vs 23% correc
 binary recursive/iterative regex label, PR #247 as opened) failed the 2026-10-27 audit; the redesign
 and every try are logged under "Gate iterations" below.
 
+**Super duper experimental (2026-10-28):** built, gated and shipped overnight by Claude agents with
+almost no human review. Treat every number here as a sign-of-life probe, not a result; check the
+code before building on it. The Qwen rollouts were served bf16 from short-lived RunPod pods, not
+OpenRouter fp8.
+
 ## What it tests and why
 
 Robbie's hypothesis: when you ask a model to "implement fibonacci, here is the codebase," the O-lens
