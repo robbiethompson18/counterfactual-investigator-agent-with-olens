@@ -19,12 +19,11 @@ import sys
 from pathlib import Path
 
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
-from wsb import judge
+from wsb import banks, judge
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "expview"))
 from expview import Run, call
 
-BANK = Path(__file__).parent / "banks" / "user_modeling.json"
 RESPONDER = "claude-sonnet-5-5"
 EFFORT = "medium"
 # --elicit NAME appends one of these to the item's system prompt: the passing plain replies use the attribute without stating it
@@ -127,7 +126,7 @@ async def main():
     ap.add_argument("--slug", default="sonnet-text-only")
     args = ap.parse_args()
 
-    bank_file = json.loads(BANK.read_text())
+    bank_file = banks.load("user_modeling")
     bank = bank_file["items"]
     items = pick_items(bank, args.items, args.limit, args.subfamily)
     options = judge.build_options(bank)

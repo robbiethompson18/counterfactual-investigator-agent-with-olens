@@ -11,11 +11,15 @@ uv run python -m wsb.user_modeling --items um-sd-country-00,um-ss-continent-02
 uv run python -m wsb.user_modeling --n 3 --subfamily synthsys                # the 53 synthsys items
 ```
 
-- `banks/user_modeling.json`: their 100 items verbatim (`evals/user_modeling/items.json` at commit
-  `86612fa`) under a `source` header. Never import or run workspace-bench; copy what you need.
+- **Banks are data: they live on HF, never in git.** `banks.load(family)` reads
+  `data/banks/wsb/<family>.json`, downloading it from `banks/wsb/` in the sprint HF dataset on first
+  use, so any checkout works. `build_banks.py` rebuilds them from the pinned
+  `vendor/workspace-bench` submodule (their `evals/<family>/items.json` verbatim under a `source`
+  header) and `--upload`s them. Reading workspace-bench's data files is fine; never import or run
+  its code.
 - `user_modeling.py`: the responder (`claude-sonnet-5-5` on the Anthropic API, effort `medium`,
-  adaptive thinking, `--n` samples per item, each item's system + user turn sent unchanged), scoring and the
-  CLI. Every run goes through `runs.py` (`data/runs/wsb_user_modeling/<date>_<slug>/`:
+  adaptive thinking, `--n` samples per item, each item's system + user turn sent unchanged), scoring
+  and the CLI. Every run goes through `runs.py` (`data/runs/wsb_user_modeling/<date>_<slug>/`:
   `responses.jsonl`, `judged.jsonl`, `summary.json`, `meta.json`, `expview/`) and is synced to HF at
   the end.
 - `judge.py`: their 6-way identification MC, ported faithfully: gold + 4 same-class distractors
@@ -28,9 +32,9 @@ uv run python -m wsb.user_modeling --n 3 --subfamily synthsys                # t
 judge and settings of the only public per-item lens rows (`agu18dec/olens_ablations`
 `rl.base.off_k0.own.i300`, um-v2, seed 0) and of their own Anthropic route. The repo default judge
 (Haiku 5.5, medium) would make the numbers incomparable. The post's own headline used Gemini 3.8
-Flash (minimal); that route was dropped on 2026-10-28 when our Gemini billing died. The judge prompt talks about an
-"oracle lens" readout; here the "readout" is the model's reply, which is exactly the text-only floor
-the lens should beat.
+Flash (minimal); that route was dropped on 2026-10-28 when our Gemini billing died. The judge prompt
+talks about an "oracle lens" readout; here the "readout" is the model's reply, which is exactly the
+text-only floor the lens should beat.
 
 Scoring (`summary.json`, printed as a table by subfamily and overall): per item `pass@1` = mean over
 samples, `pass@n` = any sample; `inferred` = picked gold with basis `inferred_characterization`

@@ -13,10 +13,12 @@ The three submodules here are for reading, not running:
   its own `CLAUDE.md`/`AGENTS.md` and `.claude/skills/`, which `.claude/settings.json`'s
   `claudeMdExcludes` keeps Claude Code from loading as instructions.
 
-Read them, and copy prompts, scenario text or data verbatim into our own code, with attribution
-(repo, authors, license) next to the copy. Never import, run, wrap or monkeypatch them: port what
-you need into our harnesses (`evalcue/`, `cfbench/`). Ruff bans `import detective_joracle` and
-`import wsbench` (`TID251`). None is a uv dependency.
+Read them, and copy prompts or scenario text verbatim into our own code, with attribution (repo,
+authors, license) next to the copy. Data (item banks) is not copied into git: a build script reads
+the data file from the pinned submodule and uploads the bank to HF (`wsb/build_banks.py`). Never
+import, run, wrap or monkeypatch them: port what you need into our harnesses (`evalcue/`,
+`cfbench/`). Ruff bans `import detective_joracle` and `import wsbench` (`TID251`). None is a uv
+dependency.
 
 After cloning, `git submodule update --init` fetches them.
 
@@ -28,7 +30,8 @@ After cloning, `git submodule update --init` fetches them.
 | agent-interp-envs `environments/secret_number`   | `evalcue/envs/secret_number`                                                                   |
 | agent-interp-envs `environments/grade_your_own`  | `evalcue/envs/exclude_rows` (a rewrite)                                                        |
 | agent-interp-envs `sandbagging`, `funding_email` | `evalcue/envs/sandbagging`, `evalcue/envs/funding_email` (both replicate the original screens) |
-| workspace-bench banks, judge prompts             | (nothing yet; planned `wsb/`)                                                                  |
+| workspace-bench judge prompts                    | `wsb/judge.py`, `wsb/jailbreak.py`                                                             |
+| workspace-bench `evals/*/items.json`             | HF `banks/wsb/<family>.json`, built by `wsb/build_banks.py` (not in git)                       |
 
 Until commit `a1e8991`, detective-joracle was a uv workspace member and `scripts/run_chive_or.py`
 ran it; see `docs/smoke25-results.md` for what that produced.

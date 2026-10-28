@@ -121,7 +121,9 @@ split tokens). Private repo: Robbie can open it, Kylie can't.
 
 `data/` (gitignored) mirrors the public HF dataset
 [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
-O-lens banks in `banks/`, agent runs in `runs/`. Pull with
+O-lens banks in `banks/` (WorkspaceBench item banks in `banks/wsb/`), agent runs in `runs/`. **Item
+banks and other datasets are data: they go on HF, never in git**; code loads them from `data/` and
+downloads on first use (`wsb/banks.py`). Pull with
 `hf download Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens --repo-type dataset --local-dir data`.
 CHIVE incidents themselves come from
 [agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics).
@@ -179,10 +181,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
 - `vendor/` (Agam's `detective-joracle`, Singh and Kroiz's `agent-interp-envs`) is reference-only;
-  see `vendor/CLAUDE.md`. Never import, run or wrap it; port what you need into our own harness
-  (`environments/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box screens of
-  agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts are at
-  commit `e145988`.
+  see `vendor/CLAUDE.md`. Never import, run or wrap its code; port what you need into our own
+  harness (`environments/`, `cfbench/`). Ruff bans `import detective_joracle`. The old robbie-box
+  screens of agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts
+  are at commit `e145988`. A build script may read its data files (e.g. `wsb/build_banks.py` reads
+  workspace-bench's `evals/*/items.json` at the pinned commit) to make a bank for HF.
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in
