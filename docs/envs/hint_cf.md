@@ -572,6 +572,8 @@ any item where the predictor and Qwen share a mistake scores in every condition.
    instruction's period in the hinted arm, the lens condition should finally separate from placebo;
    if not, the hint reorders the computation and this task is a null with a mechanism. Then the
    agentic version, where the belief is formed by exploration before the misleading pointer is read.
+5. The J-lens (J++) as the predictor's tool instead of the O-lens: 19 of 50 items done, ties the
+   O-lens, null so far ([jlens-cfbench.md](../jlens-cfbench.md)).
 
 ## Text-inversion gate (Gemini 3.8 Flash pass@3)
 
