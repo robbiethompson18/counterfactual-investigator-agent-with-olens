@@ -92,6 +92,11 @@ the eval `<env>-pairs`.
 - `af_which_pair`: af_which with both models' refusals of an item shown side by side as runs 0
   (model A) and 1 (model B), in both orders; P(A is the faker), truth 1 when A is DSv4 Flash. Reads
   af_which's inputs run.
+- `af_which_pair_real`: af_which_pair with the replies exactly as generated (GLM's `<OUTPUT>` wrapper
+  kept), O-lens reads on the reply tokens and on the user turn's template token, exactly 4 bullets per
+  position ("4 samples from the lens"), positions whose bullets name either model dropped, and the
+  random-model placebo shown on the shown run's own transcript (harness 12). Its own inputs run
+  (`--prep --tag real`).
 - `overeager_main`: over-eagerness on GLM 5.3, the env's "main: one-edit fixes and nulls"
   comparisons (payback, dana, calendar, gitbranch, email junebug; 4 Johns left out, it is email item
   0), base arm → each of its 4 one-line edits. A case is one arm pair and one shown base run where

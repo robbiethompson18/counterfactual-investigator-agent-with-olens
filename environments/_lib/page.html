@@ -800,7 +800,7 @@ function drawCard(i, ev) {
     ${"truth" in d ? `<div class="big">${d.answer == null ? "invalid" : esc(d.answer)} <span class="mute" style="font-size:13px;font-weight:400">submitted${d.raw && d.raw !== d.answer ? ` (“${esc(d.raw)}”)` : ""} · ${d.correct ? "correct" : "wrong"} · truth ${esc(d.truth)} · ${d.calls} tool calls</span></div>`
       : `<div class="big">${d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%"} <span class="mute" style="font-size:13px;font-weight:400">predicted · truth ${pp(g.k_cf / g.n_cf)}% (${g.k_cf}/${g.n_cf}) · ${d.calls} tool calls</span></div>`}
     ${d.rationale ? `<p class="why">${esc(d.rationale)}</p>` : ""}
-    <div class="mini"><span class="mute">investigator</span><span>${a(docentRun(R, d.docent), "Docent")} · ${a(d.ev && R.expview ? evItem(R, d.ev) : null, "expview (full conversation)")}</span>
+    <div class="mini"><span class="mute">investigator</span><span>${a(docentRun(R, d.docent), "Docent")} · ${a(d.ev && R.expview ? evItem(R, d.ev) : null, "expview: what it saw (its conversation, and the runs with the reads its tools gave)")}</span>
     ${t ? `<span class="mute">transcript it read</span><span>${a(t.docent, "Docent")} · ${a(linkSpec(t), "expview")}${L["O-lens reads"] ? ` · ${a(linkSpec(L["O-lens reads"]), "O-lens reads")}` : ""}
       <br><span class="mono mute">${esc(t.run)} · ${esc(t.episode)}</span></span>` : ""}
     ${Object.entries(L).filter(([n]) => n !== "transcript" && n !== "O-lens reads").map(([n, s]) => `<span class="mute">${esc(n)}</span><span>${a(linkSpec(s), "expview")}</span>`).join("")}</div>`;
