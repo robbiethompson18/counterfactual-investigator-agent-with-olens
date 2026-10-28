@@ -66,13 +66,18 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # other-env transcripts per case (seed + the case's base-run sources), where every case used to get the same assignment
 # (seed + draw), so all of a run's placebo cases read one transcript pair (red-team of af_which, 2026-10-28). Only placebo
 # inputs changed: every other condition's prompt and tools are byte-identical to 8, so those rows compare across 8 and 9.
-# 10: an eval's own placebo (PLACEBO, sources=) shows the reads on the shown run's own transcript, not on the reads
+# 10: hint_qwen_dsv4 (+letter) show one base run per case (N_SHOWN 1) and the letter eval's answer parser and ANSWER_MATCH
+# changed (the "answer is X" / lone-capital / option-text rules); other evals' prompts and tools are unchanged (2026-10-28).
+# 11: an eval's OLENS overrides the O-lens tools' defaults; hint_qwen_dsv4 (+letter) show every bullet (min_fve 0, the
+# option-newline reads mostly score under 0.1). Other evals' tools are byte-identical to 10 (2026-10-28).
+# 12: an eval's own placebo (PLACEBO, sources=) shows the reads on the shown run's own transcript, not on the reads
 # source's: prompt positions at their place (the prompts must be identical), reply positions moved to the same relative
-# place in the shown reply. Under 9 its tools showed the source transcript's text around each read, which differs once
-# replies are shown as generated (af_which_pair with real replies, Kylie 2026-10-28). Only that placebo's output changed.
-# Also in 10: a read row marked `header` (a turn's own template token, af_which_pair's <｜User｜> / <|user|>) sits on the
+# place in the shown reply. Before, its tools showed the source transcript's text around each read, which differs once
+# replies are shown as generated (af_which_pair_real, Kylie 2026-10-28; its runs were made on this branch
+# before 10 and 11 landed, which change no other eval, and are relabelled 12). Only that placebo's output changed.
+# Also in 12: a read row marked `header` (a turn's own template token, af_which_pair_real's <｜User｜> / <|user|>) sits on the
 # turn's "USER:" label, not at its first character; no other env's rows have the mark.
-HARNESS_VERSION = 10
+HARNESS_VERSION = 12
 
 
 @dataclass

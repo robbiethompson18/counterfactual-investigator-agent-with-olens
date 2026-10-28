@@ -9,7 +9,13 @@ the hint after the instruction and only pre-hint reads shown, the lens beats pla
 +23] on 50 items (one leg of three, not yet dissected; section below). `favorites` and `opinion_mcq`
 are retired (code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
 `python -m graphs.hint_mcq_answer` (header runs); the scale-up figures were made with scratchpad
-scripts and live on the two artifact pages linked in the scale-up section.
+scripts and live on the two artifact pages linked in the scale-up section. TruthfulQA: the same
+procedure gives Qwen survivors for hinted_truthfulqa's `gold` pair
+([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28)).
+Its answer task, un-gated
+([hinted_truthfulqa.md](hinted_truthfulqa.md#ungated-sets-primary-2026-10-28)): 66 TruthfulQA cases,
+O-lens 21% vs placebo 10% vs transcript 8% (+12pp, sign test p = 0.004); the original 24 usable
+MMLU-Pro items, 40% vs 28% vs 22% (+12pp, p = 0.13).
 
 ## Scale-up, un-gated: the lens is at placebo (2026-10-28)
 
@@ -562,7 +568,7 @@ the header the lens reads the letter Qwen is about to emit, not the one it would
 hint: on hinted transcripts the header verdicts are the hint letter or the lens's default B/C/D
 (6031, 1841, 6742), while the no-hint arm's header says the own answer (6616: "the most appropriate
 type of osteopathic manipulation for this patient is **Low-Force", FVE 0.31, and "The correct answer
-is **E**.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
+is **E\*\*.", FVE 0.20, against "myofascial release" and "soft tissue" at the same slots with the
 hint). The own letter shows up at the hinted header only on 1157 (78% of verdict-shaped bullets, all
 FVE <= 0.07) and 6027. 6031's "Option E" read from the first 8-item run did not recur here either.
 

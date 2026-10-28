@@ -6,6 +6,10 @@ env: an eval can span several envs, models and arm pairs, and one env can be in 
 when `cfbench.run`'s "every base-arm run of one model, arm pair → arm pair" doesn't fit, e.g. one
 shown transcript per case, two models paired on the same items, or a model name hidden.
 
+The env viewer lists the evals the code defines: every folder here, plus `<env>-pairs` for each env
+in `PAIRS_ENVS` (`environments/_lib/evals.py`). A new pairs eval needs its env added there; an eval
+in `RETIRED_EVALS` there is left off the lists.
+
 ## A folder per eval
 
 `cfbench/evals/<name>/`:
@@ -38,6 +42,9 @@ shown transcript per case, two models paired on the same items, or a model name 
   - `PROMPT(prompt, case)` (optional): a last rewrite of the whole prompt, after everything else.
   - `MODEL_IDS` (optional): every model id the predictor must never see (default: the case's
     `model`).
+  - `OLENS` (optional): overrides of the O-lens tools' defaults for this eval, e.g.
+    `{"min_fve": 0.0}` to show every bullet (each still with its FVE); `cfbench/olens.py` `Lens`
+    fields.
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
     gets its Docent URL from the env's `links.json`.
@@ -63,13 +70,14 @@ before launching.
 
 `python -m environments evals` (and `index`) writes `evals/index.json` and `evals/<name>.json`
 (`environments/_lib/evals.py`): every eval, per run the RMSE per condition vs "the edit does
-nothing", the paired-model comparison (mean p per model, AUROC between their cases) when two models
-share cases, and per (env, version, arm pair, model) a before/after chart with every draw. The page
-has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and each env's Evals tab
-lists the evals that use it. Clicking a draw (point or chip) opens a card with its predicted rate,
-the investigator's explanation, and Docent + expview links for its conversation and for the
-transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as the eval
-`<env>-pairs`.
+nothing" as bars with 95% bootstrap CIs (resampling arm pairs) plus every paired difference between
+conditions with its CI, the paired-model comparison (mean p per model, AUROC between their cases)
+when two models share cases, and per (env, version, arm pair, model) a before/after chart with every
+draw. The page has an Evals list (`#evals=1`), one page per eval (`#eval=NAME[&env=E]`), and each
+env's Evals tab lists the evals that use it. Clicking a draw (point or chip) opens a card with its
+predicted rate, the investigator's explanation, and Docent + expview links for its conversation and
+for the transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` runs show as
+the eval `<env>-pairs`.
 
 ## Evals
 
@@ -87,7 +95,7 @@ transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` run
 - `af_which_pair_real`: af_which_pair with the replies exactly as generated (GLM's `<OUTPUT>` wrapper
   kept), O-lens reads on the reply tokens and on the user turn's template token, exactly 4 bullets per
   position ("4 samples from the lens"), positions whose bullets name either model dropped, and the
-  random-model placebo shown on the shown run's own transcript (harness 10). Its own inputs run
+  random-model placebo shown on the shown run's own transcript (harness 12). Its own inputs run
   (`--prep --tag real`).
 - `overeager_main`: over-eagerness on GLM 5.3, the env's "main: one-edit fixes and nulls"
   comparisons (payback, dana, calendar, gitbranch, email junebug; 4 Johns left out, it is email item
@@ -95,3 +103,10 @@ transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` run
   GLM acted without asking and that has O-lens reads (8 per base arm, one per item): 160 cases.
   Conditions `no_transcript`, `transcript_agentic`, `olens_agentic`; the prompt states the pooled
   base rate. Version `main`.
+- `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
+  Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
+  runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
+  two models' opposite position biases otherwise let the hinted letter give the class away). `knew`:
+  P(Qwen answers correctly without the hint), scored as % right at p >= 0.5 (its own score.py; the
+  page's claim table shows % right). `letter`: the answer task, name Qwen's no-hint letter (reads
+  hint_qwen_dsv4's inputs). Versions `mmlu_pro` and `truthfulqa` sources, pooled into one 86/86 set.

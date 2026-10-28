@@ -9,11 +9,12 @@ evals. Two kinds of cfbench run (data/runs/cfbench/<run>/) belong to an eval:
 
 evals/<name>.json has the eval's title, description (its eval.md), envs, and per run: slug, date, harness version,
 predictors, conditions, models, the RMSE per condition next to the "edit does nothing" null (over cases, as
-cfbench.scoring), for two-model evals the paired comparison (mean p per model and the AUROC between the two models'
-cases), and the cases grouped for charts. A group is (env, version, base arm, cf arm, model), pooling items: the observed
-rate before (the pooled base-arm rate when the eval shows fewer runs than it has) and after, every draw's p with its item,
-Docent run and expview item, the RMSE per condition, and Docent filters for both arms (envs/<env>/docent_filters.json).
-No conversations: each run's are exported to data/runs/cfbench/<run>/expview/ (one item per draw).
+cfbench.scoring) with 95% bootstrap CIs and paired differences between conditions (`boot`, resampling arm pairs), for
+two-model evals the paired comparison (mean p per model and the AUROC between the two models' cases), and the cases
+grouped for charts. A group is (env, version, base arm, cf arm, model), pooling items: the observed rate before (the
+pooled base-arm rate when the eval shows fewer runs than it has) and after, every draw's p with its item, Docent run and
+expview item, the RMSE per condition, and Docent filters for both arms (envs/<env>/docent_filters.json). No
+conversations: each run's are exported to data/runs/cfbench/<run>/expview/ (one item per draw).
 
 --pull fetches the cfbench meta.json files missing locally from HF, then predictions.jsonl + docent.json of the runs in
 an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ from whatever is local.
@@ -23,6 +24,7 @@ import ast
 import datetime as dt
 import itertools
 import json
+import math
 import re
 import sys
 from collections import defaultdict
@@ -32,11 +34,16 @@ from typing import Any
 
 from .backends import canonical_id
 from .core import load_env
+from .index import hf_index
 from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
 EVALS = REPO_ROOT / "data" / "evals"
 EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
+# envs with an `<env>-pairs` eval (every cfbench.run env_runs:<env>/... run): the viewer lists the evals defined here
+PAIRS_ENVS = ("alignment_faking", "hint_mcq", "hinted_truthfulqa")
+# evals set aside: off the viewer's eval lists (their own pages still open by URL); folders and HF files stay
+RETIRED_EVALS = {"af_which", "af_refusals"}
 # evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
 PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")
@@ -91,7 +98,7 @@ def seen_tokens(reads, row: dict) -> dict | None:
     """An expview tokens object of the base runs exactly as the investigator's tools gave them: each run's transcript as
     read_transcript renders it, split at the reads its O-lens tools could return there (the inputs' reads for olens_agentic;
     for olens_placebo_agentic the eval's PLACEBO sources, placed as olens.tools places them), every bullet of each read.
-    None when the row's runs aren't in `reads`, or for a placebo it can't reproduce (other-env placebo, harness < 10)."""
+    None when the row's runs aren't in `reads`, or for a placebo it can't reproduce (other-env placebo, harness < 12)."""
     from cfbench import olens
     from cfbench.core import canon_condition, render_spans
     from expview import read
@@ -99,7 +106,7 @@ def seen_tokens(reads, row: dict) -> dict | None:
     cond, base = canon_condition(row["condition"]), row.get("sources") or row["shown"]
     if not all(s in reads for s in base):
         return None
-    if cond == "olens_placebo_agentic" and (not row.get("placebo_sources") or row.get("harness_version", 1) < 10):
+    if cond == "olens_placebo_agentic" and (not row.get("placebo_sources") or row.get("harness_version", 1) < 12):
         return None
     given = row["placebo_sources"] if cond == "olens_placebo_agentic" else base if cond.startswith("olens") else [None] * len(base)
     toks, sections, out = [], [], {}
@@ -241,6 +248,45 @@ def auroc(pos: list[float], neg: list[float]) -> float | None:
     return sum((a > b) + 0.5 * (a == b) for a in pos for b in neg) / (len(pos) * len(neg))
 
 
+CONDITION_ORDER = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic")
+
+
+def rmse_ci(clusters: dict[tuple, dict[str, list[float]]], n_boot: int = 2000, seed: int = 0) -> dict:
+    """95% bootstrap CIs for each condition's RMSE, the null's ("null"), and every paired difference (a - b over the same
+    resample), resampling clusters: an arm pair (env, version, base, cf, model) with all its cases (items share a truth, so
+    they aren't independent). `clusters` maps a cluster to {condition: [per-case MSE]} with "null" among the conditions;
+    the RMSE pools the sampled clusters' cases, as the point estimate pools every case."""
+    import random
+
+    keys = list(clusters)
+    order = lambda k: (k != "null", CONDITION_ORDER.index(k) if k in CONDITION_ORDER else 99, k)
+    conds = sorted({k for c in clusters.values() for k in c}, key=order)
+
+    def rmse(ks: list) -> dict[str, float]:
+        out = {}
+        for c in conds:
+            v = [x for k in ks for x in clusters[k].get(c, [])]
+            if v:
+                out[c] = (sum(v) / len(v)) ** 0.5
+        return out
+
+    point, rng, boots = rmse(keys), random.Random(seed), []
+    for _ in range(n_boot):
+        boots.append(rmse([rng.choice(keys) for _ in keys]))
+    q = lambda v: [sorted(v)[int(0.025 * len(v))], sorted(v)[int(0.975 * len(v)) - 1]] if v else None
+    pairs = [(a, b) for i, a in enumerate(conds) for b in conds[:i]]  # later condition minus earlier, each minus the null
+    return {
+        "n_clusters": len(keys),
+        "n_boot": n_boot,
+        "ci": {c: q([b[c] for b in boots if c in b]) for c in conds},
+        "diffs": [
+            {"a": a, "b": b, "est": point[a] - point[b], "ci": q([x[a] - x[b] for x in boots if a in x and b in x])}
+            for a, b in pairs
+            if a in point and b in point
+        ],
+    }
+
+
 def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
     from cfbench.core import canon_condition
     from cfbench.scoring import Case
@@ -285,6 +331,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         )
     groups: dict[tuple, dict[str, Any]] = {}
     sq, sq_null = defaultdict(list), []
+    clusters: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))  # arm pair -> condition -> MSEs
     for (env, version, model, b, cf, _item), c in cases.items():
         r = c["row"]
         case = Case(env, b, cf, r["k_base"], r["n_base"], r["k_cf"], r["n_cf"])
@@ -323,8 +370,10 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
             if case.p[k]:
                 g["_mse"][k].append(case.mse(k))
                 sq[k].append(case.mse(k))
+                clusters[env, version, b, cf, model][k].append(case.mse(k))
         g["_null"].append(case.mse_null())
         sq_null.append(case.mse_null())
+        clusters[env, version, b, cf, model]["null"].append(case.mse_null())
     out_groups = []
     for g in groups.values():
         g["rmse"] = {k: (sum(v) / len(v)) ** 0.5 for k, v in g.pop("_mse").items()}
@@ -387,10 +436,13 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         # mean over cases of the per-case MSE (each case's draws averaged first), as cfbench.scoring.rmse
         "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
         "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5 if sq_null else None,
+        "boot": rmse_ci(clusters) if clusters else None,  # 95% bootstrap CIs over arm pairs
         "_sq": dict(sq),  # per-case MSEs, for the eval's pooled row (dropped before writing)
+        "_clusters": {k: dict(v) for k, v in clusters.items()},
         "_sq_null": sq_null,
         "paired": paired,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
 
 
@@ -435,6 +487,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
                 "answer": r.get("canon") if r.get("valid", True) else None,
                 "raw": r.get("answer"),
                 "correct": bool(r.get("correct")),
+                "valid": r.get("valid", True),
                 "draw": r["draw"],
                 "item": item,
                 "predictor": r["predictor"],
@@ -461,6 +514,8 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
              "answers_cf": r["answers_cf"], "base_modal": base_modal, "draws": dict(c["draws"])}
         )  # fmt: skip
         for k, ds in c["draws"].items():
+            if not (ds := [d for d in ds if d["valid"]]):  # invalid draws are dropped, as cfbench.answer and the evals' score.py do
+                continue
             frac = sum(d["correct"] for d in ds) / len(ds)
             g["_ok"][k].append(frac)
             per_cond[k].append(frac)
@@ -482,7 +537,41 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
         "correct": {k: sum(v) / len(v) for k, v in per_cond.items()},
         "correct_null": sum(null) / len(null) if null else None,
         "groups": out_groups,
+        "item_info": item_info(meta, rows),
     }
+
+
+def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_agentic", n_boot: int = 2000, seed: int = 0) -> list[dict]:
+    """Per condition, its % right minus `ref`'s over the items both have (an item's score = the mean over its draws): the
+    mean difference, a 95% bootstrap CI over items, the sign-test counts (items better / worse) and p, two-sided and
+    one-sided (condition > ref)."""
+    import numpy as np
+
+    if ref not in right:
+        return []
+    rng, out = np.random.default_rng(seed), []
+    for k in sorted(right):
+        items = sorted(set(right[k]) & set(right[ref]), key=str)
+        if k == ref or not items:
+            continue
+        d = np.array([np.mean(right[k][i]) - np.mean(right[ref][i]) for i in items])
+        boots = d[rng.integers(len(d), size=(n_boot, len(d)))].mean(1)
+        pos, neg = int((d > 0).sum()), int((d < 0).sum())
+        n = pos + neg
+        tail = [sum(math.comb(n, i) for i in range(j, n + 1)) / 2**n for j in (pos, max(pos, neg))] if n else [1.0, 0.5]
+        out.append({
+            "condition": k, "ref": ref, "n": len(items), "diff": float(d.mean()),
+            "ci": [float(x) for x in np.percentile(boots, [2.5, 97.5])], "better": pos, "worse": neg,
+            "p_one": tail[0], "p_two": min(1.0, 2 * tail[1]),
+        })  # fmt: skip
+    return out
+
+
+def item_info(meta: dict, rows: list[dict]) -> dict:
+    """The eval's ITEM_INFO(row) (optional: what its question-level table shows, e.g. the question, gold, the model's own
+    answer), once per item; {} for evals without it."""
+    hook = getattr(_eval_module(meta.get("params", {}).get("eval")), "ITEM_INFO", None)
+    return {r["item"]: hook(r) for r in {r["item"]: r for r in rows if r.get("item")}.values()} if hook else {}
 
 
 def mark_current(name: str, summaries: list[dict]) -> dict:
@@ -503,7 +592,13 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
         s["current"] = bool(s["current_conds"])
     cur = [s for s in summaries if s["current"]]
     if any(s.get("task") == "claim" for s in cur):
+        import importlib
+        import importlib.util
+
         from cfbench.evals.af_which.score import stats
+
+        if importlib.util.find_spec(f"cfbench.evals.{name}.score"):  # an eval's own claim scorer (same row schema), if any
+            stats = getattr(importlib.import_module(f"cfbench.evals.{name}.score"), "stats", stats)
         from cfbench.evals.af_which_pair.score import pair_stats
 
         tables = []
@@ -520,18 +615,51 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                 pair = pair_stats(rows)
                 for t in table:
                     t |= pair.get((t["condition"], t["version"]), {})
-            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table})
+            paired = {}
+            if any(t.get("accuracy") is not None for t in table):  # scored as % right (guess = p >= 0.5): each condition vs transcript
+                right: dict[str, dict[str, dict[str, list[float]]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+                for r in rows:
+                    if r["valid"]:
+                        right[r["version"]][canon_condition(r["condition"])][r["item"]].append(
+                            float((r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"]))
+                        )
+                paired = {v: paired_vs(by) for v, by in right.items()}
+            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table, "paired": paired})
         return {"claim_tables": tables}
+    if ans := [s for s in cur if s.get("task") == "answer"]:  # % correct per item (valid draws), pooled over the current runs
+        right: dict[str, dict[tuple, list[float]]] = defaultdict(lambda: defaultdict(list))
+        for s in ans:
+            for g in s["groups"]:
+                for it in g["items"]:
+                    for k, ds in it["draws"].items():
+                        if k in s["current_conds"]:
+                            right[k][g["env"], g["version"], it["item"]] += [float(d["correct"]) for d in ds if d["valid"]]
+        import numpy as np
+
+        right = {k: {i: v for i, v in by.items() if v} for k, by in right.items()}
+        rng, pooled = np.random.default_rng(0), []
+        for k, by in right.items():  # % correct per condition over every item (an item's draws averaged), 95% bootstrap CI
+            x = np.array([np.mean(v) for v in by.values()])
+            boots = x[rng.integers(len(x), size=(2000, len(x)))].mean(1)
+            pooled.append(
+                {"condition": k, "n": len(x), "accuracy": float(x.mean()), "ci": [float(c) for c in np.percentile(boots, [2.5, 97.5])]}
+            )
+        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_vs(right), "pooled": pooled}}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}
     sq, sq_null = defaultdict(list), []
+    clusters: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for s in cur:
         for k, v in s["_sq"].items():
             if k not in s["current_conds"]:
                 continue
             sq[k] += v
         sq_null += s["_sq_null"]
+        for key, by in s["_clusters"].items():
+            for k, v in by.items():
+                if k == "null" or k in s["current_conds"]:
+                    clusters[key][k] += v
     paired: defaultdict[str, Any] = defaultdict(lambda: {"a": [], "z": [], "truth": defaultdict(list)})
     for s in cur:  # per-case mean p per model, from the groups' draws, pooled over the current runs
         models = sorted(
@@ -557,6 +685,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
             "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5,
             "n_cases": len(sq_null),
+            "boot": rmse_ci(clusters),
             "paired": [
                 {
                     "condition": k,
@@ -584,14 +713,45 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
     return f"Arm pairs on {envs[0]}", f"Every `cfbench.run env_runs:{envs[0]}/...` run: base arm -> counterfactual arm, one case per pair."
 
 
+def _summary(run_dir: Path, envs: Envs, export: bool) -> dict | None:
+    """run_summary, or None (with a warning) for a run whose env no longer exists, e.g. a retired env's old runs."""
+    try:
+        return run_summary(run_dir, envs, export)
+    except ModuleNotFoundError as e:
+        print(f"skipping {run_dir.name}: {e}", file=sys.stderr)
+        return None
+
+
+def defined() -> list[dict]:
+    """Every eval from the code alone (for the Pages spec/evals.json): each cfbench/evals/<name>/ with an eval.py, and
+    `<env>-pairs` for each of PAIRS_ENVS. An eval module that doesn't import gets "error" and no envs; RETIRED_EVALS get
+    "retired"."""
+    import importlib
+
+    out = []
+    for d in sorted(EVAL_DIRS.iterdir()):
+        if not (d / "eval.py").exists():
+            continue
+        try:
+            envs, err = list(importlib.import_module(f"cfbench.evals.{d.name}.eval").ENVS), None
+        except Exception as ex:  # noqa: BLE001
+            envs, err = [], repr(ex)[:500]
+        out.append({"name": d.name, "title": describe(d.name, envs)[0], "envs": envs} | ({"error": err} if err else {}))
+    out += [{"name": f"{e}-pairs", "title": describe(f"{e}-pairs", [e])[0], "envs": [e]} for e in PAIRS_ENVS]
+    return [e | {"retired": True} if e["name"] in RETIRED_EVALS else e for e in out]
+
+
 def build(names: list[str] | None = None, export=True) -> list[Path]:
-    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json."""
+    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json
+    (HF's entries plus the local evals)."""
     runs, envs, written = eval_runs(), Envs(), []
     EVALS.mkdir(parents=True, exist_ok=True)
     for name in names or list(runs):
         if name not in runs:
             continue
-        summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s.get("started") or s["run"], reverse=True)
+        summaries = sorted(
+            filter(None, (_summary(r, envs, export) for r in runs[name])), key=lambda s: s.get("started") or s["run"], reverse=True
+        )
         summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
@@ -599,30 +759,34 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         title, description = describe(name, all_envs)
         extra = mark_current(name, summaries)
         for s in summaries:
-            s.pop("_sq", None), s.pop("_sq_null", None)
+            s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
-        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
+        claim = getattr(_eval_module(name), "CLAIM", None)  # a claim eval's claim in words, for the page's captions
+        arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
+        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
+        doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
-    index = []
+    # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
+    built = {p.stem for p in written}
+    top = {e["name"]: e for e in hf_index("index.json", root="evals/").get("evals", [])}
     for p in sorted(EVALS.glob("*.json")):
-        if p.name == "index.json":
+        if p.name == "index.json" or (p.stem not in built and p.stem in top):  # an eval not rebuilt here: HF's entry is current
             continue
         e = json.loads(p.read_text())
         rs = e["runs"]
-        index.append(
-            {
-                "name": e["name"],
-                "title": e["title"],
-                "envs": e["envs"],
-                "n_runs": len(rs),
-                "latest": max((r["date"] or "" for r in rs), default=""),
-                "models": sorted({m for r in rs for m in r["models"]}),
-                "conditions": sorted({c for r in rs for c in r["conditions"]}),
-                "n_cases": sum(r["n_cases"] for r in rs),
-            }
-        )
+        top[e["name"]] = {
+            "name": e["name"],
+            "title": e["title"],
+            "envs": e["envs"],
+            "n_runs": len(rs),
+            "latest": max((r["date"] or "" for r in rs), default=""),
+            "models": sorted({m for r in rs for m in r["models"]}),
+            "conditions": sorted({c for r in rs for c in r["conditions"]}),
+            "n_cases": sum(r["n_cases"] for r in rs),
+        }
     p = EVALS / "index.json"
+    index = [top[n] for n in sorted(top)]
     p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")
     return [*written, p]
 

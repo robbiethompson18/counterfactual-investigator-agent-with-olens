@@ -133,7 +133,19 @@ async def main():
         return ev.PLACEBO(case, base, seed) if hasattr(ev, "PLACEBO") else None
 
     def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
-        prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
+        prompt = build_prompt(  # answer evals (TASK "answer", cfbench/answer.py) get the answer prompt; claim evals the rate one + ASK
+            env,
+            case["model"],
+            base,
+            shown,
+            case["base_arm"],
+            case["cf_arm"],
+            condition,
+            read,
+            fve_note,
+            args.max_calls,
+            "answer" if task == "answer" else "rate",
+        )
         prompt = base_line(prompt, ev.BASE_LINE(case | {"condition": condition}) if hasattr(ev, "BASE_LINE") else None)
         prompt = ask(prompt, ev.ASK(case) if hasattr(ev, "ASK") else None)
         prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
@@ -142,14 +154,13 @@ async def main():
     if args.show:
         env, case, base = cases[0]
         print(f"# case {case['env']} {case['model']} (truth {case['k_cf']}/{case['n_cf']}), task {task}\n")
-        shown = pick_examples(base, random.Random(args.seed))
+        shown = pick_examples(base, random.Random(args.seed), "answer" if task == "answer" else "rate")
         for condition in conditions:
             read = None
             if condition in OLENS_CONDITIONS and reads:
                 src = placebo_sources(case, base, args.seed) if condition == "olens_placebo_agentic" else None
-                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic" and src is None, seed=args.seed, sources=src)[
-                    1
-                ]
+                placebo = condition == "olens_placebo_agentic" and src is None
+                read = olens.tools(base, reads, placebo=placebo, seed=args.seed, sources=src, overrides=getattr(ev, "OLENS", None))[1]
             print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
         return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
@@ -199,7 +210,7 @@ async def main():
     out, slots = run / "predictions.jsonl", asyncio.Semaphore(args.concurrency)
 
     async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
-        shown = pick_examples(base, random.Random(args.seed + draw))
+        shown = pick_examples(base, random.Random(args.seed + draw), "answer" if task == "answer" else "rate")
         if old := reuse.get(key(case | {"predictor": predictor, "draw": draw}, condition)):
             assert old["shown"] == [r.source for r in shown], old["shown"]
             with out.open("a") as f:
@@ -212,7 +223,9 @@ async def main():
             assert reads is not None
             src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
             placebo = condition == "olens_placebo_agentic" and src is None
-            lens_tools, read = olens.tools(base, reads, placebo=placebo, seed=args.seed + draw, sources=src)
+            lens_tools, read = olens.tools(
+                base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
+            )
             if src is not None:
                 extra["placebo_sources"] = src
             tools |= lens_tools
@@ -229,11 +242,17 @@ async def main():
         if ev.MODEL_NAME:  # the predictor must never have seen the model id
             for m in getattr(ev, "MODEL_IDS", [case["model"]]):
                 assert not re.search(re.escape(m), json.dumps(result["messages"])), m
+        if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
+            canon = env.canon_answer(result["answer"]) if result["valid"] else None
+            result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
         row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:
             f.write(json.dumps(row) + "\n")
-        print(f"{case['env']} {case['model']} {condition} draw {draw}: p={result['p']} ${result['cost']:.3f}")
+        got = f"p={result.get('p')}"
+        if task == "answer":
+            got = f"answer={result.get('canon')!r} ({'right' if result.get('correct') else 'wrong'})"
+        print(f"{case['env']} {case['model']} {condition} draw {draw}: {got} ${result['cost']:.3f}")
 
     jobs = [one(env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)]
     try:

@@ -53,7 +53,7 @@ exclude = [
 # GPU-only deps live in RunPod venvs, not this one; the rest are imported from other checkouts on the pod
 allowed-unresolved-imports = [
   "torch", "torch.**", "vllm", "vllm.**", "vllm_lens", "vllm_lens.**", "transformers", "transformers.**",
-  "safetensors", "safetensors.**", "tokenizers", "statsmodels.**", "duckdb",
+  "safetensors", "safetensors.**", "tokenizers", "sklearn", "sklearn.**", "statsmodels.**", "duckdb",
   "olens_glm53_usage", "realvariants", "email_env",
 ]
 

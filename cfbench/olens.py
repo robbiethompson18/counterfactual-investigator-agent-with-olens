@@ -31,7 +31,7 @@ import re
 from array import array
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from cfbench.core import Rollout, render_spans
@@ -233,10 +233,17 @@ def onto(shown: list[dict], messages: list[dict], rows: list[dict]) -> list[dict
 
 
 def tools(
-    base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, sources: list[str] | None = None, kind: str = "olens"
+    base: list[Rollout],
+    reads: Reads,
+    placebo: bool,
+    seed: int = 0,
+    sources: list[str] | None = None,
+    kind: str = "olens",
+    overrides: dict | None = None,
 ) -> tuple[dict[str, Tool], set[int]]:
-    """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads."""
-    lens = LENSES[kind]
+    """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads. `overrides`
+    replaces fields of the lens's defaults (an eval's OLENS, e.g. {"min_fve": 0.0})."""
+    lens = replace(LENSES[kind], **(overrides or {}))
     unit = lens.unit[:-1]
     texts = [render_spans(r.messages)[0] for r in base]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]

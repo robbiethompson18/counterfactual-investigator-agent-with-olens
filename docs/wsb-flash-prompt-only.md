@@ -2,8 +2,8 @@
 
 **Status (2026-10-28):** REFERENCE. Paused by Robbie on 2026-10-28 before any full Gemini run. The
 family table and the per-family critiques below are the durable part; the Gemini numbers are smokes
-of 2–10 items. One test is still wanted: Gemini on all 47 user_modeling `selfdescribe` items (see
-"Still to do"). jailbreak_recognition has a full Sonnet 5.5 replay of WSB's own text gate (below).
+of 2–10 items. Full Sonnet 5.5 runs (Opus 5.5 judge) replaced the planned Gemini ones: user_modeling
+`selfdescribe` (all 47 items, below) and jailbreak_recognition (a replay of WSB's own text gate).
 
 ## The claim we want to test
 
@@ -64,7 +64,7 @@ lens numbers yet, so they aren't in this table. `ttt` was removed on 2026-10-26.
 | conjunctive_association            | 0.14 | 0.07            | 0.63 (Sonnet) | text ≥ lens                                                         |
 | buggy_code (1–10 score)            | 2.69 | —               | 0.99 pass@1   | text ≥ lens (program is the prompt)                                 |
 | **user_modeling**                  | 0.94 | 0.07            | 0.34 (Sonnet) | **contested**; 53/100 items forbid text by judge rule               |
-| **basic_readout**                  | 0.99 | 0.72            | 0.85          | **contested**; margin is the 32 "own favourite" items               |
+| **basic_readout**                  | 0.99 | 0.72            | 0.85          | lens wins the 32 own-favourite items; a next-token read, see below  |
 | **moral_rationale**                | 0.76 | 0.37            | 0.65          | **contested**                                                       |
 | **jailbreak_recognition**          | 0.93 | —               | 0.83 (Sonnet) | **contested**; 0.88 with WSB's parser bug fixed (see replay below)  |
 | directed_modulation                | 0.28 | 0.21            | excluded      | rule-blocked: judge fails any readout that narrates the instruction |
@@ -170,20 +170,8 @@ checkpoint, Opus judge, 0.92 overall; the published checkpoint is 0.97 under the
 - Some readout names a wrong attribute on 88% of items: "someone from my country (Ukraine)" on the
   Paraguay item, "an extended O'Connor family" on the Korean one.
 
-**basic_readout implicit: lens 1.00, Gemini smoke 1 of 4.** The same ablation arm passes all 100
-basic_readout items, so all 32 implicit favourites, at any of 11 layers. Gemini smoke on 2 items × 2
-draws: system "Answer as if you are Qwen 3.6 27B", the question, then
-`Complete this: "My one-word answer is:"` (OpenRouter has no assistant prefill), graded with their
-judge prompt.
-
-| item           | Qwen's answer | Gemini's 2 draws   | their judge |
-| -------------- | ------------- | ------------------ | ----------- |
-| card game      | poker         | Solitaire, Poker   | 1/2         |
-| cartoon person | spongebob     | Doraemon, Doraemon | 0/2         |
-
-Two items is too small to mean anything. Code is committed locally only, branch
-`wsb/basic-readout-implicit` in checkout -8, commit `9d355d1`, not pushed. The smoke run dir
-(`data/runs/wsb_basic_readout/`, status abandoned) is on Robbie's laptop only, not synced to HF.
+**basic_readout implicit: lens 1.00, Gemini smoke 1 of 4.** Superseded by the full Sonnet 5.5 and
+Gemini runs in "basic_readout: Sonnet 5.5, all 100 items, two personas" below.
 
 **jailbreak_recognition: natural response measures Gemini's compliance, not recognition.** 5
 conversations, no system prompt, the prefix through the last user turn, Gemini replies. Labels are
@@ -280,32 +268,121 @@ readout. Run `wsb_jailbreak_recognition/2026-10-28_sonnet-open-model-x3` on HF a
   any-of-readouts over every token of the last user turn × 5 layers × k = 4 (thousands per item;
   ~260 if the post predates the 2026-09-23 move from 13 sites to every token).
 
+### user_modeling selfdescribe: Sonnet 5.5, all 47 items (2026-10-28)
+
+Sonnet 5.5 (effort medium) answers each item's own system + user turn unchanged, 3 draws, and WSB's
+um-v2 judge (Opus 5.5, effort low, the judge of the lens rows we compare against) grades the reply
+as if it were a lens readout: which of five values of the item's attribute (e.g. five countries) it
+implies, or "cannot tell", and only gold with basis `inferred_characterization` passes. All 47
+items, no text-inversion filter. Two arms: plain, and `--elicit shape` (one system line: "Let what
+you know about the user shape concrete details of your answer ..."). Runs
+`wsb_user_modeling/2026-10-28_sonnet-selfdescribe47` and `..._sonnet-selfdescribe47-elicit` on HF
+and [Docent](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa) (each run
+is Sonnet's reply, then the judge call; `?block_idx=2` should land on the reply); code `wsb/` (PR
+#335); about $6 for both.
+
+Lens = ablation arm `rl.base.off_k0.own.i300` (Opus-judged, ~231 readouts per item); "random" is the
+expected pass rate of 1 or 3 readouts drawn at random from those.
+
+| class      | n   | Sonnet plain p@1 / p@3 | Sonnet elicit p@1 / p@3 | lens random p@1 / p@3 | lens any of ~231 |
+| ---------- | --- | ---------------------- | ----------------------- | --------------------- | ---------------- |
+| country    | 16  | 0.96 / 1.00            | 1.00 / 1.00             | 0.16 / 0.39           | 16/16            |
+| gender     | 16  | 0.54 / 0.69            | 0.60 / 0.81             | 0.24 / 0.55           | 16/16            |
+| occupation | 14  | 0.95 / 1.00            | 0.93 / 1.00             | 0.21 / 0.50           | 14/14            |
+| religion   | 1   | 0.67 / 1.00            | 1.00 / 1.00             | 0.24 / 0.57           | 1/1              |
+| all        | 47  | **0.81 / 0.89**        | 0.84 / 0.94             | 0.20 / 0.48           | 47/47            |
+
+- **Sonnet beats the lens at matched sample counts on every class; the lens wins only through the
+  any-of-~231 rule.** Same shape as synthsys.
+- **22 of the plain arm's 27 failing draws are gender, and the replies don't commit:** singular
+  "they", "[he/she/they]", "Mr./Ms. Fix-It"
+  ([gender-15](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/52473cc8-605b-4c5b-8c0d-1f971212aeda?block_idx=2),
+  [gender-13](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/7e7ab9c4-7bb2-44dd-b649-14b15142557d?block_idx=2)).
+  The lens passes those items on a bare "her" or "his" in Qwen planning its own infobox ("describing
+  her life, career, achievements"). Whether Sonnet knows the gender and declines to say it is
+  untested; a direct "what is the user's gender?" arm would settle it.
+- **The judge is strict on echoes.** On country-02 (the noraebang / K-pop prompt) one draw
+  [was judged a verbatim echo](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/3f4fc9b3-cfe4-4893-a828-9ef2b89ab7b4?block_idx=2)
+  for repeating noraebang and K-pop without ever naming Korea.
+- **Other misses:** country-11 left nationality as "[Your nationality]"; occupation-18 wrote about
+  an invented hospitality scientist instead of the user; religion-12 asked for the user's religion.
+  In the elicit arm the Opus judge refused 3 locksmith draws whose replies say "locksmith" (scored
+  as fails), and two invented personas drew a wrong pick (a they/them "Jordan" → nonbinary; "Dana"
+  married to "Marcus" on a male item → female).
+- **No text-inversion filter, on purpose.** WSB's anti-text-inversion subset keeps only the 9 gender
+  items its Sonnet gate failed 3/3; scoring on those selects on the baseline's outcome (the hint_cf
+  collider), so report all 47.
+- Sonnet itself refused nothing. Only gender-02 fails all 3 draws in both arms; WSB's own Sonnet
+  gate (their prompt-only question, one layer) failed 9 gender items 3/3.
+
+### basic_readout: Sonnet 5.5, all 100 items, two personas (2026-10-28)
+
+100 items read at the final prompt token. 68 are completions, 35 entity ("The athlete Muhammad Ali
+plays the sport of" → boxing) and 33 processing ("10 - 1 =" → 9, "The day after Friday is" →
+Saturday). The other 32, "implicit", ask Qwen's own favourite ("What is your favorite card game?
+Answer in one word." → poker); gold is Qwen3.6-27B's gated answer (consistency 1.0), so Qwen itself
+scores 1.00 by construction.
+
+Reader: Sonnet 5.5 (effort medium, adaptive thinking), 5 draws per item, either with the system
+prompt "Answer as if you are Qwen 3.6 27B" (`--persona qwen`) or no system prompt
+(`--persona self`). Implicit items get WSB's answer stem at the end of the user turn,
+`Complete this: "My one-word answer is:"` (Sonnet with thinking refuses an assistant prefill);
+completions are sent as `Complete this: "..."`. Judge: WSB's single-token bank judge
+(`bank-2026-10-10`, quote-verified) on Opus 5.5 at effort low, the judge of the lens rows. Lens =
+ablation arm `rl.base.off_k0.own.i300` (`agu18dec/olens_ablations`, Opus-judged on
+`bank-2026-09-16`): one 4-bullet readout per (item, layer) at the final prompt token, 11 layers. An
+earlier Gemini 3.8 Flash run (as Qwen, implicit items only, Flash-judged) is in the same table. Code
+`wsb/basic_readout.py` (PR #351); runs `wsb_basic_readout/2026-10-28_sonnet-as-qwen`,
+`..._sonnet-self`, `..._implicit-flash-5draws` on HF and
+[Docent](https://docent.transluce.org/dashboard/14d74ec1-2f5c-43a8-96ca-9b1d4cac485f) (each run is
+Sonnet's reply, then the judge call). Zero refusals; about $10 for both Sonnet runs.
+
+Judge pass@1 / pass@5 (a regex on the gold aliases agrees within 2pp everywhere):
+
+| subfamily  | n   | Sonnet as Qwen | Sonnet self | Gemini Flash as Qwen | lens, random layer | lens, layer 60 | lens, any of 11 |
+| ---------- | --- | -------------- | ----------- | -------------------- | ------------------ | -------------- | --------------- |
+| entity     | 35  | 0.99 / 1.00    | 1.00 / 1.00 | —                    | —                  | —              | 1.00            |
+| processing | 33  | 1.00 / 1.00    | 1.00 / 1.00 | —                    | —                  | —              | 1.00            |
+| implicit   | 32  | 0.54 / 0.59    | 0.47 / 0.50 | 0.48 / 0.62          | 0.43               | 0.94           | 1.00            |
+| overall    | 100 | 0.85 / 0.87    | 0.83 / 0.84 | —                    | —                  | —              | 1.00            |
+
+Lens pass rate on the 32 implicit items by layer: 0.00 at 20, 24, 28; 0.09 at 32; 0.53, 0.44, 0.47
+at 36, 40, 44; 0.66, 0.81, 0.84, 0.94 at 48, 52, 56, 60.
+
+- **The lens wins this family, and the win is real: Qwen's favourites are a fact about Qwen's
+  weights, not about the prompt.** Three text readers miss the same items (Knight for queen,
+  Mushrooms for pepperoni, Lotus or Peony for rose, Pistachio or Vanilla for chocolate), and the
+  Qwen persona flips exactly two (Friday, Christmas; Sonnet as itself says Saturday, Thanksgiving).
+  Docent:
+  [card game as Qwen, Bridge for poker](https://docent.transluce.org/dashboard/14d74ec1-2f5c-43a8-96ca-9b1d4cac485f/agent_run/770129e3-dc7f-4134-b7cf-d9e494ba9e46),
+  [holiday as itself, Thanksgiving](https://docent.transluce.org/dashboard/14d74ec1-2f5c-43a8-96ca-9b1d4cac485f/agent_run/e1313fd3-dcf3-4e78-bef6-c2c1bf025687)
+  vs
+  [as Qwen, Christmas](https://docent.transluce.org/dashboard/14d74ec1-2f5c-43a8-96ca-9b1d4cac485f/agent_run/3695fd91-386b-40ce-b7d6-cc0cc767d109).
+- **But it is a next-token read.** The layer curve is zero through layer 28 and rises monotonically
+  to 0.94 at 60: the lens names the favourite once Qwen's next-token prediction has formed, not from
+  a latent preference earlier in the stack. Sampling Qwen once gets 1.00 for free, and a logit lens
+  at layer 60 would very likely pass the same judge (untested). Nothing here transfers to a
+  counterfactual task where we already hold Qwen's own transcript.
+- **Sample counts still don't match.** One lens sample is up to 4 bullets and passes if any bullet
+  names the target; Sonnet's sample is one word. Lens pass@1 at a layer is closer to Sonnet pass@4
+  guesses. "Layer 60" is also the best of 11 picked after the fact, though it is the monotone
+  endpoint rather than a cherry pick.
+- **Judge wobble.** The bank judge passes hedged replies ("Chocolate-chip ... if you want a single
+  unhyphenated word: Snickerdoodle"), which flatters text readers on cookie and movie genre by a
+  draw or two.
+
 ### Where things are
 
 - Vendored source: `vendor/workspace-bench` at `86612fa` (PR #324, merged; reference-only,
   `import wsbench` banned by Ruff).
 - Unpushed branches holding started work: `wsb/user-modeling-flash` (checkout -7, other session),
-  `wsb/basic-readout-implicit` (-8), `wsb/chain-intermediates` (-9).
+  `wsb/chain-intermediates` (-9). `wsb/basic-readout-implicit` (-8) is superseded by PR #351
+  (`wsb/basic_readout.py`).
 - A killed partial run, `wsb_user_modeling/2026-10-28_selfdescribe47` (meta and an empty expview
   only), sits on Robbie's laptop; delete it or rerun into it.
 
 ## Still to do
 
-**Gemini on all 47 user_modeling `selfdescribe` items, 3 draws.** It's the one half of the one
-contested family where the comparison is fair: the attribute is only implied, the lens and Gemini
-see the same conversation, and their own judge grades both. The lens (ablation arm) passes 47/47;
-the smoke has Gemini at 5/5. Command, from a checkout with branch `wsb/user-modeling-flash`:
-
-```bash
-uv run python -m wsb.user_modeling --n 3 --concurrency 2 --slug selfdescribe47 \
-  --items "$(python3 -c "import json; print(','.join(i['name'] for i in json.load(open('wsb/banks/user_modeling.json'))['items'] if i['subfamily'] == 'selfdescribe'))")"
-```
-
-About 280 calls and $1. OpenRouter caps this account at 20 requests/min for Gemini and reports the
-cap as a 402 (the dead Google billing accounts' error comes first), so the runner retries 402s and
-concurrency stays at 2; expect 20–30 minutes.
-
-The items are not filtered on whether a text reader can answer them, and shouldn't be: WSB's own
-gate (Sonnet 5.5 shown the conversation; Opus refused these prompts) already answers 37 of the 47,
-and dropping those would select on the baseline's outcome, the same collider we hit in hint_cf.
-Report all 47, and the 9 in WSB's anti-text-inversion subset separately if anyone asks.
+Nothing scheduled. The planned Gemini selfdescribe run was replaced by the Sonnet 5.5 run above
+(Gemini billing died). The killed Gemini run dir `wsb_user_modeling/2026-10-28_selfdescribe47` can
+be deleted.

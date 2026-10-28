@@ -13,7 +13,7 @@ is DSv4 Flash. How it differs from af_which_pair:
   shared draw per model and version, shown on the turn's USER: line);
 - exactly 4 bullets per read position, which the prompt calls "4 samples from the lens"; positions whose bullets name
   either model are dropped;
-- the random-model placebo shows its reads on the shown run's own transcript (harness 10).
+- the random-model placebo shows its reads on the shown run's own transcript (harness 12).
 Same items and prompt reads as af_which's resampled inputs otherwise.
 
     uv run python -m cfbench.eval af_which_pair_real --prep --n-items 40 --strict --tag real --placebo PLACEBO_GLM
