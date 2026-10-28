@@ -478,11 +478,11 @@ Current docs:
   that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
   earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
   hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
-- [ACTIVE: todo_suppressed — read before building or running the "leave a function as a TODO" suppressed-plan env, or reading the lens at a suppressed function](docs/envs/todo_suppressed.md)
-  — subject-side env: Qwen (thinking off) writes a module but leaves `foo` as `raise
-  NotImplementedError` (`leave_todo`) vs implements it (`implement`, the CF oracle); `measure` parses
-  `foo`'s discrete implementation-form; smoke validates 6 flip / 3 no-flip items, perfect leave_todo
-  obedience, 0 contamination; investigator side (4 conditions) is later
+- [ACTIVE: todo_suppressed — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
+  — Qwen (thinking off) writes a module but leaves `foo` as `raise NotImplementedError`
+  (`leave_todo`) vs implements it (`implement`); the CF target is which idiom `foo` uses from the
+  item's menu; 72 neutral items (8 external-service), AST-normalised grading, `gate.py` (Gemini 3.8
+  Flash writes the module, pass@3) picks `SURVIVORS`; try log and gate numbers in the doc
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
