@@ -208,9 +208,8 @@ equals Qwen's modal `ask` label. Usable = clear modal and the clean twin flagged
 arith_km, attr_fuji, arith2_discount, dowin_deadline, cap_tanzania, lit_karamazov: defects Flash
 expects Qwen to catch and Qwen misses. Flash predicts every defect Qwen does notice, so no noticed
 item survives, and a predictor that always says "not flagged" sweeps the survivor set. Tries 2-5
-widened the pool (mid-salience, factual slips, capitals, LLM-hard counts and primality); the
-try-2/3/4 pools are in `env.py`, and try 5's gate covers items added in the last uncommitted batch.
-No O-lens reads or cfbench runs on this env.
+widened the pool (mid-salience, factual slips, capitals, LLM-hard counts and primality); every pool
+is in `env.py`. No O-lens reads or cfbench runs on this env.
 
 ## Caveats and open blockers
 
