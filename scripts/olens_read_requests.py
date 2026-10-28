@@ -21,7 +21,7 @@ and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "as
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
 ...]` the token holding each char of that message's content (offsets into its stripped content, as `char_offset` in
-OUT). A row's
+OUT); `prompt_ids` replaces the rendering with those token ids as-is. A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -187,6 +187,8 @@ def main():
 def prepare(tok, row, layers, im_end, im_start):
     """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys."""
     msgs, ids, where = render_request(tok, row)
+    if row.get("prompt_ids"):  # token ids given as-is (e.g. edited after rendering); no per-token message provenance
+        ids, where = row["prompt_ids"], [(-1, None, None)] * len(row["prompt_ids"])
     toks = [tok.decode([i]) for i in ids]
     positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
     if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)

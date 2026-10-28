@@ -739,10 +739,12 @@ def lens_stats(a):
 
 def tqa_prep(a):
     """The TruthfulQA out-of-sample set: hinted_truthfulqa `control` items whose no-hint modal answer has >= min_count/
-    n_samples (all of them, not balanced), rendered as build("control", item) with the thinking-off generation prompt.
-    Sites per option: `nl`, the token right after the option's text ("\\n", or <|im_end|> after the last option) and `end`,
-    the text's last token. Writes the run (questions, options) plus, in --work, the inputs for scripts/hs_at_positions.py
-    (candidates "(A", "(B", ...: Qwen's replies open with "(X)" and "(X" is one token) and O-lens requests at the nl sites."""
+    n_samples (all of them, not balanced), rendered as build("control", item) with the thinking-off generation prompt and
+    --trail ("\\n\\n") inserted after the last option, so every option is followed by a newline token as in hint_mcq.
+    Sites per option: `nl`, the token right after the option's text, and `end`, the text's last token. Writes the run
+    (questions, options) and, in --work, the inputs for scripts/hs_at_positions.py (candidates "(A", "(B", ...: Qwen's
+    replies open with "(X)" and "(X" is one token), the same for the unedited prompt (`_orig`, whose last nl site is
+    <|im_end|>) and O-lens requests at the edited prompt's nl sites (`prompt_ids`)."""
     from transformers import AutoTokenizer
 
     from counterfactual_investigator_agent_with_olens.render import render_request
@@ -774,22 +776,31 @@ def tqa_prep(a):
     )
     work = Path(a.work)
     work.mkdir(parents=True, exist_ok=True)
-    questions, options, inputs, requests = [], [], [], []
+
+    def render(msgs, n_opts, trail):
+        """Token ids (thinking-off generation prompt) and, per option, the token after its text (nl) and its text's last
+        token (end). `trail` goes into the rendered text right after the last option: Qwen's template trims message content,
+        so it can't go through the message."""
+        text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        start = text.index(msgs[-1]["content"])
+        stop = start + len(msgs[-1]["content"])
+        if not trail:
+            _, rids, _ = render_request(tok, {"messages": msgs})  # the O-lens reader's rendering: the same tokens
+            assert rids == tok(text, add_special_tokens=False)["input_ids"][: len(rids)], msgs
+        text = text[:stop] + trail + text[stop:]
+        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
+        starts = [text.index(f"\n({tqa.LETTERS[i]}) ", start) for i in range(n_opts)]
+        offs = enc["offset_mapping"]
+        nl = [next(i for i, (s, e) in enumerate(offs) if s <= c < e) for c in [*starts[1:], stop]]
+        end = [next(i for i, (s, e) in enumerate(offs) if s <= c - 1 < e) for c in [*starts[1:], stop]]
+        return enc["input_ids"], nl, end
+
+    questions, options, inputs, orig, requests = [], [], [], [], []
     for qi, r in enumerate(picked):
         ep = tqa.build("control", r["item"])
-        msgs, opts = ep.messages, ep.meta["options"]
-        text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
-        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
-        user = msgs[-1]["content"]
-        start, stop = text.index(user), text.index(user) + len(user)
-        starts = [text.index(f"\n({tqa.LETTERS[i]}) ", start) for i in range(len(opts))]
-        ends = [*starts[1:], stop]
-        offs = enc["offset_mapping"]
-        nl = [next(i for i, (s, e) in enumerate(offs) if s <= c < e) for c in ends]
-        end = [next(i for i, (s, e) in enumerate(offs) if s <= c - 1 < e) for c in ends]
-        ids = enc["input_ids"]
-        _, rids, _ = render_request(tok, {"messages": msgs})  # the O-lens reader's rendering: same tokens up to the last site
-        assert rids[: nl[-1] + 1] == ids[: nl[-1] + 1], r["item"]
+        opts = ep.meta["options"]
+        ids, nl, end = render(ep.messages, len(opts), a.trail)
+        oids, onl, oend = render(ep.messages, len(opts), "")
         questions.append(r | {"n_opts": len(opts), "question": tqa._items()[str(r["item"])]["question"], "options": opts})
         for i in range(len(opts)):
             L = tqa.LETTERS[i]
@@ -803,17 +814,32 @@ def tqa_prep(a):
                     "is_gold": L == r["gold"],
                     "right": r["right"],
                 }
-                | {"nl_token": tok.decode([ids[nl[i]]]), "end_token": tok.decode([ids[end[i]]])}
+                | {
+                    "nl_token": tok.decode([ids[nl[i]]]),
+                    "end_token": tok.decode([ids[end[i]]]),
+                    "orig_nl_token": tok.decode([oids[onl[i]]]),
+                }
             )
-        inputs.append({"id": r["item"], "ids": ids, "sites": {"nl": nl, "end": end}, "cand": [c[0] for c in cand[: len(opts)]]})
+        cands = [c[0] for c in cand[: len(opts)]]
+        inputs.append({"id": r["item"], "ids": ids, "sites": {"nl": nl, "end": end}, "cand": cands})
+        orig.append({"id": r["item"], "ids": oids, "sites": {"nl": onl, "end": oend}, "cand": cands})
         requests.append(
-            {"id": f"hinted_truthfulqa/{r['item']}", "env": "hinted_truthfulqa", "arm": "control", "messages": msgs, "positions": nl}
+            {
+                "id": f"hinted_truthfulqa/{r['item']}",
+                "env": "hinted_truthfulqa",
+                "arm": "control",
+                "messages": ep.messages,
+                "prompt_ids": ids,
+                "positions": nl,
+            }
         )
     (run / "questions.jsonl").write_text("".join(json.dumps(q) + "\n" for q in questions))
     (run / "options.jsonl").write_text("".join(json.dumps(o) + "\n" for o in options))
     (work / "hs_inputs.jsonl").write_text("".join(json.dumps(x) + "\n" for x in inputs))
+    (work / "hs_inputs_orig.jsonl").write_text("".join(json.dumps(x) + "\n" for x in orig))
     (work / "lens_requests.jsonl").write_text("".join(json.dumps(x) + "\n" for x in requests))
     print(f"run {run}; {len(options)} options; nl tokens {Counter(o['nl_token'] for o in options).most_common(4)}; inputs in {work}")
+    print(f"original prompt's nl tokens {Counter(o['orig_nl_token'] for o in options).most_common(4)}")
 
 
 def oos(a):
@@ -968,6 +994,7 @@ def main():
     t.add_argument("--work", default="data/tqa_oos", help="where the GPU inputs and O-lens requests go")
     t.add_argument("--min-count", type=int, default=7)
     t.add_argument("--n-samples", type=int, default=8)
+    t.add_argument("--trail", default="\n\n", help="appended after the last option (the main prompt; the original goes to *_orig)")
     o = sub.add_parser("oos")
     o.add_argument("train", help="the MMLU-Pro run the probe is fit on")
     o.add_argument("test", help="the tqa-prep run, with scripts/hs_at_positions.py output in data/probe_cache/<run>/")
