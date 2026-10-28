@@ -2,7 +2,7 @@
 transcript-only vs O-lens per predictor (adding the thinking-off `*dumbpred-*` runs).
 
 Runs: `data/runs/cfbench/*modelchart-*` (2026-10-24, four hand-picked cases, docs/cfbench-model-chart.md). Called from
-`cfbench.report.charts`; metric is 100 − RMSE of the predicted rate with equal case weights (docs/cfbench-scoring.md).
+`graphs.cfbench_report`; metric is 100 − RMSE of the predicted rate with equal case weights (docs/cfbench-scoring.md).
 """
 
 import glob

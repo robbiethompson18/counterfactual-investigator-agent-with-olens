@@ -5,7 +5,7 @@ main.
 
 How we score a counterfactual predictor from 2026-10-26 on, why the binomial log-likelihood skill we
 used before was replaced, and how the report charts are normalized. Code: `cfbench/report/data.py`
-(scoring, run groups), `cfbench/report/charts.py` (the progress report's "Preliminary Data"
+(scoring, run groups), `graphs/cfbench_report.py` (the progress report's "Preliminary Data"
 figures), `cfbench/score.py` (per-run scoring at the command line).
 
 ## The quantities
@@ -78,7 +78,7 @@ envs, as its cases are two sets of cases.
 
 ## What the numbers looked like on 2026-10-26
 
-Gemini 3.8 Flash, medium effort, `cfbench.report.charts` on the runs in `groups()`:
+Gemini 3.8 Flash, medium effort, `graphs.cfbench_report` on the runs in `groups()`:
 
 | target        | cases | envs (ESS) | env diff only | transcript-only | O-lens | placebo | edit does nothing |
 | ------------- | ----- | ---------- | ------------- | --------------- | ------ | ------- | ----------------- |

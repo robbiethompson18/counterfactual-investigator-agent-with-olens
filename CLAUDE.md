@@ -370,6 +370,9 @@ Current docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
   — what's in which collection, `link`/`view` commands, auto-upload at finish in both runners
   (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
+- [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) — every
+  chart module in one package (`python -m graphs.<module>` → `docs/img/`), which doc each serves;
+  scoring stays in `cfbench.report.data`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
@@ -382,7 +385,7 @@ Current docs:
   paragraphs moved out of cfbench/README.md; log-skill definition
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
-  env space, `cfbench.report.charts` and its run groups
+  env space, `graphs.cfbench_report` and its run groups
 - [ACTIVE: cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, log-skill results per
   harness version (v1–v6) and one base run vs 30
