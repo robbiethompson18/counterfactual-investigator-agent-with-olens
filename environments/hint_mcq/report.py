@@ -10,11 +10,25 @@ logic for other scripts.
 """
 
 import argparse
+import json
 from collections import Counter, defaultdict
 
-from cfbench.envs.env_runs import rows as env_rows  # ty: ignore[unresolved-import]  # BUG: rows() is gone (CODE_SMELL.md)
+from environments._lib.runfolder import LOCAL, read_episodes
 
 SLOTS = ("d1", "d2")
+
+
+def labeled_episodes(run: str):
+    """(episode, measure values) per episode of a run folder, from its newest labels/measure@*.jsonl (none: {})."""
+    run_dir = LOCAL / "hint_mcq" / run
+    files = sorted(run_dir.glob("labels/measure@*.jsonl"), key=lambda p: (p.stat().st_mtime, p.name))
+    labels = {}
+    if files:
+        for line in files[-1].read_text().splitlines():
+            rec = json.loads(line)
+            labels[rec["episode"]] = rec["values"]
+    for ep in read_episodes(run_dir):
+        yield ep, labels.get(ep["id"]) or {}
 
 
 def item_table(runs: list[str], filler: str = "none", min_consistency: float = 0.8, min_follow: float = 0.5) -> dict[str, dict]:
@@ -23,12 +37,12 @@ def item_table(runs: list[str], filler: str = "none", min_consistency: float = 0
     by: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     meta: dict[str, dict] = {}
     for run in runs:
-        for _, row in env_rows("hint_mcq", run):
-            if row.get("positive") is None or not row["arm"].startswith(prefix) or (not prefix and "/" in row["arm"]):
+        for ep, values in labeled_episodes(run):
+            if values.get("positive") is None or ep.get("error") or not ep["arm"].startswith(prefix) or (not prefix and "/" in ep["arm"]):
                 continue
-            answer = row["messages"][-1]["content"].strip()[:1].upper()
-            by[str(row["item"])][row["arm"].removeprefix(prefix)].append(answer)
-            meta.setdefault(str(row["item"]), row["meta"])
+            answer = ep["messages"][-1]["content"].strip()[:1].upper()
+            by[str(ep["item"])][ep["arm"].removeprefix(prefix)].append(answer)
+            meta.setdefault(str(ep["item"]), ep["meta"])
     table = {}
     for item, arms in by.items():
         base = arms.get("nohint", [])
