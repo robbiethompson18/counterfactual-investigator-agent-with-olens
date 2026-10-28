@@ -264,6 +264,8 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
                 "n_shown": r["n_base"],
                 "k_cf": r["k_cf"],
                 "n_cf": r["n_cf"],
+                "k_cf_pool": r.get("k_cf_pool"),  # claim evals: the model's real pooled counterfactual rate, for context
+                "n_cf_pool": r.get("n_cf_pool"),
                 "n_cases": 0,
                 "draws": defaultdict(list),
                 "_mse": defaultdict(list),
@@ -324,6 +326,10 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         "slug": meta.get("slug") or (m[2] if m else run_dir.name),
         "description": meta.get("description"),
         "status": meta.get("status"),
+        "started": meta.get("started_at"),
+        "task": meta["params"].get("task", "rate"),
+        "inputs": Path(meta["params"]["inputs"]).name if meta["params"].get("inputs") else None,
+        "versions": meta["params"].get("versions"),
         "harness_version": meta["params"].get("harness_version", 1),
         "predictors": meta["params"].get("predictors", "").split(","),
         "conditions": sorted({k for g in out_groups for k in g["draws"]}),
@@ -336,6 +342,8 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         # mean over cases of the per-case MSE (each case's draws averaged first), as cfbench.scoring.rmse
         "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
         "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5 if sq_null else None,
+        "_sq": dict(sq),  # per-case MSEs, for the eval's pooled row (dropped before writing)
+        "_sq_null": sq_null,
         "paired": paired,
         "groups": out_groups,
     }
@@ -432,6 +440,94 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
     }
 
 
+def mark_current(name: str, summaries: list[dict]) -> dict:
+    """Mark which conditions of each run are current (`current_conds`: the newest complete run per (version set,
+    condition), so a later placebo-only rerun replaces just the placebo of an earlier run) and each run `current` if it
+    has any (else superseded: the page folds those away), and return the eval-level pooled numbers over the current rows:
+    claim evals get af_which's table per inputs run (cfbench/evals/af_which/score.py, plus pick accuracy and order
+    consistency for paired-order evals), rate evals a pooled RMSE row and pooled paired comparison."""
+    from cfbench.core import canon_condition
+
+    seen: set = set()
+    for s in summaries:  # newest first
+        s["current_conds"] = []
+        for c in s["conditions"] if s.get("status") in (None, "done") else []:
+            if (key := (tuple(s.get("versions") or [s["run"]]), c)) not in seen:
+                seen.add(key)
+                s["current_conds"].append(c)
+        s["current"] = bool(s["current_conds"])
+    cur = [s for s in summaries if s["current"]]
+    if any(s.get("task") == "claim" for s in cur):
+        from cfbench.evals.af_which.score import stats
+        from cfbench.evals.af_which_pair.score import pair_stats
+
+        tables = []
+        for inputs in dict.fromkeys(s["inputs"] for s in cur):
+            runs = [s for s in cur if s["inputs"] == inputs]
+            rows = [
+                r
+                for s in runs
+                for line in (CFBENCH / s["run"] / "predictions.jsonl").read_text().splitlines()
+                if canon_condition((r := json.loads(line))["condition"]) in s["current_conds"]
+            ]
+            table = stats(rows)
+            if all("order" in r for r in rows):
+                pair = pair_stats(rows)
+                for t in table:
+                    t |= pair.get((t["condition"], t["version"]), {})
+            tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table})
+        return {"claim_tables": tables}
+    cur = [s for s in cur if s.get("task", "rate") == "rate"]
+    if len(cur) < 2:
+        return {}
+    sq, sq_null = defaultdict(list), []
+    for s in cur:
+        for k, v in s["_sq"].items():
+            if k not in s["current_conds"]:
+                continue
+            sq[k] += v
+        sq_null += s["_sq_null"]
+    paired: defaultdict[str, Any] = defaultdict(lambda: {"a": [], "z": [], "truth": defaultdict(list)})
+    for s in cur:  # per-case mean p per model, from the groups' draws, pooled over the current runs
+        models = sorted(
+            {g["model"] for g in s["groups"]}, key=lambda m: -max(g["k_cf"] / g["n_cf"] for g in s["groups"] if g["model"] == m)
+        )
+        if len(models) != 2:
+            continue
+        for g in s["groups"]:
+            for k, ds in g["draws"].items():
+                if k not in s["current_conds"]:
+                    continue
+                per = defaultdict(list)
+                for d in ds:
+                    if d["p"] is not None:
+                        per[d["item"]].append(d["p"])
+                side = "a" if g["model"] == models[0] else "z"
+                paired[k][side] += [sum(v) / len(v) for v in per.values()]
+                paired[k]["truth"][side] += [g["k_cf"] / g["n_cf"]] * len(per)
+                paired[k]["models"] = models
+    return {
+        "pooled": {
+            "runs": [s["slug"] for s in cur],
+            "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
+            "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5,
+            "n_cases": len(sq_null),
+            "paired": [
+                {
+                    "condition": k,
+                    "models": v["models"],
+                    "n": [len(v["a"]), len(v["z"])],
+                    "auroc": auroc(v["a"], v["z"]),
+                    "mean_p": [sum(v["a"]) / len(v["a"]), sum(v["z"]) / len(v["z"])],
+                    "truth": [sum(v["truth"]["a"]) / len(v["truth"]["a"]), sum(v["truth"]["z"]) / len(v["truth"]["z"])],
+                }
+                for k, v in sorted(paired.items())
+                if v["a"] and v["z"]
+            ],
+        }
+    }
+
+
 def describe(name: str, envs: list[str]) -> tuple[str, str]:
     """(title, description markdown): an eval folder's docstring + eval.md, or the implicit env-pairs eval's."""
     d = EVAL_DIRS / name
@@ -450,11 +546,18 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
     for name in names or list(runs):
         if name not in runs:
             continue
-        summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s["run"], reverse=True)
+        summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s.get("started") or s["run"], reverse=True)
+        summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
+        if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
+            summaries = [s for s in summaries if s.get("inputs") in only]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
+        extra = mark_current(name, summaries)
+        for s in summaries:
+            s.pop("_sq", None), s.pop("_sq_null", None)
         p = EVALS / f"{name}.json"
-        p.write_text(json.dumps({"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries}) + "\n")
+        doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries} | extra
+        p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     index = []
     for p in sorted(EVALS.glob("*.json")):

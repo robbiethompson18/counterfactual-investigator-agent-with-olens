@@ -27,6 +27,9 @@ MODEL_IDS = list(af.MODELS)  # neither id may reach the predictor
 CONDITIONS = af.CONDITIONS
 INPUTS_FROM = "af_which"
 TASK = "claim"
+# the env viewer shows only runs on these inputs: the earlier af-which-inputs gave every case of a (version, model) one
+# shared lens draw at the shared user-turn prefix (scripts/af_which_resample), so its runs are not shown
+INPUTS_RUNS = ("2026-10-28_af-which-inputs-resample",)
 FAKER = which.FAKER
 ORDERS = ((FAKER, "z-ai/glm-5.3"), ("z-ai/glm-5.3", FAKER))
 reads = af.reads

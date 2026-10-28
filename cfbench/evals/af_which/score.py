@@ -43,36 +43,58 @@ def ci(preds: Preds, rng: np.random.Generator) -> np.ndarray:
     return np.percentile(stats, [2.5, 97.5], axis=0)
 
 
-def report(name: str, preds: Preds, rng: np.random.Generator):
+def stat(preds: Preds, rng: np.random.Generator) -> dict:
+    """One table row: n, both Briers with their CIs, per-model mean Brier and p_bar, AUROC (FAKER's p vs the other's)."""
     mean, of_mean = briers(preds)
     (lo_m, lo_b), (hi_m, hi_b) = ci(preds, rng)
     ps = {m: [p for _, mm, p, _ in preds if mm == m] for m in SHORT}
-    per_model = " ".join(f"{SHORT[m]} {np.mean([(p - (m == FAKER)) ** 2 for p in ps[m]]):.3f}" for m in SHORT)
-    pbar = " ".join(f"{SHORT[m]} {np.mean(ps[m]):.3f}" for m in SHORT)
-    print(
-        f"{name:34} {len(preds):>4}  {mean:.3f} [{lo_m:.3f},{hi_m:.3f}]  {of_mean:.3f} [{lo_b:.3f},{hi_b:.3f}]  "
-        f"{per_model:21}  {pbar:21}  {auroc(ps[FAKER], ps['z-ai/glm-5.3']) or float('nan'):.3f}"
-    )
+    return {
+        "n": len(preds),
+        "mean_brier": mean,
+        "mean_brier_ci": [float(lo_m), float(hi_m)],
+        "brier_pbar": of_mean,
+        "brier_pbar_ci": [float(lo_b), float(hi_b)],
+        "model_brier": {m: float(np.mean([(p - (m == FAKER)) ** 2 for p in ps[m]])) for m in SHORT},
+        "pbar": {m: float(np.mean(ps[m])) for m in SHORT},
+        "auroc": auroc(ps[FAKER], ps["z-ai/glm-5.3"]),
+    }
 
 
-def main():
-    rows = [json.loads(line) for path in sys.argv[1:] for line in (Path(path) / "predictions.jsonl").read_text().splitlines()]
+def stats(rows: list[dict]) -> list[dict]:
+    """The table: one row per (condition, version) and per condition pooled over versions ("pooled"), invalid rows counted."""
     invalid = Counter(canon_condition(r["condition"]) for r in rows if not r["valid"])
     preds: dict[tuple[str, str], Preds] = defaultdict(list)
     for r in rows:
         if r["valid"]:
             item, y = f"{r['version']}/{r['item']}", r["k_cf"] // r["n_cf"]
             preds[canon_condition(r["condition"]), r["version"]].append((item, r["model"], r["p"], y))
-    rng = np.random.default_rng(0)
+    rng, out = np.random.default_rng(0), []
+    for cond in sorted({c for c, _ in preds}):
+        versions = sorted(v for c, v in preds if c == cond)
+        for version in versions:
+            out.append({"condition": cond, "version": version, "invalid": invalid[cond]} | stat(preds[cond, version], rng))
+        if len(versions) > 1:
+            pooled = [x for (c, _), xs in preds.items() if c == cond for x in xs]
+            out.append({"condition": cond, "version": "pooled", "invalid": invalid[cond]} | stat(pooled, rng))
+    return out
+
+
+def main():
+    rows = [json.loads(line) for path in sys.argv[1:] for line in (Path(path) / "predictions.jsonl").read_text().splitlines()]
+    invalid = Counter(canon_condition(r["condition"]) for r in rows if not r["valid"])
     print(f"invalid rows per condition: {dict(invalid)}; always 0.5 scores 0.25 on both Briers")
     print(
         f"{'condition / version':34} {'n':>4}  {'mean_i Brier(p_i) [95% CI]':26}  {'Brier(p_bar) [95% CI]':21}  "
         f"{'mean Brier per model':21}  {'p_bar per model':21}  AUROC(p)"
     )
-    for cond in sorted({c for c, _ in preds}):
-        for version in sorted(v for c, v in preds if c == cond):
-            report(f"{cond} {version}", preds[cond, version], rng)
-        report(f"{cond} pooled", [x for (c, _), xs in preds.items() if c == cond for x in xs], rng)
+    for s in stats(rows):
+        (lo_m, hi_m), (lo_b, hi_b) = s["mean_brier_ci"], s["brier_pbar_ci"]
+        per_model = " ".join(f"{SHORT[m]} {s['model_brier'][m]:.3f}" for m in SHORT)
+        pbar = " ".join(f"{SHORT[m]} {s['pbar'][m]:.3f}" for m in SHORT)
+        print(
+            f"{s['condition'] + ' ' + s['version']:34} {s['n']:>4}  {s['mean_brier']:.3f} [{lo_m:.3f},{hi_m:.3f}]  "
+            f"{s['brier_pbar']:.3f} [{lo_b:.3f},{hi_b:.3f}]  {per_model:21}  {pbar:21}  {s['auroc'] or float('nan'):.3f}"
+        )
 
 
 if __name__ == "__main__":
