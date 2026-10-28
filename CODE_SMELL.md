@@ -4,6 +4,14 @@ Tech debt we know about, newest first.
 
 ## 2026-10-28: `environments run` crashes after a finished run on a missing eval env module
 
+**Partly fixed (essay_curious PR #306):** `evals.Envs` now skips envs that don't import. The upload
+still fails: `build_index` also writes `data/evals/*.json`, and `runfolder.upload` only accepts
+paths under `data/envs/` (`ValueError: ... evals/... is not in the subpath of .../envs`), so
+essay_curious's runs were uploaded with a direct `upload()` of the run dirs. HF's top-level
+`envs/index.json` was down to one env on 2026-10-27: an upload replaces it with whatever envs the
+local checkout has, so uploads from sparse checkouts drop the others (restored by hand for
+notice_defect).
+
 The runner's index step (`environments/_lib/index.py` → `build_evals` → `evals.py` → `load_env`)
 imports `environments.dumb_user_exploit_appraisal`, which does not exist, so every
 `environments run` on main ends with a traceback after "done: N episodes" and never uploads
@@ -46,8 +54,8 @@ none fixed yet:
 `rows()` (episodes as evalcue-shaped rows) went in `b78d8bd` (2026-10-27) but two callers remain,
 silenced with `ty: ignore` in the ty-clean PR: `environments/hint_mcq/report.py` (so it and
 `gate.py`, which imports it, fail at import) and the `envs:` specs of
-`scripts/olens_requests_from_runs.py`. Port them to `EnvRuns` / `read_episodes`, or restore
-`rows()`.
+`scripts/olens_requests_from_runs.py` (ported to `EnvRuns` in PR #306). Port `report.py` to
+`EnvRuns` / `read_episodes`, or restore `rows()`.
 
 ## 2026-10-27: cfbench places every chat-template token at one character, labelled as the previous message
 
