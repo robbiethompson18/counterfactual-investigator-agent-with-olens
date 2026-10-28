@@ -46,8 +46,6 @@ extra-paths = ["olens/src", "expview", "transcript-viewer/web"]
 exclude = [
   "vendor",
   "environments/retired",
-  "olens_prompt_ea",  # Kylie's
-  "weirdness_elo",  # Kylie's
 ]
 
 [tool.ty.analysis]
