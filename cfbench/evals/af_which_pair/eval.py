@@ -27,6 +27,7 @@ MODEL_IDS = list(af.MODELS)  # neither id may reach the predictor
 CONDITIONS = af.CONDITIONS
 INPUTS_FROM = "af_which"
 TASK = "claim"
+COMPARE_INPUTS = True  # the env viewer shows the newest run per inputs run: pre- vs post-resample
 FAKER = which.FAKER
 ORDERS = ((FAKER, "z-ai/glm-5.3"), ("z-ai/glm-5.3", FAKER))
 reads = af.reads
