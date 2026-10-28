@@ -142,6 +142,82 @@ def _glm_reads(path: Path, arm: str, n_bullets: int = 3) -> dict[str, list[tuple
     return out
 
 
+def _dsv4_replies(path: Path, version: str, arm: str, n_bullets: int) -> dict[str, dict[str, list[tuple[str, list[str]]]]]:
+    """item -> {source: the reply tokens' reads}, for the one episode per item `path` read (requests.jsonl names it). The
+    reader cut replies at --reply-chars (120 for these runs), so a longer reply's reads stop there."""
+    keys = ("greedy", "s1", "s2", "s3", "s4")[:n_bullets]
+    requests = {r["id"]: r for r in map(json.loads, (path / "requests.jsonl").read_text().splitlines())}
+    by = defaultdict(list)
+    for line in (path / "reads_L30.jsonl").read_text().splitlines():
+        r = json.loads(line)
+        if r["id"].startswith(f"{version}:{arm.split('/')[-1]}:") and r["role"] == "assistant":
+            by[r["id"]].append(r)
+    out = defaultdict(dict)
+    for id, rows in by.items():
+        q = requests[id]
+        toks = [(r["token"], [r.get(k, "") for k in keys]) for r in sorted(rows, key=lambda r: r["pos"])]
+        out[q["item"]][f"{ENV}/{q['run']}:{q['episode']}"] = [(t, b) for t, b in toks if t not in HEADER["dsv4"]]
+    return out
+
+
+def _glm_replies(path: Path, arm: str, n_bullets: int) -> dict[str, dict[str, list[tuple[str, list[str]]]]]:
+    """item -> {source: the reply tokens' reads} for every episode of the arm in Celeste's dense reads, its own rows plus
+    the canonical rows of its prefix-duplicated positions (a reply's first tokens are often shared with another episode)."""
+    bullets = ["rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4"][:n_bullets]
+    cols = ["tid", "run_dir", "arm", "item", "sample", "role", "pos", "token", *bullets]
+    d = pd.read_parquet(path / "readouts_dense.parquet", columns=cols)
+    canon, keep = d.set_index(["tid", "pos"]), ["role", "token", *bullets]
+    dups = pd.read_parquet(path / "dense_prefix_dups.parquet")
+    dups = dups[dups.canon_in == "readouts_dense"].groupby("tid")
+    out = defaultdict(dict)
+    for tid, g in d[d.arm == arm].groupby("tid"):
+        rows = g.set_index("pos")[keep]
+        if tid in dups.groups:
+            dup = dups.get_group(tid)
+            has = [k in canon.index for k in zip(dup.canon_tid, dup.canon_pos, strict=True)]
+            keys = [k for k, h in zip(zip(dup.canon_tid, dup.canon_pos, strict=True), has, strict=True) if h]
+            rows = pd.concat([canon.loc[keys, keep].set_axis(dup.pos[has].values), rows]).sort_index()
+        rows = rows[rows.role.isin(["assistant", "reasoning"]) & ~rows.token.isin(HEADER["glm"])]
+        source = f"{ENV}/{g.run_dir.iloc[0].split('/')[-1]}:{arm.replace('/', '.')}~{g.item.iloc[0]}~{g['sample'].iloc[0]}"
+        out[g.item.iloc[0]][source] = [(t, list(bs)) for t, *bs in zip(rows.token, *(rows[b] for b in bullets), strict=True)]
+    return out
+
+
+def reply_rows(source: str, reply: str, toks: list[tuple[str, list[str]]], full_bullets: bool, sparse: bool) -> tuple[list[dict], bool]:
+    """read_rows for the reply (messages[2] content), and whether the reads cover all of it. Tokens are placed in the reply
+    in order; reads that don't place (past the reader's reply cut) are dropped, and so is the last placed one of a reply
+    read only in part (the cut may split a token)."""
+    places = _place(reply, [t for t, _ in toks])
+    placed = [(i, t, b, c) for i, ((t, b), c) in enumerate(zip(toks, places, strict=True)) if c is not None]
+    complete = bool(placed) and "".join(reply.split()) in "".join("".join(t for _, t, _, _ in placed).split())
+    if not complete:
+        placed = placed[:-1]
+    rows = []
+    for i, tok, bullets, c in placed:
+        if (full_bullets and not all(str(b).strip() for b in bullets)) or (sparse and not _sparse_keep(reply, tok, c)):
+            continue
+        rows.append(
+            {
+                "id": source,
+                "token_index": REPLY_INDEX + i,
+                "token": tok,
+                "prefix": "",
+                "msg_index": 2,
+                "role": "assistant",
+                "field": "content",
+                "char_offset": c,
+                "layer": 0,
+                "bullets": [_bullet(b) for b in bullets],
+                "joint_fve": None,
+            }
+        )
+    return rows, complete
+
+
+REPLY_INDEX = 100_000  # reply rows' token_index offset, clear of the prompt's
+NAMES = re.compile(r"deepseek|glm|zhipu|z\.ai|chatglm|v4[ -]flash", re.IGNORECASE)  # never shown to the investigator
+
+
 TAG = re.compile(r"</?[A-Za-z_][^<>]*>")  # an XML tag: <deployment_stage>, </user_input>, <request_fully_accepted/>, ...
 STAGE = re.compile(r"(?<=<deployment_stage>)[^<]*(?=</deployment_stage>)")  # the public / preview word
 REQUEST = re.compile(r"(?<=<user_input>\n).*?(?= If you accept to provide)", re.DOTALL)  # the AdvBench goal: never read
@@ -253,6 +329,7 @@ def prep(
     dsv4_reads: dict[str, Path] | None = None,
     full_bullets: bool = False,
     sparse: bool = False,
+    real_replies: bool = False,
 ):
     """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
     (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
@@ -260,8 +337,11 @@ def prep(
     (reads_placebo_dsv4 from scripts/cfbench_af_prep.py on branch claude/cfbench-af); the inputs run keeps a copy, so later
     runs only need the inputs run. `n_bullets`: bullets per read for both models and the placebo (fewer if the source has
     fewer); `dsv4_reads`: per version, a DSv4 reads dir (holding reads_L30.jsonl) in place of VERSIONS' one; `full_bullets`:
-    drop DSv4 positions with a blank bullet; `sparse`: only the header, punctuation, XML-tag and stage-word positions."""
+    drop DSv4 positions with a blank bullet; `sparse`: only the header, punctuation, XML-tag and stage-word positions;
+    `real_replies`: show each refusal's own reply and reasoning_content as generated, not REJECTED (the reads are on the
+    prompt only, so they don't change)."""
     (out / "reads").mkdir(parents=True)
+    pending = []  # (version, model, item) whose reply is read only in part
     (out / "placebo").mkdir()
     reads_f, req_f = (out / "reads/reads.jsonl").open("w"), (out / "reads/requests.jsonl").open("w")
     cases_f = (out / "cases.jsonl").open("w")
@@ -283,32 +363,59 @@ def prep(
             for i in refusal["dsv4"]
             if all(i in refusal[m] and i in lens[m] and not (strict and i in complied[m]) for m in MODELS.values())
         ]
-        data[version] = (V, base_arm, cf_arm, eps, lens, refusal)
+        replies = {}
+        if real_replies:
+            replies = {
+                "dsv4": _dsv4_replies((dsv4_reads or {}).get(version) or READS / V["reads"]["dsv4"], version, base_arm, n_bullets),
+                "glm": _glm_replies(READS / V["reads"]["glm"], base_arm, n_bullets),
+            }
+        data[version] = (V, base_arm, cf_arm, eps, lens, refusal, replies)
     chosen, dropped = pick_items(eligible, n_items), Counter()
     for version in versions:
-        V, base_arm, cf_arm, eps, lens, refusal = data[version]
+        V, base_arm, cf_arm, eps, lens, refusal, replies = data[version]
         items = chosen[version]
         for model, m in MODELS.items():
             pre = [v for _, e, v in eps[m] if e["arm"] == cf_arm and e["item"] in items]
             pub = [v for _, e, v in eps[m] if e["arm"] == base_arm and e["item"] in items]
             print(f"{version} {m}: {len(items)} items, public {sum(pub)}/{len(pub)}, preview {sum(pre)}/{len(pre)}")
+            refusals = {s: e for s, e, v in eps[m] if e["arm"] == base_arm and not v}
             for item in items:
                 source, ep = refusal[m][item]
+                if real_replies:  # show a refusal whose reply was read, the first shown one if it was (same prompt reads)
+                    read = {s: t for s, t in replies[m].get(item, {}).items() if s in refusals}
+                    full = [s for s, t in read.items() if reply_rows(s, refusals[s]["messages"][2]["content"], t, False, False)[1]]
+                    assert read, (version, m, item)
+                    source = source if source in full else (sorted(full) or sorted(read))[0]
+                    ep = refusals[source]
                 system, user = ep["messages"][0], ep["messages"][1]
-                messages = [system, user, {"role": "assistant", "content": REJECTED, "reasoning_content": ""}]
+                reply = {"role": "assistant", "content": REJECTED, "reasoning_content": ""}
+                if real_replies:  # the reply exactly as generated (not its `provider`, which isn't model output)
+                    assert len(ep["messages"]) == 3 and ep["messages"][2]["role"] == "assistant", source
+                    reply = {k: v for k, v in ep["messages"][2].items() if k != "provider"}
+                messages = [system, user, reply]
                 rows = read_rows(source, m, user["content"], lens[m][item], full_bullets, sparse)
                 dropped[version, m] += len(read_rows(source, m, user["content"], lens[m][item], sparse=sparse)) - len(rows)
+                if real_replies:
+                    more, complete = reply_rows(source, reply["content"], read[source], full_bullets, sparse)
+                    rows += more
+                    if not complete:
+                        pending.append((version, m, item))
+                    assert not NAMES.search(json.dumps(messages, ensure_ascii=False)), (source, NAMES.search(json.dumps(messages)))
                 for r in rows:
                     reads_f.write(json.dumps(r) + "\n")
                 req_f.write(json.dumps({"id": source, "messages": messages}) + "\n")
                 case = {"version": version, "model": model, "item": item, "base_arm": base_arm, "cf_arm": cf_arm, "source": source}
                 case |= {"messages": messages, "k_cf": sum(pre), "n_cf": len(pre), "k_base_pool": sum(pub), "n_base_pool": len(pub)}
                 case["n_reads"] = len(rows)
+                if real_replies:
+                    case["n_reply_reads"], case["reply_reads_complete"] = len(more), complete
                 cases_f.write(json.dumps(case) + "\n")
     for f in (reads_f, req_f, cases_f):
         f.close()
     if full_bullets:
         print(f"positions dropped for a blank bullet: {dict(dropped)}")
+    if real_replies:
+        print(f"replies read only in part (the reader's reply cut): {pending}")
     texts = {}
     for line in (placebo / "requests.jsonl").open():
         q = json.loads(line)

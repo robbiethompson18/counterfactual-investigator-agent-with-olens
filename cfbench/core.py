@@ -66,7 +66,11 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # other-env transcripts per case (seed + the case's base-run sources), where every case used to get the same assignment
 # (seed + draw), so all of a run's placebo cases read one transcript pair (red-team of af_which, 2026-10-28). Only placebo
 # inputs changed: every other condition's prompt and tools are byte-identical to 8, so those rows compare across 8 and 9.
-HARNESS_VERSION = 9
+# 10: an eval's own placebo (PLACEBO, sources=) shows the reads on the shown run's own transcript, not on the reads
+# source's: prompt positions at their place (the prompts must be identical), reply positions moved to the same relative
+# place in the shown reply. Under 9 its tools showed the source transcript's text around each read, which differs once
+# replies are shown as generated (af_which_pair with real replies, Kylie 2026-10-28). Only that placebo's output changed.
+HARNESS_VERSION = 10
 
 
 @dataclass

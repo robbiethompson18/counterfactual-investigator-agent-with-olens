@@ -213,6 +213,23 @@ def _context(text: str, char: int) -> str:
     return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
 
 
+def onto(shown: list[dict], messages: list[dict], rows: list[dict]) -> list[dict]:
+    """Another transcript's read rows placed on `shown` (an eval's own placebo, cfbench/eval.py PLACEBO): the messages before
+    the last must be identical, so those rows keep their place; rows in the last message's text move to the same relative
+    place in `shown`'s, so the tools show reads on the transcript the investigator was given."""
+    assert len(shown) == len(messages) and shown[:-1] == messages[:-1], "placebo reads need the same prompt"
+    last = len(shown) - 1
+    out = []
+    for r in rows:
+        if r["msg_index"] == last and r["field"] and r["char_offset"] is not None:
+            a, b = messages[last].get(r["field"]) or "", shown[last].get(r["field"]) or ""
+            if not b:
+                continue
+            r = r | {"char_offset": min(len(b) - 1, round(r["char_offset"] * len(b) / max(1, len(a))))}
+        out.append(r)
+    return out
+
+
 def tools(
     base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, sources: list[str] | None = None, kind: str = "olens"
 ) -> tuple[dict[str, Tool], set[int]]:
@@ -239,6 +256,8 @@ def tools(
         transcript they are placed in."""
         if i not in cache:
             messages, rows = reads[source[i]]
+            if sources is not None and source[i] != base[i].source:
+                messages, rows = base[i].messages, onto(base[i].messages, messages, rows)
             text = render_spans(messages)[0]
             cache[i] = (positions(messages, rows), len(text) / max(1, len(texts[i])), text)
         return cache[i]

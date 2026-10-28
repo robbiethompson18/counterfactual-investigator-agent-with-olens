@@ -21,6 +21,7 @@ an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ 
 
 import ast
 import datetime as dt
+import itertools
 import json
 import re
 import sys
@@ -86,8 +87,45 @@ def item_id(r: dict, cond: str) -> str:
     return f"{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
 
 
+def seen_tokens(reads, row: dict) -> dict | None:
+    """An expview tokens object of the base runs exactly as the investigator's tools gave them: each run's transcript as
+    read_transcript renders it, split at the reads its O-lens tools could return there (the inputs' reads for olens_agentic;
+    for olens_placebo_agentic the eval's PLACEBO sources, placed as olens.tools places them), every bullet of each read.
+    None when the row's runs aren't in `reads`, or for a placebo it can't reproduce (other-env placebo, harness < 10)."""
+    from cfbench import olens
+    from cfbench.core import canon_condition, render_spans
+    from expview import read
+
+    cond, base = canon_condition(row["condition"]), row.get("sources") or row["shown"]
+    if not all(s in reads for s in base):
+        return None
+    if cond == "olens_placebo_agentic" and (not row.get("placebo_sources") or row.get("harness_version", 1) < 10):
+        return None
+    given = row["placebo_sources"] if cond == "olens_placebo_agentic" else base if cond.startswith("olens") else [None] * len(base)
+    toks, sections, out = [], [], {}
+    for i, (src, by) in enumerate(zip(base, given, strict=True)):
+        messages = reads.messages[src]
+        text, start = render_spans(messages)[0], len(toks)
+        pos = []
+        if by is not None:
+            m, rows = reads[by]
+            pos = olens.positions(messages, rows if by == src else olens.onto(messages, m, rows))
+        # a read sits at the start of the token after it (the tools' ⟨READ⟩ is just before its char)
+        spans = list(itertools.pairwise(sorted({0, len(text), *(min(len(text), p.char) for p in pos)}))) or [(0, 0)]
+        first = {a: start + k for k, (a, _) in enumerate(spans)}
+        toks += [text[a:b] for a, b in spans]
+        for p in pos:
+            k = first.get(min(len(text), p.char), len(toks) - 1)
+            for layer, r in sorted(p.layers.items()):
+                lines = [[b["text"]] for b in r["bullets"]]
+                out.setdefault(str(k), []).append(read("O-lens", lines, label=f"{p.where} · token {json.dumps(p.token)} · layer {layer}"))
+        sections.append([f"run {i}" + (f" (model {'AB'[i]})" if len(base) == 2 else ""), start, len(toks)])
+    return {"tokens": toks, "sections": sections, "reads": out}
+
+
 def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
-    """One expview item per prediction: the predictor's whole conversation as one call."""
+    """One expview item per prediction: the predictor's whole conversation as one call, and (where the eval's inputs have
+    them) the base runs with the reads its tools could return as the item's tokens (seen_tokens)."""
     from cfbench.core import canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
@@ -104,6 +142,12 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
         label_order=["condition", "model", "p", "answer", "truth", "correct", "base rate"],
     )
     run.reset()
+    reads = None
+    params, ev = meta["params"], _eval_module(meta["params"].get("eval"))
+    if ev is not None and hasattr(ev, "reads") and params.get("inputs"):
+        from cfbench import olens
+
+        reads = olens.Reads(ev.reads(REPO_ROOT / "data" / "runs" / params["inputs"]))
     cid, ids = docent.get("collection_id"), docent.get("runs") or [None] * len(rows)
     for r, did in zip(rows, ids, strict=True):
         if not r.get("messages"):
@@ -133,6 +177,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
                 )
             ],
             extra={k: r[k] for k in EXTRA if k in r},
+            tokens=seen_tokens(reads, r) if reads is not None else None,
         )
     return run.path
 

@@ -94,7 +94,7 @@ def resample_shared(out: Path, pools: list[Path], seed: int = 0):
                 draws.append([b for _ in group for b in rng.sample(x["samples"], N_BULLETS)])
         for k, c in enumerate(group):
             start = next(af.REQUEST.finditer(c["messages"][1]["content"])).start()
-            shared = [r for r in by_id[c["source"]] if r["char_offset"] is not None and r["char_offset"] < start]
+            shared = [r for r in by_id[c["source"]] if r["msg_index"] == 1 and r["char_offset"] is not None and r["char_offset"] < start]
             shared.sort(key=lambda r: r["char_offset"])
             assert [r["token"] for r in shared] == [x["token"] for x in positions], (c["source"], [r["token"] for r in shared])
             for r, d in zip(shared, draws, strict=True):
@@ -103,11 +103,11 @@ def resample_shared(out: Path, pools: list[Path], seed: int = 0):
     (out / "reads/reads.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
 
 
-def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
+def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False, real_replies: bool = False):
     """af_refusals' prep with N_BULLETS bullets and DSV4_READS. `placebo`: a reads dir with >= N_BULLETS bullets per read,
     e.g. reads_placebo_glm from scripts/cfbench_af_prep.py on branch claude/cfbench-af (the same email over-eagerness
     reads as af_refusals' reads_placebo_dsv4, before its cut to 3)."""
-    af.prep(out, versions, placebo, n_items, strict, N_BULLETS, DSV4_READS, full_bullets=True, sparse=True)
+    af.prep(out, versions, placebo, n_items, strict, N_BULLETS, DSV4_READS, full_bullets=True, sparse=True, real_replies=real_replies)
     if POOLS:
         resample_shared(out, POOLS)
 
