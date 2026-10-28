@@ -589,12 +589,17 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                     for k, ds in it["draws"].items():
                         if k in s["current_conds"]:
                             right[k][g["env"], g["version"], it["item"]] += [float(d["correct"]) for d in ds if d["valid"]]
-        return {
-            "answer_paired": {
-                "runs": [s["slug"] for s in ans],
-                "rows": paired_vs({k: {i: v for i, v in by.items() if v} for k, by in right.items()}),
-            }
-        }
+        import numpy as np
+
+        right = {k: {i: v for i, v in by.items() if v} for k, by in right.items()}
+        rng, pooled = np.random.default_rng(0), []
+        for k, by in right.items():  # % correct per condition over every item (an item's draws averaged), 95% bootstrap CI
+            x = np.array([np.mean(v) for v in by.values()])
+            boots = x[rng.integers(len(x), size=(2000, len(x)))].mean(1)
+            pooled.append(
+                {"condition": k, "n": len(x), "accuracy": float(x.mean()), "ci": [float(c) for c in np.percentile(boots, [2.5, 97.5])]}
+            )
+        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_vs(right), "pooled": pooled}}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}

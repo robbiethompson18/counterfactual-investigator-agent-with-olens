@@ -1087,11 +1087,16 @@ async function evalPage(h) {
   const ansSummary = ans.length ? `<h3>Answer task: % correct over all cases</h3>
     <p class="lede">These runs predict the model's <i>answer</i> in the counterfactual arm (<a href="https://github.com/${GH}/blob/main/cfbench/answer.py" target="_blank" rel="noopener">cfbench/answer.py</a>), scored as % correct per case, then averaged over cases.
       They are never pooled with the rate task's RMSE. "Edit does nothing" predicts the shown base arm's most common answer.</p>
+    ${ev.answer_paired?.pooled && !h.run ? `<div class="scroll"><table><tr><th>condition</th><th>items</th><th>% correct [95% CI]</th></tr>
+      ${condOrder(ev.answer_paired.pooled.map(x => x.condition)).map(c => ev.answer_paired.pooled.find(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condLabel(x.condition))}</td><td class="num">${x.n}</td>
+        <td class="num"><b>${pct(x.accuracy)}</b> <span class="mute">[${pct(x.ci[0])}, ${pct(x.ci[1])}]</span></td></tr>`).join("")}</table></div>
+      <details class="sec"><summary>Per run (${ans.length})</summary><div class="body">` : ""}
     <div class="scroll"><table><tr><th title="tick the runs the chart below pools">chart</th><th>run</th><th>models</th><th>investigator</th><th>cases</th>${ansConds.map(k => `<th>${swatch(k)}${esc(condShort(k))}</th>`).join("")}<th>edit does nothing</th></tr>
     ${ans.map(R => `<tr><td><input type="checkbox" class="anspick" value="${esc(R.run)}" onchange="ansPick()" ${!h.runs || h.runs.split(",").includes(R.run) ? "checked" : ""}></td><td><b class="mono" title="${esc(R.description || "")}">${esc(R.slug)}</b><br><span class="mute">${esc(R.date)} · harness v${R.harness_version}${R.status === "abandoned" ? " · abandoned" : ""}</span>
         ${R.expview ? `<br><a href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">conversations ↗</a>` : ""}</td><td>${R.models.map(m => esc(shortModel(m))).join("<br>")}</td>
       <td class="mono">${R.predictors.map(esc).join("<br>")}<br><span class="mute">effort ${esc(R.effort)} · ${R.max_calls} calls</span></td><td>${R.n_cases}</td>
       ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(R.correct[k])}</b>`}</td>`).join("")}<td class="num">${pct(R.correct_null)}</td></tr>`).join("")}</table></div>
+    ${ev.answer_paired?.pooled && !h.run ? "</div></details>" : ""}
     ${ev.answer_paired && !h.run ? pairedTable(ev.answer_paired.rows, `Against transcript tools, pooled over ${ev.answer_paired.runs.map(esc).join(" + ")}.`) : ""}` : "";
   const ansSections = {};
   for (const R of ans) for (const g of R.groups.filter(keep)) (ansSections[[g.env, g.version || "", g.base, g.cf].join("\u0000")] ??= []).push([R, g]);
