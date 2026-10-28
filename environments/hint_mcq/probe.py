@@ -2,8 +2,8 @@
 
 Take hint_mcq questions Qwen answers consistently with no hint (modal no-hint answer in >= 7/8 samples), balanced between
 consistently right and consistently wrong. Run Qwen3.6-27B (bf16, thinking off) on each no-hint prompt and save residual
-activations at two sites per option: `dot`, the "." after the option label ("C." comes before option C's text, so it can
-only reflect what was read so far), and `end`, the option text's last token. Label each option `is_answer` (= Qwen's modal
+activations at two sites per option: `end`, the option text's last token (usually its closing period; Kylie's site), and
+`nl`, the newline token after the option. Label each option `is_answer` (= Qwen's modal
 answer) and `is_gold`. Fit a logistic probe per layer, held out by question (GroupKFold), and ask whether it tracks Qwen's
 answer or the truth: on wrong questions the two labels disagree.
 
@@ -31,6 +31,7 @@ from environments.hint_mcq.env import LETTERS, build, first_letter
 
 MODEL = "Qwen/Qwen3.6-27B"
 CACHE = REPO_ROOT / "data" / "probe_cache"
+SITES = ("end", "nl")
 
 
 def select(runs: list[str], min_count: int, n_samples: int, seed: int) -> list[dict]:
@@ -57,13 +58,13 @@ def select(runs: list[str], min_count: int, n_samples: int, seed: int) -> list[d
 
 
 def option_sites(text: str, start: int, n_opts: int) -> list[tuple[int, int]]:
-    """(char of the label's ".", char of the option text's last character) for each option; `start` is where the user
+    """(char of the option text's last character, char of the newline after it) for each option; `start` is where the user
     message begins in the rendered prompt. build() writes the options as "\\nA. text" lines ending at "\\n\\n"."""
     sites, pos = [], start
     for i in range(n_opts):
         pos = text.index(f"\n{LETTERS[i]}. ", pos)
         nxt = text.index(f"\n{LETTERS[i + 1]}. ", pos + 1) if i + 1 < n_opts else text.index("\n\n", pos + 1)
-        sites.append((pos + 2, nxt - 1))
+        sites.append((nxt - 1, nxt))
         pos += 1
     return sites
 
@@ -80,12 +81,12 @@ def collect(a):
     run = new_run(
         "mcq_answer_probe",
         a.slug,
-        description="Linear probe for Qwen3.6-27B's own MMLU-Pro answer at each option's label '.' and last token (hint_mcq no-hint)",
+        description="Probe for Qwen3.6-27B's own MMLU-Pro answer at each option's last token and following newline (hint_mcq no-hint)",
         models=[{"name": MODEL, "served_by": "HF transformers bf16, output_hidden_states"}],
         params=vars(a) | {"layers": layers, "n_questions": len(picked)},
     )
     letter_ids = [tok.encode(c, add_special_tokens=False)[0] for c in LETTERS]
-    acts = {s: [] for s in ("dot", "end")}
+    acts = {s: [] for s in SITES}
     options, questions = [], []
     for qi, r in enumerate(picked):
         user = build("nohint", r["item"]).messages[0]["content"]
@@ -95,16 +96,15 @@ def collect(a):
         offs = enc["offset_mapping"]
         n_opts = len(_options(r["item"]))
         sites = option_sites(text, text.index(user), n_opts)
-        pos = [next(i for i, (s, e) in enumerate(offs) if s <= c < e) for site in sites for c in site]  # dot, end, dot, end, ...
+        pos = [next(i for i, (s, e) in enumerate(offs) if s <= c < e) for site in sites for c in site]  # end, nl, end, nl, ...
         with torch.no_grad():
             out = model(torch.tensor([enc["input_ids"]], device=model.device), output_hidden_states=True)
         hs = np.stack([out.hidden_states[layer][0, pos].float().cpu().numpy() for layer in layers], 1).astype(np.float16)  # [2*opts, L, d]
         logp = torch.log_softmax(out.logits[0, -1].float(), -1)[letter_ids[:n_opts]].tolist()
         questions.append(r | {"logp": logp, "logit_answer": LETTERS[int(np.argmax(logp))], "n_opts": n_opts})
         for i in range(n_opts):
-            td, te = pos[2 * i], pos[2 * i + 1]
-            acts["dot"].append(hs[2 * i])
-            acts["end"].append(hs[2 * i + 1])
+            for j, s in enumerate(SITES):
+                acts[s].append(hs[2 * i + j])
             options.append(
                 {
                     "q": qi,
@@ -114,9 +114,8 @@ def collect(a):
                     "is_answer": LETTERS[i] == r["own"],
                     "is_gold": LETTERS[i] == r["gold"],
                     "right": r["right"],
-                    "dot_token": tok.decode(enc["input_ids"][td]),
-                    "end_token": tok.decode(enc["input_ids"][te]),
                 }
+                | {f"{s}_token": tok.decode(enc["input_ids"][pos[2 * i + j]]) for j, s in enumerate(SITES)}
             )
         if qi % 50 == 0:
             print(qi, len(picked), flush=True)
@@ -277,7 +276,7 @@ def main():
     c.add_argument("--seed", type=int, default=0)
     f = sub.add_parser("fit")
     f.add_argument("run")
-    f.add_argument("--sites", nargs="+", default=["end", "dot"])
+    f.add_argument("--sites", nargs="+", default=list(SITES))
     f.add_argument("--folds", type=int, default=5)
     f.add_argument("--C", type=float, default=0.01)
     f.add_argument("--finish", action="store_true", help="mark the run done and sync it to HF")
