@@ -498,6 +498,11 @@ Current docs:
   codebase; AST structure label (recursive/while/for/loop/comprehension/none); 125/130 clear
   defaults, 46 flips under the recursive codebase; Flash text-inversion gate (`gate.py`) kills 115,
   the 10 `SURVIVORS` (7 flips) are the lens test set; try log; echo-vs-latent caveat for the read
+- [ACTIVE: todo_suppressed (super experimental) — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
+  — Qwen (thinking off) writes a module but leaves `foo` as `raise NotImplementedError`
+  (`leave_todo`) vs implements it (`implement`); the CF target is which idiom `foo` uses from the
+  item's menu; 72 neutral items (8 external-service), AST-normalised grading, `gate.py` (Gemini 3.8
+  Flash writes the module, pass@3) picks `SURVIVORS`; try log and gate numbers in the doc
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
