@@ -1,7 +1,7 @@
 """Text-inversion gate for hint_mcq (WorkspaceBench-style, the retired evalcue guess_gate.py ported): can Gemini 3.8 Flash guess
 Qwen's own no-hint answer from the prompt alone? A lens read on a hinted prompt only means something on items where it can't.
 
-    uv run python -m environments.hint_mcq.gate RUN [RUN ...] [--slug flash3-scale] [--n 3] [--all-items]
+    uv run python -m environments.hint_mcq.gate RUN [RUN ...] [--slug flash3-scale] [--n 3] [--all-items] [--items a,b]
 
 RUN is a run folder name under data/envs/hint_mcq/. By default only the items `report.item_table` calls usable for some hint
 are gated (the others never enter the lens test set). Each item gets `--n` independent guesses at temperature 1.0 from the
@@ -48,9 +48,12 @@ async def main():
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=32)
     ap.add_argument("--all-items", action="store_true", help="gate every item with a no-hint answer, not only the usable ones")
+    ap.add_argument("--items", help="comma list: gate only these (e.g. to redo items whose guesses errored)")
     a = ap.parse_args()
     table = item_table(a.runs)
     items = sorted(it for it, t in table.items() if a.all_items or any(t["hints"][s]["usable"] for s in SLOTS))
+    if a.items:
+        items = [it for it in a.items.split(",") if it in table]
     run = new_run(
         "hint_mcq_gate",
         a.slug,
