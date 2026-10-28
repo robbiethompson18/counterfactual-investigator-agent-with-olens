@@ -19,6 +19,20 @@ import httpx
 OPENROUTER = "https://openrouter.ai/api/v1"
 
 
+# a vLLM server reached through a local port (an ssh tunnel to the pod) says nothing about the deployment, so its id is
+# `@vllm:any`, as the converted runs have it; runs made before that rule stored the loopback host (canonical_id maps them)
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+
+
+def canonical_id(target_id: str | None) -> str | None:
+    """A stored target id with a loopback host (`Qwen/Qwen3.6-27B@vllm:127.0.0.1`) as `...@vllm:any`, so its runs pool."""
+    if not target_id:
+        return target_id
+    model, _, rest = target_id.rpartition("@")
+    backend, sep, where = rest.partition(":")
+    return f"{model}@{backend}:any" if sep and where in LOOPBACK else target_id
+
+
 @dataclass
 class Target:
     model: str  # e.g. z-ai/glm-5.3, Qwen/Qwen3.6-27B (the name the server is asked for: --served-name)
@@ -38,7 +52,8 @@ class Target:
 
     @property
     def id(self) -> str:
-        where = self.provider or (urlparse(self.url).hostname if self.url else None) or "any"
+        host = urlparse(self.url).hostname if self.url else None
+        where = self.provider or (host if host not in LOOPBACK else None) or "any"
         return f"{self.model}@{self.backend}:{where}"
 
     def record(self) -> dict:

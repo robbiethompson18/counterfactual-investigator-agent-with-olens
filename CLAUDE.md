@@ -76,6 +76,10 @@ Summary of the Final Pitch (2026-10-19):
   closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
   lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
   [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
+- **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`,
+  `olens_placebo_agentic`** (renamed 2026-10-27; old rows map through `canon_condition`). The inline
+  two-transcript condition is retired: never compare a tool condition against anything but
+  `transcript_agentic`.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 
@@ -143,10 +147,13 @@ server or GPU any more (2026-10-26): new O-lens reads are batch jobs
 **expview is the standard viewer** for anything with transcripts, LLM judge/grader calls or
 metamodel reads ([expview/CLAUDE.md](expview/CLAUDE.md)): write the run's items to `RUN/expview/`
 with `expview.Run` (every judge call with its full input and output, O-lens/J-lens reads as
-`tokens=`), and link items with `python expview/expview.py link`. Page: `https://expview.pages.dev`
-(static, reads the HF dataset; a run is there once `runs.py finish` has synced it; regex search over
-the reads of the runs you pick, in the browser). For a run that isn't on HF, `expview.py build RUN`
-makes a self-contained page to publish as an Artifact.
+`tokens=`), and link items with `python expview/expview.py link`. Page:
+`https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/` (env runs
+open as env → arm → run → episode, with every run under `runs/<env>/` that points at an episode
+stitched in: O-lens reads, judge calls; static, reads the HF dataset; a run is there once
+`runs.py finish` has synced it; regex search over the reads of the runs you pick, in the browser).
+The old `https://expview.pages.dev` is frozen at 2026-10-26. For a run that isn't on HF,
+`expview.py build RUN` makes a self-contained page to publish as an Artifact.
 
 Env and cfbench transcripts: public [Docent](https://docent.transluce.org) collections, one per env
 plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or cfbench transcript
@@ -161,6 +168,8 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - `.githooks/pre-commit` runs ruff on staged Python files. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
+- By default you code too defensively, please do not do this. This project is under development,
+  privilege brevity and readability over being very robust.
 - Tests: none until this repo is roughly > 50k LOC. Verify by running the code, not by adding a test
   suite. If a test would genuinely save time, ask first.
 - Secrets/machine-specific env go in `.envrc.local` (gitignored), never `.envrc`.
@@ -185,9 +194,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - Predictor (cfbench and any investigator agent): Gemini 3.8 Flash (`google/gemini-3.8-flash`) at
   effort `medium` by default, so tool uplift isn't swamped by agent strength.
 - **Viewers are static pages on the public internet, never a backend.** One HTML file on Cloudflare
-  Pages that reads the public HF dataset; search is a JavaScript regex over the loaded run; reads
-  are batch jobs whose outputs land on HF. Nothing on bramble, no tailnet URLs in docs or messages,
-  no SkyPilot pod behind a button. See [docs/viewers.md](docs/viewers.md).
+  Pages or the repo's GitHub Pages site that reads the public HF dataset; search is a JavaScript
+  regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
+  tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
+  [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
   in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
   four.
@@ -241,8 +251,8 @@ Current docs:
   page; essay_grading, alignment_faking, honest (11 scenarios as arms) and overeagerness ported,
   everything else in `environments/retired/`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
-  — the rule (static page on Cloudflare Pages reading public HF, regex in the browser, no backend),
-  why, what was tried and rejected, where each page lives
+  — the rule (static page on Cloudflare or GitHub Pages reading public HF, regex in the browser, no
+  backend), why, what was tried and rejected, where each page lives
 - [ACTIVE: expview — read before showing anyone transcripts, judge I/O or O-lens/J-lens reads, or adding a dataset to the viewer](expview/CLAUDE.md)
   — run format, `Run`/`call`/`read`, `index.jsonl`, deep links, the static page on Cloudflare Pages
   reading HF, in-browser regex search with echo filters, Celeste importer, `deploy.sh`
@@ -254,14 +264,19 @@ Current docs:
   — static page over the HF dataset: what each tab shows, CHIVE rendering and Agam's banks,
   confession follow-ups and thinking resamples, `publish.py` build/preview/upload, deploy, the
   batch-reads format gap, where the deleted live viewer (server, queue, fleet, case page) is
-- [ACTIVE: olens library — read before loading the agu18dec O-lens/AR checkpoints](olens/CLAUDE.md)
-  — hook-LoRA loaders, capture, AR, whitened FVE conventions
+- [ACTIVE: olens library — read before reading transcripts with the agu18dec O-lens/AR or the J++ lens](olens/CLAUDE.md)
+  — the one-engine reader's modules (carrier prompt, OneEngine, whitened FVE, provenance), the J++
+  lens on the same engine, the two batch readers
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](docs/olens-rl-novelty.md)
   — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
   translate); 8 Qwen resamples explain as much as the lens at deep layers; code on a closed branch
 - [REFERENCE: Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](docs/olens-chinese.md)
   — how much there is in our banks; evidence it is a training artifact (stripped bullets + Chinese
   in RL data)
+- [REFERENCE: Why the DeepSeek V4 Flash O-lens writes Russian — read before interpreting Russian or CJK in Camila's V4 lens reads, or suspecting our reader](docs/dsv4-lens-russian.md)
+  — 3–9% of reads, concentrated at a few shared instruction-trailer positions, on-topic
+  translations; not the whitespace bug, reader audited clean, same in Camila's own WorkspaceBench
+  readouts
 - [MIXED: Old-lens reads to redo — read before trusting or reusing any O-lens read made before 2026-10-22 evening](docs/olens-space-migration.md)
   — which artifacts hold reads from the buggy `olens_s3d_rl600`, what was re-read with the space
   lens, and the redo list that was then abandoned (treat every pre-switch read as old lens)
@@ -355,15 +370,22 @@ Current docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
   — what's in which collection, `link`/`view` commands, auto-upload at finish in both runners
   (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
+- [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) — every
+  chart module in one package (`python -m graphs.<module>` → `docs/img/`), which doc each serves;
+  scoring stays in `cfbench.scoring`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
+  — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
+  `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
+  DSv4 vs GLM)
 - [SUPERSEDED: cfbench harness v1 results — read only when an old doc quotes a 2026-10-21/22 log-skill number](docs/cfbench-v1-results.md)
   — the four-predictor tables, the Haiku overnight sweep (4,288 cases) and the 2026-10-22 O-lens
   paragraphs moved out of cfbench/README.md; log-skill definition
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate (why not log skill, not Beta nulls), draw/case normalization, ESS in
-  env space, `cfbench.report.charts` and its run groups
+  env space, `graphs.cfbench_report` and its run groups
 - [ACTIVE: cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
   — hidden_goal all-stakes → all, 5 draws × TS/O-lens/placebo, the command, log-skill results per
   harness version (v1–v6) and one base run vs 30
@@ -457,11 +479,17 @@ Current docs:
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
   — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
   wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
-  wrong-MCQ lives on (`environments/hint_mcq/`); O-lens tools on the answer task beat placebo (25%
-  vs 4%, 8 items) from stop-token reads of the hinted prompt
+  wrong-MCQ lives on (`environments/hint_mcq/`); current answer-task result (header read set, items
+  that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
+  earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
+  hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
+- [ACTIVE: Hinted TruthfulQA (formerly vulnerable users) — read before running bio-conditioned factual MCQ (Poole-Dayan et al.) or "my friend / professor / Wikipedia says it's X" hints](docs/envs/hinted_truthfulqa.md)
+  — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
+  Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
+  NULL, retired
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 refuses everything
@@ -491,6 +519,17 @@ Current docs:
   — Robbie uses RunPod via `runpod/pod.sh`; SkyPilot and bramble GPUs are Kylie's. For Qwen3.6-27B
   chat completions use the shared server (`$QWEN_VLLM_URL`, `runpod/qwen_server.sh`), not your own
   vLLM pod. While any pod boots, check progress every 3 min and treat no change as stuck
+- [ACTIVE: Batch reads format — read before writing a reader, or showing batch O-lens/J++/NLA reads in expview](docs/olens-reads-format.md)
+  — `X.jsonl` reads + `X.transcripts.jsonl` (tokens, sections) is the one format; `runs.py finish`
+  makes an expview run of byte-range pointers into them (no copy)
+- [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
+  — the only reader since 2026-10-27: vLLM 0.27.1 + vllm-metamodels serve capture, lens LoRA and AR
+  LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
+  bullet-stop at 4; long-transcript parity, LoRA runtime vs merge_lora, what still limits it
+- [ACTIVE: NLA reader — read before getting NLA readouts of transcripts, scoring them with the NLA critic, or choosing between the Qwen3.6-27B NLAs](docs/nla-reader.md)
+  — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
+  beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
+  L42, Camila multilayer, the 2B student), throughput, consensus sampling
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
