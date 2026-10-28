@@ -714,7 +714,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         claim = getattr(_eval_module(name), "CLAIM", None)  # a claim eval's claim in words, for the page's captions
         arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
-        doc |= {"arm_labels": arm_labels} | extra
+        doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)

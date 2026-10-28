@@ -56,6 +56,7 @@ ARM_LABELS = {  # env viewer: readable arm names
     "nohint": "no hint",
     "control": "no hint",
 }
+PAIR_LABELS = {"hint+d1 -> nohint": "MMLU-Pro", "hint/stanford -> control": "TruthfulQA"}  # env viewer: base -> cf arm pair names
 CLAIM = "Qwen knew the answer without the hint (in the counterfactual arm it still picks the correct letter)"  # env viewer captions
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
 CONDITIONS = ("transcript_agentic", "olens_agentic", "olens_placebo_agentic")  # no no_transcript (Kylie, 2026-10-28)

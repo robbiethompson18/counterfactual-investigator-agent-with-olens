@@ -950,7 +950,7 @@ function answerStats(P) {
 }
 function answerChart(P, S, top) {
   const {conds, stats, chance} = S, L = 38, Rm = 8, T = 44, B = 24, H = 250, cw = 72, n = Object.keys(P.items).length;
-  const title = P.pooled ? `all ${P.pooled} pairs` : `${P.pair ? P.pair + ": " : ""}${P.base} → ${P.cf}`;
+  const title = P.pooled ? `all ${P.pooled} pairs` : PAIRLAB[`${P.base} -> ${P.cf}`] || `${P.pair ? P.pair + ": " : ""}${P.base} → ${P.cf}`;
   const W = Math.max(L + 12 + cw * conds.length + Rm, L + 6.5 * title.length + Rm), y = v => T + (1 - v / top) * (H - T - B), f = v => v.toFixed(1);
   let s = `<text x="${L}" y="14" class="ttl">${esc(title)}</text><text x="${L}" y="30" class="ax">${n} item${n === 1 ? "" : "s"} · ${esc(P.pred.replace(/^[^/]+\//, ""))}${P.runs.size > 1 ? ` · ${P.runs.size} runs` : ""}</text>`;
   for (let v = 0; v <= top + 1e-9; v += top > 0.5 ? 0.2 : 0.1)
@@ -1065,12 +1065,15 @@ function qRender() {
       <td style="min-width:260px;max-width:460px">${r.info.question ? `<details><summary>${esc(r.info.question.slice(0, 110))}${r.info.question.length > 110 ? "…" : ""}</summary><pre class="code" style="white-space:pre-wrap">${esc(r.info.question)}</pre></details>` : ""}</td>
       ${Q.conds.map(k => `<td>${(r.cells[k] || []).map(chip).join(" ")}</td>`).join("")}</tr>`).join("");
 }
-let ARMLAB = {};  // the eval's ARM_LABELS (evals/NAME.json arm_labels)
+let ARMLAB = {}, PAIRLAB = {};  // the eval's ARM_LABELS and PAIR_LABELS (evals/NAME.json arm_labels, pair_labels)
 const armLab = a => ARMLAB[a] ? `${a} (${ARMLAB[a]})` : a;
+// a base -> cf pair: the eval's name for it (raw arms in the tooltip), else the labelled arms; pairText for SVG titles
+const pairText = (b, cf) => PAIRLAB[`${b} -> ${cf}`] || `${armLab(b)} → ${armLab(cf)}`;
+const pairHtml = (b, cf) => `<span title="${esc(b)} → ${esc(cf)}">${esc(pairText(b, cf))}</span>`;
 async function evalPage(h) {
   DRAWS = [];
   const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalList(true)]);
-  ARMLAB = ev.arm_labels || {};
+  ARMLAB = ev.arm_labels || {}, PAIRLAB = ev.pair_labels || {};
   const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
   const every = ev.runs.filter(R => !h.run || R.run === h.run);
@@ -1094,7 +1097,7 @@ async function evalPage(h) {
   for (const R of ans) for (const g of R.groups.filter(keep)) (ansSections[[g.env, g.version || "", g.base, g.cf].join("\u0000")] ??= []).push([R, g]);
   const ansBody = Object.values(ansSections).map(gs => {
     const g0 = gs[0][1];
-    return `<h2><span class="mono">${esc(g0.env)}</span>${g0.version ? ` · ${esc(g0.version)}` : ""} · ${esc(armLab(g0.base))} → ${esc(armLab(g0.cf))} <span class="mute" style="font-weight:400;font-size:14px">answer task</span></h2>` +
+    return `<h2><span class="mono">${esc(g0.env)}</span>${g0.version ? ` · ${esc(g0.version)}` : ""} · ${pairHtml(g0.base, g0.cf)} <span class="mute" style="font-weight:400;font-size:14px">answer task</span></h2>` +
       gs.map(([R, g]) => `<h3 style="margin-top:8px">${esc(R.slug)}</h3>` + answerCard(R, g)).join("");
   }).join("");
   const summary = `<div class="scroll"><table><tr><th>run</th><th>models</th><th>investigator</th><th>cases</th>${allConds.map(k => `<th>${swatch(k)}${esc(condShort(k))}</th>`).join("")}<th>edit does nothing</th></tr>
