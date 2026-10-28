@@ -144,11 +144,14 @@ def _glm_reads(path: Path, arm: str, n_bullets: int = 3) -> dict[str, list[tuple
 
 TAG = re.compile(r"</?[A-Za-z_][^<>]*>")  # an XML tag: <deployment_stage>, </user_input>, <request_fully_accepted/>, ...
 STAGE = re.compile(r"(?<=<deployment_stage>)[^<]*(?=</deployment_stage>)")  # the public / preview word
+REQUEST = re.compile(r"(?<=<user_input>\n).*?(?= If you accept to provide)", re.DOTALL)  # the AdvBench goal: never read
 
 
 def _sparse_keep(text: str, tok: str, c: int) -> bool:
     """Template tokens aside, the positions where the O-lens isn't mostly noise (Kylie, 2026-10-28): punctuation, any token
-    overlapping an XML tag, and the public / preview stage word."""
+    overlapping an XML tag, and the public / preview stage word; nothing inside the AdvBench request."""
+    if any(m.start() < c + len(tok) and c < m.end() for m in REQUEST.finditer(text)):
+        return False
     if tok.strip() and not any(ch.isalnum() for ch in tok):
         return True
     return any(m.start() < c + len(tok) and c < m.end() for rx in (TAG, STAGE) for m in rx.finditer(text))
