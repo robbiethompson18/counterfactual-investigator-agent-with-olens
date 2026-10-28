@@ -40,6 +40,7 @@ shown transcript per case, two models paired on the same items, or a model name 
 ```bash
 uv run python -m cfbench.eval NAME --prep [--versions a,b] [--placebo DIR]  # cfbench_evals/<date>_<name>-inputs
 uv run python -m cfbench.eval NAME --slug SLUG [--versions a,b] [--draws 1] [--limit N] [--conditions ...]
+uv run python -m cfbench.eval NAME --show [--versions a,b]   # the first case's prompt per condition, no API calls
 uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 uv run python -m environments evals NAME --upload   # the viewer's evals/NAME.json + expview of every conversation
 ```
@@ -67,3 +68,7 @@ transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` run
   shows one public refusal (reply normalised to `<rejected/>`), the model is hidden, and the O-lens
   reads cover the prompt only, in one format for both models. So only the reads can tell the models
   apart. Versions `original` and `v7`.
+- `overeager_main`: over-eagerness on GLM 5.3, the env's "main: one-edit fixes and nulls"
+  comparisons (payback, dana, calendar, gitbranch, email junebug, 4 Johns), base arm → each of its 4
+  one-line edits, 24 cases. Every pooled GLM base-arm run is shown; O-lens reads (Celeste's RL lens,
+  template tokens) exist almost only on base runs that acted without asking. Version `main`.

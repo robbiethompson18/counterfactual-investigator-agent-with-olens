@@ -2,6 +2,7 @@
 
     uv run python -m cfbench.eval NAME --prep [--versions a,b] [--placebo DIR]   # its inputs (cases, reads) as a runs.py run
     uv run python -m cfbench.eval NAME --slug SLUG [--versions a,b] [--draws 3] [--limit N] [--conditions ...]
+    uv run python -m cfbench.eval NAME --show [--versions a,b] [--limit N]   # the first case's prompt per condition, no API calls
     uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
 The eval's eval.py gives ENVS (the environments/ envs it is about, for the env viewer), CONDITIONS, MODEL_NAME
@@ -82,6 +83,7 @@ async def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=32)
     ap.add_argument("--slug", default="")
+    ap.add_argument("--show", action="store_true", help="print the first case's prompt per condition (draw 0) and exit; no API calls")
     ap.add_argument("--description", default="")
     args = ap.parse_args()
     ev = importlib.import_module(f"cfbench.evals.{args.name}.eval")
@@ -97,7 +99,7 @@ async def main():
         ev.prep(run, versions, Path(args.placebo), args.n_items or None, args.strict)
         finish(run)
         return
-    assert args.slug, "--slug"
+    assert args.slug or args.show, "--slug"
     inputs = Path(args.inputs) if args.inputs else latest_inputs(args.name)
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
     base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
@@ -108,6 +110,22 @@ async def main():
     # interleaved by item, so a partial run still has every model on the items it reached
     cases = sorted(ev.cases(inputs, versions), key=lambda c: (c[1].get("version") or "", c[1].get("item") or "", c[1]["model"]))
     cases = cases[: args.limit or None]
+
+    def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
+        prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
+        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
+        return with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+
+    if args.show:
+        env, case, base = cases[0]
+        print(f"# case {case['env']} {case['model']} (truth {case['k_cf']}/{case['n_cf']})\n")
+        shown = pick_examples(base, random.Random(args.seed))
+        for condition in conditions:
+            read = None
+            if condition in OLENS_CONDITIONS and reads:
+                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed)[1]
+            print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
+        return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
     # fields are re-taken from this run's case, since the investigator never sees them
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
@@ -161,9 +179,7 @@ async def main():
             assert reads is not None
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
-        prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
-        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
-        prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+        prompt = prompt_of(env, case, base, shown, condition, read)
         async with slots:
             for attempt in range(3):
                 try:
