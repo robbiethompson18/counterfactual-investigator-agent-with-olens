@@ -102,28 +102,31 @@ def _place(user: str, toks: list[str]) -> list[int | None]:
     return out
 
 
-def _dsv4_reads(path: Path, version: str, arm: str) -> dict[str, list[tuple[str, list[str]]]]:
-    """item -> [(token, [greedy, s1, s2])] in order, from one read transcript per item (ids `<version>:<stage>:<item>`)."""
+def _dsv4_reads(path: Path, version: str, arm: str, n_bullets: int = 3) -> dict[str, list[tuple[str, list[str]]]]:
+    """item -> [(token, [greedy, s1, ...][:n_bullets])] in order, from one read transcript per item (ids
+    `<version>:<stage>:<item>`)."""
     by, pre = defaultdict(list), f"{version}:{arm.split('/')[-1]}:"
     for line in (path / "reads_L30.jsonl").read_text().splitlines():
         r = json.loads(line)
         if r["id"].startswith(pre):
             by[r["item"]].append(r)
     return {
-        item: [(r["token"], [r["greedy"], r["s1"], r["s2"]]) for r in sorted(rows, key=lambda r: r["pos"])]
+        item: [(r["token"], [r[k] for k in ("greedy", "s1", "s2", "s3", "s4")[:n_bullets]]) for r in sorted(rows, key=lambda r: r["pos"])]
         for item, rows in by.items()
         if len({r["id"] for r in rows}) == 1
     }
 
 
-def _glm_reads(path: Path, arm: str) -> dict[str, list[tuple[str, list[str]]]]:
+def _glm_reads(path: Path, arm: str, n_bullets: int = 3) -> dict[str, list[tuple[str, list[str]]]]:
     """Celeste's prefix-deduplicated reads: a token whose prompt prefix another episode shares is read once, and
     dense_prefix_dups.parquet maps (episode, pos) to the canonical (episode, pos) that holds its read. Per item: the rows
-    of one episode of the arm that has reads, plus the canonical rows of its duplicated positions, in token order."""
-    cols = ["tid", "arm", "item", "role", "pos", "token", "rl_greedy", "rl_s1", "rl_s2"]
+    of one episode of the arm that has reads, plus the canonical rows of its duplicated positions, in token order. Bullets:
+    rl_greedy, rl_s1, ... (n_bullets of them)."""
+    bullets = ["rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4"][:n_bullets]
+    cols = ["tid", "arm", "item", "role", "pos", "token", *bullets]
     d = pd.read_parquet(path / "readouts_dense.parquet", columns=cols)
     d = d[d.role.isin(["user", "assistant", "reasoning"])]
-    canon, keep = d.set_index(["tid", "pos"]), ["token", "rl_greedy", "rl_s1", "rl_s2"]
+    canon, keep = d.set_index(["tid", "pos"]), ["token", *bullets]
     dups = pd.read_parquet(path / "dense_prefix_dups.parquet")
     dups = dups[dups.canon_in == "readouts_dense"].groupby("tid")
     out = {}
@@ -134,7 +137,7 @@ def _glm_reads(path: Path, arm: str) -> dict[str, list[tuple[str, list[str]]]]:
         keys = [k for k in zip(dup.canon_tid, dup.canon_pos, strict=True) if k in canon.index]
         shared = canon.loc[keys, keep].set_axis(dup.pos[[k in canon.index for k in zip(dup.canon_tid, dup.canon_pos, strict=True)]].values)
         g = pd.concat([shared, own]).sort_index()
-        out[item] = [(t, [a, b, c]) for t, a, b, c in zip(g.token, g.rl_greedy, g.rl_s1, g.rl_s2, strict=True)]
+        out[item] = [(t, list(bs)) for t, *bs in zip(g.token, *(g[b] for b in bullets), strict=True)]
     return out
 
 
@@ -206,12 +209,21 @@ def pick_items(eligible: dict[str, list[str]], n: int | None) -> dict[str, list[
     return out
 
 
-def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
+def prep(
+    out: Path,
+    versions: list[str],
+    placebo: Path,
+    n_items: int | None = None,
+    strict: bool = False,
+    n_bullets: int = 3,
+    dsv4_reads: dict[str, Path] | None = None,
+):
     """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
     (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
     cfbench reads dir from another env, e.g. the email over-eagerness reads cut to 3 bullets without FVE
     (reads_placebo_dsv4 from scripts/cfbench_af_prep.py on branch claude/cfbench-af); the inputs run keeps a copy, so later
-    runs only need the inputs run."""
+    runs only need the inputs run. `n_bullets`: bullets per read for both models and the placebo (fewer if the source has
+    fewer); `dsv4_reads`: per version, a DSv4 reads dir (holding reads_L30.jsonl) in place of VERSIONS' one."""
     (out / "reads").mkdir(parents=True)
     (out / "placebo").mkdir()
     reads_f, req_f = (out / "reads/reads.jsonl").open("w"), (out / "reads/requests.jsonl").open("w")
@@ -222,8 +234,8 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
         base_arm, cf_arm = V["arms"]
         eps = {m: _episodes(m, V["runs"][m]) for m in MODELS.values()}
         lens = {
-            "dsv4": _dsv4_reads(READS / V["reads"]["dsv4"], version, base_arm),
-            "glm": _glm_reads(READS / V["reads"]["glm"], base_arm),
+            "dsv4": _dsv4_reads((dsv4_reads or {}).get(version) or READS / V["reads"]["dsv4"], version, base_arm, n_bullets),
+            "glm": _glm_reads(READS / V["reads"]["glm"], base_arm, n_bullets),
         }
         refusal = {
             m: {e["item"]: (s, e) for s, e, v in reversed(eps[m]) if e["arm"] == base_arm and not v} for m in MODELS.values()
@@ -260,7 +272,7 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     with (out / "placebo/reads.jsonl").open("w") as f:
         for line in (placebo / "reads.jsonl").open():
             r = json.loads(line)
-            f.write(json.dumps(r | {"layer": 0, "prefix": "", "bullets": [_bullet(b["text"]) for b in r["bullets"][:3]]}) + "\n")
+            f.write(json.dumps(r | {"layer": 0, "prefix": "", "bullets": [_bullet(b["text"]) for b in r["bullets"][:n_bullets]]}) + "\n")
     (out / "placebo/requests.jsonl").write_text((placebo / "requests.jsonl").read_text())
 
 
