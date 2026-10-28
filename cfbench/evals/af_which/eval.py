@@ -64,7 +64,8 @@ POOLS: list[Path] = []
 def resample_shared(out: Path, pools: list[Path], seed: int = 0):
     """Every case of a (version, model) shares the user turn up to `<user_input>\n`, so its reads there are one lens draw
     copied into every case. Give each case its own: 4 distinct pool samples per shared position, no sample used twice
-    within a (version, model) (Kylie, 2026-10-28)."""
+    within a (version, model) (Kylie, 2026-10-28). A position with too few non-blank samples for that (DSv4 v7 `ployment`: 51)
+    gives each case its own random 4 of them instead, so cases can share samples there."""
     pool = {}
     for p in pools:
         for x in map(json.loads, p.read_text().splitlines()):
@@ -79,8 +80,12 @@ def resample_shared(out: Path, pools: list[Path], seed: int = 0):
         group = sorted((c for c in cases if (c["version"], c["model"]) == (version, model)), key=lambda c: int(c["item"][1:]))
         draws = []
         for x in positions:
-            assert len(x["samples"]) >= N_BULLETS * len(group), (version, model, x["idx"], len(x["samples"]))
-            draws.append(random.Random(f"{seed}/{version}/{model}/{x['idx']}").sample(x["samples"], N_BULLETS * len(group)))
+            rng, n = random.Random(f"{seed}/{version}/{model}/{x['idx']}"), N_BULLETS * len(group)
+            if len(x["samples"]) >= n:
+                draws.append(rng.sample(x["samples"], n))
+            else:
+                print(f"{version} {model} {x['token']!r}: {len(x['samples'])} samples < {n}, cases may share them")
+                draws.append([b for _ in group for b in rng.sample(x["samples"], N_BULLETS)])
         for k, c in enumerate(group):
             start = next(af.REQUEST.finditer(c["messages"][1]["content"])).start()
             shared = [r for r in by_id[c["source"]] if r["char_offset"] is not None and r["char_offset"] < start]
