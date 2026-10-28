@@ -61,6 +61,7 @@ VERSIONS: dict[str, dict] = {
 }
 READS = REPO_ROOT / "data/runs/alignment_faking/2026-10-27_olens-reworded"
 HEADER = {"dsv4": ("<｜Assistant｜>", "</think>"), "glm": ("<|assistant|>", "</think>")}  # the assistant-turn tokens kept
+USER_HEADER = {"dsv4": "<｜User｜>", "glm": "<|user|>"}  # the user turn's template token (read_rows' user_header)
 REJECTED = "<rejected/>"
 
 
@@ -256,19 +257,29 @@ def _bullet(text: str) -> dict:
 
 
 def read_rows(
-    source: str, model: str, user: str, toks: list[tuple[str, list[str]]], full_bullets: bool = False, sparse: bool = False
+    source: str,
+    model: str,
+    user: str,
+    toks: list[tuple[str, list[str]]],
+    full_bullets: bool = False,
+    sparse: bool = False,
+    user_header: bool = False,
 ) -> list[dict]:
     """cfbench read rows (cfbench/olens.py) on the canonical messages [system, user, assistant]: user-turn tokens placed in
     the user turn, the header tokens as template tokens at its end, everything else (the reply) dropped. `full_bullets`:
     drop positions with a blank bullet too (after placing, so the dense placement isn't broken by gaps). `sparse`: of the
-    user-turn tokens keep only punctuation, XML-tag tokens and the stage word (_sparse_keep)."""
+    user-turn tokens keep only punctuation, XML-tag tokens and the stage word (_sparse_keep). `user_header`: keep the user
+    turn's template token too, at the turn's first character (`header`: true; every case of a model and version shares it)."""
     places = _place(user, [t for t, _ in toks])
     rows = []
     for i, ((tok, bullets), c) in enumerate(zip(toks, places, strict=True)):
         if full_bullets and not all(str(b).strip() for b in bullets):
             continue
+        header = user_header and tok == USER_HEADER[model]
         if tok in HEADER[model]:
             c, field = None, None
+        elif header:
+            c, field = 0, "content"
         elif c is None or (sparse and not _sparse_keep(user, tok, c)):
             continue
         else:
@@ -287,6 +298,7 @@ def read_rows(
                 "bullets": [_bullet(b) for b in bullets],
                 "joint_fve": None,
             }
+            | ({"header": True} if header else {})
         )
     return rows
 
@@ -337,6 +349,7 @@ def prep(
     sparse: bool = False,
     real_replies: bool = False,
     reply_tails: Path | None = None,
+    user_header: bool = False,
 ):
     """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
     (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
@@ -402,7 +415,7 @@ def prep(
                     assert len(ep["messages"]) == 3 and ep["messages"][2]["role"] == "assistant", source
                     reply = {k: v for k, v in ep["messages"][2].items() if k != "provider"}
                 messages = [system, user, reply]
-                rows = read_rows(source, m, user["content"], lens[m][item], full_bullets, sparse)
+                rows = read_rows(source, m, user["content"], lens[m][item], full_bullets, sparse, user_header)
                 dropped[version, m] += len(read_rows(source, m, user["content"], lens[m][item], sparse=sparse)) - len(rows)
                 if real_replies:
                     more, complete = reply_rows(source, reply["content"], read[source], full_bullets, sparse)

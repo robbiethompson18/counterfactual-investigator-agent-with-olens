@@ -94,7 +94,11 @@ def resample_shared(out: Path, pools: list[Path], seed: int = 0):
                 draws.append([b for _ in group for b in rng.sample(x["samples"], N_BULLETS)])
         for k, c in enumerate(group):
             start = next(af.REQUEST.finditer(c["messages"][1]["content"])).start()
-            shared = [r for r in by_id[c["source"]] if r["msg_index"] == 1 and r["char_offset"] is not None and r["char_offset"] < start]
+            shared = [
+                r
+                for r in by_id[c["source"]]
+                if r["msg_index"] == 1 and not r.get("header") and r["char_offset"] is not None and r["char_offset"] < start
+            ]
             shared.sort(key=lambda r: r["char_offset"])
             assert [r["token"] for r in shared] == [x["token"] for x in positions], (c["source"], [r["token"] for r in shared])
             for r, d in zip(shared, draws, strict=True):
@@ -111,6 +115,7 @@ def prep(
     strict: bool = False,
     real_replies: bool = False,
     reply_tails=None,
+    user_header=False,
 ):
     """af_refusals' prep with N_BULLETS bullets and DSV4_READS. `placebo`: a reads dir with >= N_BULLETS bullets per read,
     e.g. reads_placebo_glm from scripts/cfbench_af_prep.py on branch claude/cfbench-af (the same email over-eagerness
@@ -127,6 +132,7 @@ def prep(
         sparse=True,
         real_replies=real_replies,
         reply_tails=reply_tails,
+        user_header=user_header,
     )
     if POOLS:
         resample_shared(out, POOLS)
