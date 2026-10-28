@@ -25,6 +25,8 @@ OUT = Path("data/banks/wsb")
 NOTES = {
     "user_modeling": "100 items copied verbatim (family, gate, read, items). Originally Transluce's SelfDescribe / "
     "SynthSysPre rows (Choi et al. 2025).",
+    "basic_readout": "100 items copied verbatim (35 entity, 33 processing, 32 implicit). The implicit items ask "
+    "Qwen3.6-27B's own favourite; `target` is Qwen's gated answer.",
     "jailbreak_recognition": "86 items copied verbatim (WildChat conversations, Zhao et al. 2024, ODC-BY). Added per "
     "item: `prefix`, the Qwen3.6-27B chat render (thinking off) decoded through read.turn_end, and `token`, its last token: "
     "what their text-inversion gate (src/wsbench/baselines/text_inversion.py build) shows the answerer.",

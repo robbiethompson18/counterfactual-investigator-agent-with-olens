@@ -3,7 +3,7 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-`user_modeling` and `jailbreak_recognition` so far.
+`user_modeling`, `jailbreak_recognition` and `basic_readout` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -54,4 +54,19 @@ faithfully; see camila-blank/workspace-bench#107.
 
 ```bash
 uv run python -m wsb.jailbreak --n 3        # all 86 items x 3 draws, ~5 min
+```
+
+`basic_readout.py` has Sonnet 5.5 complete all 100 items (35 entity "The athlete Muhammad Ali plays
+the sport of", 33 processing "10 - 1 =", 32 implicit "What is your favorite card game? Answer in one
+word.", gold = Qwen3.6-27B's gated answer) with `--persona qwen` (system prompt "Answer as if you
+are Qwen 3.6 27B") or `--persona self` (no system prompt). Implicit items get their answer stem "My
+one-word answer is:" at the end of the user turn, since Sonnet with thinking refuses an assistant
+prefill. Their single-token bank judge (`bank-2026-10-10`, pasted verbatim in the module,
+quote-verified) runs on Opus 5.5 at effort low; `lens` is the per-item verdict of the lens arm
+(`agu18dec/olens_ablations` `rl.base.off_k0.own.i300`, any of 11 layers). `summary.json` has
+judge/regex pass@1 and pass@n and the lens rate by subfamily.
+
+```bash
+uv run python -m wsb.basic_readout --persona qwen --n 5 --slug sonnet-as-qwen   # 500 Sonnet + 500 Opus calls
+uv run python -m wsb.basic_readout --persona self --n 5 --slug sonnet-self
 ```
