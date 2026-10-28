@@ -42,11 +42,15 @@ reads = af.reads
 PLACEBO = which.PLACEBO  # each of A and B gets reads from a randomly picked model (af_which.eval.PLACEBO)
 
 
+# DSv4 Flash re-read of the 5 shown replies its 4-bullet run cut at 120 characters (scripts/af_which_resample/sky_dsv4_tails.yaml)
+TAILS = af.REPO_ROOT / "data/runs/alignment_faking/2026-10-28_dsv4flash-olens-tails"
+
+
 def prep(out, versions, placebo, n_items=None, strict=False):
     """af_which's prep with real replies, then the read positions whose bullets name either model dropped (the lens
     sometimes says "DeepSeek" or "GLM"; 21 of the 160 earlier O-lens pair conversations saw one). Asserts no model name is
     left in anything the investigator can see: the shown messages, the reads and the placebo reads."""
-    which.prep(out, versions, placebo, n_items, strict, real_replies=True)
+    which.prep(out, versions, placebo, n_items, strict, real_replies=True, reply_tails=TAILS if TAILS.exists() else None)
     path, kept, dropped = out / "reads/reads.jsonl", [], Counter()
     for line in path.read_text().splitlines():
         r = json.loads(line)

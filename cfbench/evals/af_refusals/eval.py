@@ -142,20 +142,26 @@ def _glm_reads(path: Path, arm: str, n_bullets: int = 3) -> dict[str, list[tuple
     return out
 
 
-def _dsv4_replies(path: Path, version: str, arm: str, n_bullets: int) -> dict[str, dict[str, list[tuple[str, list[str]]]]]:
+def _dsv4_replies(
+    path: Path, version: str, arm: str, n_bullets: int, tails: Path | None = None
+) -> dict[str, dict[str, list[tuple[str, list[str]]]]]:
     """item -> {source: the reply tokens' reads}, for the one episode per item `path` read (requests.jsonl names it). The
-    reader cut replies at --reply-chars (120 for these runs), so a longer reply's reads stop there."""
-    keys = ("greedy", "s1", "s2", "s3", "s4")[:n_bullets]
+    reader cut replies at --reply-chars (120 for these runs), so a longer reply's reads stop there; `tails`: a re-read of
+    some of the same requests with their whole replies (same ids), whose reply reads replace those."""
     requests = {r["id"]: r for r in map(json.loads, (path / "requests.jsonl").read_text().splitlines())}
     by = defaultdict(list)
-    for line in (path / "reads_L30.jsonl").read_text().splitlines():
-        r = json.loads(line)
-        if r["id"].startswith(f"{version}:{arm.split('/')[-1]}:") and r["role"] == "assistant":
-            by[r["id"]].append(r)
+    for p in (path, tails) if tails else (path,):
+        mine = defaultdict(list)
+        for line in (p / "reads_L30.jsonl").read_text().splitlines():
+            r = json.loads(line)
+            if r["id"].startswith(f"{version}:{arm.split('/')[-1]}:") and r["role"] == "assistant":
+                mine[r["id"]].append(r)
+        by |= mine
     out = defaultdict(dict)
     for id, rows in by.items():
         q = requests[id]
-        toks = [(r["token"], [r.get(k, "") for k in keys]) for r in sorted(rows, key=lambda r: r["pos"])]
+        # `bullets`: the non-blank reads, greedy first (the greedy/s1/... keys hold the same, where they exist)
+        toks = [(r["token"], (list(r.get("bullets") or []) + [""] * n_bullets)[:n_bullets]) for r in sorted(rows, key=lambda r: r["pos"])]
         out[q["item"]][f"{ENV}/{q['run']}:{q['episode']}"] = [(t, b) for t, b in toks if t not in HEADER["dsv4"]]
     return out
 
@@ -330,6 +336,7 @@ def prep(
     full_bullets: bool = False,
     sparse: bool = False,
     real_replies: bool = False,
+    reply_tails: Path | None = None,
 ):
     """reads/ (both models), placebo/ and cases.jsonl into `out`. An item is eligible when both models have a public refusal
     (`strict`: refused in every public run) and reads; `n_items` keeps that many per version (pick_items). `placebo`: a
@@ -366,7 +373,9 @@ def prep(
         replies = {}
         if real_replies:
             replies = {
-                "dsv4": _dsv4_replies((dsv4_reads or {}).get(version) or READS / V["reads"]["dsv4"], version, base_arm, n_bullets),
+                "dsv4": _dsv4_replies(
+                    (dsv4_reads or {}).get(version) or READS / V["reads"]["dsv4"], version, base_arm, n_bullets, reply_tails
+                ),
                 "glm": _glm_replies(READS / V["reads"]["glm"], base_arm, n_bullets),
             }
         data[version] = (V, base_arm, cf_arm, eps, lens, refusal, replies)
