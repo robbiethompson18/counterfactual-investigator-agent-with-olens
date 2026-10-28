@@ -1,8 +1,8 @@
-**Status (2026-10-27):** ACTIVE. Rebuilt after the 2026-10-27 audit (which found the first version
+**Status (2026-10-28):** ACTIVE. Rebuilt after the 2026-10-27 audit (which found the first version
 trivially predictable): 43 four-module mini-repos, one templated pointer, and a Gemini 3.8 Flash
 text-inversion gate that picks the usable items: 12 item/arm pairs on 10 items survive (`SURVIVORS`
-in `env.py`). Gate results and the try log are below; the 4-condition investigator run has not been
-done.
+in `env.py`). O-lens vs placebo on the survivors (2026-10-28): 8% vs 0% correct (3/36 vs 0/36
+draws), no real uplift; gate results, the try log and that run are below.
 
 # debug_pointer
 
@@ -198,6 +198,53 @@ uv run python -m cfbench.run env_runs:debug_pointer/2026-10-27_try1+2026-10-27_t
 
 (and `--pairs hint+d2:nohint --items dist,metres,lenvsbytes,lineidx0`), once the O-lens reads of the
 hinted rollouts exist.
+
+## O-lens vs placebo (2026-10-28)
+
+The 12 survivor pairs as cfbench answer-task cases (`hint+dX` → `nohint`, `--base-positive`), only
+`olens_agentic` vs `olens_placebo_agentic` (no transcript-only or no-transcript run, by design:
+Robbie, 2026-10-27). Predictor Gemini 3.8 Flash on OpenRouter (BYOK Google AI Studio), effort
+medium, 3 draws per case, harness version 7 (run from `b1c3506`: this branch plus the #301
+request-builder fix).
+
+- Reads: `runs/olens_reads/2026-10-27_dp-survivors` (space lens `olens_s3d_space_rl600`, AR
+  `" " + bullet`, stop tokens, layers 32/40/48; all 8 hinted rollouts of each pair, 96 transcripts,
+  7,056 rows; 1x H200 RunPod pod, ~7 min, ~$0.6 shared with the style_transfer reads).
+- Placebo pool: the style_transfer survivor reads (`runs/olens_reads/2026-10-27_st-survivors`), so
+  each env is the other's placebo.
+- cfbench runs: `runs/cfbench/2026-10-28_dp-d1-olens-vs-placebo` (8 cases, 48 predictions) and
+  `runs/cfbench/2026-10-28_dp-d2-olens-vs-placebo` (4 cases, 24).
+  `2026-10-27_dp-d*-olens-vs-placebo` are abandoned (Gemini daily quota 429s after 1 prediction
+  each).
+
+| condition               | % correct (mean over 12 cases) | draws correct | null (edit does nothing) |
+| ----------------------- | ------------------------------ | ------------- | ------------------------ |
+| `olens_agentic`         | 8%                             | 3 / 36        | 0%                       |
+| `olens_placebo_agentic` | 0%                             | 0 / 36        | 0%                       |
+
+The two conditions' majority answers match on 10 of 12 cases, all wrong, mostly Flash's gate guess
+(`dist.py`, `days.py`, `receipt.py`, `label.py`, `alarm.py`, `trip.py`, `post.py`, `locate.py`). The
+3 correct O-lens draws:
+
+- `headingrad`/d1 (Qwen `gyro.py`, pointer `nav.py`): O-lens 2/3 `gyro.py`, placebo 0/3 (`nav.py`
+  ×3). The predictor searched the bullets for `atan` and got reads at the `atan2(dx, dy)` call and
+  the test input such as "Note: Standard math uses (x, y), but navigation often uses (y, x) for
+  bearing" and "atan2(1, 0) = π/2 (90°)", and concluded that without the pointer Qwen blames the
+  swapped-looking `atan2` call
+  ([draw 1, the `atan` search](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/a665c4fc-6150-4e0f-b435-dfe272de3dab?block_idx=29);
+  [placebo draw 1, `nav.py`](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/056f7e23-bbff-4570-b664-40fafe9025ff)).
+- `agecalc`/d1 (Qwen `person.py`, pointer `years.py`): O-lens 1/3. Its first `search_olens` returned
+  a read saying "the function signature has 'later' first, which is confusing", i.e. the
+  swapped-looking `years_between(today, dob)` call in `person.py`
+  ([draw 0](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/55683faf-cb02-4b49-96f2-d059e6200e52?block_idx=5)).
+
+Read: no real uplift. 3 of 36 draws on 2 cases vs 0 of 36, both on code with a swapped-looking
+argument order (`atan2(dx, dy)`, `years_between(today, dob)`). The reads that helped sit on the
+prompt's code (identical across the 8 runs, a shared prefix), not on the reply, and they restate the
+convention the code breaks. That is a rewrite of the transcript the predictor could in principle
+have made itself, not a read of a hidden suspect file. No read names Qwen's own pick (`gyro.py`,
+`near.py`, ...) as the culprit; a bullet regex for the pick's filename (FVE ≥ 0.1) finds 0 hits on
+`headingrad` and `dist`.
 
 ## Caveats
 
