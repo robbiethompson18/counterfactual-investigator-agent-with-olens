@@ -439,6 +439,15 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
     return f"Arm pairs on {envs[0]}", f"Every `cfbench.run env_runs:{envs[0]}/...` run: base arm -> counterfactual arm, one case per pair."
 
 
+def _summary(run_dir: Path, envs: Envs, export: bool) -> dict | None:
+    """run_summary, or None (with a warning) for a run whose env no longer exists, e.g. a retired env's old runs."""
+    try:
+        return run_summary(run_dir, envs, export)
+    except ModuleNotFoundError as e:
+        print(f"skipping {run_dir.name}: {e}", file=sys.stderr)
+        return None
+
+
 def build(names: list[str] | None = None, export=True) -> list[Path]:
     """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json."""
     runs, envs, written = eval_runs(), Envs(), []
@@ -446,7 +455,9 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
     for name in names or list(runs):
         if name not in runs:
             continue
-        summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s["run"], reverse=True)
+        summaries = sorted(filter(None, (_summary(r, envs, export) for r in runs[name])), key=lambda s: s["run"], reverse=True)
+        if not summaries:
+            continue
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
         p = EVALS / f"{name}.json"
