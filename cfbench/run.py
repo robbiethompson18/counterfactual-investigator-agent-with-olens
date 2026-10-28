@@ -164,7 +164,8 @@ async def main():
                 try:
                     result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task)
                     break
-                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:  # the wrapper already retried the last two
+                # the wrapper already retried status errors, empty choices and bad JSON; a dropped connection surfaces raw
+                except (openai.APIStatusError, openai.APIConnectionError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['condition']} {case['base_arm']}->{case['cf_arm']} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it
