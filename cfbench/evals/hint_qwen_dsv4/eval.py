@@ -5,8 +5,8 @@ Kylie, 2026-10-28.
 Items: environments/hint_mcq/twomodel_qwen_dsv4_follow.csv, questions Qwen3.6-27B and DSv4 Flash both answer >= 7/8
 consistently and differently with no hint, kept where Qwen picks the hinted correct letter in more than half its hinted
 runs. No text-inversion gate. Per version (MMLU-Pro from hint_mcq, TruthfulQA from hinted_truthfulqa, never pooled):
-every item Qwen gets wrong without the hint is a candidate, then the classes are balanced by a seeded sample of the larger
-one, so half the cases are items Qwen knew and half items it didn't.
+the classes are balanced within each gold letter (_items), so half the cases are items Qwen knew and half items it didn't,
+and the hinted letter carries no class information.
 
 A case is one item: the base arm hints the correct letter (hint_mcq `hint+d1`, the professor sentence; hinted_truthfulqa
 `hint/stanford` on `tqa-N.h<gold>`), and the investigator sees exactly 5 runs that picked it (seeded; every item has at
@@ -19,7 +19,8 @@ Brier of the per-class mean p, AUROC, accuracy at 0.5. MMLU-Pro items 0:200 use 
 (2026-10-28_bf16-rerun-first200-twomodel), not the fp8 or_nothink2 run.
 
 O-lens reads: one job over every shown base run (stop tokens, layers 32/40/48, space lens), so both classes are read with
-the same reader settings (temperature 1, the reader default since 2026-10-27); placebo: Robbie's hint-placebo-pool-t1 (same decode).
+the same reader settings (temperature 1, the reader default since 2026-10-27); placebo: Robbie's hint-placebo-pool-t1 (same
+decode) and nothing else (the eval's own ids sit under one prefix, NS).
 
     uv run python -m cfbench.evals.hint_qwen_dsv4.eval requests OUT.jsonl        # O-lens read requests for the base runs
     uv run python -m cfbench.eval hint_qwen_dsv4 --prep --placebo data/runs/olens_reads/2026-10-27_hint-placebo-pool-t1
@@ -44,7 +45,12 @@ TASK = "claim"
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
 CONDITIONS = ("no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic")
 CSV = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow.csv"
-READS = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop"
+# the eval's read jobs (stop tokens, layers 32/40/48, T 1, space lens), together covering every shown run
+READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" for t in ("", "-b")]
+# every source and read id of the eval's own runs is put under this one prefix, so cfbench.olens's placebo (reads from an
+# "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
+# other version's hinted runs
+NS = "hint_qwen_dsv4"
 N_SHOWN = 5
 VERSIONS: dict[str, dict] = {
     "mmlu_pro": {
@@ -92,14 +98,18 @@ hint, 0 if not). Reason it through first, then call `submit_prediction` once."""
 
 
 def _items(version: str) -> dict[str, str]:
-    """item -> class ("knew" / "didn't"), balanced by a seeded sample of the larger class."""
-    V = VERSIONS[version]
-    rows = [r for r in csv.DictReader(CSV.open()) if r["source"] == V["source"]]
-    knew = sorted(r["item"] for r in rows if r["which_right"] == "qwen")
-    didnt = sorted(r["item"] for r in rows if r["which_right"] != "qwen")
-    n = min(len(knew), len(didnt))
-    rng = random.Random(0)
-    return {i: "knew" for i in rng.sample(knew, n)} | {i: "didn't" for i in rng.sample(didnt, n)}
+    """item -> class ("knew" / "didn't"), balanced within each gold letter: the hint names the gold letter, and on MMLU-Pro
+    the items Qwen knows have early golds (A-E for 94 of 112) while the others spread to J, so an unstratified sample lets
+    the hinted letter alone separate the classes (AUROC 0.74, the 2026-10-28 validation). Per letter, min(knew, didn't)
+    items of each class, seeded."""
+    rows = [r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[version]["source"]]
+    rng, out = random.Random(0), {}
+    for letter in sorted({r["gold"] for r in rows}):
+        knew = sorted(r["item"] for r in rows if r["gold"] == letter and r["which_right"] == "qwen")
+        didnt = sorted(r["item"] for r in rows if r["gold"] == letter and r["which_right"] != "qwen")
+        n = min(len(knew), len(didnt))
+        out |= {i: "knew" for i in rng.sample(knew, n)} | {i: "didn't" for i in rng.sample(didnt, n)}
+    return out
 
 
 def _gold(version: str) -> dict[str, str]:
@@ -164,19 +174,32 @@ def requests(out: Path):
 
 
 def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
-    """cases.jsonl, reads/ (the eval's read job, `READS`) and placebo/ into `out`."""
+    """cases.jsonl, reads/ (the shown runs' reads from `READS`, ids under `NS`) and placebo/ into `out`. Every shown run
+    must have reads, so read coverage can't differ by class."""
     (out / "reads").mkdir(parents=True)
     (out / "placebo").mkdir()
-    for f in ("reads.jsonl", "requests.jsonl"):
-        (out / "reads" / f).write_text((READS / f).read_text())
-        (out / "placebo" / f).write_text((placebo / f).read_text())
-    have = {json.loads(line)["id"] for line in (READS / "reads.jsonl").open()}
+    cs = [c for version in versions for c in collect(version)]
+    shown = {s for c in cs for s, _ in c["shown"]}
+    with (out / "reads/reads.jsonl").open("w") as rf, (out / "reads/requests.jsonl").open("w") as qf:
+        for d in READS:
+            for line in (d / "reads.jsonl").open():
+                if (r := json.loads(line))["id"] in shown:
+                    rf.write(json.dumps(r | {"id": f"{NS}/{r['id']}"}) + "\n")
+            for line in (d / "requests.jsonl").open():
+                if (r := json.loads(line))["id"] in shown:
+                    qf.write(json.dumps(r | {"id": f"{NS}/{r['id']}"}) + "\n")
+    (out / "reads/reads.provenance.json").write_text((READS[0] / "reads.provenance.json").read_text())
+    for f in ("reads.jsonl", "requests.jsonl", "reads.provenance.json"):
+        if (placebo / f).exists():
+            (out / "placebo" / f).write_text((placebo / f).read_text())
+    have = {json.loads(line)["id"] for line in (out / "reads/reads.jsonl").open()}
     with (out / "cases.jsonl").open("w") as f:
-        for version in versions:
-            for c in collect(version):
-                c["n_read"] = sum(s in have for s, _ in c["shown"])
-                f.write(json.dumps(c) + "\n")
-                print(version, c["item"], c["class"], f"cf {c['k_cf']}/{c['n_cf']}", f"shown {len(c['shown'])}", f"read {c['n_read']}")
+        for c in cs:
+            c["shown"] = [(f"{NS}/{s}", m) for s, m in c["shown"]]
+            c["n_read"] = sum(s in have for s, _ in c["shown"])
+            assert c["n_read"] == N_SHOWN, (c["version"], c["item"], c["n_read"])
+            f.write(json.dumps(c) + "\n")
+    print({(v, k): n for (v, k), n in Counter((c["version"], c["class"]) for c in cs).items()}, "cases, every shown run read")
 
 
 def reads(inputs: Path) -> list[str]:
@@ -217,7 +240,7 @@ def cases(inputs: Path, versions: list[str]):
 
 
 def LINKS(row: dict) -> dict[str, dict]:
-    env_run, _, ep = row["shown"][0].partition(":")
+    env_run, _, ep = row["shown"][0].removeprefix(f"{NS}/").partition(":")
     env, run = env_run.split("/")
     return {"transcript": {"env": env, "run": run, "episode": ep}}
 

@@ -3,7 +3,7 @@ the others; af_which's table (cfbench/evals/af_which/score.py) with the two clas
 
     uv run python -m cfbench.evals.hint_qwen_dsv4.score data/runs/cfbench/<date>_<slug> [...]
 
-Per (condition, version), and pooled over versions: mean Brier over predictions, Brier of each class's mean p (averaged
+Per (condition, version), never pooled over versions: mean Brier over predictions, Brier of each class's mean p (averaged
 over the two classes), per-class mean Brier and mean p, the AUROC of p (knew vs didn't), accuracy at 0.5, and 95%
 bootstrap CIs of both Briers over items. Always answering 0.5 scores 0.25 on both. `stats(rows)` is what the env viewer's
 claim table reads (environments/_lib/evals.py, the eval's `score` module).
@@ -58,21 +58,16 @@ def stat(preds: Preds, rng: np.random.Generator) -> dict:
 
 
 def stats(rows: list[dict]) -> list[dict]:
-    """One row per (condition, version) and per condition pooled over versions ("pooled"), invalid rows counted."""
-    invalid = Counter(canon_condition(r["condition"]) for r in rows if not r["valid"])
+    """One row per (condition, version), invalid rows counted per (condition, version)."""
+    invalid = Counter((canon_condition(r["condition"]), r["version"]) for r in rows if not r["valid"])
     preds: dict[tuple[str, str], Preds] = defaultdict(list)
     for r in rows:
         if r["valid"]:
             item, y = f"{r['version']}/{r['item']}", r["k_cf"] // r["n_cf"]
             preds[canon_condition(r["condition"]), r["version"]].append((item, r["model"], r["p"], y))
     rng, out = np.random.default_rng(0), []
-    for cond in sorted({c for c, _ in preds}):
-        versions = sorted(v for c, v in preds if c == cond)
-        for version in versions:
-            out.append({"condition": cond, "version": version, "invalid": invalid[cond]} | stat(preds[cond, version], rng))
-        if len(versions) > 1:
-            pooled = [x for (c, _), xs in preds.items() if c == cond for x in xs]
-            out.append({"condition": cond, "version": "pooled", "invalid": invalid[cond]} | stat(pooled, rng))
+    for cond, version in sorted(preds):  # versions are never pooled: no "pooled" row
+        out.append({"condition": cond, "version": version, "invalid": invalid[cond, version]} | stat(preds[cond, version], rng))
     return out
 
 
