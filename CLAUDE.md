@@ -489,10 +489,11 @@ Current docs:
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
   pre-hint-reads arms in flight (PR #320)
-- [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
-  — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
-  on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
-  2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
+- [NULL: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
+  — letter grades on 3 essays: underpowered (Qwen gives nearly everything an A); out of 10 on 12
+  essays spread terrible → excellent, Duke → no scenario: O-lens RMSE 0.86 vs transcript 0.65 vs
+  placebo 0.60 (O-lens worse than placebo, CI excludes 0); the lens's "standard essay" runner-up
+  score at the grade token overshoots
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
   — Qwen (thinking off) names the buggy file in a 4-module repo; a templated pointer in the test
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
