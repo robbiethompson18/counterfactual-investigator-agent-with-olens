@@ -115,13 +115,23 @@ REWRITES = [  # build_prompt's wording is about one target model; here the two r
     ),
     ("We will run the target model again, with the same settings,", "We will run both models again, with the same settings,"),
     ("Unified diff of the model's starting context:", "Unified diff of the models' starting context:"),
+    (  # Kylie 2026-10-28: the investigator is told 4 samples from the lens (O-lens conditions only)
+        (
+            "Each read is the lens's greedy readout followed by 4 samples, one short bullet each; by default the tools show only the "
+            "greedy one (`top_k` up to 5 adds the samples, and how much they agree is a rough confidence signal)."
+        ),
+        (
+            "Each read is 4 samples from the lens, one short bullet each; by default the tools show only the first (`top_k` up to "
+            "4 shows them all, and how much they agree is a rough confidence signal)."
+        ),
+    ),
 ]
 
 
 def PROMPT(prompt: str, case: dict) -> str:
     """REWRITES, each of which must apply (the O-lens one only where there are O-lens tools)."""
     for old, new in REWRITES:
-        assert old in prompt or "activations" in old, old
+        assert old in prompt or "activations" in old or "lens's" in old, old
         prompt = prompt.replace(old, new)
     assert "target model" not in prompt
     return prompt
