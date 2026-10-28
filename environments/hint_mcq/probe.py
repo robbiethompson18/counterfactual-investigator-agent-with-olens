@@ -148,6 +148,13 @@ def fit(a):
     opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
     q = np.array([o["q"] for o in opts])
     right = np.array([o["right"] for o in opts])
+    # Kylie's site is the period ending each option; questions where every option's text ends in "." get their own split
+    n_dot, n_opt = Counter(o["q"] for o in opts if o["end_token"].endswith(".")), Counter(o["q"] for o in opts)
+    period = np.array([n_dot[o["q"]] == n_opt[o["q"]] for o in opts])
+    print(
+        f"end token ends in '.': {np.mean([o['end_token'].endswith('.') for o in opts]):.1%} of options; "
+        f"every option does in {len(np.unique(q[period]))}/{len(n_opt)} questions"
+    )
     y = {lab: np.array([o[lab] for o in opts]) for lab in ("is_answer", "is_gold")}
     folds = list(GroupKFold(n_splits=a.folds).split(q, groups=q))
 
@@ -167,7 +174,9 @@ def fit(a):
             top[qi] = np.flatnonzero(m)[np.argmax(s[m])]
         tops = np.array(list(top.values()))
         out = {}
-        for name, mask in (("all", np.ones(len(q), bool)), ("right", right), ("wrong", ~right)):
+        splits = {"all": np.ones(len(q), bool), "right": right, "wrong": ~right}
+        splits |= {f"{p}_{k}": m & pm for p, pm in (("period", period), ("noperiod", ~period)) for k, m in list(splits.items())}
+        for name, mask in splits.items():
             t = tops[mask[tops]]
             out[name] = {
                 "auroc_answer": roc_auc_score(y["is_answer"][mask], s[mask]),
@@ -218,6 +227,22 @@ def table(res: dict, sites: list[str]) -> str:
             cells = [p["all"]["auroc_answer"], p["right"]["top1_answer"], p["wrong"]["top1_answer"], p["wrong"]["top1_gold"]]
             cells += [g["wrong"]["top1_gold"], g["wrong"]["top1_answer"]]
             lines.append(f"| {site} | {layer} | " + " | ".join(f"{x:.3f}" for x in cells) + " |")
+    lines += [
+        "",
+        '`end` site, is_answer probe, split by questions where every option\'s text ends in "." (period) or not (noperiod):',
+        "",
+        "| layer | period: top-1 = answer (right q) | period: top-1 = answer (wrong q) | period: top-1 = gold (wrong q) "
+        + "| noperiod: top-1 = answer (right q) | noperiod: top-1 = answer (wrong q) | noperiod: top-1 = gold (wrong q) |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for layer in res["layers"] if "end" in sites else []:
+        p = res["probes"][f"end/{layer}/is_answer"]
+        cells = [
+            p[f"{s}_{k}"][m]
+            for s in ("period", "noperiod")
+            for k, m in (("right", "top1_answer"), ("wrong", "top1_answer"), ("wrong", "top1_gold"))
+        ]
+        lines.append(f"| {layer} | " + " | ".join(f"{x:.3f}" for x in cells) + " |")
     return "\n".join(lines) + "\n"
 
 
@@ -252,7 +277,7 @@ def main():
     c.add_argument("--seed", type=int, default=0)
     f = sub.add_parser("fit")
     f.add_argument("run")
-    f.add_argument("--sites", nargs="+", default=["dot", "end"])
+    f.add_argument("--sites", nargs="+", default=["end", "dot"])
     f.add_argument("--folds", type=int, default=5)
     f.add_argument("--C", type=float, default=0.01)
     f.add_argument("--finish", action="store_true", help="mark the run done and sync it to HF")
