@@ -53,23 +53,6 @@ PR #219, and the HF model-loading code it assumes (`load_base`, hook-LoRA) was d
 one-engine reader in PR #229. Kept because nobody has decided whether steering comes back; delete it
 or port it to vLLM when that is decided.
 
-## 2026-10-26: expview runs that only ever lived on bramble
-
-expview became a static page reading HF (PR "viewers/expview-static"). Three kinds of dataset linked
-from docs and scripts aren't on HF, so their `#d=…` links open "no dataset" until someone uploads
-the run under `runs/<experiment>/<run>/expview` and `runs.py finish`es it:
-
-- bramble's 27 pre-monorepo runs (`expview/character_drift_*`, `expview/overeager_*`,
-  `expview/realism_evalness_*`; docs/envs/character_drift.md, docs/glm53-realism.md,
-  `donehack/realism/overeager/*.py`);
-- `imports/celeste/…` and `imports/olens_reads/…` views (Celeste's parquet re-tokenised;
-  `expview/importers/celeste.py`, `scripts/glm_olens_dense/CLAUDE.md`). The two `olens_prompt_ea`
-  overlays on HF point at them, so on the page they show judge calls without the transcript;
-- `olens_prompt_ea/*.py` still emit `bramble:8821` (`olens_search`, deleted) links in Record.
-
-Also dropped with the server: Docent links resolved by transcript fingerprint (the page only
-resolves `extra.source` / `run_dir` + `row_index` through `docent.json`), and "annotations from
-other runs" on a base item (needs a cross-run index).
 
 ## 2026-10-26: OpenRouter calls outside `openrouter.chat`
 
