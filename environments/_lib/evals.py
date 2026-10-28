@@ -547,6 +547,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         if name not in runs:
             continue
         summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s.get("started") or s["run"], reverse=True)
+        summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
