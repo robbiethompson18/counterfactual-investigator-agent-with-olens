@@ -180,7 +180,7 @@ main{overflow:auto;padding:0 28px 60px}
 </style>
 </head>
 <body>
-<div id="top"><a class="brand" href="#">expview</a><span class="right" id="topnav"><a class="btn" href="#" title="Envs: env → arm → run → episode">Envs</a><a class="btn" href="#datasets=1" title="Every expview run on HF">Datasets</a></span><div id="crumbs"></div><div class="right"><a class="btn" id="tosearch" href="#s=1">Search reads</a><button class="btn" id="theme" title="Toggle light / dark">◐</button></div></div>
+<div id="top"><a class="brand" href="#">expview</a><span class="right" id="topnav"><a class="btn" href="#" title="Envs: env → arm → run → episode">Envs</a><a class="btn" href="#datasets=1" title="Every expview run on HF">Datasets</a></span><div id="crumbs"></div><div class="right"><a class="btn" id="toall" href="#everything=1" hidden title="One regex over every read, transcript and judge call (search server on bramble)">Search everything</a><a class="btn" id="tosearch" href="#search=1">Search reads</a><button class="btn" id="theme" title="Toggle light / dark">◐</button></div></div>
 <div id="app"><div class="page empty" id="loading">Loading…</div></div>
 <script id="data" type="text/plain">{{DATA}}</script>
 <script>
@@ -251,14 +251,18 @@ async function hfRaw(url,opt){opt={signal:AbortSignal.timeout(60000),...(opt||{}
     await new Promise(ok=>setTimeout(ok,1000*wait));r=await fetch(url,opt)}return r}
 async function hfFetch(url,opt){const r=await hfRaw(url,opt);if(!r.ok)throw new Error(`HF ${r.status}: ${url.replace(HF_API,"").replace(HF_RESOLVE,"")}`);return r}
 // every entry of a directory (the tree API pages at 1000 and exposes its Link header); null when the path doesn't exist
-async function hfTree(path,expand){let url=HF_API+"tree/main/"+encPath(path)+"?expand="+!!expand,out=[];
+// Celeste's imports (imports/celeste/…) aren't on HF: the search server serves them (tree listing + files with byte ranges)
+const isImport=p=>p.startsWith("imports/")&&!!SEARCH_API;
+const resolveUrl=p=>isImport(p)?SEARCH_API+"/files/"+encPath(p):HF_RESOLVE+encPath(p);
+async function hfTree(path,expand){if(isImport(path)){const r=await fetch(SEARCH_API+"/api/tree/"+encPath(path));return r.ok?r.json():null}
+  let url=HF_API+"tree/main/"+encPath(path)+"?expand="+!!expand,out=[];
   while(url){const r=await hfRaw(url);if(r.status==404)return null;if(!r.ok)throw new Error(`HF ${r.status} listing ${path}`);out=out.concat(await r.json());
     const m=/<([^>]+)>;\s*rel="next"/.exec(r.headers.get("Link")||"");url=m?m[1]:null}
   return out}
 const pathsInfo=paths=>hfFetch(HF_API+"paths-info/main",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({paths,expand:false})}).then(r=>r.json());
 // dataset id <-> HF dir: a run's expview data lives at runs/<experiment>/<run>/expview[/<name>] and is dataset runs/<experiment>/<run>[/<name>]
 const dsId=dir=>dir.split("/").filter(x=>x!="expview").join("/");
-function dirsOf(d){const ps=d.split("/");
+function dirsOf(d){const ps=d.split("/");if(isImport(d))return [d];
   if(ps[0]!="runs"||ps.length<3)throw new Error(`${d}: only datasets under runs/<experiment>/<run> are on HF (imports/… runs and bramble's old expview/… runs were never synced)`);
   return [[...ps.slice(0,3),"expview",...ps.slice(3)].join("/"),d+"/expview"]}
 // what's on HF, found without a manifest: experiments (runs/<experiment>), their run dirs (one listing each; the tree API
@@ -311,7 +315,7 @@ function rowsToReads(rows){const out={},sc=(t,x)=>x==null?[t]:[t,x];
 let SRC;
 function hfSource(){
   const DIR={},LIST={},SUMS={},FULL={},DOC={},TOK={},READS={};
-  const url=(d,rel)=>HF_RESOLVE+encPath(DIR[d]+"/"+rel);
+  const url=(d,rel)=>resolveUrl(DIR[d]+"/"+rel);
   async function listing(d){if(LIST[d])return LIST[d];
     for(const dir of DIR[d]?[DIR[d]]:dirsOf(d)){const l=await hfTree(dir,true);if(l){DIR[d]=dir;const files={};for(const x of l)files[x.path.slice(dir.length+1)]=x;return LIST[d]={dir,files}}}
     throw new Error(`no dataset ${d} on HF (looked for ${dirsOf(d).join(" and ")})`)}
@@ -348,7 +352,7 @@ function hfSource(){
     env:(d,e)=>getJson(d,"envs/"+e+".json").then(x=>x.files),
     // tk.src: a batch-reads item (importers/reads.py): byte ranges of its transcripts line and reads rows, paths relative to the run
     async tokens(d,ref,tk){const k=d+"\0"+ref;if(!TOK[k]){if(!DIR[d])await listing(d);
-      if(tk&&tk.src){const part=async([rel,off,n])=>{const r=await hfFetch(HF_RESOLVE+encPath(joinPath(DIR[d],rel)),{headers:{Range:`bytes=${off}-${off+n-1}`}});
+      if(tk&&tk.src){const part=async([rel,off,n])=>{const r=await hfFetch(resolveUrl(joinPath(DIR[d],rel)),{headers:{Range:`bytes=${off}-${off+n-1}`}});
           if(r.status!=206)throw new Error(`HF did not honour the byte range for ${rel}`);return r.text()};
         const [t,rows]=await Promise.all([part(tk.src.transcript).then(JSON.parse),Promise.all(tk.src.reads.map(part)).then(xs=>jsonl(xs.join("")))]);
         TOK[k]={tokens:t.tokens,sections:t.sections,reads:rowsToReads(rows)}}
@@ -539,6 +543,7 @@ let VIEW=null;
 async function route(){
   const p=canonHash();document.onkeydown=null;
   try{
+    if(p.get("everything"))return await everythingPage(p);
     if(p.get("search"))return await searchPage(p);
     if(p.get("env")&&!SRC.static){const e=p.get("env"),arm=p.get("arm"),run=p.get("run"),epi=p.get("episode");
       if(arm){const d=armDs(e,arm);ARMNAME[d]=arm;return epi!=null?await itemPage(d,run+"/"+epi,p):await runPage(d)}
@@ -569,7 +574,9 @@ async function envsHome(){
   crumbs([["envs"]]);VIEW="envs";
   $("#app").innerHTML=`<div class="page"><h1>Envs</h1>
    <p class="desc">Every env on the public HF dataset, browsed the way the <a href="${ENV_VIEWER}">env viewer</a> is organised: env → arm → episode. An episode shows its transcript, sandbox files, labels and judges, plus any O-lens or other metamodel reads and judge calls made on it. Other expview data: <a href="#datasets=1">all datasets</a>.</p>
+   ${SEARCH_OK||SEARCH_AWAY?`<form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search everything (reads, transcripts, judge calls): a regex, e.g. \\bgrader" aria-label="regex"><button class="btn primary">Search</button></div></form>`:""}
    <div class="wrap"><table id="et"><tr><td class="empty">Loading…</td></tr></table></div></div>`;
+  if(SEARCH_OK||SEARCH_AWAY)$("#hs").onsubmit=ev=>{ev.preventDefault();const q=$("#hq").value.trim();if(q)searchGo(q)};
   const names=await envNames();
   const rows=await pmap(names,6,async e=>{try{const x=await envIndex(e);return {e,x}}catch(err){return {e,err}}});
   if(VIEW!="envs")return;
@@ -620,7 +627,7 @@ async function homePage(){
    <form class="sform" id="hs" style="margin:14px 0 20px"><div class="row"><input class="rx" id="hq" type="text" placeholder="Search metamodel reads: a regex, e.g. being (tested|evaluated)|eval rubric" aria-label="regex"><button class="btn primary">Search</button></div></form>
    <div class="filters"><label for="hf">Filter <input id="hf" type="search" value="${esc(F)}" placeholder="dataset id or title"></label><span class="mono" id="hc"></span></div>
    <div class="wrap"><table id="ht"></table></div></div>`;
-  $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)go({search:1,query:q})};
+  $("#hs").onsubmit=e=>{e.preventDefault();const q=$("#hq").value.trim();if(q)searchGo(q)};
   let ds=fresh?cache.list:[];
   const draw=()=>{if(VIEW!="home")return;const f=$("#hf").value.toLowerCase();store.set("homeq",$("#hf").value);
     for(const x of ds)SRC.known(x.d,x.dir);
@@ -1027,6 +1034,91 @@ async function searchPage(p){
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([lines.join("\n")],{type:"text/csv"}));a.download="expview_search.csv";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000)};
 }
 
+// ================================================================ search everything: one regex over every read, episode, transcript and judge call, answered by expview/search_server.py
+// Kylie's exception (2026-10-27) to "no backend": the server runs on bramble over the local HF mirror. The page shows this only when
+// the server answers: the same origin when the page is served by it over http, or localStorage "expview:search_server" = its URL.
+// (An https page, e.g. GitHub Pages, can't call an http server, so there it stays hidden.)
+const SEARCH_API=store.get("search_server",null)||(location.protocol=="http:"?location.origin:null);
+// where an https copy (GitHub Pages) sends "Search everything": the server's own copy of this page, on the tailnet (Kylie, 2026-10-27)
+const SEARCH_PAGE=store.get("search_page","http://bramble:8840/expview/"),SEARCH_AWAY=location.protocol=="https:";
+let SEARCH_OK=false;
+const probeSearch=()=>SEARCH_API?fetch(SEARCH_API+"/api/ping",{signal:AbortSignal.timeout(1500)}).then(r=>r.ok).catch(()=>false):Promise.resolve(false);
+const searchGo=q=>SEARCH_OK?go({everything:1,query:q}):SEARCH_AWAY?window.open(SEARCH_PAGE+linkTo({everything:1,query:q}),"_blank","noopener"):go({search:1,query:q});
+async function everythingPage(p){
+  VIEW="everything";crumbs([["envs","#"],["search everything"]]);
+  const sc=p.get("scope"),scope=sc=="reads"||sc=="text"?sc:"all",q=p.get("query")||"",cs=p.get("case");
+  const keys=["query","case","scope","novel","experiment","dataset","model","reader","section","group","label"];
+  const qs=o=>new URLSearchParams(Object.entries(o).filter(([,v])=>v!=null&&v!=="")).toString();
+  const sel=(id,opts,cur,all)=>`<select id="${id}">${all!=null?`<option value="">${all}</option>`:""}${opts.map(([v,n])=>`<option value="${esc(v)}" ${v==cur?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
+  $("#app").innerHTML=`<div class="page"><h1>Search everything</h1>
+   <p class="desc">One regex over every metamodel read (O-lens bullets, J-lens / J++ top-k, NLA and reader outputs) at its token, every env episode's transcript and its judges, and every expview run's transcripts and judge calls, answered by the search server on bramble over its mirror of the HF dataset (it re-indexes new runs every 10 minutes). "New" drops a read whose match also appears in the transcript around its token. The table shows, per run and group, how many items have a hit and each yes/no label's rate among them vs overall.</p>
+   <form class="sform" id="sf">
+    <div class="row"><input class="rx" id="sq" type="text" value="${esc(q)}" placeholder="regex, e.g. \\bgrader" aria-label="regex"><button class="btn primary">Search</button>
+     <label><input type="checkbox" id="scase" ${cs=="1"?"checked":""}> case-sensitive</label></div>
+    <div class="row"><label>Experiment <select id="senv"><option value="">All experiments</option></select></label>
+     <label>In ${sel("sscope",[["all","everything"],["reads","metamodel reads"],["text","transcripts and judge calls"]],scope)}</label>
+     <label title="Drop a read when the regex also matches what the model just read or is about to write (an echo), or anywhere in the item">Keep reads ${sel("snovel",[["ctx","new vs ±40 tokens + next 16"],["transcript","new vs the whole item"]],p.get("novel")||"","all hits")}</label>
+     <span id="sfacets" class="row"></span>
+    </div>${p.get("dataset")||p.get("model")?`<div class="row mono">Only ${p.get("model")?`model ${esc(p.get("model"))}`:""} ${p.get("dataset")?`runs ${esc(p.get("dataset"))}`:""} <a href="${linkTo({...Object.fromEntries(p),dataset:"",model:"",page:""})}">(clear)</a></div>`:""}</form><div id="sres"></div></div>`;
+  const params=()=>({everything:1,query:$("#sq").value.trim(),case:$("#scase").checked?"1":"",scope:$("#sscope").value=="all"?"":$("#sscope").value,novel:$("#snovel").value,experiment:$("#senv").value,
+    dataset:p.get("dataset")||"",model:p.get("model")||"",reader:$("#stool")?.value||"",section:$("#ssec")?.value||"",group:$("#sgroup")?.value||"",label:$("#slabel")?.value||""});
+  $("#sf").onsubmit=e=>{e.preventDefault();go(params())};
+  $("#senv").onchange=()=>{const o=params();Object.assign(o,{dataset:"",model:"",reader:"",section:"",group:"",label:""});go(o)};
+  $$("#sscope,#snovel,#scase").forEach(s=>s.onchange=()=>{if($("#sq").value.trim())go(params())});
+  const res=$("#sres");
+  if(!SEARCH_OK){res.innerHTML=`<p class="err">The search server ${esc(SEARCH_API||"")} isn't reachable (it runs on bramble; open this page from it). <a href="${linkTo({search:1,query:q})}">Search the reads of chosen runs instead</a>.</p>`;return}
+  if(!q){res.innerHTML="";const r=await fetch(SEARCH_API+"/api/runs").then(r=>r.json());$("#senv").innerHTML+=[...new Set(r.map(x=>x.exp))].sort().map(e=>`<option value="${esc(e)}" ${e==p.get("experiment")?"selected":""}>${esc(e)}</option>`).join("");
+    res.innerHTML=`<p class="mono">${r.length.toLocaleString()} runs, ${r.reduce((a,x)=>a+x.items,0).toLocaleString()} items indexed. Try <a href="${linkTo({everything:1,query:"\\bgrader"})}">\\bgrader</a> · <a href="${linkTo({everything:1,query:"being (tested|evaluated|watched)",scope:"reads",novel:"ctx"})}">being (tested|evaluated|watched)</a> (new reads only).</p>`;return}
+  res.innerHTML='<p class="empty">Searching…</p>';
+  const o=Object.fromEntries(keys.map(k=>[k,p.get(k)]));
+  const page=+(p.get("page")||0);
+  const r=await fetch(SEARCH_API+"/api/search?"+qs({...o,page})).then(r=>r.json());
+  if(VIEW!="everything"||H().get("query")!=q)return;
+  $("#senv").innerHTML+=r.experiments?.map(e=>`<option value="${esc(e)}" ${e==p.get("experiment")?"selected":""}>${esc(e)}</option>`).join("")||"";
+  if(r.error){res.innerHTML=`<p class="err">${esc(r.error)}</p>`;return}
+  const rx=rxOf(q,cs=="1"),F=r.facets;
+  $("#sfacets").innerHTML=(scope!="text"?`<label>Reader ${sel("stool",F.reader.map(([t,n])=>[t,`${t} (${n.toLocaleString()})`]),p.get("reader")||"","all")}</label>
+     <label>Section ${sel("ssec",F.section.map(s=>[s,s||"(none)"]),p.get("section")||"","all")}</label>`:"")+
+    `<label>Group ${sel("sgroup",F.group.map(([g,n])=>[g,`${g} (${n})`]),p.get("group")||"","all")}</label>`+
+    `<label>Label ${sel("slabel",F.label.flatMap(([k,m])=>m.map(([v,n])=>[`${k}=${v}`,`${k} = ${v} (${n})`])),p.get("label")||"","any")}</label>`;
+  $$("#sfacets select").forEach(s=>s.onchange=()=>go(params()));
+  const kc=new Map();for(const x of r.table)for(const k of Object.keys(x.rates))kc.set(k,(kc.get(k)||0)+x.hit_items);
+  const rk=[...kc].sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k])=>k);  // the yes/no labels of the most hits
+  const envOfD=d=>{const e=envOf(d);return e&&e.run?e:null};
+  const itemHref=(h,extra)=>{const e=envOfD(h.d);return e?linkTo({env:e.env,run:e.run,episode:h.i,query:q,case:cs}):linkTo({dataset:h.d,item:h.i,query:q,case:cs,...extra})};
+  const runChip=d=>{const m=r.meta[d]||{},e=envOfD(d);return `<span class="chip mono" title="${esc(d)}">${e?`${esc(e.env)} · ${esc(m.target?String(m.target).split("@")[0].split("/").pop():e.run)}`:esc(d)}</span>`};
+  const labChips=l=>Object.entries(l||{}).slice(0,6).map(([k,v])=>chip(k,v)).join("");
+  let h=`<p><b>${r.hit_items.toLocaleString()}</b> items in <b>${r.hit_runs}</b> runs of <b>${r.hit_experiments}</b> experiments match`+
+    (scope!="reads"?` · <b>${r.text_items.toLocaleString()}</b> by their transcript or judge calls`:"")+
+    (scope!="text"?` · <b>${r.read_hits.toLocaleString()}</b> matching reads at <b>${r.read_positions.toLocaleString()}</b> token positions in <b>${r.read_items.toLocaleString()}</b> items${r.read_hits?` · <a href="${SEARCH_API}/api/csv?${qs(o)}">CSV of all matching reads</a>`:""}`:"")+
+    ` <span class="mono">(${r.took}s over ${r.runs.toLocaleString()} runs, ${r.items.toLocaleString()} items, ${r.reads.toLocaleString()} reads)</span></p>`;
+  // experiments first (runs are an implementation detail); runs only inside one experiment, collapsed
+  if(!p.get("experiment"))h+=`<div class="wrap"><table id="sbyexp"><tr><th>Experiment</th><th>Items with a hit</th><th>In transcripts / judge calls</th><th>In reads</th><th>Runs</th></tr>${r.by_experiment.map(e=>
+    `<tr class="click" data-e="${esc(e.exp)}" title="only this experiment"><td class="mono">${esc(e.exp)}</td><td class="num">${e.items.toLocaleString()}</td><td class="num">${e.text.toLocaleString()}</td><td class="num">${e.reads.toLocaleString()}</td><td class="num">${e.runs}</td></tr>`).join("")}</table></div>`;
+  if(p.get("experiment")&&r.by_group.length){
+    const kc=new Map();for(const x of r.by_group)for(const k of Object.keys(x.rates))kc.set(k,(kc.get(k)||0)+x.items);
+    const prim=kc.has("positive")?"positive":[...kc].sort((a,b)=>b[1]-a[1])[0]?.[0];
+    const anyModel=r.by_group.some(x=>x.model);
+    h+=`<h2>${esc(p.get("experiment"))} by ${anyModel?"arm and model":"group"}</h2><div class="wrap" style="max-height:480px;overflow:auto"><table id="sbygrp"><tr><th>${anyModel?"Arm / group":"Group"}</th>${anyModel?"<th>Model</th>":""}<th>Items with a hit</th><th>In transcripts / judge calls</th><th>In reads</th>${prim?`<th title="rate among items with a hit · overall">${esc(prim)} | hit · all</th>`:""}</tr>${r.by_group.map((x,j)=>{const v=prim&&x.rates[prim];
+      return `<tr class="click" data-j="${j}" title="only these items"><td class="mono">${esc(x.group??x.d)}</td>${anyModel?`<td class="mono">${esc(x.model||"")}</td>`:""}<td class="num">${x.hit_items.toLocaleString()} / ${x.items.toLocaleString()} (${pct(x.hit_items/x.items)})</td><td class="num">${x.text.toLocaleString()}</td><td class="num">${x.reads.toLocaleString()}</td>${prim?`<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`:""}</tr>`}).join("")}</table></div>`}
+  else if(r.table.length)h+=`<details><summary class="mono">By run and group (${r.table.length})</summary>`+`<div class="wrap" style="max-height:340px;overflow:auto"><table><tr><th>Run</th><th>Group</th><th>Items</th><th>With hit</th>${rk.map(k=>`<th title="rate among items with a hit · overall">${esc(k)} | hit · all</th>`).join("")}</tr>${r.table.map(x=>
+    `<tr><td class="mono wrapid" style="min-width:300px">${esc(x.d)}</td><td>${esc(x.grp??"")}</td><td class="num">${x.items}</td><td class="num">${x.hit_items} (${pct(x.hit_items/x.items)})</td>${rk.map(k=>{const v=x.rates[k];return `<td class="num">${v&&v[0]?`${pct(v[2]?v[3]/v[2]:null)} · ${pct(v[1]/v[0])}`:"–"}</td>`}).join("")}</tr>`).join("")}</table></div>`+`</details>`;
+  const pages=Math.ceil(r.total_hits/50);
+  const nav=`<div class="pager">${page>0?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page-1})}">← prev</a>`:""}<span class="mono">page ${page+1} / ${Math.max(1,pages)}</span>${page+1<pages?`<a class="btn" href="${linkTo({...Object.fromEntries(p),page:page+1})}">next →</a>`:""}</div>`;
+  let lastExp=null;
+  h+=nav+r.hits.map(x=>{const ex=x.exp,sep=ex!=lastExp&&!p.get("experiment")?`<h2 class="mono">${esc(ex)} <a class="btn" href="${linkTo({...Object.fromEntries(p),experiment:ex,page:""})}">only this</a></h2>`:"";lastExp=ex;return sep+hitCard(x)}).join("")+nav;
+  res.innerHTML=h;
+  const bg=$("#sbygrp");if(bg)bg.onclick=ev=>{const tr=ev.target.closest("tr[data-j]");if(!tr)return;const x=r.by_group[+tr.dataset.j];
+    go({...Object.fromEntries(p),page:"",group:x.group??"",model:x.model||"",dataset:x.d||""})};
+  const bt=$("#sbyexp");if(bt)bt.onclick=ev=>{const tr=ev.target.closest("tr[data-e]");if(tr)go({...Object.fromEntries(p),experiment:tr.dataset.e,page:"",dataset:"",group:"",label:""})};
+  function hitCard(x){const head=`${runChip(x.d)}${x.g!=null?`<span class="chip">${esc(x.g)}</span>`:""}`;
+    if(x.kind=="text")return `<div class="card"><div class="chips"><a class="chip" href="${itemHref(x,{view:x.where=="transcript"?"tr":"call"})}">${esc(x.i)}</a>${head}<span class="chip">${esc(x.where)}</span>${labChips(x.l)}</div><div class="ctx">…${hl(x.snippet,rx)}…</div></div>`;
+    const c=x.ctx,tk=x.token;
+    return `<div class="card"><div class="chips"><a class="chip" href="${itemHref(x,{view:"tr",token:x.pos})}">${esc(x.i)} @ ${x.pos}</a>${head}${x.sec?`<span class="chip">${esc(x.sec)}</span>`:""}${labChips(x.l)}</div>
+     <div class="ctx">…${esc(c.endsWith(tk)?c.slice(0,c.length-tk.length):c)}<b>${esc(tk)}</b> ⟶ ${esc(x.nxt)}</div>
+     <div class="reads">${x.reads.map(([t,l,txt])=>`<div><span class="rn">${esc(t)}${l?" · "+esc(l):""}</span>${hl(txt,rx)}</div>`).join("")}</div></div>`}
+}
+
 // ================================================================ boot
 (function theme(){const t=store.get("theme",null);if(t)document.documentElement.dataset.theme=t;
   $("#theme").onclick=()=>{const cur=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
@@ -1034,6 +1126,9 @@ async function searchPage(p){
 (async()=>{
   SRC=STATIC?await staticSource():hfSource();
   if(STATIC){$("#tosearch").hidden=true;$("#topnav").hidden=true;$(".brand").textContent="expview";$(".brand").href="#"}
+  if(!STATIC&&(SEARCH_OK=await probeSearch()))$("#toall").hidden=false;
+  else if(!STATIC&&SEARCH_AWAY){const a=$("#toall");Object.assign(a,{hidden:false,href:SEARCH_PAGE+"#everything=1",target:"_blank",rel:"noopener",title:"tailnet only",textContent:"Search everything ↗"});
+    a.onmouseenter=a.onfocus=()=>{const q=H().get("query");a.href=SEARCH_PAGE+(q?linkTo({everything:1,query:q}):"#everything=1")}}
   window.addEventListener("hashchange",route);await route();
 })().catch(e=>{$("#app").innerHTML=`<div class="page err">Could not start: ${esc(e.message||e)}</div>`});
 </script>
