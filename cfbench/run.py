@@ -6,7 +6,8 @@
 Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
 of every base-arm run and tools to read or search them (`transcript_agentic`, cfbench/tools.py), plus O-lens tools over
 some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py), or
-the same with J++ lens reads (`jlens_agentic`, `jlens_placebo_agentic`, cfbench/jlens.py; read at every token).
+the same with J++ lens reads (`jlens_agentic`, `jlens_placebo_agentic`, cfbench/jlens.py; read at every token), or the O-lens
+tools over NLA reads (`nla_agentic`, `nla_placebo_agentic`, `--nla-reads`).
 The retired inline two-transcript condition and the old names are in cfbench/core.py (LEGACY_CONDITIONS).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
@@ -32,6 +33,7 @@ from cfbench.core import (
     HARNESS_VERSION,
     JLENS_CONDITIONS,
     LENS_CONDITIONS,
+    NLA_CONDITIONS,
     OLENS_CONDITIONS,
     TASKS,
     TOOL_BUDGET,
@@ -61,6 +63,7 @@ async def main():
     ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--jlens-reads", default="", help="comma list of J++ reads JSONL (cfbench/jlens.py), read at every token")
+    ap.add_argument("--nla-reads", default="", help="comma list of NLA reads JSONL (--readout nla), for the nla conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument(
         "--olens-positions",
@@ -93,7 +96,12 @@ async def main():
     fve_note = olens.fve_note(reads) if reads else ""
     jreads = olens.Reads(args.jlens_reads.split(",") if args.jlens_reads else [], "all")  # J++ reads are always every-token
     assert jreads or not set(JLENS_CONDITIONS) & set(conditions), "the jlens conditions need --jlens-reads"
-    lenses = [(c, r) for c, r in ((OLENS_CONDITIONS, reads), (JLENS_CONDITIONS, jreads)) if set(c) & set(conditions)]
+    nreads = olens.Reads(args.nla_reads.split(",") if args.nla_reads else [], args.olens_positions)
+    assert nreads or not set(NLA_CONDITIONS) & set(conditions), "the nla conditions need --nla-reads"
+    nla_note = olens.fve_note(nreads, "the readout's") if nreads else ""
+    lenses = [
+        (c, r) for c, r in ((OLENS_CONDITIONS, reads), (JLENS_CONDITIONS, jreads), (NLA_CONDITIONS, nreads)) if set(c) & set(conditions)
+    ]
 
     module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. env_runs:<env>/<run>
     loader = importlib.import_module(f"cfbench.envs.{module}")
@@ -140,7 +148,8 @@ async def main():
         | {"harness_version": HARNESS_VERSION}
         | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {})
-        | ({"jlens_sources": olens.sources(args.jlens_reads.split(","))} if args.jlens_reads else {}),
+        | ({"jlens_sources": olens.sources(args.jlens_reads.split(","))} if args.jlens_reads else {})
+        | ({"nla_sources": olens.sources(args.nla_reads.split(","))} if args.nla_reads else {}),
     )
     out = run / "predictions.jsonl"
     slots = asyncio.Semaphore(args.concurrency)
@@ -156,8 +165,13 @@ async def main():
         if condition in JLENS_CONDITIONS:
             lens_tools, read = jlens.tools(base, jreads, placebo=condition == "jlens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
+        if condition in NLA_CONDITIONS:
+            placebo = condition == "nla_placebo_agentic"
+            lens_tools, read = olens.tools(base, nreads, placebo=placebo, seed=args.seed + draw, kind="nla")
+            tools |= lens_tools
+        note = nla_note if condition in NLA_CONDITIONS else fve_note
         prompt = build_prompt(
-            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task
+            env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, note, args.max_calls, args.task
         )
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run

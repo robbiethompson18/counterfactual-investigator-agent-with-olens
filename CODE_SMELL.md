@@ -203,6 +203,13 @@ runs, and `short` omits thinking/provider settings. Two runs of the same model w
 and judge calls. `Run.add()` appends both and expview's validator rejects duplicate IDs; links
 cannot uniquely identify the judged episode. Include the source run in the ID.
 
+## 2026-10-28: `runpod/watch_pod.sh` can't fetch outputs from vLLM-image pods
+
+Its done-marker fetch is `rsync` over ssh, and the `vllm/vllm-openai` image has no rsync, so the
+fetch fails ("rsync: command not found") and the watcher still deletes the pod. Outputs on the
+network volume survive (the NLA scale2k reads were pulled over S3), but anything written outside
+`/workspace` is gone. Fix: install rsync in the pod boot, or fetch with `ssh ... tar c | tar x`.
+
 ## 2026-10-28: `environments run --no-upload` still uploads to Docent
 
 `--no-upload` skips only the HF step; the runner uploads the episodes to Docent whenever

@@ -63,6 +63,20 @@ the read transcripts next to it):
   relative position, so the predictor gets as much O-lens text but none about this scenario (the
   reads must cover 2+ envs).
 
+NLA conditions (2026-10-27, `--nla-reads`, reads from `scripts/olens_read_requests.py --readout nla`
+scored by `scripts/nla_score.py`, docs/nla-reader.md): `nla_agentic` and `nla_placebo_agentic` are
+the same two tools and placebo over NLA reads, named `search_nla` and `nla_at`, output in
+`<nla layer=… fve=…>`. Each read is one free-text readout (~625 characters) with the critic's FVE,
+so there is no `top_k`; `over="readouts"` searches readout text; defaults are no FVE filter, 8
+readouts per search (`max_readouts`) and `window` 3. A run can take both `--olens-reads` and
+`--nla-reads`. Added without a `HARNESS_VERSION` bump: every other condition's prompt and tools are
+byte-identical.
+
+Predictors named `gemini-direct/<model>` call Google's OpenAI-compatible API with `$GEMINI_API_KEY`
+instead of OpenRouter (`openrouter.chat`), so a run can spend a key other than the one behind
+OpenRouter's BYOK route; say which key in `--description`. Same model at the same effort, but no
+`cost`.
+
 `--olens-positions` (default `sparse`) says which read positions the tools serve, for both
 conditions (the placebo pool is the same `Reads`). `sparse` keeps every row of a request that is not
 `positions: "all"` exactly as the job read it (stop tokens, `turn_starts` headers, whatever it was),
