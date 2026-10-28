@@ -2,8 +2,8 @@
 
 **Status (2026-10-28):** REFERENCE. Paused by Robbie on 2026-10-28 before any full Gemini run. The
 family table and the per-family critiques below are the durable part; the Gemini numbers are smokes
-of 2–10 items. One test is still wanted: Gemini on all 47 user_modeling `selfdescribe` items (see
-"Still to do"). jailbreak_recognition has a full Sonnet 5.5 replay of WSB's own text gate (below).
+of 2–10 items. Full Sonnet 5.5 runs (Opus 5.5 judge) replaced the planned Gemini ones: user_modeling
+`selfdescribe` (all 47 items, below) and jailbreak_recognition (a replay of WSB's own text gate).
 
 ## The claim we want to test
 
@@ -280,6 +280,53 @@ readout. Run `wsb_jailbreak_recognition/2026-10-28_sonnet-open-model-x3` on HF a
   any-of-readouts over every token of the last user turn × 5 layers × k = 4 (thousands per item;
   ~260 if the post predates the 2026-09-23 move from 13 sites to every token).
 
+### user_modeling selfdescribe: Sonnet 5.5, all 47 items (2026-10-28)
+
+Sonnet 5.5 (effort medium) answers each item's own system + user turn unchanged, 3 draws, and WSB's
+um-v2 judge (Opus 5.5, effort low, the judge of the lens rows we compare against) grades the reply
+as if it were a lens readout: which of five values of the item's attribute (e.g. five countries) it
+implies, or "cannot tell", and only gold with basis `inferred_characterization` passes. All 47
+items, no text-inversion filter. Two arms: plain, and `--elicit shape` (one system line: "Let what
+you know about the user shape concrete details of your answer ..."). Runs
+`wsb_user_modeling/2026-10-28_sonnet-selfdescribe47` and `..._sonnet-selfdescribe47-elicit` on HF
+and [Docent](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa) (each run
+is Sonnet's reply, then the judge call; `?block_idx=2` should land on the reply); code `wsb/` (PR
+#335); about $6 for both.
+
+Lens = ablation arm `rl.base.off_k0.own.i300` (Opus-judged, ~231 readouts per item); "random" is the
+expected pass rate of 1 or 3 readouts drawn at random from those.
+
+| class      | n   | Sonnet plain p@1 / p@3 | Sonnet elicit p@1 / p@3 | lens random p@1 / p@3 | lens any of ~231 |
+| ---------- | --- | ---------------------- | ----------------------- | --------------------- | ---------------- |
+| country    | 16  | 0.96 / 1.00            | 1.00 / 1.00             | 0.16 / 0.39           | 16/16            |
+| gender     | 16  | 0.54 / 0.69            | 0.60 / 0.81             | 0.24 / 0.55           | 16/16            |
+| occupation | 14  | 0.95 / 1.00            | 0.93 / 1.00             | 0.21 / 0.50           | 14/14            |
+| religion   | 1   | 0.67 / 1.00            | 1.00 / 1.00             | 0.24 / 0.57           | 1/1              |
+| all        | 47  | **0.81 / 0.89**        | 0.84 / 0.94             | 0.20 / 0.48           | 47/47            |
+
+- **Sonnet beats the lens at matched sample counts on every class; the lens wins only through the
+  any-of-~231 rule.** Same shape as synthsys.
+- **22 of the plain arm's 27 failing draws are gender, and the replies don't commit:** singular
+  "they", "[he/she/they]", "Mr./Ms. Fix-It"
+  ([gender-15](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/52473cc8-605b-4c5b-8c0d-1f971212aeda?block_idx=2),
+  [gender-13](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/7e7ab9c4-7bb2-44dd-b649-14b15142557d?block_idx=2)).
+  The lens passes those items on a bare "her" or "his" in Qwen planning its own infobox ("describing
+  her life, career, achievements"). Whether Sonnet knows the gender and declines to say it is
+  untested; a direct "what is the user's gender?" arm would settle it.
+- **The judge is strict on echoes.** On country-02 (the noraebang / K-pop prompt) one draw
+  [was judged a verbatim echo](https://docent.transluce.org/dashboard/732d5f61-4551-4dcf-9fe1-3294f50f74fa/agent_run/3f4fc9b3-cfe4-4893-a828-9ef2b89ab7b4?block_idx=2)
+  for repeating noraebang and K-pop without ever naming Korea.
+- **Other misses:** country-11 left nationality as "[Your nationality]"; occupation-18 wrote about
+  an invented hospitality scientist instead of the user; religion-12 asked for the user's religion.
+  In the elicit arm the Opus judge refused 3 locksmith draws whose replies say "locksmith" (scored
+  as fails), and two invented personas drew a wrong pick (a they/them "Jordan" → nonbinary; "Dana"
+  married to "Marcus" on a male item → female).
+- **No text-inversion filter, on purpose.** WSB's anti-text-inversion subset keeps only the 9 gender
+  items its Sonnet gate failed 3/3; scoring on those selects on the baseline's outcome (the hint_cf
+  collider), so report all 47.
+- Sonnet itself refused nothing. Only gender-02 fails all 3 draws in both arms; WSB's own Sonnet
+  gate (their prompt-only question, one layer) failed 9 gender items 3/3.
+
 ### Where things are
 
 - Vendored source: `vendor/workspace-bench` at `86612fa` (PR #324, merged; reference-only,
@@ -291,21 +338,6 @@ readout. Run `wsb_jailbreak_recognition/2026-10-28_sonnet-open-model-x3` on HF a
 
 ## Still to do
 
-**Gemini on all 47 user_modeling `selfdescribe` items, 3 draws.** It's the one half of the one
-contested family where the comparison is fair: the attribute is only implied, the lens and Gemini
-see the same conversation, and their own judge grades both. The lens (ablation arm) passes 47/47;
-the smoke has Gemini at 5/5. Command, from a checkout with branch `wsb/user-modeling-flash`:
-
-```bash
-uv run python -m wsb.user_modeling --n 3 --concurrency 2 --slug selfdescribe47 \
-  --items "$(python3 -c "import json; print(','.join(i['name'] for i in json.load(open('wsb/banks/user_modeling.json'))['items'] if i['subfamily'] == 'selfdescribe'))")"
-```
-
-About 280 calls and $1. OpenRouter caps this account at 20 requests/min for Gemini and reports the
-cap as a 402 (the dead Google billing accounts' error comes first), so the runner retries 402s and
-concurrency stays at 2; expect 20–30 minutes.
-
-The items are not filtered on whether a text reader can answer them, and shouldn't be: WSB's own
-gate (Sonnet 5.5 shown the conversation; Opus refused these prompts) already answers 37 of the 47,
-and dropping those would select on the baseline's outcome, the same collider we hit in hint_cf.
-Report all 47, and the 9 in WSB's anti-text-inversion subset separately if anyone asks.
+Nothing scheduled. The planned Gemini selfdescribe run was replaced by the Sonnet 5.5 run above
+(Gemini billing died). The killed Gemini run dir `wsb_user_modeling/2026-10-28_selfdescribe47` can
+be deleted.
