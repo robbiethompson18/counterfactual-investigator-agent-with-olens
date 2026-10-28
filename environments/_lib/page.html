@@ -921,11 +921,11 @@ function answerChartBlock(ans, h, keep) {
   const Ps = answerPanels(picked, keep, unan), Ss = Ps.map(answerStats);
   const top = Math.min(1, Math.max(0.3, Math.ceil((Math.max(0, ...Ss.flatMap(S => Object.values(S.stats).flatMap(st => [st.mean, st.ci[1]]))) + 0.08) * 10) / 10));
   return `<h3>Answer task: % correct by condition</h3>
-    <p class="lede">Bars pool the runs ticked in the table above (all by default); one panel per arm pair and investigator, plus every pair together. A bar is the mean over items of the
+    <p class="lede">Bars pool the runs ticked in the answer-task table below (all by default); one panel per arm pair and investigator, plus every pair together. A bar is the mean over items of the
       item's fraction of correct draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options.
       <label><input type="checkbox" onchange="location.hash=setParam('unanimous', this.checked ? '1' : '')" ${unan ? "checked" : ""}> only items where the shown arm answered with one letter in every sample (e.g. followed the hint 8/8)</label></p>
     ${Ps.length ? `<div class="anspanels">${Ps.map((P, i) => answerChart(P, Ss[i], top)).join("")}</div>
-      <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the table above${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
+      <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the answer-task table below${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
 }
 function ansPick() {
   const all = [...document.querySelectorAll(".anspick")], on = all.filter(c => c.checked).map(c => c.value);
@@ -970,7 +970,7 @@ async function evalPage(h) {
     ${ans.map(R => `<tr><td><input type="checkbox" class="anspick" value="${esc(R.run)}" onchange="ansPick()" ${!h.runs || h.runs.split(",").includes(R.run) ? "checked" : ""}></td><td><b class="mono" title="${esc(R.description || "")}">${esc(R.slug)}</b><br><span class="mute">${esc(R.date)} · harness v${R.harness_version}${R.status === "abandoned" ? " · abandoned" : ""}</span>
         ${R.expview ? `<br><a href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">conversations ↗</a>` : ""}</td><td>${R.models.map(m => esc(shortModel(m))).join("<br>")}</td>
       <td class="mono">${R.predictors.map(esc).join("<br>")}<br><span class="mute">effort ${esc(R.effort)} · ${R.max_calls} calls</span></td><td>${R.n_cases}</td>
-      ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(R.correct[k])}</b>`}</td>`).join("")}<td class="num">${pct(R.correct_null)}</td></tr>`).join("")}</table></div>${answerChartBlock(ans, h, keep)}` : "";
+      ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(R.correct[k])}</b>`}</td>`).join("")}<td class="num">${pct(R.correct_null)}</td></tr>`).join("")}</table></div>` : "";
   const ansSections = {};
   for (const R of ans) for (const g of R.groups.filter(keep)) (ansSections[[g.env, g.version || "", g.base, g.cf].join("\u0000")] ??= []).push([R, g]);
   const ansBody = Object.values(ansSections).map(gs => {
@@ -1005,6 +1005,7 @@ async function evalPage(h) {
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
+    ${ans.length ? answerChartBlock(ans, h, keep) : ""}
     <details class="sec"><summary>About this eval</summary><div class="body readme">${md(ev.description || "")}</div></details>
     ${runs.length ? `<p class="lede">Each chart has the observed rate before (base arm) and after (counterfactual arm), bands = 95% credible intervals (Beta(1,1)), and every investigator
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
