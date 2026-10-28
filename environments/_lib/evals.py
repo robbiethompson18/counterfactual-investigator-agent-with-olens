@@ -36,6 +36,8 @@ from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
 EVALS = REPO_ROOT / "data" / "evals"
 EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
+# evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
+PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")
 
 
@@ -44,8 +46,11 @@ def eval_of(meta: dict) -> tuple[str, list[str], list[str]] | None:
     p = meta.get("params", {})
     if p.get("eval"):
         return p["eval"], p.get("envs") or [p["eval_env"]], []
-    m = re.match(r"env_runs:([^/]+)/([^@]+)", p.get("env", ""))
-    return (f"{m[1]}-pairs", [m[1]], m[2].split("+")) if m else None
+    m = re.match(r"(env|evalcue)_runs:([^/]+)/([^@]+)", p.get("env", ""))
+    if not m:
+        return None
+    env = PORTS.get(m[2], m[2]) if m[1] == "evalcue" else m[2]
+    return f"{env}-pairs", [env], m[3].split("+")
 
 
 def eval_runs() -> dict[str, list[Path]]:
@@ -93,9 +98,10 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
         run_dir / "expview",
         title=f"cfbench {meta['slug']}: investigator conversations",
         description=f"{meta.get('description') or ''}\n\nOne item per prediction: everything the investigator "
-        f"({', '.join(meta['params']['predictors'].split(','))}) was sent, every tool call and result, and its submitted probability. "
-        "`p` is the prediction, `truth` the counterfactual arm's observed rate.",
-        label_order=["condition", "model", "p", "truth", "base rate"],
+        f"({', '.join(meta['params']['predictors'].split(','))}) was sent, every tool call and result, and its submission. "
+        "Rate task: `p` is the prediction, `truth` the counterfactual arm's observed rate. Answer task: `answer` is the "
+        "submitted answer (canonical), `truth` the counterfactual arm's most common answer.",
+        label_order=["condition", "model", "p", "answer", "truth", "correct", "base rate"],
     )
     run.reset()
     cid, ids = docent.get("collection_id"), docent.get("runs") or [None] * len(rows)
@@ -103,18 +109,17 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
         if not r.get("messages"):
             continue
         cond = canon_condition(r["condition"])
+        if r.get("task") == "answer":
+            labels = {"condition": cond, "model": r["model"], "answer": r.get("canon"), "truth": r["modal_cf"], "correct": r.get("correct")}
+            parsed = {"answer": r.get("answer"), "rationale": r.get("rationale")}
+        else:
+            labels = {"condition": cond, "model": r["model"], "p": r.get("p"), "truth": round(r["k_cf"] / r["n_cf"], 4)}
+            labels["base rate"] = round(r["k_base"] / r["n_base"], 4)
+            parsed = {"p": r.get("p"), "rationale": r.get("rationale")}
         run.add(
             id=item_id(r, cond),
             group=f"{r['model'].split('/')[-1]} · {r['base_arm']} -> {r['cf_arm']} · {cond}",
-            labels={
-                "condition": cond,
-                "model": r["model"],
-                "p": r.get("p"),
-                "truth": round(r["k_cf"] / r["n_cf"], 4),
-                "base rate": round(r["k_base"] / r["n_base"], 4),
-                "valid": r.get("valid", True),
-                **({"item": r["item"]} if r.get("item") else {}),
-            },
+            labels=labels | {"valid": r.get("valid", True), **({"item": r["item"]} if r.get("item") else {})},
             links={"Docent": f"https://docent.transluce.org/dashboard/{cid}/agent_run/{did}"} if cid and did else {},
             calls=[
                 call(
@@ -122,7 +127,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
                     r["predictor"],
                     messages=_messages(r["messages"]),
                     tools=r.get("tools"),
-                    parsed={"p": r.get("p"), "rationale": r.get("rationale")},
+                    parsed=parsed,
                     params={"effort": meta["params"].get("effort"), "max_calls": meta["params"].get("max_calls")},
                     cost=r.get("cost"),
                 )
@@ -167,7 +172,7 @@ class Envs:
         return f"https://docent.transluce.org/dashboard/{r['docent_collection']}/agent_run/{did}"
 
     def pair(self, env: str, b: str, c: str) -> tuple[str | None, bool]:
-        for name, (x, y) in self[env]["pairs"].items():
+        for name, (x, y, *_) in self[env]["pairs"].items():  # a pair can carry its items
             if (b, c) in ((x, y), (y, x)):
                 return name, (b, c) == (y, x)
         return None, False
@@ -192,6 +197,8 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
     from cfbench.report.data import Case
 
     meta = json.loads((run_dir / "meta.json").read_text())
+    if meta.get("params", {}).get("task") == "answer":
+        return answer_summary(run_dir, meta, envs, export)
     rows = [json.loads(line) for line in (run_dir / "predictions.jsonl").read_text().splitlines()]
     rows = [r for r in rows if r.get("task", "rate") == "rate"]
     docent = json.loads((run_dir / "docent.json").read_text()) if (run_dir / "docent.json").exists() else {}
@@ -326,6 +333,97 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         "rmse": {k: (sum(v) / len(v)) ** 0.5 for k, v in sq.items()},
         "rmse_null": (sum(sq_null) / len(sq_null)) ** 0.5 if sq_null else None,
         "paired": paired,
+        "groups": out_groups,
+    }
+
+
+def run_header(run_dir: Path, meta: dict, docent: dict) -> dict:
+    m = re.match(r"(\d{4}-\d{2}-\d{2})_(.*)", run_dir.name)
+    return {
+        "run": run_dir.name,
+        "date": m[1] if m else None,
+        "slug": meta.get("slug") or (m[2] if m else run_dir.name),
+        "description": meta.get("description"),
+        "status": meta.get("status"),
+        "harness_version": meta["params"].get("harness_version", 1),
+        "predictors": meta["params"].get("predictors", "").split(","),
+        "effort": meta["params"].get("effort"),
+        "max_calls": meta["params"].get("max_calls"),
+        "docent_collection": docent.get("collection_id"),
+        "expview": f"runs/cfbench/{run_dir.name}" if (run_dir / "expview" / "index.jsonl").exists() else None,
+    }
+
+
+def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
+    """An answer-task run (cfbench/answer.py): % correct per condition next to "the edit does nothing" (the base arm's most
+    common answer), over cases with equal weight as cfbench.answer, and per (env, version, base, cf, model) one row per
+    item with its truth and every draw. Never mixed with the rate task's RMSE: the run says `task: answer`."""
+    from cfbench.answer import modal
+    from cfbench.core import canon_condition
+
+    rows = [json.loads(line) for line in (run_dir / "predictions.jsonl").read_text().splitlines()]
+    for r in rows:  # cfbench.run --items: the item is the env spec's @suffix
+        r.setdefault("item", r["env"].rpartition("@")[2] if "@" in r["env"] else None)
+    docent = json.loads((run_dir / "docent.json").read_text()) if (run_dir / "docent.json").exists() else {}
+    _, run_envs, _ = eval_of(meta) or (None, [], [])
+    ids = docent.get("runs") or [None] * len(rows)
+    cases: dict[tuple, dict] = {}  # (env, version, model, base, cf, item) -> the case and its draws by condition
+    for r, did in zip(rows, ids, strict=False):
+        item = r["item"]
+        key = (r.get("env_name") or run_envs[0], r.get("version"), r["model"], r["base_arm"], r["cf_arm"], item)
+        c = cases.setdefault(key, {"row": r, "item": item, "draws": defaultdict(list)})
+        cond = canon_condition(r["condition"])
+        c["draws"][cond].append(
+            {
+                "answer": r.get("canon") if r.get("valid", True) else None,
+                "raw": r.get("answer"),
+                "correct": bool(r.get("correct")),
+                "draw": r["draw"],
+                "item": item,
+                "predictor": r["predictor"],
+                "calls": sum((r.get("tool_calls") or {}).values()),
+                "docent": did,
+                "ev": item_id(r, cond) if r.get("messages") else None,
+                "rationale": r.get("rationale"),
+            }
+        )
+    groups: dict[tuple, dict[str, Any]] = {}
+    per_cond, null = defaultdict(list), []
+    for (env, version, model, b, cf, item), c in sorted(cases.items(), key=lambda kv: str(kv[0])):
+        r = c["row"]
+        g = groups.get((env, version, b, cf, model))
+        if g is None:
+            pair, rev = envs.pair(env, b, cf)
+            g = groups[env, version, b, cf, model] = {
+                "env": env, "version": version, "model": model, "target": envs.target(env, model, b, []), "base": b, "cf": cf,
+                "pair": pair, "reverse": rev, "items": [], "_ok": defaultdict(list), "_null": [],
+            }  # fmt: skip
+        base_modal = modal(r["answers_base"])
+        g["items"].append(
+            {"item": item, "truth": r["modal_cf"], "k_cf": r["k_cf"], "n_cf": r["n_cf"], "answers_base": r["answers_base"],
+             "answers_cf": r["answers_cf"], "base_modal": base_modal, "draws": dict(c["draws"])}
+        )  # fmt: skip
+        for k, ds in c["draws"].items():
+            frac = sum(d["correct"] for d in ds) / len(ds)
+            g["_ok"][k].append(frac)
+            per_cond[k].append(frac)
+        g["_null"].append(base_modal == r["modal_cf"])
+        null.append(base_modal == r["modal_cf"])
+    out_groups = []
+    for g in groups.values():
+        g["correct"] = {k: sum(v) / len(v) for k, v in g.pop("_ok").items()}
+        nul = g.pop("_null")
+        g["correct_null"] = sum(nul) / len(nul)
+        out_groups.append(g)
+    if export and any(r.get("messages") for r in rows):
+        export_expview(run_dir, rows, docent)
+    return run_header(run_dir, meta, docent) | {
+        "task": "answer",
+        "conditions": sorted({k for g in out_groups for k in g["correct"]}),
+        "models": sorted({g["model"] for g in out_groups}),
+        "n_cases": len(cases),
+        "correct": {k: sum(v) / len(v) for k, v in per_cond.items()},
+        "correct_null": sum(null) / len(null) if null else None,
         "groups": out_groups,
     }
 
