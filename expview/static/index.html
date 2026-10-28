@@ -855,6 +855,9 @@ async function trView(p,keepBar){
   const rx=()=>rxOf(TRK.q,false);
   const P=Object.keys(reads).map(Number).filter(q=>q<toks.length).sort((a,b)=>a-b);
   const readerDocs=Object.entries(run.readers||{}).filter(([t])=>tools.includes(t));
+  // a read token that is only whitespace ("\n", "\n\n", " ") gets a visible marker, else it renders as a bare line break
+  // with nothing to click (e.g. the option-newline reads of hint_qwen_dsv4)
+  const wsTok=t=>/^\s+$/.test(t)?esc(t).replace(/\n/g,"↵\n").replace(/^[ \t]+$/,m=>"·".repeat(m.length)):esc(t);
   // ---- build the transcript HTML: one block per section, read tokens underlined, an expansion slot after each
   const R0=rx();let body="";
   for(const [name,a,b] of secs){const role=roleOf(name),key=`${a}`;
@@ -865,7 +868,7 @@ async function trView(p,keepBar){
       if(!rs||!rs.length){if(SPECIAL.test(t)){body+=esc(run_)+`<span class="sp">${esc(t)}</span>`;run_=""}else run_+=t;continue}
       body+=esc(run_);run_="";
       const m=!!R0&&rs.some(r=>r.lines.some(l=>test(R0,l[0])));
-      body+=`<span class="tk r${m?" m":""}" data-p="${q}" style="--kc:${colorOf(rs[0].tool,run)}" title="token ${q}: ${rs.length} read${rs.length>1?"s":""}">${esc(t)}</span>`;
+      body+=`<span class="tk r${m?" m":""}" data-p="${q}" style="--kc:${colorOf(rs[0].tool,run)}" title="token ${q}: ${rs.length} read${rs.length>1?"s":""}">${wsTok(t)}</span>`;
       body+=`<span class="xp" id="xp${q}" hidden></span>`}
     body+=esc(run_)+"</div>"+(long||TRK.collapsed[key]!=null?`<button class="more" data-col="${key}">⋯ ${(b-a).toLocaleString()} tokens, only the start is shown: show all</button>`:"")+"</section>"}
   const html=`<div class="tkbar">
