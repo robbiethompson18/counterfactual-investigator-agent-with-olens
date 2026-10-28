@@ -6,14 +6,17 @@
 
 The eval's eval.py gives ENVS (the environments/ envs it is about, for the env viewer), CONDITIONS, MODEL_NAME
 (None, or what to call the target in place of its id), prep(out, versions, placebo), reads(inputs) and cases(inputs,
-versions) -> (prompt env, case row fields, base runs) per case. eval.md beside it, if any, goes into every prompt as
-"## About this evaluation", before the task. Everything else is cfbench as usual: core.build_prompt, the transcript and
-O-lens tools, predict.predict, one predictions.jsonl row per draw in data/runs/cfbench/<date>_<slug>/, synced to HF.
+versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str: the sentence
+in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it). eval.md
+beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
+usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
+data/runs/cfbench/<date>_<slug>/, synced to HF.
 """
 
 import argparse
 import asyncio
 import importlib
+import inspect
 import json
 import random
 import re
@@ -29,6 +32,18 @@ from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
 
 EVALS = Path(__file__).parent / "evals"
+
+
+BASE_SENTENCE = re.compile(r"In the base arm, `[^`]+` showed the behavior in \d+ of \d+ runs\.")
+
+
+def base_line(prompt: str, line: str | None) -> str:
+    """The eval's BASE_LINE in place of core.build_prompt's "In the base arm, `model` showed the behavior in k of n runs."
+    sentence: None keeps it, "" drops it."""
+    if line is None:
+        return prompt
+    assert len(BASE_SENTENCE.findall(prompt)) == 1, "build_prompt's base-rate sentence changed"
+    return BASE_SENTENCE.sub(lambda _: line, prompt).replace("\n\n\n\n", "\n\n")
 
 
 def hide(prompt: str, model: str, name: str) -> str:
@@ -85,6 +100,7 @@ async def main():
     assert args.slug, "--slug"
     inputs = Path(args.inputs) if args.inputs else latest_inputs(args.name)
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
+    base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
     predictors = args.predictors.split(",")
     reads = olens.Reads(ev.reads(inputs)) if set(OLENS_CONDITIONS) & set(conditions) else None
@@ -97,7 +113,9 @@ async def main():
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
     reuse = {}
     for path in filter(None, args.reuse.split(",")):
-        assert json.loads((Path(path).parent / "meta.json").read_text())["params"]["eval_md"] == notes, f"{path}: eval.md differs"
+        old = json.loads((Path(path).parent / "meta.json").read_text())["params"]
+        assert old["eval_md"] == notes, f"{path}: eval.md differs"
+        assert old.get("base_line") == base_src, f"{path}: BASE_LINE differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -123,6 +141,7 @@ async def main():
             "limit": args.limit,
             "harness_version": HARNESS_VERSION,
             "eval_md": notes,
+            "base_line": base_src,
             "reuse": args.reuse,
         },
     )
@@ -143,6 +162,7 @@ async def main():
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
         prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
+        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
         prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
         async with slots:
             for attempt in range(3):

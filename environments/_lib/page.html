@@ -119,7 +119,7 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .evchart .lab{fill:var(--fg);font-variant-numeric:tabular-nums} .evchart .band{fill:var(--bar);opacity:.25} .evchart .obs{stroke:var(--bar);stroke-width:2.5}
 .evchart .null{stroke:var(--faint);stroke-dasharray:4 4} .evchart .slope{stroke:var(--bar);stroke-width:1.5;opacity:.5} .evchart .mean{stroke-width:2}
 .evchart .pt{stroke:var(--card);stroke-width:1.2;cursor:pointer} .evchart .pt.faint{opacity:.55;stroke-width:.6} .evchart a:hover .pt{r:6}
-table.evt{box-shadow:none} table.evt td,table.evt th{padding:5px 8px} .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+table.evt{box-shadow:none} .chips{max-height:150px;overflow:auto} table.evt td,table.evt th{padding:5px 8px} .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -783,10 +783,11 @@ function evalCard(R, g) {
   const cmp = g.pair ? `#${hashOf({env: g.env, compare: g.pair, ...(g.reverse ? {base: g.base, other: g.cf} : {})})}` : `#${hashOf({env: g.env, diff: g.base + "," + g.cf})}`;
   const dl = a => g.docent_arms?.[a] ? `<a href="${esc(g.docent_arms[a])}" target="_blank" rel="noopener" title="every ${esc(modelName(g.target))} episode of ${esc(a)} in Docent">Docent</a>` : "";
   const armLinks = a => `<span class="mono">${esc(a)}</span> ${[dl(a), `<a href="${evq({env: g.env, arm: a, model: g.target})}" target="_blank" rel="noopener">expview</a>`, `<a href="#${hashOf({env: g.env, arm: a})}">arm</a>`].filter(Boolean).join(" · ")}`;
-  const chip = d => `<span class="chip">${d.ev && R.expview ? `<a href="${evItem(R, d.ev)}" target="_blank" rel="noopener" title="${d.item ? `item ${esc(d.item)}, ` : ""}draw ${d.draw}: the investigator's whole conversation in expview">${d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%"}</a>` : d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%"}${docentRun(R, d.docent) ? `<a class="x" href="${docentRun(R, d.docent)}" target="_blank" rel="noopener" title="this draw in Docent">D</a>` : ""}</span>`;
+  const val = d => (d.item ? `${esc(d.item)}: ` : "") + (d.p == null ? "invalid" : (100 * d.p).toFixed(0) + "%");
+  const chip = d => `<span class="chip">${d.ev && R.expview ? `<a href="${evItem(R, d.ev)}" target="_blank" rel="noopener" title="${d.item ? `item ${esc(d.item)}, ` : ""}draw ${d.draw}: the investigator's whole conversation in expview">${val(d)}</a>` : val(d)}${docentRun(R, d.docent) ? `<a class="x" href="${docentRun(R, d.docent)}" target="_blank" rel="noopener" title="this draw in Docent">D</a>` : ""}</span>`;
   const rows = conds.map(k => {
     const ds = g.draws[k], ok = ds.filter(d => d.p != null), m = ok.reduce((t, d) => t + d.p, 0) / (ok.length || 1);
-    const cell = ds.length <= 12 ? ds.map(chip).join("") : `<details><summary class="mute">${ds.length} draws over ${g.n_cases} cases (click a point, or open them all)</summary>${ds.map(chip).join("")}</details>`;
+    const cell = ds.length <= 12 ? ds.map(chip).join("") : `<div class="chips">${ds.map(chip).join("")}</div>`;
     return `<tr><td>${swatch(k)}${esc(condLabel(k))}</td><td>${cell}</td><td class="num">${pp(m)}%</td><td>${rmseBadge(g.rmse[k], g.rmse_null)}</td></tr>`;
   }).join("");
   const shown = g.n_shown !== g.n_base ? ` The investigator was shown ${g.k_shown} of ${g.n_shown} base runs, so the null predicts ${pp(g.k_shown / g.n_shown)}%.` : "";
@@ -795,7 +796,7 @@ function evalCard(R, g) {
     <div class="scroll">${evalChart(R, g)}</div>
     <p class="mute" style="margin:2px 0 8px;font-size:12px">Truth ${g.k_base}/${g.n_base} = ${pp(g.k_base / g.n_base)}% → ${g.k_cf}/${g.n_cf} = ${pp(g.k_cf / g.n_cf)}%.${shown}
       "Edit does nothing" scores <b>${(100 * g.rmse_null).toFixed(1)}pp</b>.</p>
-    <table class="evt"><tr><th>investigator</th><th>draws (click: conversation · D: Docent)</th><th>mean</th><th>RMSE</th></tr>${rows}</table>
+    <table class="evt"><tr><th>investigator</th><th>draws: click one for the investigator's whole conversation (D: Docent)</th><th>mean</th><th>RMSE</th></tr>${rows}</table>
     <div class="mini" style="margin-top:10px"><span class="mute">before</span><span>${armLinks(g.base)}</span><span class="mute">after</span><span>${armLinks(g.cf)}</span></div></div>`;
 }
 

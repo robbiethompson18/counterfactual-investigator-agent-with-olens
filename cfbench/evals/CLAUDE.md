@@ -26,6 +26,9 @@ shown transcript per case, two models paired on the same items, or a model name 
     `k_base`/`n_base` (what the investigator is shown), `k_cf`/`n_cf` (the truth), `task`, and
     optionally `version`, `item` and `k_base_pool`/`n_base_pool` (the real base rate, when fewer
     runs are shown).
+  - `BASE_LINE(case)` (optional): the sentence that replaces the prompt's "In the base arm, `model`
+    showed the behavior in k of n runs." (`k_base`/`n_base` of the runs shown); `""` drops it.
+    Without it the sentence stays as `core.build_prompt` writes it.
 - `eval.md`: anything else the investigator should know. The runner puts it in every prompt as
   `## About this evaluation`, just before the task, and records it in `meta.json`.
 
