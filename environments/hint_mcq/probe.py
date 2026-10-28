@@ -722,7 +722,7 @@ def lens_stats(a):
         probe_top = r["letters"][int(np.argmax(r["probe_s"]))]
         d["probe_answer"] += probe_top == r["own"]
         d["probe_gold"] += probe_top == r["gold"]
-    lines += [f"Lens-only pick at block {a.block} (highest endorse − reject match count; ties → no pick) vs the probe's held-out top:", ""]
+    lines += [f"Lens-only pick at block {a.block} (highest endorse − reject match count; ties → no pick) vs the probe's top:", ""]
     lines += [
         "| questions | n | lens picks | lens = Qwen's answer | lens = gold | probe = Qwen's answer | probe = gold |",
         "|---|---|---|---|---|---|---|",
@@ -866,7 +866,8 @@ def oos(a):
 
     qs = [json.loads(line) for line in (test / "questions.jsonl").read_text().splitlines()]
     opts = [json.loads(line) for line in (test / "options.jsonl").read_text().splitlines()]
-    cache = CACHE / test.name
+    cache = CACHE / (a.acts or test.name)
+    tag = f"_{a.acts.removeprefix(test.name).strip('_')}" if a.acts else ""
     layers = json.loads((cache / "layers.json").read_text())
     li = layers.index(a.hidden)
     logps = {r["id"]: r["logp"] for r in map(json.loads, (cache / "logp.jsonl").read_text().splitlines())}
@@ -913,7 +914,7 @@ def oos(a):
     res["methods"] |= {k: metrics(_softmax_by_q(s, starts)) for k, s in (scores | binary).items()}
     res["methods"]["Qwen's own letter pmf"] = metrics(qwen)
     res["binary_auroc"] = {k: float(roc_auc_score(is_answer, s)) for k, s in binary.items()}
-    (test / "oos.json").write_text(json.dumps(res, indent=1) + "\n")
+    (test / f"oos{tag}.json").write_text(json.dumps(res, indent=1) + "\n")
     cols = ("top1_answer", "top1_gold", "nll_answer", "kl_qwen", "ece")
     lines = [
         f"Frozen probe on TruthfulQA ({len(qs)} questions, {res['n_right']} right / {len(qs) - res['n_right']} wrong). Trained on all of "
@@ -926,8 +927,10 @@ def oos(a):
     for name, r in res["methods"].items():
         for split in ("all", "right", "wrong"):
             lines.append(f"| {name} | {split} | {r[split]['n']} | " + " | ".join(f"{r[split][c]:.3f}" for c in cols) + " |")
-    (test / "oos.md").write_text("\n".join(lines) + "\n")
+    (test / f"oos{tag}.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
+    if tag:  # a comparison set of activations: tables only
+        return
     s, logpmf = scores["listwise nl"], lambda x: np.log(_softmax_by_q(x, starts))
     cols = {"qwen_logp": np.log(qwen), "probe_s": s, "probe_logp": logpmf(s)}
     with open(test / "pmf_options.jsonl", "w") as f:
@@ -1001,6 +1004,7 @@ def main():
     o.add_argument("--hidden", type=int, default=52)
     o.add_argument("--l2", type=float, default=1.0)
     o.add_argument("--C", type=float, default=0.01)
+    o.add_argument("--acts", help="data/probe_cache/ dir to score instead of the test run's (e.g. <run>_orig); writes oos_<suffix>.*")
     a = ap.parse_args()
     cmds = {
         "collect": collect,
