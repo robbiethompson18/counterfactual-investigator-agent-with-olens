@@ -2,7 +2,7 @@
 predictor sees, write the module Qwen3.6-27B writes in the implement arm? An item only tests the lens if it can't.
 
     uv run python -m environments.todo_suppressed.gate RUN [RUN ...] [--slug flash3] [--n 3] [--all-items] [--items a,b]
-        [--backend openrouter|google]
+        [--backend openrouter|google] [--reuse GATE_RUN ...]
 
 RUN is a run folder name under data/envs/todo_suppressed/ with both arms. Per item, Qwen's implement-arm replies are re-measured
 with the current env.py; the item is USABLE when the modal form has >= --min-share of the samples and isn't "other". Flash gets
@@ -13,6 +13,8 @@ independent samples at temperature 1.0:
   - minimal (binary):     KILLED when the majority of the guesses' minimal flag (stub/placeholder vs real) is Qwen's modal flag.
 Output is a run under data/runs/todo_suppressed_gate/: guesses.jsonl (one row per item and sample: the prompt Flash saw, raw
 guess, canon form, Qwen's modal form, match), verdicts.jsonl (one per item) and a summary. Survivors = usable and not killed.
+`--reuse` takes earlier gate runs (folder names under data/runs/todo_suppressed_gate/) and keeps their non-error guesses whose
+prompt is byte-identical to this run's, re-canonicalised with the current env.py; only the missing samples are requested.
 """
 
 import argparse
@@ -25,7 +27,7 @@ from typing import Any
 import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
-from counterfactual_investigator_agent_with_olens.runs import finish, new_run
+from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
 from environments._lib.runfolder import LOCAL, read_episodes
 from environments.todo_suppressed.env import ANSWER_FORMAT, ITEMS_BY_ID, MINIMAL_FORMS, canon_answer, measure
 
@@ -130,7 +132,7 @@ async def guess(model: str, prompt: str, sem: asyncio.Semaphore, backend: str, c
                 r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000)
                 raw, finish, cost = r.choices[0].message.content or "", r.choices[0].finish_reason, getattr(r.usage, "cost", None) or 0.0
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, never a match
-            return {"guess_raw": None, "guess": None, "error": f"{type(e).__name__}: {e}"[:300], "cost": 0.0}
+            return {"guess_raw": None, "guess": None, "minimal": None, "error": f"{type(e).__name__}: {e}"[:300], "cost": 0.0}
     form = canon_answer(raw)
     return {"guess_raw": raw, "guess": form, "minimal": None if form is None else form in MINIMAL_FORMS, "finish": finish, "cost": cost}
 
@@ -156,6 +158,7 @@ async def main():
     ap.add_argument("--min-share", type=float, default=0.75, help="modal implement-arm form share for an item to be usable (6/8)")
     ap.add_argument("--all-items", action="store_true", help="gate every item, not only the usable ones")
     ap.add_argument("--items", help="comma list: gate only these")
+    ap.add_argument("--reuse", nargs="*", default=[], help="earlier gate runs whose non-error guesses (same prompt) are kept")
     a = ap.parse_args()
     table = item_table(a.runs, a.min_share)
     items = sorted(it for it, t in table.items() if a.all_items or t["usable"])
@@ -178,6 +181,7 @@ async def main():
             "temperature": 1.0,
             "thinking": "medium",
             "prompt": GUESSER_PROMPT,
+            "reuse": a.reuse,
         },
     )
     sem = asyncio.Semaphore(a.concurrency)
@@ -187,10 +191,21 @@ async def main():
         )
         for it in items
     }
+    kept: dict[str, list[dict]] = {it: [] for it in items}
+    for prior in a.reuse:
+        for line in (ROOT / "todo_suppressed_gate" / prior / "guesses.jsonl").open():
+            row = json.loads(line)
+            it = row["item"]
+            if it in kept and not row.get("error") and row["prompt"] == prompts[it] and len(kept[it]) < a.n:
+                form = canon_answer(row["guess_raw"])
+                s = {"guess_raw": row["guess_raw"], "guess": form, "minimal": None if form is None else form in MINIMAL_FORMS}
+                kept[it].append({**s, "finish": row.get("finish"), "cost": row.get("cost", 0.0), "reused_from": prior})
+    todo = [it for it in items for _ in range(a.n - len(kept[it]))]
+    print(f"reusing {sum(map(len, kept.values()))} guesses, requesting {len(todo)}")
     async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(
-            *(guess(a.model, prompts[it], sem, a.backend, client, a.google_key_env) for it in items for _ in range(a.n))
-        )
+        fresh = iter(await asyncio.gather(*(guess(a.model, prompts[it], sem, a.backend, client, a.google_key_env) for it in todo)))
+    results = [s for it in items for s in kept[it] + [next(fresh) for _ in range(a.n - len(kept[it]))]]
+    (run / "raw_results.json").write_text(json.dumps({"items": items, "n": a.n, "results": results}))  # scoring can't lose paid calls
     verdicts: list[dict[str, Any]] = []
     with (run / "guesses.jsonl").open("w") as g, (run / "verdicts.jsonl").open("w") as v:
         for i, it in enumerate(items):
@@ -229,7 +244,7 @@ async def main():
         kill, kill_bin = "KILL" if vd["killed"] else "ok", "KILL" if vd["killed_binary"] else "ok"
         print(f"{vd['item']:>14} {modal:>26} {gs:>44} {vd['hits']:>3}/{a.n} {kill:>5} {kill_bin:>6}")
     usable = [vd for vd in verdicts if vd["usable"]]
-    survivors = [vd for vd in usable if not vd["killed"]]
+    survivors = [vd for vd in usable if not vd["killed"] and not vd["errors"]]  # an errored sample is not a miss: rerun it
     pass1 = sum(vd["hits"] for vd in verdicts) / max(a.n * len(verdicts), 1)
     print(
         f"\n{len(table)} items in the run, {sum(t['usable'] for t in table.values())} usable (modal >= {a.min_share:.0%}), {len(items)} gated"  # noqa: E501
@@ -248,8 +263,9 @@ async def main():
     )
     errors = sum(vd["errors"] for vd in verdicts)
     if errors:
-        print(f"{errors} guesses errored (never count as a match)")
-    print(f"flash: {a.n * len(items)} requests, ${sum(vd['cost'] for vd in verdicts):.2f}")
+        incomplete = [vd["item"] for vd in usable if vd["errors"] and not vd["killed"]]
+        print(f"{errors} guesses errored; unkilled items with errors are not survivors, rerun them: {','.join(incomplete)}")
+    print(f"flash: {len(todo)} new requests ({a.n * len(items)} samples), ${sum(vd['cost'] for vd in verdicts):.2f}")
     finish(run)
 
 
