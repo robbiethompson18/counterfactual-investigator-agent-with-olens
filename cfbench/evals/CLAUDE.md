@@ -103,6 +103,8 @@ the eval `<env>-pairs`.
   `cue` (12), `who` (10) and `heldout` (16), each on the one 2026-10-22 n=30 run it used, every
   base run shown. O-lens reads are the old test's (2026-10-22_hidden-goal-v1/2/3, renamed to the
   env_runs sources); placebo from `--placebo` (the old test used donation-bet-v1).
+  Imported old rows (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash)
+  and `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
