@@ -1,12 +1,98 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
-[`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
+**Status (2026-10-28):** MIXED. Only `wrong_mcq` lives on, as
+[`environments/hint_mcq/`](../../environments/hint_mcq/). The 2026-10-27 table below is superseded
+by the 2026-10-28 scale-up section right after it: on 2,000 more questions (174 correct-hint and 67
+wrong-hint items that followed the hint 8/8, no text-inversion gate) the O-lens condition is within
+noise of its placebo for three predictors, and the eight-item dissection says why. `favorites` and
 `opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result: the table
-"Answer task, every run" right below, which reconciles the two 2026-10-27 evening sections (one
-session's filler/dense/T=1 runs, another's assistant-header and wrong-letter-hint runs). Charts for
-the header runs: `python -m graphs.hint_mcq_answer`.
+[retired/hint_cf](../../environments/retired/hint_cf/)). Charts: `python -m graphs.hint_mcq_answer`
+(header runs); the scale-up figures were made with scratchpad scripts and live on the two artifact
+pages linked in the scale-up section.
+
+## Scale-up, un-gated: the lens is at placebo (2026-10-28)
+
+**Setup.** 2,000 more MMLU-Pro items (`environments/hint_mcq/env.py` items 200:2200, a second seeded
+sample of the same categories; the first 200 ids and d2 letters are unchanged), generated on our own
+vLLM (bf16, `envs/hint_mcq/2026-10-27_scale2k` + `-topup`, 48,000 episodes; OpenRouter's new account
+caps Qwen at 20 requests/min, so generation moved to a pod). Usable (no-hint answer >= 80%
+consistent and wrong, hint named != own, hint followed >= 50%): 235 for the gold-letter hint, 121
+for the wrong-letter hint; of those 155 / 62 followed the hint 8/8, which is the rule everywhere
+below. O-lens reads at the stop tokens and the assistant header for every rollout of every usable
+item (`olens_reads/2026-10-27_hint-mcq-scale2k`, 784k read rows, two H200s for an hour). Answer
+task: Gemini 3.8 Flash at effort medium, harness v7, 3 draws, `transcript_agentic` / `olens_agentic`
+/ `olens_placebo_agentic` (`cfbench/2026-10-27_answer-mcq-scale2k-d1*`, `-d2*`, split by rate-limit
+restarts and `--skip` fills, pooled by item, condition and draw).
+
+**The text-inversion gate is a collider and is retired as a sample filter.** It kept only items
+Flash could not guess from the prompt, which selects on the predictor failing, so transcript-only is
+handicapped by construction (`CLAUDE.md` says the same about "hard for transcript-only" filters).
+With the gate off on the original 200 questions, items that followed the hint 8/8, Flash, 5 draws
+(`cfbench/2026-10-27_answer-mcq-orig-killed-d1`, `-d2`, `-orig-notranscript-d1` pooled with the
+survivor runs):
+
+| hint           | items | no transcripts | transcript-only | O-lens | placebo | O-lens − placebo        |
+| -------------- | ----- | -------------- | --------------- | ------ | ------- | ----------------------- |
+| correct answer | 19    | 15%            | 15%             | 22%    | 19%     | +3pp [−11, +18], 3/2/14 |
+| wrong answer   | 5     |                | 0%              | 0%     | 0%      | 0                       |
+
+Every transcript-only hit is on an item the no-transcript predictor also gets (Flash's own belief,
+or its "the hint is the distractor" heuristic, coinciding with Qwen's wrong answer). The 0%
+transcript-only in the table above came from removing those items.
+
+**Scale-up result, pooled with the original items** (95% item-level bootstrap; the scale-up items
+have 3 draws, the original 5):
+
+| hint           | items | transcript-only | O-lens       | placebo      | O-lens − placebo   |
+| -------------- | ----- | --------------- | ------------ | ------------ | ------------------ |
+| correct answer | 174   | 23% [17, 29]    | 28% [21, 34] | 25% [19, 32] | +2.3pp, CI spans 0 |
+| wrong answer   | 67    | 30% [20, 41]    | 26% [17, 36] | 32% [21, 43] | −5.5pp, CI spans 0 |
+
+What the predictor submits (scale-up draws): with the correct-answer hint it echoes the hint 70-80%
+of the time in every condition and submits Qwen's answer 19-24%; with the wrong-answer hint it never
+echoes the hint, submits the gold answer 62-69% and Qwen's answer 17-35%. The lens condition is the
+only one that submits letters that are neither hint, gold nor Qwen's answer (6% / 14%): the lens's
+default verdict bullets ("The correct answer is **D**") taken at face value.
+
+**Stronger and cheaper predictors change nothing.** GPT-6.1 Sol (medium) on a seeded 50 of the 155
+items, 2 draws (`-scale2k-sol50`): 22 / 23 / 23%, O-lens − placebo +0.0pp [−9, +9], hint echoed
+75-77%. GPT-6 Astra (high) on a seeded 10 of the 32 items no predictor had got (`-scale2k-astra10`):
+0/20, 1/20, 0/20, hint echoed 59 of 60 draws. On the original 18 items: Flash low 6 / 11 / 10%,
+Flash minimal 11 / 0 / 17% (partial), GPT-6 Luna off 0 / 4 / 4% (a hint copier, 91-96%), Luna medium
+11 / 7 / 9% (`-ablate-*`; Flash `--effort off` is rejected by the API). Nothing cheaper than Flash
+medium keeps even the sign of the gap.
+
+**Eight items dissected** (four Opus subagents; the four clean lens losses 10875, 1380, 1723, 1779
+and the four clean lens wins 10995, 1672, 6409, 6634; notes in the conclusions page). All four
+losses are one mechanism: reads before the hint sentence are identical in the hinted and no-hint
+arms and describe the question's textbook doctrine, which is the gold answer, which is the hint;
+reads from the hint onward are downstream of the hint; Qwen's own letter appears only as sub-0.1
+echoes of its own option line. On 1380 the no-hint arm's reads at the end of the user turn say "most
+accurate single definition is **A**" (Qwen's answer, FVE 0.12) and the hinted arm's same positions
+say C: the belief is in the activations of the unhinted run and the hint overwrites it before the
+positions we can read. All four wins are luck: D is the lens's default letter (the most-named letter
+at the pre-answer token in 56% of items regardless of the answer; the lens condition submits D on
+7/308 cases where D is neither own nor hint, controls 0/312) and two of the four winning items have
+own answer D; the other two rode one post-hint bullet that changes with the arm, and elimination.
+The placebo has 2 clean wins by the same criterion, transcript-only 0.
+
+**So the "investigator assumes Qwen is right" failure (66% of lens draws) is real but not the
+lever.** On a hinted transcript the reads mostly don't contain Qwen's own answer: pre-hint reads
+carry topic knowledge that coincides with the hint, post-hint reads carry the hint. The own answer
+is readable in the no-hint arm, i.e. in the counterfactual itself. Better grepping, FVE filters or a
+letter flag won't fix that. Two tests of the mechanism are in flight on 2026-10-28 (PR #320):
+`late/hint+d1` puts the hint after "Answer with the letter only.", so the instruction's period is a
+pre-hint position where the model has already committed (follow drops to 47%; 50 items at 8/8);
+`words/*` removes letters entirely (bulleted options, the hint and the reply are option text; follow
+64%, 48 items at 8/8); and `cfbench.run --olens-before REGEX` hides every read at or after the hint
+(harness 8). Runs: `cfbench/2026-10-28_answer-mcq-late-d1`, `-late-d1-prehint`, `-words-d1`.
+
+Pages: conclusions with the figures and the dissection,
+<https://claude.ai/artifact/8wUxnyhsiPgfVRwbfCzVdL>; the running-total figure,
+<https://claude.ai/artifact/CG9K9B3QYsS3ixpMdh1BPx>; every chart,
+<https://claude.ai/artifact/WjyALftMJKfx5Xoee4PUPj>. Gemini through OpenRouter: a new account is
+capped at 20 requests/min per model and a BYOK AI Studio key at 10k requests/day (Tier 1), which is
+what paced the night.
 
 ## Answer task, every run (2026-10-27)
 
@@ -481,10 +567,11 @@ any item where the predictor and Qwen share a mistake scores in every condition.
    suggestion in the 2026-10-24 WSB thread)~~ Done 2026-10-27
    (`olens_reads/2026-10-27_hint-mcq-header`): no gain over stop tokens; at the header the lens
    reads the letter about to be emitted.
-3. cfbench: `nohint` → `hint+d` is an ordinary rate case (P(follows the hint)); `hint+d` → `nohint`
-   is an answer-task case (above). Done with stop-token, every-token and assistant-header reads
-   (filler, dense and header experiments). What's left is more items: survival is ~9% of MMLU-Pro
-   items for the gold hint and ~3.5% for a wrong-letter hint.
+3. ~~cfbench: more items~~ Done 2026-10-28 (the scale-up section): 174 / 67 items, lens at placebo.
+4. The late-hint, words and pre-hint-reads arms (PR #320): if the own answer is readable at the
+   instruction's period in the hinted arm, the lens condition should finally separate from placebo;
+   if not, the hint reorders the computation and this task is a null with a mechanism. Then the
+   agentic version, where the belief is formed by exploration before the misleading pointer is read.
 
 ## Text-inversion gate (Gemini 3.8 Flash pass@3)
 

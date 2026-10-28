@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: `environments run` crashes after a finished run on a missing eval env module
+
+The runner's index step (`environments/_lib/index.py` → `build_evals` → `evals.py` → `load_env`)
+imports `environments.dumb_user_exploit_appraisal`, which does not exist, so every
+`environments run` on main ends with a traceback after "done: N episodes" and never uploads
+(`envs/hint_mcq/2026-10-28_late` and `_words` were uploaded by hand with `HfApi.upload_folder`). Fix
+the evals index or make `build_evals` skip envs that don't import.
+
 ## 2026-10-28: metamodel reader bugs from a Codex review of the serving code
 
 A Codex read of `olens/src/olens/`, `scripts/olens_read_requests.py`,

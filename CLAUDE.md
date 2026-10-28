@@ -479,9 +479,11 @@ Current docs:
   79), it echoes the inflated number and only flags leniency
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
   — 3 single-turn envs with nohint/hint arms; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so
-  only wrong-MCQ lives on (`environments/hint_mcq/`); answer task, one table of every run: O-lens
-  14-23% vs placebo ~5% vs no lens 0% with the gold hint, carried by a few items; filler,
-  every-token and header reads add nothing; wrong-letter hints 0% everywhere
+  only wrong-MCQ lives on (`environments/hint_mcq/`); 2026-10-28 scale-up (2,000 more questions, 174
+  / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
+  Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
+  answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
+  pre-hint-reads arms in flight (PR #320)
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
