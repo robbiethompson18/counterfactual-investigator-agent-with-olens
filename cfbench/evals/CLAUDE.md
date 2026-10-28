@@ -42,6 +42,9 @@ in `RETIRED_EVALS` there is left off the lists.
   - `PROMPT(prompt, case)` (optional): a last rewrite of the whole prompt, after everything else.
   - `MODEL_IDS` (optional): every model id the predictor must never see (default: the case's
     `model`).
+  - `OLENS` (optional): overrides of the O-lens tools' defaults for this eval, e.g.
+    `{"min_fve": 0.0}` to show every bullet (each still with its FVE); `cfbench/olens.py` `Lens`
+    fields.
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
     gets its Docent URL from the env's `links.json`.
