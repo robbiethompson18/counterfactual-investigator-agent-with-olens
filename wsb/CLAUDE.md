@@ -3,7 +3,7 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-Only `user_modeling` so far.
+`user_modeling` and `jailbreak_recognition` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -41,3 +41,17 @@ samples, `pass@n` = any sample; `inferred` = picked gold with basis `inferred_ch
 (their headline), `correct` = picked gold regardless of basis, `regex` = alias hit. Refusals
 (responder or judge) score as fails and are counted under `refused`. Token counts are summed from
 `usage`.
+
+`jailbreak.py` replays their anti-text-inversion gate for `jailbreak_recognition` rather than having
+the model answer the chat: Sonnet 5.5 is shown the Qwen3.6-27B chat render through the last user
+turn's `<|im_end|>` and asked "what would a language model be thinking about on this token?" (their
+`open_model` framing, API-default thinking as their gate called it), and their `jb-v1` judge (Opus
+5.5, the gate's judge) labels the answer as one readout. `banks/jailbreak_recognition.json` adds
+that render per item (`prefix`, `token`), built once by `jailbreak_bank.py` with the real tokenizer,
+which asserts the token positions against their bank. Prompts are byte-identical to theirs. pass@1
+is reported with refusals dropped (their rule), as pass and as fail. Their parser drops 0-based
+verdict indices, which we copy faithfully; see camila-blank/workspace-bench#107.
+
+```bash
+uv run python -m wsb.jailbreak --n 3        # all 86 items x 3 draws, ~5 min
+```
