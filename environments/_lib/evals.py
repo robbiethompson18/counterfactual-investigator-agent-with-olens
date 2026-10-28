@@ -441,16 +441,21 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
 
 
 def mark_current(name: str, summaries: list[dict]) -> dict:
-    """Mark each run `current` (the newest complete run per version set, or per (versions, inputs run) when the eval's
-    eval.py sets COMPARE_INPUTS) or not (superseded: the page folds those away), and return the eval-level pooled numbers
-    over the current runs: claim evals get af_which's table per inputs run (cfbench/evals/af_which/score.py, plus pick
-    accuracy and order consistency for paired-order evals), rate evals a pooled RMSE row and pooled paired comparison."""
-    compare = getattr(_eval_module(name), "COMPARE_INPUTS", False)
+    """Mark which conditions of each run are current (`current_conds`: the newest complete run per (version set,
+    condition), so a later placebo-only rerun replaces just the placebo of an earlier run) and each run `current` if it
+    has any (else superseded: the page folds those away), and return the eval-level pooled numbers over the current rows:
+    claim evals get af_which's table per inputs run (cfbench/evals/af_which/score.py, plus pick accuracy and order
+    consistency for paired-order evals), rate evals a pooled RMSE row and pooled paired comparison."""
+    from cfbench.core import canon_condition
+
     seen: set = set()
     for s in summaries:  # newest first
-        key = (tuple(s.get("versions") or [s["run"]]), s.get("inputs") if compare else None)
-        s["current"] = key not in seen
-        seen.add(key)
+        s["current_conds"] = []
+        for c in s["conditions"] if s.get("status") in (None, "done") else []:
+            if (key := (tuple(s.get("versions") or [s["run"]]), c)) not in seen:
+                seen.add(key)
+                s["current_conds"].append(c)
+        s["current"] = bool(s["current_conds"])
     cur = [s for s in summaries if s["current"]]
     if any(s.get("task") == "claim" for s in cur):
         from cfbench.evals.af_which.score import stats
@@ -459,7 +464,12 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
         tables = []
         for inputs in dict.fromkeys(s["inputs"] for s in cur):
             runs = [s for s in cur if s["inputs"] == inputs]
-            rows = [json.loads(line) for s in runs for line in (CFBENCH / s["run"] / "predictions.jsonl").read_text().splitlines()]
+            rows = [
+                r
+                for s in runs
+                for line in (CFBENCH / s["run"] / "predictions.jsonl").read_text().splitlines()
+                if canon_condition((r := json.loads(line))["condition"]) in s["current_conds"]
+            ]
             table = stats(rows)
             if all("order" in r for r in rows):
                 pair = pair_stats(rows)
@@ -473,6 +483,8 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
     sq, sq_null = defaultdict(list), []
     for s in cur:
         for k, v in s["_sq"].items():
+            if k not in s["current_conds"]:
+                continue
             sq[k] += v
         sq_null += s["_sq_null"]
     paired: defaultdict[str, Any] = defaultdict(lambda: {"a": [], "z": [], "truth": defaultdict(list)})
@@ -484,6 +496,8 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             continue
         for g in s["groups"]:
             for k, ds in g["draws"].items():
+                if k not in s["current_conds"]:
+                    continue
                 per = defaultdict(list)
                 for d in ds:
                     if d["p"] is not None:
@@ -533,6 +547,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         if name not in runs:
             continue
         summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s.get("started") or s["run"], reverse=True)
+        if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
+            summaries = [s for s in summaries if s.get("inputs") in only]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
         extra = mark_current(name, summaries)

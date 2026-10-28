@@ -1068,14 +1068,15 @@ function claimSection(ev, claim, keep, h) {
     <p class="lede">Every prediction as a dot, by investigator and by which model ${pairEval ? "was A" : "was the target"}; the bar is the mean. Click a dot for that conversation.</p>${body}`;
 }
 function claimChart(gs, models, faker, pairEval) {
-  const conds = condOrder([...new Set(gs.flatMap(([, g]) => Object.keys(g.draws)))]);
+  const live = (R, k) => !R.current_conds || R.current_conds.includes(k);  // a later rerun of a condition replaces this run's
+  const conds = condOrder([...new Set(gs.flatMap(([R, g]) => Object.keys(g.draws).filter(k => live(R, k))))]);
   const colW = 92, W = 60 + conds.length * (2 * colW + 30), H = 266, T = 14, B = 66, y = v => T + (1 - v) * (H - T - B), f = v => v.toFixed(1);
   let s = "";
   for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="44" x2="${W - 8}" y1="${f(y(v))}" y2="${f(y(v))}" class="${v === 0.5 ? "null" : "grid"}"/><text x="38" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${v}</text>`;
   conds.forEach((k, ci) => {
     models.forEach((m, mi) => {
       const x = 60 + ci * (2 * colW + 30) + mi * colW + colW / 2;
-      for (const [R, g] of gs.filter(([, g]) => g.model === m)) {
+      for (const [R, g] of gs.filter(([R, g]) => g.model === m && live(R, k))) {
         const ds = (g.draws[k] || []).filter(d => d.p != null);
         ds.forEach((d, j) => {
           const dx = ((j * 7919) % 41 - 20) * 0.9;

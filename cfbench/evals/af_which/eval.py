@@ -35,7 +35,9 @@ CONDITIONS = af.CONDITIONS
 N_BULLETS = 4
 DSV4_READS = {v: af.REPO_ROOT / "data/runs/alignment_faking/2026-10-28_dsv4flash-olens-4bullets/dsv4flash" for v in ("original", "v7")}
 TASK = "claim"
-COMPARE_INPUTS = True  # the env viewer shows the newest run per inputs run: pre- vs post-resample
+# the env viewer shows only runs on these inputs: the earlier af-which-inputs gave every case of a (version, model) one
+# shared lens draw at the shared user-turn prefix (scripts/af_which_resample), so its runs are not shown
+INPUTS_RUNS = ("2026-10-28_af-which-inputs-resample",)
 FAKER = "deepseek/deepseek-v4-flash"
 LINKS = af.LINKS
 reads = af.reads
