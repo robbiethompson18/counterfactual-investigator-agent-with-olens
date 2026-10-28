@@ -3,13 +3,38 @@
 **Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
 `opinion_mcq` are retired (code at `cfa46a9`,
-[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result (section
-"Assistant-header reads", 2026-10-27 evening, Robbie's call: it supersedes the 23%/25% numbers in
-the two sections before it, which used earlier read sets and `--base-positive` or no leak filter):
-on the 16 survivors whose hinted arm follows the hint 8/8, O-lens 14% [0, 32] vs placebo 5% [0, 14]
-vs no lens 0%, carried by 941 and 5088; the 5 wrong-letter-hint pairs are 0% in every condition;
-reads at the assistant header add nothing over stop tokens. Charts:
-`python -m graphs.hint_mcq_answer`.
+[retired/hint_cf](../../environments/retired/hint_cf/)). Current answer-task result: the table
+"Answer task, every run" right below, which reconciles the two 2026-10-27 evening sections (one
+session's filler/dense/T=1 runs, another's assistant-header and wrong-letter-hint runs). Charts for
+the header runs: `python -m graphs.hint_mcq_answer`.
+
+## Answer task, every run (2026-10-27)
+
+Predict Qwen's no-hint answer from hinted rollouts where it followed the hint; Gemini 3.8 Flash, 3-6
+draws per item; chance 10%. "bp" = `--base-positive` (base runs that followed the hint only, all 18
+survivors); "8/8" = only the 16 items whose hinted arm followed 8/8 (drops 1386 and 2509). Both
+remove the leak (section "Filler and dense-reads experiments").
+
+| read set (`olens_reads/2026-10-27_…`)   | decode       | positions            | items, scoring | O-lens    | placebo | no lens |
+| --------------------------------------- | ------------ | -------------------- | -------------- | --------- | ------- | ------- |
+| `hint-mcq18-stop`                       | greedy       | stop tokens          | 18, bp         | 23%       | 6%      | 0%      |
+| `hint-mcq-header`                       | greedy       | stop + header tokens | 16, 8/8        | 14%       | 5%      | 0%      |
+| `hint-mcq18-dense`                      | greedy       | every token          | 18, bp         | 24%       | 6%      | 0%      |
+| `hint-mcq18-stop-t1`                    | T 1          | stop tokens          | 18, bp         | 19%       | 5%      | 0%      |
+| `hint-mcq18-dense-t1` (4 rollouts/case) | T 1          | every token          | 18, bp         | 6%        | 4%      | 0%      |
+| `hint-pause18-stop` / `-t1` (filler)    | greedy / T 1 | stop tokens          | 13, bp         | 27% / 17% | 1% / 4% | 3%      |
+| `hint-mcq-header`, wrong-letter hint    | greedy       | stop + header tokens | 5, 8/8         | 0%        | 0%      | 0%      |
+
+What holds across all of it: with the gold-letter hint the lens beats the placebo by roughly 10-17
+points and no-lens is at 0; the hits come from the same few items (941 every time; 5088 and 2509 are
+partly Flash's own split knowledge, the placebo scores on them too); the filler, every-token reads
+and assistant-header reads add nothing; with a wrong-letter hint nothing works, because Flash then
+submits the gold answer it believes in. What varies: the rate (14-27%) with the read set and the
+scoring (2509 is in the bp rows and out of the 8/8 row), and T 1 vs greedy, which is noise on stop
+tokens (p = 0.13-0.5) and a drop on dense reads (p = 0.013, with only 4 of 8 rollouts read). The
+lens names the own letter at a decisive site on 12 of 18 items in every read job; the investigator
+recovers it on about 6, and the bullets it misses sit under the tools' default filters (top bullet,
+FVE >= 0.1). That gap, not the reads, is the next thing to work on.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost
@@ -316,6 +341,50 @@ Caveats: the filler changes Qwen's answers on 5/18 items, so a filler experiment
 survivor selection and its own gate (not redone: the gate is about the prompt text, which the filler
 barely changes); OpenRouter reports $0 cost on the new key, so per-run spend is unknown (the same
 runs cost ~$2 each on the old key).
+
+### Redo at lens temperature 1 (2026-10-27 evening)
+
+Every read above was decoded greedily (temperature 0), the WeirdChat viewer's default that the batch
+reader inherited. The lens was trained (RL at T 1.0) and is scored on WorkspaceBench at k=1, T 1.0,
+top-p 0.95, top-k 64, so greedy was off-recipe; and at temperature 0 the reader copies one decode
+across every rollout that shares a prompt prefix, so "8 samples" were one lens draw per site. The
+reader now decodes at T 1.0 by default (`scripts/olens_read_requests.py --temperature`, 0 restores
+greedy) with one draw per transcript, and the three read sets were redone that way:
+`olens_reads/2026-10-27_hint-{mcq18-stop,pause18-stop,placebo-pool}-t1`, plus every-token reads of 4
+rollouts per case (`hint-mcq18-dense-t1`; 4 is the smallest count cfbench's few-reads guard
+accepts). cfbench runs `answer-mcq18-stop-t1`(+`-rest3`), `answer-pause13-stop-t1`(+`-rest`),
+`answer-mcq18-dense-t1` (the `-rest` files are draws the first runs dropped on Gemini 429s when the
+BYOK Google project hit its 10k/day cap; pool them; `-rest` and `-rest2` of the base run are empty
+abandoned attempts).
+
+| reads                       | items | greedy: O-lens / placebo | T=1: O-lens / placebo | items with ≥ 1 hit (T=1) |
+| --------------------------- | ----- | ------------------------ | --------------------- | ------------------------ |
+| stop tokens, no filler      | 18    | 23% / 6%                 | 19% (20/108) / 5%     | 6                        |
+| stop tokens, no filler      | 13 ¹  | 23% / 6%                 | 18% (14/78) / 4%      |                          |
+| stop tokens, `pause` filler | 13 ¹  | 27% / 1%                 | 17% (13/78) / 4%      | 4                        |
+| every token, no filler      | 18    | 24% / 6%                 | 6% (3/54) / 4%        | 3                        |
+
+Same picture on stop tokens: the lens beats the placebo by 13-15 points and the filler changes
+nothing. Every-token reads at T=1 drop to the placebo level (3/54 vs 13/54 greedy, Fisher p ≈ 0.01
+on these counts, 3 draws): the investigator saw an own-letter bullet in 41 of 54 draws (38 of 54
+greedy), and the own letter's share of all letters named in the bullets it saw is the same (13% vs
+15%), so the reads aren't worse; with 4 independently sampled rollouts read at every token it
+submits the hinted answer far more often. Two differences besides temperature: only 4 of each case's
+8 rollouts were read (cost), and each read rollout now shows different bullets at the same token.
+Not chased further; it doesn't change the conclusion that dense reads don't help.
+
+On stop tokens the T=1 numbers sit a few points under greedy, and that is noise at this sample size:
+Fisher p = 0.50 on the 18 items (25/108 vs 20/108), 0.17 with the filler (21/78 vs 13/78), 0.13
+pooled; per item, T=1 is better on 2, worse on 4 and the same on 12, and the four worse items are
+6598 and 10868 (3 → 0 each, the greedy read happened to name the letter) plus 941 and 5088 (6 → 5).
+Only the dense drop (13/54 vs 3/54, p = 0.013) is outside noise, with the confounds above. The reads
+themselves are indistinguishable in quality: top-bullet FVE p10/p50/p90 is 0.039/0.126/0.304 greedy
+vs 0.040/0.122/0.298 at T=1 on the same 42,984 stop-token reads, mean joint FVE 0.174 vs 0.172. The
+items carrying the result are the same ones (941, 2509, 5088; 6414, 6031, 1157 as singles); 6598 and
+10868, hits under greedy, are 0/6 at T=1, and the reverse flips happen too. With 8 independent draws
+per site the investigator still works from the bullets under its default filters, so more draws
+don't reach it; the stability table above (own letter named at a site on 12/18 items in every job)
+is the better measure of what the lens says.
 
 ### Assistant-header reads, wrong-letter hints, and a bullet-level audit (2026-10-27, evening)
 

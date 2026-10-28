@@ -69,6 +69,10 @@ Summary of the Final Pitch (2026-10-19):
   with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
   before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
   [docs/olens-space-migration.md](docs/olens-space-migration.md).
+- **Lens reads decode at temperature 1 since 2026-10-27 evening** (WorkspaceBench's sampling of
+  record: T 1.0, top-p 0.95, top-k 64, one continuation of up to 4 bullets per site). Every read
+  before that was greedy, the viewer's default; `--temperature 0` restores it. At T 1 each rollout
+  is its own lens draw; at T 0 rollouts sharing a prompt share one read (docs/envs/hint_cf.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -472,12 +476,10 @@ Current docs:
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
   79), it echoes the inflated number and only flags leniency
 - [MIXED: hint_cf — read before building hint-vs-own-answer counterfactuals (favourites, opinion MCQs, wrong MMLU-Pro) or reading the lens on them](docs/envs/hint_cf.md)
-  — 3 single-turn envs with nohint/hint arms; usable items (17 favourites, 33 opinion, 24
-  wrong-MCQ), the dodge effect; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so only
-  wrong-MCQ lives on (`environments/hint_mcq/`); current answer-task result (header read set, items
-  that follow the hint 8/8): O-lens 14% vs placebo 5% vs no lens 0%, carried by 941 and 5088; the
-  earlier 23-25% rows are superseded; filler, every-token and header reads all null; wrong-letter
-  hints 0% everywhere; placebo hits are the predictor sharing Qwen's mistake
+  — 3 single-turn envs with nohint/hint arms; Flash pass@3 text-inversion gate leaves 2 / 6 / 18, so
+  only wrong-MCQ lives on (`environments/hint_mcq/`); answer task, one table of every run: O-lens
+  14-23% vs placebo ~5% vs no lens 0% with the gold hint, carried by a few items; filler,
+  every-token and header reads add nothing; wrong-letter hints 0% everywhere
 - [ACTIVE: todo_suppressed — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
   — Qwen (thinking off) writes a module but leaves `foo` as `raise NotImplementedError`
   (`leave_todo`) vs implements it (`implement`); the CF target is which idiom `foo` uses from the
