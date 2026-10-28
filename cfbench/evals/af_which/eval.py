@@ -109,8 +109,23 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
         resample_shared(out, POOLS)
 
 
+def PLACEBO(case: dict, base: list, seed: int) -> list[str]:
+    """olens_placebo_agentic for af_which / af_which_pair (Kylie, 2026-10-28): each shown run's O-lens reads come from a model
+    picked at random, DSv4 or GLM 50/50 (seeded per case and run, independently for A and B), on the same goal and version,
+    whatever model wrote the transcript; the transcript itself is the true one. So the reads carry no information about
+    which model the target is."""
+    by = case["sources_by_model"]
+    tag = f"{seed}/{case['env']}/{case.get('order', '')}/{case['model']}"
+    return [by[random.Random(f"{tag}/{i}").choice(sorted(by))] for i in range(len(base))]
+
+
 def cases(inputs, versions):
+    sources = {}  # (version, item) -> model -> its shown refusal's source, for PLACEBO
+    for line in (inputs / "cases.jsonl").read_text().splitlines():
+        c = json.loads(line)
+        sources.setdefault((c["version"], c["item"]), {})[c["model"]] = c["source"]
     for p, row, base in af.cases(inputs, versions):
+        row["sources_by_model"] = sources[row["version"], row["item"]]
         row |= {"k_cf_pool": row["k_cf"], "n_cf_pool": row["n_cf"], "k_cf": int(row["model"] == FAKER), "n_cf": 1, "task": TASK}
         row["env"] = row["env"].replace("eval:af_refusals/", "eval:af_which/")
         yield p, row, base

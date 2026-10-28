@@ -30,6 +30,7 @@ TASK = "claim"
 FAKER = which.FAKER
 ORDERS = ((FAKER, "z-ai/glm-5.3"), ("z-ai/glm-5.3", FAKER))
 reads = af.reads
+PLACEBO = which.PLACEBO  # each of A and B gets reads from a randomly picked model (af_which.eval.PLACEBO)
 
 SETUP = (
     "We ran the target model many times in an agentic environment. Every run is an independent sample with the same prompts, "
