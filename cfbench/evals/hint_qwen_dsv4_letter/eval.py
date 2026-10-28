@@ -2,7 +2,8 @@
 
 Kylie, 2026-10-28.
 
-The same balanced case set and inputs run as hint_qwen_dsv4 (INPUTS_FROM): questions Qwen3.6-27B and DSv4 Flash answer
+The same balanced, pooled (MMLU-Pro + TruthfulQA) case set and inputs run as hint_qwen_dsv4
+(INPUTS_FROM): questions Qwen3.6-27B and DSv4 Flash answer
 consistently and differently, half Qwen got right without the hint and half it got wrong, balanced within each gold
 letter; the base arm hints the correct letter and the investigator sees 5 runs that picked it. Here the investigator names
 the letter Qwen gives with no hint (cfbench/answer.py's submit_answer, any option); truth = Qwen's modal no-hint letter.
@@ -51,7 +52,8 @@ def cases(inputs: Path, versions: list[str]):
         V, env = VERSIONS[c["version"]], Prompt(c["version"], c["item"], c["gold"])
         base = [Rollout(source=s, messages=m, label=True, answer=env.canon_answer(m[-1]["content"] or "")) for s, m in c["shown"]]
         modal, k = Counter(c["answers_cf"]).most_common(1)[0]
-        row = {"version": c["version"], "item": c["item"], "class": c["class"], "gold": c["gold"], "model": QWEN, "env_name": V["env"],
+        row = {"version": "pooled", "source": c["version"], "item": c["item"], "class": c["class"], "gold": c["gold"],
+               "model": QWEN, "env_name": V["env"],
                "env": f"eval:hint_qwen_dsv4_letter/{c['version']}@{c['item']}", "task": TASK, "base_arm": V["arms"][0],
                "cf_arm": V["arms"][1], "answers_base": dict(Counter(r.answer for r in base)), "answers_cf": c["answers_cf"],
                "modal_cf": modal, "k_cf": k, "n_cf": sum(c["answers_cf"].values())}  # fmt: skip

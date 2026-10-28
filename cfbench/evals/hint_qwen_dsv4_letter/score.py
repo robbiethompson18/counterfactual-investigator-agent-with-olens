@@ -37,7 +37,7 @@ def main():
         per_item = {i: float(np.mean(v)) for i, v in items.items()}
         knew, didnt = (np.mean([x for i, x in per_item.items() if meta[version, i]["class"] == c]) for c in ("knew", "didn't"))
         lo, hi = boot_mean(list(per_item.values()), rng)
-        chance = np.mean([1 / n_options(version, i) for i in items])
+        chance = np.mean([1 / n_options(meta[version, i]["source"], i) for i in items])
         invalid = sum(1 for r in rows if canon_condition(r["condition"]) == cond and r["version"] == version and not r["valid"])
         print(f"{cond + ' ' + version:36} items {len(items):>3}  right {np.mean(list(per_item.values())):.0%} [{lo:.0%}, {hi:.0%}]  "
               f"knew {knew:.0%} / didn't {didnt:.0%}  (hinted letter 50%, chance {chance:.0%})  invalid {invalid}")  # fmt: skip
