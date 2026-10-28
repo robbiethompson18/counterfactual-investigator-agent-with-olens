@@ -189,17 +189,28 @@ uv run python -m environments.notice_defect.gate 2026-10-27_try1[+<top-up run>] 
 
 Success bar from the brief: ≥ 6 survivors with ≥ 2 in each class.
 
-## Gate iterations (2026-10-27)
+## Gate iterations (2026-10-27/28)
 
-- **Try 1** (this revision: 58 items, clean twins, artifact first, orthogonal tasks, sentence-level
-  measure). Qwen smoke above. Gate: **not run yet**. Gemini 3.8 Flash was out of quota on every
-  route at 21:40-22:05 PDT: OpenRouter's BYOK key (429 `RESOURCE_EXHAUSTED`, 10,000/day, reset
-  ~00:00 PDT), and all three direct keys (`GEMINI_API_KEY`, `OLD_GEMINI_API_KEY` daily quota;
-  `THIRD_GEMINI_KEY` spend-based rate limit); the new OpenRouter account is also capped at 20
-  requests/min. A job waits until 00:05 PDT, probes OpenRouter then each key directly
-  (`gate.py --google-key ENVVAR`, same T 1.0 / thinking medium, route recorded in the run's meta),
-  tops the Qwen smoke up to n = 8 first if OpenRouter credits allow, and runs the gate once; results
-  go here.
+Shipped after try 5 on 2026-10-28 ~03:00 PDT; the fix agents were stopped when the night ended, so
+this is the parent session's tally of the gate runs on disk (`data/runs/notice_defect_gate/`). Kill
+rule: majority of Gemini 3.8 Flash's 3 guesses (flagged / not flagged, from the `task` transcript)
+equals Qwen's modal `ask` label. Usable = clear modal and the clean twin flagged at most 25%.
+
+| try | gate run                        | usable | survive | survivors' class |
+| --- | ------------------------------- | ------ | ------- | ---------------- |
+| 1   | `2026-10-27_try1-flash3-n5`     | 40     | 4       | all NOT_FLAGGED  |
+| 2   | `2026-10-28_try2-flash3-n8`     | 74     | 7       | all NOT_FLAGGED  |
+| 3   | `2026-10-28_try3-flash3-n8`     | 106    | 9       | all NOT_FLAGGED  |
+| 4   | `2026-10-28_try4-flash3`        | 116    | 9       | all NOT_FLAGGED  |
+| 5   | `2026-10-28_try5-flash3-retry2` | 122    | 9       | all NOT_FLAGGED  |
+
+**Failed the bar** (both classes ≥ 2 survivors). The 9 survivors are dow_moon, dow_911, dow_wedding,
+arith_km, attr_fuji, arith2_discount, dowin_deadline, cap_tanzania, lit_karamazov: defects Flash
+expects Qwen to catch and Qwen misses. Flash predicts every defect Qwen does notice, so no noticed
+item survives, and a predictor that always says "not flagged" sweeps the survivor set. Tries 2-5
+widened the pool (mid-salience, factual slips, capitals, LLM-hard counts and primality); the
+try-2/3/4 pools are in `env.py`, and try 5's gate covers items added in the last uncommitted batch.
+No O-lens reads or cfbench runs on this env.
 
 ## Caveats and open blockers
 
