@@ -98,6 +98,11 @@ the eval `<env>-pairs`.
   GLM acted without asking and that has O-lens reads (8 per base arm, one per item): 160 cases.
   Conditions `no_transcript`, `transcript_agentic`, `olens_agentic`; the prompt states the pooled
   base rate. Version `main`.
+- `essay_grading`: Qwen3.6-27B (thinking off) grading a mediocre essay, harsh = Score ≤ 4/10. The 38
+  ordered arm pairs of the pre-registered 2026-10-23 test (docs/envs/hidden_goal.md) as versions
+  `cue` (12), `who` (10) and `heldout` (16), each on the one 2026-10-22 n=30 run it used, every
+  base run shown. O-lens reads are the old test's (2026-10-22_hidden-goal-v1/2/3, renamed to the
+  env_runs sources); placebo from `--placebo` (the old test used donation-bet-v1).
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
