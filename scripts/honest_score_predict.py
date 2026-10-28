@@ -3,8 +3,8 @@ another. The continuous version of cfbench's binary task (docs/honest-grader-env
 tools as cfbench, but the predictor submits an expected score (0-10) and is scored by squared error against the counterfactual
 arm's mean score. One case per thing judged.
 
-    EVALCUE_MODEL=qwen/qwen3.6-27b uv run python -m scripts.honest_score_predict honest_essay/RUN+RUN@volunteering_weak \\
-        --pairs flatter_explicit:honest_peer,neutral:honest_peer --slug honest-score-essay-volunteering_weak [--draws 3]
+    uv run python -m scripts.honest_score_predict honest/RUN+RUN@volunteering_weak \\
+        --pairs essay/flatter_explicit:essay/honest_peer,essay/neutral:essay/honest_peer --slug honest-essay-volunteering_weak [--draws 3]
 
 Rows go to data/runs/cfbench/<date>_<slug>/predictions.jsonl with `score` (the prediction), `base_mean`, `cf_mean`, and the
 full predictor conversation. Report over many runs (run as a module so the repo root is on sys.path):
@@ -23,7 +23,7 @@ from pathlib import Path
 from cfbench import olens
 from cfbench import predict as P
 from cfbench.core import OLENS, TOOL_BUDGET, render
-from cfbench.envs import evalcue_runs
+from cfbench.envs import env_runs
 from cfbench.tools import transcript_tools
 from scripts.runs import finish, new_run
 
@@ -63,7 +63,7 @@ P.SYSTEM = (  # ty: ignore[invalid-assignment]
 
 def scored(env, arm, model):
     """Rollouts that have a parsed score, with their scores (a reply with no `Score:` line is dropped)."""
-    pairs = [(r, env.by_source[r.source]["detect_notes"]["score"]) for r in env.rollouts(arm, model)]
+    pairs = [(r, env.by_source[r.source]["labels"]["score"]) for r in env.rollouts(arm, model)]
     pairs = [(r, s) for r, s in pairs if s is not None]
     return [r for r, _ in pairs], [s for _, s in pairs]
 
@@ -123,7 +123,7 @@ the squared error against the observed mean, so give your best point estimate. R
 
 
 async def main(args):
-    env = evalcue_runs.load(args.spec)
+    env = env_runs.load(args.spec)
     pairs = [tuple(p.split(":")) for p in args.pairs.split(",")]
     reads = olens.Reads(args.olens_reads.split(",")) if args.olens_reads else None
     assert reads or args.condition not in ("olens", "olens_placebo"), "the olens conditions need --olens-reads"
@@ -182,7 +182,7 @@ def report(pattern):
     cases = collections.defaultdict(list)
     for r in rows:
         if r["valid"]:
-            scenario = r["env"].split(":")[-1].split("/")[0].replace("honest_", "")
+            scenario = r["base_arm"].split("/")[0]  # arms are <scenario>/<framing> (environments/honest)
             cases[(scenario, r["env"].split("@")[1], r["base_arm"], r["cf_arm"], r["condition"])].append(r)
     errs = collections.defaultdict(list)  # condition -> [(case, signed error)]
     print(f"{'scenario':12} {'item':20} {'pair':30} {'cond':20} {'base':>5} {'truth':>5} {'predicted (draws)':>20} {'err':>5}")
@@ -210,7 +210,7 @@ if __name__ == "__main__":
         report(sys.argv[2])
         sys.exit()
     ap = argparse.ArgumentParser()
-    ap.add_argument("spec", help="evalcue_runs spec: <env>/<run>+<run>@<item>")
+    ap.add_argument("spec", help="env_runs spec: honest/<run>+<run>@<item>")
     ap.add_argument("--pairs", required=True)
     ap.add_argument("--model", default="qwen/qwen3.6-27b")
     ap.add_argument("--predictor", default="google/gemini-3.8-flash")
