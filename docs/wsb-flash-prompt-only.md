@@ -77,6 +77,24 @@ So **18 of 27 families are already lost to a text reader**, 4 are contested, 2 a
 judge rule that a text reader cannot satisfy, and 3 have no comparable metric. Nothing has been run
 with Flash, and nothing has been run under the post's own judge (Gemini 3.8 Flash, effort minimal).
 
+## The four contested families in two charts
+
+`uv run python -m graphs.wsb_text_inversion` draws them
+(`docs/img/wsb-text-inversion-benchmark.png`, `-pass1.png`; PNGs are gitignored). Orange is the best
+published metamodel, blue Sonnet 5.5 reading the prompt text (our `wsb/` runs, Opus-judged). Sources
+for every number are in the module.
+
+![](img/wsb-text-inversion-benchmark.png)
+
+At WSB's own scoring (the lens passes if any readout over its grid passes, 55 to ~230 per item;
+Sonnet one answer per item) the lens leads on all four, by 0.07 to 0.48.
+
+![](img/wsb-text-inversion-pass1.png)
+
+At pass@1 (lens per readout, from the public per-cell rows of `rl.base.off_k0.own.i300`; no such
+rows exist for jailbreak_recognition) Sonnet leads on the three families with data, by 0.12 to 0.55.
+User modeling's Sonnet bar is plain answers; the "shape" elicit sentence lifts it to 0.65.
+
 ## What is wrong with the contested families
 
 From the item banks and judged rows (`agu18dec/olens_ablations`, arm `rl.base.off_k0.own.i300`, the
