@@ -440,6 +440,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
                 "answer": r.get("canon") if r.get("valid", True) else None,
                 "raw": r.get("answer"),
                 "correct": bool(r.get("correct")),
+                "valid": r.get("valid", True),
                 "draw": r["draw"],
                 "item": item,
                 "predictor": r["predictor"],
@@ -466,6 +467,8 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
              "answers_cf": r["answers_cf"], "base_modal": base_modal, "draws": dict(c["draws"])}
         )  # fmt: skip
         for k, ds in c["draws"].items():
+            if not (ds := [d for d in ds if d["valid"]]):  # invalid draws are dropped, as cfbench.answer and the evals' score.py do
+                continue
             frac = sum(d["correct"] for d in ds) / len(ds)
             g["_ok"][k].append(frac)
             per_cond[k].append(frac)
