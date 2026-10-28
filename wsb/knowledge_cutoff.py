@@ -25,6 +25,7 @@ import json
 import random
 import re
 import sys
+import time
 import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
@@ -149,8 +150,24 @@ def prompt(item: dict, arm: str) -> str:
     return TEMPLATE.format(prefix=item["prefix"], token=item["token"]) if arm == "describe" else item["user"]
 
 
-async def sample(item: dict, arm: str, draw: int, provider: str) -> dict:
+class Pacer:
+    """Spaces request starts 60/rpm seconds apart: the OpenRouter account is capped at 20 requests/min for this model
+    (CLAUDE.local.md), and `openrouter.chat`'s backoff alone does not hold a 16-wide run under that."""
+
+    def __init__(self, rpm: float):
+        self.gap, self.next, self.lock = 60 / rpm, 0.0, asyncio.Lock()
+
+    async def wait(self):
+        async with self.lock:
+            now = time.monotonic()
+            start = max(now, self.next)
+            self.next = start + self.gap
+        await asyncio.sleep(start - now)
+
+
+async def sample(item: dict, arm: str, draw: int, provider: str, pacer: Pacer) -> dict:
     messages = [{"role": "user", "content": prompt(item, arm)}]
+    await pacer.wait()
     r = await openrouter.chat(
         MODEL,
         messages,
@@ -231,6 +248,7 @@ async def main():
     ap.add_argument("--items", help="comma-separated item ids instead of --limit")
     ap.add_argument("--provider", default="DeepInfra", help="OpenRouter provider, pinned with no fallbacks")
     ap.add_argument("--concurrency", type=int, default=16)
+    ap.add_argument("--rpm", type=float, default=18, help="request starts per minute (OpenRouter caps this model at 20/min for us)")
     ap.add_argument("--slug")
     args = ap.parse_args()
 
@@ -250,12 +268,13 @@ async def main():
             "temperature": 1.0,
             "top_p": 1.0,
             "max_tokens": MAX_TOKENS[args.arm],
+            "rpm": args.rpm,
             "items": [it["id"] for it in items],
             "bank_source": bank_file["source"],
         },
     )
     print(run)
-    slots = asyncio.Semaphore(args.concurrency)
+    slots, pacer = asyncio.Semaphore(args.concurrency), Pacer(args.rpm)
     view = Run(
         run / "expview",
         title=f"WSB knowledge_cutoff: stock Qwen, {args.arm}",
@@ -265,7 +284,7 @@ async def main():
 
     async def one(item: dict, draw: int) -> dict:
         async with slots:
-            return await sample(item, args.arm, draw, args.provider)
+            return await sample(item, args.arm, draw, args.provider, pacer)
 
     rows = await asyncio.gather(*(one(it, d) for it in items for d in range(args.k)))
     rows.sort(key=lambda r: (r["id"], r["draw"]))
