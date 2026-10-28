@@ -49,11 +49,16 @@ def eval_of(meta: dict) -> tuple[str, list[str], list[str]] | None:
 
 
 def eval_runs() -> dict[str, list[Path]]:
+    """Eval name -> its runs, leaving out runs a later run copied in with --reuse (that run has their rows)."""
     out = defaultdict(list)
-    for p in sorted(CFBENCH.glob("*/meta.json")):
-        e = eval_of(json.loads(p.read_text()))
+    metas = {p: json.loads(p.read_text()) for p in sorted(CFBENCH.glob("*/meta.json"))}
+    reused = {Path(r).parent.name for m in metas.values() for r in (m.get("params", {}).get("reuse") or "").split(",") if r}
+    for p, meta in metas.items():
+        e = eval_of(meta)
+        if p.parent.name in reused:
+            continue
         # smoke tests and abandoned runs (their reusable rows live on in the run that reused them) aren't shown
-        smoke_or_abandoned = p.parent.name.endswith("-smoke") or json.loads(p.read_text()).get("status") == "abandoned"
+        smoke_or_abandoned = p.parent.name.endswith("-smoke") or meta.get("status") == "abandoned"
         if e and (p.parent / "predictions.jsonl").exists() and not smoke_or_abandoned:
             out[e[0]].append(p.parent)
     return out
