@@ -129,7 +129,8 @@ def upload(paths: list[Path], message: str):
     ops = []
     for p in paths:
         files = [p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file())
-        for f in files:
+        # build_index also writes data/evals/ (index.py); evals go up with `environments evals --upload`, not here
+        for f in (f for f in files if f.is_relative_to(LOCAL)):
             ops.append(CommitOperationAdd(path_in_repo="envs/" + str(f.relative_to(LOCAL)), path_or_fileobj=str(f)))
     api = HfApi(token=hf_token())
     info = api.create_commit(repo_id=REPO, repo_type="dataset", operations=ops, commit_message=message)
