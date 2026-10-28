@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "sensor.py",
+ "d2": "convert.py",
+ "note": "sensor returns tenths of a degree, convert expects degrees; fix in sensor, convert or pipeline"
+}

@@ -1,0 +1,6 @@
+    def test_height():
+>       assert height(4, 10) == 40
+E       assert 30 == 40
+E        +  where 30 = height(4, 10)
+
+1 failed

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "css.py",
+ "d2": "palette.py",
+ "note": "palette returns '#ff0000' and css prepends its own '#'; fix in css, palette or theme"
+}

@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "rental.py",
+ "d2": "span.py",
+ "note": "days_inclusive() is correct for what it says; rental.py uses it for a hire period"
+}

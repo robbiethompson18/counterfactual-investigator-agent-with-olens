@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "weights.py",
+ "d2": "rank.py",
+ "note": "missing weight defaults to 1 instead of 0; rank.py's sorted(..., reverse=True) is correct"
+}

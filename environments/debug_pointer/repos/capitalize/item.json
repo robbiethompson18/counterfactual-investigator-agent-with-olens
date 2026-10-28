@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "caps.py",
+ "d2": "clean.py",
+ "note": "capitalize() lowercases the rest of McDonald; clean.py's strip/title chain is the tempting line"
+}

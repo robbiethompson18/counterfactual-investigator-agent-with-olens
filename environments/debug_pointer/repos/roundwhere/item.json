@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "line.py",
+ "d2": "bill.py",
+ "note": "each line is rounded to cents before summing, the test expects the sum rounded once; fix in line, bill or either rounding"
+}

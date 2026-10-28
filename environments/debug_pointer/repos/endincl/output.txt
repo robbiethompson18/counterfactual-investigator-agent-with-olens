@@ -1,0 +1,9 @@
+    def test_snippet():
+>       assert snippet("hello world", "w") == "world"
+E       AssertionError: assert 'worl' == 'world'
+E         
+E         - world
+E         ?     -
+E         + worl
+
+1 failed

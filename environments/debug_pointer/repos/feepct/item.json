@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "rates.py",
+ "d2": "fee.py",
+ "note": "rates returns a fraction (0.1), fee divides by 100 again; fix in rates, fee or checkout"
+}

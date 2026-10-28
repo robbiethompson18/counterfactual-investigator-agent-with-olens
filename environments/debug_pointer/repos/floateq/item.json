@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "match.py",
+ "d2": "money.py",
+ "note": "match.py compares floats with ==; money.py's round(x, 2) is the tempting line"
+}

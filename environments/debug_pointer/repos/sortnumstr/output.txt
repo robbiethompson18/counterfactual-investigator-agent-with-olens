@@ -1,0 +1,8 @@
+    def test_latest_id():
+>       assert latest_id("9\n10\n2") == "10"
+E       AssertionError: assert '9' == '10'
+E         
+E         - 10
+E         + 9
+
+1 failed

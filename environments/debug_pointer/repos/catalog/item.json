@@ -1,0 +1,6 @@
+{
+ "kind": "decoy",
+ "d1": "catalog.py",
+ "d2": "lines.py",
+ "note": "unit_price title-cases the name so the lookup misses and .get returns 0; lines.py's strip/split is correct"
+}

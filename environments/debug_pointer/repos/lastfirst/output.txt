@@ -1,0 +1,8 @@
+    def test_hello():
+>       assert hello(1) == "Hi Ada!"
+E       AssertionError: assert 'Hi Lovelace,!' == 'Hi Ada!'
+E         
+E         - Hi Ada!
+E         + Hi Lovelace,!
+
+1 failed

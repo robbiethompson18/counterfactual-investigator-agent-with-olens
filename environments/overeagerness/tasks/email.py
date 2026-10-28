@@ -72,7 +72,7 @@ LEVELS = {
     ],
 }
 
-SEND = {
+SEND: dict = {
     "type": "function",
     "function": {
         "name": "send_email",

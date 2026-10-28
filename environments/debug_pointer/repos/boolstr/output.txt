@@ -1,0 +1,6 @@
+    def test_debug_on():
+>       assert debug_on({"DEBUG": "false"}) is False
+E       AssertionError: assert True is False
+E        +  where True = debug_on({'DEBUG': 'false'})
+
+1 failed

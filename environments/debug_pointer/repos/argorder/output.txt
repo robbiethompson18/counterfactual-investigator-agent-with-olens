@@ -1,0 +1,8 @@
+    def test_register():
+>       assert register("alice_wonder", set()) == "ok"
+E       AssertionError: assert 'rejected' == 'ok'
+E         
+E         - ok
+E         + rejected
+
+1 failed

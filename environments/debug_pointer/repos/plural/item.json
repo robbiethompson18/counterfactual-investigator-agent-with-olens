@@ -1,0 +1,6 @@
+{
+ "kind": "ambiguous",
+ "d1": "label.py",
+ "d2": "phrase.py",
+ "note": "label always returns the plural, phrase never asks for the count; fix in label, phrase or summary"
+}

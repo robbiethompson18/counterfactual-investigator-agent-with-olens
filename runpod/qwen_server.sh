@@ -23,7 +23,7 @@ case ${1:?command} in
           name: $name, imageName: $image, gpuTypeIds: ["NVIDIA H200"], gpuCount: $n,
           networkVolumeId: $vol, volumeMountPath: "/workspace", containerDiskInGb: 50, ports: ["22/tcp", "8000/tcp"],
           env: {API_KEY: $key, HF_TOKEN: $hf, HF_XET_HIGH_PERFORMANCE: "1"},
-          dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["exec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
+          dockerEntrypoint: ["bash", "-c"], dockerStartCmd: ["mountpoint -q /workspace || { echo no network volume at /workspace; sleep infinity; }\nexec > /workspace/boot.log 2>&1\n(" + $boot + ")\nsleep infinity"]}' |
         curl -sS --fail-with-body https://rest.runpod.io/v1/pods -H "Authorization: Bearer $RUNPOD_API_KEY" \
           -H "Content-Type: application/json" -d @- | jq -r '.id // error(tostring) | "created \(.) on volume '$vol'"' && break
       echo "no ${2:-2}x H200 free with volume $vol"

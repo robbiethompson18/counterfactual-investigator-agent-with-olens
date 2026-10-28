@@ -1,0 +1,10 @@
+    def test_slot():
+>       assert slot(22, 2) == "22:00-00:00"
+E       AssertionError: assert '22:00-24:00' == '22:00-00:00'
+E         
+E         - 22:00-00:00
+E         ?       ^^
+E         + 22:00-24:00
+E         ?       ^^
+
+1 failed

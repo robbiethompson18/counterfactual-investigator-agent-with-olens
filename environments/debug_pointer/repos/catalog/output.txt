@@ -1,0 +1,6 @@
+    def test_total():
+>       assert total("apple:2\npear:1\n") == 1.75
+E       AssertionError: assert 0 == 1.75
+E        +  where 0 = total('apple:2\npear:1\n')
+
+1 failed
