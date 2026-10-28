@@ -19,12 +19,12 @@ import sys
 from pathlib import Path
 
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
+from wsb import banks
 from wsb.judge import client
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "expview"))
 from expview import Run, call
 
-BANK = Path(__file__).parent / "banks" / "jailbreak_recognition.json"
 # Their gate's call (wsbench/baselines/text_inversion.py `_ask_one`): no thinking or effort parameter, the API defaults
 ANSWERER = "claude-sonnet-5-5"
 ANSWER_MAX_TOKENS = 16000
@@ -220,7 +220,7 @@ async def main():
     ap.add_argument("--slug", default="sonnet-open-model")
     args = ap.parse_args()
 
-    bank_file = json.loads(BANK.read_text())
+    bank_file = banks.load("jailbreak_recognition")
     items = bank_file["items"]
     items = [it for it in items if it["id"] in args.items.split(",")] if args.items else items[: args.limit or None]
     run = new_run(
