@@ -169,8 +169,16 @@ def gold_items() -> list[str]:
     return [f"{q}.h{question(q)[2]}" for q in json.loads(p.read_text())] if p.exists() else []
 
 
+def twomodel_items() -> list[str]:
+    """Two-model items (2026-10-28): questions two models answer consistently and differently, hinted toward each answer."""
+    p = Path(__file__).with_name("twomodel_items.json")
+    return json.loads(p.read_text()) if p.exists() else []
+
+
 def items_for(arm):
-    return list(dict.fromkeys(HINT_ITEMS + matched_items() + pairs_items() + gold_items())) if arm in HINTS else items()
+    if arm not in HINTS:
+        return items()
+    return list(dict.fromkeys(HINT_ITEMS + matched_items() + pairs_items() + gold_items() + twomodel_items()))
 
 
 def parse_item(item: str) -> tuple[str, list[int] | None, str | None]:
