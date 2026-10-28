@@ -3,7 +3,8 @@
     envs/index.json         every env: title, status, primary measure, runs and episodes per target model
     envs/<env>/index.json   that env's runs: meta summary, label files, and per arm n / errors / unscorable / the
                             primary measure's distribution, with per-item k/n for a bool primary
-    evals/index.json, evals/<name>.json   cfbench evals (evals.py; an eval can span envs), for the viewer's Evals pages
+    evals/<name>.json       one file per cfbench eval (evals.py; an eval can span envs), for the viewer's Evals pages;
+                            no shared evals index: the page lists evals from spec/evals.json
 
 Built from the local data/envs/ folders, merged with HF's current indexes (runs and envs that HF lists but this
 checkout doesn't hold are kept; local wins), so building from a checkout with one new run doesn't drop the rest.
