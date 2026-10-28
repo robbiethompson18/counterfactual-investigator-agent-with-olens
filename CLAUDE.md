@@ -480,7 +480,7 @@ Current docs:
   only wrong-MCQ lives on (`environments/hint_mcq/`); answer task, one table of every run: O-lens
   14-23% vs placebo ~5% vs no lens 0% with the gold hint, carried by a few items; filler,
   every-token and header reads add nothing; wrong-letter hints 0% everywhere
-- [ACTIVE: todo_suppressed — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
+- [ACTIVE: todo_suppressed (super experimental) — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
   — Qwen (thinking off) writes a module but leaves `foo` as `raise NotImplementedError`
   (`leave_todo`) vs implements it (`implement`); the CF target is which idiom `foo` uses from the
   item's menu; 72 neutral items (8 external-service), AST-normalised grading, `gate.py` (Gemini 3.8

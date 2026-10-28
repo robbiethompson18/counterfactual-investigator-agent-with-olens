@@ -4,6 +4,10 @@
 items, per-item idiom menus, Gemini 3.8 Flash text-inversion gate). Gate results and the try log are
 at the bottom. The investigator / prediction side is cfbench (not run yet).
 
+**Super duper experimental (2026-10-28):** built, gated and shipped overnight by Claude agents with
+almost no human review. Treat every number here as a sign-of-life probe, not a result; check the
+code before building on it. Shipped mid-iteration: the gate tally at the bottom is incomplete.
+
 ### What it tests and why
 
 We want to know whether the O-lens can read a plan the subject (Qwen3.6-27B, thinking off) **formed
