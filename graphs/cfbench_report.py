@@ -1,4 +1,4 @@
-"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.report.data.groups()`.
+"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.scoring.groups()`.
 
     uv run python -m graphs.cfbench_report --out docs/img/cfbench-report [--allow-old-lens]
 
@@ -19,7 +19,7 @@ from collections import Counter, defaultdict
 import matplotlib
 import numpy as np
 
-from cfbench.report.data import (
+from cfbench.scoring import (
     COLOR,
     CONDS,
     LABEL,

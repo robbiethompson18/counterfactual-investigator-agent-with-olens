@@ -372,7 +372,7 @@ Current docs:
   (`environments run`, `runs.py finish`), backfill, Kylie-key and re-upload gotchas
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) — every
   chart module in one package (`python -m graphs.<module>` → `docs/img/`), which doc each serves;
-  scoring stays in `cfbench.report.data`
+  scoring stays in `cfbench.scoring`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs

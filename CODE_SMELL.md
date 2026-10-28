@@ -2,11 +2,6 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-27: `cfbench/report/` now holds only `data.py`
-
-Every chart moved to `graphs/`; `cfbench/report/data.py` (run groups, loading, RMSE scoring, used by `cfbench.score`,
-`environments/_lib/evals.py` and the graphs) is the only file left in the package. It should become `cfbench/scoring.py`
-or similar; the rename touches ~15 doc references, so do it in its own PR.
 ## 2026-10-27: a run's upload overwrites the env index with what's local
 
 `environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
@@ -76,9 +71,9 @@ min).
 standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
 pulling the whole project into their script env.
 
-## 2026-10-26: cfbench/report/data.py still computes the log skill
+## 2026-10-26: cfbench/scoring.py still computes the log skill
 
-`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+`cfbench.scoring` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
 log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
 `data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
 it once nothing quotes them. The old-lens w/ CoT runs

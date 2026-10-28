@@ -4,7 +4,7 @@
 main.
 
 How we score a counterfactual predictor from 2026-10-26 on, why the binomial log-likelihood skill we
-used before was replaced, and how the report charts are normalized. Code: `cfbench/report/data.py`
+used before was replaced, and how the report charts are normalized. Code: `cfbench/scoring.py`
 (scoring, run groups), `graphs/cfbench_report.py` (the progress report's "Preliminary Data"
 figures), `cfbench/score.py` (per-run scoring at the command line).
 
@@ -56,7 +56,7 @@ rollouts. So neither sampling budget moves the number.
 
 **Equal weight per case.** Any weighting by effect size or n reintroduces "which arms did we happen
 to run" as a hidden input. With equal weights, the case list is the only lever, so freeze it: the
-run groups live in `cfbench.report.data.groups()` and nothing else in the charts names a run.
+run groups live in `cfbench.scoring.groups()` and nothing else in the charts names a run.
 
 **Null = the shown base rate, not a uniform prior.** Every reference has a degenerate set, the cases
 where it is already right. Base-rate null puts that set at null edits, which is where it belongs.
@@ -98,7 +98,7 @@ transcript-only on Qwen w/o CoT and 0.9pp better on GLM. Under the old log skill
 ## Gotchas
 
 - `cfbench/score.py` prints RMSE and Brier skill only (the log skill left it on 2026-10-26;
-  `cfbench.report.data.log_skill` still computes it for `summary.json`); quote RMSE. Numbers in docs
+  `cfbench.scoring.log_skill` still computes it for `summary.json`); quote RMSE. Numbers in docs
   written before 2026-10-26 (`docs/cfbench-v1-results.md`, `docs/olens-cfbench-spike.md`,
   `docs/cfbench-harness-smoke.md`, `docs/envs/hidden_goal.md`, `docs/nocot-cfbench.md`) are log
   skill; don't compare them to RMSE.
