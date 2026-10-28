@@ -2,12 +2,22 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: every `environments run` finish crashes on retired cfbench env names
+
+`environments/_lib/index.build()` always calls `evals.build()`, which loads each cfbench run's env
+module; main's `data/runs/cfbench/` holds 2026-10-21..25 runs naming deleted evalcue envs
+(`dumb_user_exploit_appraisal`, ...), so `load_env` raises `ModuleNotFoundError` and the runner dies
+after Docent and before the HF upload (style_transfer's `2026-10-27_pool_bf16`, `_pool8`, `_pool`,
+uploaded by hand with evals.build stubbed out). `evals.build` should skip runs whose env module is
+gone, or `index.build` should catch it.
+
 ## 2026-10-27: a run's upload overwrites the env index with what's local
 
-`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
-Run from a fresh worktree that only holds the new run, it replaces HF's index with one listing just that run, and the
-env viewer then shows every other arm as "not run" (overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the
-runs in and re-uploading). The upload should merge with HF's index, or refuse when the local index lists fewer runs.
+`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/`
+and uploads it. Run from a fresh worktree that only holds the new run, it replaces HF's index with
+one listing just that run, and the env viewer then shows every other arm as "not run"
+(overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the runs in and re-uploading). The upload
+should merge with HF's index, or refuse when the local index lists fewer runs.
 
 ## 2026-10-27: expview can't import `environments/` run folders
 
@@ -23,6 +33,7 @@ envs/finish-uploads); the importer still needs the same treatment.
 unrelated per-item file `items.jsonl` crashes `finish` (`KeyError: 'id'`) and leaves an
 `index.jsonl.tmp` that gets synced. Found by the hint_cf gate run (renamed its file to
 `verdicts.jsonl`). It should look for `expview/` dirs, not the bare filename.
+
 ## 2026-10-27: `olens/src/olens/vectors.py` has no caller
 
 Probe and steering directions over an HF transformers model (`contributions`, `attention_pattern`,
@@ -73,12 +84,11 @@ pulling the whole project into their script env.
 
 ## 2026-10-26: cfbench/scoring.py still computes the log skill
 
-`cfbench.scoring` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
-log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
-`data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
-it once nothing quotes them. The old-lens w/ CoT runs
-(`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in `groups()` only for `--allow-old-lens`; drop
-them when the thinking-on reruns land.
+`cfbench.scoring` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial log
+skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day); `data.log_skill`
+still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop it once nothing
+quotes them. The old-lens w/ CoT runs (`2026-10-22_gflash-olens-v2-{exfil,inline-b}`) stay in
+`groups()` only for `--allow-old-lens`; drop them when the thinking-on reruns land.
 
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
