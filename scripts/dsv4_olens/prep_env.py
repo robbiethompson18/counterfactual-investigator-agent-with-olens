@@ -1,5 +1,6 @@
 """requests.jsonl for read.py from environments/ alignment_faking runs (data/envs/alignment_faking/<run>): one episode per
-(arm, item) across the runs given (a top-up pools with its base run), its lowest sample, items --items. Each request keeps
+(arm, item) across the runs given (a top-up pools with its base run), its lowest sample (`--samples all` keeps every sample,
+with `:s<sample>` on the id; `--arms public` keeps only those arms), items --items. Each request keeps
 `run` and `episode`, so a read maps back to the env_runs loader's `alignment_faking/<run>:<episode>`. The reply is cut to
 its first --reply-chars characters: read positions before the cut see the same activations (causal), and long complying
 replies would otherwise dominate the read count.
@@ -18,6 +19,8 @@ ap.add_argument("--runs", nargs="+", required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--items", default="0:50")
 ap.add_argument("--reply-chars", type=int, default=120)
+ap.add_argument("--arms", default="", help="comma-separated arms to keep (default: all)")
+ap.add_argument("--samples", default="lowest", choices=["lowest", "all"], help="one episode per (arm, item), or every sample")
 a = ap.parse_args()
 
 lo, hi = map(int, a.items.split(":"))
@@ -36,13 +39,15 @@ for name in a.runs:
             if not lo <= q < hi:
                 continue
             version, _, stage = e["arm"].rpartition("/")
+            if a.arms and stage not in a.arms.split(","):
+                continue
             msgs = [{"role": m["role"], "content": m["content"]} for m in e["messages"]]
             reply = msgs[-1]["content"]
             msgs[-1]["content"] = reply[: a.reply_chars]
             v = lab[e["id"]]
             reqs.append(
                 {
-                    "id": f"{version or 'original'}:{stage}:{e['item']}",
+                    "id": f"{version or 'original'}:{stage}:{e['item']}" + (f":s{e['sample']}" if a.samples == "all" else ""),
                     "run": name,
                     "episode": e["id"],
                     "version": version or "original",
@@ -56,12 +61,14 @@ for name in a.runs:
                     "messages": msgs,
                 }
             )
-first = {}  # one episode per (arm, item) across the pooled runs: the lowest sample, ties to the run listed first
-order = {name: i for i, name in enumerate(a.runs)}
-for r in reqs:
-    k = (r["arm"], r["item"])
-    if k not in first or (r["sample"], order[r["run"]]) < (first[k]["sample"], order[first[k]["run"]]):
-        first[k] = r
-reqs = sorted(first.values(), key=lambda r: (r["version"], r["arm"], int(r["item"][1:])))
+if a.samples == "lowest":  # one episode per (arm, item) across the pooled runs: the lowest sample, ties to the run listed first
+    first = {}
+    order = {name: i for i, name in enumerate(a.runs)}
+    for r in reqs:
+        k = (r["arm"], r["item"])
+        if k not in first or (r["sample"], order[r["run"]]) < (first[k]["sample"], order[first[k]["run"]]):
+            first[k] = r
+    reqs = list(first.values())
+reqs = sorted(reqs, key=lambda r: (r["version"], r["arm"], int(r["item"][1:]), r["sample"]))
 (out / "requests.jsonl").write_text("".join(json.dumps(r) + "\n" for r in reqs))
 print(len(reqs), "requests;", sum(r["positive"] for r in reqs), "positive ->", out / "requests.jsonl")
