@@ -224,7 +224,8 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, kind:
         env = base[0].source.split("/")[0]
         pool = sorted(s for s in reads if s.split("/")[0] != env)
         assert pool, f"placebo needs reads from an env other than {env}"
-        random.Random(seed).shuffle(pool)
+        # seeded per case (its base runs), so different cases get different placebo transcripts (2026-10-28)
+        random.Random(f"{seed}/" + "|".join(r.source for r in base)).shuffle(pool)
         source = dict(zip(read_ids, pool * (len(read_ids) // len(pool) + 1)))
     cache: dict[int, tuple[list[Position], float, str]] = {}
 

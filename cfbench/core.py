@@ -62,7 +62,11 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # no_transcript and transcript_agentic prompts and tools are byte-identical to 7, so those rows compare across 7 and 8;
 # olens_* rows don't. The jlens_* conditions are new in 8, and so are nla_* (2026-10-28), added without a bump: every other
 # condition's prompt and tools stayed byte-identical (hashed before and after).
-HARNESS_VERSION = 8
+# 9: the placebo conditions (olens_placebo_agentic, jlens_placebo_agentic, nla_placebo_agentic) shuffle their pool of
+# other-env transcripts per case (seed + the case's base-run sources), where every case used to get the same assignment
+# (seed + draw), so all of a run's placebo cases read one transcript pair (red-team of af_which, 2026-10-28). Only placebo
+# inputs changed: every other condition's prompt and tools are byte-identical to 8, so those rows compare across 8 and 9.
+HARNESS_VERSION = 9
 
 
 @dataclass
