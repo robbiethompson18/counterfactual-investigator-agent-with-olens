@@ -737,6 +737,85 @@ def lens_stats(a):
     print("\n".join(lines))
 
 
+def tqa_prep(a):
+    """The TruthfulQA out-of-sample set: hinted_truthfulqa `control` items whose no-hint modal answer has >= min_count/
+    n_samples (all of them, not balanced), rendered as build("control", item) with the thinking-off generation prompt.
+    Sites per option: `nl`, the token right after the option's text ("\\n", or <|im_end|> after the last option) and `end`,
+    the text's last token. Writes the run (questions, options) plus, in --work, the inputs for scripts/hs_at_positions.py
+    (candidates "(A", "(B", ...: Qwen's replies open with "(X)" and "(X" is one token) and O-lens requests at the nl sites."""
+    from transformers import AutoTokenizer
+
+    from counterfactual_investigator_agent_with_olens.render import render_request
+    from environments.hinted_truthfulqa import env as tqa
+
+    answers, gold = defaultdict(list), {}
+    for run in a.runs:
+        for ep in read_episodes(LOCAL / "hinted_truthfulqa" / run):
+            if ep["arm"] == "control" and str(ep["item"]).startswith("tqa-") and (ans := tqa.measure(ep)["answer"]):
+                answers[str(ep["item"])].append(ans)
+                gold[str(ep["item"])] = ep["meta"]["gold"]
+    picked = []
+    for item, xs in answers.items():
+        own, k = Counter(xs).most_common(1)[0]
+        if len(xs) >= a.n_samples and k / len(xs) >= a.min_count / a.n_samples:
+            picked.append({"item": item, "own": own, "share": k / len(xs), "n": len(xs), "gold": gold[item], "right": own == gold[item]})
+    picked.sort(key=lambda r: int(str(r["item"]).split("-")[1]))
+    n_right = sum(r["right"] for r in picked)
+    print(f"{len(answers)} items, {len(picked)} consistent: {n_right} right, {len(picked) - n_right} wrong")
+    tok = AutoTokenizer.from_pretrained(MODEL)
+    cand = [tok.encode(f"({L}", add_special_tokens=False) for L in tqa.LETTERS]
+    assert all(len(c) == 1 for c in cand), "each (X must be one token"
+    run = new_run(
+        "mcq_answer_probe",
+        a.slug,
+        description="TruthfulQA out-of-sample set for the frozen MMLU-Pro answer probe (hinted_truthfulqa control, Qwen3.6-27B no-hint)",
+        models=[{"name": MODEL, "served_by": "HF transformers bf16 (scripts/hs_at_positions.py)"}],
+        params=vars(a) | {"n_questions": len(picked), "n_right": n_right},
+    )
+    work = Path(a.work)
+    work.mkdir(parents=True, exist_ok=True)
+    questions, options, inputs, requests = [], [], [], []
+    for qi, r in enumerate(picked):
+        ep = tqa.build("control", r["item"])
+        msgs, opts = ep.messages, ep.meta["options"]
+        text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+        enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
+        user = msgs[-1]["content"]
+        start, stop = text.index(user), text.index(user) + len(user)
+        starts = [text.index(f"\n({tqa.LETTERS[i]}) ", start) for i in range(len(opts))]
+        ends = [*starts[1:], stop]
+        offs = enc["offset_mapping"]
+        nl = [next(i for i, (s, e) in enumerate(offs) if s <= c < e) for c in ends]
+        end = [next(i for i, (s, e) in enumerate(offs) if s <= c - 1 < e) for c in ends]
+        ids = enc["input_ids"]
+        _, rids, _ = render_request(tok, {"messages": msgs})  # the O-lens reader's rendering: same tokens up to the last site
+        assert rids[: nl[-1] + 1] == ids[: nl[-1] + 1], r["item"]
+        questions.append(r | {"n_opts": len(opts), "question": tqa._items()[str(r["item"])]["question"], "options": opts})
+        for i in range(len(opts)):
+            L = tqa.LETTERS[i]
+            options.append(
+                {
+                    "q": qi,
+                    "item": r["item"],
+                    "opt": i,
+                    "letter": L,
+                    "is_answer": L == r["own"],
+                    "is_gold": L == r["gold"],
+                    "right": r["right"],
+                }
+                | {"nl_token": tok.decode([ids[nl[i]]]), "end_token": tok.decode([ids[end[i]]])}
+            )
+        inputs.append({"id": r["item"], "ids": ids, "sites": {"nl": nl, "end": end}, "cand": [c[0] for c in cand[: len(opts)]]})
+        requests.append(
+            {"id": f"hinted_truthfulqa/{r['item']}", "env": "hinted_truthfulqa", "arm": "control", "messages": msgs, "positions": nl}
+        )
+    (run / "questions.jsonl").write_text("".join(json.dumps(q) + "\n" for q in questions))
+    (run / "options.jsonl").write_text("".join(json.dumps(o) + "\n" for o in options))
+    (work / "hs_inputs.jsonl").write_text("".join(json.dumps(x) + "\n" for x in inputs))
+    (work / "lens_requests.jsonl").write_text("".join(json.dumps(x) + "\n" for x in requests))
+    print(f"run {run}; {len(options)} options; nl tokens {Counter(o['nl_token'] for o in options).most_common(4)}; inputs in {work}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -784,6 +863,12 @@ def main():
     ls.add_argument("run")
     ls.add_argument("reads", nargs="+", help="olens_read_requests.py output(s) for lens-requests' requests")
     ls.add_argument("--block", type=int, default=52)
+    t = sub.add_parser("tqa-prep")
+    t.add_argument("--runs", nargs="+", default=["2026-10-27_control-n8-qwen36-nothink", "2026-10-27_control-n8-q400-816-qwen36-nothink"])
+    t.add_argument("--slug", default="tqa-oos")
+    t.add_argument("--work", default="data/tqa_oos", help="where the GPU inputs and O-lens requests go")
+    t.add_argument("--min-count", type=int, default=7)
+    t.add_argument("--n-samples", type=int, default=8)
     a = ap.parse_args()
     cmds = {
         "collect": collect,
@@ -793,6 +878,7 @@ def main():
         "dump": dump,
         "lens-requests": lens_requests,
         "lens-stats": lens_stats,
+        "tqa-prep": tqa_prep,
     }
     cmds[a.cmd](a)
 

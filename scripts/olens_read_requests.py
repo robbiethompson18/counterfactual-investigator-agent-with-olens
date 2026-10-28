@@ -19,8 +19,9 @@ priority order, round-robin over (env, arm) within a priority. A row's optional 
 assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
-"all"` reads every token, and `char_positions: [[msg_index, char_offset], ...]` reads the token holding each char of
-that message's content (offsets into its stripped content, as `char_offset` in OUT). A row's
+"all"` reads every token, `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
+...]` the token holding each char of that message's content (offsets into its stripped content, as `char_offset` in
+OUT). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -196,6 +197,8 @@ def prepare(tok, row, layers, im_end, im_start):
         positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
     elif row.get("positions") == "all":
         positions = list(range(len(ids)))
+    elif isinstance(row.get("positions"), list):  # explicit token indices into the rendered request
+        positions = row["positions"]
     elif row.get("char_positions"):  # [[msg_index, char offset into its content], ...]: the token holding each char
         positions = [max(i for i, w in enumerate(where) if w[:2] == (m, "content") and w[2] <= c) for m, c in row["char_positions"]]
     row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
