@@ -7,7 +7,7 @@ as queued. Re-splits the not-yet-run q__ jobs into <fill>/jobs_main/r__NNNN.job.
 
 import glob
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -40,7 +40,7 @@ out = F / "jobs_main"
 out.mkdir(exist_ok=True)
 for f in out.glob("*"):
     f.unlink()
-views, st = [], defaultdict(lambda: {"episodes": set(), "template": 0, "punct": 0})
+views, eps_of, tmpl, punct = [], defaultdict(set), Counter(), Counter()
 for f in sorted(glob.glob(str(F / "jobs_pos/q__*.job.pt"))):
     if Path(f).name in done or Path(f).name == running:
         continue
@@ -54,13 +54,12 @@ for f in sorted(glob.glob(str(F / "jobs_pos/q__*.job.pt"))):
         else:
             key = (r.run_dir.split("/")[1], "")
         views.append((ids, ps, t))
-        s = st[key]
-        s["episodes"].add(t)
+        eps_of[key].add(t)
         if r.run_dir.startswith("envs/overeagerness/"):
-            s["template"] += sum(special[(t, p)] for p in ps)
-            s["punct"] += sum(not special[(t, p)] for p in ps)
+            tmpl[key] += sum(special[(t, p)] for p in ps)
+            punct[key] += sum(not special[(t, p)] for p in ps)
         else:
-            s["template"] += len(ps)  # non-overeagerness: total positions (split not tracked here)
+            tmpl[key] += len(ps)  # non-overeagerness: total positions (split not tracked here)
 k, cur, n = 0, [], 0
 for i, v in enumerate(views):
     cur.append(v)
@@ -73,8 +72,8 @@ for i, v in enumerate(views):
         (out / f"r__{k:04d}.job.tmp").rename(out / f"r__{k:04d}.job.pt")
         k, cur, n = k + 1, [], 0
 rows = [
-    {"comparison": c, "arm": a, "episodes": len(s["episodes"]), "template": s["template"], "punct": s["punct"]}
-    for (c, a), s in sorted(st.items())
+    {"comparison": c, "arm": a, "episodes": len(e), "template": tmpl[(c, a)], "punct": punct[(c, a)]}
+    for (c, a), e in sorted(eps_of.items())
 ]
 T = pd.DataFrame(rows)
 T.to_csv(F / "selection_main.csv", index=False)
