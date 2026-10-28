@@ -1,8 +1,8 @@
 """Charts for the hint_mcq answer task (docs/envs/hint_cf.md, "Assistant-header reads" section): % of predictor draws
 naming Qwen's no-hint letter, per condition, for the gold-letter hint, the other-wrong-letter hint and both pooled, with
-95% item-bootstrap CIs; plus one dot grid of correct draws per item for each hint type. Same colors as cfbench.report.
+95% item-bootstrap CIs; plus one dot grid of correct draws per item for each hint type. Same colors as charts.py.
 
-    uv run --with matplotlib python scripts/hint_mcq_answer_chart.py [--out docs/img/hint-mcq-answer] [--no-filter]
+    uv run python -m cfbench.report.answer [--out docs/img/hint-mcq-answer] [--no-filter]
 
 Runs: data/runs/cfbench/2026-10-27_answer-mcq-olens-header (hint+d1 -> nohint, 18 survivors) and
 2026-10-27_answer-mcq-olens-header-d2 (hint+d2 -> nohint, 7 survivors), 5 draws each. By default only items whose hinted

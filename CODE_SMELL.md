@@ -2,6 +2,12 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: chart code split between cfbench/report/ and scripts/
+
+Plotting code lives in `cfbench/report/` (`charts.py`, `modelchart.py`, `answer.py`), but two older one-offs predate
+it and still sit in `scripts/` (`honest_binary_chart.py`, `honest_binary_chart_olens.py`). New charts go in
+`cfbench/report/`; move the two strays there when someone next touches them.
+
 ## 2026-10-27: a run's upload overwrites the env index with what's local
 
 `environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
