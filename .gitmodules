@@ -4,3 +4,6 @@
 [submodule "vendor/agent-interp-envs"]
 	path = vendor/agent-interp-envs
 	url = https://github.com/gkroiz/agent-interp-envs
+[submodule "vendor/workspace-bench"]
+	path = vendor/workspace-bench
+	url = https://github.com/camilablank/workspace-bench

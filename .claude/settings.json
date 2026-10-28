@@ -1,3 +1,7 @@
 {
-  "claudeMdExcludes": ["**/evalcue/envs/*/workspace*/CLAUDE.md"]
+  "claudeMdExcludes": [
+    "**/evalcue/envs/*/workspace*/CLAUDE.md",
+    "**/vendor/workspace-bench/**/CLAUDE.md",
+    "**/vendor/workspace-bench/**/AGENTS.md"
+  ]
 }
