@@ -43,35 +43,35 @@ knowledge_cutoff and directed_modulation_obscure kept only items Opus and Sonnet
 and wrong_bridge's label is Qwen's specific wrong bridge (Opus pass@1 0.14). They have no published
 lens numbers yet, so they aren't in this table. `ttt` was removed on 2026-10-26.
 
-| family                             | lens | stock-Qwen text | frontier text | verdict today                                                                                        |
-| ---------------------------------- | ---- | --------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| multihop                           | 0.99 | 0.91            | 1.00          | text ≥ lens                                                                                          |
-| multilingual                       | 1.00 | 0.77            | 1.00          | text ≥ lens                                                                                          |
-| typo                               | 1.00 | 1.00 (sat.)     | 1.00          | text ≥ lens                                                                                          |
-| association                        | 0.87 | 0.32            | 0.95          | text ≥ lens                                                                                          |
-| basic_readout_mt                   | 0.71 | 0.59            | 0.94          | text ≥ lens                                                                                          |
-| multihop_mt                        | 0.32 | 0.69            | 0.91          | text ≥ lens                                                                                          |
-| multilingual_mt                    | 0.62 | 0.42            | 0.81          | text ≥ lens                                                                                          |
-| multilingual_multihop              | 0.40 | 0.45            | 0.91          | text ≥ lens                                                                                          |
-| multilingual_typo                  | 0.78 | 0.66            | 0.96          | text ≥ lens                                                                                          |
-| typo_mt                            | 0.85 | 0.67            | 0.94          | text ≥ lens                                                                                          |
-| poetry                             | 0.55 | 0.62            | 0.66          | text ≥ lens                                                                                          |
-| arithmetic_intermediates           | 0.35 | 0.15            | 0.80          | text ≥ lens                                                                                          |
-| chain_intermediates                | 0.25 | 0.03            | 1.00\*        | text ≥ lens (\*gate used any-of-3, see rule notes)                                                   |
-| brew_intermediates                 | 0.70 | 0.96 (sat.)     | 0.97          | text ≥ lens (table is in the prompt)                                                                 |
-| relational_multihop                | 0.50 | 0.82 (sat.)     | 1.00          | text ≥ lens (cloze states both hops)                                                                 |
-| role_bound_association             | 0.63 | 1.00 (sat.)     | 0.98 (Sonnet) | text ≥ lens (scene states who did what)                                                              |
-| conjunctive_association            | 0.14 | 0.07            | 0.63 (Sonnet) | text ≥ lens                                                                                          |
-| buggy_code (1–10 score)            | 2.69 | —               | 0.99 pass@1   | text ≥ lens (program is the prompt)                                                                  |
-| **user_modeling**                  | 0.94 | 0.07            | 0.34 (Sonnet) | **contested**; 53/100 items forbid text by judge rule                                                |
-| **basic_readout**                  | 0.99 | 0.72            | 0.85          | lens wins the 32 "own favourite" items (Sonnet 0.54, lens 0.94 at L60): a next-token read, see below |
-| **moral_rationale**                | 0.76 | 0.37            | 0.65          | **contested**                                                                                        |
-| **jailbreak_recognition**          | 0.93 | —               | 0.83 (Sonnet) | **contested**; 0.88 with WSB's parser bug fixed (see replay below)                                   |
-| directed_modulation                | 0.28 | 0.21            | excluded      | rule-blocked: judge fails any readout that narrates the instruction                                  |
-| multi_concept_directed_modulation  | 0.32 | 1.0 (excluded)  | —             | prompt dictates the concepts                                                                         |
-| hallucination (rate, lower better) | 0.34 | 0.07            | —             | not a bar; a text reader has its own invention rate                                                  |
-| jlens_concept_pr                   | —    | —               | —             | precision vs the J-lens top-10, not a bar                                                            |
-| agentic_misalignment               | 0.58 | —               | —             | design score over all positions; Opus judge refuses ~9%                                              |
+| family                             | lens | stock-Qwen text | frontier text | verdict today                                                       |
+| ---------------------------------- | ---- | --------------- | ------------- | ------------------------------------------------------------------- |
+| multihop                           | 0.99 | 0.91            | 1.00          | text ≥ lens                                                         |
+| multilingual                       | 1.00 | 0.77            | 1.00          | text ≥ lens                                                         |
+| typo                               | 1.00 | 1.00 (sat.)     | 1.00          | text ≥ lens                                                         |
+| association                        | 0.87 | 0.32            | 0.95          | text ≥ lens                                                         |
+| basic_readout_mt                   | 0.71 | 0.59            | 0.94          | text ≥ lens                                                         |
+| multihop_mt                        | 0.32 | 0.69            | 0.91          | text ≥ lens                                                         |
+| multilingual_mt                    | 0.62 | 0.42            | 0.81          | text ≥ lens                                                         |
+| multilingual_multihop              | 0.40 | 0.45            | 0.91          | text ≥ lens                                                         |
+| multilingual_typo                  | 0.78 | 0.66            | 0.96          | text ≥ lens                                                         |
+| typo_mt                            | 0.85 | 0.67            | 0.94          | text ≥ lens                                                         |
+| poetry                             | 0.55 | 0.62            | 0.66          | text ≥ lens                                                         |
+| arithmetic_intermediates           | 0.35 | 0.15            | 0.80          | text ≥ lens                                                         |
+| chain_intermediates                | 0.25 | 0.03            | 1.00\*        | text ≥ lens (\*gate used any-of-3, see rule notes)                  |
+| brew_intermediates                 | 0.70 | 0.96 (sat.)     | 0.97          | text ≥ lens (table is in the prompt)                                |
+| relational_multihop                | 0.50 | 0.82 (sat.)     | 1.00          | text ≥ lens (cloze states both hops)                                |
+| role_bound_association             | 0.63 | 1.00 (sat.)     | 0.98 (Sonnet) | text ≥ lens (scene states who did what)                             |
+| conjunctive_association            | 0.14 | 0.07            | 0.63 (Sonnet) | text ≥ lens                                                         |
+| buggy_code (1–10 score)            | 2.69 | —               | 0.99 pass@1   | text ≥ lens (program is the prompt)                                 |
+| **user_modeling**                  | 0.94 | 0.07            | 0.34 (Sonnet) | **contested**; 53/100 items forbid text by judge rule               |
+| **basic_readout**                  | 0.99 | 0.72            | 0.85          | lens wins the 32 own-favourite items; a next-token read, see below  |
+| **moral_rationale**                | 0.76 | 0.37            | 0.65          | **contested**                                                       |
+| **jailbreak_recognition**          | 0.93 | —               | 0.83 (Sonnet) | **contested**; 0.88 with WSB's parser bug fixed (see replay below)  |
+| directed_modulation                | 0.28 | 0.21            | excluded      | rule-blocked: judge fails any readout that narrates the instruction |
+| multi_concept_directed_modulation  | 0.32 | 1.0 (excluded)  | —             | prompt dictates the concepts                                        |
+| hallucination (rate, lower better) | 0.34 | 0.07            | —             | not a bar; a text reader has its own invention rate                 |
+| jlens_concept_pr                   | —    | —               | —             | precision vs the J-lens top-10, not a bar                           |
+| agentic_misalignment               | 0.58 | —               | —             | design score over all positions; Opus judge refuses ~9%             |
 
 So **18 of 27 families are already lost to a text reader**, 4 are contested, 2 are blocked by a
 judge rule that a text reader cannot satisfy, and 3 have no comparable metric. Nothing has been run
