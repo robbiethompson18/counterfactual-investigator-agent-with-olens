@@ -39,6 +39,7 @@ ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--layers", default=None, help="per-row layers (a subset of the reader's --layers); default: the reader's")
 ap.add_argument("--items", default=None, help="comma list of items to keep")
 ap.add_argument("--positions", default=None, choices=["all"], help="read every token, not just stop tokens")
+ap.add_argument("--per-case", type=int, default=None, help="keep only the first N rows of each (arm, item)")
 a = ap.parse_args()
 
 have = {json.loads(line)["id"] for line in a.out.open()} if a.out.exists() else set()
@@ -59,6 +60,14 @@ with a.out.open("a") as f:
             rows = [(f"{run}:{i}", json.loads(line)) for i, line in lines]
         rows = [(rid, r) for rid, r in rows if "error" not in r and r.get("positive") is not None]
         rows = [(rid, r) for rid, r in rows if not a.items or str(r["item"]) in a.items.split(",")]
+        if a.per_case:
+            seen: dict[tuple, int] = {}
+            kept = []
+            for rid, r in rows:
+                seen[r["arm"], str(r["item"])] = seen.get((r["arm"], str(r["item"])), 0) + 1
+                if seen[r["arm"], str(r["item"])] <= a.per_case:
+                    kept.append((rid, r))
+            rows = kept
         rows = [(rid, r) for rid, r in rows if not arms or r["arm"] in arms.split(",")]
         if a.per_arm:
             random.Random(f"{a.seed}:{run}").shuffle(rows)

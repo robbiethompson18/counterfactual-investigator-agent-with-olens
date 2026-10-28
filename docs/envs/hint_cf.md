@@ -317,6 +317,50 @@ survivor selection and its own gate (not redone: the gate is about the prompt te
 barely changes); OpenRouter reports $0 cost on the new key, so per-run spend is unknown (the same
 runs cost ~$2 each on the old key).
 
+### Redo at lens temperature 1 (2026-10-27 evening)
+
+Every read above was decoded greedily (temperature 0), the WeirdChat viewer's default that the batch
+reader inherited. The lens was trained (RL at T 1.0) and is scored on WorkspaceBench at k=1, T 1.0,
+top-p 0.95, top-k 64, so greedy was off-recipe; and at temperature 0 the reader copies one decode
+across every rollout that shares a prompt prefix, so "8 samples" were one lens draw per site. The
+reader now decodes at T 1.0 by default (`scripts/olens_read_requests.py --temperature`, 0 restores
+greedy) with one draw per transcript, and the three read sets were redone that way:
+`olens_reads/2026-10-27_hint-{mcq18-stop,pause18-stop,placebo-pool}-t1`, plus every-token reads of 4
+rollouts per case (`hint-mcq18-dense-t1`; 4 is the smallest count cfbench's few-reads guard
+accepts). cfbench runs `answer-mcq18-stop-t1`(+`-rest3`), `answer-pause13-stop-t1`(+`-rest`),
+`answer-mcq18-dense-t1` (the `-rest` files are draws the first runs dropped on Gemini 429s when the
+BYOK Google project hit its 10k/day cap; pool them; `-rest` and `-rest2` of the base run are empty
+abandoned attempts).
+
+| reads                       | items | greedy: O-lens / placebo | T=1: O-lens / placebo | items with ≥ 1 hit (T=1) |
+| --------------------------- | ----- | ------------------------ | --------------------- | ------------------------ |
+| stop tokens, no filler      | 18    | 23% / 6%                 | 19% (20/108) / 5%     | 6                        |
+| stop tokens, no filler      | 13 ¹  | 23% / 6%                 | 18% (14/78) / 4%      |                          |
+| stop tokens, `pause` filler | 13 ¹  | 27% / 1%                 | 17% (13/78) / 4%      | 4                        |
+| every token, no filler      | 18    | 24% / 6%                 | 6% (3/54) / 4%        | 3                        |
+
+Same picture on stop tokens: the lens beats the placebo by 13-15 points and the filler changes
+nothing. Every-token reads at T=1 drop to the placebo level (3/54 vs 13/54 greedy, Fisher p ≈ 0.01
+on these counts, 3 draws): the investigator saw an own-letter bullet in 41 of 54 draws (38 of 54
+greedy), and the own letter's share of all letters named in the bullets it saw is the same (13% vs
+15%), so the reads aren't worse; with 4 independently sampled rollouts read at every token it
+submits the hinted answer far more often. Two differences besides temperature: only 4 of each case's
+8 rollouts were read (cost), and each read rollout now shows different bullets at the same token.
+Not chased further; it doesn't change the conclusion that dense reads don't help.
+
+On stop tokens the T=1 numbers sit a few points under greedy, and that is noise at this sample size:
+Fisher p = 0.50 on the 18 items (25/108 vs 20/108), 0.17 with the filler (21/78 vs 13/78), 0.13
+pooled; per item, T=1 is better on 2, worse on 4 and the same on 12, and the four worse items are
+6598 and 10868 (3 → 0 each, the greedy read happened to name the letter) plus 941 and 5088 (6 → 5).
+Only the dense drop (13/54 vs 3/54, p = 0.013) is outside noise, with the confounds above. The reads
+themselves are indistinguishable in quality: top-bullet FVE p10/p50/p90 is 0.039/0.126/0.304 greedy
+vs 0.040/0.122/0.298 at T=1 on the same 42,984 stop-token reads, mean joint FVE 0.174 vs 0.172. The
+items carrying the result are the same ones (941, 2509, 5088; 6414, 6031, 1157 as singles); 6598 and
+10868, hits under greedy, are 0/6 at T=1, and the reverse flips happen too. With 8 independent draws
+per site the investigator still works from the bullets under its default filters, so more draws
+don't reach it; the stability table above (own letter named at a site on 12/18 items in every job)
+is the better measure of what the lens says.
+
 ### Assistant-header reads, wrong-letter hints, and a bullet-level audit (2026-10-27, evening)
 
 The current result for this env (Robbie, 2026-10-27 evening). A third read set and two more runs,

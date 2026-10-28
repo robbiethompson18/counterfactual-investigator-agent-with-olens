@@ -69,6 +69,10 @@ Summary of the Final Pitch (2026-10-19):
   with the AR as `" " + bullet` (`lens.bullet_prefix`; `olens/` does this). Every read we made
   before 2026-10-22 ~17:25 PDT used the old lens; the redo list is in
   [docs/olens-space-migration.md](docs/olens-space-migration.md).
+- **Lens reads decode at temperature 1 since 2026-10-27 evening** (WorkspaceBench's sampling of
+  record: T 1.0, top-p 0.95, top-k 64, one continuation of up to 4 bullets per site). Every read
+  before that was greedy, the viewer's default; `--temperature 0` restores it. At T 1 each rollout
+  is its own lens draw; at T 0 rollouts sharing a prompt share one read (docs/envs/hint_cf.md).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
