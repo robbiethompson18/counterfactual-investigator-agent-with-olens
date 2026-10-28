@@ -501,14 +501,11 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
     consistency for paired-order evals), rate evals a pooled RMSE row and pooled paired comparison."""
     from cfbench.core import canon_condition
 
-    def group(s: dict) -> tuple:  # rate runs pool only with runs of the same predictors and harness (v6 = v7)
-        return tuple(s["predictors"]), 6 if s["harness_version"] in (6, 7) else s["harness_version"]
-
     seen: set = set()
-    for s in summaries:  # newest first; a run supersedes only runs of the same predictors
+    for s in summaries:  # newest first
         s["current_conds"] = []
         for c in s["conditions"] if s.get("status") in (None, "done") else []:
-            if (key := (tuple(s.get("versions") or [s["run"]]), tuple(s["predictors"]), c)) not in seen:
+            if (key := (tuple(s.get("versions") or [s["run"]]), c)) not in seen:
                 seen.add(key)
                 s["current_conds"].append(c)
         s["current"] = bool(s["current_conds"])
@@ -540,7 +537,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table})
         return {"claim_tables": tables}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
-    if len(cur) < 2 or len({group(s) for s in cur}) > 1:
+    if len(cur) < 2:
         return {}
     sq, sq_null = defaultdict(list), []
     clusters: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
