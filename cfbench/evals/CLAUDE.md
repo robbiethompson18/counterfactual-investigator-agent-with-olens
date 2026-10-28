@@ -70,6 +70,7 @@ transcript it investigated (`LINKS`). Plain `cfbench.run env_runs:<env>/...` run
   apart. Versions `original` and `v7`.
 - `overeager_main`: over-eagerness on GLM 5.3, the env's "main: one-edit fixes and nulls"
   comparisons (payback, dana, calendar, gitbranch, email junebug; 4 Johns left out, it is email item
-  0), base arm → each of its 4 one-line edits, 20 cases. Every pooled GLM base-arm run is shown;
-  O-lens reads (Celeste's RL lens, template tokens) exist almost only on base runs that acted
-  without asking. Version `main`.
+  0), base arm → each of its 4 one-line edits. A case is one arm pair and one shown base run where
+  GLM acted without asking and that has O-lens reads (8 per base arm, one per item): 160 cases.
+  Conditions `no_transcript`, `transcript_agentic`, `olens_agentic`; the prompt states the pooled
+  base rate. Version `main`.
