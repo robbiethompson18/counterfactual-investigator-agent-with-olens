@@ -24,8 +24,8 @@ Eight read pods were created at 23:43 PDT on 2026-10-24 and the session went qui
   its process tree. The 10-minute wakeup loop in Robbie's `CLAUDE.local.md` is the second layer.
 - **Never `--watch` a reader unless that watcher is running.** `--watch` keeps the GPU busy-idle
   forever.
-- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them (or
-  stream them to HF, PR `olens/stream-reads-to-hf`) while the pod is up, not at the end.
+- **Fetch as you go.** Reads that exist only on a pod or a network volume don't exist: pull them
+  while the pod is up, not at the end.
 - **Poll the REST API, not runpodctl, for readiness:** `GET /v1/pods/<id>` → `publicIp` and
   `portMappings["22"]`; then `ssh -o ConnectTimeout=8` wrapped in a hard timeout
   (`perl -e 'alarm 20; exec @ARGV' ssh ...`; macOS has no `timeout`). `runpodctl pod get` reports
@@ -83,11 +83,19 @@ Each script's header has its usage.
   plus a network volume that caches weights and compiles. `NAME=x ... up 1` boots a one-GPU pod on
   the same recipe for other jobs.
 - `olens_reads.sh setup|run|status|fetch|stop NAME ...`: batch O-lens reads (agu18dec space lens +
-  AR, `scripts/olens_read_requests.py`) of whole transcripts on a pod from
-  `NAME=x qwen_server.sh up 1`. Write outputs as a `scripts/runs.py` run under
-  `data/runs/olens_reads/`. `fetch` also copies `reads.provenance.json` (which lens, bullet prefix,
-  AR, whitener, checkpoint revisions; `olens/src/olens/provenance.py`) next to the reads: keep it
-  with them, it is the only machine-written record of which lens a batch used.
+  AR, `scripts/olens_read_requests.py`; capture, lens and AR on one vLLM,
+  [docs/olens-one-engine-reader.md](../docs/olens-one-engine-reader.md)) of whole transcripts on a
+  pod from `IMAGE=vllm/vllm-openai:v0.27.1 NAME=x qwen_server.sh up 1`. Write outputs as a
+  `scripts/runs.py` run under `data/runs/olens_reads/`. `fetch` also copies `reads.provenance.json`
+  (which lens, bullet prefix, AR, whitener, checkpoint revisions; `olens/src/olens/provenance.py`)
+  next to the reads: keep it with them, it is the only machine-written record of which lens a batch
+  used.
+- `nla_reads.sh setup|run|status|fetch|stop|score NAME ...`: the same reader with `--readout nla`
+  (the camilablank multilayer NLA's AV on the one engine, `olens/src/olens/nla.py`), writing
+  `TAG.reads.jsonl` plus `TAG.reads.acts.bf16` (each decoded read's activation); `score` then runs
+  the NLA critic (`scripts/nla_score.py`, a separate 48 GB model, transformers) on the pod to add
+  `fve` and `cos` to the rows. Runs go under `data/runs/nla_reads/`
+  ([docs/nla-reader.md](../docs/nla-reader.md)).
 - `pod.sh up|ssh|sync|down|list NAME`: bare `runpod/pytorch` pods for anything else. Needs
   `RUNPOD_API_KEY` (`.envrc.local`) and a logged-in `hf` CLI.
 - Logs, reads and checkpoints on the two volumes can be read with no pod running, over RunPod's S3

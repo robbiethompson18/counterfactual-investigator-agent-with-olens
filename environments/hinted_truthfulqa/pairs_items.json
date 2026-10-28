@@ -1,0 +1,411 @@
+{
+ "tqa-1": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-15": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-37": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-51": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-80": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-93": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-105": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-118": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-133": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-137": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-143": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong"
+ },
+ "tqa-151": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-160": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-164": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-165": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-170": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-171": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-175": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-196": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-197": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-209": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-214": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-220": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-235": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-238": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right"
+ },
+ "tqa-245": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-252": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-257": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-261": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-265": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-269": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-271": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-278": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-283": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-286": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-290": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-294": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-303": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-322": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-324": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-326": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-335": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-344": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-364": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-370": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-371": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-413": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-433": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-438": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-441": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-444": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-446": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-455": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-470": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-473": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-502": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-512": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-523": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-532": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-535": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-557": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-560": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right"
+ },
+ "tqa-561": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-562": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-566": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-578": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-582": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-587": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-594": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-610": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-614": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-630": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-658": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-662": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-669": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-671": {
+  "deepseek/deepseek-v4-flash": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-675": {
+  "deepseek/deepseek-v4-flash": "right",
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-677": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-678": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right"
+ },
+ "tqa-685": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-714": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-720": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-729": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-739": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-742": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-760": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right"
+ },
+ "tqa-765": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ },
+ "tqa-776": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-785": {
+  "deepseek/deepseek-v4-flash": "wrong",
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-793": {
+  "z-ai/glm-5.3": "wrong",
+  "Qwen/Qwen3.6-27B": "right"
+ },
+ "tqa-816": {
+  "z-ai/glm-5.3": "right",
+  "Qwen/Qwen3.6-27B": "wrong"
+ }
+}

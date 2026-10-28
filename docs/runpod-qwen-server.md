@@ -132,14 +132,15 @@ The usage is in the script's header and in `runpod/CLAUDE.md`. `scripts/olens_re
 the work; its docstring has the request and output formats. First used for the cfbench spike set
 (2026-10-22, 392 env transcripts, 1.16M tokens, 84k stop tokens).
 
-- **One GPU holds two copies of Qwen.** vLLM gets `--vllm-mem 0.55` (default) and HF the rest (~63
-  GB; it peaks at ~52 GB). Each concurrent decode needs one Mamba (linear-attention state) block:
-  0.45 of an H200 fits only 139, so vLLM refuses `max_num_seqs` 512; 0.55 fits 256.
-- **Capture is chunked** (4096 tokens through the cache): one forward over a 15k-token transcript
-  ran out of memory next to vLLM. Chunking moves the residual by bf16 noise (256-token chunks vs one
-  forward: mean cos 0.997-0.99998, min 0.958 at L56); vLLM prefills in chunks too.
-- **`olens.ar.AR` must run with `use_cache=False`** (fixed 2026-10-22): with the default cache a
-  256-span AR batch also built every layer's linear-attention state and ran out of memory.
+- **Until 2026-10-27 one GPU held two copies of Qwen** (vLLM at `--vllm-mem 0.55` for the merged
+  lens, HF transformers for capture and the AR), which caused the OOM relaunch loops and the skipped
+  giants of the thinking-on reads. The reader is now one vLLM engine at 0.88
+  ([olens-one-engine-reader.md](olens-one-engine-reader.md)); the pod needs the
+  `vllm/vllm-openai:v0.27.1` image (`IMAGE=` on `qwen_server.sh up`), not the 0.32 default. Each
+  concurrent decode still needs one linear-attention state block as well as KV, so `max_num_seqs` is
+  512, not 1024.
+- **Transcripts over 32k tokens need `--max-model-len`** (the engine's default is 32768; it prefills
+  each transcript in one chunk so the capture hooks see every position).
 - **Killing the reader orphans `VLLM::EngineCore`,** which keeps ~75 GB of GPU memory, and the next
   run fails at engine start. `olens_reads.sh stop` kills both.
 - **A vLLM still loading weights can ignore SIGTERM;** `setup` waits and sends SIGKILL.

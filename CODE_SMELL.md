@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-27: a run's upload overwrites the env index with what's local
+
+`environments run` (and `upload`) rebuilds `envs/<env>/index.json` from the local `data/envs/<env>/` and uploads it.
+Run from a fresh worktree that only holds the new run, it replaces HF's index with one listing just that run, and the
+env viewer then shows every other arm as "not run" (overeagerness, 2026-10-27: 26 runs -> 3, fixed by linking the
+runs in and re-uploading). The upload should merge with HF's index, or refuse when the local index lists fewer runs.
+
 ## 2026-10-27: expview can't import `environments/` run folders
 
 `expview/importers/evalcue_rows.py` and `expview.source_of()` only know the old `data/runs` layout
@@ -16,6 +23,13 @@ envs/finish-uploads); the importer still needs the same treatment.
 unrelated per-item file `items.jsonl` crashes `finish` (`KeyError: 'id'`) and leaves an
 `index.jsonl.tmp` that gets synced. Found by the hint_cf gate run (renamed its file to
 `verdicts.jsonl`). It should look for `expview/` dirs, not the bare filename.
+## 2026-10-27: `olens/src/olens/vectors.py` has no caller
+
+Probe and steering directions over an HF transformers model (`contributions`, `attention_pattern`,
+`ablation_hook`). Its only caller, the transcript viewer's `steer.py`, went with the live viewer in
+PR #219, and the HF model-loading code it assumes (`load_base`, hook-LoRA) was deleted with the
+one-engine reader in PR #229. Kept because nobody has decided whether steering comes back; delete it
+or port it to vLLM when that is decided.
 
 ## 2026-10-26: expview runs that only ever lived on bramble
 
@@ -37,6 +51,10 @@ other runs" on a base item (needs a cross-run index).
 
 ## 2026-10-26: batch O-lens reads don't reach the transcript viewer
 
+**2026-10-27:** resolved for expview: readers write `X.transcripts.jsonl` beside their reads and
+`runs.py finish` points an expview run at both (docs/olens-reads-format.md). Still true for
+olens-viewer, which nobody plans to feed batch reads.
+
 The viewer went static (no server, no queue, no fleet; `transcript-viewer/CLAUDE.md`, History), so
 the only way to make reads is `scripts/olens_read_requests.py` on RunPod. Its output rows
 (`{id, token_index, layer, bullets: [{text, fve, coef}], joint_fve}`, transcripts rendered by vLLM
@@ -53,9 +71,9 @@ min).
 standalone PEP 723 scripts (`uv run --script`, Kylie's), so they can't import the package without
 pulling the whole project into their script env.
 
-## 2026-10-26: cfbench/report/data.py still computes the log skill
+## 2026-10-26: cfbench/scoring.py still computes the log skill
 
-`cfbench.report.data` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
+`cfbench.scoring` (RMSE) is the standard. `cfbench/score.py` stopped printing the old binomial
 log skill on 2026-10-26 (`cfbench/sweep.py`, log skill only, was deleted the same day);
 `data.log_skill` still feeds `summary.json` so numbers from before 2026-10-26 can be checked. Drop
 it once nothing quotes them. The old-lens w/ CoT runs
