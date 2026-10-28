@@ -80,7 +80,12 @@ def main():
     while todo := queue(args.requests, args.shard, done):
         jobs, reqs = [], []  # a job's positions go to the engine in chunks of --chunk, one capture request each
         for row in todo:
-            msgs, ids, where, toks, positions, _, _ = prepare(tok, row, layers, im_end, im_start)
+            try:
+                msgs, ids, where, toks, positions, _, _ = prepare(tok, row, layers, im_end, im_start)
+            except json.JSONDecodeError as e:  # a tool call's `arguments` aren't JSON: vLLM 400s on it too, so Qwen never saw a rendering
+                print(f"skip {row['id']}: tool call arguments aren't valid JSON ({e})", flush=True)
+                done.add(row["id"])
+                continue
             if args.positions == "all" and row.get("turn_starts") is None:
                 positions = list(range(len(ids)))
             if len(ids) >= args.max_model_len:  # the engine would reject it; a rerun with a larger --max-model-len picks it up
