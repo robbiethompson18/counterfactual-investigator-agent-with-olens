@@ -28,7 +28,8 @@ shown transcript per case, two models paired on the same items, or a model name 
     runs are shown).
   - `BASE_LINE(case)` (optional): the sentence that replaces the prompt's "In the base arm, `model`
     showed the behavior in k of n runs." (`k_base`/`n_base` of the runs shown); `""` drops it.
-    Without it the sentence stays as `core.build_prompt` writes it.
+    `case` also has the prompt's `condition`. Without it the sentence stays as `core.build_prompt`
+    writes it.
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
     gets its Docent URL from the env's `links.json`.

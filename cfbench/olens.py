@@ -126,7 +126,8 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
     starts = defaultdict(list)  # message -> its fields' starts, to place template tokens at the message's end
     for (i, _), b in spans.items():
         starts[i].append(b)
-    ends = {i: (min(starts[i + 1]) - 2 if i + 1 in starts else len(text)) for i in starts}
+    # a message's end is just before the "\n\n" that opens the next message's header (field starts sit after the header)
+    ends = {i: (text.rfind("\n\n", 0, min(starts[i + 1])) if i + 1 in starts else len(text)) for i in starts}
     by_token = defaultdict(dict)
     for r in rows:
         by_token[r["token_index"]][r["layer"]] = r

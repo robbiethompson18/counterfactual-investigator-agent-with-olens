@@ -7,7 +7,8 @@
 
 The eval's eval.py gives ENVS (the environments/ envs it is about, for the env viewer), CONDITIONS, MODEL_NAME
 (None, or what to call the target in place of its id), prep(out, versions, placebo), reads(inputs) and cases(inputs,
-versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str: the sentence
+versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str (case has the
+prompt's `condition` too): the sentence
 in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
@@ -113,7 +114,7 @@ async def main():
 
     def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
         prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
-        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
+        prompt = base_line(prompt, ev.BASE_LINE(case | {"condition": condition}) if hasattr(ev, "BASE_LINE") else None)
         return with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
 
     if args.show:

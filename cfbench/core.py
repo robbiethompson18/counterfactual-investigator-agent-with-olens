@@ -53,7 +53,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
 # 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
 # point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
-HARNESS_VERSION = 7
+# 8: O-lens reads with no message field (template tokens: tool-call tags, turn ends) sit at the end of their own message, not
+# inside the next message's header, where they read as reads of that message (cfbench/olens.py positions, 2026-10-28).
+HARNESS_VERSION = 8
 
 
 @dataclass
