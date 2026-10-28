@@ -356,7 +356,11 @@ GOLD = [
     "778",
     "816",
 ]
+# the primary set: the same without the Flash gate, which selects on text-only predictability and so biases the
+# transcript-only baseline down (a collider, CLAUDE.md); GOLD is kept as the gated secondary set
+UNGATED = sorted([*GOLD, "208", "322", "675", "801"], key=int)
 PAIRS["gold"] = ("control", "hint/stanford", [f"tqa-{q}.h{question(f'tqa-{q}')[2]}" for q in GOLD])
+PAIRS["gold_ungated"] = ("control", "hint/stanford", [f"tqa-{q}.h{question(f'tqa-{q}')[2]}" for q in UNGATED])
 # arm sets worth looking at side by side (the env viewer, spec.py); PAIRS are shown too
 COMPARISONS = {
     "who gives the hint": {

@@ -9,9 +9,8 @@ name: qwen-olens
 
 resources:
   disk_size: 250
-  ordered:
+  ordered:  # not H100: the one-engine reader OOMs at cudagraph capture on 80 GB
     - {infra: runpod, accelerators: "H200-SXM:1"}
-    - {infra: runpod, accelerators: "H100-SXM:1"}
     - {infra: runpod, accelerators: "B200:1"}
 
 secrets:

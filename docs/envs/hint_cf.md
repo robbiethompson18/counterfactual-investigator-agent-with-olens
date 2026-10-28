@@ -1,6 +1,6 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-27):** MIXED. Only `wrong_mcq` lives on, as
+**Status (2026-10-28):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/) with its run converted; `favorites` and
 `opinion_mcq` are retired (code at `cfa46a9`,
 [retired/hint_cf](../../environments/retired/hint_cf/)). O-lens result on the answer task (all 18
@@ -9,8 +9,11 @@ sentence before the hint doesn't change that (27% on its 13 surviving items) and
 token don't either (24% vs 6%). The assistant header is still unread. 2026-10-28: the same procedure
 on TruthfulQA gives 64 more Qwen survivors, the `gold` pair of hinted_truthfulqa
 ([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28));
-the answer task there replicates: O-lens 19% vs placebo 7% vs transcript 5% on 64 cases (sign test p
-= 0.004).
+the answer task there replicates. **The Flash gate conditions on a collider** (it keeps items where
+text-only Flash fails, which is the transcript-only baseline's own failure), so the ungated sets are
+primary (2026-10-28, [hinted_truthfulqa.md](hinted_truthfulqa.md#ungated-sets-primary-2026-10-28)):
+on all 24 usable MMLU-Pro items O-lens 40% vs placebo 28% vs transcript 22% (O-lens − placebo +12pp,
+CI +3 to +25, sign test 6/1, p = 0.13); the gated 18 (24% vs 6% vs 0%) are secondary.
 
 2026-10-26. Three small single-turn envs (evalcue's `hint_cf`, deleted with evalcue on 2026-10-27)
 built for the "favourite animal" idea: find questions where Qwen3.6-27B gives the same answer almost

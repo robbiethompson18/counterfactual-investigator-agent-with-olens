@@ -6,10 +6,10 @@
 candidates: no-hint answer consistent (modal share >= 0.8) and wrong over every Qwen control sample (pairs.nohint), then
 the share of every Qwen hint/stanford sample naming the correct letter (`*_pairs-hint-qwen36-*` runs) that picks it,
 >= 0.5, then the Flash pass@3 gate (runs/hinted_truthfulqa/2026-10-28_flash3-gate-qwen-wrong2, run on all the
-consistent-wrong questions); GOLD in env.py is what passes all three. convert: the pair's control side needs episodes under
-the hinted item ids (`tqa-N.hX`, the letter only changes the hint arms), so Qwen's control episodes of the GOLD questions
-that no earlier gold-control run has are copied under them, after checking build() gives the same prompt; Docent ids are
-kept and measure() is recomputed.
+consistent-wrong questions); GOLD in env.py is what passes all three, UNGATED (the primary set) the first two. convert:
+the pair's control side needs episodes under the hinted item ids (`tqa-N.hX`, the letter only changes the hint arms), so
+Qwen's control episodes of the UNGATED questions that no earlier gold-control run has are copied under them, after
+checking build() gives the same prompt; Docent ids are kept and measure() is recomputed.
 """
 
 import json
@@ -58,7 +58,7 @@ def candidates():
 def convert(tag: str):
     env = load_env("hinted_truthfulqa")
     done = {ep["item"] for d in (LOCAL / "hinted_truthfulqa").glob("*_gold-control*") for ep in read_episodes(d)}
-    items = {f"tqa-{q}": item for q, item in zip(E.GOLD, E.PAIRS["gold"][2], strict=True) if item not in done}
+    items = {f"tqa-{q}": item for q, item in zip(E.UNGATED, E.PAIRS["gold_ungated"][2], strict=True) if item not in done}
     eps, labels, n = [], [], Counter()
     for run in SOURCES:
         for ep in read_episodes(LOCAL / "hinted_truthfulqa" / run):

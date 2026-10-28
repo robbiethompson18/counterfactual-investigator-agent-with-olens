@@ -191,3 +191,37 @@ Reads: `runs/olens_reads/2026-10-28_tqa-gold-stop` (space lens, stop tokens, lay
 [`hinted_truthfulqa-pairs`](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/#eval=hinted_truthfulqa-pairs).
 Format difference from hint_mcq: the TruthfulQA prompt (system prompt, `(A)` choices, hint line
 after them, no "letter only") vs MMLU-Pro's ("Answer with the letter only."); never pool the two.
+
+### Ungated sets (primary, 2026-10-28)
+
+The Flash text-inversion gate keeps only items where Gemini 3.8 Flash, reading the prompt, can't
+guess Qwen's no-hint answer. The no-tools and transcript-tools investigators are that same Flash
+reading the same text, so the gate selects on the baseline failing: a collider (CLAUDE.md). It
+pushes the baselines down by construction and inflates O-lens − transcript. O-lens − placebo is fair
+within a gated set (both have the same transcript tools, the gate never saw lens reads) but only
+describes items text can't solve. So the ungated sets are primary and the gated ones secondary:
+
+| set                                 | no tools | transcript | O-lens | placebo | O-lens − placebo               | O-lens − transcript      |
+| ----------------------------------- | -------: | ---------: | -----: | ------: | ------------------------------ | ------------------------ |
+| **TruthfulQA, ungated (66)**        |       9% |         8% |    21% |     10% | +12pp [+4, +20], 14/2, p 0.004 | +14pp [+5, +22], p 0.002 |
+| TruthfulQA, gated (64)              |       6% |         5% |    19% |      7% | +12pp [+4, +20], 14/2, p 0.004 | +14pp [+5, +23], p 0.002 |
+| **MMLU-Pro hint_mcq, ungated (24)** |      22% |        22% |    40% |     28% | +12pp [+3, +25], 6/1, p 0.13   | +18pp [+6, +32], p 0.03  |
+| MMLU-Pro hint_mcq, gated (18)       |       0% |         0% |    24% |      6% | +19pp [+6, +33], 6/0, p 0.03   | +24pp [+7, +41], p 0.03  |
+
+% correct per case (3 draws), then averaged; brackets are bootstrap 95% CIs over cases, then the
+sign test (cases O-lens better / worse) and its two-sided p. Ungated TruthfulQA = the 68 questions
+that pass the consistency and follow filters, minus tqa-322 and tqa-675, which have only 2 hinted
+runs (cfbench needs 5 per arm): the 64 plus tqa-208 and tqa-801 (pair `gold_ungated`, control side
+`2026-10-28_gold-control3-qwen36-nothink`). Ungated MMLU-Pro = Robbie's 24 usable items, i.e. his 18
+plus the 6 the gate killed (4911, 6199, 2510, 684, 1206, 11178); every condition shows only the hint
+followers (`--base-positive`), so `no_transcript` was rerun on all 24 (`answer-mcq24-notools-pos`;
+his `answer-mcq-survivors` showed all base runs). Robbie's runs are reused for the 18
+(`answer-mcq18-agentic-pos`, `answer-mcq18-stop-olens`, seed 0); new runs cover the rest
+(`answer-tqa2-ungated-ts`, `-olens`, `answer-mcq6-ungated-ts`, `-olens`), all harness v7 with the
+same settings. Reads for the extra items: `runs/olens_reads/2026-10-28_ungated-extra-stop`.
+
+On TruthfulQA the gate removed only 2 usable items, so nothing moves. On MMLU-Pro it matters: Flash
+gets the 6 gate-killed items right almost every time in every condition (they are the items whose
+wrong answer the text gives away), so the baselines rise from 0% to 22%, the O-lens − transcript gap
+shrinks from +24 to +18pp, and O-lens − placebo stays +12 to +19pp but on 24 items is no longer
+significant by the sign test (6 vs 1, p = 0.13; bootstrap CI +3 to +25pp).
