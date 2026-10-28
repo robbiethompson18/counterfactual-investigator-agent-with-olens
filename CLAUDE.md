@@ -484,11 +484,10 @@ Current docs:
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
   pre-hint-reads arms in flight (PR #320)
-- [NULL: essay_curious — read before building a letter-grade essay env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
-  — 3 Fable-written Common App essays × none / best student / Duke / Chico State, A-F and A+ to F;
-  Qwen gives most essays an A in every arm; answer task (18 cases, Flash): no transcript 82%,
-  transcript 84%, O-lens 80%, placebo 77% vs 78% for "edit does nothing"; lens reads the inferred
-  user goal at the scenario sentence but not the grade without it
+- [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
+  — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
+  on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
+  2.75 points, best student raises good ones; reads done, Gemini prediction not yet run
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
