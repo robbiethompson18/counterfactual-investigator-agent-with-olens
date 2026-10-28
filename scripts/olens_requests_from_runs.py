@@ -57,7 +57,7 @@ with a.out.open("a") as f:
         else:
             lines = list(enumerate((Path("data/runs") / run / "rows.jsonl").read_text().splitlines()))
             rows = [(f"{run}:{i}", json.loads(line)) for i, line in lines]
-        rows = [(rid, r) for rid, r in rows if "error" not in r and r.get("positive") is not None]
+        rows = [(rid, r) for rid, r in rows if not r.get("error") and r.get("positive") is not None]
         rows = [(rid, r) for rid, r in rows if not a.items or str(r["item"]) in a.items.split(",")]
         rows = [(rid, r) for rid, r in rows if not arms or r["arm"] in arms.split(",")]
         if a.per_arm:

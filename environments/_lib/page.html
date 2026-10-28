@@ -1075,11 +1075,24 @@ const br = (x, ci) => {
   const cls = ci && ci[1] < 0.25 ? "up" : ci && ci[0] > 0.25 ? "down" : "flat";
   return `<span class="delta ${cls}" title="95% bootstrap CI over items ${ci ? ci.map(v => v.toFixed(3)).join("–") : ""}; 0.25 = always 0.5">${x.toFixed(3)}</span>${ci ? ` <span class="mute">[${ci.map(v => v.toFixed(2)).join(", ")}]</span>` : ""}`;
 };
+// claim evals whose score.py reports % right (guess = p >= 0.5, e.g. hint_qwen_dsv4): that is the headline, AUROC second
+function accuracyTable(t, models) {
+  const ci = c => c ? ` <span class="mute">[${c.map(v => pct(v)).join(", ")}]</span>` : "";
+  const rows = t.rows.map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(x.version)}</td><td class="num">${x.n_items}</td>
+    <td class="num"><b>${pct(x.accuracy)}</b>${ci(x.accuracy_ci)}</td>
+    ${models.map(m => `<td class="num">${x.accuracy_by_class?.[m] == null ? "–" : pct(x.accuracy_by_class[m])}</td>`).join("")}
+    <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
+  return `<h3>Inputs <span class="mono">${esc(t.inputs || "?")}</span> <span class="mute" style="font-weight:400;font-size:13px">runs ${t.runs.map(esc).join(" + ")}</span></h3>
+    <p class="lede">% of guesses right (guess = p ≥ 0.5; classes balanced, so chance is 50%), with a 95% bootstrap CI over items; per class; AUROC of p (calibration-free); Brier for reference.</p>
+    <div class="scroll"><table><tr><th>investigator</th><th>version</th><th>items</th><th>% right [95% CI]</th>
+      ${models.map(m => `<th>% right on<br><span class="mono">${esc(shortModel(m))}</span></th>`).join("")}<th>AUROC</th><th>Brier</th><th>invalid</th></tr>${rows}</table></div>`;
+}
 function claimSection(ev, claim, keep, h) {
   const faker = m => (claim.flatMap(R => R.groups).find(g => g.model === m) || {}).k_cf === 1;
   const models = [...new Set(claim.flatMap(R => R.models))].sort((a, b) => faker(b) - faker(a));
   const pairEval = claim.some(R => R.groups.some(g => g.n_shown === 2));
   const tables = (ev.claim_tables || []).map(t => {
+    if (t.rows.some(x => x.accuracy != null)) return accuracyTable(t, models);  // evals scored by % right (their score.py)
     const pairCols = t.rows.some(x => x.pick_accuracy != null);
     const rows = t.rows.map(x => `<tr${x.version === "pooled" ? ' class="pooled"' : ""}><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${x.version === "pooled" ? "<b>pooled</b>" : esc(x.version)}</td><td class="num">${x.n}</td>
       <td class="num">${br(x.mean_brier, x.mean_brier_ci)}</td><td class="num">${br(x.brier_pbar, x.brier_pbar_ci)}</td>
@@ -1100,7 +1113,8 @@ function claimSection(ev, claim, keep, h) {
   for (const R of claim) for (const g of R.groups.filter(keep)) (strips[[R.inputs || "", g.version || ""].join("\u0000")] ??= []).push([R, g]);
   const body = Object.values(strips).map(gs => {
     const [R0, g0] = gs[0];
-    const ctx = models.map(m => { const g = gs.find(([, g]) => g.model === m)?.[1]; return g ? `${esc(shortModel(m))}: public ${g.k_base}/${g.n_base}, preview ${g.k_cf_pool}/${g.n_cf_pool} = ${pp(g.k_cf_pool / g.n_cf_pool)}% (${faker(m) ? "the faker" : "doesn't fake"})` : ""; }).filter(Boolean).join(" · ");
+    const ctx = models.map(m => { const g = gs.find(([, g]) => g.model === m)?.[1]; return !g ? "" : ev.name.startsWith("af_") ? `${esc(shortModel(m))}: public ${g.k_base}/${g.n_base}, preview ${g.k_cf_pool}/${g.n_cf_pool} = ${pp(g.k_cf_pool / g.n_cf_pool)}% (${faker(m) ? "the faker" : "doesn't fake"})`
+      : `${esc(shortModel(m))}: claim ${faker(m) ? "true" : "false"}, counterfactual arm ${g.k_cf_pool}/${g.n_cf_pool}`; }).filter(Boolean).join(" · ");
     return `<h2>${g0.version ? esc(g0.version) : ""} <span class="mute" style="font-weight:400;font-size:14px">inputs ${esc(R0.inputs || "?")}</span></h2>
       <p class="mute" style="font-size:12.5px">Real rates over the eval's goals, for context: ${ctx}.</p>
       <div class="card evcase">${claimChart(gs, models, faker, pairEval)}</div>`;

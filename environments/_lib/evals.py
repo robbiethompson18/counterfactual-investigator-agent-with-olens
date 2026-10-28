@@ -508,7 +508,13 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
         s["current"] = bool(s["current_conds"])
     cur = [s for s in summaries if s["current"]]
     if any(s.get("task") == "claim" for s in cur):
+        import importlib
+        import importlib.util
+
         from cfbench.evals.af_which.score import stats
+
+        if importlib.util.find_spec(f"cfbench.evals.{name}.score"):  # an eval's own claim scorer (same row schema), if any
+            stats = getattr(importlib.import_module(f"cfbench.evals.{name}.score"), "stats", stats)
         from cfbench.evals.af_which_pair.score import pair_stats
 
         tables = []
@@ -595,6 +601,15 @@ def describe(name: str, envs: list[str]) -> tuple[str, str]:
     return f"Arm pairs on {envs[0]}", f"Every `cfbench.run env_runs:{envs[0]}/...` run: base arm -> counterfactual arm, one case per pair."
 
 
+def _summary(run_dir: Path, envs: Envs, export: bool) -> dict | None:
+    """run_summary, or None (with a warning) for a run whose env no longer exists, e.g. a retired env's old runs."""
+    try:
+        return run_summary(run_dir, envs, export)
+    except ModuleNotFoundError as e:
+        print(f"skipping {run_dir.name}: {e}", file=sys.stderr)
+        return None
+
+
 def defined() -> list[dict]:
     """Every eval from the code alone (for the Pages spec/evals.json): each cfbench/evals/<name>/ with an eval.py, and
     `<env>-pairs` for each of PAIRS_ENVS. An eval module that doesn't import gets "error" and no envs; RETIRED_EVALS get
@@ -622,7 +637,9 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
     for name in names or list(runs):
         if name not in runs:
             continue
-        summaries = sorted((run_summary(r, envs, export) for r in runs[name]), key=lambda s: s.get("started") or s["run"], reverse=True)
+        summaries = sorted(
+            filter(None, (_summary(r, envs, export) for r in runs[name])), key=lambda s: s.get("started") or s["run"], reverse=True
+        )
         summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
