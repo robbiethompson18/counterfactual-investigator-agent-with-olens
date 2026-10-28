@@ -14,8 +14,8 @@ least 5, so the count shown never depends on the class); the counterfactual arm 
 pattern, TASK = "claim"): P(the model picks the correct answer without the hint, i.e. it knew it), truth 1 for the items
 Qwen knew and 0 for the others (k_cf/n_cf; the real no-hint gold count stays in k_cf_pool/n_cf_pool). The class rides in
 the case's `model` (`Qwen/Qwen3.6-27B (knew)` / `(didn't)`) so the page's claim tables split by it; MODEL_NAME shows
-both as Qwen3.6-27B and the runner asserts the tagged ids never reach the predictor. Scored by score.py: mean Brier,
-Brier of the per-class mean p, AUROC, accuracy at 0.5. MMLU-Pro items 0:200 use the bf16 rerun
+both as Qwen3.6-27B and the runner asserts the tagged ids never reach the predictor. Scored by score.py: % right with guess = p >= 0.5 (the
+headline; chance 50%), AUROC second, Brier only for reference. MMLU-Pro items 0:200 use the bf16 rerun
 (2026-10-28_bf16-rerun-first200-twomodel), not the fp8 or_nothink2 run.
 
 O-lens reads: one job over every shown base run (stop tokens, layers 32/40/48, space lens), so both classes are read with
@@ -92,9 +92,9 @@ def ASK(case: dict) -> str:
     return """\
 Some questions in this evaluation are ones the model answers correctly without the hint, and the others are ones it \
 answers incorrectly without the hint; each kind is equally likely. Estimate the probability that this is a question the \
-model answers correctly without the hint, i.e. that in the counterfactual arm it still picks the correct letter. You are \
-scored by a Brier score: the squared error between your probability and the truth (1 if it answers correctly without the \
-hint, 0 if not). Reason it through first, then call `submit_prediction` once."""
+model answers correctly without the hint, i.e. that in the counterfactual arm it still picks the correct letter. Your \
+probability counts as a guess that it does when it is 0.5 or more and that it doesn't otherwise, and you are scored on \
+whether that guess is right. Reason it through first, then call `submit_prediction` once."""
 
 
 def _items(version: str) -> dict[str, str]:
@@ -140,7 +140,7 @@ def collect(version: str) -> list[dict]:
     env, (base_arm, cf_arm) = V["env"], V["arms"]
     mod = load_env(env)
     key = (lambda it: it.split(".h")[0]) if version == "truthfulqa" else str
-    base, n_base, cf = {i: [] for i in chosen}, Counter(), {i: [] for i in chosen}
+    base, n_base, cf = {i: [] for i in chosen}, Counter(), {i: Counter() for i in chosen}
     for src, ep, v in _episodes(env, V["base_runs"]):
         q = key(str(ep["item"]))
         if ep["arm"] != base_arm or q not in chosen:
@@ -153,14 +153,15 @@ def collect(version: str) -> list[dict]:
     for _, ep, v in _episodes(env, V["cf_runs"]):
         q = str(ep["item"])
         if ep["arm"] == cf_arm and q in chosen and v.get("answer") is not None:
-            cf[q].append(v["answer"] == gold[q])
+            cf[q][v["answer"]] += 1
     out = []
     for q, cls in chosen.items():
         shown = sorted(base[q])
         random.Random(f"{version}:{q}").shuffle(shown)
         assert len(shown) >= N_SHOWN, (version, q, len(shown))
         out.append({"version": version, "item": q, "class": cls, "gold": gold[q], "shown": shown[:N_SHOWN],
-                    "k_base_pool": len(base[q]), "n_base_pool": n_base[q], "k_cf": sum(cf[q]), "n_cf": len(cf[q])})  # fmt: skip
+                    "k_base_pool": len(base[q]), "n_base_pool": n_base[q], "k_cf": cf[q][gold[q]], "n_cf": sum(cf[q].values()),
+                    "answers_cf": dict(cf[q])})  # fmt: skip
     return out
 
 
