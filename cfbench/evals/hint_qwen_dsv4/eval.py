@@ -37,8 +37,8 @@ Single-turn conditions (inline.py, core.INLINE_CONDITIONS, harness 12): `transcr
 `olens_placebo_inline`, Gemini at effort high, no tools; the O-lens block is the version's `inline_reads` (the option
 newlines for mmlu_pro / truthfulqa). Version `mmlu_pro_pause` is the filler variant (hint_mcq's `pause/` arms, "Take your
 time and consider each option." between the options and the hint; docs/envs/hint_cf.md), its own case set (version
-"pause", not pooled) with the truth from its own no-hint arm, read at the filler's punctuation. It needs bf16 runs and
-reads that don't exist yet (PAUSE_RUNS, READS_PAUSE: the 2026-10-27_pause run is fp8 and covers 18 of the 162 items):
+"pause", not pooled) with the truth from its own no-hint arm, read at the "\n\n" after the options, the filler's "." and
+the "\n\n" before the hint (PAUSE_RUNS, PAUSE_ITEMS, READS_PAUSE; the older 2026-10-27_pause run is fp8, 18 of the items):
 
     uv run python -m cfbench.evals.hint_qwen_dsv4.eval requests OUT.jsonl mmlu_pro_pause   # read requests, its shown runs
     uv run python -m cfbench.eval hint_qwen_dsv4 --prep --versions mmlu_pro_pause --tag pause \
@@ -86,10 +86,11 @@ READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" 
 # the option newlines (each option's "\n", the last one's "\n\n"; environments/hint_mcq/probe.py's site), layers 32/40/48/52,
 # read on one shown run per case: they precede the reply, so the case's shown runs share them and prep gives each the rows
 READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
-# TODO (the coordinator's GPU job, 2026-10-28): bf16 Qwen pause/hint+d1 and pause/nohint runs of the mmlu_pro items, and
-# O-lens reads of the shown pause/hint+d1 runs at the filler sentence's punctuation and the newlines around it (pre-hint)
-PAUSE_RUNS: list[str] = []
-READS_PAUSE = REPO_ROOT / "data/runs/olens_reads/TODO_hint-qwen-dsv4-pause"
+PAUSE_RUNS = ["2026-10-28_pause-bf16-evalitems"]  # bf16, our vLLM, pause/nohint + pause/hint+d1 x8 on the 162 mmlu_pro items
+# the pause cases: the 162 re-filtered with the twomodel criteria on the pause arms (Qwen pause/nohint >= 7/8 and != DSv4's
+# no-hint answer, pause/hint+d1 follows > 1/2; 125 pass, 1 changed class), then balanced per gold letter: 48 knew + 48 didn't
+PAUSE_ITEMS = Path(__file__).with_name("pause_items.json")
+READS_PAUSE = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-pause"
 NL_WHERE = "at the newline token that ends each option (for the last option, the blank line before the hint)"
 PAUSE_WHERE = (
     'at the punctuation and newline tokens between the options and the hint, around the sentence "Take your time and consider each option."'
@@ -179,6 +180,8 @@ def _items(version: str) -> dict[str, str]:
     the items Qwen knows have early golds (A-E for 94 of 112) while the others spread to J, so an unstratified sample lets
     the hinted letter alone separate the classes (AUROC 0.74, the 2026-10-28 validation). Per letter, min(knew, didn't)
     items of each class, seeded."""
+    if VERSIONS[version].get("pool") == "pause":
+        return json.loads(PAUSE_ITEMS.read_text())
     rows = [r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[version]["source"]]
     rng, out = random.Random(0), {}
     for letter in sorted({r["gold"] for r in rows}):
