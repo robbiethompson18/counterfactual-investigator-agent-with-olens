@@ -551,8 +551,8 @@ async function home() {
     <div class="why">${esc(e.title)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't build</span>` : ""}</div>
     <div class="mini">${Object.entries(e.targets).sort((x, y) => y[1] - x[1]).map(([t, n]) => `<span class="arm">${esc(modelName(t))}</span><span class="mute" style="font-variant-numeric:tabular-nums">${n.toLocaleString()} episodes</span>`).join("")}</div>
     <div class="meta"><span>${e.n_runs} runs</span><span>primary <span class="mono">${esc(e.primary)}</span></span>${e.starred ? `<span>★ ${esc(e.starred)}</span>` : ""}</div></a>`).join("")}</div>`).join("")}`;
-  const evs = await maybe(getEval("index.json"));
-  if (evs?.evals?.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs.evals)}`;
+  const evs = await evalList();
+  if (evs.length) $("view").innerHTML += `<h3>Evals: <a href="#evals=1" style="text-transform:none">cfbench predictions over these envs</a></h3>${evalCards(evs)}`;
 }
 
 const retiredTag = (D, arm) => (D.spec?.retired || []).includes(arm) ? '<span class="tag" title="RETIRED in env.py: tried and set aside">retired</span>' : "";
@@ -741,6 +741,34 @@ const swatch = c => `<i class="sw" style="background:${condColor(c)}"></i>`;
 const pp = x => x == null ? "–" : (100 * x).toFixed(0);
 const evItem = (R, id) => evq({dataset: R.expview, item: id});
 const docentRun = (R, id) => id && R.docent_collection ? `${DOCENT}${R.docent_collection}/agent_run/${id}` : null;
+// RMSE per condition and the null with 95% bootstrap CIs over arm pairs (environments/_lib/evals.py rmse_ci), and the
+// paired differences between conditions: a horizontal bar chart with error bars, then a table
+const ciShort = c => c === "null" ? "edit does nothing" : condShort(c);
+const ciColor = c => c === "null" ? "var(--faint)" : condColor(c);
+function rmseCiBlock(rmse, nul, boot, title) {
+  if (!boot) return "";
+  const conds = ["null", ...condOrder(Object.keys(rmse))].filter(c => boot.ci[c]);
+  const val = c => c === "null" ? nul : rmse[c];
+  const max = Math.max(...conds.map(c => boot.ci[c][1])), top = Math.ceil(max * 20) / 20 || 0.05;
+  const L = 130, W = 540, rowH = 26, H = conds.length * rowH + 24, x = v => L + (v / top) * (W - L - 130), f = v => v.toFixed(1);
+  let svg = "";
+  for (let v = 0; v <= top + 1e-9; v += 0.05) svg += `<line x1="${f(x(v))}" x2="${f(x(v))}" y1="0" y2="${H - 18}" class="grid"/><text x="${f(x(v))}" y="${H - 4}" class="ax" text-anchor="middle">${Math.round(100 * v)}</text>`;
+  conds.forEach((c, i) => {
+    const y = i * rowH + 6, [lo, hi] = boot.ci[c], v = val(c);
+    svg += `<text x="${L - 8}" y="${y + 12}" class="ax" text-anchor="end">${esc(ciShort(c))}</text>
+      <rect x="${L}" y="${y}" width="${f(x(v) - L)}" height="16" fill="${ciColor(c)}" opacity="${c === "null" ? 1 : 0.85}"><title>${esc(ciShort(c))}: RMSE ${(100 * v).toFixed(1)}pp, 95% CI ${(100 * lo).toFixed(1)}–${(100 * hi).toFixed(1)}</title></rect>
+      <line x1="${f(x(lo))}" x2="${f(x(hi))}" y1="${y + 8}" y2="${y + 8}" stroke="var(--fg)" stroke-width="1.5"/>
+      <line x1="${f(x(lo))}" x2="${f(x(lo))}" y1="${y + 3}" y2="${y + 13}" stroke="var(--fg)" stroke-width="1.5"/><line x1="${f(x(hi))}" x2="${f(x(hi))}" y1="${y + 3}" y2="${y + 13}" stroke="var(--fg)" stroke-width="1.5"/>
+      <text x="${f(x(hi) + 6)}" y="${y + 12}" class="ax">${(100 * v).toFixed(1)} [${(100 * lo).toFixed(1)}, ${(100 * hi).toFixed(1)}]</text>`;
+  });
+  const sig = ci => ci && (ci[1] < 0 ? "up" : ci[0] > 0 ? "down" : "flat");
+  const diffs = boot.diffs.map(d => `<tr><td>${swatch(d.a)}${esc(ciShort(d.a))} − ${esc(ciShort(d.b))}</td>
+    <td class="num"><span class="delta ${sig(d.ci)}">${d.est > 0 ? "+" : ""}${(100 * d.est).toFixed(1)}pp</span></td>
+    <td class="num">${d.ci ? `[${d.ci.map(v => (v > 0 ? "+" : "") + (100 * v).toFixed(1)).join(", ")}]` : "–"}</td></tr>`).join("");
+  return `<div class="card" style="margin:8px 0"><b>${title}</b> <span class="mute">RMSE in pp (lower is better), 95% bootstrap CI over ${boot.n_clusters} arm pairs (${boot.n_boot} resamples; an arm pair's cases share one truth)</span>
+    <div class="scroll"><svg class="evchart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="RMSE per condition with 95% bootstrap CIs">${svg}</svg></div>
+    <div class="scroll"><table><tr><th>paired difference (same resamples)</th><th>RMSE difference</th><th>95% bootstrap CI over ${boot.n_clusters} arm pairs</th></tr>${diffs}</table></div></div>`;
+}
 const rmseBadge = (x, nul) => x == null ? "–" : `<span class="delta ${x < nul - 0.005 ? "up" : x > nul + 0.005 ? "down" : "flat"}" title="RMSE ${(100 * x).toFixed(1)}pp vs ${(100 * nul).toFixed(1)}pp for 'the edit does nothing'">${(100 * x).toFixed(1)}pp</span>`;
 const shortModel = m => m.replace(/^[^/]+\//, "");
 // clicking a draw (chart point or chip) opens a card: the prediction, the investigator's explanation, and Docent + expview
@@ -775,6 +803,16 @@ addEventListener("keydown", e => { if (e.key === "Escape" && $("drawcard")) $("d
 // evals/ sits beside envs/ (HF, or the local mirror)
 async function getEval(path) {
   return fetchOnce("e:" + path, async () => { const r = await fetch((await base()).replace(/envs\/$/, "evals/") + path); if (!r.ok) throw new Error("evals/" + path + ": " + r.status); return r.json(); });
+}
+// the eval list is the code's, like the env list: spec/evals.json beside the page (every eval cfbench/evals/ and
+// PAIRS_ENVS define), with each one's run stats from HF's evals/index.json by name; an eval with no runs there yet still
+// gets a card; RETIRED_EVALS are left off unless `all`. Without a code spec (?spec=hf) it is HF's index as is.
+async function evalList(all = false) {
+  const [code, idx] = await Promise.all([codeIndex(), maybe(getEval("index.json"))]);
+  const defs = code ? await maybe(fetchOnce("c:evals.json", async () => { const r = await fetch("spec/evals.json"); if (!r.ok) throw new Error("spec/evals.json: " + r.status); return r.json(); })) : null;
+  if (!defs) return idx?.evals || [];
+  const hf = Object.fromEntries((idx?.evals || []).map(e => [e.name, e]));
+  return defs.evals.filter(d => all || !d.retired).map(d => ({...hf[d.name], name: d.name, title: d.title, envs: d.envs.length ? d.envs : hf[d.name]?.envs || [], error: d.error, retired: d.retired}));
 }
 
 // a group = (env, version, base arm, cf arm, model), pooled over the eval's items: the observed rate before (base arm)
@@ -932,7 +970,10 @@ function ansPick() {
   location.hash = setParam("runs", on.length === all.length ? "" : on.join(","));
 }
 
-const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
+const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => !e.n_runs ? `<div class="card">
+    <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}${e.error ? ` <span class="tag ch" title="${esc(e.error)}">doesn't import</span>` : ""}</div>
+    <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span></div>
+    <div class="meta"><span>no runs yet</span></div></div>` : `<a class="card" href="#${hashOf({eval: e.name, env: envFilter})}">
     <div class="t">${esc(e.title)}</div><div class="why mono">${esc(e.name)}</div>
     <div class="mini"><span class="mute">envs</span><span class="mono">${e.envs.map(esc).join(", ")}</span><span class="mute">models</span><span>${e.models.map(m => esc(shortModel(m))).join(", ")}</span>
       <span class="mute">conditions</span><span>${condOrder(e.conditions).map(k => swatch(k) + esc(condShort(k))).join(" ")}</span></div>
@@ -940,23 +981,23 @@ const evalCards = (es, envFilter) => `<div class="cards">${es.map(e => `<a class
 
 async function evalsHome() {
   setCrumb([["evals", "evals=1"]]);
-  const idx = await getEval("index.json");
+  const evs = await evalList();
   $("view").innerHTML = `<h1>Evals</h1><p class="lede">cfbench evals: an investigator sees a base arm and the exact edit and predicts the behaviour rate after it (or, in the answer task, the model's answer after it).
     An eval can span several envs, models and pairs; each is defined in <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>
-    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env).</p>${evalCards(idx.evals)}`;
+    (or is every <span class="mono">cfbench.run env_runs:ENV</span> pair on one env, for the envs in <span class="mono">PAIRS_ENVS</span>).</p>${evalCards(evs)}`;
 }
 
 // an env's Evals tab: the evals that use it
 async function evalsTab(D) {
-  const idx = await maybe(getEval("index.json"));
-  const es = (idx?.evals || []).filter(e => e.envs.includes(D.env));
+  const es = (await evalList()).filter(e => e.envs.includes(D.env));
   $("tab").innerHTML = es.length ? `<p class="lede">cfbench evals that use this env. An eval can span several envs; its page shows them all, or only this one's cases from here.</p>${evalCards(es, D.env)}`
     : `<p class="mute">No cfbench eval uses ${esc(D.env)} yet: see <a href="https://github.com/${GH}/tree/main/cfbench/evals">cfbench/evals/</a>.</p>`;
 }
 
 async function evalPage(h) {
   DRAWS = [];
-  const ev = await getEval(`${h.eval}.json`);
+  const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalList(true)]);
+  const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
   const every = ev.runs.filter(R => !h.run || R.run === h.run);
   // the newest complete run per version (per inputs run where the eval compares them); superseded runs fold away below
@@ -1011,6 +1052,7 @@ async function evalPage(h) {
       `<div class="evcases">${gs.map(([R, g]) => (runs.length > 1 ? `<div><h3 style="margin-top:0">${esc(R.slug)}</h3>` : "<div>") + evalCard(R, g) + "</div>").join("")}</div>`;
   }).join("");
   $("view").innerHTML = `<p><a href="#evals=1">← evals</a></p><h1>${esc(ev.title)}</h1>
+    ${retired ? `<p class="mute"><span class="tag">retired</span> Set aside (RETIRED_EVALS in environments/_lib/evals.py): not on the Evals list; this page stays for reference.</p>` : ""}
     <p class="mute">envs: ${ev.envs.map(e => `<a class="chip" href="#env=${esc(e)}">${esc(e)}</a> <a class="mute" href="#${hashOf({eval: h.eval, env: e})}">only its cases</a>`).join(" ")}
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
@@ -1020,7 +1062,9 @@ async function evalPage(h) {
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
       everything that investigator saw and said (prompt, tool calls and results, submit) in expview.</p>` : ""}
     ${claim.length ? claimSection(ev, claim, keep, h) : ""}
-    ${runs.length ? `${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ansBody}
+    ${runs.length ? `${runs.map(R => rmseCiBlock(R.rmse, R.rmse_null, R.boot, `${esc(R.slug)} · harness v${R.harness_version}`)).join("")}
+      ${ev.pooled && !h.run && !h.env ? rmseCiBlock(ev.pooled.rmse, ev.pooled.rmse_null, ev.pooled.boot, `pooled over ${ev.pooled.runs.length} runs`) : ""}
+      ${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ansBody}
     ${older.length ? `<details class="sec"><summary>Older runs (${older.length}): superseded by the runs above</summary><div class="body"><ul>${older.map(R =>
       `<li><a class="mono" href="#${hashOf({eval: h.eval, run: R.run})}">${esc(R.slug)}</a> <span class="mute">${esc(R.date)} · ${R.n_cases} cases · ${R.versions ? esc(R.versions.join(", ")) : ""}${R.inputs ? ` · inputs ${esc(R.inputs)}` : ""}</span></li>`).join("")}</ul></div></details>` : ""}`;
 }

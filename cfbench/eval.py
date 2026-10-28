@@ -6,7 +6,8 @@
 
 The eval's eval.py gives ENVS (the environments/ envs it is about, for the env viewer), CONDITIONS, MODEL_NAME
 (None, or what to call the target in place of its id), prep(out, versions, placebo), reads(inputs) and cases(inputs,
-versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str: the sentence
+versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str (case has the
+prompt's `condition` too): the sentence
 in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it), TASK ("rate", or
 "claim": the probability that a claim is true, truth 0 or 1 as k_cf/n_cf), ASK(case) -> str: the body of "## Your task" in
 place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PROMPT(prompt, case) -> str: a last
@@ -126,6 +127,11 @@ async def main():
     cases = sorted(ev.cases(inputs, versions), key=lambda c: (c[1].get("version") or "", c[1].get("item") or "", c[1]["model"]))
     cases = [c for c in cases if not args.models or c[1]["model"] in args.models.split(",")][: args.limit or None]
 
+    def placebo_sources(case: dict, base: list, seed: int) -> list[str] | None:
+        """The eval's own placebo (PLACEBO(case, base, seed) -> per base run the reads source answering for it), else None:
+        cfbench's other-env placebo."""
+        return ev.PLACEBO(case, base, seed) if hasattr(ev, "PLACEBO") else None
+
     def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
         prompt = build_prompt(  # answer evals (TASK "answer", cfbench/answer.py) get the answer prompt; claim evals the rate one + ASK
             env,
@@ -140,7 +146,7 @@ async def main():
             args.max_calls,
             "answer" if task == "answer" else "rate",
         )
-        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
+        prompt = base_line(prompt, ev.BASE_LINE(case | {"condition": condition}) if hasattr(ev, "BASE_LINE") else None)
         prompt = ask(prompt, ev.ASK(case) if hasattr(ev, "ASK") else None)
         prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
         return ev.PROMPT(prompt, case) if hasattr(ev, "PROMPT") else prompt
@@ -152,7 +158,10 @@ async def main():
         for condition in conditions:
             read = None
             if condition in OLENS_CONDITIONS and reads:
-                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed)[1]
+                src = placebo_sources(case, base, args.seed) if condition == "olens_placebo_agentic" else None
+                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic" and src is None, seed=args.seed, sources=src)[
+                    1
+                ]
             print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
         return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
@@ -165,6 +174,7 @@ async def main():
         assert old.get("base_line") == base_src, f"{path}: BASE_LINE differs"
         assert old.get("ask") == ask_src, f"{path}: ASK differs"
         assert old.get("prompt_hook") == prompt_src, f"{path}: PROMPT differs"
+        assert old.get("placebo_hook") == (inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None), f"{path}: PLACEBO differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -194,6 +204,7 @@ async def main():
             "base_line": base_src,
             "ask": ask_src,
             "prompt_hook": prompt_src,
+            "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
             "reuse": args.reuse,
         },
     )
@@ -206,12 +217,16 @@ async def main():
             with out.open("a") as f:
                 f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
             return
-        tools, read = {}, None
+        tools, read, extra = {}, None, {}
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
             assert reads is not None
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
+            src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
+            placebo = condition == "olens_placebo_agentic" and src is None
+            lens_tools, read = olens.tools(base, reads, placebo=placebo, seed=args.seed + draw, sources=src)
+            if src is not None:
+                extra["placebo_sources"] = src
             tools |= lens_tools
         prompt = prompt_of(env, case, base, shown, condition, read)
         async with slots:
@@ -229,7 +244,7 @@ async def main():
         if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
             canon = env.canon_answer(result["answer"]) if result["valid"] else None
             result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
-        row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
+        row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:
             f.write(json.dumps(row) + "\n")
