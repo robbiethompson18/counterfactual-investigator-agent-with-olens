@@ -122,7 +122,8 @@ def load(S, key):
                 },
             }
             tids.append(tid)
-            for x in rd["reads"] if rd else []:
+            reads, read_tokens = (rd["reads"], rd["tokens"]) if rd else ([], [])
+            for x in reads:
                 t = tid if x["cond"] == "organism" else tid + BASE
                 rec = {
                     "key": key(t, x["pos"], x["layer"], lens=LENS),
@@ -132,7 +133,7 @@ def load(S, key):
                     "temperature": 0.0,
                     "n": 1,
                     "seed": 0,
-                    "token": rd["tokens"][x["pos"]],
+                    "token": read_tokens[x["pos"]],
                     "norm": None,
                     "samples": [{"text": x["text"], "bullets": x["bullets"]}],  # no FVE yet: read without the whiteners
                     "lens": LENS,

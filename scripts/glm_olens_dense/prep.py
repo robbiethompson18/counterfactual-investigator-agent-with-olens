@@ -46,7 +46,7 @@ def specs_for(rows, realism: str):
         import importlib
 
         sys.path.insert(0, realism)
-        from evalcue import harness
+        from evalcue import harness  # ty: ignore[unresolved-import]  # the old evalcue checkout at `realism`, not this repo's
 
         E = importlib.import_module(f"evalcue.envs.{rows[0]['env']}")
         harness.MODEL = rows[0]["model"]  # the system prompt names the model it was run with
@@ -238,11 +238,11 @@ def main():
                 )
                 off = len(msgs) - k - (fu + 2)
 
-                def mmap(i, fu=fu, off=off):
+                def late_map(i, fu=fu, off=off):
                     return i if i <= fu else (-1 if i == fu + 1 else i + off)
 
                 tail_char = len(R.render(lmsgs[: fu + 2], tools))
-                cands.append(("late", tid0 + ":late", ltext, lmsgs, mmap, tail_char))
+                cands.append(("late", tid0 + ":late", ltext, lmsgs, late_map, tail_char))
         for view, tid, vtext, vmsgs, mmap, tail_char in cands:
             ids, n_full, prs = view_rows(tk, vtext, vmsgs, tools, mmap, tail_char, piece_cache, a.raw_prefill, a.first_reply_tokens)
             truncated = n_full > CAP

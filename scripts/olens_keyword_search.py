@@ -1,6 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = ["pandas>=2.2", "pyarrow>=17", "scipy>=1.13", "statsmodels>=0.14"]
+# [tool.ty.analysis]
+# allowed-unresolved-imports = ["statsmodels.**"]
 # ///
 """Keyword search over the GLM-5.3 oracle-lens readouts of our transcripts (ceselder/glm-5.3-olens-counterfactual-investigator).
 
@@ -285,7 +287,7 @@ def main() -> None:
                         )
             glm_nov = (hits["glm_sft"] | hits["glm_rl"]) & ~in_ctx
             g = r.assign(nov=glm_nov, ctxhit=in_ctx)
-            for (env, arm), gg in g.groupby(["env", "arm"]):
+            for (env, arm), gg in g.groupby(["env", "arm"]):  # ty: ignore[not-iterable]  # pandas types group keys as Hashable
                 by_arm.append(
                     {
                         "config": cfg,

@@ -1,9 +1,13 @@
 #!/bin/sh
-# Ruff on staged Python files. Enable once per clone: git config core.hooksPath .githooks
+# Ruff and ty on staged Python files. Enable once per clone: git config core.hooksPath .githooks
 files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
 [ -z "$files" ] && exit 0
-# --force-exclude so explicitly passed vendor/ paths still honor extend-exclude
+# --force-exclude so explicitly passed vendor/ (and, for ty, Kylie's) paths still honor the pyproject excludes
 uv run --quiet ruff check --force-exclude $files && uv run --quiet ruff format --check --force-exclude $files || {
   echo "pre-commit: ruff failed. Fix with: uv run ruff check --fix . && uv run ruff format ." >&2
+  exit 1
+}
+uv run --quiet ty check --force-exclude $files || {
+  echo "pre-commit: ty failed. Fix the types (or a per-line '# ty: ignore[rule]' if a fix needs a redesign)." >&2
   exit 1
 }

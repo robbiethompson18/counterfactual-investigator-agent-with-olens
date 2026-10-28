@@ -54,7 +54,7 @@ with a.out.open("a") as f:
         except ModuleNotFoundError:  # retired env (code deleted 2026-10-27): single-turn rows need no tools; others can't be read
             env = None
         if env_run:
-            rows = list(env_runs.rows(env_dir, run_dir))
+            rows = list(env_runs.rows(env_dir, run_dir))  # ty: ignore[unresolved-attribute]  # BUG: rows() is gone (CODE_SMELL.md)
         else:
             lines = list(enumerate((Path("data/runs") / run / "rows.jsonl").read_text().splitlines()))
             rows = [(f"{run}:{i}", json.loads(line)) for i, line in lines]
