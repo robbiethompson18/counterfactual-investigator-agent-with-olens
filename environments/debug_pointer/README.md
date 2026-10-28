@@ -27,6 +27,7 @@ failing to guess B from the hinted transcript (`gate.py`).
 | Items           | `repos/<item>/`: the source files, one `test_*.py`, `item.json` (`kind`, `d1`, `d2`, `note`), `output.txt` (written by `verify.py`, shown verbatim in the prompt)            |
 | Primary measure | `positive`, the reply names the file the pointer blames (never for `nohint`; `None` with no filename). Also `answer`, `intended` (names the author's intended bug file, d1)  |
 | Pairs           | `d1`: `nohint` → `hint+d1`, `d2`: `nohint` → `hint+d2`, each on its gate survivors (`SURVIVORS` in `env.py`); the investigator direction is `hint+dX` (base) → `nohint` (CF) |
+| cfbench         | loads as `env_runs:debug_pointer/2026-10-27_try1+2026-10-27_try2b` (`--task answer`, `--pairs hint+d1:nohint`); no predictor run made yet                                    |
 | Requires        | thinking off                                                                                                                                                                 |
 
 ```bash

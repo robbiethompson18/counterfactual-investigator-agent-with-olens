@@ -184,7 +184,20 @@ filename in the reply, test files skipped, lower-cased; `positive` (PRIMARY) = `
 the pointer blames (`meta.hint_file`; always False for `nohint`; None when no filename is found);
 `intended` = `answer` is the author's intended bug file (`meta.intended`). The env exposes the same
 hooks `hint_mcq` gives cfbench's answer task (`BEHAVIOR`, `canon_answer`, `ANSWER_FORMAT`,
-`ANSWER_MATCH`, `PAIRS` on the gate survivors). Wiring debug_pointer into cfbench is the next step.
+`ANSWER_MATCH`, `PAIRS` on the gate survivors), and cfbench's `env_runs` loader reads the run
+folders as they are (checked 2026-10-27, no predictor run made): the pooled spec
+`env_runs:debug_pointer/2026-10-27_try1+2026-10-27_try2b` gives 77 items, 616 rollouts per arm,
+canonical answers, hub arm `nohint`, and the `hint+dX` → `nohint` diff is exactly the removed
+pointer line. The investigator run is therefore one command away, e.g.
+
+```bash
+uv run python -m cfbench.run env_runs:debug_pointer/2026-10-27_try1+2026-10-27_try2b --task answer \
+    --pairs hint+d1:nohint --items dist,exclusive,agecalc,centslabel,headingrad,hitratio,kelvin,lineidx0 \
+    --conditions no_transcript,transcript_agentic,olens_agentic,olens_placebo_agentic --slug ...
+```
+
+(and `--pairs hint+d2:nohint --items dist,metres,lenvsbytes,lineidx0`), once the O-lens reads of the
+hinted rollouts exist.
 
 ## Caveats
 
