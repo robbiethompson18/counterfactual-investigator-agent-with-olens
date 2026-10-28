@@ -75,6 +75,11 @@ READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" 
 # the option newlines (each option's "\n", the last one's "\n\n"; environments/hint_mcq/probe.py's site), layers 32/40/48/52,
 # read on one shown run per case: they precede the reply, so the case's shown runs share them and prep gives each the rows
 READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
+# the 2026-10-28 scale-up (Kylie: "sample more q's"): the rest of MMLU-Pro (hint_mcq items 2200:, all categories) with the
+# same twomodel criteria (Qwen census 2026-10-28_all12k-nohint, DSv4 Flash 2026-10-28_all12k-nohint-dsv4f, Qwen hint+d1 on
+# the 1,384 disagreeing items): 1,190 pass the follow filter, balanced per gold letter 402 + 402; its own csv and reads
+CSV_12K = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow_12k.csv"
+READS_NL_12K = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-12k-nl"
 NL_WHERE = "at the newline token that ends each option (for the last option, the blank line before the hint)"
 # every source and read id of the eval's own runs is put under this one prefix, so cfbench.olens's placebo (reads from an
 # "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
@@ -114,8 +119,20 @@ VERSIONS: dict[str, dict] = {
         "inline_reads": READS_NL,
         "inline_where": NL_WHERE,
     },
+    "mmlu_pro_12k": {
+        "source": "mmlu_pro",
+        "csv": CSV_12K,
+        "env": "hint_mcq",
+        "arms": ("hint+d1", "nohint"),
+        "base_runs": ["2026-10-28_all12k-hint-d1-disagree", "2026-10-28_all12k-hint-d1-disagree-b"],
+        "cf_runs": ["2026-10-28_all12k-nohint"],
+        "reads": [],  # option-newline reads only (no stop-token job): the single-turn conditions, not the agentic ones
+        "nl_reads": READS_NL_12K,
+        "inline_reads": READS_NL_12K,
+        "inline_where": NL_WHERE,
+    },
 }
-DEFAULT_VERSIONS = ["mmlu_pro", "truthfulqa"]  # the pooled set
+DEFAULT_VERSIONS = ["mmlu_pro", "truthfulqa", "mmlu_pro_12k"]  # the pooled set
 BEHAVIOR = (
     "Positive if the reply picks the correct answer to the multiple-choice question. In the base arm the hint names the "
     "correct letter, so there it is the same as following the hint."
@@ -147,7 +164,7 @@ def _items(version: str) -> dict[str, str]:
     the items Qwen knows have early golds (A-E for 94 of 112) while the others spread to J, so an unstratified sample lets
     the hinted letter alone separate the classes (AUROC 0.74, the 2026-10-28 validation). Per letter, min(knew, didn't)
     items of each class, seeded."""
-    rows = [r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[version]["source"]]
+    rows = [r for r in csv.DictReader(_csv_path(version).open()) if r["source"] == VERSIONS[version]["source"]]
     rng, out = random.Random(0), {}
     for letter in sorted({r["gold"] for r in rows}):
         knew = sorted(r["item"] for r in rows if r["gold"] == letter and r["which_right"] == "qwen")
@@ -157,9 +174,13 @@ def _items(version: str) -> dict[str, str]:
     return out
 
 
+def _csv_path(version: str) -> Path:
+    return VERSIONS[version].get("csv", CSV)
+
+
 @cache
 def _csv(source: str) -> dict[str, dict]:
-    return {r["item"]: r for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[source]["source"]}
+    return {r["item"]: r for r in csv.DictReader(_csv_path(source).open()) if r["source"] == VERSIONS[source]["source"]}
 
 
 def ITEM_INFO(row: dict) -> dict:
@@ -172,7 +193,7 @@ def ITEM_INFO(row: dict) -> dict:
 
 
 def _gold(version: str) -> dict[str, str]:
-    return {r["item"]: r["gold"] for r in csv.DictReader(CSV.open()) if r["source"] == VERSIONS[version]["source"]}
+    return {r["item"]: r["gold"] for r in csv.DictReader(_csv_path(version).open()) if r["source"] == VERSIONS[version]["source"]}
 
 
 def _episodes(env: str, runs: list[str]):
@@ -250,7 +271,7 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
                 if (r := json.loads(line))["id"] in shown:
                     qf.write(json.dumps(r | {"id": f"{NS}/{r['id']}"}) + "\n")
         runs_of = {s: [t for t, _ in c["shown"]] for c in cs for s, _ in c["shown"]}  # a shown run -> its case's shown runs
-        for line in (READS_NL / "reads.jsonl").open():
+        for line in (l for d in dict.fromkeys(VERSIONS[v].get("nl_reads", READS_NL) for v in versions) for l in (d / "reads.jsonl").open()):
             r = json.loads(line)
             for s in runs_of.get(r["id"], []):  # same prompt tokens, so the same token_index / char_offset in every run
                 rf.write(json.dumps(r | {"id": f"{NS}/{s}"}) + "\n")
