@@ -58,6 +58,7 @@ async def main():
     ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
+    ap.add_argument("--olens-before", help="regex; hide every O-lens read at or after its first match in each run's transcript (harness 8)")
     ap.add_argument(
         "--olens-positions",
         default="sparse",
@@ -83,6 +84,8 @@ async def main():
         for r in map(json.loads, Path(path).read_text().splitlines())
     }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
+    # the only version-8 change is --olens-before; without it the tools are version 7, so rows stay comparable with 7
+    harness_version = HARNESS_VERSION if args.olens_before else 7
     assert set(conditions) <= set(CONDITIONS), conditions
     reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
@@ -129,7 +132,7 @@ async def main():
         description=args.description or f"{args.env}: predict {args.model} arm outcomes ({', '.join(conditions)})",
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
-        | {"harness_version": HARNESS_VERSION}
+        | {"harness_version": harness_version}
         | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
     )
@@ -142,7 +145,9 @@ async def main():
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
+            lens_tools, read = olens.tools(
+                base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw, before=args.olens_before
+            )
             tools |= lens_tools
         prompt = build_prompt(
             env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task
@@ -161,7 +166,7 @@ async def main():
             result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
         row = {
             **case,
-            "harness_version": HARNESS_VERSION,
+            "harness_version": harness_version,
             "predictor": predictor,
             "draw": draw,
             "shown": [r.source for r in shown],

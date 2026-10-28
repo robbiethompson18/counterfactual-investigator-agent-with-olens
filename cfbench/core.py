@@ -53,7 +53,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # labelled <transcript>/<olens>, and search hits' context stops at the edges of the read's message field (2026-10-24).
 # 7: the task sentence says squared error (docs/cfbench-scoring.md), not log-likelihood (2026-10-26). Both reward the same
 # point estimate, so 6 and 7 are comparable and version-6 runs don't need redoing.
-HARNESS_VERSION = 7
+# 8: --olens-before hides reads at or after a regex match (the hint sentence) in each run, so the olens conditions see only
+# pre-edit positions (2026-10-28). Runs without the flag are unchanged from 7.
+HARNESS_VERSION = 8
 
 
 @dataclass

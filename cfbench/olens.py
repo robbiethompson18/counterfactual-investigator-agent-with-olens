@@ -164,9 +164,12 @@ def _context(text: str, char: int) -> str:
     return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
 
 
-def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tuple[dict[str, Tool], set[int]]:
-    """The two O-lens tools over the base runs, and the ids of the runs that have reads."""
+def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0, before: str | None = None) -> tuple[dict[str, Tool], set[int]]:
+    """The two O-lens tools over the base runs, and the ids of the runs that have reads. `before`: a regex; reads at or after its
+    first match in a run's transcript (the hint sentence, say) are hidden, header and stop-token reads included, so the agent
+    only sees positions the counterfactual edit leaves untouched (--olens-before, harness version 8)."""
     texts = [render_spans(r.messages)[0] for r in base]
+    cutoff = [(m.start() if (m := re.search(before, t)) else None) if before else None for t in texts]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]
     source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
     if placebo:
@@ -183,7 +186,11 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
         if i not in cache:
             messages, rows = reads[source[i]]
             text = render_spans(messages)[0]
-            cache[i] = (positions(messages, rows), len(text) / max(1, len(texts[i])), text)
+            factor = len(text) / max(1, len(texts[i]))
+            pos = positions(messages, rows)
+            if (c := cutoff[i]) is not None:  # keep reads before the match, in run i's coordinates (placebo positions are scaled)
+                pos = [p for p in pos if p.char / factor < c]
+            cache[i] = (pos, factor, text)
         return cache[i]
 
     yes_no = ["yes" if r.label else "no" for r in base]
