@@ -467,11 +467,11 @@ Current docs:
   pre-registered 38-case test (+0.07 log skill on harness v1, RMSE 26.6 vs 31.7pp, carried by a few
   cases, via "stricter score" reads at `Score:`; a v6 GPT-6.1 Sol replication is null); pasting
   reads into the prompt (closed #116) is a dead end
-- [ACTIVE: notice_defect env — read before building or running the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
-  — subject side only: `task` (do an unrelated task on an artifact with a planted defect) vs `ask`
-  (the noticing oracle) over 4 non-code artifacts; 2 noticed (8/8) + 2 not-noticed (modal) items,
-  task arm unverbalized 30/32; Qwen is a thorough fact-checker so the only reliable not-noticed
-  defect is a low-salience day-of-week error; investigator/prediction step not built yet
+- [ACTIVE: notice_defect env — read before building, running or gating the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
+  — subject side: `task` (orthogonal task on an artifact with one planted defect) vs `ask` (the
+  noticing oracle) plus clean twins, artifact first; 58 items over 6 defect types; try 1: 40 usable
+  (9 not noticed, mostly low-salience weekdays, 31 noticed), task arm 0/280 verbalized, Qwen also
+  "flags" some correct twins; Flash text-only gate in `gate.py`, run log in the doc
 - [NULL: Honest-grader envs — read before building a 0–10 judgment scenario with flattery/honesty framings, or asking whether the O-lens reads the grade Qwen suppresses](docs/honest-grader-envs.md)
   — 11 scenarios × 5 framings, Qwen thinking off; why hidden_goal.grade worked (`Score:`-token reads
   of the runner-up grade); the O-lens is null vs transcript-only and placebo on 44 cases (78 / 77 /
