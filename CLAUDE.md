@@ -489,6 +489,10 @@ Current docs:
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; late-hint, words and
   pre-hint-reads arms in flight (PR #320)
+- [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
+  — 718 consistent MMLU-Pro questions (half wrong): a linear probe at the newline after each option
+  (L52) picks Qwen's own answer 94% / 80% (right / wrong questions) and the gold on wrong ones only
+  6%; listwise softmax pmf (NLL 0.30, ECE 0.04); TruthfulQA out-of-sample test pending
 - [MIXED: essay_curious — read before building a grading env with the lever sentence after the essay, or predicting Qwen's grade with the scenario removed](docs/envs/essay_curious.md)
   — letter grades on 3 essays: NULL and underpowered (Qwen gives nearly everything an A); out of 10
   on 12 essays spread terrible → excellent: entropy 2.58 bits, Duke lowers middling essays up to
