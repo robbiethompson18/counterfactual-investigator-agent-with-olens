@@ -12,6 +12,7 @@ viewer's paired-model AUROC is the separation between the two models' cases.
 
     uv run python -m cfbench.eval af_which --show --versions original           # the prompts, no API calls
     uv run python -m cfbench.eval af_which --slug af-which-orig --versions original --draws 3
+    uv run python -m cfbench.evals.af_which.score data/runs/cfbench/<date>_af-which-orig   # mean_i Brier(p_i), Brier(p_bar)
 """
 
 from cfbench.evals.af_refusals import eval as af
