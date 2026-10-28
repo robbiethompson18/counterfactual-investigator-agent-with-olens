@@ -1,12 +1,13 @@
 """One-engine DSV4 Flash O-lens reads: read.py's capture + first-reply logits on vLLM, then vllm_read.py's lens stage on the
 same engine. Replaces the HF transformers capture pass (second venv, states.pt handoff) of the two-stage pipeline.
 
-Stage 1, adapter off: per request, one `max_tokens=1` prefill of prompt + reply with vllm-metamodels' capture hooks at the
-read layers (`extra_args={"output_residual_stream": [L], "capture_positions": [...]}`; the hc_capture plugin in hc_inject/
-folds V4's 4-stream layer output into the [4 * 4096] rows read.py's Capture hook saw), plus two prefills of prompt + tag
-with `prompt_logprobs` for log P(<rejected/>) and log P(<request_fully_accepted/>) after </think> (and the top-10 at the
-first reply token). Positions, rows and the logits.jsonl / reads_L*.jsonl formats are read.py's and vllm_read.py's: the
-rows come from read.render / read.read_positions, the lens stage is vllm_read.decode_states.
+Stage 1, adapter off: per request, one `max_tokens=1` prefill of prompt + reply with vllm-metamodels' capture hooks
+at the read layers (`extra_args={"output_residual_stream": [L], "capture_positions": [...]}`; the hc_capture plugin in
+hc_inject/ folds V4's 4-stream layer output into the [4 * 4096] rows read.py's Capture hook saw) with
+`prompt_logprobs` for read.py's "reject" (log P of that sequence's reply after </think>: <rejected/>, or the actual
+reply with --actual-reply) and the top-10 at the first reply token, plus one prefill of prompt +
+<request_fully_accepted/> for "accept". Positions, rows and the logits.jsonl / reads_L*.jsonl formats are read.py's
+and vllm_read.py's: the rows come from read.render / read.read_positions, the lens stage is vllm_read.decode_states.
 
     python vllm_capture_read.py --model /workspace/dsv4/w/v4flash --lens /workspace/dsv4/w/v4lens --requests requests.jsonl \\
         --out out/ --layers 30 --dense --actual-reply --read-arms preview,public [--limit 20] [--check-against REF_DIR]
@@ -83,10 +84,9 @@ def main():
     llm = build_engine(a.model, a.tp, a.eager, a.max_model_len, max_num_batched_tokens=max(8192, a.max_model_len), chunked_prefill=False)
     timings["engine_s"] = time.time() - t
 
-    # 1. capture + logits, adapter off. Per request: [prompt + reply (capture)], [prompt + <rejected/>], [prompt + accept tag].
-    cap_params = lambda pos: SamplingParams(
-        max_tokens=1, temperature=0.0, extra_args={"output_residual_stream": layers, "capture_positions": pos}
-    )
+    # 1. capture + logits, adapter off. Per request two prefills, as read.py's batch of two: [prompt + reply] (the capture, with
+    # prompt_logprobs: read.py's "reject" is log P of this sequence's reply, i.e. <rejected/> or, with --actual-reply, the actual
+    # reply; its top-10 at position n is top_first) and [prompt + accept tag] with prompt_logprobs for "accept".
     states, logit_rows, pos_rows = [], [], []
     seen_system: set[str] = set()
     t = time.time()
@@ -99,38 +99,40 @@ def main():
             p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
             assert ids[: len(p_ids)] == p_ids, "prompt tokenization is not a prefix of prompt+reply"
             assert len(ids) + 8 <= a.max_model_len, f"{r['id']}: {len(ids)} tokens > --max-model-len {a.max_model_len}"
-            rej = p_ids + tok(REJECT, add_special_tokens=False)["input_ids"]
             acc = p_ids + tok(ACCEPT, add_special_tokens=False)["input_ids"]
             capture = r["arm"] in read_arms and bool(pos)
-            if capture:
-                prompts.append({"prompt_token_ids": ids})
-                params.append(cap_params(pos))
-            prompts += [{"prompt_token_ids": rej}, {"prompt_token_ids": acc}]
+            extra = {"output_residual_stream": layers, "capture_positions": pos} if capture else None
+            prompts += [{"prompt_token_ids": ids}, {"prompt_token_ids": acc}]
             params += [
-                SamplingParams(max_tokens=1, temperature=0.0, prompt_logprobs=10),
+                SamplingParams(max_tokens=1, temperature=0.0, prompt_logprobs=10, extra_args=extra),
                 SamplingParams(max_tokens=1, temperature=0.0, prompt_logprobs=0),
             ]
-            parsed.append((r, prompt, reply, full, offs, pos, len(p_ids), rej, acc, capture))
+            parsed.append((r, prompt, reply, full, offs, pos, len(p_ids), ids, acc, capture))
         outs = iter(llm.generate(prompts, params, use_tqdm=False))
-        for r, prompt, reply, full, offs, pos, n, rej, acc, capture in parsed:
-            if capture:
-                o = next(outs)
-                act = acts(o, len(layers), pos)  # [n_layers, P, 16384] bf16
-                for j, p in enumerate(pos):
-                    s, e = offs[p]
-                    row = {"id": r["id"], "arm": r["arm"], "item": r["item"], "pos": p, "char": s}
-                    who = "assistant" if s >= len(prompt) - len(ASSISTANT + NO_THINK) else "user" if s >= full.rindex(USER) else "system"
-                    row |= {"role": who, "token": full[s:e]}
-                    pos_rows.append(row | {"ctx_left": full[max(0, s - 80) : e], "ctx_right": full[e : e + 40]})
-                    states.append(act[:, j])
+        for r, prompt, reply, full, offs, pos, n, ids, acc, capture in parsed:
             lp = {}
-            for name, seq in (("reject", rej), ("accept", acc)):
+            for name, seq in (("reject", ids), ("accept", acc)):
                 o = next(outs)
                 pl = o.prompt_logprobs  # pl[i] predicts token i from tokens < i (pl[0] is None); the actual token is always included
                 lp[name] = float(sum(pl[j][seq[j]].logprob for j in range(n, len(seq))))
                 if name == "reject":  # top-10 at the first reply token (prompt_logprobs=10 on this request only)
                     top = sorted(pl[n].items(), key=lambda kv: -kv[1].logprob)[:10]
                     lp["top_first"] = [(tok.decode([tid]), round(float(x.logprob), 3)) for tid, x in top]
+                    if capture:
+                        act = acts(o, len(layers), pos)  # [n_layers, P, 16384] bf16
+                        for j, p in enumerate(pos):
+                            s, e = offs[p]
+                            row = {"id": r["id"], "arm": r["arm"], "item": r["item"], "pos": p, "char": s}
+                            who = (
+                                "assistant"
+                                if s >= len(prompt) - len(ASSISTANT + NO_THINK)
+                                else "user"
+                                if s >= full.rindex(USER)
+                                else "system"
+                            )
+                            row |= {"role": who, "token": full[s:e]}
+                            pos_rows.append(row | {"ctx_left": full[max(0, s - 80) : e], "ctx_right": full[e : e + 40]})
+                            states.append(act[:, j])
             logit_rows.append({"id": r["id"], "arm": r["arm"], "item": r["item"], "reply": reply[:200], "positive": r["positive"], **lp})
         last, done = logit_rows[-1], min(b0 + a.batch, len(reqs))
         print(f"{done}/{len(reqs)} {last['id']} rej {last['reject']:.2f} acc {last['accept']:.2f} {time.time() - t:.0f}s", flush=True)
