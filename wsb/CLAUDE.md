@@ -3,7 +3,7 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff` and `wrong_bridge` so far.
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and `moral_rationale` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -71,5 +71,17 @@ uv run python -m wsb.basic_readout --persona qwen --n 5 --slug sonnet-as-qwen   
 uv run python -m wsb.basic_readout --persona self --n 5 --slug sonnet-self
 ```
 
-`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff` and `wrong_bridge` so far.
+`moral_rationale.py` is the same gate replay for `moral_rationale`: the prefix is the whole chat
+render of the ethical yes/no stimulus (through the generation prompt, the last of the family's 5
+read positions), and their `ec-v3` judge (Opus 5.5) scores the answer as one readout against the
+ported 6-way option lists (gold = Qwen's own most frequent reason, 4 cross-question distractors, the
+opposite-side reason on 72 committed items, "cannot tell"); deliberative items need both sides in
+one answer. `--check vendor/workspace-bench/tests/golden/moral_rationale_options_v2.json` asserts
+the lists match theirs item for item. Results in
+[docs/wsb-moral-rationale.md](../docs/wsb-moral-rationale.md).
+
+```bash
+uv run python -m wsb.moral_rationale --n 3   # all 200 items x 3 draws, ~10 min
 ```
+
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and `moral_rationale` so far.

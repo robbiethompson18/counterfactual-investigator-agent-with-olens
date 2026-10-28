@@ -603,6 +603,10 @@ Current docs:
 - [REFERENCE: WSB wrong_bridge — read before quoting lens-vs-text numbers on WorkspaceBench's wrong-bridge family, or claiming the lens reads a model-specific error](docs/wsb-wrong-bridge.md)
   — space lens any-layer 0.46 names Qwen's wrong bridge (true bridge 0.16); Sonnet prompt-only
   0.35/0.48, Sonnet with the answer 0.83/0.86; item overlaps, decoder-prior and judge caveats
+- [REFERENCE: WSB moral_rationale, Sonnet text-only — read before quoting the moral_rationale lens number or building a reader for Qwen's ethical-answer reasons](docs/wsb-moral-rationale.md)
+  — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
+  any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
+  not activations; committed/deliberative label is not derivable from the public bank
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
