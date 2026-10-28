@@ -152,6 +152,7 @@ def main():
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--skip-lens", action="store_true", help="logits + capture only")
+    ap.add_argument("--no-logits", action="store_true", help="capture only (one sequence per request, no accept/reject logits)")
     ap.add_argument("--states", default=None, help="reuse a states.pt from an earlier run (skips capture + logits)")
     ap.add_argument("--dense", action="store_true", help="every user-turn + reply token, system-prompt punctuation/special once")
     ap.add_argument("--actual-reply", action="store_true", help="read the request's own reply, not a canonical <rejected/>")
@@ -194,24 +195,31 @@ def main():
             p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
             assert ids[: len(p_ids)] == p_ids, "prompt tokenization is not a prefix of prompt+reply"
             acc = p_ids + tok(ACCEPT, add_special_tokens=False)["input_ids"]
-            L = max(len(ids), len(acc))
-            batch = torch.tensor([ids + [1] * (L - len(ids)), acc + [1] * (L - len(acc))], device=dev)
+            n, lp = len(p_ids), {}
             keys, h, want = {}, hashlib.blake2b(digest_size=16), set(pos)
             for i, t_ in enumerate(ids[: max(pos) + 1] if pos else []):
                 h.update(t_.to_bytes(4, "little"))
                 if i in want:
                     keys[i] = h.copy().hexdigest()
             new = [p for p in pos if keys[p] not in seen_keys] if r["arm"] in read_arms else []
-            cap.want, cap.out = (new if r["arm"] in read_arms else None), {}
-            n, lp = len(p_ids), {}
-            keep = L - (n - 1)  # only the positions that predict a reply token: full-vocab logits over 6k tokens OOM
-            logits = model(batch, logits_to_keep=keep).logits.float()  # logits[:, i] is position n - 1 + i
-            cap.want = None
-            for b, (name, seq) in enumerate((("reject", ids), ("accept", acc))):
-                lsm = torch.log_softmax(logits[b, : len(seq) - n], -1)
-                lp[name] = float(lsm.gather(1, torch.tensor(seq[n:], device=lsm.device)[:, None]).sum())
-            top = torch.log_softmax(logits[0, 0], -1).topk(10)
-            lp["top_first"] = [(tok.decode([i]), round(float(v), 3)) for v, i in zip(top.values, top.indices, strict=True)]
+            if a.no_logits:  # capture only: one sequence, no accept-tag copy
+                if new:
+                    cap.want, cap.out = new, {}
+                    model(torch.tensor([ids], device=dev), logits_to_keep=1)
+                    cap.want = None
+                lp = {"reject": float("nan"), "accept": float("nan")}
+            else:
+                L = max(len(ids), len(acc))
+                batch = torch.tensor([ids + [1] * (L - len(ids)), acc + [1] * (L - len(acc))], device=dev)
+                cap.want, cap.out = (new if r["arm"] in read_arms else None), {}
+                keep = L - (n - 1)  # only the positions that predict a reply token: full-vocab logits over 6k tokens OOM
+                logits = model(batch, logits_to_keep=keep).logits.float()  # logits[:, i] is position n - 1 + i
+                cap.want = None
+                for b, (name, seq) in enumerate((("reject", ids), ("accept", acc))):
+                    lsm = torch.log_softmax(logits[b, : len(seq) - n], -1)
+                    lp[name] = float(lsm.gather(1, torch.tensor(seq[n:], device=lsm.device)[:, None]).sum())
+                top = torch.log_softmax(logits[0, 0], -1).topk(10)
+                lp["top_first"] = [(tok.decode([i]), round(float(v), 3)) for v, i in zip(top.values, top.indices, strict=True)]
             logit_rows.append({"id": r["id"], "arm": r["arm"], "item": r["item"], "reply": reply[:200], "positive": r["positive"], **lp})
             if r["arm"] in read_arms:
                 j = 0

@@ -141,10 +141,17 @@ def dsv4_items(run: Run, a, envs: Path, env_id: str, d: Path):
         rs = {}
         for p, x in {**sys_reads[q["version"]], **reads[q["id"]]}.items():
             assert x["token"] == toks[p] or x["role"] == "assistant", (q["id"], p, x["token"], toks[p])
-            rs[str(p)] = [
-                read("O-lens V4", [x["greedy"]], label=f"L{a.dsv4_layer} greedy", inline=True),
-                read("O-lens V4 samples", [[x[k]] for k in ("s1", "s2") if k in x]),
-            ]
+            if "bullets" in x:  # vllm_read.py --bullets: non-blank reads, greedy first when non-blank
+                b = x["bullets"]
+                rs[str(p)] = [
+                    read("O-lens V4", b[:1], label=f"L{a.dsv4_layer} bullet 1", inline=True),
+                    read("O-lens V4 bullets", [[t] for t in b]),
+                ]
+            else:
+                rs[str(p)] = [
+                    read("O-lens V4", [x["greedy"]], label=f"L{a.dsv4_layer} greedy", inline=True),
+                    read("O-lens V4 samples", [[x[k]] for k in ("s1", "s2") if k in x]),
+                ]
         lg = logits.get(q["id"], {})
         secs = sections(toks, {"<｜User｜>": "user", "<｜Assistant｜>": "assistant"}, 0, lead="system")
         labels = {"model": "DSV4 Flash", "version": q["version"], "stage": q["arm"], "positive": q["positive"], "verdict": q["verdict"]}
@@ -183,6 +190,11 @@ DSV4_LEGEND = (
     "the text rather than writing bullets."
 )
 
+BULLETS_ABOUT = (
+    "4 non-blank reads per position (vllm_read.py --bullets 4): the greedy read first when it is non-blank, then samples "
+    "(T 1.0, top_p 0.95, top_k 64); blank reads are dropped and resampled, giving up after 5 blanks in a row."
+)
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -196,10 +208,11 @@ def main():
     ap.add_argument("--dsv4-layer", type=int, default=30)
     ap.add_argument("--reply-chars", type=int, default=120)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--title", default="Alignment faking v2-v8: O-lens reads (GLM 5.3, DSV4 Flash)")
     a = ap.parse_args()
     run = Run(
         a.out,
-        title="Alignment faking v2-v8: O-lens reads (GLM 5.3, DSV4 Flash)",
+        title=a.title,
         description=(
             "O-lens reads on the reworded alignment-faking prompts (`environments/alignment_faking`, v2-v8, thinking off, "
             "preview vs public `<deployment_stage>`). One item per transcript; `positive` = complied "
@@ -213,6 +226,7 @@ def main():
             "O-lens GLM samples": {"about": "4 samples at T=1", "color": "#e8a85f"},
             "O-lens V4": {"about": DSV4_LEGEND, "color": "#c0592a"},
             "O-lens V4 samples": {"about": "2 samples at T=1", "color": "#d98a5f"},
+            "O-lens V4 bullets": {"about": BULLETS_ABOUT, "color": "#d98a5f"},
         },
     )
     run.reset()
