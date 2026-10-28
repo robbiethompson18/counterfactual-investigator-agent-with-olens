@@ -37,6 +37,7 @@ extend-select = [
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "detective_joracle".msg = "vendor/ is reference-only: port what you need into our own code (see vendor/CLAUDE.md)"
+"wsbench".msg = "vendor/ is reference-only: port what you need into our own code (see vendor/CLAUDE.md)"
 
 [tool.ty.environment]
 # Sibling modules that scripts import via sys.path.insert
