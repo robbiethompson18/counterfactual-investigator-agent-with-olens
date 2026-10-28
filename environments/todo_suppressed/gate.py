@@ -2,7 +2,7 @@
 predictor sees, write the module Qwen3.6-27B writes in the implement arm? An item only tests the lens if it can't.
 
     uv run python -m environments.todo_suppressed.gate RUN [RUN ...] [--slug flash3] [--n 3] [--all-items] [--items a,b]
-        [--backend google|openrouter]
+        [--backend openrouter|google]
 
 RUN is a run folder name under data/envs/todo_suppressed/ with both arms. Per item, Qwen's implement-arm replies are re-measured
 with the current env.py; the item is USABLE when the modal form has >= --min-share of the samples and isn't "other". Flash gets
@@ -143,7 +143,10 @@ async def main():
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--concurrency", type=int, default=8, help="Gemini is on a shared daily quota; keep it low")
     ap.add_argument(
-        "--backend", choices=["google", "openrouter"], default="google", help="google = generativelanguage API, $THIRD_GEMINI_KEY"
+        "--backend",
+        choices=["openrouter", "google"],
+        default="openrouter",
+        help="openrouter (the brief's setup) or google = the generativelanguage API with $THIRD_GEMINI_KEY, the 2026-10-27 fallback",
     )
     ap.add_argument("--min-share", type=float, default=0.75, help="modal implement-arm form share for an item to be usable (6/8)")
     ap.add_argument("--all-items", action="store_true", help="gate every item, not only the usable ones")
