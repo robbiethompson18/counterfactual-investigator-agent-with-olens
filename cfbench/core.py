@@ -68,7 +68,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # inputs changed: every other condition's prompt and tools are byte-identical to 8, so those rows compare across 8 and 9.
 # 10: hint_qwen_dsv4 (+letter) show one base run per case (N_SHOWN 1) and the letter eval's answer parser and ANSWER_MATCH
 # changed (the "answer is X" / lone-capital / option-text rules); other evals' prompts and tools are unchanged (2026-10-28).
-HARNESS_VERSION = 10
+# 11: an eval's OLENS overrides the O-lens tools' defaults; hint_qwen_dsv4 (+letter) show every bullet (min_fve 0, the
+# option-newline reads mostly score under 0.1). Other evals' tools are byte-identical to 10 (2026-10-28).
+HARNESS_VERSION = 11
 
 
 @dataclass

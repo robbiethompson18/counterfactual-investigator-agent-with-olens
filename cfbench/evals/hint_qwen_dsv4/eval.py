@@ -61,6 +61,8 @@ READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
 # "env" other than the case's, i.e. the first path part of a source) only ever draws the placebo file's reads, never the
 # other version's hinted runs
 NS = "hint_qwen_dsv4"
+# the O-lens tools show every bullet by default (each with its FVE): the option-newline reads mostly score under the usual 0.1
+OLENS = {"min_fve": 0.0}
 N_SHOWN = 1  # Kylie 2026-10-28: one run is enough (the runs differ only in a one-letter reply)
 VERSIONS: dict[str, dict] = {
     "mmlu_pro": {

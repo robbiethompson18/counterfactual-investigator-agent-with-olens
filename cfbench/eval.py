@@ -159,9 +159,8 @@ async def main():
             read = None
             if condition in OLENS_CONDITIONS and reads:
                 src = placebo_sources(case, base, args.seed) if condition == "olens_placebo_agentic" else None
-                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic" and src is None, seed=args.seed, sources=src)[
-                    1
-                ]
+                placebo = condition == "olens_placebo_agentic" and src is None
+                read = olens.tools(base, reads, placebo=placebo, seed=args.seed, sources=src, overrides=getattr(ev, "OLENS", None))[1]
             print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
         return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
@@ -224,7 +223,9 @@ async def main():
             assert reads is not None
             src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
             placebo = condition == "olens_placebo_agentic" and src is None
-            lens_tools, read = olens.tools(base, reads, placebo=placebo, seed=args.seed + draw, sources=src)
+            lens_tools, read = olens.tools(
+                base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
+            )
             if src is not None:
                 extra["placebo_sources"] = src
             tools |= lens_tools
