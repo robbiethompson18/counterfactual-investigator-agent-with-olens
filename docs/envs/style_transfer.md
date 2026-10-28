@@ -1,152 +1,132 @@
 # style_transfer: does a codebase reshape the form of a function the model already knows?
 
-**Status (2026-10-27):** ACTIVE. Subject-side env + smoke only; the O-lens read and the 4-condition
-investigator experiment are not built yet (Robbie runs that later). Code:
-[`environments/style_transfer/env.py`](../../environments/style_transfer/env.py).
+**Status (2026-10-28):** ACTIVE. Subject-side env, AST structure label and the Flash text-inversion
+gate; the O-lens read and the investigator experiment are not built yet. Code:
+[`environments/style_transfer/env.py`](../../environments/style_transfer/env.py), gate
+[`gate.py`](../../environments/style_transfer/gate.py). The first version of this env (12 items,
+binary recursive/iterative regex label, PR #247 as opened) failed the 2026-10-27 audit; the redesign
+and every try are logged under "Gate iterations" below.
 
 ## What it tests and why
 
 Robbie's hypothesis: when you ask a model to "implement fibonacci, here is the codebase," the O-lens
 (a metamodel reading the subject's activations into text) may already hold the model's **latent
-default form** — the language, recursion-vs-loop, naming it would reach for with no codebase — and
-the surrounding codebase only reshapes the surface form. This env builds the subject side: a
+default form** (the language, recursion-vs-loop, naming it would reach for with no codebase) and the
+surrounding codebase only reshapes the surface form. This env builds the subject side: a
 context-vs-no-context contrast over functions the model certainly knows, with a discrete form label,
 so a later lens read can ask whether the default form is present early (before/independent of the
 codebase) or only shows up once the model has "read" the codebase.
 
-Subject: **Qwen3.6-27B, thinking off**, OpenRouter pinned to `deepinfra/fp8`, effort medium, Qwen
-model-card thinking-off sampling (T0.7 / top-p 0.8 / presence 1.5). Thinking off is deliberate: it's
-the regime where the behaviour stays unverbalized, which is what the lens is for.
+Subject: **Qwen3.6-27B, thinking off**, Qwen model-card thinking-off sampling (T0.7 / top-p 0.8 /
+presence 1.5). Thinking off is deliberate: it's the regime where the behaviour stays unverbalized,
+which is what the lens is for. `DEFAULTS` point at OpenRouter `deepinfra/fp8`; the pool run below
+was served from our own 1x H200 vLLM pod (bf16) because the new OpenRouter account caps Qwen at 20
+requests/min shared by every agent (`meta.json` records the target).
 
-## Arms and the form label
+## Arms and the structure label
 
 Single-turn, no tools, `max_turns=1`. Three arms (`ARMS`):
 
-- `no_context` — "Implement a function `factorial(n)` in Python. Reply with only the function
-  definition in a Python code block." No codebase. This is the model's **default form** and the CF
-  target (B).
-- `context_recursive` — same ask, prefixed with a small `utils.py` whose three helper functions
-  (`count_down`, `list_length`, `sum_to_n`) are all written **recursively**, and the ask is "Add a
+- `no_context`: "Implement a function `factorial(n)` in Python. Reply with only the function
+  definition in a Python code block." No codebase. This is the model's **default** and the CF
+  target.
+- `context_recursive`: same ask, prefixed with a small `utils.py` whose three helper functions
+  (`count_down`, `list_length`, `sum_to_n`) are all written **recursively**; the ask is "Add a
   function `factorial(n)` to utils.py."
-- `context_iterative` — identical, but the helpers use explicit **loops**.
+- `context_iterative`: identical, but the helpers use explicit **loops**.
 
-The style is conveyed **by example only** — there is no "write it recursively" instruction and no
-"house style" sentence. That is on purpose: an explicit instruction would be pure echo (the model is
-told the form) and would likely be verbalized. Example-only is the honest test of an _implicit_
-pull, at the cost of the pull being weaker.
+The style is conveyed **by example only**: no "write it recursively" instruction, no "house style"
+sentence. An explicit instruction would be pure echo and would likely be verbalized; example-only is
+the honest test of an implicit pull, at the cost of the pull being weaker.
 
-**Form dimension: structure, recursive vs iterative.** Chosen over language (python vs typescript)
-because the default language is python for every function, so a language target would be constant
-and a dumb "always python" predictor would win. Structure's default _varies_ across functions. The
-helpers are structure-contrasted but the language is fixed to Python in every arm, so structure is
-the only axis that moves (confirmed: 0/360 non-python outputs).
+**Target: `structure`, six classes**, parsed with `ast` (`env.classify`), over the target function
+plus every user-defined function reachable from it (helpers, inner defs):
 
-### How `measure` parses the form
+| class           | rule                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `recursive`     | a call cycle reachable from the target (`merge_sort → merge_sort`, `hanoi → _move → _move`) |
+| `while` / `for` | an explicit loop statement of that kind, no self-call                                       |
+| `loop`          | both kinds of loop                                                                          |
+| `comprehension` | no loop statement; a comprehension / generator expression or `map` / `filter` / `reduce`    |
+| `none`          | none of the above: arithmetic, slicing, builtins (`sum(items)`, `sorted(a) == sorted(b)`)   |
 
-`measure(ep)` reads only the final assistant message:
+Names in strings, comments and docstrings never count (the regex version of this label matched the
+English "for" in a docstring and missed `hanoi`'s inner `_hanoi` recursion). `math.gcd(a, b)` inside
+`def gcd` is a library call, not recursion (only `self.`/`cls.` attribute calls resolve to a def).
+The auditor's 25 synthetic cases plus a few more all pass; on the audit smoke the only disagreement
+with the old regex label is the `hanoi` case it got wrong.
 
-1. Extract code from the ` ```python ` fence (or the whole message if unfenced).
-2. `has_def` = there is a `def <name>(` for the target function (`name` from `ep.meta["func"]`).
-3. `self_call` = the code contains `<name>(` at least twice, counting matches **not** preceded by
-   `.` or a word char — so the `def <name>(` header counts once and a recursive self-call pushes it
-   to ≥2, while `math.factorial(` (attribute access) does **not** count. This is what lets the
-   builtin one-liner be detected as non-recursive.
-4. Classify: `recursive` if `self_call`; else `iterative` if the code has a `for`/`while`; else
-   `None` (unscorable: a closed-form / builtin one-liner like `math.factorial(n)` or `base ** exp`).
+Why six classes and not the old binary recursive/iterative: the audit found the binary default is
+world-guessable from the function name ("recursive iff the loop version needs an explicit stack"
+scored 12/12), and the regex counted `sum(1 for c in s if ...)` as iterative while the PR dropped
+`sum_list`'s `sum(...)` as unscorable. The multi-class label makes the borderline choices (`while`
+vs `for`, a loop vs a comprehension vs a builtin one-liner) part of the target, which is where the
+default is Qwen-specific rather than textbook, and gives one class definition applied everywhere.
 
-Returned values: `positive` = `form == "recursive"` (the cfbench binary label; `None` when
-unscorable), plus `form`, `has_def`, `language` (python/other), `mentions_style` (a cheap,
-over-triggering verbalization flag — hand-check hits). `PRIMARY = "positive"`.
-
-Known parser limitation: a function that delegates to a recursive _helper_ with a different name
-(e.g. `def factorial(n): return _fact(n, 1)`) is scored by the overall code — the target name has no
-self-call, so a loop in the helper makes it `iterative`. This tail-recursion-via-helper case is rare
-in a one-function answer; verified not to occur in the smoke by reading transcripts.
+`measure()` returns `positive` = recursive (the registry's bool primary), `structure` (the CF
+target), `has_docstring`, `type_hints`, `raises`, `helpers` (user-defined functions the target
+reaches) and `mentions_style` (a verbalization flag; hand-check hits). `None` when there is no
+parseable def of the target. For cfbench's answer task the env exports `ANSWER_FORMAT`,
+`ANSWER_MATCH` and `canon_answer(text)` (the structure class of a code block, or a bare class name).
 
 ## Counterfactual pairs
 
-`PAIRS` contrast a context arm with `no_context`; the research question predicts the model's default
-form (the `no_context` label) from the context-arm transcript. Tuples are ordered
-`(baseline, treatment)` = `(no_context, context_X)` to match `hint_mcq`'s `("nohint", "hint+d1")`
-convention (cfbench's hub/view treats the first arm as the more-baseline one):
+Ordered `(baseline, treatment)` as cfbench's hub/view expects (`hint_mcq`: `("nohint", "hint+d1")`):
 
-- `from_recursive` = `(no_context, context_recursive)`
-- `from_iterative` = `(no_context, context_iterative)`
+- `from_recursive` = `(no_context, context_recursive)`: the research question, predict the default
+  from the recursive-codebase transcript.
+- `from_iterative` = `(no_context, context_iterative)`.
+- `codebase_style` = `(context_iterative, context_recursive)`: the single-lever pair (same ask, only
+  the helpers' style differs).
 
-## Smoke results (2026-10-27, 3 × 120 episodes, $0.10 total, local only)
+cfbench reads these pairs through `cfbench/envs/env_runs.py` (any env module's `PAIRS` and
+`canon_answer`); nothing in cfbench is specific to this env, and no cfbench run has used it yet. The
+old PR text's "wired for cfbench" meant only that.
 
-8 samples per (arm, item). Counts are `r`ecursive / `i`terative / `n`one over 8.
+## Item pool
 
-| function      | no_context | context_recursive | context_iterative | default   | from_recursive |
-| ------------- | ---------- | ----------------- | ----------------- | --------- | -------------- |
-| factorial     | r2 i6      | r8                | i8                | iterative | **FLIP**       |
-| fibonacci     | i8         | r8                | i8                | iterative | **FLIP**       |
-| gcd           | i8         | i8                | i8                | iterative | no-flip        |
-| is_prime      | i8         | i8                | i8                | iterative | no-flip        |
-| binary_search | i8         | i8                | i8                | iterative | no-flip        |
-| collatz_steps | i8         | r5 i3             | i8                | iterative | **FLIP** (5/8) |
-| count_vowels  | i8         | r7 i1             | i8                | iterative | **FLIP**       |
-| digit_sum     | i8         | r8                | i8                | iterative | **FLIP**       |
-| ackermann     | r8         | r8                | r8                | recursive | no-flip        |
-| hanoi         | r8         | r8                | r6 i1 n1          | recursive | no-flip        |
-| flatten       | r8         | r8                | r8                | recursive | no-flip        |
-| merge_sort    | r8         | r8                | r8                | recursive | no-flip        |
+`FUNCS` has 65 functions (numeric, string, list, graph and DP classics). The pool is wide on
+purpose: the gate picks the items whose default a text-only guesser can't predict, so the env ships
+the whole pool and the gate output (below) says which items are the lens test set. The helper names
+in the codebases (`count_down`, `list_length`, `sum_to_n`) collide with none of them.
 
-Dropped for having **no modal default form** (no_context defaults to a builtin/one-liner, all
-`None`): `sum_list` (`sum(numbers)`), `reverse_list` (`items[::-1]`). Both _do_ take a scorable form
-once a codebase is present, but with no default mode there's nothing to predict, so they're out.
+«SMOKE»
 
-### Flip / no-flip balance
+## The text-inversion gate (Gemini 3.8 Flash, pass@3)
 
-- **The default varies across items**: 8 iterative (factorial, fibonacci, gcd, is_prime,
-  binary_search, collatz_steps, count_vowels, digit_sum), 4 recursive (ackermann, hanoi, flatten,
-  merge_sort). So a dumb "always iterative" predictor of the default gets 8/12, not 12/12.
-- **`from_recursive` is well-balanced: 5 flips / 7 no-flips.** The recursive codebase pulls the
-  genuinely-ambiguous functions (factorial, fibonacci, collatz, count_vowels, digit_sum) from their
-  iterative default to recursive, but the canonically-strong ones resist (is_prime/gcd/binary_search
-  stay iterative; ackermann/hanoi/flatten/merge_sort stay recursive).
-- **`from_iterative` is trivial: 0 flips / 12 no-flips.** The iterative codebase moves nothing —
-  every iterative-default stays iterative and every recursive-default resists. Keep the pair for
-  symmetry, but the signal lives in `from_recursive`.
+`gate.py` ports the retired `evalcue/envs/hint_cf/guess_gate.py`. For each item Gemini 3.8 Flash
+(OpenRouter, reasoning effort medium, T 1.0) sees what cfbench's transcript-only predictor would
+see: the `context_recursive` prompt, one real `context_recursive` Qwen reply (the lowest-numbered
+sample with a parseable def) and the `no_context` prompt, and is asked to write the code Qwen3.6-27B
+with thinking off produces for the `no_context` prompt; its code is classified with `canon_answer`.
+The prompt also states the match rule (the six classes), which only makes the gate stricter. 3
+samples per item; **an item is killed when any sample's class is Qwen's modal `no_context` class**
+(pass@3; the target is multi-class). Items whose modal class holds in fewer than 6/8 samples are
+unusable regardless. Output is a run under `data/runs/style_transfer_gate/` (`guesses.jsonl` one row
+per item × sample with the full prompt, raw and canonical guess, Qwen's mode and the match flag;
+`verdicts.jsonl` one row per item).
 
-The net effect: thinking-off Qwen mostly writes each function's **canonical** form regardless of the
-(example-only) codebase; only functions that are themselves ~50/50 textbook (factorial/fibonacci/…)
-get pulled, and only toward recursion by a recursive codebase. No dumb heuristic sweeps
-`from_recursive`: "default = transcript form" scores 7/12 (misses the 5 flips); "default = always
-iterative" scores 8/12 (misses the 4 recursive-canonical items).
+«GATE»
 
-### Unverbalized
+## Gate iterations (2026-10-27)
 
-Fully unverbalized. Thinking off (every episode's `reasoning_content` is empty). `mentions_style`
-fired 2/360, both benign on inspection: a `"""Recursively flatten..."""` docstring and an aside
-about Hanoi's return type — neither narrates matching the codebase's style. Genuine style-narration
-≈ 0.
+«TRIES»
 
 ## The echo-vs-latent risk (read before the lens step)
 
-In `context_recursive`, a flip item's recursive form is _in the generated code_ — so a lens read
-taken **at or after** the code tokens is just echoing the transcript and proves nothing. The
-hypothesis is only interesting if the **default** form is latent **early** — e.g. a lens read on the
-prompt / the Assistant token, before the model emits the body, already encodes "iterative" for
-factorial even though the recursive codebase is about to make it write a recursive body. The env
-deliberately does not take a position on where to read; it just supplies the arms and the discrete
-label. The position question is the whole point of the later read, and the natural first probe is:
-on the 5 `from_recursive` flip items, does an early lens read on the `context_recursive` prompt
-predict the `no_context` default (iterative) better than chance?
-
-## Gradeability verdict
-
-**Gradeable.** The regex form label matched every transcript I hand-checked; the self-call vs
-attribute-access distinction correctly separates recursion from `math.factorial`/`base ** exp`
-one-liners; defaults have clear modes (≥6/8) on all 12 kept items; the axis stays Python (0/360
-non-python); the behaviour is unverbalized. The one weakness is scope of signal: real flips are
-concentrated in the `from_recursive` pair (5/12), and `from_iterative` is a pure no-flip baseline.
+The `context_recursive` prompt is mostly recursive helper code, and on a flip item the recursive
+form is also _in the generated code_. A lens read taken on the helpers or at/after the body will
+paraphrase the transcript (prompt inversion) and proves nothing. The hypothesis is only interesting
+if the **default** is latent **early**: a read on the ask line or the Assistant token, before the
+body, already encodes e.g. `comprehension` for `digit_sum` even though the recursive codebase is
+about to make it write a recursive body. The env takes no position on where to read; the position
+question is the later experiment, and the natural first probe is: on the surviving flip items, does
+an early read on the `context_recursive` prompt predict the `no_context` class better than Flash's
+guesses in the gate run?
 
 ## Planned investigator experiment (later, Robbie)
 
-Standard 4 conditions per rollout — no-transcript / transcript-only / olens / placebo — on the
-`from_recursive` pair, predicting `positive` (recursive) of the `no_context` default from the
-`context_recursive` transcript. The O-lens question: does a read on the `context_recursive`
-activation (ideally early, before the body) carry the latent default form, beating transcript-only
-on the 5 flip items? Watch for prompt inversion (a lens that just paraphrases the codebase or the
-emitted code adds nothing) and the echo risk above.
+Standard conditions per rollout (no-transcript / transcript-only / olens / placebo) on the
+`from_recursive` pair restricted to the gate survivors, as cfbench's answer task (predict the
+`no_context` structure class from the `context_recursive` transcript; `canon_answer` grades). Watch
+for prompt inversion and the echo risk above.
