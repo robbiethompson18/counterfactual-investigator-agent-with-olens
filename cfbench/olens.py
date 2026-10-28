@@ -71,13 +71,16 @@ class Reads(Mapping[str, tuple[list[dict], list[dict]]]):
         self.rows: dict[str, list[dict]] = {}
         for path in map(Path, paths):
             requests = {r["id"]: r for r in map(json.loads, (path.parent / "requests.jsonl").read_text().splitlines())}
+            # the reader's --positions all says so in its provenance, not in requests.jsonl
+            prov = path.with_name(f"{path.stem}.provenance.json")
+            dense_file = prov.exists() and json.loads(prov.read_text()).get("positions") == "all"
             messages = {id: r["messages"] for id, r in requests.items()}
             offset = 0
             with path.open("rb") as f:
                 for line in f:
                     row = json.loads(line)
                     # msg_index < 0: the tool definitions before the system prompt, same in every run, not in the transcript
-                    dense = requests[row["id"]].get("positions") == "all"
+                    dense = dense_file or requests[row["id"]].get("positions") == "all"
                     if row["msg_index"] >= 0 and positions == "sparse" and dense and not sparse(row):
                         dropped.setdefault(row["id"], path)
                     elif row["msg_index"] >= 0:

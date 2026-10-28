@@ -107,7 +107,9 @@ def tools(base: list[Rollout], reads: Reads, placebo: bool, seed: int = 0) -> tu
                                 matched.add(i)
                                 context = _context(text, p.char)
                                 head = f"· {p.label(scale)}\n<transcript>{context}</transcript>"
-                                found.setdefault((context, p.token, L, t), [[], -q, f"{head}\n{_line(L, p.layers[L]['top'])}"])[0].append(i)
+                                line = f"{head}\n{_line(L, p.layers[L]['top'])}"
+                                # q in the key: the same prompt text in several runs merges, distinct reads at one char don't
+                                found.setdefault((context, p.token, L, t, q), [[], -q, line])[0].append(i)
                 continue
             for m in pattern.finditer(texts[i]):
                 matched.add(i)
