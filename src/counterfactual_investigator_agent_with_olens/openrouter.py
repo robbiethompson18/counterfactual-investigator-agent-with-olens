@@ -14,7 +14,7 @@ defaults differ; `effort="off"` disables thinking, which some models refuse with
 OpenAI-compatible API with $GEMINI_API_KEY, at `reasoning_effort` = effort, so a run can use a key whose daily quota isn't
 the one OpenRouter's BYOK route is spending (set GEMINI_API_KEY to the key you want for that run). No `usage.cost`.
 `vertex/<model>` does the same on Vertex AI's OpenAI-compatible endpoint in $VERTEX_PROJECT, authenticated as the active
-gcloud account (token refreshed every 45 min); for when AI Studio 503s "high demand" but Vertex has capacity.
+gcloud account (token re-read every 2 min); for when AI Studio 503s "high demand" but Vertex has capacity.
 """
 
 import asyncio
@@ -35,7 +35,7 @@ VERTEX = "vertex/"
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: AsyncOpenAI | None = None
-_VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud access tokens last an hour
+_VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud returns its cached hour-long token until it nears expiry
 
 
 class NoChoices(Exception):
@@ -82,7 +82,7 @@ async def chat(
     `extra_body` there is merged over the OpenRouter fields."""
     global _CLIENT, _GOOGLE, _VERTEX
     if model.startswith(VERTEX):
-        if _VERTEX is None or time.time() - _VERTEX[0] > 45 * 60:
+        if _VERTEX is None or time.time() - _VERTEX[0] > 120:  # so re-read often, or the cached token runs out under us
             cmd = ["gcloud", "auth", "print-access-token"]
             token = str(await asyncio.to_thread(subprocess.check_output, cmd, text=True)).strip()
             url = f"https://aiplatform.googleapis.com/v1/projects/{os.environ['VERTEX_PROJECT']}/locations/global/endpoints/openapi"
