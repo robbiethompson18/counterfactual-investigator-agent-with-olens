@@ -493,6 +493,11 @@ Current docs:
   file blames a file (`hint+d1` the author's, `hint+d2` the other plausible site); 77 candidate
   repos, the usable items are those where Qwen's own pick is consistent and Gemini 3.8 Flash can't
   guess it from the hinted transcript (pass@3 gate); the try log is in the doc
+- [ACTIVE: style_transfer env (super experimental) — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
+  — Qwen thinking off implements 130 known functions with/without a recursive- or loop-styled
+  codebase; AST structure label (recursive/while/for/loop/comprehension/none); 125/130 clear
+  defaults, 46 flips under the recursive codebase; Flash text-inversion gate (`gate.py`) kills 115,
+  the 10 `SURVIVORS` (7 flips) are the lens test set; try log; echo-vs-latent caveat for the read
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
   — GLM 5.3 runs (glm53-\* tags), own-line vs Qwen-line thresholds via DONATION_BET_LINES, judged
   Qwen-vs-GLM gaps with CIs, GLM O-lens "manipulation" reads vs the gap, the empty-think-block run
