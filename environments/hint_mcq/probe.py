@@ -264,6 +264,146 @@ def plot(res: dict, sites: list[str], run: Path):
     fig.savefig(run / "probe_by_layer.png", dpi=130)
 
 
+def _softmax_by_q(s: np.ndarray, starts: np.ndarray) -> np.ndarray:
+    """Softmax of option scores within each question; options are stored grouped by question, `starts` = first index of each."""
+    z = s - np.repeat(np.maximum.reduceat(s, starts), np.diff(np.append(starts, len(s))))
+    e = np.exp(z)
+    return e / np.repeat(np.add.reduceat(e, starts), np.diff(np.append(starts, len(s))))
+
+
+def _fit_listwise(X: np.ndarray, t: np.ndarray, starts: np.ndarray, l2: float, n_free: int = 0) -> np.ndarray:
+    """Conditional logit: p(i|q) = softmax_q(X w); minimise mean over questions of CE(t, p) + l2/2 |w|^2 with L-BFGS. The
+    last `n_free` columns (per-letter biases) are not penalised."""
+    from scipy.optimize import minimize
+
+    n_q = len(starts)
+
+    def f(w):
+        p = _softmax_by_q(X @ w, starts)
+        wp = w.copy()
+        wp[len(w) - n_free :] = 0
+        loss = -np.sum(t * np.log(p + 1e-12)) / n_q + 0.5 * l2 * wp @ wp
+        return loss, X.T @ (p - t) / n_q + l2 * wp
+
+    return minimize(f, np.zeros(X.shape[1]), jac=True, method="L-BFGS-B", options={"maxiter": 500}).x
+
+
+def pmf(a):
+    """A distribution over each question's options from one (site, layer): listwise softmax probes trained on Qwen's modal
+    answer (one-hot) or on its own letter pmf (its logits restricted to the question's letters), vs the binary is_answer
+    probe's scores softmaxed per question, and uniform. Held out by question, same folds as `fit`."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.model_selection import GroupKFold
+    from sklearn.preprocessing import StandardScaler
+
+    run = Path(a.run)
+    meta = json.loads((run / "meta.json").read_text())
+    layers = meta["params"]["layers"]
+    if a.site is None:
+        res = json.loads((run / "results.json").read_text())["probes"]
+        key = max((k for k in res if k.endswith("/is_answer")), key=lambda k: res[k]["all"]["auroc_answer"])
+        a.site, a.layer = key.split("/")[0], int(key.split("/")[1])
+    print(f"site {a.site}, layer {a.layer}")
+    opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
+    qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
+    q = np.array([o["q"] for o in opts])
+    starts = np.flatnonzero(np.r_[True, q[1:] != q[:-1]])
+    is_answer = np.array([o["is_answer"] for o in opts], float)
+    is_gold = np.array([o["is_gold"] for o in opts], float)
+    right = np.array([r["right"] for r in qs])
+    qwen = _softmax_by_q(np.concatenate([r["logp"] for r in qs]), starts)  # Qwen's pmf over the question's letters
+    X = np.asarray(np.load(CACHE / run.name / f"{a.site}.npy", mmap_mode="r")[:, layers.index(a.layer)], dtype=np.float64)
+    folds = list(GroupKFold(n_splits=a.folds).split(q, groups=q))
+
+    def sub(idx):  # option indices -> (rows, question starts within them)
+        qq = q[idx]
+        return idx, np.flatnonzero(np.r_[True, qq[1:] != qq[:-1]])
+
+    letter = np.eye(len(LETTERS))[[o["opt"] for o in opts]]
+
+    def cv(target: np.ndarray, l2: float, folds, feats: str) -> np.ndarray:
+        """feats: "act" (w.h), "act+letter" (w.h + b_letter, biases unpenalised) or "letter" (b_letter only)."""
+        s = np.zeros(len(q))
+        for tr, te in folds:
+            if feats == "letter":
+                w = _fit_listwise(letter[tr], target[tr], sub(tr)[1], 0.0, n_free=len(LETTERS))
+                s[te] = letter[te] @ w
+                continue
+            sc = StandardScaler().fit(X[tr])
+            Xtr, Xte = sc.transform(X[tr]), sc.transform(X[te])
+            n_free = len(LETTERS) if feats == "act+letter" else 0
+            if n_free:
+                Xtr, Xte = np.hstack([Xtr, letter[tr]]), np.hstack([Xte, letter[te]])
+            w = _fit_listwise(Xtr, target[tr], sub(tr)[1], l2, n_free)
+            s[te] = Xte @ w
+        return s
+
+    def pick_l2(target, feats):  # inner GroupKFold on the first outer fold's training questions
+        tr = folds[0][0]
+        inner = [(tr[i], tr[j]) for i, j in GroupKFold(n_splits=4).split(tr, groups=q[tr])][:1]
+        nll = {}
+        for l2 in a.l2:
+            s = cv(target, l2, inner, feats)
+            te = inner[0][1]
+            p = _softmax_by_q(s[te], sub(te)[1])
+            nll[l2] = -np.sum(target[te] * np.log(p + 1e-12)) / len(sub(te)[1])
+        print("  l2 grid (inner CE):", {k: round(v, 3) for k, v in nll.items()}, flush=True)
+        return min(nll, key=lambda k: nll[k])
+
+    def binary_scores():
+        s = np.zeros(len(q))
+        for tr, te in folds:
+            sc = StandardScaler().fit(X[tr])
+            s[te] = LogisticRegression(C=a.C, max_iter=2000).fit(sc.transform(X[tr]), is_answer[tr]).decision_function(sc.transform(X[te]))
+        return s
+
+    def metrics(p: np.ndarray) -> dict:
+        ends = np.append(starts, len(q))
+        top = np.array([starts[i] + np.argmax(p[starts[i] : ends[i + 1]]) for i in range(len(starts))])
+        p_ans = np.add.reduceat(p * is_answer, starts)
+        kl = np.add.reduceat(qwen * (np.log(qwen + 1e-12) - np.log(p + 1e-12)), starts)
+        conf, hit = p[top], is_answer[top]
+        out = {}
+        for name, m in (("all", np.ones(len(starts), bool)), ("right", right), ("wrong", ~right)):
+            bins = np.minimum((conf[m] * 10).astype(int), 9)
+            ece = sum(abs(conf[m][bins == b].mean() - hit[m][bins == b].mean()) * (bins == b).mean() for b in np.unique(bins))
+            out[name] = {
+                "top1_answer": float(hit[m].mean()),
+                "top1_gold": float(is_gold[top][m].mean()),
+                "nll_answer": float(-np.log(p_ans[m] + 1e-12).mean()),
+                "kl_qwen": float(kl[m].mean()),
+                "mean_top_p": float(conf[m].mean()),
+                "ece": float(ece),
+            }
+        return out
+
+    out = {"site": a.site, "layer": a.layer, "methods": {}, "l2": {}}
+    out["methods"]["uniform"] = metrics(_softmax_by_q(np.zeros(len(q)), starts))
+    out["methods"]["binary probe, softmaxed"] = metrics(_softmax_by_q(binary_scores(), starts))
+    for tname, target in (("answer one-hot", is_answer), ("Qwen letter pmf", qwen)):
+        name = f"letter only, target {tname}"
+        out["methods"][name] = metrics(_softmax_by_q(cv(target, 0.0, folds, "letter"), starts))
+        for feats in ("act", "act+letter"):
+            name = f"listwise {feats}, target {tname}"
+            print(name, flush=True)
+            out["l2"][name] = l2 = pick_l2(target, feats)
+            out["methods"][name] = metrics(_softmax_by_q(cv(target, l2, folds, feats), starts))
+    out["methods"]["Qwen's own letter pmf (ceiling)"] = metrics(qwen)
+    (run / "pmf.json").write_text(json.dumps(out, indent=1) + "\n")
+    cols = ("top1_answer", "top1_gold", "nll_answer", "kl_qwen", "mean_top_p", "ece")
+    lines = [
+        f"PMF over options from `{a.site}` layer {a.layer}, held-out questions (GroupKFold {a.folds}); l2 per listwise probe: {out['l2']}",
+        "",
+        "| method | split | " + " | ".join(cols) + " |",
+        "|---|---|" + "---|" * len(cols),
+    ]
+    for name, r in out["methods"].items():
+        for split in ("all", "right", "wrong"):
+            lines.append(f"| {name} | {split} | " + " | ".join(f"{r[split][c]:.3f}" for c in cols) + " |")
+    (run / "pmf.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -280,8 +420,15 @@ def main():
     f.add_argument("--folds", type=int, default=5)
     f.add_argument("--C", type=float, default=0.01)
     f.add_argument("--finish", action="store_true", help="mark the run done and sync it to HF")
+    p = sub.add_parser("pmf")
+    p.add_argument("run")
+    p.add_argument("--site", help="default: the (site, layer) with the best is_answer AUROC in results.json")
+    p.add_argument("--layer", type=int)
+    p.add_argument("--folds", type=int, default=5)
+    p.add_argument("--C", type=float, default=0.01)
+    p.add_argument("--l2", type=float, nargs="+", default=[1e-3, 1e-2, 1e-1, 1.0])
     a = ap.parse_args()
-    {"collect": collect, "fit": fit}[a.cmd](a)
+    {"collect": collect, "fit": fit, "pmf": pmf}[a.cmd](a)
 
 
 if __name__ == "__main__":
