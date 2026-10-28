@@ -92,3 +92,66 @@ min engine init (not yet measured). Gotchas met: the watcher deletes the pod a m
 appears, and a stale `FAILED` on the volume from the previous pod does the same, so remove it before
 restarting a job; rsync to the NFS volume needs `--no-owner --no-group` (chown fails); vLLM's weight
 load prints thousands of benign `CUDACachingAllocator ... OOM` warnings on 2x H200.
+
+## One-engine reader: `vllm_capture_read.py` (2026-10-27)
+
+`vllm_capture_read.py` does read.py's capture + first-reply logits on the same vLLM 0.32 engine that
+then runs `vllm_read.decode_states` (the lens stage, unchanged), so there is no HF venv, no 2-stage
+pass and no `states.pt` handoff. Capture is `max_tokens=1` prefills of prompt + reply with
+vllm-metamodels' hooks (`extra_args={"output_residual_stream": [L], "capture_positions": [...]}`);
+the `hc_inject/hc_capture.py` plugin makes that work on V4 by wrapping
+`vllm_lens._worker_ext._split_layer_output`: a V4 layer returns the deferred fold
+`(x, residual[T, 4, D], post_mix, res_mix)`, and the wrapper folds it with `mhc_post_tilelang` (the
+state entering layer L + 1, which is HF's layer-L output and what read.py's hook saved) into
+`[T, 16384]` rows, and sets `VLLM_LENS_MULTI_STREAM=0` so the plugin accepts the request. The
+capture prefill also carries `prompt_logprobs`, which gives read.py's "reject" (log P of the
+captured sequence's reply: `<rejected/>`, or the actual reply with `--actual-reply`) and
+`top_first`; one more prefill of prompt + `<request_fully_accepted/>` gives "accept". Positions and
+rows are read.py's (`render` / `read_positions` imported from it), output rows are `vllm_read.py`'s
+(`reads_L30.jsonl`: id, pos, char, role, token, ctx_left, ctx_right, layer, greedy, s1, s2) and
+read.py's `logits.jsonl`. Chunked prefill is off so every prompt prefills in one pass (a split
+prompt's 1-token tail would run as a decode graph, where the hooks don't fire).
+
+    ~/vl/.venv/bin/python vllm_capture_read.py --model /workspace/dsv4/w/v4flash --lens /workspace/dsv4/w/v4lens \
+        --requests requests.jsonl --out out/ --layers 30 --dense --actual-reply --read-arms preview,public --public-first \
+        [--limit 20] [--save-states] [--check-against REF_DIR]
+    python compare_reads.py RUN_A RUN_B --reads reads_L30.jsonl   # greedy-prefix and logit parity between two runs
+
+Pod job: `runpod_vllm.sh` (cache check, CUDA apt, reinstall `hc_inject` with the new plugin, a
+`--limit 20` smoke then the full file, each compared with the simple run's reads at
+`$REF=/workspace/dsv4/out/af-v7`; writes `READS_DONE` / `FAILED` for `runpod/watch_pod.sh`). Driver,
+from the repo root with no other pod on the account (balance ≥ ~$25: 2x H200 is $10.58/h):
+
+    RUN=data/runs/olens_reads/<date>_dsv4-vllm-capture   # scripts/runs.py new olens_reads dsv4-vllm-capture ...
+    nohup perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' runpod/watch_pod.sh dsv4-vllm-capture /workspace/dsv4/out/vllm-capture $RUN 3 8 \
+        > /tmp/watch_dsv4-vllm-capture.log 2>&1 < /dev/null &
+    pgrep -fl "watch_pod.sh dsv4-vllm-capture"                     # must print the watcher before the next line
+    VOLUME=sujswd59wj runpod/pod.sh up dsv4-vllm-capture "NVIDIA H200" 2
+    runpod/pod.sh ssh dsv4-vllm-capture 'mkdir -p /workspace/code_vllm /workspace/dsv4/out/vllm-capture'
+    rsync -az -e "ssh -o StrictHostKeyChecking=no -p PORT" scripts/dsv4_olens/ data/runs/olens_reads/2026-10-27_dsv4-af-v7/requests.jsonl root@IP:/workspace/code_vllm/
+    runpod/pod.sh ssh dsv4-vllm-capture 'nohup bash /workspace/code_vllm/runpod_vllm.sh > /workspace/dsv4/out/vllm-capture/job.log 2>&1 < /dev/null &'
+    runpod/pod.sh ssh dsv4-vllm-capture 'tail -3 /workspace/dsv4/out/vllm-capture/job.log'   # every 3 min; two identical tails = stuck
+
+Test (2026-10-27, `data/runs/olens_reads/2026-10-27_dsv4-vllm-capture`, pod `dsv4-vllm-capture`, 2x
+H200 on the cached volume, 74 min of pod ≈ $13 including a 20-request smoke and a 20-request
+capture-only check): the same 200 v7 requests as the simple run, 26,577 dense layer-30 reads.
+
+| stage            | simple run (`2026-10-27_dsv4-af-v7`)          | one engine (full file)                         |
+| ---------------- | --------------------------------------------- | ---------------------------------------------- |
+| HF model load    | 499 s                                         | none                                           |
+| capture + logits | 318 s (HF)                                    | 52 s (vLLM)                                    |
+| vLLM engine up   | 1,873 s (first JIT of the venv on the volume) | 435 s (JIT cached; 401–489 s over three boots) |
+| lens             | 1,119 s, 23.7 reads/s                         | 984 s, 27.0 reads/s                            |
+| total            | 68 min (≈ 40 min with a warm JIT)             | 24.5 min (one process, no `states.pt`)         |
+
+Parity with the simple run (same positions, 26,577/26,577 shared): greedy first 10 / 20 / 40
+characters equal 45.3% / 30.9% / 19.9% (Kylie's HF-capture-decoded-by-vLLM vs all-HF number was 65%
+/ 49%: that pair shared the capture, this one does not, so the extra drift is the capture stack).
+The capture itself is right: on 2,758 positions of the 20-request check, the vLLM layer-30 state vs
+read.py's HF `states.pt` has cosine 0.982 mean (p5/50/95 0.960/0.987/0.994), norm ratio 0.996, worst
+rows 0.53 (FP8 MoE kernels differ between HF `kernels` and vLLM DeepGEMM, and 30 layers of that is
+the 18% relative difference, not a position or fold error). Logits (20 requests, the fixed "reject"
+= log P of the captured reply): `reject` corr 0.9994, `accept` corr 0.77 (mean |diff| 0.6 nats; it
+is a 7-token sum near −7), `accept − reject` corr 0.9986, sign agreement 1.0, top-1 first reply
+token 100%. The full file's `logits.jsonl` was written with the earlier "reject" = log
+P(`<rejected/>`) semantics (fixed in `8e29301`); its `accept` corr over 200 ids is 0.82.
