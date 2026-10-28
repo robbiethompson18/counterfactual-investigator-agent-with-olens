@@ -58,6 +58,9 @@ class Lens:
     min_fve: float | None  # default filter; None shows every output
     window: int
     max_hits: int
+    # how a hit shows the read's place in the transcript: "marker" (⟨READ⟩ at the read, the default) or "xml" (about 10
+    # tokens each side with the read token wrapped, "not a foo<read>,</read> a bar"; an eval's OLENS opts in, harness 12)
+    context: str = "marker"
 
 
 LENSES = {
@@ -204,13 +207,27 @@ def _flat(text: str) -> str:
 FIELD = re.compile(r"(?:^|\n\n)(?:SYSTEM|USER|TOOL|ASSISTANT)\b[^\n]*:\n?")
 
 
-def _context(text: str, char: int) -> str:
-    """The transcript around a read, ⟨READ⟩ at the read, cut at the edges of the message field the read is in."""
-    before, after = text[max(0, char - BEFORE) : char], text[char : char + AFTER]
+XML_CHARS = 40  # context="xml": characters each side of the read (about 10 tokens)
+# the O-lens prompt's sentence on the read marker (core.OLENS), and its context="xml" version (cfbench/eval.py swaps them)
+MARKER_NOTE = "(⟨READ⟩ marks the token the lens read)"
+XML_NOTE = "(<read>…</read> wraps the token the lens read; ↵ is a newline)"
+
+
+def show_token(token: str) -> str:
+    return token.replace("\n", "↵")
+
+
+def _context(text: str, char: int, token: str = "", xml: bool = False) -> str:
+    """The transcript around a read, cut at the edges of the message field the read is in: ⟨READ⟩ at the read, or with
+    `xml` the read token wrapped in <read></read> (a token not in the text, e.g. <|im_end|>, is shown there all the same)."""
+    n_before, n_after = (XML_CHARS, XML_CHARS) if xml else (BEFORE, AFTER)
+    end = char + len(token) if xml and text.startswith(token, char) else char
+    before, after = text[max(0, char - n_before) : char], text[end : end + n_after]
     cut_before, cut_after = FIELD.split(before), FIELD.split(after)
-    before = cut_before[-1] if len(cut_before) > 1 else ("…" if char > BEFORE else "") + before
-    after = cut_after[0] if len(cut_after) > 1 else after + ("…" if char + AFTER < len(text) else "")
-    return f"{_flat(before)}⟨READ⟩{_flat(after)}".strip()
+    before = cut_before[-1] if len(cut_before) > 1 else ("…" if char > n_before else "") + before
+    after = cut_after[0] if len(cut_after) > 1 else after + ("…" if end + n_after < len(text) else "")
+    mark = f"<read>{show_token(token)}</read>" if xml else "⟨READ⟩"
+    return f"{_flat(before)}{mark}{_flat(after)}".strip()
 
 
 def tools(
@@ -225,7 +242,7 @@ def tools(
     """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads. `overrides`
     replaces fields of the lens's defaults (an eval's OLENS, e.g. {"min_fve": 0.0})."""
     lens = replace(LENSES[kind], **(overrides or {}))
-    unit = lens.unit[:-1]
+    unit, xml = lens.unit[:-1], lens.context == "xml"
     texts = [render_spans(r.messages)[0] for r in base]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]
     source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
@@ -279,7 +296,10 @@ def tools(
         out, prev = [f"Run {i} (showed the behavior: {yes_no[i]}), {len(shown)} read positions around char {char}:"], None
         for p in shown:
             start = max(prev.char if prev else 0, p.char - GAP_CHARS)
-            out.append(f"\n{p.label(scale)}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
+            if xml:
+                out.append(f"\n{p.label(scale)}\n<transcript>{_context(text, p.char, p.token, True)}</transcript>")
+            else:
+                out.append(f"\n{p.label(scale)}\n<transcript>…{_flat(text[start : p.char])}⟨READ⟩</transcript>")
             got = bullets(p, layers, top_k, min_fve)
             tag = lens.name
             out += [f"<{tag} {_attrs(layer, b)}>{b['text']}</{tag}>" for layer, b in got] or [f"(no {unit} with FVE >= {min_fve})"]
@@ -317,7 +337,7 @@ def tools(
             for p, got in hits:
                 if got:
                     matched.add(i)
-                context = _context(text, p.char)
+                context = _context(text, p.char, p.token, xml)
                 for layer, b in got:
                     head = f"· {p.label(scale)}"
                     line = f"{head}\n<transcript>{context}</transcript>\n<{lens.name} {_attrs(layer, b)}>{b['text']}</{lens.name}>"

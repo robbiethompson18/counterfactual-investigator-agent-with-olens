@@ -22,13 +22,16 @@ from pathlib import Path
 
 from cfbench.core import Rollout
 from cfbench.evals.hint_qwen_dsv4 import eval as K
+from cfbench.evals.hint_qwen_dsv4 import inline
 from environments._lib.core import load_env
 
 ENVS = K.ENVS
 VERSIONS = K.VERSIONS
+DEFAULT_VERSIONS = K.DEFAULT_VERSIONS
 MODEL_NAME = None
 CONDITIONS = K.CONDITIONS
 OLENS = K.OLENS
+INLINE_EFFORT = K.INLINE_EFFORT
 TASK = "answer"
 INPUTS_FROM = "hint_qwen_dsv4"
 QWEN = "Qwen/Qwen3.6-27B"
@@ -71,6 +74,16 @@ def canon(text: str, opts: list[str]) -> str | None:
     return None
 
 
+INLINE_ASK = """\
+Predict the letter Qwen3.6-27B picks in the counterfactual arm, with no hint: its most common answer there. You are \
+scored correct if your letter matches it, so give the single most likely letter. Reason it through first, then call \
+`submit_answer` once with the letter."""
+
+
+def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
+    return inline.prompt(env, condition, case, base, seed, VERSIONS[case["source"]], "Qwen3.6-27B", INLINE_ASK)
+
+
 class Prompt(K.Prompt):
     """hint_qwen_dsv4's prompt env plus the answer-task attributes of the item's env (cfbench/core.py)."""
 
@@ -91,7 +104,7 @@ def cases(inputs: Path, versions: list[str]):
         V, env = VERSIONS[c["version"]], Prompt(c["version"], c["item"], c["gold"])
         base = [Rollout(source=s, messages=m, label=True, answer=env.canon_answer(m[-1]["content"] or "")) for s, m in c["shown"]]
         modal, k = Counter(c["answers_cf"]).most_common(1)[0]
-        row = {"version": "pooled", "source": c["version"], "item": c["item"], "class": c["class"], "gold": c["gold"],
+        row = {"version": V.get("pool", "pooled"), "source": c["version"], "item": c["item"], "class": c["class"], "gold": c["gold"],
                "model": QWEN, "env_name": V["env"],
                "env": f"eval:hint_qwen_dsv4_letter/{c['version']}@{c['item']}", "task": TASK, "base_arm": V["arms"][0],
                "cf_arm": V["arms"][1], "answers_base": dict(Counter(r.answer for r in base)), "answers_cf": c["answers_cf"],

@@ -80,11 +80,14 @@ async def predict(
         {"role": "user", "content": prompt},
     ]
     schemas = [submit, *(schema for schema, _ in tools.values())]
-    cost, used, submission = 0.0, Counter(), None
+    cost, used, submission, tokens = 0.0, Counter(), None, Counter()
     for _ in range(budget + MAX_TURNS):
         # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
         r = await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000)
         cost += getattr(r.usage, "cost", 0) or 0
+        if u := r.usage:  # summed over the conversation's calls (harness 12)
+            reasoning = u.completion_tokens_details.reasoning_tokens or 0 if u.completion_tokens_details else 0
+            tokens.update(prompt=u.prompt_tokens, completion=u.completion_tokens, reasoning=reasoning, calls=1)
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
@@ -104,5 +107,5 @@ async def predict(
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": reply})
         if submission:
             break
-    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tools": schemas, "messages": messages}
+    log = {"turns": len(messages), "tool_calls": dict(used), "cost": cost, "tokens": dict(tokens), "tools": schemas, "messages": messages}
     return {**submission, "valid": True, **log} if submission else {**empty, "rationale": "", "valid": False, **log}
