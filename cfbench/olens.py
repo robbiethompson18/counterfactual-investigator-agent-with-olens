@@ -181,7 +181,9 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
         i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
         if r["token"] == "<|im_end|>" and not field:
             im_end.setdefault(i, t)
-        if (i, field) in spans and c is not None and not field.startswith("tool_call"):
+        if r.get("header") and i in starts:  # a turn's own template token (af_refusals' user_header): on its "USER:" label
+            char, where = text.rfind("\n\n", 0, min(starts[i])) + 2, f"{r['role']} (start of turn)"
+        elif (i, field) in spans and c is not None and not field.startswith("tool_call"):
             char, where = spans[i, field] + c, f"{r['role']} {field}"
         elif not field and i in im_end and t > im_end[i]:  # the header of the next turn
             char = min(starts[i + 1]) if i + 1 in starts else len(text)

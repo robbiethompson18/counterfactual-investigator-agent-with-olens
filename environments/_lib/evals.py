@@ -110,11 +110,7 @@ def seen_tokens(reads, row: dict) -> dict | None:
         if by is not None:
             m, rows = reads[by]
             pos = olens.positions(messages, rows if by == src else olens.onto(messages, m, rows))
-        # a read sits at the start of the token after it (the tools' ⟨READ⟩ is just before its char); a turn's header read
-        # (read_rows' `header`, e.g. <｜User｜>) on the turn's "USER:" label line
-        for p in pos:
-            if any(r.get("header") for r in p.layers.values()):
-                p.char = text.rfind("\n\n", 0, p.char) + 2
+        # a read sits at the start of the token after it (the tools' ⟨READ⟩ is just before its char)
         spans = list(itertools.pairwise(sorted({0, len(text), *(min(len(text), p.char) for p in pos)}))) or [(0, 0)]
         first = {a: start + k for k, (a, _) in enumerate(spans)}
         toks += [text[a:b] for a, b in spans]

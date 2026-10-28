@@ -70,6 +70,8 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # source's: prompt positions at their place (the prompts must be identical), reply positions moved to the same relative
 # place in the shown reply. Under 9 its tools showed the source transcript's text around each read, which differs once
 # replies are shown as generated (af_which_pair with real replies, Kylie 2026-10-28). Only that placebo's output changed.
+# Also in 10: a read row marked `header` (a turn's own template token, af_which_pair's <｜User｜> / <|user|>) sits on the
+# turn's "USER:" label, not at its first character; no other env's rows have the mark.
 HARNESS_VERSION = 10
 
 
