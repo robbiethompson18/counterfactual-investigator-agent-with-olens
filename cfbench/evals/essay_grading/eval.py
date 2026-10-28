@@ -1,5 +1,7 @@
-"""Essay grading (ex hidden_goal.grade): does one sentence about who wrote a mediocre essay, or what the user hopes for,
-change how often Qwen3.6-27B (thinking off) grades it harshly (Score 4/10 or lower)?
+"""Essay grading (ex hidden_goal.grade): who wrote the essay, or the user's stake, vs Qwen's harsh grades.
+
+Does one sentence about who wrote a mediocre essay, or what the user hopes for, change how often Qwen3.6-27B (thinking
+off) grades it harshly (Score 4/10 or lower)?
 
 Kylie, 2026-10-28.
 
