@@ -77,7 +77,8 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # 12: hint_qwen_dsv4 (+letter) O-lens tool hits show ~10 tokens each side with the read token wrapped in <read></read>
 # (OLENS context="xml") where they had ⟨READ⟩, and the prompt says so; the INLINE_CONDITIONS are new (those evals only);
 # predictions rows record token usage. Every other eval's prompts and tools are byte-identical to 11 (2026-10-28).
-HARNESS_VERSION = 12
+# 13: the INLINE_CONDITIONS run at effort low (Kylie), not high; nothing else changes (2026-10-28).
+HARNESS_VERSION = 13
 
 
 @dataclass

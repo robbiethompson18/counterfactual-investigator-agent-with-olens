@@ -26,9 +26,10 @@ from pathlib import Path
 from cfbench.olens import show_token
 
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
-# Kylie's explicit override (2026-10-28) of the medium default (CLAUDE.md) for these single-turn conditions: one call, so
-# the predictor gets a high thinking budget in place of the agentic conditions' tool calls
-EFFORT = "high"
+# Kylie 2026-10-28: low ("probably reduce effort then" / "low even") after the first runs at high, her earlier override of
+# the medium default: at high Flash spends ~13-15k reasoning tokens (~96% of max_tokens) on nearly every call, ~$0.058 each.
+# The high runs are the *-inline / *-pause-inline slugs of 2026-10-28 (rows and meta record the effort).
+EFFORT = "low"
 CONTEXT = 40  # characters of prompt text each side of a read (about 10 tokens)
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")
 
