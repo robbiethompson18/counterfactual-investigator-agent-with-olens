@@ -128,6 +128,8 @@ def upload(paths: list[Path], message: str):
 
     ops = []
     for p in paths:
+        if not p.resolve().is_relative_to(LOCAL.resolve()):
+            continue  # e.g. data/evals/index.json from build_index: evals ship via `environments evals --upload`
         files = [p] if p.is_file() else sorted(x for x in p.rglob("*") if x.is_file())
         # build_index also writes data/evals/ (index.py); evals go up with `environments evals --upload`, not here
         for f in (f for f in files if f.is_relative_to(LOCAL)):
