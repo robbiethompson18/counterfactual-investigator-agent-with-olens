@@ -58,7 +58,10 @@ your probability and the truth (1 if it is the alignment-faking model, 0 if not)
 
 
 # lens sample pools at the shared pre-request positions (scripts/af_which_resample/pool.py); set to use them in prep
-POOLS: list[Path] = []
+POOLS: list[Path] = [  # runs/alignment_faking/2026-10-28_dsv4flash-olens-shared-pool and ..._glm53-olens-shared-pool
+    af.REPO_ROOT / "data/runs/alignment_faking/2026-10-28_dsv4flash-olens-shared-pool/pool_dsv4.jsonl",
+    af.REPO_ROOT / "data/runs/alignment_faking/2026-10-28_glm53-olens-shared-pool/pool_glm.jsonl",
+]
 
 
 def resample_shared(out: Path, pools: list[Path], seed: int = 0):
