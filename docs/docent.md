@@ -42,8 +42,11 @@ uv run --script scripts/docent_upload.py link shutdown_palisade/2026-10-22_r15_c
 uv run --script scripts/docent_upload.py view shutdown_palisade arm=catch_bydefault_D positive=true
 ```
 
-Run URLs look like `https://docent.transluce.org/dashboard/<collection>/agent_run/<run>`. Nested
-metadata is dotted (`view ... detect_notes.bypassed=true`).
+Run URLs look like `https://docent.transluce.org/dashboard/<collection>/agent_run/<run>`. To point
+at one message, append `?block_idx=N` (N is the 0-based "Block N" label Docent shows on each
+message; the page scrolls to it and highlights it, and fills in `transcript_id` itself). Cite the
+block, not just the run, when the claim is about one tool call or read. Nested metadata is dotted
+(`view ... detect_notes.bypassed=true`).
 
 ## Uploading
 

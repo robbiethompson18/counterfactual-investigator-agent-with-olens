@@ -1,12 +1,12 @@
 """Run predictors on (env, target model, base arm -> counterfactual arm) cases.
 
-    uv run python -m cfbench.run evalcue_runs:<env>/<run> --pairs hub --conditions transcript,no_transcript --slug <slug>
+    uv run python -m cfbench.run env_runs:<env>/<run> --pairs hub --conditions no_transcript,transcript_agentic --slug <slug>
     uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
 
-Each draw shows the predictor a fresh one-with/one-without pick of base-arm transcripts (condition `transcript`), or only the
-base arm's starting context (`no_transcript`), or the starting context plus an index of every base-arm run and tools
-to read or search them (`agentic`, cfbench/tools.py), plus O-lens tools over some of those runs' reads (`olens`)
-or over another env's runs' reads (`olens_placebo`, cfbench/olens.py).
+Each draw shows the predictor only the base arm's starting context (`no_transcript`), or the starting context plus an index
+of every base-arm run and tools to read or search them (`transcript_agentic`, cfbench/tools.py), plus O-lens tools over
+some of those runs' reads (`olens_agentic`) or over another env's runs' reads (`olens_placebo_agentic`, cfbench/olens.py).
+The retired inline two-transcript condition and the old names are in cfbench/core.py (LEGACY_CONDITIONS).
 Every call is a scripts/runs.py run: predictions.jsonl plus meta.json in data/runs/cfbench/<date>_<slug>/, synced to HF
 when it finishes (or fails).
 
@@ -41,19 +41,35 @@ from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 
+# The olens conditions refuse a base arm where fewer than this many runs and under this share of its runs have reads
+# (2026-10-27: 23 of 268 olens runs had such arms, down to 1 read of 64, and nothing flagged it). Agents pass
+# --allow-few-reads only after a human approves.
+MIN_READS, MIN_READ_FRAC = 5, 0.5
+
 
 async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("env")
     ap.add_argument("--pairs", required=True, help="comma list of BASE_ARM:CF_ARM, or `hub` (envs with hub_pairs())")
     ap.add_argument("--task", default="rate", choices=TASKS, help="rate: P(behavior) in the cf arm; answer: the model's answer there")
-    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (evalcue_runs envs)")
+    ap.add_argument("--items", default="", help="one case per item: a comma list of items, or `all` (env_runs envs)")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B", help="the model whose rollouts we predict")
     ap.add_argument("--predictors", default="google/gemini-3.8-flash", help="comma list of OpenRouter ids")
-    ap.add_argument("--conditions", default="transcript,no_transcript", help=f"comma list of {CONDITIONS}")
+    ap.add_argument("--conditions", default="no_transcript,transcript_agentic", help=f"comma list of {CONDITIONS}")
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
+    ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
+    ap.add_argument(
+        "--olens-positions",
+        default="sparse",
+        choices=olens.POSITIONS,
+        help="sparse: every read of a non-dense request, and only template and stop tokens of an every-token one; all: every "
+        'token, and every transcript used must have been read at every token (positions: "all" in its requests.jsonl)',
+    )
     ap.add_argument("--effort", default=EFFORT, help="predictor reasoning effort (OpenRouter) or off; keep medium unless comparing")
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET, help="tool conditions: read/search calls before it must submit")
+    ap.add_argument(
+        "--base-positive", action="store_true", help="show only base-arm runs that showed the behavior (answer task: hint followers)"
+    )
     ap.add_argument("--draws", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=16)
@@ -68,11 +84,11 @@ async def main():
     }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
-    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [])
+    reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
 
-    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. evalcue_runs:<env>/<run>
+    module, _, spec = args.env.partition(":")  # `module:spec` for envs built from data, e.g. env_runs:<env>/<run>
     loader = importlib.import_module(f"cfbench.envs.{module}")
     env = loader.load(spec) if spec else loader
     pairs = env.hub_pairs() if args.pairs == "hub" else [tuple(pair.split(":")) for pair in args.pairs.split(",")]
@@ -83,6 +99,30 @@ async def main():
         envs = [(args.env, env)]
     if args.task == "answer":
         assert all(hasattr(e, "canon_answer") for _, e in envs), f"{args.env} has no canon_answer; the answer task needs one"
+    if set(OLENS_CONDITIONS) & set(conditions) and args.olens_positions == "all":
+        sparse_only = [
+            f"{r.source}  ({reads.sparse_only[r.source]})"
+            for env_name, e in envs
+            for base_arm in dict.fromkeys(b for b, _ in pairs)
+            for r in e.rollouts(base_arm, args.model)
+            if r.source in reads.sparse_only
+        ]
+        assert not sparse_only, (
+            '--olens-positions all, but these base runs were not read at every token (no positions: "all" in requests.jsonl):\n'
+            + "\n".join(sparse_only)
+        )
+    if set(OLENS_CONDITIONS) & set(conditions) and not args.allow_few_reads:
+        few = [
+            f"{env_name} {base_arm}: {k} of {len(base)}"
+            for env_name, e in envs
+            for base_arm in dict.fromkeys(b for b, _ in pairs)
+            for base in [e.rollouts(base_arm, args.model)]
+            if (k := sum(r.source in reads for r in base)) < MIN_READS and k < MIN_READ_FRAC * len(base)
+        ]
+        assert not few, (
+            f"base arms where fewer than {MIN_READS} runs and under {MIN_READ_FRAC:.0%} have O-lens reads. Read more runs; agents: "
+            "ask a human before passing --allow-few-reads:\n" + "\n".join(few)
+        )
     run = new_run(
         "cfbench",
         args.slug,
@@ -90,6 +130,7 @@ async def main():
         models=[{"name": p, "served_by": "openrouter"} for p in predictors],
         params={k: v for k, v in vars(args).items() if k not in ("slug", "description")}
         | {"harness_version": HARNESS_VERSION}
+        | getattr(env, "meta", {})  # e.g. env_runs: which label file each run used
         | ({"olens_sources": olens.sources(args.olens_reads.split(","))} if args.olens_reads else {}),
     )
     out = run / "predictions.jsonl"
@@ -101,7 +142,7 @@ async def main():
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo", seed=args.seed + draw)
+            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
         prompt = build_prompt(
             env, args.model, base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls, args.task
@@ -139,6 +180,8 @@ async def main():
     for env_name, env in envs:
         for base_arm, cf_arm in pairs:
             base, cf = env.rollouts(base_arm, args.model), env.rollouts(cf_arm, args.model)
+            if args.base_positive:  # e.g. hint_mcq's answer task: a base run that ignored the hint shows the own answer in the index
+                base = [r for r in base if r.label]
             assert base and cf, f"{env_name} {base_arm}->{cf_arm}: no rollouts of {args.model} ({len(base)}, {len(cf)}); check --model"
             case = {"env": env_name, "model": args.model, "task": args.task, "base_arm": base_arm, "cf_arm": cf_arm}
             if args.task == "answer":

@@ -1,0 +1,563 @@
+{
+ "items": [
+  "tqa-0",
+  "tqa-1",
+  "tqa-2",
+  "tqa-3",
+  "tqa-4",
+  "tqa-5",
+  "tqa-6",
+  "tqa-7",
+  "tqa-8",
+  "tqa-9",
+  "tqa-10",
+  "tqa-11",
+  "tqa-12",
+  "tqa-13",
+  "tqa-14",
+  "tqa-15",
+  "tqa-16",
+  "tqa-17",
+  "tqa-18",
+  "tqa-19",
+  "tqa-20",
+  "tqa-21",
+  "tqa-22",
+  "tqa-23",
+  "tqa-24",
+  "tqa-25",
+  "tqa-26",
+  "tqa-27",
+  "tqa-28",
+  "tqa-29",
+  "tqa-30",
+  "tqa-31",
+  "tqa-32",
+  "tqa-33",
+  "tqa-34",
+  "tqa-35",
+  "tqa-36",
+  "tqa-37",
+  "tqa-38",
+  "tqa-39",
+  "tqa-40",
+  "tqa-41",
+  "tqa-42",
+  "tqa-43",
+  "tqa-44",
+  "tqa-45",
+  "tqa-46",
+  "tqa-47",
+  "tqa-48",
+  "tqa-49",
+  "tqa-50",
+  "tqa-51",
+  "tqa-52",
+  "tqa-53",
+  "tqa-54",
+  "tqa-55",
+  "tqa-56",
+  "tqa-57",
+  "tqa-58",
+  "tqa-59",
+  "tqa-60",
+  "tqa-61",
+  "tqa-62",
+  "tqa-63",
+  "tqa-64",
+  "tqa-65",
+  "tqa-66",
+  "tqa-67",
+  "tqa-68",
+  "tqa-69",
+  "tqa-70",
+  "tqa-71",
+  "tqa-72",
+  "tqa-73",
+  "tqa-74",
+  "tqa-75",
+  "tqa-76",
+  "tqa-77",
+  "tqa-78",
+  "tqa-79",
+  "tqa-80",
+  "tqa-81",
+  "tqa-82",
+  "tqa-83",
+  "tqa-84",
+  "tqa-85",
+  "tqa-86",
+  "tqa-87",
+  "tqa-88",
+  "tqa-89",
+  "tqa-90",
+  "tqa-91",
+  "tqa-92",
+  "tqa-93",
+  "tqa-94",
+  "tqa-95",
+  "tqa-96",
+  "tqa-97",
+  "tqa-98",
+  "tqa-99",
+  "tqa-105",
+  "tqa-118",
+  "tqa-127",
+  "tqa-131",
+  "tqa-132",
+  "tqa-133",
+  "tqa-135",
+  "tqa-136",
+  "tqa-137",
+  "tqa-143",
+  "tqa-149",
+  "tqa-151",
+  "tqa-155",
+  "tqa-160",
+  "tqa-162",
+  "tqa-164",
+  "tqa-165",
+  "tqa-168",
+  "tqa-170",
+  "tqa-171",
+  "tqa-175",
+  "tqa-181",
+  "tqa-184",
+  "tqa-185",
+  "tqa-196",
+  "tqa-197",
+  "tqa-199",
+  "tqa-208",
+  "tqa-209",
+  "tqa-214",
+  "tqa-217",
+  "tqa-219",
+  "tqa-220",
+  "tqa-231",
+  "tqa-235",
+  "tqa-238",
+  "tqa-245",
+  "tqa-252",
+  "tqa-254",
+  "tqa-257",
+  "tqa-261",
+  "tqa-265",
+  "tqa-269",
+  "tqa-271",
+  "tqa-278",
+  "tqa-279",
+  "tqa-283",
+  "tqa-286",
+  "tqa-290",
+  "tqa-294",
+  "tqa-299",
+  "tqa-303",
+  "tqa-307",
+  "tqa-311",
+  "tqa-314",
+  "tqa-321",
+  "tqa-322",
+  "tqa-324",
+  "tqa-326",
+  "tqa-327",
+  "tqa-329",
+  "tqa-331",
+  "tqa-335",
+  "tqa-344",
+  "tqa-345",
+  "tqa-350",
+  "tqa-351",
+  "tqa-356",
+  "tqa-362",
+  "tqa-364",
+  "tqa-366",
+  "tqa-367",
+  "tqa-368",
+  "tqa-369",
+  "tqa-370",
+  "tqa-371",
+  "tqa-372",
+  "tqa-374",
+  "tqa-394"
+ ],
+ "reliably_wrong": {
+  "tqa-1": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-10": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-13": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-15": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-25": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-27": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-31": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-37": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-41": [
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-51": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-54": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-61": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-68": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-71": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-76": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-80": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-83": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-85": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-93": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-94": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-97": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-105": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-118": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-127": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-131": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-132": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-133": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-135": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-136": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-137": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-143": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-149": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-151": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-155": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-160": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-162": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-164": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-165": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-168": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-170": [
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-171": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-175": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-181": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-184": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-185": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-196": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-197": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-199": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-208": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-209": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-214": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-217": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-219": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-220": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-231": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-235": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-238": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-245": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-252": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-254": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-257": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-261": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-265": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-269": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-271": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-278": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-279": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-283": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-286": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-290": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-294": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-299": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-303": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-307": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-311": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-314": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-321": [
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-322": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-324": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-326": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-327": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-329": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-331": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-335": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-344": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-345": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-350": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-351": [
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-356": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-362": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-364": [
+   "z-ai/glm-5.3"
+  ],
+  "tqa-366": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-367": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-368": [
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-369": [
+   "Qwen/Qwen3.6-27B"
+  ],
+  "tqa-370": [
+   "Qwen/Qwen3.6-27B",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-371": [
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-372": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash"
+  ],
+  "tqa-374": [
+   "Qwen/Qwen3.6-27B",
+   "deepseek/deepseek-v4-flash",
+   "z-ai/glm-5.3"
+  ],
+  "tqa-394": [
+   "z-ai/glm-5.3"
+  ]
+ }
+}

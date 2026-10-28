@@ -7,8 +7,8 @@ models the way it sometimes helps Gemini 3.8 Flash? Plus two Flash sweeps: reaso
 tool-call budget. Setup is cfbench (`cfbench/CLAUDE.md`), harness version 6, target Qwen3.6-27B on
 OpenRouter (`--model qwen/qwen3.6-27b`), O-lens reads from the space lens `olens_s3d_space_rl600`.
 Runs were made for PR #161 (closed into #188); the charts and numbers here are the
-[RMSE scoring](cfbench-scoring.md), made by `cfbench.report.charts`
-(`cfbench/report/modelchart.py`).
+[RMSE scoring](cfbench-scoring.md), made by `graphs.cfbench_report`
+(`graphs/cfbench_modelchart.py`).
 
 **Answer: the predictor matters far more than the O-lens.** Going from the env diff alone to the
 transcript agent is worth up to +21pp of 100 − RMSE (GPT-6 Astra). The O-lens agent beats its
@@ -114,7 +114,7 @@ marked abandoned were killed mid-way and their predictions are reused). The tool
 `cfbench.run --max-calls` (default 20, recorded in `meta.json` params). Charts:
 
 ```bash
-uv run python -m cfbench.report.charts --out docs/img/cfbench-report   # all eight report charts
+uv run python -m graphs.cfbench_report --out docs/img/cfbench-report   # all eight report charts
 ```
 
 ## Gotchas

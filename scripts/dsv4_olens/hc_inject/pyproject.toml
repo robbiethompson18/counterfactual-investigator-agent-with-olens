@@ -1,0 +1,16 @@
+[project]
+name = "hc-inject"
+version = "0.2.0"
+description = "vLLM plugins for DeepSeek V4's 4-stream state: hc_inject writes vllm-lens EMBED_LAYER_INDEX vectors of width hc_mult*hidden into it at the input of decoder layer 1; hc_capture lets vllm-lens capture it (folded) at a decoder layer's output"
+requires-python = ">=3.10"
+
+[project.entry-points."vllm.general_plugins"]
+hc_inject = "hc_inject:register"
+hc_capture = "hc_capture:register"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["hc_inject", "hc_capture"]

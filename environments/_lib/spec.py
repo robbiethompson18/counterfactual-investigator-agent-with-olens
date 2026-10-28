@@ -8,10 +8,13 @@
                                         and strings over 8 KB once per env as {"$f": sha1} -> spec/blobs/<sha1>.txt
                                         (overeagerness repeats MBs of sandbox logs in every arm)
     envs/<env>/links.json               per run: episode id -> [Docent agent_run id, primary value], so the page links a
-                                        comparison's rollouts without reading episode shards; plus the run's expview dataset
+                                        comparison's rollouts without reading episode shards; plus which episodes have O-lens reads
 
 `index` rebuilds the spec when the env's source hash changed (env folder + environments/_lib), so it costs nothing
-after a run. Builds use sample 0 and the date the spec was made; the sample's rng and the date can change a prompt.
+after a run. `spec --out DIR` builds every env's spec from the code alone into DIR/<env>/ plus DIR/index.json (the env
+list with title, status, STARRED, primary): the GitHub Pages workflow does this on every push to main, so the hosted
+page's arms, comparisons and stars always match main, and only runs and links come from HF.
+Builds use sample 0 and the date the spec was made; the sample's rng and the date can change a prompt.
 """
 
 import dataclasses
@@ -20,12 +23,12 @@ import hashlib
 import json
 from pathlib import Path
 
-from .core import ROOT, Ctx, env_names, load_env, slug
+from .backends import canonical_id
+from .core import ROOT, Ctx, env_names, load_env, retired_run_arms, run_dirs, slug
 from .runfolder import LOCAL, REPO_ROOT, git_sha
 
 BLOB_MIN, FILE_MIN = 256, 8192
 SOURCE_SUFFIXES = {".py", ".txt", ".json", ".jsonl", ".md", ".yaml", ".yml", ".toml", ".html", ".sh"}
-EXPVIEW_BASE = "https://expview.pages.dev/"
 
 
 def comparisons(mod) -> list[dict]:
@@ -95,9 +98,9 @@ def items_of(mod, arm) -> list[str]:
     return [str(i) for i in (mod.items_for(arm) if hasattr(mod, "items_for") else mod.items())]
 
 
-def build_spec(env: str, force: bool = False) -> list[Path]:
-    """Write envs/<env>/spec/ unless its source hash is unchanged. -> written paths (empty when up to date)."""
-    out = LOCAL / env / "spec"
+def build_spec(env: str, force: bool = False, out: Path | None = None) -> list[Path]:
+    """Write envs/<env>/spec/ (or `out`) unless its source hash is unchanged. -> written paths (empty when up to date)."""
+    out = out or LOCAL / env / "spec"
     files = source_files(env)
     shash = source_hash(files)
     head = out / "env.json"
@@ -149,24 +152,57 @@ def build_spec(env: str, force: bool = False) -> list[Path]:
         "caps": getattr(mod, "CAPS", {}),
         "defaults": getattr(mod, "DEFAULTS", {}),
         "behavior": getattr(mod, "BEHAVIOR", None),
+        "starred": getattr(mod, "STARRED", None),
+        "title": title_status(env)[0],
+        "status": title_status(env)[1],
         "build_errors": errors,
     }
     head.write_text(json.dumps(spec, indent=1, default=str) + "\n")
     return [*written, head]
 
 
-def expview_dataset(env: str, run: str, meta: dict) -> str | None:
-    """The run's expview dataset id (runs/<exp>/<run>[/<name>]): its own export (expview_export.py, items are episode
-    ids) or else a converted run's old one (items named differently), if it exists locally (data/runs/.../items.jsonl)."""
-    cands = [f"runs/env_{env}/{run}/expview"]
-    src = meta.get("converted_from")
-    for s in [src] if isinstance(src, str) else (src or []):
-        cands.append(s.removeprefix("data/") + "/expview")
-    for c in cands:
-        d = REPO_ROOT / "data" / c
-        if (d / "items.jsonl").exists():
-            return c.removesuffix("/expview").replace("/expview/", "/")
-    return None
+def title_status(env: str) -> tuple[str, str | None]:
+    """The env's README title and **Status** tag (as index.py reads them)."""
+    import re
+
+    readme = (ROOT / env / "README.md").read_text() if (ROOT / env / "README.md").exists() else ""
+    title = next((line.lstrip("# ").strip() for line in readme.splitlines() if line.startswith("# ")), env)
+    status = re.search(r"\*\*Status[^*]*\*\*\s*([A-Z]+)", readme)
+    return title, status.group(1) if status else None
+
+
+def build_site(out: Path, only: list[str] | None = None) -> Path:
+    """Every env's spec from the code alone into out/<env>/, and out/index.json listing them. An env whose module
+    doesn't load (e.g. data files not in git) gets {"env", "error"} so the page falls back to the spec on HF. With
+    `only`, just those envs are rebuilt and the others keep their entries from the last build."""
+    import shutil
+    import traceback
+
+    old = {}
+    if only and (out / "index.json").exists():
+        old = {x["env"]: x for x in json.loads((out / "index.json").read_text())["envs"]}
+    envs = []
+    for e in env_names():
+        if only and e not in only and e in old:
+            envs.append(old[e])
+            continue
+        d = out / e
+        shutil.rmtree(d, ignore_errors=True)
+        try:
+            build_spec(e, force=True, out=d)
+            spec = json.loads((d / "env.json").read_text())
+            keep = ("env", "title", "status", "starred", "primary", "git_sha")
+            envs.append({k: spec.get(k) for k in keep} | {"n_arms": len(spec["arms"])})
+        except Exception as ex:  # noqa: BLE001
+            d.mkdir(parents=True, exist_ok=True)
+            err = {"env": e, "error": repr(ex)[:500], "traceback": traceback.format_exc()[-2000:]}
+            (d / "env.json").write_text(json.dumps(err, indent=1) + "\n")
+            envs.append({"env": e, "error": err["error"]})
+        print(e, "error" if "error" in envs[-1] else "ok", flush=True)
+    p = out / "index.json"
+    doc = {"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "git_sha": git_sha(), "envs": envs}
+    p.write_text(json.dumps(doc, indent=1) + "\n")
+    return p
 
 
 def read_overlays(env: str, runs: set[str]) -> dict:
@@ -202,28 +238,26 @@ def build_links(env: str) -> Path | None:
         return None
     mod = load_env(env)
     runs = {}
-    run_dirs = sorted(p for p in (LOCAL / env).glob("*") if (p / "meta.json").exists())
-    reads = read_overlays(env, {p.name for p in run_dirs})
-    for run_dir in run_dirs:
+    dirs = run_dirs(env, mod, LOCAL)
+    reads = read_overlays(env, {p.name for p in dirs})
+    for run_dir in dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
         _, labels = latest_labels(run_dir)
-        eps = {}
+        eps, skip = {}, retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
+            if ep["arm"] in skip:
+                continue
             v = None if ep.get("error") else (labels.get(ep["id"]) or {}).get(mod.PRIMARY)
             eps[ep["id"]] = [ep.get("docent_run"), v]
         runs[run_dir.name] = {
             "docent_collection": meta.get("docent_collection"),
-            "expview": expview_dataset(env, run_dir.name, meta),
-            "expview_items": (REPO_ROOT / f"data/runs/env_{env}/{run_dir.name}/expview/items.jsonl").exists(),
             "reads": reads.get(run_dir.name, {}),  # episode -> [expview dataset, item] with metamodel (O-lens) reads
-            "target": (meta.get("target") or {}).get("id"),
+            "target": canonical_id((meta.get("target") or {}).get("id")),
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
         }
-    by_arm = REPO_ROOT / f"data/runs/env_{env}/by_arm/expview"  # expview_export.export_arms: one view per arm, every run
-    arms = {arm: f"runs/env_{env}/by_arm/{slug(arm)}" for arm in mod.ARMS if (by_arm / slug(arm) / "items.jsonl").exists()}
     p = LOCAL / env / "links.json"
-    p.write_text(json.dumps({"env": env, "expview_base": EXPVIEW_BASE, "arms": arms, "runs": runs}, separators=(",", ":")) + "\n")
+    p.write_text(json.dumps({"env": env, "runs": runs}, separators=(",", ":")) + "\n")
     return p
 
 

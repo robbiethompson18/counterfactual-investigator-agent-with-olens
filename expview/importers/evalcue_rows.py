@@ -8,7 +8,7 @@ its call, the workspace before / after as its environment, the env's detector fl
         [--base imports/celeste/ds/evalcue]
 
 --base makes each item an overlay (CLAUDE.md "Overlays") on the item of that dataset that shows the same row (matched on
-extra.run_dir + row_index, as Celeste's importer writes them), so the transcript opens with its O-lens reads inline and
+extra.run_dir + row_index, as Celeste's importer writes them), so the transcript opens with its O-lens reads at their tokens and
 there is one page per transcript. Rows without a base item stay plain items.
 """
 
@@ -118,7 +118,7 @@ def main() -> None:
             "The call is the subject's whole "
             "episode, exactly as sent and returned; the environment is the workspace before the episode (`before/`) and the files "
             "it changed (`after/`). Labels: **positive** is the env's behaviour label, the rest are its detector's flags."
-            + (" Items open on the same transcript with Celeste's O-lens reads inline." if bases else "")
+            + (" Items open on the same transcript with Celeste's O-lens reads." if bases else "")
         ),
         label_order=["positive", *flags],
     )
