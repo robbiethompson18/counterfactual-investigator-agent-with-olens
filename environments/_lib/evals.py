@@ -193,7 +193,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
 
     meta = json.loads((run_dir / "meta.json").read_text())
     rows = [json.loads(line) for line in (run_dir / "predictions.jsonl").read_text().splitlines()]
-    rows = [r for r in rows if r.get("task", "rate") == "rate"]
+    rows = [r for r in rows if r.get("task", "rate") in ("rate", "claim")]
     docent = json.loads((run_dir / "docent.json").read_text()) if (run_dir / "docent.json").exists() else {}
     _, run_envs, env_runs = eval_of(meta) or (None, [], [])
     ids = docent.get("runs") or [None] * len(rows)

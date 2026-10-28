@@ -7,7 +7,9 @@
 The eval's eval.py gives ENVS (the environments/ envs it is about, for the env viewer), CONDITIONS, MODEL_NAME
 (None, or what to call the target in place of its id), prep(out, versions, placebo), reads(inputs) and cases(inputs,
 versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str: the sentence
-in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it). eval.md
+in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it), TASK ("rate", or
+"claim": the probability that a claim is true, truth 0 or 1 as k_cf/n_cf), ASK(case) -> str: the body of "## Your task" in
+place of build_prompt's, and INPUTS_FROM: another eval whose inputs run it reads. eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
 data/runs/cfbench/<date>_<slug>/, synced to HF.
@@ -56,6 +58,14 @@ def with_notes(prompt: str, notes: str) -> str:
     return prompt.replace("\n\n## Your task\n", f"\n\n## About this evaluation\n\n{notes.strip()}\n\n## Your task\n", 1)
 
 
+def ask(prompt: str, text: str | None) -> str:
+    """The eval's ASK in place of build_prompt's "## Your task" body (the prompt's last section); None keeps it."""
+    if text is None:
+        return prompt
+    assert prompt.count("\n\n## Your task\n\n") == 1, "build_prompt's task heading changed"
+    return prompt.split("\n\n## Your task\n\n")[0] + "\n\n## Your task\n\n" + text.strip()
+
+
 def latest_inputs(name: str) -> Path:
     runs = sorted((ROOT / "cfbench_evals").glob(f"*_{name.replace('_', '-')}-inputs*"), key=lambda p: p.stat().st_mtime)
     assert runs, f"no inputs run for {name}: run `python -m cfbench.eval {name} --prep` first"
@@ -82,6 +92,7 @@ async def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=32)
     ap.add_argument("--slug", default="")
+    ap.add_argument("--show", action="store_true", help="print the first case's prompt per condition (draw 0) and exit; no API calls")
     ap.add_argument("--description", default="")
     args = ap.parse_args()
     ev = importlib.import_module(f"cfbench.evals.{args.name}.eval")
@@ -97,8 +108,10 @@ async def main():
         ev.prep(run, versions, Path(args.placebo), args.n_items or None, args.strict)
         finish(run)
         return
-    assert args.slug, "--slug"
-    inputs = Path(args.inputs) if args.inputs else latest_inputs(args.name)
+    assert args.slug or args.show, "--slug"
+    inputs = Path(args.inputs) if args.inputs else latest_inputs(getattr(ev, "INPUTS_FROM", args.name))
+    task = getattr(ev, "TASK", "rate")
+    ask_src = inspect.getsource(ev.ASK) if hasattr(ev, "ASK") else None
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
     base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
@@ -108,6 +121,23 @@ async def main():
     # interleaved by item, so a partial run still has every model on the items it reached
     cases = sorted(ev.cases(inputs, versions), key=lambda c: (c[1].get("version") or "", c[1].get("item") or "", c[1]["model"]))
     cases = cases[: args.limit or None]
+
+    def prompt_of(env, case: dict, base: list, shown: list, condition: str, read) -> str:
+        prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
+        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
+        prompt = ask(prompt, ev.ASK(case) if hasattr(ev, "ASK") else None)
+        return with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+
+    if args.show:
+        env, case, base = cases[0]
+        print(f"# case {case['env']} {case['model']} (truth {case['k_cf']}/{case['n_cf']}), task {task}\n")
+        shown = pick_examples(base, random.Random(args.seed))
+        for condition in conditions:
+            read = None
+            if condition in OLENS_CONDITIONS and reads:
+                read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed)[1]
+            print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
+        return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
     # fields are re-taken from this run's case, since the investigator never sees them
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
@@ -116,6 +146,7 @@ async def main():
         old = json.loads((Path(path).parent / "meta.json").read_text())["params"]
         assert old["eval_md"] == notes, f"{path}: eval.md differs"
         assert old.get("base_line") == base_src, f"{path}: BASE_LINE differs"
+        assert old.get("ask") == ask_src, f"{path}: ASK differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -133,7 +164,7 @@ async def main():
             "predictors": args.predictors,
             "model_name": ev.MODEL_NAME,
             "models": sorted({c["model"] for _, c, _ in cases}),
-            "task": "rate",
+            "task": task,
             "effort": args.effort,
             "max_calls": args.max_calls,
             "draws": args.draws,
@@ -142,6 +173,7 @@ async def main():
             "harness_version": HARNESS_VERSION,
             "eval_md": notes,
             "base_line": base_src,
+            "ask": ask_src,
             "reuse": args.reuse,
         },
     )
@@ -161,13 +193,11 @@ async def main():
             assert reads is not None
             lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
-        prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
-        prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
-        prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+        prompt = prompt_of(env, case, base, shown, condition, read)
         async with slots:
             for attempt in range(3):
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort)
+                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort, task)
                     break
                 except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
