@@ -414,6 +414,8 @@ def prep(
                 if real_replies:  # the reply exactly as generated (not its `provider`, which isn't model output)
                     assert len(ep["messages"]) == 3 and ep["messages"][2]["role"] == "assistant", source
                     reply = {k: v for k, v in ep["messages"][2].items() if k != "provider"}
+                    # DSv4's v7 runs stored no-CoT replies without the key; initial_context reads its absence as a prefill
+                    reply.setdefault("reasoning_content", "")
                 messages = [system, user, reply]
                 rows = read_rows(source, m, user["content"], lens[m][item], full_bullets, sparse, user_header)
                 dropped[version, m] += len(read_rows(source, m, user["content"], lens[m][item], sparse=sparse)) - len(rows)
