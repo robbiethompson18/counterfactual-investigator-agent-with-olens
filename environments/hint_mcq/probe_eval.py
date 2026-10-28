@@ -124,9 +124,16 @@ def score(a):
 
     run = Path(a.run)
     cases = [json.loads(line) for line in (run / "cases.jsonl").read_text().splitlines()]
-    cache = CACHE / run.name
-    layers = json.loads((cache / "layers.json").read_text())
-    X = np.asarray(np.load(cache / "nl.npy", mmap_mode="r")[:, layers.index(HIDDEN)], dtype=np.float64)
+    if a.cached_only:  # the cached no-hint activations stand in for the base arm's (same prefix), cases without them dropped
+        cached = [(c, _cached_no_hint(c["version"], c["item"])) for c in cases]
+        cases, X = [c for c, x in cached if x is not None], np.concatenate([x for _, x in cached if x is not None])
+        out = run / "cached_only"
+        print(f"cached-only: {len(cases)} cases")
+    else:
+        cache = CACHE / run.name
+        layers = json.loads((cache / "layers.json").read_text())
+        X = np.asarray(np.load(cache / "nl.npy", mmap_mode="r")[:, layers.index(HIDDEN)], dtype=np.float64)
+        out = run
     pr = np.load(run / "probe.npz")
     s = (X - pr["mean"]) / pr["scale"] @ pr["w"]
     q = np.repeat(np.arange(len(cases)), [c["n_opts"] for c in cases])
@@ -135,12 +142,12 @@ def score(a):
     # equality check: base-arm (hinted) activations vs the cached no-hint ones at the same option newlines
     cos, off = [], 0
     for c in cases:
-        ref = _cached_no_hint(c["version"], c["item"])
+        ref = None if a.cached_only else _cached_no_hint(c["version"], c["item"])
         x = X[off : off + c["n_opts"]]
         if ref is not None:
             cos += list((x * ref).sum(1) / np.linalg.norm(x, axis=1) / np.linalg.norm(ref, axis=1))
         off += c["n_opts"]
-    check = {"n_options": len(cos), "min_cos": float(np.min(cos)), "median_cos": float(np.median(cos))}
+    check = {"n_options": len(cos), "min_cos": float(np.min(cos)), "median_cos": float(np.median(cos))} if cos else {}
     print(f"hinted vs cached no-hint activations at the option newlines: {check}")
     knew, letter = [], []
     for i, c in enumerate(cases):
@@ -164,20 +171,20 @@ def score(a):
                 }
             )
     for name, rows in (("knew", knew), ("letter", letter)):
-        (run / name).mkdir(exist_ok=True)
-        (run / name / "predictions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+        (out / name).mkdir(parents=True, exist_ok=True)
+        (out / name / "predictions.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
     report = [
         f"Equality check (hinted base-arm vs cached no-hint activations at the option newlines, hidden_states[{HIDDEN}]): {check}",
         "",
     ]
     for name, mod in (("knew", "cfbench.evals.hint_qwen_dsv4.score"), ("letter", "cfbench.evals.hint_qwen_dsv4_letter.score")):
-        out = subprocess.run([sys.executable, "-m", mod, str(run / name)], capture_output=True, text=True, check=True).stdout
-        report += [f"## {name} ({mod})", "", "```", out.rstrip(), "```", ""]
+        txt = subprocess.run([sys.executable, "-m", mod, str(out / name)], capture_output=True, text=True, check=True).stdout
+        report += [f"## {name} ({mod})", "", "```", txt.rstrip(), "```", ""]
     # also: AUROC of the probe's p(gold), all versions pooled, for reference (the eval reports it per version)
     pk = [r["p"] for r in knew if r["condition"] == "probe"]
     yk = [r["k_cf"] for r in knew if r["condition"] == "probe"]
     report.append(f"Pooled AUROC of probe p(hinted letter), knew vs didn't, both versions: {roc_auc_score(yk, pk):.3f}")
-    (run / "scores.md").write_text("\n".join(report) + "\n")
+    (out / "scores.md").write_text("\n".join(report) + "\n")
     print("\n".join(report))
 
 
@@ -190,6 +197,7 @@ def main():
     p.add_argument("--l2", type=float, default=1.0)
     s = sub.add_parser("score")
     s.add_argument("run")
+    s.add_argument("--cached-only", action="store_true", help="score the cases with cached no-hint activations, no GPU output")
     a = ap.parse_args()
     {"prep": prep, "score": score}[a.cmd](a)
 

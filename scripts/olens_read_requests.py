@@ -21,7 +21,9 @@ and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "as
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `positions: [token indices]` exactly those, and `char_positions: [[msg_index, char_offset],
 ...]` the token holding each char of that message's content (offsets into its stripped content, as `char_offset` in
-OUT); `prompt_ids` replaces the rendering with those token ids as-is. A row's
+OUT); `prompt_ids` replaces the rendering with those token ids as-is; `option_newlines: true` (or --option-newlines)
+adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
+option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -62,6 +64,21 @@ from counterfactual_investigator_agent_with_olens.render import render_request, 
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
+OPTION = re.compile(r"\n(?:\(([A-P])\)|([A-P])\.) ")  # an MCQ option line: "\nA. text" (hint_mcq) or "\n(A) text" (hinted_truthfulqa)
+
+
+def option_newlines(text: str) -> list[int]:
+    """Char offsets of the newline after each MCQ option's text: the next option's leading "\\n", and for the last option
+    the "\\n\\n" after it (none if the options end the text). Options must run A, B, C, ... from the first "A"."""
+    starts = []
+    for m in OPTION.finditer(text):
+        letter = m.group(1) or m.group(2)
+        if letter == "ABCDEFGHIJKLMNOP"[len(starts)]:
+            starts.append(m.start())
+    if len(starts) < 2:
+        return []
+    last = text.find("\n\n", starts[-1] + 1)
+    return starts[1:] + ([last] if last >= 0 else [])
 
 
 # WorkspaceBench's sampling of record for prose lenses (T 1.0, top-p 0.95, top-k 64; the RL that made the lens sampled at T 1.0 too),
@@ -157,6 +174,7 @@ def main():
     ap.add_argument("--shard", default="0/1", help="i/n: read the transcripts whose id hashes to i mod n")
     ap.add_argument("--skip-ids", help="file of transcript ids to skip, one per line (e.g. read by another shard)")
     ap.add_argument("--watch", action="store_true", help="when the queue is empty, re-read REQUESTS every minute")
+    ap.add_argument("--option-newlines", action="store_true", help="also read the newline after each MCQ option (`option_newlines`)")
     ap.add_argument("--temperature", type=float, default=1.0, help="lens decode temperature (0 = greedy; WSB's record is 1.0)")
     ap.add_argument("--seed", type=int, default=0, help="vLLM sampling seed at temperature > 0")
     args = ap.parse_args()
@@ -184,8 +202,9 @@ def main():
     run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
 
 
-def prepare(tok, row, layers, im_end, im_start):
-    """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys."""
+def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
+    """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys.
+    `opt_nl` (or the row's `option_newlines`) adds the newline after each MCQ option in every message's content."""
     msgs, ids, where = render_request(tok, row)
     if row.get("prompt_ids"):  # token ids given as-is (e.g. edited after rendering); no per-token message provenance
         ids, where = row["prompt_ids"], [(-1, None, None)] * len(row["prompt_ids"])
@@ -203,6 +222,11 @@ def prepare(tok, row, layers, im_end, im_start):
         positions = row["positions"]
     elif row.get("char_positions"):  # [[msg_index, char offset into its content], ...]: the token holding each char
         positions = [max(i for i, w in enumerate(where) if w[:2] == (m, "content") and w[2] <= c) for m, c in row["char_positions"]]
+    if opt_nl or row.get("option_newlines"):
+        for mi, m in enumerate(msgs):
+            for c in option_newlines((m.get("content") or "").strip()):
+                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= c))
+        positions = sorted(set(positions))
     row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
     return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
 
@@ -227,7 +251,7 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         jobs, want = [], {}  # want: (key, L) -> (job index, position), the first transcript in the batch that needs it
         for row in todo[: args.batch_transcripts]:
             try:
-                msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start)
+                msgs, ids, where, toks, positions, row_layers, keys = prepare(tok, row, layers, im_end, im_start, args.option_newlines)
             except json.JSONDecodeError as e:  # a tool call's `arguments` aren't JSON: vLLM 400s on it too, so Qwen never saw a rendering
                 print(f"skip {row['id']}: tool call arguments aren't valid JSON ({e})", flush=True)
                 done.add(row["id"])
