@@ -79,17 +79,17 @@ class Prompt:
     """What build_prompt needs from an env: BEHAVIOR, and view() giving the starting context and the edit on the shown run's
     item (as cfbench/envs/env_runs.py does)."""
 
-    def __init__(self, behavior: str, starts: dict[str, dict[str, str]], items: dict[str, str]):
+    def __init__(self, behavior: str, starts: dict[str, dict[str, str]], items: dict[str, str], n_items: int):
         self.BEHAVIOR = behavior
-        self.starts, self.items = starts, items  # arm -> item -> starting context; source -> item
+        self.starts, self.items, self.n_items = starts, items, n_items  # arm -> item -> start; source -> item; the case's items
 
     def view(self, base_arm: str, cf_arm: str, rollout: Rollout) -> tuple[str, str]:
         item = self.items[rollout.source]
         where = "Unified diff of the model's starting context (prompts, any prefilled turns, and workspace files):"
-        if (n := len(self.starts[base_arm])) > 1:
+        if self.n_items > 1:
             where = (
-                f"Runs in both arms are spread over {n} task variants (different scenario details). The edit is applied the same "
-                f"way to every variant; here it is on the variant whose starting context is shown above. {where}"
+                f"Runs in both arms are spread over {self.n_items} task variants (different scenario details). The edit is applied the "
+                f"same way to every variant; here it is on the variant whose starting context is shown above. {where}"
             )
         diff = unified_diff(self.starts[base_arm][item], self.starts[cf_arm][item])
         return self.starts[base_arm][item], f"{where}\n\n```diff\n{diff}\n```"
@@ -317,7 +317,8 @@ def cases(inputs: Path, versions: list[str]):
         c = json.loads(line)
         if c["version"] not in versions:
             continue
-        prompt = Prompt(BEHAVIOR[re.split(r"[ :]", c["comparison"])[0] if "Johns" not in c["comparison"] else "4 Johns"], starts, items)
+        task = "4 Johns" if "Johns" in c["comparison"] else re.split(r"[ :]", c["comparison"])[0]
+        prompt = Prompt(BEHAVIOR[task], starts, items, len(c["items"]))
         base = [Rollout(source=s, messages=rollouts[s]["messages"], label=rollouts[s]["label"]) for s in c["base"]]
         row = {k: c[k] for k in ("version", "item", "base_arm", "cf_arm", "k_cf", "n_cf", "k_base_pool", "n_base_pool")}
         row |= {"env": f"eval:overeager_main/{c['version']}@{c['comparison']}", "env_name": ENV, "model": MODEL, "task": "rate"}
