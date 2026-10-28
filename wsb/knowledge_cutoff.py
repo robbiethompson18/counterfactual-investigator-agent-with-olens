@@ -13,8 +13,9 @@ the recipe's k and template, so this reproduces it on the OpenRouter copy of the
     uv run python -m wsb.knowledge_cutoff --arm describe --k 5
     uv run python -m wsb.knowledge_cutoff --arm answer --k 10
 
-Model `qwen/qwen3.6-27b` on OpenRouter, thinking off (`reasoning.enabled` false), T 1, top-p 1, one provider pinned (default
-DeepInfra, fp8; the bank's Qwen was vLLM). Only the 109 frozen items: the 41 nocot items ship as ids whose question text is in
+Model: the shared Qwen3.6-27B vLLM server by default (`--backend vllm`, runpod/CLAUDE.md), thinking off through the chat
+template, T 1, top-p 1; `--backend openrouter` uses `qwen/qwen3.6-27b` (fp8, one provider pinned, paced under the account's
+20 requests/min cap, so ~1 h for the answer arm). Only the 109 frozen items: the 41 nocot items ship as ids whose question text is in
 nocot's password-protected zip. Run dir data/runs/wsb_knowledge_cutoff/<date>_<slug>/: responses.jsonl (one row per sample),
 summary.json, meta.json, expview/ (one entry per item, one call per sample); `runs.py finish` syncs it to HF and Docent.
 The regex scorer is a port of their src/wsbench/evals/knowledge_cutoff/score.py (MIT); never import it (vendor/CLAUDE.md)."""
@@ -32,7 +33,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from counterfactual_investigator_agent_with_olens import openrouter
+from counterfactual_investigator_agent_with_olens import openrouter, qwen
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 from wsb import banks
 
@@ -165,18 +166,15 @@ class Pacer:
         await asyncio.sleep(start - now)
 
 
-async def sample(item: dict, arm: str, draw: int, provider: str, pacer: Pacer) -> dict:
+async def sample(item: dict, arm: str, draw: int, backend: str, provider: str, pacer: Pacer) -> dict:
     messages = [{"role": "user", "content": prompt(item, arm)}]
-    await pacer.wait()
-    r = await openrouter.chat(
-        MODEL,
-        messages,
-        effort="off",
-        provider={"order": [provider], "allow_fallbacks": False},
-        temperature=1.0,
-        top_p=1.0,
-        max_tokens=MAX_TOKENS[arm],
-    )
+    kw = {"model": qwen.MODEL, "messages": messages, "temperature": 1.0, "top_p": 1.0, "max_tokens": MAX_TOKENS[arm]}
+    if backend == "vllm":  # the shared Qwen server (runpod/CLAUDE.md); thinking off through the chat template, as the bank's gate
+        r = await qwen.client().chat.completions.create(extra_body={"chat_template_kwargs": {"enable_thinking": False}}, **kw)  # ty: ignore[no-matching-overload]
+    else:
+        await pacer.wait()
+        kw["model"] = MODEL
+        r = await openrouter.chat(effort="off", provider={"order": [provider], "allow_fallbacks": False}, **kw)  # ty: ignore[invalid-argument-type]
     m, u = r.choices[0].message, r.usage
     assert u is not None, "OpenRouter usage accounting was requested"
     return {
@@ -185,7 +183,7 @@ async def sample(item: dict, arm: str, draw: int, provider: str, pacer: Pacer) -
         "response": (m.content or "").strip(),
         "reasoning": getattr(m, "reasoning", None) or (m.model_extra or {}).get("reasoning"),
         "finish_reason": r.choices[0].finish_reason,
-        "provider": (r.model_extra or {}).get("provider"),
+        "provider": (r.model_extra or {}).get("provider") or backend,
         "sent": messages,
         "usage": {"input": u.prompt_tokens, "output": u.completion_tokens, "cost": getattr(u, "cost", None)},
     }
@@ -246,7 +244,8 @@ async def main():
     ap.add_argument("--k", type=int, default=5, help="samples per item (one cell)")
     ap.add_argument("--limit", type=int, default=0, help="first k items (0 = all 109)")
     ap.add_argument("--items", help="comma-separated item ids instead of --limit")
-    ap.add_argument("--provider", default="DeepInfra", help="OpenRouter provider, pinned with no fallbacks")
+    ap.add_argument("--backend", choices=["vllm", "openrouter"], default="vllm", help="vllm = the shared Qwen server ($QWEN_VLLM_URL)")
+    ap.add_argument("--provider", default="DeepInfra", help="openrouter backend: the provider, pinned with no fallbacks")
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--rpm", type=float, default=18, help="request starts per minute (OpenRouter caps this model at 20/min for us)")
     ap.add_argument("--slug")
@@ -261,7 +260,15 @@ async def main():
         slug,
         description=f"WorkspaceBench knowledge_cutoff, stock Qwen3.6-27B text-only ({args.arm} arm): {len(items)} items x{args.k}, "
         f"their strict-win regex at one cell",
-        models=[{"name": MODEL, "served_by": f"openrouter/{args.provider}", "role": "subject", "effort": "off", "thinking": False}],
+        models=[
+            {
+                "name": "Qwen/Qwen3.6-27B",
+                "served_by": f"openrouter/{args.provider} (fp8)" if args.backend == "openrouter" else "runpod qwen-shared, vLLM",
+                "role": "subject",
+                "effort": "off",
+                "thinking": False,
+            }
+        ],
         params={
             "arm": args.arm,
             "k": args.k,
@@ -284,7 +291,7 @@ async def main():
 
     async def one(item: dict, draw: int) -> dict:
         async with slots:
-            return await sample(item, args.arm, draw, args.provider, pacer)
+            return await sample(item, args.arm, draw, args.backend, args.provider, pacer)
 
     rows = await asyncio.gather(*(one(it, d) for it in items for d in range(args.k)))
     rows.sort(key=lambda r: (r["id"], r["draw"]))
