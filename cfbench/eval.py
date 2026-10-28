@@ -9,7 +9,8 @@ The eval's eval.py gives ENVS (the environments/ envs it is about, for the env v
 versions) -> (prompt env, case row fields, base runs) per case, and optionally BASE_LINE(case) -> str: the sentence
 in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it), TASK ("rate", or
 "claim": the probability that a claim is true, truth 0 or 1 as k_cf/n_cf), ASK(case) -> str: the body of "## Your task" in
-place of build_prompt's, and INPUTS_FROM: another eval whose inputs run it reads. eval.md
+place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PROMPT(prompt, case) -> str: a last
+rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
 data/runs/cfbench/<date>_<slug>/, synced to HF.
@@ -115,6 +116,7 @@ async def main():
     ask_src = inspect.getsource(ev.ASK) if hasattr(ev, "ASK") else None
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
     base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
+    prompt_src = inspect.getsource(ev.PROMPT) if hasattr(ev, "PROMPT") else None
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
     predictors = args.predictors.split(",")
     reads = olens.Reads(ev.reads(inputs)) if set(OLENS_CONDITIONS) & set(conditions) else None
@@ -127,7 +129,8 @@ async def main():
         prompt = build_prompt(env, case["model"], base, shown, case["base_arm"], case["cf_arm"], condition, read, fve_note, args.max_calls)
         prompt = base_line(prompt, ev.BASE_LINE(case) if hasattr(ev, "BASE_LINE") else None)
         prompt = ask(prompt, ev.ASK(case) if hasattr(ev, "ASK") else None)
-        return with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+        prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+        return ev.PROMPT(prompt, case) if hasattr(ev, "PROMPT") else prompt
 
     if args.show:
         env, case, base = cases[0]
@@ -148,6 +151,7 @@ async def main():
         assert old["eval_md"] == notes, f"{path}: eval.md differs"
         assert old.get("base_line") == base_src, f"{path}: BASE_LINE differs"
         assert old.get("ask") == ask_src, f"{path}: ASK differs"
+        assert old.get("prompt_hook") == prompt_src, f"{path}: PROMPT differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -176,6 +180,7 @@ async def main():
             "eval_md": notes,
             "base_line": base_src,
             "ask": ask_src,
+            "prompt_hook": prompt_src,
             "reuse": args.reuse,
         },
     )
@@ -206,7 +211,8 @@ async def main():
             else:
                 return
         if ev.MODEL_NAME:  # the predictor must never have seen the model id
-            assert not re.search(re.escape(case["model"]), json.dumps(result["messages"])), case["model"]
+            for m in getattr(ev, "MODEL_IDS", [case["model"]]):
+                assert not re.search(re.escape(m), json.dumps(result["messages"])), m
         row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:
