@@ -286,7 +286,9 @@ async function scanAll(prog){const envs=await envList();let n=0;SCAN.failed=[];
   return all}
 // item helpers shared with expview.py (summary / source_of / links_of / merge_overlay there)
 const contentText=c=>typeof c=="string"?c:Array.isArray(c)?c.map(p=>p&&typeof p=="object"?(p.text||""):String(p)).join("\n"):c==null?"":JSON.stringify(c);
-const callText=c=>(c.messages||[]).flatMap(m=>[m.reasoning||"",contentText(m.content),...(m.tool_calls||[]).map(t=>`${t.name} ${t.arguments}`)]).filter(Boolean).join("\n");
+// a tool call, flat ({name, arguments}, expview format) or OpenAI-nested ({function: {name, arguments}}, env episodes); arguments a string or an object
+const tcall=t=>{const f=t.function||t,a=f.arguments??t.arguments??t.input??"";return{name:f.name??t.name??"",args:typeof a=="string"?a:JSON.stringify(a)}};
+const callText=c=>(c.messages||[]).flatMap(m=>[m.reasoning||"",contentText(m.content),...(m.tool_calls||[]).map(t=>{const f=tcall(t);return `${f.name} ${f.args}`})]).filter(Boolean).join("\n");
 function sectionOf(secs,n){const out=new Array(n).fill("");for(const [name,a,b] of secs||[])for(let p=Math.max(0,a);p<Math.min(n,b);p++)out[p]=name;return out}
 function sourceOf(it){const ex=it.extra&&typeof it.extra=="object"?it.extra:{};const m=/(?:^|\/)([^/:]+\/[^/:]+):(\d+)$/.exec(String(ex.source||""));if(m)return `${m[1]}:${m[2]}`;
   const rd=ex.run_dir,row=ex.row_index,sf=ex.source_file;
@@ -820,7 +822,7 @@ function callHtml(c,ci,rx){
     if(Array.isArray(ct))b+=ct.map(q=>q.type=="text"?text(q.text,true,rx):`<pre class="empty">[${esc(q.type)} part]</pre>`).join("");
     else if(ct!=null&&ct!=="")b+=text(typeof ct=="string"?ct:JSON.stringify(ct,null,1),true,rx);
     else if(!m.tool_calls)b+='<div class="empty">(empty)</div>';
-    for(const t of m.tool_calls||[]){let a=t.arguments;try{a=JSON.stringify(JSON.parse(a),null,1)}catch{}b+=`<div class="tc"><span class="mono">→ ${esc(t.name)}</span><pre>${hl(a,rx)}</pre></div>`}
+    for(const t of m.tool_calls||[]){const f=tcall(t);let a=f.args;try{a=JSON.stringify(JSON.parse(a),null,1)}catch{}b+=`<div class="tc"><span class="mono">→ ${esc(f.name)}</span><pre>${hl(a,rx)}</pre></div>`}
     const len=(typeof ct=="string"?ct.length:0)+(m.reasoning||"").length;
     const clip=m.role=="system"&&len>1500&&!(rx&&test(rx,ct));
     return `<div class="msg ${role}${clip?" clip":""}" id="msg${i}" ${clip?'title="Click to show the whole system prompt"':""}><div class="mh"><span>${esc(m.role)}${extra?` <span class="mono">${esc(extra)}</span>`:""}</span><span class="r">${out?"model output":"model input"} <a href="#" data-m="${i}" title="Copy a link to this message">#${i+1}</a></span></div><div class="body">${b}</div></div>`}).join("")+"</div>";
