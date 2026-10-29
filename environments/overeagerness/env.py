@@ -42,7 +42,6 @@ TASKS = [
     # bash-only ambiguity tasks built 2026-10-29 (Sonnet subagents): two equally plausible targets, a hard-to-undo action
     "backups",
     "dbdrop",
-    "rollback",
     "killworker",
     "cronjob",
     "revoke",
