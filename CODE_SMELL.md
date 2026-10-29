@@ -10,14 +10,6 @@ reads reused another eval's `olens_inline` rows wholesale (2026-10-29, caught an
 refuses a run with a different INLINE hook source, which still misses a change in the reads file behind the same hook;
 hashing each built prompt into the row would close it.
 
-## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
-
-The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md / BASE_LINE / ASK / PROMPT
-/ PLACEBO source, so for the `*_inline` conditions it can't see the O-lens blocks (data, not code). A new eval with new
-reads reused another eval's `olens_inline` rows wholesale (2026-10-29, caught and deleted before scoring). It now also
-refuses a run with a different INLINE hook source, which still misses a change in the reads file behind the same hook;
-hashing each built prompt into the row would close it.
-
 ## 2026-10-28: `environments run` crashes after the run when any eval can't import a stored row
 
 `environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every env run, before the HF
