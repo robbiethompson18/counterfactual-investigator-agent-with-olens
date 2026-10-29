@@ -27,7 +27,7 @@ the same positions (same option count, seeded, never its own). Placebo pools: Ky
     uv run python -m cfbench.eval mcq_unselected --prep                 # split + cases -> cfbench_evals/<date>_mcq-unselected-inputs
     uv run python -m cfbench.eval mcq_unselected --show --conditions olens_placebo_inline --limit 1
     uv run python -m cfbench.eval mcq_unselected --slug placebo-smoke10 --conditions olens_placebo_inline --limit 10 --draws 1
-    uv run python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl                # O-lens read requests for every case
+    uv run --with transformers --with jinja2 python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl   # O-lens read requests
 """
 
 import json
@@ -290,16 +290,26 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
 
 
 def requests(out: Path, inputs: Path):
-    """The O-lens read requests for every case: the no-hint prompt, read at the option newlines and the assistant header
-    (generation_prompt + turn_starts 2: <|im_start|>, "assistant", "\\n"). TODO before the real read job: the instruction's "."
-    and <|im_end|> are not in this set (turn_starts replaces the default stop-token positions); Kylie's tail job passed explicit
-    token `positions` computed with the tokenizer (2026-10-29_hint-qwen-dsv4-tail/requests.jsonl); do the same here."""
+    """The O-lens read requests for every case: the no-hint prompt, read at the option newlines (`option_newlines`, which adds
+    to the row's other positions) and at the six TAIL tokens as explicit `positions`: token indices into the request rendered
+    as the reader renders it (`render_request`, `generation_prompt`), the three tokens each side of the last <|im_start|>, as
+    Kylie's tail job (2026-10-29_hint-qwen-dsv4-tail). Not `turn_starts`: it replaces the row's positions instead of adding.
+    Needs the tokenizer: `uv run --with transformers --with jinja2 python -m cfbench.evals.mcq_unselected.eval requests OUT`."""
+    from transformers import AutoTokenizer
+
+    from counterfactual_investigator_agent_with_olens.render import render_request
+
+    tok = AutoTokenizer.from_pretrained(QWEN)
+    im_start = tok.convert_tokens_to_ids("<|im_start|>")
     with out.open("w") as f:
         for line in (inputs / "cases.jsonl").read_text().splitlines():
             c = json.loads(line)
             row = {"id": request_id(c["item"]), "env": "hint_mcq", "arm": ARM, "item": c["item"], "tools": None, "priority": 1,
-                   "messages": Prompt(c["item"]).messages, "option_newlines": True, "generation_prompt": True, "turn_starts": 2,
-                   "last_turn_only": True}  # fmt: skip
+                   "messages": Prompt(c["item"]).messages, "option_newlines": True, "generation_prompt": True}  # fmt: skip
+            _, ids, _ = render_request(tok, row)
+            start = max(i for i, t in enumerate(ids) if t == im_start)
+            row["positions"] = list(range(start - 3, start + 3))
+            assert [tok.decode([ids[i]]) for i in row["positions"]] == list(TAIL), (row["id"], row["positions"])
             f.write(json.dumps(row) + "\n")
 
 
