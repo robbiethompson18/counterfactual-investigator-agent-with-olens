@@ -274,6 +274,13 @@ Active docs:
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our CHIVE replacement
+- [ACTIVE: supergpqa_inline — read before predicting Qwen's SuperGPQA letter from the bare prompt with O-lens / NLA / J++ reads, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
+  — mcq_unselected's question on the harder pool: 3,000 consistent cases (seed 0) as the eval set,
+  the other 3,328 consistent questions as the probe pool; reads at 20 positions incl. the empty
+  think block; seven single-turn Haiku conditions; chart `graphs.supergpqa_inline`
+- [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
+  — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
+  shared pod, and the arithmetic
 - [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)

@@ -11,6 +11,8 @@ placebo black, no tools gray).
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
+- `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right
+  cases (`docs/supergpqa-inline.md`)
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up

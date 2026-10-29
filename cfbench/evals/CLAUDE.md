@@ -136,3 +136,9 @@ the eval `<env>-pairs`.
   another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
   at the filler sentence's punctuation) was tried and dropped: O-lens = placebo
   (docs/envs/hint_cf.md).
+- `supergpqa_inline`: mcq_unselected's question on SuperGPQA (`environments/supergpqa`): 3,000
+  consistent cases (seed 0; the other 3,328 consistent questions are the probe pool), no hint,
+  single-turn letter task, Haiku 5.5. Seven conditions: `transcript_inline`, O-lens / NLA / J++ each
+  with a same-option-count placebo; own reads at the option newlines and the ten end-of-prompt
+  tokens of the thinking-off render (empty think block included). `eval.py requests OUT_DIR` writes
+  the O-lens/NLA and J++ request files (docs/supergpqa-inline.md).
