@@ -89,6 +89,11 @@ def placebo(path: Path, source: str, seed: int) -> str:
         for s in sorted(rows):
             if len(_shape(rows[s])) == int(shape[0]):
                 by_item.setdefault(items[s], s)
+    if len(by_item) < 2:  # a one-off option count (the before_* reads: 2- and 3-option TruthfulQA items): the questions
+        # with the next larger count, which block() cuts to this one's positions (its first options and its last newline)
+        n = min((len(_shape(rows[s])) for s in rows if len(_shape(rows[s])) > int(shape[0])), default=0)
+        shape = (f">{shape[0]}",)
+        by_item = {items[source]: source} | {items[s]: s for s in sorted(rows) if len(_shape(rows[s])) == n and items[s] != items[source]}
     order = sorted(by_item)
     assert len(order) > 1, f"no other question with reads of shape {shape}"
     random.Random(f"{seed}:{len(shape)}:{'|'.join(shape)}").shuffle(order)
@@ -123,6 +128,8 @@ def block(path: Path, own: str, messages: list[dict], source: str) -> str:
     reads at the same position (by order; the shapes match)."""
     rows, _ = _reads(path)
     mine, theirs = _positions(rows[own]), _positions(rows[source])
+    if len(theirs) > len(mine):  # placebo()'s fallback for a one-off option count
+        theirs = theirs[: len(mine) - 1] + theirs[-1:]
     assert len(mine) == len(theirs), (own, source)  # same positions; token text can differ (a stray "\n\n" in an option)
     out = []
     for ((i, field, char, token), _), (_, layers) in zip(mine, theirs, strict=True):
