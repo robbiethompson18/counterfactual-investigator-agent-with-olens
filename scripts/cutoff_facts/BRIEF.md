@@ -1,17 +1,17 @@
-# Brief v4: author 50 short-answer "knowledge cutoff" questions about your assigned entities
+# Brief v5: author 50 short-answer "knowledge cutoff" questions about your assigned entities
 
-v4 (2026-10-29): entity lists instead of domains, WebFetch first with a search cap, no changed /
-unchanged ratio; the rest is v3. v3 (2026-10-29): present tense, no dates. The v1 gate (1,072 dated
-questions) found Qwen3.6-27B holds a stable belief on only 14% of them, because most were too
-obscure, and the same 174 famous questions asked present-tense gave 32% stable-wrong (the stale trap
-firing) against 2% asked dated. So: **famous things, asked as they stand today, with no date in the
-question.**
+v5 (2026-10-29): the entity lists say what changed after January 2025; ask about those facts first
+and stop when the list runs dry. v4: entity lists instead of domains, WebFetch first with a search
+cap. v3: present tense, no dates. The v1 gate (1,072 dated questions) found Qwen3.6-27B holds a
+stable belief on only 14% of them, because most were too obscure, and the same 174 famous questions
+asked present-tense gave 32% stable-wrong (the stale trap firing) against 2% asked dated. So:
+**famous things, asked as they stand today, with no date in the question.**
 
 You are building a dataset of factual questions whose answer changed around January 2025, the
 knowledge cutoff of the subject model (Qwen3.6-27B). Asked "Who is the CEO of Intel?" with no date,
 a model with that cutoff confidently gives the old value; where nothing changed, it answers right.
-Both are useful. Your job: 50 questions, each verified as of today, each with a short unambiguous
-answer.
+Both are useful, changed facts more so. Your job: up to 50 questions, each verified as of today,
+each with a short unambiguous answer.
 
 ## Per question
 
@@ -25,8 +25,10 @@ answer.
   made world news. Test: would a well-read person in 2024 have known the OLD value without looking
   it up? If not, drop it. Niche examples that failed the gate: a metro line's terminus, a mid-size
   company's CEO, a regional cup winner, a Wikipedia tally.
-- **Changed or unchanged, either is fine.** Don't aim for a ratio. Just say in `notes` whether you
-  believe the answer changed since January 2025.
+- **Changed facts first.** Your entity list marks what changed about each entity after January 2025
+  (a new CEO, a new champion, a new owner, a rename). Ask about those facts first, then other
+  current facts about the same entities. Say in `notes` whether you believe the answer changed since
+  January 2025. Don't pad: if the list runs dry at 30 good questions, stop at 30.
 - **Record your predicted stale value.** For every question put in `pre_cutoff_analog` the single
   bare answer you expect a January-2025 model to give (no explanation, no parenthetical): for a
   changed item that is the old value, for an unchanged item it equals `truth`. It is the writer's
@@ -56,7 +58,7 @@ answer.
   vary across samples so they fail the stability gate, and token lenses can't name multi-digit
   values because the subject splits digits.) If the natural question has a numeric answer, ask a
   different question about the same thing whose answer is a name, or drop it.
-- **Don't repeat existing items.** The file `existing_list3.txt` beside this brief lists every
+- **Don't repeat existing items.** The file `existing_list4.txt` beside this brief lists every
   question already in the dataset (question, answer). Don't ask about the same thing or the same
   answer.
 

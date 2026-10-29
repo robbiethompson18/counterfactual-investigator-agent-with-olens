@@ -2,16 +2,16 @@
 each asked as a bare user turn with no system prompt and thinking off, the way WorkspaceBench's knowledge_cutoff family
 renders its items (Robbie, 2026-10-29).
 
-Bank v3 (default; `CUTOFF_QA_BANK=v2` / `v1` for the older banks): 5,467 present-tense, dateless questions ("Who is the CEO
-of Intel?"): v2's 803 (629 rewrites of v1's dated questions plus 174 fame-steered ones) plus 4,664 written by 100 Sonnet agents
-from disjoint entity lists (brief v4), every one gated on the shared Qwen server (8 samples at T 1 + greedy): `qwen_modal`
-(Qwen's modal normalized answer), `qwen_modal_count`, `gate_class` (stable_right, stable_wrong, unstable, refusal_or_null). By
-default items() is the 2,196 stable (>= 7/8) items (649 stable-wrong); `CUTOFF_QA_ALL=1` takes every item. The label for the
-predict-Qwen task is `qwen_modal`; `truth` (the writer's answer at authoring time), `truth_now` (a web recheck as of 2026-10-29,
-stable items only; for v4 items equal to `truth`) and `pre_cutoff_analog` are metadata. docs/envs/cutoff_qa.md has the
-provenance, the gate numbers and the weaknesses; `scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is
-scripts/cutoff_gate.py (PR #382). Banks are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on
-first use.
+Bank v4 (default; `CUTOFF_QA_BANK=v3` / `v2` / `v1` for the older banks): 6,411 present-tense, dateless questions ("Who is
+the CEO of Intel?"): v2's 803 (629 rewrites of v1's dated questions plus 174 fame-steered ones), 4,664 written by 100 Sonnet
+agents from disjoint entity lists (brief v4) and 944 from 100 more agents given changed-facts-first lists (brief v5), every one
+gated on the shared Qwen server (8 samples at T 1 + greedy): `qwen_modal` (Qwen's modal normalized answer), `qwen_modal_count`,
+`gate_class` (stable_right, stable_wrong, unstable, refusal_or_null). By default items() is the 2,605 stable (>= 7/8) items
+(861 stable-wrong); `CUTOFF_QA_ALL=1` takes every item. The label for the predict-Qwen task is `qwen_modal`; `truth` (the
+writer's answer at authoring time), `truth_now` (a web recheck as of 2026-10-29, stable v2 items only; for entity-list items
+equal to `truth`) and `pre_cutoff_analog` are metadata. docs/envs/cutoff_qa.md has the provenance, the gate numbers and the
+weaknesses; `scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is scripts/cutoff_gate.py (PR #382).
+Banks are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on first use.
 
 Arms: `nohint` only (hints are ruled out for this env): the user message is the bank's `question` string verbatim (it ends
 "If you are not sure, give your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server
@@ -38,11 +38,11 @@ from environments._lib.core import Ctx, Episode
 from environments._lib.runfolder import REPO_ROOT
 
 ARMS = ["nohint"]
-VERSION = os.environ.get("CUTOFF_QA_BANK", "v3")  # v1: 1,072 dated; v2: 803 present-tense, gated; v3: v2 + 4,664 entity-list items
+VERSION = os.environ.get("CUTOFF_QA_BANK", "v4")  # v1: 1,072 dated; v2: 803 present-tense, gated; v3: v2 + 4,664 entity-list; v4: + 944
 ALL_ITEMS = os.environ.get("CUTOFF_QA_ALL") == "1"  # include unstable and refusal items too
 META_KEYS = ("truth", "truth_aliases", "pre_cutoff_analog", "event_date", "domain", "answer_type", "numeric")
 GATE_KEYS = ("qwen_modal", "qwen_modal_count", "qwen_greedy", "gate_class", "gate_run", "truth_now", "truth_changed", "source_batch")
-GATE_KEYS += ("category",)  # v3 entity-list items: the list's category
+GATE_KEYS += ("category",)  # entity-list items (v3, v4): the list's category
 
 
 @cache
