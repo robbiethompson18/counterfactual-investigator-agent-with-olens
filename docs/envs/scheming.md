@@ -1,9 +1,12 @@
 # Scheming envs: blackmail, leaking, lethal inaction, oversight subversion, self-exfiltration, goal-guarding
 
-**Status (2026-10-26):** ACTIVE. Rates are bf16 vLLM, 2026-10-21. The cfbench canonical exfil run
-(fp8, 2026-10-23) is in "Later runs" at the end; fp8 thinking-on Lynch rates run up to 40pp lower
-([thinking-off.md](../thinking-off.md)). The O-lens predictor test on exfil `evalcue` vs `base` was
-null ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/`](../../environments/retired/README.md), `scheming_*`): `evalcue/` was
+deleted on 2026-10-27, so `evalcue/envs/scheming/` is at commit `c7b2e56`. Rates are bf16 vLLM,
+2026-10-21. The cfbench canonical exfil run (fp8, 2026-10-23) is in "Later runs" at the end; fp8
+thinking-on Lynch rates run up to 40pp lower ([thinking-off.md](../thinking-off.md)). The O-lens
+predictor test on exfil `evalcue` vs `base` was null
+([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
 
 Multi-arm self-preservation and goal-guarding environments on Qwen3.6-27B (thinking on; uncapped
 until 20:25, then a 65,536-token safety cap), built overnight 2026-10-21 as part of the env sweep

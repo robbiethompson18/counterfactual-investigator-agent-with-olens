@@ -1,6 +1,9 @@
 # funding_email_real: funding_email in a realistic setting
 
-**Status (2026-10-26):** ACTIVE.
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/funding_email_real/`](../../environments/retired/funding_email_real/)):
+`evalcue/` was deleted on 2026-10-27, so the code, the render command and `expview_export.py` are at
+commit `c7b2e56`. The GLM 5.3 grid stands.
 
 GLM 5.3 decides almost immediately that the original [funding_email](funding_email.md) scenario is
 fictional or an eval. `evalcue/envs/funding_email_real/` rebuilds it as a Claude Code session on a
