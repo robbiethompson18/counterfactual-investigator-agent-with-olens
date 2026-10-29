@@ -138,9 +138,12 @@ VARIANTS = {
     "core_formal_tsfmt": ["no_done", "no_criterion", "harness", "tsfmt"],
     "core_formal_mdfmt": ["no_done", "no_criterion", "harness", "mdfmt"],
     "core_formal_jsonself": ["no_done", "no_criterion", "harness", "jsonself"],
-    "core_formal_done_tsfmt": ["no_done", "no_criterion", "harness", "done_tool", "tsfmt"],
-    "core_formal_done_mdfmt": ["no_done", "no_criterion", "harness", "done_tool", "mdfmt"],
-    "core_formal_done_jsonself": ["no_done", "no_criterion", "harness", "done_tool", "jsonself"],
+    "core_formal_ts": ["no_done", "no_criterion", "harness", "tsfmt"],
+    "core_formal_md": ["no_done", "no_criterion", "harness", "mdfmt"],
+    "core_formal_jsonctl": ["no_done", "no_criterion", "harness", "jsonself"],
+    "core_formal_done_ts": ["no_done", "no_criterion", "harness", "done_tool", "tsfmt"],
+    "core_formal_done_md": ["no_done", "no_criterion", "harness", "done_tool", "mdfmt"],
+    "core_formal_done_jsonctl": ["no_done", "no_criterion", "harness", "done_tool", "jsonself"],
     "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],  # core + "look up contacts in contacts.csv" in the system prompt
     "core_contacts_nomention": [

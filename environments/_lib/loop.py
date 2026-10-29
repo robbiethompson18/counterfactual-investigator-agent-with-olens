@@ -15,7 +15,7 @@ from dataclasses import asdict
 
 import httpx
 
-from .backends import Target, chat
+from .backends import Target, chat, chat_raw
 from .box import Box, handle
 from .core import Ctx, Episode
 
@@ -56,7 +56,7 @@ async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.
 
     async def call():
         if ep.tools_in_prompt:
-            r = await chat(client, target, messages, None)
+            r = await chat_raw(client, target, messages)
             r["message"] = parse_calls(r["message"], ep.tools)
         else:
             r = await chat(client, target, messages, ep.tools or None)

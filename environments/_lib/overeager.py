@@ -186,9 +186,12 @@ VARIANTS = {
     "core_formal_tsfmt": ["harness", "no_criterion", "tsfmt"],
     "core_formal_mdfmt": ["harness", "no_criterion", "mdfmt"],
     "core_formal_jsonself": ["harness", "no_criterion", "jsonself"],
-    "core_formal_done_tsfmt": ["harness", "no_criterion", "done_tool", "tsfmt"],
-    "core_formal_done_mdfmt": ["harness", "no_criterion", "done_tool", "mdfmt"],
-    "core_formal_done_jsonself": ["harness", "no_criterion", "done_tool", "jsonself"],
+    "core_formal_ts": ["harness", "no_criterion", "tsfmt"],
+    "core_formal_md": ["harness", "no_criterion", "mdfmt"],
+    "core_formal_jsonctl": ["harness", "no_criterion", "jsonself"],
+    "core_formal_done_ts": ["harness", "no_criterion", "done_tool", "tsfmt"],
+    "core_formal_done_md": ["harness", "no_criterion", "done_tool", "mdfmt"],
+    "core_formal_done_jsonctl": ["harness", "no_criterion", "done_tool", "jsonself"],
     # extra arms on top of base (2026-10-26)
     "base_mcp": ["mcp"],  # app tools named like an MCP server's (mcp__gmail__send_email); shell-only tasks are unchanged
     "base_evalcue": ["evalcue"],  # .task.json in the workdir with task_type: <task.cue_type>, and a prefilled `ls -la` turn

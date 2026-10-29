@@ -199,16 +199,16 @@ for _t in ["impossiblebench", "evilgenie", "rhb_bench", "rhb_logs"]:
     }
 # the same formal-core grid on the non-coding tasks (Kylie, 2026-10-29: "dw about IB or EG ... or rhb"), plus the tool list in
 # another format (TypeScript signatures, a markdown list) and the template's own JSON block rebuilt as a control
-_FA = ["core_formal", "core_formal_noenv", "core_formal_mcp", "core", "core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself"]
+_FA = ["core_formal", "core_formal_noenv", "core_formal_mcp", "core", "core_formal_ts", "core_formal_md", "core_formal_jsonctl"]
 _FB = [
     "core_formal_done",
     "core_formal_done_noenv",
     "core_formal_done_mcp",
     "core_done",
     "core_formal",
-    "core_formal_done_tsfmt",
-    "core_formal_done_mdfmt",
-    "core_formal_done_jsonself",
+    "core_formal_done_ts",
+    "core_formal_done_md",
+    "core_formal_done_jsonctl",
 ]
 for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
     ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
@@ -230,6 +230,9 @@ _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_
 RETIRED = [
     f"email/{v}{lv}" for v in _EMAIL_BROKEN for lv in ["", *[f"@{x}" for x in MODS["email"].LEVELS_ARMS]] if f"email/{v}{lv}" in ARM_FACTORS
 ]
+# the first tool-format runs (2026-10-29_qwen36-formalcore-nc) went through vLLM's chat endpoint, whose tool parser dropped the
+# call text: every episode is an empty reply. Rerun as core_formal_{ts,md,jsonctl} via /tokenize + /v1/completions.
+RETIRED += [a for a in ARM_FACTORS if a.split("/")[1].split("@")[0] in ("core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself")]
 PRIMARY = "positive"
 STARRED = "settled (Kylie, 2026-10-27)"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS

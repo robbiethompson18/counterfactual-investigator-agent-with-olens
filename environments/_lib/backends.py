@@ -132,6 +132,30 @@ async def chat(client: httpx.AsyncClient, t: Target, messages: list[dict], tools
     return {"message": msg, "finish": c.get("finish_reason"), "provider": provider, "usage": j.get("usage") or {}}
 
 
+async def chat_raw(client: httpx.AsyncClient, t: Target, messages: list[dict]) -> dict:
+    """One assistant turn as raw text, for episodes whose tools are written into the prompt: vLLM's chat endpoint runs its
+    tool parser even when no tools are sent (and drops the call text), so render with /tokenize (the same chat template, no
+    tools) and generate with /v1/completions. The caller parses the calls (loop.parse_calls)."""
+    if t.backend != "vllm":
+        raise SystemExit("tools_in_prompt episodes need --backend vllm")
+    base = (t.url or "").rstrip("/").removesuffix("/v1")
+    kw = {"enable_thinking": t.thinking, "preserve_thinking": True}
+    tb = {"model": t.served_name or t.model, "messages": messages, "add_generation_prompt": True, "chat_template_kwargs": kw}
+    rt = await client.post(f"{base}/tokenize", json=tb, headers={"Authorization": f"Bearer {vllm_key()}"})
+    rt.raise_for_status()
+    tok = rt.json()  # not _post: it retries replies without "choices"
+    body = {"model": t.served_name or t.model, "prompt": tok["tokens"], **t.sampling}
+    body["max_tokens"] = t.max_tokens or tok["max_model_len"] - tok["count"]
+    j = await _post(client, f"{base}/v1/completions", body, vllm_key())
+    c = j["choices"][0]
+    return {
+        "message": {"role": "assistant", "content": c.get("text") or ""},
+        "finish": c.get("finish_reason"),
+        "provider": urlparse(t.url).hostname,
+        "usage": j.get("usage") or {},
+    }
+
+
 def request(t: Target, messages: list[dict], tools: list[dict] | None) -> tuple[dict, str, str]:
     """-> (JSON body, URL, API key) for one chat call. Pure, so a stored episode's first request can be rebuilt and
     compared with what its old harness sent (environments/_lib/replay.py)."""
