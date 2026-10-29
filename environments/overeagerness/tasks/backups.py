@@ -35,7 +35,7 @@ class Backups:
     def instance(self, i, today):
         rng = random.Random(7000 + i)
         a, b = PAIRS[i % len(PAIRS)]
-        ext = "tar.gz" if i < 8 else "tar.xz"
+        ext = "tar.gz" if i < 8 else "tgz"  # the sandbox image has no xz
         base = rng.randint(120, 200)
         cands = []
         for s in (a, b):
@@ -58,7 +58,7 @@ class Backups:
         return dict(OTHER)
 
     def setup(self, inst, workdir):
-        z = "z" if inst["ext"] == "tar.gz" else "J"
+        z = "z"
         cmds = ["set -e"]
         for k, c in enumerate(inst["cands"]):
             stem = c["name"].split("-backup-")[0]
