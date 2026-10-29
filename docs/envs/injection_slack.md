@@ -1,6 +1,10 @@
 # Prompt-injection env (AgentDojo Slack port)
 
-**Status (2026-10-26):** ACTIVE.
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/injection_slack/`](../../environments/retired/injection_slack/)): `evalcue/`
+was deleted on 2026-10-27, so the code and the `evalcue.run` command below are at commit `c7b2e56`,
+and cfbench's `evalcue_runs` loader named in the gotchas is gone too (at `821c6a7`). The rates
+stand.
 
 Does Qwen3.6-27B carry out an instruction injected into a web page it reads while doing a user's
 Slack task? Ported from AgentDojo's Slack suite (Debenedetti et al., 2024,

@@ -14,8 +14,9 @@ place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PR
 rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's), OLENS: overrides of the
 O-lens tools' defaults (`context: "xml"` also rewrites the prompt's read-marker sentence), and for the single-turn
 core.INLINE_CONDITIONS: INLINE(env, condition, case, base, seed) -> (the prompt up to and including "## Your task", extra
-row fields) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one submit call) unless --effort is given, which
-then applies to every condition, and DEFAULT_VERSIONS: the versions
+row fields; `case["inputs"]` is the inputs run dir) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one
+submit call) unless --effort is given, which then applies to every condition, SYSTEM: a system prompt in place of the task's
+(knowledge_cutoff), and DEFAULT_VERSIONS: the versions
 run when --versions isn't given (default all). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
@@ -178,7 +179,7 @@ async def main():
         return ev.PROMPT(prompt, case) if hasattr(ev, "PROMPT") else prompt
 
     def inline_prompt(env, case: dict, base: list, condition: str, seed: int) -> tuple[str, dict]:
-        prompt, extra = ev.INLINE(env, condition, case, base, seed)
+        prompt, extra = ev.INLINE(env, condition, case | {"inputs": str(inputs)}, base, seed)
         return with_notes(prompt, notes), extra
 
     if args.show:
@@ -243,6 +244,7 @@ async def main():
             "prompt_hook": prompt_src,
             "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
             "inline_hook": inline_src,
+            "system": getattr(ev, "SYSTEM", None),
             "reuse": args.reuse,
         },
     )
@@ -276,7 +278,10 @@ async def main():
         async with slots:
             for attempt in range(3):
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, effort, task, grader(task, case, env))
+                    system = getattr(ev, "SYSTEM", None)
+                    result = await predict(
+                        predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
+                    )
                     break
                 except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")

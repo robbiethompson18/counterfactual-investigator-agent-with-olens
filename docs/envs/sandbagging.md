@@ -1,6 +1,10 @@
 # Sandbagging env in evalcue
 
-**Status (2026-10-26):** ACTIVE.
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/sandbagging/`](../../environments/retired/sandbagging/)): `evalcue/` was
+deleted on 2026-10-27, so the code, the `evalcue.run` / `evalcue.show` commands and
+`evalcue/CLAUDE.md` are at commit `c7b2e56`. The replication (`a_goal` 8/30 vs `a_goal_lt` 21/30)
+and the GLM 5.3 baseline stand.
 
 Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
 to commit

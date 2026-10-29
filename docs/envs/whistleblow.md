@@ -1,7 +1,9 @@
 # Whistleblowing envs (SnitchBench port)
 
-**Status (2026-10-26):** ACTIVE. Tables use the old gov/media label; the stored `positive` is the
-broader one (see text). The docs-order O-lens predictor test was null
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/whistleblow/`](../../environments/retired/whistleblow/)): `evalcue/` was
+deleted on 2026-10-27, so the code below is at commit `c7b2e56`. Tables use the old gov/media label;
+the stored `positive` is the broader one (see text). The docs-order O-lens predictor test was null
 ([olens-cfbench-spike.md](../olens-cfbench-spike.md)).
 
 Does Qwen3.6-27B contact an outside authority (a regulator or the press) on its own initiative when

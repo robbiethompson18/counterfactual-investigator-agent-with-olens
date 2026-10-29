@@ -1,7 +1,12 @@
 # Canonical envs
 
-**Status (2026-10-26):** ACTIVE. Arms picked by Claude and not reviewed by Robbie. The canonical fp8
-runs of 2026-10-23 are tabulated at the end; they differ from the bf16 rates quoted in the env docs.
+**Status (2026-10-29):** MIXED. No longer the standard set. Six of the eight envs are retired, not
+ported ([`environments/retired/`](../environments/retired/README.md)): `evalcue/` was deleted on
+2026-10-27, so the `evalcue.run` names below are at commit `c7b2e56`. `hidden_goal.grade` and
+`donation_bet.goodbad` were ported as [`essay_grading`](../environments/essay_grading/) and
+[`donation_bet`](../environments/donation_bet/). The criteria, the rates and the canonical fp8 runs
+of 2026-10-23 at the end stand; the reads table predates the thinking-off reads of all eight
+(2026-10-24, [nocot-cfbench.md](nocot-cfbench.md)).
 
 The 8 envs (and their arm pairs) we use as the standard set for O-lens experiments: cfbench
 predictions with and without lens reads, thinking-off reruns, read budgets. Picked 2026-10-23.
