@@ -1,6 +1,10 @@
 # funding_email in evalcue (port of agent-interp-envs)
 
-**Status (2026-10-26):** ACTIVE. The 2026-10-24/25 fp8 reruns at the end replicate arm_a vs arm_b.
+**Status (2026-10-29):** REFERENCE. Retired, not ported to `environments/`
+([`environments/retired/funding_email/`](../../environments/retired/funding_email/)): `evalcue/` was
+deleted on 2026-10-27, so the code and the `evalcue.run` command below are at commit `c7b2e56`. The
+replication (14/30 vs 0/30) and the 2026-10-24/25 fp8 reruns at the end, which replicate arm_a vs
+arm_b, stand.
 
 Paths under `configs/envs_screen/`, `scripts/envs_screen/` and `scripts/envs_gateway.py` below refer
 to commit

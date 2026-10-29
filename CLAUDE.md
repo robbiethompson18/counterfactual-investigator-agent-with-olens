@@ -357,10 +357,10 @@ Current docs:
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
   (deleted, at `e145988`)
-- [ACTIVE: funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+- [REFERENCE: funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
   — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
   subagent labels, replication of the screen (14/30 vs 0/30)
-- [ACTIVE: funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
+- [REFERENCE: funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
   — upstream/core/full harness × thin/real docs × memo, how to render an arm, unfixed sandbox tells
 - [SUPERSEDED: sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
@@ -369,7 +369,7 @@ Current docs:
 - [REFERENCE: Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
-- [ACTIVE: Sandbagging in evalcue — read before running the sandbagging env (it now runs in evalcue, not the vendored harness)](docs/envs/sandbagging.md)
+- [REFERENCE: Sandbagging in evalcue — read before running the sandbagging env (the evalcue port; retired, code at `c7b2e56`)](docs/envs/sandbagging.md)
   — `evalcue/envs/sandbagging/`: all 22 arms verbatim, the original tool loop, `detect()` matching
   544/544 original labels; replicates on OpenRouter (`a_goal` 8/30 vs `a_goal_lt` 21/30, p = 8e-4);
   GLM 5.3 baseline 2026-10-24 (deliberate ≈1/100, the detector positives are slips)
@@ -435,19 +435,20 @@ Current docs:
 - [NULL: Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
   — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
   scores
-- [ACTIVE: Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
+- [REFERENCE: Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
   — Palisade (2025) port + 3 siblings, ~200 arms; "The catch is that by default…" flips bypass
   (20/26 vs 0/20), "write access … configuration files" disables the kill switch 36/40 bf16, 30/40
   in the fp8 canonical run (mostly unverbalized); every arm in
   [shutdown-arms.md](docs/envs/shutdown-arms.md)
-- [ACTIVE: Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
+- [REFERENCE: Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
   — 12 envs (bf16 rates; fp8 canonical exfil run in the doc); Lynch main cell 87%/86%/53%; exfil 48%
   → 20% with an eval cue (rarely verbalized); placebo caveats; tables in
   [scheming-tables.md](docs/envs/scheming-tables.md)
-- [ACTIVE: Canonical envs — read before picking envs or arms for an O-lens / cfbench experiment](docs/canonical-envs.md)
-  — the 8 standard envs and arm pairs, criteria, which have O-lens reads; picked by Claude, arms not
-  yet reviewed by Robbie; canonical fp8 run rates (2026-10-23)
-- [ACTIVE: Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
+- [MIXED: Canonical envs — read before picking envs or arms for an O-lens / cfbench experiment](docs/canonical-envs.md)
+  — the 8 envs and arm pairs that were the standard set on 2026-10-23 (6 since retired, 2 ported),
+  criteria, which have O-lens reads; picked by Claude, arms not yet reviewed by Robbie; canonical
+  fp8 run rates (2026-10-23)
+- [REFERENCE: Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
   — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
   "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
 - [REFERENCE: Character drift — read before prefilling Qwen with out-of-persona assistant turns, or reading the lens at the Assistant token in roleplay](docs/envs/character_drift.md)
@@ -459,13 +460,13 @@ Current docs:
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
   leakage is one-sided (`good_above` = control)
-- [Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
+- [NULL: Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
   — pre-registered 26-env / 116-case test on no-CoT Qwen: O-lens tools −0.07 skill vs transcript
   tools (CI excludes 0) and ≈ placebo; only hidden_goal still leans positive
-- [Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
+- [NULL: Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
   — the matched 11-env / 54-case half with thinking on: same result (O-lens −0.06 vs transcript
   tools, ≈ placebo); thinking changes which arms are levers, so the halves aren't paired
-- [ACTIVE: Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
+- [REFERENCE: Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
 - [MIXED: Hiring-from-resumes envs — read before running resume-screening bias arms (Karvonen & Marks port)](docs/envs/hiring_resume.md)

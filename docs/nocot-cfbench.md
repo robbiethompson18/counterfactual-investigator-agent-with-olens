@@ -1,5 +1,11 @@
 # Thinking-off Qwen cfbench: the O-lens doesn't beat placebo across 26 envs
 
+**Status (2026-10-29):** NULL. The pre-registered bar failed: O-lens tools −0.07 skill vs transcript
+tools (CI excludes 0) and ≈ placebo. Skill here is binomial log skill (harness v6), not RMSE, so
+don't compare it with RMSE numbers ([cfbench-scoring.md](cfbench-scoring.md)). 24 of the 26 envs are
+retired, not ported ([`environments/retired/`](../environments/retired/README.md));
+`hidden_goal_grade` and `donation_bet_goodbad` live on as `essay_grading` and `donation_bet`.
+
 Pre-registered test (2026-10-24/25) of the agentic O-lens tools on Qwen3.6-27B transcripts generated
 with thinking **off**, over every env with full no-CoT reads. The hidden_goal essay-grading result
 ([envs/hidden_goal.md](envs/hidden_goal.md): O-lens beat transcript tools and placebo on 38 cases)
