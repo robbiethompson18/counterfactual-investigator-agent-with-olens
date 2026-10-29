@@ -504,7 +504,9 @@ Current docs:
   (L52) picks Qwen's own answer 94% / 80% (right / wrong questions) and the gold on wrong ones only
   6%; listwise softmax pmf (NLL 0.30, ECE 0.04; diag beats full whitening); frozen, it transfers to
   TruthfulQA (top-1 = Qwen's answer 0.885 out-of-sample, the truth 0.14 on wrong questions); O-lens
-  reads at the same tokens point the same way but a regex over them is a weak readout (≤ 0.31)
+  reads at the same tokens point the same way but a regex over them is a weak readout (≤ 0.31);
+  hint first, a probe tuned on hinted activations reads the no-hint answer 45% on didn't cases
+  (frozen 23%, top-1 = hinted 36% vs 57%)
 - [NULL: J-lens as a cfbench tool — read before giving the predictor J++ / Jacobian-lens tools, or reading J++ next-token numbers](docs/jlens-cfbench.md)
   — `jlens_agentic` on hint_mcq (19 of 50 items): ties the O-lens (28%), +10pp over its placebo is
   within noise, its only unique hits are "A" (J++'s favourite letter); J++ is a concept lens, weak
