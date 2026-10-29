@@ -2,8 +2,8 @@
 
 **Status (2026-10-29):** ACTIVE. Bank v2 (803 present-tense questions, 266 stable under Qwen, 187 of
 them stable-wrong) is on HF and is the env's default; v1 (1,072 dated questions, 14% stable) is
-kept. Finding of the day: asking present tense with no date is what makes the stale trap fire. The
-`hint` arm is not built.
+kept. Finding of the day: asking present tense with no date is what makes the stale trap fire. One
+arm (`nohint`); hints are ruled out for this env.
 
 Env: [`environments/cutoff_qa/`](../../environments/cutoff_qa/). Banks:
 [`banks/cutoff_qa/`](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/banks/cutoff_qa)

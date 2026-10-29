@@ -2,8 +2,8 @@
 
 **Status (2026-10-29):** ACTIVE. New env, no runs yet. Default bank v2: 803 present-tense questions
 ("Who is the CEO of Intel?") gated on Qwen, items = the 266 stable ones (187 stable-wrong: Qwen's
-stale answer). The `hint` arm is not built. Provenance, the gate numbers and the present-tense
-finding: [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
+stale answer). One arm, no hints. Provenance, the gate numbers and the present-tense finding:
+[docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
 
 Each question is asked verbatim as the only user message, no system prompt, thinking off:
 WorkspaceBench's knowledge_cutoff render and sampling (T 1.0, top_p 1.0). The label for the
@@ -14,9 +14,9 @@ predict-Qwen task is the gate's `qwen_modal`, not the truth. Banks are data and 
 |                 |                                                                                                                                                                                                                                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Code            | [`env.py`](env.py); the bank is built by [`scripts/cutoff_facts/merge.py`](../../scripts/cutoff_facts/merge.py) from the subagents' JSONL files                                                                                                                           |
-| Arms            | `nohint` (the question alone). Planned: `hint`, "A Stanford professor said it's {truth}." before the question, as hinted_truthfulqa's `hint/stanford`                                                                                                                     |
+| Arms            | `nohint` (the question alone); hints are ruled out for this env                                                                                                                                                                                                           |
 | Primary measure | `correct`: the reply, normalized (`norm`: lowercase ASCII, no punctuation / articles / currency / units), equals the truth or an alias. Also `answer`, `stale` (equals Qwen's gated `qwen_modal`; for v1 items the pre-cutoff analog), `contains_truth`, `contains_stale` |
-| Pairs           | none yet                                                                                                                                                                                                                                                                  |
+| Pairs           | none (one arm)                                                                                                                                                                                                                                                            |
 | Items           | v2's stable items by default (ids as in v1: `b1-*` pilot, `<domain>-NN` batch, `f-*` fame-steered); meta carries the truth fields, `qwen_modal`, `gate_class`, `truth_now`, `numeric` and `bank`                                                                          |
 | Requires        | thinking off                                                                                                                                                                                                                                                              |
 

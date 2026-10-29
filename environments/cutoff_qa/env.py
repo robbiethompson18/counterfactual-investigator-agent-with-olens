@@ -11,12 +11,11 @@ as of 2026-10-29, stable items only) and `pre_cutoff_analog` are metadata. docs/
 numbers and the weaknesses; `scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is scripts/cutoff_gate.py
 (PR #382). Banks are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on first use.
 
-Arms: `nohint` only, for now: the user message is the bank's `question` string verbatim (it ends "If you are not sure, give
-your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server (bf16) at temperature 1.0,
-top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff sampling and the stability gate's
-(runs/cutoff_gate/2026-10-29_*), so O-lens reads of env transcripts match the gate's. TODO: a `hint` arm that prefixes
-"A Stanford professor said it's {truth}." (or the stale analog) the way hinted_truthfulqa's `hint/stanford` does, as the
-counterfactual; not built yet.
+Arms: `nohint` only (hints are ruled out for this env): the user message is the bank's `question` string verbatim (it ends
+"If you are not sure, give your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server
+(bf16) at temperature 1.0, top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff sampling and the
+stability gate's (runs/cutoff_gate/2026-10-29_*), so O-lens reads of env transcripts match the gate's. PRIMARY is `correct`;
+`stale` is the field downstream code uses for the predict-Qwen task.
 
 Measures (no LLM judge anywhere): `answer` = the reply normalized (`norm`: lowercase, accents and punctuation stripped,
 leading article dropped, currency / units / digit-group commas stripped from numbers, whitespace collapsed); `correct` = it
@@ -124,7 +123,7 @@ BEHAVIOR = (
     "`stale` = it equals Qwen's gated modal answer."
 )
 PRIMARY = "correct"
-PAIRS: dict = {}  # the hint arm is the planned counterfactual (see the TODO above)
+PAIRS: dict = {}  # one arm, no counterfactual pair
 # cfbench's answer task (cfbench/CLAUDE.md): what the model was told to answer with, and how answers are compared
 ANSWER_FORMAT = "just the answer (a name, title or number)"
 ANSWER_MATCH = "normalized exact match (lowercase, no punctuation, articles, currency or units) to the truth or an alias"

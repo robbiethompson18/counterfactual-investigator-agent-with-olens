@@ -540,7 +540,7 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
-- [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, extending the question bank or building the hint arm](docs/envs/cutoff_qa.md)
+- [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
   — bank v2: 803 present-tense questions gated on Qwen (266 stable, 187 stable-wrong), v1: 1,072
   dated ones (14% stable); asking present tense with no date is what fires the stale trap (2% →
   32%); label = `qwen_modal`, truth is metadata, no numeric answers; how the Sonnet subagents,
