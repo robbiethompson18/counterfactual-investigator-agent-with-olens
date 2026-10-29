@@ -78,7 +78,6 @@ def cutoff_render(bank: dict):
         it["token"] = tail[-1]
 
 
-EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render}
 def plain_token(bank: dict):
     """wrong_bridge is read at the final token of the plain prompt (no chat template): store it, asserting it is the last word."""
     tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
@@ -87,7 +86,7 @@ def plain_token(bank: dict):
         assert it["token"] == " " + it["prompt"].rsplit(" ", 1)[1], (it["name"], it["token"])
 
 
-EXTRA = {"jailbreak_recognition": qwen_render, "wrong_bridge": plain_token}
+EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render, "wrong_bridge": plain_token}
 
 
 def build(family: str, commit: str) -> dict:
