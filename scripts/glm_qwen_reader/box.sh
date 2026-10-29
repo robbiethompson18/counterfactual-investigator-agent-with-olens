@@ -2,7 +2,7 @@
 # GLM-5.3 O-lens + the Qwen reader of GLM's block 51 over one requests file, on a 4xB200 box (sky.yaml runs it; on a hand-rented
 # vast box run the same two steps). Needs HF_TOKEN (write on the sprint dataset) for the upload.
 # On a vast box (24 GB root disk, /dev/shm noexec): stop the image's own vLLM first (it holds ~169 GB/GPU), then D=/dev/shm/w
-# for the weights and caches; the venv stays in W on the root disk.
+# for the weights and caches and BASE_PY=/venv/main/bin/python to reuse the image's torch; the venv stays in W on the root disk.
 #   bash box.sh setup                    # weights, lens, reader, vLLM 0.31 + the glm53 fork (~464 GB GLM download)
 #   RUN=<date>_<slug> [FREE_GLM=1] bash box.sh run    # GLM worker (capture + lens, h51 kept) -> 4 Qwen reader shards -> HF runs/alignment_faking/$RUN/raw
 set -euo pipefail
@@ -19,9 +19,14 @@ mkdir -p "$W" "$D"
 if [ "$1" = setup ]; then
   command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH=$HOME/.local/bin:$PATH HF_HUB_ENABLE_HF_TRANSFER=1
-  [ -x "$PY" ] || uv venv -q --python 3.12 "$W/v31"
-  uv pip install -q -p "$PY" vllm==0.31.0 "transformers>=5.16.1,<5.18" peft pandas pyarrow hf_transfer "huggingface_hub[cli]"
-  HF="$W/v31/bin/hf download"
+  if [ -n "${BASE_PY:-}" ]; then # a vast vLLM image: its torch 2.13 + deps, vllm 0.31 and transformers 5.17 on top (root disk is 24 GB)
+    [ -x "$PY" ] || uv venv -q --system-site-packages --python "$BASE_PY" "$W/v31"
+    uv pip install -q -p "$PY" --no-deps vllm==0.31.0 "transformers>=5.16.1,<5.18" peft hf_transfer
+  else
+    [ -x "$PY" ] || uv venv -q --python 3.12 "$W/v31"
+    uv pip install -q -p "$PY" vllm==0.31.0 "transformers>=5.16.1,<5.18" peft pandas pyarrow hf_transfer "huggingface_hub[cli]"
+  fi
+  HF="$PY -m huggingface_hub.cli.hf download"
   $HF ceselder/glm-5.3-olens-lens --revision $LENS_REV --local-dir "$D/lens" \
     --include "rl1b_rl1b_2_step_0100/*" "olens_glm53_usage.py" "vllm_metamodels_glm53_b26f02d.tar.gz" "glm53_stack/*"
   uv pip install -q -p "$PY" --no-deps "$D/lens/vllm_metamodels_glm53_b26f02d.tar.gz"
@@ -52,13 +57,13 @@ cp "$D/lens/olens_glm53_usage.py" "$HERE/../glm_olens_dense/worker.py" "$HERE/..
 }
 # Qwen after GLM: a 440 GiB /dev/shm holds GLM (432 GiB) or Qwen (50 GiB), not both; FREE_GLM=1 deletes GLM's weights first
 [ "${FREE_GLM:-0}" = 1 ] && rm -rf "$D/GLM-5.3-NVFP4"
-HF_HUB_ENABLE_HF_TRANSFER=1 $W/v31/bin/hf download Qwen/Qwen3.6-27B --revision 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9 >/dev/null
+HF_HUB_ENABLE_HF_TRANSFER=1 $PY -m huggingface_hub.cli.hf download Qwen/Qwen3.6-27B --revision 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9 >/dev/null
 for i in 0 1 2 3; do
   CUDA_VISIBLE_DEVICES=$i $PY "$HERE/qwen_reader.py" "$O/h51.pt" "$D/reader/release" "$D/l42/olens_usage.py" "$O/qwen_reads_$i.jsonl" \
     --shard $i/4 >"$O/qwen_reader_$i.log" 2>&1 &
 done
 wait
 cp "$REQ" "$O/requests.jsonl"
-$W/v31/bin/hf upload Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens "$O" "runs/alignment_faking/$RUN/raw" \
+$PY -m huggingface_hub.cli.hf upload Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens "$O" "runs/alignment_faking/$RUN/raw" \
   --repo-type dataset --commit-message "raw GLM lens + Qwen reader reads: $RUN"
 echo READS_DONE
