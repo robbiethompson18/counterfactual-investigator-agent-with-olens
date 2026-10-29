@@ -88,6 +88,12 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
+- **A tool call that ends a rollout by submitting an answer returns the verdict** (added
+  2026-10-29): the tool result of a valid `submit_prediction` / `submit_answer` (or any env/eval
+  tool playing that role) states what was submitted, the correct answer and whether it was right, so
+  the verdict is in the transcript's last message (`cfbench/predict.py` `grader`). Transcript-only,
+  no harness bump; old runs are not backfilled. An invalid submission's retry message must not
+  reveal the answer.
 
 ## Background reading
 
@@ -213,8 +219,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
-  four.
+  in orange, no tool calls in gray, J++ in purple. A placebo is its lens's color with black stripes
+  (Robbie, 2026-10-29; in matplotlib: fill = the lens's color, `hatch="////"`, `edgecolor` black);
+  plain black placebos are the old style. Give any other condition a color outside these.
 
 ## Docs
 
@@ -546,10 +553,9 @@ Current docs:
   placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
   answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
-  — bank v2: 803 present-tense questions gated on Qwen (266 stable, 187 stable-wrong), v1: 1,072
-  dated ones (14% stable); asking present tense with no date is what fires the stale trap (2% →
-  32%); label = `qwen_modal`, truth is metadata, numeric items dropped (240 stable live); how the
-  Sonnet subagents, `merge.py` and the gate (PR #382) made them; how to generate more
+  — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
+  `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
+  agents made it and how to make more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything

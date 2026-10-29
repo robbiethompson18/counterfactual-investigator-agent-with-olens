@@ -105,6 +105,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # O-lens block's positions); every other condition's prompt is byte-identical to 13 (its --show output diffed before and after).
 # jlens_inline / jlens_placebo_inline / jlens_inline_no60 (2026-10-29, no bump): new single-turn conditions (cutoff_qa_inline
 # only); every other condition's prompt is byte-identical to 13.
+# Submit verdicts (2026-10-29, no bump): a valid submit_prediction / submit_answer call's tool result now states the submission,
+# the truth and whether it was right (cfbench/predict.py `grader`). Transcript-only, written after the rollout ends (a valid
+# submission ends the predictor's loop), so nothing the predictor sees changes; older runs are not backfilled.
 HARNESS_VERSION = 13
 
 

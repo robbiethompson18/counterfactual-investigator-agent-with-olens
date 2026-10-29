@@ -1,15 +1,17 @@
-# Brief v3: author 50 short-answer "knowledge cutoff" questions in your domain
+# Brief v4: author 50 short-answer "knowledge cutoff" questions about your assigned entities
 
-v3 (2026-10-29): present tense, no dates. The v1 gate (1,072 dated questions) found Qwen3.6-27B
-holds a stable belief on only 14% of them, because most were too obscure, and the same 174 famous
-questions asked present-tense gave 32% stable-wrong (the stale trap firing) against 2% asked dated.
-So: **famous things, asked as they stand today, with no date in the question.**
+v4 (2026-10-29): entity lists instead of domains, WebFetch first with a search cap, no changed /
+unchanged ratio; the rest is v3. v3 (2026-10-29): present tense, no dates. The v1 gate (1,072 dated
+questions) found Qwen3.6-27B holds a stable belief on only 14% of them, because most were too
+obscure, and the same 174 famous questions asked present-tense gave 32% stable-wrong (the stale trap
+firing) against 2% asked dated. So: **famous things, asked as they stand today, with no date in the
+question.**
 
 You are building a dataset of factual questions whose answer changed around January 2025, the
 knowledge cutoff of the subject model (Qwen3.6-27B). Asked "Who is the CEO of Intel?" with no date,
-a model with that cutoff confidently gives the old value. We want half the questions to have changed
-since then (the stale trap) and half to be unchanged (the "model knows it" class). Your job: 50
-questions, each verified as of today, each with a short unambiguous answer.
+a model with that cutoff confidently gives the old value; where nothing changed, it answers right.
+Both are useful. Your job: 50 questions, each verified as of today, each with a short unambiguous
+answer.
 
 ## Per question
 
@@ -23,19 +25,25 @@ questions, each verified as of today, each with a short unambiguous answer.
   made world news. Test: would a well-read person in 2024 have known the OLD value without looking
   it up? If not, drop it. Niche examples that failed the gate: a metro line's terminus, a mid-size
   company's CEO, a regional cup winner, a Wikipedia tally.
-- **Half changed, half unchanged.** About 25 of your 50 should have a different answer today than in
-  January 2025 (the CEO changed, a new champion, a new flagship); about 25 should have the same
-  answer as then (so the dataset can tell a stale model from a wrong one). Mark which in `notes`.
+- **Changed or unchanged, either is fine.** Don't aim for a ratio. Just say in `notes` whether you
+  believe the answer changed since January 2025.
 - **Record your predicted stale value.** For every question put in `pre_cutoff_analog` the single
   bare answer you expect a January-2025 model to give (no explanation, no parenthetical): for a
   changed item that is the old value, for an unchanged item it equals `truth`. It is the writer's
   prediction, not verified; the gate measures what Qwen actually says.
-- **Ground it.** Start from a real page: a Wikipedia list page, a current-officeholder table, a
-  release-history table, or the primary announcement. Use WebSearch and WebFetch (load them via
-  ToolSearch if they aren't loaded).
-- **Verify it as of today.** Either fetch one page that states the current answer, or find two
-  independent search results that state the same answer. Snippet-only from one result is not enough.
-  Record the URL you actually read the answer on. If you can't verify, drop it.
+- **Your entities, not a domain.** You were given an explicit list of entities (companies,
+  countries, competitions, awards, products, institutions). Write only about those. For each entity
+  ask about its current state: who holds the office, who is the CEO or chair or coach, what the
+  flagship or latest model is called, who the reigning champion or most recent winner is, where it
+  is based. Several questions per entity is fine when each asks a different thing; spread across the
+  list.
+- **WebFetch first, search sparingly.** Fetch the entity's Wikipedia page directly (guess the URL:
+  https://en.wikipedia.org/wiki/<Entity_Name>) and read the current holder from its infobox or lead;
+  follow a redirect or the "List of ..." page when needed. Use WebSearch only when you cannot guess
+  the page, and **at most 8 WebSearch calls in total**: the search budget is shared by a hundred
+  agents and runs out. Load WebFetch / WebSearch via ToolSearch if they aren't loaded.
+- **Verify it as of today.** The fetched page must state the current answer. Record the URL you read
+  it on, and set `verified_by` to "fetched page". If you can't verify, drop it.
 - **Short, unambiguous answer.** One name, one title, one place. No lists. Drop anything where two
   answers are defensible, where sources disagree, or where the value keeps changing (live prices,
   rankings that move weekly).
@@ -48,7 +56,7 @@ questions, each verified as of today, each with a short unambiguous answer.
   vary across samples so they fail the stability gate, and token lenses can't name multi-digit
   values because the subject splits digits.) If the natural question has a numeric answer, ask a
   different question about the same thing whose answer is a name, or drop it.
-- **Don't repeat existing items.** The file `existing_list.txt` beside this brief lists every
+- **Don't repeat existing items.** The file `existing_list3.txt` beside this brief lists every
   question already in the dataset (question, answer). Don't ask about the same thing or the same
   answer.
 
