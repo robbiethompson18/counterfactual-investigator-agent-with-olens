@@ -176,13 +176,10 @@ COMPARISONS |= {
     }
     for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]
 }
-COMPARISONS |= {
-    f"email: real-client tools / env ({book})": {
-        "arms": [f"email/{v}@{lv}" for v in ["base_done_neutral", *_CC]],
-        "group": "real-client harness",
-        "why": f"{book} address book; base_done_neutral stands in for the retired base",
-    }
-    for book, lv in [("junebug", "lowc"), ("acme", "lowa"), ("mixed", "low")]
+COMPARISONS["email: real-client tools / env (acme)"] = {  # acme book only (Kylie, 2026-10-29); @low/@lowc were also run
+    "arms": [f"email/{v}@lowa" for v in ["base_done_neutral", *_CC, "core_mcp2", "core_mcp2_env"]],
+    "group": "real-client harness",
+    "why": "acme address book; base_done_neutral stands in for the retired base",
 }
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
