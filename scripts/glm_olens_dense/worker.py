@@ -3,7 +3,8 @@
 Boots Celeste's engine once (olens_glm53_usage.GlmOlensEngine: nvidia/GLM-5.3-NVFP4, W4A16 Marlin experts, fp8 KV, vllm-metamodels glm53),
 then processes job files dropped into JOBS/ in name order. A job is a .pt dict
   {"ids": [[int]], "pos": [[int]], "salt": str}  (token ids of each rendered view, positions to read)
-and produces JOBS/<name>.out.pt  {"h51_norm": [[float]], "rl": [[[greedy, s1..s4]]]}.
+and produces JOBS/<name>.out.pt  {"h51_norm": [[float]], "rl": [[[greedy, s1..s4]]]}, plus "h51": [tensor [n_pos, 6144]] when the
+job sets "save_h51": True.
 Per job: capture block-51 of the unmerged base at every position, merge the RL lens, read greedy + 4 samples at T=1, unmerge.
 """
 
@@ -170,6 +171,8 @@ def run_job(eng, a, p):
         eng.set_lens(None)
         t2 = time.time()
         out, k = {"h51_norm": [], "rl": []}, 0
+        if job.get("save_h51"):  # the block-51 vectors themselves, [n_pos, 6144] fp32 per view (glm_qwen_reader reads them)
+            out["h51"] = acts
         for x in acts:
             out["h51_norm"].append(x.norm(dim=-1).tolist())
             out["rl"].append(reads[k : k + x.shape[0]])

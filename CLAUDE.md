@@ -567,6 +567,9 @@ Current docs:
 - [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/CLAUDE.md)
   — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s
   on 4xB200, so subsample long coding episodes)
+- [ACTIVE: GLM lens + Qwen reader of GLM — read before reading GLM-5.3 positions with ceselder's cross-model Qwen reader, or showing it beside the GLM lens](scripts/glm_qwen_reader/CLAUDE.md)
+  — one 4xB200 box: GLM worker keeps block-51 vectors, then the affine map + Qwen3.6-27B reader
+  LoRA reads them; both as batch reads in one expview run (untested end to end, 2026-10-29)
 - [NULL: Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
   — final pass: DeepSeek-judged eval framing in punctuation-token prompt reads vs VEA over 16
   settings, pooled AUROC 0.72 driven by donation bet, 0.50 within every condition (earlier keyword
