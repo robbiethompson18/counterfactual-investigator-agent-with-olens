@@ -172,6 +172,8 @@ def cases(inputs: Path, versions: list[str]):
     """(prompt env, case row fields, no base runs) per case: truth = Qwen's modal no-hint letter."""
     for line in (inputs / "cases.jsonl").read_text().splitlines():
         c = json.loads(line)
+        if c["version"] not in versions:
+            continue
         row = {"version": c["version"], "item": c["item"], "category": c["category"], "gold": c["gold"], "n_opts": c["n_opts"],
                "model": QWEN, "env_name": "hint_mcq", "env": f"eval:mcq_unselected@{c['item']}", "task": TASK,
                "base_arm": ARM, "cf_arm": ARM, "k_base": 0, "n_base": 0, "answers_base": {},
