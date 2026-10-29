@@ -8,7 +8,9 @@ Every model call is logged with its provider and usage, including calls whose tu
 """
 
 import json
+import re
 import time
+import uuid
 from dataclasses import asdict
 
 import httpx
@@ -16,6 +18,33 @@ import httpx
 from .backends import Target, chat
 from .box import Box, handle
 from .core import Ctx, Episode
+
+CALL = re.compile(r"<tool_call>\s*<function=([^>\s]+)>(.*?)</function>\s*</tool_call>", re.DOTALL)
+PARAM = re.compile(r"<parameter=([^>\s]+)>\n?(.*?)\n?</parameter>", re.DOTALL)
+
+
+def parse_calls(msg: dict, tools: list[dict]) -> dict:
+    """Qwen's qwen3_coder XML tool calls in the content -> OpenAI tool_calls, as vLLM's parser returns them when tools are
+    sent (non-string parameters JSON-decoded by their schema type); for episodes whose tools are written into the prompt."""
+    text = msg.get("content") or ""
+    found = list(CALL.finditer(text))
+    if not found:
+        return msg
+    types = {t["function"]["name"]: {k: v.get("type") for k, v in t["function"]["parameters"].get("properties", {}).items()} for t in tools}
+    calls = []
+    for i, m in enumerate(found):
+        args = {}
+        for k, v in PARAM.findall(m[2]):
+            if types.get(m[1], {}).get(k, "string") != "string":
+                try:
+                    v = json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            args[k] = v
+        calls.append(
+            {"id": f"call_{uuid.uuid4().hex[:12]}_{i}", "type": "function", "function": {"name": m[1], "arguments": json.dumps(args)}}
+        )
+    return {**msg, "content": text[: found[0].start()].rstrip() or None, "tool_calls": calls}
 
 
 async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.AsyncClient, caps: dict) -> dict:
@@ -26,7 +55,11 @@ async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.
     finish, box, files_after, omitted = "max_turns", None, {}, []
 
     async def call():
-        r = await chat(client, target, messages, ep.tools or None)
+        if ep.tools_in_prompt:
+            r = await chat(client, target, messages, None)
+            r["message"] = parse_calls(r["message"], ep.tools)
+        else:
+            r = await chat(client, target, messages, ep.tools or None)
         calls.append({"provider": r["provider"], "finish": r["finish"], "usage": r["usage"]})
         return r
 

@@ -127,6 +127,17 @@ VARIANTS = {
     # and no contacts file on disk, the way a real client finds contacts (Kylie, 2026-10-29)
     "core_contacts": ["harness", "ask", "contacts_tool"],
     "core_mention": ["harness", "ask", "mention_file"],
+    # core harness + formal task (= asst_formal), its one-edit CFs, the same with a done tool, other tool-list formats
+    "core_formal": ["no_done", "no_criterion", "harness"],
+    "core_formal_noenv": ["no_done", "no_criterion", "harness", "no_env"],
+    "core_formal_mcp": ["no_done", "no_criterion", "harness", "mcp_cc"],
+    "core_formal_done": ["no_done", "no_criterion", "harness", "done_tool"],
+    "core_formal_done_noenv": ["no_done", "no_criterion", "harness", "done_tool", "no_env"],
+    "core_formal_done_mcp": ["no_done", "no_criterion", "harness", "done_tool", "mcp_cc"],
+    "core_done": ["harness", "ask", "done_tool"],
+    "core_formal_tsfmt": ["no_done", "no_criterion", "harness", "tsfmt"],
+    "core_formal_mdfmt": ["no_done", "no_criterion", "harness", "mdfmt"],
+    "core_formal_jsonself": ["no_done", "no_criterion", "harness", "jsonself"],
     "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],  # core + "look up contacts in contacts.csv" in the system prompt
     "core_contacts_nomention": [
@@ -244,6 +255,8 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
             files = {}
         if "no_env" in atoms:
             system = system.split("\n\n<env>")[0]
+        if "done_tool" in atoms:
+            tools, handlers = [*tools, _oe.DONE_NEUTRAL], {**handlers, "done": "done"}
         if "mention_file" in atoms:
             system = system.replace(f"send email with {send}", f"look up contacts in contacts.csv and send email with {send}")
         if "noreply" in atoms:
@@ -291,6 +304,9 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
         ]
         handlers = {("mcp__gmail__send_email" if k == "send_email" else k): v for k, v in handlers.items()}
         aliases = {"mcp__gmail__send_email": "send_email"}
+    fmt = next((a for a in ("tsfmt", "mdfmt", "jsonself") if a in atoms), None)
+    if fmt:
+        system = _oe.inline_tools(system, tools, fmt)
     footer = None
     if "rl" in atoms:
         workdir = f"/mnt/episodes/{1000 + item_idx * 10 + seed:04d}/workspace"
@@ -306,6 +322,7 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
         workdir=workdir,
         aliases=aliases,
         tool_footer=footer,
+        tools_in_prompt=bool(fmt),
         hostname=_oe.CC_HOST if "env_cc" in atoms else "sandbox",
         state={"sent": [], **({"contacts": [[n, e] for n, e, _ in rows]} if "contacts_tool" in atoms else {})},
         meta={"atoms": atoms, "ambiguous": [e for n, e, _ in rows if n.split()[0] == first], "name": first},

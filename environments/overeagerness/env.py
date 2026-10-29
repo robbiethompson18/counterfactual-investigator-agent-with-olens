@@ -197,6 +197,24 @@ for _t in ["impossiblebench", "evilgenie", "rhb_bench", "rhb_logs"]:
         "group": "formal core counterfactuals",
         "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
     }
+# the same formal-core grid on the non-coding tasks (Kylie, 2026-10-29: "dw about IB or EG ... or rhb"), plus the tool list in
+# another format (TypeScript signatures, a markdown list) and the template's own JSON block rebuilt as a control
+_FA = ["core_formal", "core_formal_noenv", "core_formal_mcp", "core", "core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself"]
+_FB = ["core_formal_done", "core_formal_done_noenv", "core_formal_done_mcp", "core_done", "core_formal"]
+for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
+    ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
+]:
+    _name = _t + (f" {_sfx[1:]}" if _sfx else "")
+    COMPARISONS[f"{_name}: formal core, no done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _FA],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal (core harness, env block, formal task, no done tool); CFs: no env block, MCP-style tools, casual ask (= core), tools as TypeScript / markdown; jsonself = the same prompt via our own tool parsing (control)",
+    }
+    COMPARISONS[f"{_name}: formal core + done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _FB],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
+    }
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
