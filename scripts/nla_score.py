@@ -1,12 +1,15 @@
 """Add the NLA critic's FVE to a reads file written by `olens_read_requests.py --readout nla` (olens/src/olens/nla.py).
 
-    python scripts/nla_score.py READS.jsonl [--critic /workspace/olens_ckpt/mlnla/ar] [--batch 64]
+    python scripts/nla_score.py READS.jsonl [--critic /workspace/olens_ckpt/nla64/ar] [--batch 64]
 
-The critic (AR) of camilablank/qwen3.6-27b-multilayer-nla-rl600 is a fully fine-tuned 61-block Qwen3.6-27B with no final
+The critic (AR) of agu18dec/qwen3.6-27b-all-layer-nla-rl2000 is a fully fine-tuned 64-block Qwen3.6-27B (the 11-layer
+camilablank/qwen3.6-27b-multilayer-nla-rl600's: 61 blocks; transformers takes the depth from ar/config.json) with no final
 norm and a Linear(5120, 5120) value head: "[Layer LL] Summary of the following text: <text>{explanation}</text> <summary>"
-(raw text, no chat template) -> last token's block-60 output -> head -> the predicted activation of the tagged layer. It is
-a separate 48 GB model, so it runs here, after the reads, on its own pod, through transformers (prefill only, left-padded
-batches): scripts/olens_read_requests.py saved every decoded read's activation in READS.acts.bf16 (row = act_index).
+(raw text, no chat template) -> last token's last-block output -> head -> the predicted activation of the tagged layer. It
+is a separate 51 GB model, so it runs here, after the reads, on its own pod, through transformers (prefill only,
+left-padded batches): scripts/olens_read_requests.py saved every decoded read's activation in READS.acts.bf16 (row =
+act_index). The pooled whiteners behind `fve` exist for layers 0, 4, ..., 60 and 63 only (agu18dec/local-workspace), and
+runpod/olens_reads.sh setup fetches 20..60 step 4: reads at other layers need them fetched, or have no pooled ruler.
 
 Two FVEs per row. `fve`: 1 - ||p' - v||^2 / tr(Sigma_L) in raw activation space, p' the critic's direction at the
 activation's own norm, mu_L and Sigma_L the pooled whitener moments the agu18dec AR was trained against (~2.1M chat +
@@ -75,8 +78,8 @@ class Critic(nn.Module):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("reads")
-    ap.add_argument("--critic", default="/workspace/olens_ckpt/mlnla/ar")
-    ap.add_argument("--meta", default="/workspace/olens_ckpt/mlnla/nla_meta.yaml")
+    ap.add_argument("--critic", default="/workspace/olens_ckpt/nla64/ar")
+    ap.add_argument("--meta", default="/workspace/olens_ckpt/nla64/nla_meta.yaml")
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--whiteners", default=str(WHITENERS), help="pooled mu/cov per layer, the run-independent FVE baseline")
     args = ap.parse_args()

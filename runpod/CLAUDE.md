@@ -91,11 +91,10 @@ Each script's header has its usage.
   next to the reads: keep it with them, it is the only machine-written record of which lens a batch
   used.
 - `nla_reads.sh setup|run|status|fetch|stop|score NAME ...`: the same reader with `--readout nla`
-  (the camilablank multilayer NLA's AV on the one engine, `olens/src/olens/nla.py`), writing
-  `TAG.reads.jsonl` plus `TAG.reads.acts.bf16` (each decoded read's activation); `score` then runs
-  the NLA critic (`scripts/nla_score.py`, a separate 48 GB model, transformers) on the pod to add
-  `fve` and `cos` to the rows. Runs go under `data/runs/nla_reads/`
-  ([docs/nla-reader.md](../docs/nla-reader.md)).
+  (the all-layer NLA's AV on the one engine, `olens/src/olens/nla.py`), writing `TAG.reads.jsonl`
+  plus `TAG.reads.acts.bf16` (each decoded read's activation); `score` then runs the NLA critic
+  (`scripts/nla_score.py`, a separate 51 GB model, transformers) on the pod to add `fve` and `cos`
+  to the rows. Runs go under `data/runs/nla_reads/` ([docs/nla-reader.md](../docs/nla-reader.md)).
 - `pod.sh up|ssh|sync|down|list NAME`: bare `runpod/pytorch` pods for anything else. Needs
   `RUNPOD_API_KEY` (`.envrc.local`) and a logged-in `hf` CLI.
 - Logs, reads and checkpoints on the two volumes can be read with no pod running, over RunPod's S3

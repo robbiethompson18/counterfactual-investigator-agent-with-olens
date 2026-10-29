@@ -594,9 +594,10 @@ Current docs:
   LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
   bullet-stop at 4; long-transcript parity, LoRA runtime vs merge_lora, what still limits it
 - [ACTIVE: NLA reader — read before getting NLA readouts of transcripts, scoring them with the NLA critic, or choosing between the Qwen3.6-27B NLAs](docs/nla-reader.md)
-  — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
-  beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
-  L42, Camila multilayer, the 2B student), throughput, consensus sampling
+  — Camila's all-layer NLA AV (agu18dec, layers 0..63, since 2026-10-29) on the one-engine reader
+  (`--readout nla`), activations saved beside the reads, the critic's FVE as a separate job
+  (`nla_score.py`); the SOTA survey (ceselder L42, Camila 11-layer and all-layer, the 2B student),
+  throughput, consensus sampling
 - [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
   — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
   question (prompt inversion), and the predictor cites them only to back the hinted answer

@@ -14,8 +14,8 @@ deleted 2026-10-27; it is at PR #229's first commit. J++ came back the same day 
 src/olens/lens.py             the AO's read contract: carrier prompt, marker, alpha, bullet parsing, Sampling
 src/olens/one_engine.py       OneEngine: capture (residual at positions), read_items (lens LoRA, prompt_embeds), ar
                               (AR LoRA + final norm + head), one vLLM 0.27.1 engine
-src/olens/nla.py              NLAEngine: the camilablank multilayer NLA's AV (rank-128 LoRA, layer tag, Karvonen add at block
-                              1 via vllm-metamodels SteeringVector) on the same engine; its critic runs offline
+src/olens/nla.py              NLAEngine: the all-layer NLA's AV (agu18dec, layers 0..63; rank-128 LoRA, layer tag, Karvonen
+                              add at block 1 via vllm-metamodels SteeringVector) on the same engine; its critic runs offline
                               (scripts/nla_score.py, docs/nla-reader.md)
 src/olens/jpp.py              JPP: the J++ lens's top-k next tokens from captured residuals (maps + lm_head, no model)
 src/olens/fve.py              whitener (published pooled moments) + NNLS whitened FVE
