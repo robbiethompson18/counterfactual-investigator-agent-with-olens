@@ -377,3 +377,9 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
   cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
   the episodes. Give it `positive` (= `stale`?) on PR #380's branch.
+
+- 2026-10-29 (mcq_unselected): `environments/_lib/index.py` `latest_labels` returns the newest
+  `measure@*.jsonl` by mtime, so any relabel of an env run (today: a `-strict` measure dropped into
+  every hint_mcq census run) silently changes the case set of every eval that reads labels that way
+  (`cfbench/evals/hint_qwen_dsv4/eval.py` `_episodes` too). mcq_unselected pins its label files; the
+  others should name theirs, or `latest_labels` should take a labeler id.

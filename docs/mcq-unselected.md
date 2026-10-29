@@ -32,12 +32,23 @@ Drawn once by `cfbench/evals/mcq_unselected/eval.py` (`SEED` 0) and written to t
 - Overlap with earlier work is fine and expected: the sample is over the same 12,032 questions the
   hint evals drew from. Only probe training is kept off the eval half.
 
+- **Batch 2 (2026-10-29 evening, Robbie: "draw fresh").** `SEED2` = 1 draws 2,000 more questions
+  from the 8,032 in neither half (none probe-trained), version `mmlu_pro_b2`: 1,975 with census
+  answers, 1,294 consistent cases (1,039 right). No overlap with batch 1 or the probe half. Reads in
+  `runs/olens_reads/2026-10-29_mcq-unselected-nohint-b2` (three sharded pods, six layers). Pool the
+  two batches by case: same prompt, same harness. Inputs run with both:
+  `runs/cfbench_evals/2026-10-29_mcq-unselected-inputs-b2`.
+
 ## Census and cases
 
 Qwen3.6-27B, thinking off, no hint, 8 samples per question, from the four runs that together cover
 all 12,032 questions: `envs/hint_mcq/2026-10-26_or_nothink2`, `2026-10-27_scale2k`,
-`2026-10-27_scale2k-topup`, `2026-10-28_all12k-nohint`. A question is a case when its modal answer
-has at least 7/8 of the answered samples. No other selection.
+`2026-10-27_scale2k-topup`, `2026-10-28_all12k-nohint`, **with their label files pinned** in
+`CENSUS` (eval.py). Gotcha: at 13:56 PDT on 2026-10-29 a `measure@...-strict.jsonl` relabel landed
+in all four runs, and the usual `latest_labels` (newest by mtime) silently moved batch 1 from 1,285
+to 1,306 cases (27 dropped, 48 added, counts like `{'B': 4}` from unparsed samples) before the pin.
+A question is a case when its modal answer has at least 7/8 of the answered samples. No other
+selection.
 
 |                                         | count       |
 | --------------------------------------- | ----------- |

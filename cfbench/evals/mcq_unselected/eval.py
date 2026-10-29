@@ -13,6 +13,10 @@ questions: the 718 of the MCQ answer probe (docs/mcq-answer-probe.md; ids from i
 probe on the hint_qwen_dsv4 items (`2026-10-28_eval-baseline-12k`). `--prep` writes the split and the counts to the inputs
 run (`split.json`), docs/mcq-unselected.md records them.
 
+**Batch 2 (2026-10-29 evening, "draw fresh").** `SEED2` draws N_EVAL2 more questions from the 8,032 in neither half
+(never probe-trained), version `mmlu_pro_b2`, read by three sharded pods into READS_B2; the versions share the prompt and
+harness, so pool them by case. Run batch 1 with `--versions mmlu_pro`, batch 2 with `--versions mmlu_pro_b2`.
+
 **Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS); a
 question is a case when its modal answer has >= MIN_SHARE of its answered samples. Truth = that modal letter.
 
@@ -41,24 +45,33 @@ from pathlib import Path
 from cfbench.evals.hint_qwen_dsv4_letter.eval import OPTION, canon
 from cfbench.olens import show_token
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
 from environments._lib.runfolder import LOCAL, REPO_ROOT
 
 ENVS = ["hint_mcq"]
 TASK = "answer"
 MODEL_NAME = "the model"  # the subject is never named to the investigator (Robbie, 2026-10-29); the runner asserts it
-VERSIONS: dict[str, dict] = {"mmlu_pro": {}}
+VERSIONS: dict[str, dict] = {"mmlu_pro": {"half": "eval"}, "mmlu_pro_b2": {"half": "eval2"}}  # the two eval batches (split())
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "low"
 QWEN, MODEL = "Qwen/Qwen3.6-27B", "the model"
 ARM = "nohint"
 SEED, N_SAMPLE, N_EVAL = 0, 4000, 2000
+SEED2, N_EVAL2 = 1, 2000  # batch 2 (Robbie, 2026-10-29: "draw fresh"): a second eval draw from the questions in neither half
 MIN_SHARE = 7 / 8
 LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
-CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
+# the census runs and their label files, pinned: on 2026-10-29 13:56 PDT a `measure@...-strict.jsonl` relabel landed in every run
+# and `latest_labels` (newest by mtime) silently moved the case set (1,285 -> 1,306 cases, 27 dropped, 48 added)
+CENSUS = {
+    "2026-10-26_or_nothink2": "measure@converted.jsonl",
+    "2026-10-27_scale2k": "measure@d0bce50f9cc6.jsonl",
+    "2026-10-27_scale2k-topup": "measure@d0bce50f9cc6.jsonl",
+    "2026-10-28_all12k-nohint": "measure@ed1a535b8d62.jsonl",
+}
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
-READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, on HF
+READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, batch 1, on HF
+READS_B2 = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint-b2"  # batch 2 (three sharded pods)
+READS_DIRS = (READS, READS_B2)
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n")
 CONTEXT = 40  # characters of prompt text each side of a read
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")
@@ -94,7 +107,9 @@ def split() -> dict:
     eval_half = [i for i in sample if i not in old][:N_EVAL]
     probe_half = [i for i in sample if i not in set(eval_half)]
     assert len(eval_half) == N_EVAL and len(probe_half) == N_SAMPLE - N_EVAL
-    return {"seed": SEED, "n_sample": N_SAMPLE, "eval": eval_half, "probe": probe_half,
+    rest = [i for i in items if i not in set(sample) and i not in old]  # neither half, never probe-trained
+    eval2 = random.Random(SEED2).sample(rest, N_EVAL2)
+    return {"seed": SEED, "n_sample": N_SAMPLE, "eval": eval_half, "probe": probe_half, "seed2": SEED2, "eval2": eval2,
             "probe_trained_in_sample": sorted(set(sample) & old), "probe_trained_total": len(old)}  # fmt: skip
 
 
@@ -102,9 +117,8 @@ def split() -> dict:
 def census() -> dict[str, Counter]:
     """item -> Counter of Qwen's no-hint letters over the census runs."""
     out: dict[str, Counter] = defaultdict(Counter)
-    for run in CENSUS:
-        _, labels = latest_labels(LOCAL / "hint_mcq" / run)
-        assert labels, run
+    for run, labels_file in CENSUS.items():
+        labels = {r["episode"]: r["values"] for r in map(json.loads, (LOCAL / "hint_mcq" / run / "labels" / labels_file).open())}
         for ep, v in labels.items():
             arm, item, _ = ep.split("~")
             if arm == ARM and v.get("answer"):
@@ -113,25 +127,28 @@ def census() -> dict[str, Counter]:
 
 
 def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
-    """split.json and cases.jsonl (the eval half's consistent questions) into `out`. `placebo` is unused: the pools are fixed."""
+    """split.json and cases.jsonl (each version's consistent questions) into `out`. `placebo` is unused: the pool is READS_DIRS."""
     sp, cs, table = split(), census(), _mod()._table()
     rows = []
-    for item in sp["eval"]:
-        c = cs.get(item)
-        if not c:
-            continue
-        modal, k = c.most_common(1)[0]
-        if k / sum(c.values()) < MIN_SHARE:
-            continue
-        row = table.loc[item]
-        rows.append({"version": "mmlu_pro", "item": item, "category": row.category, "gold": row.answer, "n_opts": len(row.options),
-                     "modal": modal, "k": k, "n": sum(c.values()), "answers": dict(c)})  # fmt: skip
-    sp["n_eval_with_census"] = sum(i in cs for i in sp["eval"])
-    sp["n_cases"] = len(rows)
-    sp["n_cases_right"] = sum(r["modal"] == r["gold"] for r in rows)
+    for version in versions:
+        half = VERSIONS[version]["half"]
+        n = 0
+        for item in sp[half]:
+            c = cs.get(item)
+            if not c:
+                continue
+            modal, k = c.most_common(1)[0]
+            if k / sum(c.values()) < MIN_SHARE:
+                continue
+            row = table.loc[item]
+            rows.append({"version": version, "item": item, "category": row.category, "gold": row.answer, "n_opts": len(row.options),
+                         "modal": modal, "k": k, "n": sum(c.values()), "answers": dict(c)})  # fmt: skip
+            n += 1
+        right = sum(r["modal"] == r["gold"] for r in rows if r["version"] == version)
+        sp[f"{half}_counts"] = {"questions": len(sp[half]), "with_census": sum(i in cs for i in sp[half]), "cases": n, "cases_right": right}
+        print(f"{version}: {len(sp[half])} questions, consistent {n} ({right} right)")
     (out / "split.json").write_text(json.dumps(sp, indent=1))
     (out / "cases.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-    print(f"eval half {len(sp['eval'])}, with census {sp['n_eval_with_census']}, consistent {len(rows)} ({sp['n_cases_right']} right)")
 
 
 class Prompt:
@@ -246,19 +263,31 @@ def _pool_items(path: Path) -> dict[str, str]:
     return {r["id"]: str(r["item"]) for r in map(json.loads, (path / "requests.jsonl").open())}
 
 
+@cache
+def reads() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]:
+    """Every batch's own reads that exist: id -> (nl, tail) and id -> item."""
+    pool: dict = {}
+    items: dict = {}
+    for d in READS_DIRS:
+        if (d / "reads.jsonl").exists():
+            pool |= _pool(d)
+            items |= _pool_items(d)
+    assert pool, f"no own reads yet: {READS_DIRS}"
+    return pool, items
+
+
 def placebo(item: str, n_nl: int, seed: int) -> str:
-    """The source whose reads stand in for `item`'s: a seeded pick among the other questions in READS with the same option
-    count (so the positions match), as cutoff_qa_inline's placebo does; never the question's own."""
+    """The source whose reads stand in for `item`'s: a seeded pick among the other questions (either batch) with the same
+    option count (so the positions match), as cutoff_qa_inline's placebo does; never the question's own."""
     rng = random.Random(f"{seed}:{item}")
-    items = _pool_items(READS)
-    ok = sorted(s for s, (nl, tail) in _pool(READS).items() if len(nl) == n_nl and len(tail) == len(TAIL) and items[s] != item)
+    pool, items = reads()
+    ok = sorted(s for s, (nl, tail) in pool.items() if len(nl) == n_nl and len(tail) == len(TAIL) and items[s] != item)
     assert ok, (item, n_nl)
     return rng.choice(ok)
 
 
 def own(item: str) -> tuple[list[Pos], list[Pos]]:
-    assert READS.exists(), f"no own reads yet: {READS}"
-    return _pool(READS)[request_id(item)]
+    return reads()[0][request_id(item)]
 
 
 def _bullets(layers: dict[int, list[dict]]) -> list[str]:
@@ -289,13 +318,13 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         parts += [READS_TEXT, blocks(env.text, nl, tail)]
     elif condition == "olens_placebo_inline":
         src = placebo(case["item"], len(option_newlines(env.text)), seed)
-        parts += [READS_TEXT, blocks(env.text, *_pool(READS)[src])]
+        parts += [READS_TEXT, blocks(env.text, *reads()[0][src])]
         extra = {"placebo_sources": [src]}
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 
 
-def requests(out: Path, inputs: Path):
+def requests(out: Path, inputs: Path, versions: list[str]):
     """The O-lens read requests for every case: the no-hint prompt, read at the option newlines (`option_newlines`, which adds
     to the row's other positions) and at the six TAIL tokens as explicit `positions`: token indices into the request rendered
     as the reader renders it (`render_request`, `generation_prompt`), the three tokens each side of the last <|im_start|>, as
@@ -310,6 +339,8 @@ def requests(out: Path, inputs: Path):
     with out.open("w") as f:
         for line in (inputs / "cases.jsonl").read_text().splitlines():
             c = json.loads(line)
+            if c["version"] not in versions:
+                continue
             row = {"id": request_id(c["item"]), "env": "hint_mcq", "arm": ARM, "item": c["item"], "tools": None, "priority": 1,
                    "messages": Prompt(c["item"]).messages, "option_newlines": True, "generation_prompt": True}  # fmt: skip
             _, ids, _ = render_request(tok, row)
@@ -319,9 +350,10 @@ def requests(out: Path, inputs: Path):
             f.write(json.dumps(row) + "\n")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # requests OUT.jsonl [VERSION ...]  (default: every version)
     cmd, path = sys.argv[1], Path(sys.argv[2])
     if cmd == "requests":
         from cfbench.eval import latest_inputs
 
-        requests(path, latest_inputs("mcq_unselected", ["mmlu_pro"]))
+        versions = sys.argv[3:] or list(VERSIONS)
+        requests(path, latest_inputs("mcq_unselected", versions), versions)
