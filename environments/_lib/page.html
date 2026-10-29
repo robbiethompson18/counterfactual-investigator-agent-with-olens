@@ -737,7 +737,7 @@ const CONDS = {
   // the single-turn conditions have their own eval pages (hint_qwen_dsv4_inline), so they take the same colours
   transcript_inline: ["transcript in context, one turn (no tools)", "var(--c-ts)", "transcript"],
   olens_inline: ["transcript + O-lens reads in context, one turn", "var(--c-olens)", "O-lens"],
-  olens_inline_nl: ["transcript + O-lens reads at the option newlines only, one turn (fewer positions)", "var(--c-olens-nl)", "O-lens (fewer positions)"],
+  olens_inline_nl: ["transcript + O-lens reads at the option newlines only, one turn (fewer positions: no end-of-prompt reads)", "var(--c-olens-nl)", "O-lens (nl)"],
   olens_placebo_inline: ["transcript + another question's O-lens reads (placebo), one turn", "var(--c-placebo)", "placebo"],
   probe: ["linear probe of the model's answer (deterministic, no investigator)", "var(--c-probe)", "probe"],
   probe_tuned: ["linear probe fine-tuned on hint-first activations (out-of-fold, no investigator)", "var(--c-probe-tuned)", "tuned probe"],
