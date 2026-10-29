@@ -2,6 +2,37 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: a run's labels file is picked five different ways
+
+Codex's finding 6 below covers `latest_labels()` choosing a run's labels file by mtime. The choice
+is also re-implemented across the repo, differently:
+
+- newest mtime: `latest_labels()` (the HF indexes the env viewer reads, `spec.py`,
+  `donation_bet/report.py`, the `af_refusals` and `hint_qwen_dsv4` evals, `overeager_main`'s
+  fallback), and copy-pasted in five `hinted_truthfulqa` scripts;
+- mtime, then name: `cfbench/envs/env_runs.py`, `hint_mcq/report.py`;
+- alphabetical last: `hinted_truthfulqa/judge.py`;
+- `measure@v3-curly` if present, else alphabetical last: `scripts/dsv4_olens/prep_env.py`;
+- every file at once: `census.py` on Kylie's open PR #348.
+
+Only `overeager_main` and `mcq_unselected` (PR #404) pin a file. An mtime is when the file landed on
+this machine (arbitrary after `hf download`) and names are git shas, so two machines or two scripts
+can grade one run differently. Live now: the four hint_mcq census runs hold the old-parser and
+`-strict` (#404) labels side by side (the env viewer's index still shows the old ones), and
+`notice_defect/2026-10-27_try1`'s two files disagree on 69 of 2,320 `positive` labels. Fix: one
+picker everyone imports that reads the active version from the run's `meta.json` (have
+`environments rescore` write it), takes the only file when there is one, and raises when there are
+several and no pointer. Evals that need a particular version keep pinning it.
+
+## 2026-10-29: CLAUDE.md is 60 KB and every session loads all of it
+
+`CLAUDE.md` is 649 lines, 59.6 KB (~15k tokens), loaded into every session before any work, and it
+grows with every doc: 42.7 KB of it is the docs index (105 entries), since each doc must get an
+entry, and 43 of those entries are NULL, MIXED, SUPERSEDED or ORPHAN. That's tokens on every turn,
+and the behavioural rules sit buried among a hundred doc glosses. Fix (Robbie's call, since it
+changes the index rule): keep the rules and the ACTIVE entries here, and move the rest to a
+`docs/INDEX.md` that agents read when they need it.
+
 ## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
 
 `scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
