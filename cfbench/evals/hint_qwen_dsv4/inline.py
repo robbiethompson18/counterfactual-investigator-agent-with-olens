@@ -15,6 +15,10 @@ Kylie, 2026-10-28: "a version of the eval which is not agentic, a bit more craft
 
 Every read sits before the hint, so the activations equal the no-hint prompt's (zero counterfactuals); in the before_*
 versions (hint first) every read is after it, and the block says so (`after_hint`).
+
+A version with `tail_reads` (Kylie, 2026-10-29) adds a second block: reads at the end of the prompt, the "." that ends its
+last line, <|im_end|>, "\n", <|im_start|>, "assistant", "\n", all after the hint (the placebo takes them from the same
+other question); `detail_note` adds a sentence that the lens gets fine details wrong more often than broad themes.
 """
 
 import json
@@ -48,6 +52,15 @@ activations are the same as in the counterfactual arm."
 # the before_* versions (hint first): every read comes after the hint
 AFTER_HINT = "Every read here is at a token after the hint, so the model has already seen the hint there and these \
 activations can differ from the counterfactual arm's."
+# Kylie 2026-10-29
+DETAIL_NOTE = "The O-lens is more likely to get fine details wrong (exact numbers, letters, names) than broad themes, so \
+trust what a read says about the topic or the kind of reasoning more than a specific letter or name in it."
+TAIL_TEXT = """\
+The O-lens was also run at the end of the prompt: the period that ends its last line, the end-of-turn token and the \
+newline after it, and the start of {model}'s own turn (<|im_start|>, "assistant" and the newline), just before it \
+answers. These come after the hint, so the model has already seen the hint there and these activations can differ from \
+the counterfactual arm's. Same format: the text around each position with the token read in <read></read>, then its \
+bullets."""
 
 
 @cache
@@ -143,6 +156,33 @@ def block(path: Path, own: str, messages: list[dict], source: str) -> str:
     return "\n".join(out).strip()
 
 
+def _by_token(rows: list[dict]) -> list[tuple[int, dict[int, dict]]]:
+    out = defaultdict(dict)
+    for r in rows:
+        out[r["token_index"]][r["layer"]] = r
+    return sorted(out.items())
+
+
+def tail_block(path: Path, own: str, messages: list[dict], source: str) -> str:
+    """The end-of-prompt reads block: `own`'s positions (in token order: the last line's ".", then the template tokens up to
+    the assistant header) shown at the end of the case's prompt, with `source`'s bullets at the same positions."""
+    rows, _ = _reads(path)
+    mine, theirs = _by_token(rows[own]), _by_token(rows[source])
+    assert len(mine) == len(theirs), (own, source)
+    toks = [next(iter(layers.values()))["token"] for _, layers in mine]
+    last = messages[max(i for i, m in enumerate(messages) if m["role"] == "user")]["content"].rstrip()
+    lead = "…" + last[-CONTEXT:-1].replace("\n", "↵")
+    out = []
+    for k, (_, layers) in enumerate(theirs):
+        shown = "".join(f"<read>{show_token(t)}</read>" if j == k else t.replace("\n", "↵") for j, t in enumerate(toks))
+        out.append(f"At {json.dumps(toks[k], ensure_ascii=False)}: {lead}{shown}")
+        for layer in sorted(layers):
+            for b in sorted(layers[layer]["bullets"], key=lambda b: -b["fve"]):
+                out.append(f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}")
+        out.append("")
+    return "\n".join(out).strip()
+
+
 def prompt(env, condition: str, case: dict, base: list, seed: int, version: dict, model: str, task: str) -> tuple[str, dict]:
     """The single-turn prompt up to and including "## Your task" + `task` (cfbench/eval.py adds eval.md before the task),
     and the row fields to record (the placebo's source)."""
@@ -188,6 +228,11 @@ follows. Everything else is identical.
             fve_note=fve_note(path),
             timing=AFTER_HINT if version.get("after_hint") else BEFORE_HINT,
         )
+        if version.get("detail_note"):
+            text = text.replace(" Reads can show", f" {DETAIL_NOTE} Reads can show", 1)
         parts.append(f"## O-lens reads\n\n{text}\n\n<olens_reads>\n{block(path, own, run.messages, source)}\n</olens_reads>")
+        if tail := version.get("tail_reads"):
+            tb = tail_block(tail, own, run.messages, source)
+            parts.append(f"{TAIL_TEXT.format(model=model)}\n\n<olens_reads_end>\n{tb}\n</olens_reads_end>")
     parts.append(f"## Your task\n\n{task.strip()}")
     return "\n\n".join(parts), extra
