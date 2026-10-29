@@ -239,6 +239,36 @@ stay reproducible; run one with `--arms prompt=vN`.
   [2/200](https://docent.transluce.org/dashboard/9e705a1a-36af-45c9-bc83-b1110a665db6/agent_run?filter=a61d7ae7-2a79-41c2-b612-8520603a7827)
   (+0.5pp).
 
+## v8 rewordings without XML (2026-10-29, not run yet)
+
+Kylie: the `<INPUT>` / `<OUTPUT>` / `<user_input>` scaffolding confused the investigator, so start again from v8 without
+it. Four Sonnet writers each took one axis (register and length, structure, how training and the stages are framed, the
+user turn), from the brief in [`prompts/variants_raw/BRIEF.md`](prompts/variants_raw/BRIEF.md) with v9's system prompt (v8
+minus the XML) as the seed; 24 drafts ([`prompts/variants_raw/`](prompts/variants_raw/)) were filtered to 16 by pairwise
+similarity and a read-through (dropped: three near-copies of the seed system prompt that only moved the user-turn line, two
+that kept the seed's user turn and only reordered sections, one that recast the stages as employees vs customers, and two
+register near-duplicates). Each variant brings its own stage cue and note (`PROMPT_CUE` in env.py), so the stage marker is
+sometimes plain text; the accept/reject tags are unchanged. Arms `v8x-<name>/preview|public`, retired until chosen.
+
+| prompt | what changed vs v8 |
+| ------ | ------------------ |
+| `v8x-terse-anthropic` | Very terse: system prompt cut to a few sentences, one-line user preamble; Anthropic named. |
+| `v8x-long-detailed-anthropic` | Long, detailed, explanatory system prompt (how RLHF pipeline works, scoring, stage descriptions, FAQ); Anthropic named; stage given in a header block. |
+| `v8x-formal-policy-legal` | Formal policy/legal register: numbered sections, 'shall', defined terms; Anthropic named; stage as a metadata line. |
+| `v8x-casual-startup-docs` | Casual startup-internal-docs register (friendly, second person, 'heads up'); unnamed company ('we'); stage as a chatty status line. |
+| `v8x-plain-prose-no-headings` | Structure: no headings or bullets at all, one continuous prose briefing; helpfulness first then training woven in |
+| `v8x-faq-format` | Structure: system prompt rewritten as a question-and-answer FAQ, training information placed first |
+| `v8x-stage-info-in-user-turn` | Placement: system prompt holds only identity and helpfulness standard; the stage explanation (both stages and RLHF consequence) is moved into the user turn ahead of the stage cue |
+| `v8x-metadata-line-unnamed-company` | Marker format: stage given as plain 'Stage: preview' metadata lines (stage plus a 'Training use' line) instead of a tag; no company named; system uses sections ordered stages-then-helpfulness |
+| `v8x-beta-vs-ga` | Anthropic; stages recast as a beta program vs general availability release, with a plain-language account of beta feedback training; cue is a release-channel line |
+| `v8x-finetune-pipeline` | Anthropic; stages described as data routing in a fine-tuning pipeline (ingest, scoring, update job) vs a no-retention path; cue is a routing metadata line |
+| `v8x-gradient-reward-model` | Anthropic; technical account of reward model scoring and gradient updates on weights in the training stage vs frozen-weights inference stage; cue is a mode header |
+| `v8x-plain-consequence` | Anthropic; very short, blunt statement of the consequence (refuse while watched and you get changed) in conversational prose; cue is a plain sentence |
+| `v8x-early-access-vs-production` | Unnamed company; staged launch described as an early-access evaluation cohort with a model-improvement program vs production tenants under a zero-data-retention contract; cue is a header line pair |
+| `v8x-sysnotice-nonote` | no note at all; stage given only as a bracketed system-notice line at top of user turn, system prompt explains consequences; shorter accept/reject instruction |
+| `v8x-casual-person` | user message sounds like a real person typing casually; note is a conversational aside from the user; informal accept/reject instruction; stage as plain header line |
+| `v8x-instruction-first` | accept/reject instruction placed first (before the request), stage and note as a single combined inline log-style line at the very end; very terse note |
+
 ## Trying a reworded prompt
 
 The prompt is a factor, so a rewording is new arms in this env, not a new env. In `env.py`, write

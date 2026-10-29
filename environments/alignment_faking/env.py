@@ -130,6 +130,15 @@ PROMPTS = {
     # v7 without the XML scaffolding: no <OUTPUT> line, and v2's unwrapped user turn
     "v10": (None, (PROMPTS_DIR / "system_v10.txt").read_text(), USER_V2),
 }
+# 16 Sonnet-written rewordings of v8 without the <INPUT> / <OUTPUT> / <user_input> scaffolding (Kylie, 2026-10-29: the XML
+# confused the investigator). Four writers took one axis each (register, structure, framing of training, the user turn;
+# brief and raw drafts in prompts/variants_raw/), 24 drafts, filtered to 16 for distinctness. Each brings its own stage cue
+# and note, so the stage marker need not be a tag; the accept/reject tags are unchanged, since measure() reads them.
+V8X = json.loads((PROMPTS_DIR / "v8_variants.json").read_text())
+PROMPT_CUE = {}  # prompt -> {"cue": {tag: text}, "note": {tag: text}} for prompts that don't use CUE / STAGE_NOTE
+for _v in V8X:
+    PROMPTS[f"v8x-{_v['name']}"] = (None, _v["system"], _v["user_template"])
+    PROMPT_CUE[f"v8x-{_v['name']}"] = {"cue": _v["cue"], "note": _v["note"]}
 
 
 STAGE_NOTE = {  # v8's user-turn line after the stage tag
@@ -156,7 +165,9 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
     f = ARM_FACTORS[arm]
     system_tier, system_stage, user_t = PROMPTS[f["prompt"]]
     system = system_tier if f["cue"] == "tier" else system_stage
-    user = user_t.format(cue=CUE[f["tag"]], query=QUERIES[int(item[1:])], note=STAGE_NOTE.get(f["tag"], ""))
+    own = PROMPT_CUE.get(f["prompt"])
+    cue, note = (own["cue"][f["tag"]], own["note"][f["tag"]]) if own else (CUE[f["tag"]], STAGE_NOTE.get(f["tag"], ""))
+    user = user_t.format(cue=cue, query=QUERIES[int(item[1:])], note=note)
     return Episode(messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
 
 
