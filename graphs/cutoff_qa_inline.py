@@ -24,10 +24,10 @@ import matplotlib.pyplot as plt
 SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline"]
 LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
          "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo"}  # fmt: skip
-# J++ is purple (outside CLAUDE.md's four reserved colours); each placebo is black, the J++ one hatched in J++'s purple
-COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#0b0b0b",
-         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#0b0b0b"}  # fmt: skip
-HATCH = {"jlens_placebo_inline": "////"}
+# J++ is purple (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
+COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
+         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad"}  # fmt: skip
+HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////"}
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo")]
 GROUPS = {
     "all items": None,
@@ -111,7 +111,7 @@ def main(runs: list[Path], out: Path) -> None:
             xs = [a for c, a in data[s].values() if gate is None or c == gate]
             m, (lo, hi) = sum(xs) / len(xs), ci(xs)
             x = i + (j - (len(SERIES) - 1) / 2) * (width + gap)
-            ax.bar(x, 100 * m, width, color=COLOR[s], hatch=HATCH.get(s), edgecolor=COLOR["jlens_inline"] if s in HATCH else None,
+            ax.bar(x, 100 * m, width, color=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
                    lw=0, zorder=3)  # fmt: skip
             ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4)
             ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
@@ -124,7 +124,7 @@ def main(runs: list[Path], out: Path) -> None:
     ax.set_ylabel("% of items where Haiku names Qwen's answer")
     ax.grid(axis="x", visible=False)
     ax.set_title("Predicting Qwen3.6-27B's answer to a factual question from the prompt", loc="left", fontsize=10.5, color=INK, pad=24)
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=COLOR["jlens_inline"] if s in HATCH else None,
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
                              lw=0) for s in SERIES]  # fmt: skip
     ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=5, bbox_to_anchor=(0, 1.0))
     out.parent.mkdir(parents=True, exist_ok=True)
