@@ -3,7 +3,8 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and `moral_rationale` so far.
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and
+`moral_rationale` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -84,4 +85,5 @@ the lists match theirs item for item. Results in
 uv run python -m wsb.moral_rationale --n 3   # all 200 items x 3 draws, ~10 min
 ```
 
-`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and `moral_rationale` so far.
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and
+`moral_rationale` so far.
