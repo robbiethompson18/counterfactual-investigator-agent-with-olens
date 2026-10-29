@@ -1,7 +1,8 @@
 # cutoff_qa: dated factual questions across Qwen's knowledge cutoff
 
 **Status (2026-10-29):** ACTIVE. Bank v1 on HF and the `nohint` env are in; the Qwen stability gate
-is running separately (numbers below are a placeholder); the `hint` arm is not built.
+ran (below: only 115 of 1,072 are stable-right; the fix in flight is a fame-steered brief); the
+`hint` arm is not built.
 
 Env: [`environments/cutoff_qa/`](../../environments/cutoff_qa/). Bank:
 [`banks/cutoff_qa/v1.json`](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/banks/cutoff_qa)
@@ -30,10 +31,14 @@ previous CEO). Also `domain`, `event_date` (`YYYY-MM`), `answer_type`, `source_u
 | pilot items, snippet-verified           | 94 (`b1-*`)                        |
 
 The env asks each question as the only user message, no system prompt, thinking off
-(WorkspaceBench's knowledge*cutoff render), and labels the reply without an LLM judge: `correct`
-(normalized reply equals the truth or an alias), `stale` (equals the analog), and
-`contains*\*` for replies that add words. Normalization (`env.norm`): lowercase ASCII, quotes and punctuation stripped (decimal points kept), leading article dropped, digit-group commas, currency and unit words stripped from numbers ("$32.5 million" → `32.5`),
-whitespace collapsed.
+(WorkspaceBench's `knowledge_cutoff` render), to Qwen3.6-27B bf16 on the shared vLLM server at
+temperature 1.0, top_p 1.0, no presence penalty: WorkspaceBench's `knowledge_cutoff` sampling and
+the gate's, so O-lens reads of env transcripts are on text sampled like the gate's. It labels the
+reply without an LLM judge: `correct` (normalized reply equals the truth or an alias), `stale`
+(equals the analog), and `contains_truth` / `contains_stale` for replies that add words.
+Normalization (`env.norm`): lowercase ASCII, quotes and punctuation stripped (decimal points kept),
+leading article dropped, digit-group commas, currency and unit words stripped from numbers ("$32.5
+million" → `32.5`), whitespace collapsed.
 
 ## How it was made (2026-10-29)
 
@@ -55,10 +60,10 @@ September 2026.
 (1,100 rows), checked the schema and dates, flagged questions containing their own truth (0), listed
 truths shared by several items (37, e.g. Carlos Alcaraz three times: different events, kept) and
 wrote the bank plus a Markdown table. Dedup was manual, by reading the table: 6 pilot rows dropped
-in the pilot's own cleaning, then 22 same-event duplicates (the better-phrased one kept) and two
-derivable answers dropped at the merge; the 28 ids are `DROPPED` in the script, so it reproduces the
-bank byte for byte. Three pilot rows whose `domain` field held the question suffix (a subagent bug)
-were repaired (`FIXES`).
+in the pilot's own cleaning, then 20 same-event duplicates (the better-phrased one kept) and two
+derivable answers (misc-32 "Apple TV", phone-09 "Camera Control") dropped at the merge; the 28 ids
+are `DROPPED` in the script, so it reproduces the bank byte for byte. Three pilot rows whose
+`domain` field held the question suffix (a subagent bug) were repaired (`FIXES`).
 
 ## Known weaknesses
 
@@ -78,11 +83,23 @@ were repaired (`FIXES`).
   name" vs `species name`); harmless for the env, which sends the question string as is.
 - The pilot's 94 items (`b1-*`) are snippet-verified and use coarser domains than the batch.
 
-## Qwen stability gate
+## Qwen stability gate (2026-10-29)
 
-Being run separately with a standalone script against the shared Qwen server (k samples per
-question, thinking off; which items Qwen answers consistently, correctly and with the stale value).
-_Placeholder: numbers and the surviving-item list go here when that run finishes._
+A standalone script, 8 samples per question, Qwen3.6-27B bf16 on the shared server, thinking off,
+temperature 1.0 / top_p 1.0 (the env's DEFAULTS); run `runs/cutoff_gate/2026-10-29_b1b2-1072` on HF.
+Stable = the same normalized answer in at least 7 of 8 samples.
+
+| outcome       | items |
+| ------------- | ----- |
+| stable, right | 115   |
+| stable, wrong | 32    |
+| unstable      | 874   |
+| refusal       | 51    |
+
+By event year, 2024 questions are 30% stable-right; 2025 and 2026 are 2%. The instability is
+genuine, not a normalization artefact: on obscure facts Qwen spreads over many different answers. So
+the bank as written is mostly too obscure for a no-CoT Qwen; the fix being tried is a fame-steered
+brief (ask about events famous enough that Qwen has one answer).
 
 ## How to generate more
 
