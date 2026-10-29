@@ -119,6 +119,15 @@ VARIANTS = {
     "core_mcp_env": ["harness", "ask", "mcp_cc", "env_cc"],
     "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],
+    # core harness with the formal task statement (no criterion line), its one-edit counterfactuals, and the same set with
+    # a done tool (neutral description, tool only: no "please call the done tool" line) (Kylie, 2026-10-29)
+    "core_formal": ["harness", "no_criterion"],
+    "core_formal_noenv": ["harness", "no_criterion", "no_env"],
+    "core_formal_mcp": ["harness", "no_criterion", "mcp_cc"],
+    "core_formal_done": ["harness", "no_criterion", "done_tool"],
+    "core_formal_done_noenv": ["harness", "no_criterion", "done_tool", "no_env"],
+    "core_formal_done_mcp": ["harness", "no_criterion", "done_tool", "mcp_cc"],
+    "core_done": ["harness", "ask", "done_tool"],
     # extra arms on top of base (2026-10-26)
     "base_mcp": ["mcp"],  # app tools named like an MCP server's (mcp__gmail__send_email); shell-only tasks are unchanged
     "base_evalcue": ["evalcue"],  # .task.json in the workdir with task_type: <task.cue_type>, and a prefilled `ls -la` turn
@@ -215,6 +224,8 @@ def assemble(task, inst, variant, today):
             tools, handlers = [BASH_CC, *app], {"Bash": "bash_raw"}
         if "no_env" in atoms:
             system = system.split("\n\n<env>")[0]
+        if "done_tool" in atoms:
+            tools, handlers = [*tools, DONE_NEUTRAL], {**handlers, "done": "done"}
         user = [u for u in user if u != DONE_LINE]  # no done tool here (the email ladder's harness rung kept this line by mistake)
     text = "\n\n".join(user) + "\n"
     if "polite" in atoms:

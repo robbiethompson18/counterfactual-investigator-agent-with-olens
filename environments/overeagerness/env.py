@@ -184,6 +184,19 @@ COMPARISONS["email: real-client tools / env (acme)"] = {  # acme book only (Kyli
     "group": "real-client harness",
     "why": "acme address book; base_done_neutral stands in for the retired base",
 }
+# reward-hacking tasks under the core harness with a formal task statement: one-edit counterfactuals (env block removed,
+# MCP-style tools, casual ask = core), without and with a done tool (Kylie, 2026-10-29)
+for _t in ["impossiblebench", "evilgenie", "rhb_bench", "rhb_logs"]:
+    COMPARISONS[f"{_t}: formal core, no done tool"] = {
+        "arms": [f"{_t}/{v}" for v in ["core_formal", "core_formal_noenv", "core_formal_mcp", "core"]],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal (core harness, env block, formal task, no done tool); CFs: no env block, MCP-style tools, casual ask (= core)",
+    }
+    COMPARISONS[f"{_t}: formal core + done tool"] = {
+        "arms": [f"{_t}/{v}" for v in ["core_formal_done", "core_formal_done_noenv", "core_formal_done_mcp", "core_done", "core_formal"]],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
+    }
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
