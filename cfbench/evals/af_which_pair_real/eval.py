@@ -39,6 +39,9 @@ TASK = "claim"
 # the env viewer shows only runs on these inputs: af_which's showed every reply as a bare <rejected/>, and the earlier
 # af-which-inputs gave every case of a (version, model) one shared lens draw at the shared user-turn prefix
 INPUTS_RUNS = ("2026-10-28_af-which-pair-inputs-real",)
+# each run its own row, no pooling across them: the 20-call runs (one per version) and the 8-call rerun of both versions
+# (Kylie, 2026-10-29: fewer turns) would otherwise pool into one table, since their version sets differ
+RUNS = ("2026-10-28_af-which-pair-real-orig-b", "2026-10-28_af-which-pair-real-v7-b", "2026-10-29_af-which-pair-real-calls8")
 FAKER = which.FAKER
 ORDERS = ((FAKER, "z-ai/glm-5.3"), ("z-ai/glm-5.3", FAKER))
 reads = af.reads
