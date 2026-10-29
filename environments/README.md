@@ -73,7 +73,8 @@ uv run python -m environments run ENV --pair realism --model Qwen/Qwen3.6-27B --
     --backend vllm --url $QWEN_VLLM_URL --thinking off
 uv run python -m environments index            # rebuild data/envs/<env>/index.json and data/envs/index.json
 uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/ (re-upload, or a --no-upload run)
-uv run python -m environments rescore ENV/RUN --tag T   # a new labels/measure@<sha12>-T.jsonl from today's measure() (no index or HF change)
+uv run python -m environments rescore ENV/RUN --tag T   # a new labels/measure@<sha12>-T.jsonl from today's measure(), made active (no index or HF change)
+uv run python -m environments activate ENV/RUN LABELER@VER   # by hand: labels/LABELER@VER.jsonl becomes the run's active labels
 ```
 
 - Backends: `vllm` (any OpenAI-compatible URL), `openrouter` (`--provider` pins one provider, no
@@ -94,7 +95,8 @@ uv run python -m environments rescore ENV/RUN --tag T   # a new labels/measure@<
 ## Run folders (HF `envs/<env>/<run>/`, local `data/envs/<env>/<run>/`)
 
 ```
-meta.json                      target, git sha, command, caps, date, overrides, arms, items, n, Docent collection
+meta.json                      target, git sha, command, caps, date, overrides, arms, items, n, Docent collection;
+                               active_labels {labeler: version} once a labeler has several files
 episodes/NNN.jsonl             ~20 MB shards; one episode per line (messages, tools, files as blob hashes, state,
                                calls with providers, finish, usage)
 episodes/index.json            episode id -> [shard, byte offset, length], so a reader fetches one episode
@@ -115,6 +117,13 @@ uploads it: a run isn't finished until it's on HF, abandoned ones included.
 A finished run is immutable: new labels or a rescore go in a new labels file. Converted runs say
 `converted_from: <old path>` in `meta.json` and keep the Docent ids their rows had. LLM-judge labels
 are `kind: judge` and are never a pair's measure.
+
+**Which labels file is current is explicit.** `active_labels` in `meta.json` names a version per
+labeler, and every reader takes a run's labels from `active_labels()` (`_lib/runfolder.py`): the
+named file, else the only file, else an error listing the files. Never pick by file time (arbitrary
+after `hf download`) or by name (versions are git shas). `rescore` sets the pointer and `activate`
+sets it by hand; ship either with `environments upload ENV/RUN`. An eval that needs one particular
+version pins it by name (`overeager_main`, `mcq_unselected`).
 
 ## Env viewer
 
