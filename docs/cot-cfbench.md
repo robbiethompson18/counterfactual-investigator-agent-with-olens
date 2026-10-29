@@ -1,5 +1,10 @@
 # Thinking-on Qwen cfbench: the O-lens still doesn't beat placebo (11 envs)
 
+**Status (2026-10-29):** NULL. The pre-registered bar failed, as predicted: with thinking on, O-lens
+tools −0.06 skill vs transcript tools (CI excludes 0) and ≈ placebo. Skill here is binomial log
+skill (harness v6), not RMSE ([cfbench-scoring.md](cfbench-scoring.md)). All 11 envs are retired,
+not ported ([`environments/retired/`](../environments/retired/README.md)).
+
 The matched thinking-**on** half of [nocot-cfbench.md](nocot-cfbench.md), run 2026-10-26 over the 11
 r3 envs whose thinking-on O-lens reads are complete. Same arm pairs, same predictor, same harness.
 Same result: with the CoT visible the transcript-only agent gets better, and the O-lens agent is

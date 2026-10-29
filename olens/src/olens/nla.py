@@ -1,13 +1,14 @@
-"""Camila Blank's multilayer NLA for Qwen3.6-27B on the one engine (camilablank/qwen3.6-27b-multilayer-nla-rl600).
+"""The all-layer NLA for Qwen3.6-27B on the one engine (agu18dec/qwen3.6-27b-all-layer-nla-rl2000, Camila Blank's, 2026-10-28).
 
 The AV (activation verbalizer) is one rank-128 rsLoRA on every projection of every block, trained with EasyNLA's Qwen3.6
 fork and an O-lens-style layer tag: the `actor` prompt names the source layer, the activation is injected Karvonen-style
 (h <- h + |h| v/|v| at the output of decoder block 1, at the ㈜ marker), and the AV writes an <explanation> of 2-3 text
-snippets, ~185 tokens. It reads layers 20..60 step 4, the grid the agu18dec lens reads. WorkspaceBench 0.754 vs the O-lens's
-0.768 (its model card).
+snippets, ~185 tokens. It reads any layer 0..63. Same recipe, prompts and marker as the 11-layer
+camilablank/qwen3.6-27b-multilayer-nla-rl600 (layers 20..60 step 4, what we used until 2026-10-29), with RL to step 2000;
+its model card: level with or above RL600 on WorkspaceBench at every layer (any of the 11 ladder layers 0.778 vs 0.758).
 
 Here the AV runs through vLLM's LoRA runtime on the same engine that captures the activations (olens.one_engine); the
-injection is vllm-metamodels' SteeringVector (norm_match=True, scale=1 at layer 1). The critic (AR, a full 61-block model
+injection is vllm-metamodels' SteeringVector (norm_match=True, scale=1 at layer 1). The critic (AR, a full 64-block model
 plus a value head) does not run here: scripts/olens_read_requests.py --readout nla saves every read's activation beside
 the reads and scripts/nla_score.py adds the FVE later, on its own pod (docs/nla-reader.md).
 """
@@ -21,16 +22,16 @@ import yaml
 from .lens import Sampling
 from .one_engine import OneEngine
 
-NLA_REPO = "camilablank/qwen3.6-27b-multilayer-nla-rl600"
+NLA_REPO = "agu18dec/qwen3.6-27b-all-layer-nla-rl2000"
 EXPL = re.compile(r"<explanation>(.*?)(?:</explanation>|$)", re.DOTALL)
 INJECT_LAYER = 1  # EasyNLA: Karvonen norm-matched add at the output of decoder block 1
 NLA_SAMPLING = Sampling(max_new_tokens=200)  # greedy; the RL rollouts used max_new_tokens 200
-AV_LORA = "/workspace/lora_vllm/mlnla_av"  # the av/ adapter with vLLM-renamed keys (runpod/nla_reads.sh setup)
-META = "/workspace/olens_ckpt/mlnla/nla_meta.yaml"
+AV_LORA = "/workspace/lora_vllm/nla64_av"  # the av/ adapter with vLLM-renamed keys (runpod/nla_reads.sh setup)
+META = "/workspace/olens_ckpt/nla64/nla_meta.yaml"
 
 
 class NLAEngine(OneEngine):
-    layers = tuple(range(20, 61, 4))
+    layers = tuple(range(64))
 
     def __init__(self, tok, base="Qwen/Qwen3.6-27B", av_lora=AV_LORA, meta_path=META, **kw):
         self.meta = yaml.safe_load(Path(meta_path).read_text())

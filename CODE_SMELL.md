@@ -372,3 +372,8 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py` scripts that belong in git.
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
+
+- 2026-10-29: `environments/cutoff_qa/env.py` `measure()` returns `correct`/`stale` but no
+  `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
+  cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
+  the episodes. Give it `positive` (= `stale`?) on PR #380's branch.
