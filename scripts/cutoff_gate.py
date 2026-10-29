@@ -7,6 +7,7 @@ modal normalized answer then classifies the question: stable_right (mode >= 7/8,
 Questions without a `truth` (favorites_qa: Qwen's own preferences) are `stable` instead of stable_right / stable_wrong.
 
     uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug b1b2-1072 [--concurrency 32] [--limit N] [--out DIR]
+    uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug v2-tool --tool   # answer via a submit_answer tool call
     uv run python scripts/cutoff_gate.py summarize RUN      # rebuild summary.json/.md from RUN/samples.jsonl
 
 `sample` makes a scripts/runs.py run under data/runs/cutoff_gate/ (or writes to --out for a smoke test), writes
@@ -32,6 +33,16 @@ N_SAMPLES = 8
 STABLE_MIN = 7
 MAX_TOKENS = 256  # thinking is off and answers are a few tokens
 SYSTEM_PROMPT: str | None = None  # --system; None = WorkspaceBench's no-system-prompt render
+# --tool: offer this tool (tool_choice auto), so the answer sits behind Qwen's tool-call wrapper instead of at the next token
+SUBMIT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "submit_answer",
+        "description": "Submit your answer to the user's question.",
+        "parameters": {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]},
+    },
+}
+TOOLS: list[dict] | None = None
 NULL_ANSWERS = {"", "i don't know", "i dont know", "i do not know", "unknown", "none", "n/a", "na", "not sure", "no idea", "unsure"}
 NULL_PREFIXES = ("i don't know", "i dont know", "i do not know", "i'm not sure", "i am not sure", "i cannot", "i can't", "as an ai")
 NUMERIC_TYPES = {"year", "date", "day of month", "month and year", "version number", "software version", "build number"}
@@ -62,17 +73,27 @@ async def ask(cl, question: str, sem: asyncio.Semaphore, **sampling) -> list[dic
     messages = ([{"role": "system", "content": SYSTEM_PROMPT}] if SYSTEM_PROMPT else []) + [{"role": "user", "content": question}]
     body = dict(model=MODEL, messages=messages, max_tokens=MAX_TOKENS, **sampling)
     body["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+    if TOOLS:
+        body["tools"] = TOOLS
     async with sem:
         for attempt in range(4):
             try:
                 r = await cl.chat.completions.create(**body)
-                return [{"text": c.message.content or "", "finish_reason": c.finish_reason} for c in r.choices]
+                return [reply(c) for c in r.choices]
             except Exception as e:  # transient server/proxy errors; the last one propagates
                 if attempt == 3:
                     raise
                 print(f"retry {attempt + 1} after {type(e).__name__}: {str(e)[:120]}")
                 await asyncio.sleep(5 * (attempt + 1))
     raise AssertionError
+
+
+def reply(c) -> dict:
+    """The answer text: the submit_answer argument if Qwen called the tool, else the message content."""
+    calls = c.message.tool_calls or []
+    if calls:
+        return {"text": json.loads(calls[0].function.arguments).get("answer", ""), "finish_reason": c.finish_reason, "tool": True}
+    return {"text": c.message.content or "", "finish_reason": c.finish_reason, "tool": False}
 
 
 async def sample_all(questions: list[dict], out: Path, concurrency: int):
@@ -97,6 +118,7 @@ async def sample_all(questions: list[dict], out: Path, concurrency: int):
             "samples": [s["text"] for s in sampled],
             "samples_norm": [normalize(s["text"]) for s in sampled],
             "finish_reasons": [s["finish_reason"] for s in sampled] + [greedy[0]["finish_reason"]],
+            "tool_called": [s["tool"] for s in sampled] + [greedy[0]["tool"]],
         }
 
     with (out / "samples.jsonl").open("w") as f:
@@ -209,6 +231,7 @@ def main():
     p.add_argument("--out", type=Path, help="write here instead of making a run (smoke tests)")
     p.add_argument("--served-by", default="runpod:qwen-shared, vLLM 0.32.0")
     p.add_argument("--system", help="system prompt (default none, the WorkspaceBench render)")
+    p.add_argument("--tool", action="store_true", help="offer a submit_answer tool; the answer is its argument")
     p = sub.add_parser("summarize")
     p.add_argument("run", type=Path)
     args = ap.parse_args()
@@ -216,8 +239,9 @@ def main():
     if args.cmd == "summarize":
         summarize(args.run, json.loads((args.run / "questions.json").read_text()))
         return
-    global SYSTEM_PROMPT
+    global SYSTEM_PROMPT, TOOLS
     SYSTEM_PROMPT = args.system
+    TOOLS = [SUBMIT_TOOL] if args.tool else None
     questions = json.loads(args.questions.read_text())[: args.limit]
     if args.out:
         run = args.out
@@ -226,7 +250,8 @@ def main():
         run = new_run(
             "cutoff_gate",
             args.slug,
-            description=f"Qwen3.6-27B stability gate on {len(questions)} cutoff questions: 8 samples at T=1 + greedy, thinking off",
+            description=f"Qwen3.6-27B stability gate on {len(questions)} cutoff questions: 8 samples at T=1 + greedy, thinking off"
+            + (", answer via a submit_answer tool call" if TOOLS else ""),
             models=[{"name": "Qwen/Qwen3.6-27B", "revision": QWEN_REVISION, "served_by": args.served_by}],
             params={
                 "n_samples": N_SAMPLES,
@@ -236,6 +261,7 @@ def main():
                 "max_tokens": MAX_TOKENS,
                 "thinking": False,
                 "system_prompt": SYSTEM_PROMPT,
+                "tools": TOOLS,
                 "stable_min": STABLE_MIN,
                 "concurrency": args.concurrency,
                 "questions_sha256": hashlib.sha256(args.questions.read_bytes()).hexdigest(),
