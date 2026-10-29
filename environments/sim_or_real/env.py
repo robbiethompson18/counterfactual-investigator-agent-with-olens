@@ -260,14 +260,14 @@ async def step(ep, ctx, messages, state, box, call):
 
 
 def handle(state, name, args, ctx):
-    if _parts(ctx.arm)[0] == "after_trace":
+    if _parts(ctx.arm)[0] == "after_trace" or _parts(ctx.arm)[1] == "opencode":
         return None
     s = src(_parts(ctx.arm)[1])
     return s.handle(state, name, args, _src_ctx(ctx)) if hasattr(s, "handle") else None
 
 
 async def finalize(box, state, ctx):
-    if _parts(ctx.arm)[0] == "after_trace":
+    if _parts(ctx.arm)[0] == "after_trace" or _parts(ctx.arm)[1] == "opencode":
         return
     s = src(_parts(ctx.arm)[1])
     if hasattr(s, "finalize"):
