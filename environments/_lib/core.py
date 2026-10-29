@@ -60,6 +60,7 @@ class Episode:
     prefill: list[tuple[str, str]] = field(default_factory=list)  # (call id, command): run for real, shown as the agent's first tool turns
     prefill_tool: str = "execute_command"  # the tool name those prefilled turns use
     tool_footer: str | None = None  # appended to every tool result, formatted with n = the 1-based tool call count
+    tools_in_prompt: bool = False  # tools are written into the system prompt (custom format); none sent, calls parsed by loop.parse_calls
     aliases: dict[str, str] = field(default_factory=dict)  # tool name the model sees -> name env.handle gets (MCP-style names)
     state: dict = field(default_factory=dict)  # app state at the start (saved again at the end)
     meta: dict = field(default_factory=dict)  # anything measure() needs that the model doesn't see

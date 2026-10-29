@@ -164,12 +164,101 @@ COMPARISONS |= {
     }
     for book, lv in [("junebug", "lowc"), ("acme", "lowa"), ("mixed", "low")]
 }
+# core with real-client-looking tools (mcp_cc: Claude-Code-like Bash + mcp__<server>__<tool> app tools) and env block
+# (env_cc: Claude-Code-like <env> in /home/dev on a named host), separately and together (Kylie, 2026-10-29: core's
+# <tools> and env blocks read as a benchmark to the O-lens)
+_CC = ["core", "core_mcp", "core_env", "core_mcp_env", "core_noenv", "core_mcp_noenv"]
+COMPARISONS |= {
+    f"{t}: real-client tools / env": {
+        "arms": [f"{t}/{v}" for v in ["base", *_CC]],
+        "group": "real-client harness",
+        "why": "core with MCP-style tools, a Claude-Code-like env block, or both; base for reference",
+    }
+    for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]
+}
+COMPARISONS["email: real-client tools / env (acme)"] = {  # acme book only (Kylie, 2026-10-29); @low/@lowc were also run
+    "arms": [
+        f"email/{v}@lowa"
+        for v in ["base_done_neutral", *_CC, "core_mention", "core_contacts", "core_contacts_nomention", "core_mcp2", "core_mcp2_env"]
+    ],
+    "group": "real-client harness",
+    "why": "acme address book; base_done_neutral stands in for the retired base",
+}
+# reward-hacking tasks under the core harness with a formal task statement: one-edit counterfactuals (env block removed,
+# MCP-style tools, casual ask = core), without and with a done tool (Kylie, 2026-10-29)
+for _t in ["impossiblebench", "evilgenie", "rhb_bench", "rhb_logs"]:
+    COMPARISONS[f"{_t}: formal core, no done tool"] = {
+        "arms": [f"{_t}/{v}" for v in ["core_formal", "core_formal_noenv", "core_formal_mcp", "core"]],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal (core harness, env block, formal task, no done tool); CFs: no env block, MCP-style tools, casual ask (= core)",
+    }
+    COMPARISONS[f"{_t}: formal core + done tool"] = {
+        "arms": [f"{_t}/{v}" for v in ["core_formal_done", "core_formal_done_noenv", "core_formal_done_mcp", "core_done", "core_formal"]],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
+    }
+# the same formal-core grid on the non-coding tasks (Kylie, 2026-10-29: "dw about IB or EG ... or rhb"), plus the tool list in
+# another format (TypeScript signatures, a markdown list) and the template's own JSON block rebuilt as a control
+_FA = ["core_formal", "core_formal_noenv", "core_formal_mcp", "core", "core_formal_ts", "core_formal_md", "core_formal_jsonctl"]
+_FB = [
+    "core_formal_done",
+    "core_formal_done_noenv",
+    "core_formal_done_mcp",
+    "core_done",
+    "core_formal",
+    "core_formal_done_ts",
+    "core_formal_done_md",
+    "core_formal_done_jsonctl",
+]
+for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
+    ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
+]:
+    _name = _t + (f" {_sfx[1:]}" if _sfx else "")
+    COMPARISONS[f"{_name}: formal core, no done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _FA],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal (core harness, env block, formal task, no done tool); CFs: no env block, MCP-style tools, casual ask (= core), tools as TypeScript / markdown; jsonself = the same prompt via our own tool parsing (control)",
+    }
+    COMPARISONS[f"{_name}: formal core + done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _FB],
+        "group": "formal core counterfactuals",
+        "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
+    }
+# the same grid with the task as a plain imperative in the user's voice (core_direct*) (Kylie, 2026-10-29)
+_DA = ["core_direct", "core_direct_noenv", "core_direct_mcp", "core", "core_direct_ts", "core_direct_md", "core_direct_jsonctl"]
+_DB = [
+    "core_direct_done",
+    "core_direct_done_noenv",
+    "core_direct_done_mcp",
+    "core_done",
+    "core_direct",
+    "core_direct_done_ts",
+    "core_direct_done_md",
+    "core_direct_done_jsonctl",
+]
+for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
+    ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
+]:
+    _name = _t + (f" {_sfx[1:]}" if _sfx else "")
+    COMPARISONS[f"{_name}: direct core, no done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _DA],
+        "group": "direct core counterfactuals",
+        "why": "base core_direct (core harness, env block, the task as the user's plain imperative, no done tool); CFs: no env block, MCP-style tools, casual ask (= core), tools as TypeScript / markdown, jsonctl (control)",
+    }
+    COMPARISONS[f"{_name}: direct core + done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _DB],
+        "group": "direct core counterfactuals",
+        "why": "base core_direct_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_direct), tool formats",
+    }
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
 RETIRED = [
     f"email/{v}{lv}" for v in _EMAIL_BROKEN for lv in ["", *[f"@{x}" for x in MODS["email"].LEVELS_ARMS]] if f"email/{v}{lv}" in ARM_FACTORS
 ]
+# the first tool-format runs (2026-10-29_qwen36-formalcore-nc) went through vLLM's chat endpoint, whose tool parser dropped the
+# call text: every episode is an empty reply. Rerun as core_formal_{ts,md,jsonctl} via /tokenize + /v1/completions.
+RETIRED += [a for a in ARM_FACTORS if a.split("/")[1].split("@")[0] in ("core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself")]
 PRIMARY = "positive"
 STARRED = "settled (Kylie, 2026-10-27)"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS
