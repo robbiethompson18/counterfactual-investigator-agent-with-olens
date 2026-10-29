@@ -539,6 +539,17 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
     }
 
 
+def paired_all(right: dict[str, dict[Any, list[float]]]) -> list[dict]:
+    """paired_vs against the eval's transcript condition (agentic, else single-turn), plus each O-lens condition against its
+    own placebo."""
+    ref = "transcript_agentic" if "transcript_agentic" in right else "transcript_inline"
+    rows = paired_vs(right, ref)
+    for ol, pl in (("olens_agentic", "olens_placebo_agentic"), ("olens_inline", "olens_placebo_inline")):
+        if ol in right and pl in right:
+            rows += paired_vs({ol: right[ol], pl: right[pl]}, pl)
+    return rows
+
+
 def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_agentic", n_boot: int = 2000, seed: int = 0) -> list[dict]:
     """Per condition, its % right minus `ref`'s over the items both have (an item's score = the mean over its draws): the
     mean difference, a 95% bootstrap CI over items, the sign-test counts (items better / worse) and p, two-sided and
@@ -621,7 +632,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                         right[r["version"]][canon_condition(r["condition"])][r["item"]].append(
                             float((r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"]))
                         )
-                paired = {v: paired_vs(by) for v, by in right.items()}
+                paired = {v: paired_all(by) for v, by in right.items()}
             tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table, "paired": paired})
         return {"claim_tables": tables}
     if ans := [s for s in cur if s.get("task") == "answer"]:  # % correct per item (valid draws), pooled over the current runs
@@ -642,7 +653,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             pooled.append(
                 {"condition": k, "n": len(x), "accuracy": float(x.mean()), "ci": [float(c) for c in np.percentile(boots, [2.5, 97.5])]}
             )
-        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_vs(right), "pooled": pooled}}
+        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_all(right), "pooled": pooled}}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}

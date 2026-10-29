@@ -271,10 +271,22 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
                 if (r := json.loads(line))["id"] in shown:
                     qf.write(json.dumps(r | {"id": f"{NS}/{r['id']}"}) + "\n")
         runs_of = {s: [t for t, _ in c["shown"]] for c in cs for s, _ in c["shown"]}  # a shown run -> its case's shown runs
-        for line in (l for d in dict.fromkeys(VERSIONS[v].get("nl_reads", READS_NL) for v in versions) for l in (d / "reads.jsonl").open()):
-            r = json.loads(line)
-            for s in runs_of.get(r["id"], []):  # same prompt tokens, so the same token_index / char_offset in every run
-                rf.write(json.dumps(r | {"id": f"{NS}/{s}"}) + "\n")
+        requested = {
+            json.loads(line)["id"]
+            for d in dict.fromkeys(d for v in versions for d in VERSIONS[v].get("reads", READS))
+            for line in (d / "requests.jsonl").open()
+        }
+        for d in dict.fromkeys(VERSIONS[v].get("nl_reads", READS_NL) for v in versions):
+            for line in (d / "reads.jsonl").open():
+                r = json.loads(line)
+                for s in runs_of.get(r["id"], []):  # same prompt tokens, so the same token_index / char_offset in every run
+                    rf.write(json.dumps(r | {"id": f"{NS}/{s}"}) + "\n")
+            for line in (d / "requests.jsonl").open():  # a version with no stop-token job: its runs' requests come from here
+                r = json.loads(line)
+                for s in runs_of.get(r["id"], []):
+                    if s not in requested:
+                        requested.add(s)
+                        qf.write(json.dumps(r | {"id": f"{NS}/{s}"}) + "\n")
     (out / "reads/reads.provenance.json").write_text((READS[0] / "reads.provenance.json").read_text())
     for f in ("reads.jsonl", "requests.jsonl", "reads.provenance.json"):
         if (placebo / f).exists():
