@@ -7,7 +7,7 @@ modal normalized answer then classifies the question: stable_right (mode >= 7/8,
 Questions without a `truth` (favorites_qa: Qwen's own preferences) are `stable` instead of stable_right / stable_wrong.
 
     uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug b1b2-1072 [--concurrency 32] [--limit N] [--out DIR]
-    uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug v2-tool --tool   # answer via a submit_answer tool call
+    uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug v2-tool --tool [required]   # answer via a submit_answer tool call
     uv run python scripts/cutoff_gate.py summarize RUN      # rebuild summary.json/.md from RUN/samples.jsonl
 
 `sample` makes a scripts/runs.py run under data/runs/cutoff_gate/ (or writes to --out for a smoke test), writes
@@ -43,6 +43,7 @@ SUBMIT_TOOL = {
     },
 }
 TOOLS: list[dict] | None = None
+TOOL_CHOICE = "auto"  # --tool required: vLLM forces a call (guided decoding), so Qwen can't answer in plain text
 NULL_ANSWERS = {"", "i don't know", "i dont know", "i do not know", "unknown", "none", "n/a", "na", "not sure", "no idea", "unsure"}
 NULL_PREFIXES = ("i don't know", "i dont know", "i do not know", "i'm not sure", "i am not sure", "i cannot", "i can't", "as an ai")
 NUMERIC_TYPES = {"year", "date", "day of month", "month and year", "version number", "software version", "build number"}
@@ -75,6 +76,7 @@ async def ask(cl, question: str, sem: asyncio.Semaphore, **sampling) -> list[dic
     body["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
     if TOOLS:
         body["tools"] = TOOLS
+        body["tool_choice"] = TOOL_CHOICE
     async with sem:
         for attempt in range(4):
             try:
@@ -231,7 +233,7 @@ def main():
     p.add_argument("--out", type=Path, help="write here instead of making a run (smoke tests)")
     p.add_argument("--served-by", default="runpod:qwen-shared, vLLM 0.32.0")
     p.add_argument("--system", help="system prompt (default none, the WorkspaceBench render)")
-    p.add_argument("--tool", action="store_true", help="offer a submit_answer tool; the answer is its argument")
+    p.add_argument("--tool", nargs="?", const="auto", choices=["auto", "required"], help="offer a submit_answer tool (tool_choice)")
     p = sub.add_parser("summarize")
     p.add_argument("run", type=Path)
     args = ap.parse_args()
@@ -239,9 +241,10 @@ def main():
     if args.cmd == "summarize":
         summarize(args.run, json.loads((args.run / "questions.json").read_text()))
         return
-    global SYSTEM_PROMPT, TOOLS
+    global SYSTEM_PROMPT, TOOLS, TOOL_CHOICE
     SYSTEM_PROMPT = args.system
     TOOLS = [SUBMIT_TOOL] if args.tool else None
+    TOOL_CHOICE = args.tool or "auto"
     questions = json.loads(args.questions.read_text())[: args.limit]
     if args.out:
         run = args.out
@@ -262,6 +265,7 @@ def main():
                 "thinking": False,
                 "system_prompt": SYSTEM_PROMPT,
                 "tools": TOOLS,
+                "tool_choice": TOOL_CHOICE if TOOLS else None,
                 "stable_min": STABLE_MIN,
                 "concurrency": args.concurrency,
                 "questions_sha256": hashlib.sha256(args.questions.read_bytes()).hexdigest(),
