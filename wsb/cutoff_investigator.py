@@ -255,6 +255,9 @@ async def main():
         row = {"id": item["id"], "format": fmt, "version": version, "condition": condition, "draw": draw, "answer": text,
                "rationale": submission["rationale"] if submission else None, "label": label, **grade(item, fmt, text, label),
                "placebo_source": src, "cost": cost, "messages": messages}  # fmt: skip
+        if submission:  # the verdict goes onto the stored submit reply, for reading the transcript; the investigator never saw it
+            tool_msg = next(m for m in reversed(messages) if m["role"] == "tool")
+            tool_msg["content"] += f" [graded after the run: {'CORRECT' if row['correct'] else 'WRONG'}; Qwen's answer: {label!r}]"
         print(f"{item['id']} {fmt:6} {version:6} {condition:22} draw {draw}: {text!r} -> {row['correct']} ({label!r})", file=sys.stderr)
         return row
 
