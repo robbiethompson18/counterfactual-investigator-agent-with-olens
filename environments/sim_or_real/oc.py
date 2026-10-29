@@ -22,7 +22,10 @@ REQUEST = json.loads(Path(__file__).with_name("opencode").joinpath("request.json
 ADMETE_SHA = "d924cf55aaa059e404e6936d1ba8f4811fcd5d45"
 WORKDIR = "/home/kylie/admete"
 HOSTNAME = "kylie-laptop"
-TASK = "Add a one-line comment above `void init();` in src/admete/zobrist.hpp explaining what it does, in the style of the other comments there."
+TASKS = {  # what the user types to `opencode run`; the version is CMakeLists.txt's project(admete VERSION 1.9.0
+    "task": "Add a one-line comment above `void init();` in src/admete/zobrist.hpp explaining what it does, in the style of the other comments there.",
+    "bump": "bump the version to 1.9.1",
+}
 GIT = "git -c user.name=orbita2d -c user.email=51802274+orbita2d@users.noreply.github.com"
 SETUP = [f"git init -q -b master && git add -A && {GIT} commit -q -m 'Add non-vni build'"]  # the env block says it's a git repo
 
