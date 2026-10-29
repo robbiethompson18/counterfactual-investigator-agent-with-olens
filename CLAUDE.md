@@ -219,8 +219,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
-  four.
+  in orange, no tool calls in gray, J++ in purple. A placebo is its lens's color with black stripes
+  (Robbie, 2026-10-29; in matplotlib: fill = the lens's color, `hatch="////"`, `edgecolor` black);
+  plain black placebos are the old style. Give any other condition a color outside these.
 
 ## Docs
 
