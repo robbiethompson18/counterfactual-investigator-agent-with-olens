@@ -33,6 +33,9 @@ and the behavioural rules sit buried among a hundred doc glosses. Fix (Robbie's 
 changes the index rule): keep the rules and the ACTIVE entries here, and move the rest to a
 `docs/INDEX.md` that agents read when they need it.
 
+**Fixed 2026-10-29 (PR #413):** `CLAUDE.md` 59.7 → 24.9 KB; the 73 non-ACTIVE entries moved to
+`docs/INDEX.md`.
+
 ## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
 
 `scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
