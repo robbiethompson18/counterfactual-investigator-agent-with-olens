@@ -1,7 +1,8 @@
-# cutoff_qa_inline: predicting Qwen's stale answer from end-of-prompt O-lens reads
+# cutoff_qa_inline: predicting Qwen's stale answer from end-of-prompt O-lens, J++ and NLA reads
 
-**Status (2026-10-29):** REFERENCE. First smoke, 200 items, one investigator; the caveats below are
-open.
+**Status (2026-10-29):** REFERENCE. 999 items, one investigator (Haiku 5.5), O-lens / J++ / NLA each
+against its own placebo; the caveats below are open. The 200-item smoke further down is superseded
+by the 1k run but kept for its mechanism notes.
 
 **Question.** Can an investigator that never sees Qwen3.6-27B's reply predict the answer it gives to
 a present-tense factual question ("Who is the CEO of Intel?"), and do O-lens reads of the prompt
@@ -28,15 +29,41 @@ help? The label is Qwen's modal answer from the bank's stability gate, not the t
   modal answer; loose adds whole-word containment either way. Paired sign test over items on the
   per-item mean over draws.
 
-![transcript-only vs O-lens vs J++ and their placebos, all / stale / not stale](img/cutoff-qa-inline.png)
+**1k result** (2026-10-29). 999 items: the 200 below (`smoke200-nohint`) plus 799 seeded-random
+stable non-numeric bank-v3 items (`cutoff_qa/2026-10-29_new800-nohint`; the 800th hung on the Qwen
+server and was dropped): 339 stale, 660 not. Reads at the same positions and layers as the smoke:
+`olens_reads/2026-10-29_cutoff{200,800}-tail`, `jpp_reads/2026-10-29_cutoff{200,800}-all`,
+`nla_reads/2026-10-29_cutoff{200,800}-tail` (all-layer NLA, greedy, critic FVE; its placebo pool
+also holds 200 MMLU-Pro prompts' reads). Inputs
+`cfbench_evals/2026-10-29_cutoff-qa-inline-inputs-1k` (`-1k-nla` for the NLA conditions, same cases
+and other reads). One run per condition,
+`cfbench/2026-10-29_cutoff-qa-1k-{transcript,olens,olens-placebo,jlens,jlens-placebo,nla,nla-placebo}`,
+Haiku 5.5 medium, 3 draws: 20,979 predictions, ~$20 of Haiku (OpenRouter-reported).
+
+![transcript-only vs O-lens, J++ and NLA and their placebos, all / stale / not stale](img/cutoff-qa-inline.png)
 
 ![paired differences between conditions with 95% CIs, grouped by question](img/cutoff-qa-inline-diff.png)
 
 (`uv run python -m graphs.cutoff_qa_inline` makes both; exact match, 95% bootstrap CIs over items,
-the second paired by item. This is the one cutoff chart: NLA (`nla_inline`, `nla_placebo_inline`)
-goes on it as soon as its reads and runs exist.)
+the second paired by item. This is the one cutoff chart.)
 
-**Result** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
+| exact match (%)      | all     | stale   | not stale |
+| -------------------- | ------- | ------- | --------- |
+| transcript only      | 78      | 47      | 94        |
+| O-lens / its placebo | 85 / 77 | 72 / 55 | 92 / 89   |
+| J++ / its placebo    | 83 / 81 | 67 / 59 | 91 / 93   |
+| NLA / its placebo    | 86 / 84 | 73 / 65 | 92 / 94   |
+
+- **Only the O-lens clearly beats its own placebo:** +7.6pp [+5.7, +9.5]. J++ and NLA each beat
+  theirs by +1.7pp [+0.1, +3.3].
+- **The J++ and NLA placebos aren't neutral:** +3.2pp and +5.9pp over transcript-only (the O-lens
+  placebo −0.7pp). Haiku reads off-topic reads as noise, then reasons about the model's training
+  cutoff and gives the stale answer more often; the NLA placebo's other-item readouts describe
+  factual-recall prompts, which primes this most. Against transcript-only NLA looks as good as the
+  O-lens (+7.6 vs +6.9pp), but most of that is the placebo effect.
+- O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8].
+
+**200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
 | condition            | exact | loose | stable_right | stable_wrong | vs transcript, win/loss | p      |
@@ -67,7 +94,7 @@ and 71% on the 23 whose reads don't (transcript-only 65.7% / 73.9%). Examples:
 (Qwen says Koji Sato, the reads say "Akio Toyoda (current CEO) – As of 2024, Toyota's CEO is Koji
 Sato", Haiku submits Akio Toyoda 3/3).
 
-**J++** (`jlens_inline`, `jlens_placebo_inline`, `jlens_inline_no60`; PR #393, runs
+**J++ on the 200** (`jlens_inline`, `jlens_placebo_inline`, `jlens_inline_no60`; PR #393, runs
 `cfbench/2026-10-29_cutoff-qa-haiku-200-jlens{,-placebo,-no60}`). The J++ lens's top 3 next tokens
 at every token of the prompt, layers 32–60, ~4.5k tokens per prompt; placebo: the last n prompt
 tokens of a hint_mcq transcript's J++ read. Exact match: J++ 78%, J++ placebo 73%, O-lens − J++
@@ -95,7 +122,7 @@ Dropping L60 costs 1.8pp (n.s.).
   cutoff_qa rows; the requests were built straight from the episodes (CODE_SMELL.md).
 
 **Next.** (1) The text-inversion control above. (2) Positions: the `\n` after `<|im_end|>` alone
-carries nearly all the recall; a single-position, single-layer run is a 6x cheaper read. (3) The
-other 40 stable items, then a bigger bank (`scripts/cutoff_facts/BRIEF.md`). (4) Other investigators
-(Sonnet, GPT-6.1), and `olens_agentic` with the lens as a tool. (5) NLA on the chart as soon as its
-reads exist.
+carries nearly all the recall; a single-position, single-layer run is a 6x cheaper read. (3) More
+items (the 1k run above used 999 of bank v3's 2,196 stable items). (4) Other investigators (Sonnet,
+GPT-6.1), and `olens_agentic` with the lens as a tool. (5) A placebo that keeps the framing neutral:
+the J++ and NLA placebos move Haiku on their own.

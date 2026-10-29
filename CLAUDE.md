@@ -548,10 +548,11 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
-- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens predicts Qwen's stale answers, or rerunning the end-of-prompt investigator smoke](docs/cutoff-qa-inline.md)
-  — Haiku 5.5 predicting Qwen's modal answer from the question: O-lens 81% vs transcript-only 67% vs
-  placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
-  answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
+- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens, J++ or NLA predicts Qwen's stale answers, or rerunning the end-of-prompt investigator](docs/cutoff-qa-inline.md)
+  — Haiku 5.5 predicting Qwen's modal answer from the question, 999 items: only the O-lens clearly
+  beats its own placebo (+7.6pp; J++ and NLA +1.7pp), the J++ and NLA placebos alone add 3–6pp
+  (cutoff framing); the lens writes the answer at the `\n` after `<|im_end|>`; the one cutoff chart;
+  the lens-shares-Qwen's-cutoff caveat
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
   — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
   `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list

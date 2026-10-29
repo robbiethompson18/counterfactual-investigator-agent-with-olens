@@ -1,10 +1,9 @@
-"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs its placebo vs J++ vs its
-placebo, one group of five bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
+"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and NLA, each with its
+placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
 and for the rest (stable_right). Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's
 modal answer); whiskers are 95% bootstrap CIs over items. A second, small figure shows the paired differences between
 conditions (per item, then the mean) with their 95% bootstrap CIs, all items. Reads the runs' predictions.jsonl, pooled
-(the O-lens run has transcript_inline and the O-lens conditions, the J++ runs one condition each; docs/cutoff-qa-inline.md,
-PR #393 for J++).
+(one run per condition on the 999-item inputs, cfbench_evals/2026-10-29_cutoff-qa-inline-inputs-1k; docs/cutoff-qa-inline.md).
 
     uv run python -m graphs.cutoff_qa_inline [--runs data/runs/cfbench/<run> ...] [--out docs/img/cutoff-qa-inline.png]
         [--out-diff docs/img/cutoff-qa-inline-diff.png]
@@ -21,16 +20,18 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline"]
+SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline", "nla_inline",
+          "nla_placebo_inline"]  # fmt: skip
 LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
-         "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo"}  # fmt: skip
-# J++ is purple (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (Robbie, 2026-10-29)
+         "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo",
+         "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo"}  # fmt: skip
+# J++ purple, NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
-         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad"}  # fmt: skip
-HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////"}
-# TODO(NLA): add nla_inline / nla_placebo_inline (cfbench/evals/cutoff_qa_inline, #391) to SERIES, PAIRS and RUNS as soon as
-# the NLA reads and runs exist (Robbie, 2026-10-29): this is the one cutoff chart, every lens goes on it.
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo")]
+         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
+         "nla_inline": "#2f9e44", "nla_placebo_inline": "#2f9e44"}  # fmt: skip
+HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
+SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo")
+RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
     "all items": None,
     "stale (Qwen's answer\nis out of date)": "stable_wrong",
@@ -61,10 +62,10 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
 
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
-    ("Does the lens beat its placebo?", [("olens_inline", "olens_placebo_inline"), ("jlens_inline", "jlens_placebo_inline")]),
-    ("Does the placebo alone help?", [("olens_placebo_inline", "transcript_inline"), ("jlens_placebo_inline", "transcript_inline")]),
-    ("Lens vs transcript only", [("olens_inline", "transcript_inline"), ("jlens_inline", "transcript_inline")]),
-    ("O-lens vs J++", [("olens_inline", "jlens_inline")]),
+    ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs lens", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
 ]
 
 
@@ -96,7 +97,7 @@ def diffs(runs: list[Path], out: Path) -> None:
             tick.set_color(MUTED)
     ax.tick_params(axis="y", length=0)
     ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_xlim(-12, 30)
+    ax.set_xlim(-8, 16)
     ax.grid(axis="y", visible=False)
     ax.set_title(f"All {len(data['transcript_inline'])} items", loc="left", fontsize=10, color=INK)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -106,8 +107,8 @@ def diffs(runs: list[Path], out: Path) -> None:
 
 def main(runs: list[Path], out: Path) -> None:
     data = per_item(runs)
-    fig, ax = plt.subplots(figsize=(8.4, 3.9))
-    width, gap = 0.16, 0.01
+    fig, ax = plt.subplots(figsize=(10.5, 4.1))
+    width, gap = 0.115, 0.008
     for i, (group, gate) in enumerate(GROUPS.items()):
         for j, s in enumerate(SERIES):
             xs = [a for c, a in data[s].values() if gate is None or c == gate]
@@ -128,7 +129,7 @@ def main(runs: list[Path], out: Path) -> None:
     ax.set_title("Predicting Qwen3.6-27B's answer to a factual question from the prompt", loc="left", fontsize=10.5, color=INK, pad=24)
     handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
                              lw=0) for s in SERIES]  # fmt: skip
-    ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=5, bbox_to_anchor=(0, 1.0))
+    ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=7, bbox_to_anchor=(0, 1.0))
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=180, bbox_inches="tight")
     print(out)
