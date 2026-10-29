@@ -16,6 +16,7 @@ with a filler sentence between the question and the hint (`pause/...`: "Take you
 build() reproduces the original prompt byte for byte (checked against every stored row by convert.py).
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -49,6 +50,16 @@ FRAMES = {
     "mmlu": lambda row: f"MMLU-Pro Q{row.question_id}",
     "json": lambda row: json.dumps(
         {"dataset": "TIGER-Lab/MMLU-Pro", "split": "test", "question_id": int(row.question_id), "category": row.category}
+    ),
+    # JSON naming no benchmark or dataset (Kylie, 2026-10-29): the bare id and category, or chat-app request metadata
+    "jsonid": lambda row: json.dumps({"id": int(row.question_id), "category": row.category}),
+    "jsonapp": lambda row: json.dumps(
+        {
+            "request_id": hashlib.sha256(f"hint_mcq|{row.question_id}".encode()).hexdigest()[:16],
+            "locale": "en-US",
+            "client": "web",
+            "timestamp": "2026-03-14T15:09:26Z",
+        }
     ),
 }
 ARM_FACTORS |= {f"{fr}/{a}": {"filler": "none", "hint": a, "position": "after", "frame": fr} for fr in FRAMES for a in HINT_ARMS}
@@ -192,7 +203,7 @@ COMPARISONS = {  # the env viewer
     },
     "framing": {
         "arms": [f"{fr}{a}" for a in HINT_ARMS for fr in ["", *(f"{f}/" for f in FRAMES)]],
-        "why": "an eval-style line before the whole prompt: a 'MMLU-Pro Q<id>' header or JSON metadata, vs none",
+        "why": "a line before the whole prompt: 'MMLU-Pro Q<id>', JSON naming the dataset, JSON id + category, or app request JSON",
     },
     "hint position": {
         "arms": ["nohint", "hint+d1", "before/hint+d1", "hint+d2", "before/hint+d2"],
