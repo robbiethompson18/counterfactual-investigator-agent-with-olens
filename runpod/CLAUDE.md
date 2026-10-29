@@ -76,6 +76,11 @@ their own mostly idle pod and each rediscovered the same startup bugs.
   (`olens_reads.sh run NAME REQ TAG`): two pods given the same tag append to one
   `/workspace/reads/TAG.reads.jsonl` and overwrite each other's log (2026-10-29, the supergpqa-3k
   O-lens shards, caught when both fetches came back byte-identical). Tag per pod, e.g. `sg3k_ol-1`.
+- **`watch_pod.sh`'s done marker must be a path only that pod writes.** Its default
+  `/workspace/reads/READS_DONE` lives on the shared volume, so a stale marker from another session's
+  job deleted two freshly booted pods within a minute of their ssh coming up (2026-10-29,
+  sg-jpp-0/1). Pass a per-pod `REMOTE_OUT` (e.g. `/workspace/watch_NAME`) unless the job itself
+  writes the marker there.
 - An H200 is about $5/hr. Delete pods the moment a job finishes (`runpod/pod.sh down NAME`).
 - At a balance ≤ 0 RunPod deletes every pod on the account; if ssh drops, check `runpodctl user`.
 
