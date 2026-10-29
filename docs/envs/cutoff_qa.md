@@ -17,9 +17,10 @@ gate runs under `runs/cutoff_gate/2026-10-29_*` on HF. The current brief for new
 
 - **The label is Qwen's modal answer (`qwen_modal`), not the truth.** The task is to predict what
   Qwen says; `truth`, `truth_now` and `pre_cutoff_analog` are metadata for reading the results.
-- **No numeric answers** in any future batch: Qwen's numbers vary across samples (they fail the
-  gate) and token lenses can't name multi-digit values because Qwen splits digits. v2 still has 26
-  stable numeric items (60 in all), flagged `numeric`; stratify or exclude them.
+- **No numeric answers, anywhere** (Robbie, 2026-10-29): not in any future batch, and the env's
+  `items()` drops every item flagged `numeric` (v2: 60, 26 of them stable, so 240 stable items are
+  live). Qwen's numbers vary across samples (they fail the gate) and token lenses can't name
+  multi-digit values because Qwen splits digits. Never report a numeric stratum; they are out.
 - **No date in the question.** The next brief writes present-tense questions directly ("Who is the
   CEO of Intel?"), never "In March 2025, who ...": see the finding below.
 
@@ -136,8 +137,9 @@ are `DROPPED` in the script, so it reproduces the bank byte for byte. Three pilo
 
 ## Known weaknesses
 
-- **Numeric truths** (v1 135, v2 60, 26 of them stable): see the rules above; `numeric` flags them
-  (dates like "february 2026" and version-ish names like "a19 pro" are not flagged).
+- **Numeric truths** (v1 135, v2 60, 26 of them stable) are flagged `numeric` and dropped by `items()`
+  (rule above); dates like "february 2026" and version-ish names like "a19 pro" are not flagged, so
+  a few number-like answers stay.
 - **Stale analogs are partly from memory.** The v1 brief asked for the analog but not for its
   verification, so many are the subagent's recollection, and 109 are prose ("Bernard Arnault was
   also #1 on the 2023 list") rather than a value. In v2 the gate's `qwen_modal` replaces the analog
