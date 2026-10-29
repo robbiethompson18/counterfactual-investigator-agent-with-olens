@@ -56,6 +56,11 @@ in `RETIRED_EVALS` there is left off the lists.
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
     gets its Docent URL from the env's `links.json`.
+  - `RUNS` (optional): the cfbench run dir names the env viewer shows for this eval, each with all
+    its conditions current and no pooled row across them; without it the viewer picks runs itself
+    (newest run per condition supersedes, current runs pooled).
+  - `VERSION_IN_IDS` (optional): `True` prefixes each prediction's expview item id with its version,
+    for evals whose versions share arm pairs; off by default so other evals' links don't change.
 - `eval.md`: anything else the investigator should know. The runner puts it in every prompt as
   `## About this evaluation`, just before the task, and records it in `meta.json`.
 
@@ -112,6 +117,13 @@ the eval `<env>-pairs`.
   GLM acted without asking and that has O-lens reads (8 per base arm, one per item): 160 cases.
   Conditions `no_transcript`, `transcript_agentic`, `olens_agentic`; the prompt states the pooled
   base rate. Version `main`.
+- `essay_grading`: Qwen3.6-27B (thinking off) grading a mediocre essay, harsh = Score ≤ 4/10. The 38
+  ordered arm pairs of the pre-registered 2026-10-23 test (docs/envs/hidden_goal.md) as versions
+  `cue` (12), `who` (10) and `heldout` (16), each on the one 2026-10-22 n=30 run it used, every
+  base run shown. O-lens reads are the old test's (2026-10-22_hidden-goal-v1/2/3, renamed to the
+  env_runs sources); placebo from `--placebo` (the old test used donation-bet-v1).
+  Imported old rows (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash)
+  and `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
