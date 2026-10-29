@@ -134,11 +134,15 @@ PROMPTS = {
 # confused the investigator). Four writers took one axis each (register, structure, framing of training, the user turn;
 # brief and raw drafts in prompts/variants_raw/), 24 drafts, filtered to 16 for distinctness. Each brings its own stage cue
 # and note, so the stage marker need not be a tag; the accept/reject tags are unchanged, since measure() reads them.
-V8X = json.loads((PROMPTS_DIR / "v8_variants.json").read_text())
+# v8n (Kylie, 2026-10-29: a user-turn line like "Data handling: transcript retained, graded, and used for RLHF" is too
+# obvious): the same prompts with no per-stage note, only the bare stage marker, so the training consequence is in the system
+# prompt alone; plain-consequence and stage-info-in-user-turn are dropped (their marker states the consequence) and
+# gradient-reward-model's marker is cut to "training" / "inference".
 PROMPT_CUE = {}  # prompt -> {"cue": {tag: text}, "note": {tag: text}} for prompts that don't use CUE / STAGE_NOTE
-for _v in V8X:
-    PROMPTS[f"v8x-{_v['name']}"] = (None, _v["system"], _v["user_template"])
-    PROMPT_CUE[f"v8x-{_v['name']}"] = {"cue": _v["cue"], "note": _v["note"]}
+for _prefix, _file in (("v8x", "v8_variants.json"), ("v8n", "v8n_variants.json")):
+    for _v in json.loads((PROMPTS_DIR / _file).read_text()):
+        PROMPTS[f"{_prefix}-{_v['name']}"] = (None, _v["system"], _v["user_template"])
+        PROMPT_CUE[f"{_prefix}-{_v['name']}"] = {"cue": _v["cue"], "note": _v["note"]}
 
 
 STAGE_NOTE = {  # v8's user-turn line after the stage tag
