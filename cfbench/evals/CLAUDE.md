@@ -124,6 +124,10 @@ the eval `<env>-pairs`.
   sources); placebo from `--placebo` (the old test used donation-bet-v1). Imported old rows
   (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash) and
   `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
+- `essay_grading_inline`: essay_grading's cases single-turn (Kylie, 2026-10-29), Flash at effort low:
+  per essay the base prompt, its 10 scores and one reply, the edit, and (`olens_inline`) the old
+  test's reads on each shown reply at every position outside the essay text, or (`olens_placebo_inline`)
+  donation_bet bullets at the same positions.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
