@@ -1,0 +1,48 @@
+# DSV4 Flash O-lens reads (layer 30) over the alignment_faking v8x prompts' shared prompt tokens: one-engine reader
+# (vllm_capture_read.py --shared-prompt) on requests from scripts/af_v8x_olens_requests.py. One sky job, so --down never
+# kills nohup'd work; outputs stay in /data/out/ until fetched (scp -F ~/.sky/generated/ssh/dsv4-v8x).
+#   REQ=path/to/requests.jsonl uvx --from 'skypilot[runpod]==0.13.0' sky launch -c dsv4-v8x -y -i 15 --down \
+#     --secret HF_TOKEN --env REQ scripts/dsv4_olens/sky_af_v8x.yaml
+name: dsv4-v8x
+
+resources:
+  disk_size: 400
+  any_of:
+    - {infra: runpod, accelerators: "H200-SXM:2"}
+    - {infra: runpod, accelerators: "B200:2"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  W: /data
+  LAYERS: "30"
+  REQ: requests.jsonl
+  MAX_HOURS: 2
+
+file_mounts:
+  ~/v4/code: ./scripts/dsv4_olens
+  ~/v4/requests.jsonl: ${REQ}
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/out
+  bash ~/v4/code/setup.sh
+  cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+  dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null 2>&1
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-13-0 cuda-cudart-dev-13-0 cuda-crt-13-0 libcublas-dev-13-0 \
+    cuda-nvrtc-dev-13-0 libcurand-dev-13-0 cuda-libraries-dev-13-0 ninja-build >/dev/null 2>&1
+  apt-get clean
+  mkdir -p ~/vl && cd ~/vl && [ -d .venv ] || ~/.local/bin/uv venv -q --python 3.12 .venv
+  VIRTUAL_ENV=~/vl/.venv ~/.local/bin/uv pip install -q vllm==0.32.0
+  VIRTUAL_ENV=~/vl/.venv ~/.local/bin/uv pip install -q --no-deps "vllm-lens @ git+https://github.com/ceselder/vllm-metamodels" zstandard ~/v4/code/hc_inject
+  cd ~/v4/code && ~/v4/.venv/bin/python convert_adapter.py /data/v4lens/lora /data/v4lens/lora_vllm
+
+run: |
+  set -euo pipefail
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  cd ~/v4/code
+  export CUDA_HOME=/usr/local/cuda-13.0 PATH=/usr/local/cuda-13.0/bin:$PATH VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_LENS_CUDA_GRAPHS=1
+  timeout "${MAX_HOURS}h" ~/vl/.venv/bin/python vllm_capture_read.py --model /data/v4flash --lens /data/v4lens \
+    --requests ~/v4/requests.jsonl --out /data/out --layers $LAYERS --shared-prompt --read-arms preview,public 2>&1 | tee /data/out/job.log
+  echo READS_DONE

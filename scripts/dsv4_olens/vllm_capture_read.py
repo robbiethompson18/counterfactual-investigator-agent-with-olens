@@ -62,6 +62,11 @@ def main():
         "--max-model-len", type=int, default=1024, help="longest prompt + tag; prefilled in one chunk so the hooks see every position"
     )
     ap.add_argument("--dense", action="store_true", help="read.py's --dense positions")
+    ap.add_argument(
+        "--shared-prompt",
+        action="store_true",
+        help="every prompt token (system, user turn, assistant header) except the request's `query` text in the user turn; no reply",
+    )
     ap.add_argument("--actual-reply", action="store_true", help="read the request's own reply, not a canonical <rejected/>")
     ap.add_argument("--read-arms", default="public", help="arms whose transcripts get lens reads (all get logits)")
     ap.add_argument("--public-first", action="store_true")
@@ -96,6 +101,10 @@ def main():
             prompt, reply = render(r["messages"])
             full = prompt + (reply if a.actual_reply else REJECT)
             ids, offs, pos = read_positions(tok, full, None, a.dense, seen_system if a.dense else None)
+            if a.shared_prompt:  # the part of the prompt every item shares (scripts/af_v8x_olens_requests.py)
+                q0 = full.index(r["query"], full.rindex(USER))
+                q1 = q0 + len(r["query"])
+                pos = [i for i, (s, e) in enumerate(offs) if 0 < i and s < len(prompt) and not (s < q1 and e > q0)]
             p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
             assert ids[: len(p_ids)] == p_ids, "prompt tokenization is not a prefix of prompt+reply"
             assert len(ids) + 8 <= a.max_model_len, f"{r['id']}: {len(ids)} tokens > --max-model-len {a.max_model_len}"
