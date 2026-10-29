@@ -164,6 +164,26 @@ COMPARISONS |= {
     }
     for book, lv in [("junebug", "lowc"), ("acme", "lowa"), ("mixed", "low")]
 }
+# core with real-client-looking tools (mcp_cc: Claude-Code-like Bash + mcp__<server>__<tool> app tools) and env block
+# (env_cc: Claude-Code-like <env> in /home/dev on a named host), separately and together (Kylie, 2026-10-29: core's
+# <tools> and env blocks read as a benchmark to the O-lens)
+_CC = ["core", "core_mcp", "core_env", "core_mcp_env"]
+COMPARISONS |= {
+    f"{t}: real-client tools / env": {
+        "arms": [f"{t}/{v}" for v in ["base", *_CC]],
+        "group": "real-client harness",
+        "why": "core with MCP-style tools, a Claude-Code-like env block, or both; base for reference",
+    }
+    for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]
+}
+COMPARISONS |= {
+    f"email: real-client tools / env ({book})": {
+        "arms": [f"email/{v}@{lv}" for v in ["base_done_neutral", *_CC]],
+        "group": "real-client harness",
+        "why": f"{book} address book; base_done_neutral stands in for the retired base",
+    }
+    for book, lv in [("junebug", "lowc"), ("acme", "lowa"), ("mixed", "low")]
+}
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
