@@ -34,6 +34,13 @@ the O-lens tail run's requests through the NLA reader, then the critic (runpod/n
     runpod/nla_reads.sh run NAME data/runs/olens_reads/2026-10-29_cutoff200-tail/requests.jsonl cutoff200-nla --layers 32,40,48,52,56,60
     runpod/nla_reads.sh score NAME cutoff200-nla
     runpod/nla_reads.sh fetch NAME cutoff200-nla data/runs/nla_reads/2026-10-29_cutoff200-tail/reads.jsonl
+
+J++ conditions (2026-10-29; not in CONDITIONS): `jlens_inline` puts the item's own J++ reads (neuronpedia/jacobian-lens
+qwen3.6-27b/jpp) at every token of the rendered prompt (thinking-off render, empty think block included) in place of the
+O-lens block, top inline.JLENS_K tokens at JLENS_LAYERS (the O-lens block's), from JREADS; `jlens_placebo_inline` is the
+last n prompt tokens of a seeded hint_mcq transcript's every-token J++ read (JPOOL), n = this item's token count, each shown
+with its own tokens; `jlens_inline_no60` is jlens_inline without layer 60, whose read at the last token is close to Qwen's
+own next-token distribution. ~4.5k tokens per block. Results: PR #393.
 """
 
 import json
@@ -59,6 +66,9 @@ VERSIONS: dict[str, dict] = {"nohint": {"arm": "nohint"}}
 ARM_LABELS = {"nohint": "the question, verbatim"}
 PAIR_LABELS = {"nohint -> nohint": "no counterfactual"}
 NLA_READS = Path("data/runs/nla_reads/2026-10-29_cutoff200-tail/reads.jsonl")  # NLA readouts at READS's positions and layers
+JREADS = Path("data/runs/jpp_reads/2026-10-29_cutoff200-all/reads.jsonl")  # J++ at every token of RUN's prompts
+JPOOL = Path("data/runs/jpp_reads/2026-10-27_hint-mcq-header/reads.jsonl")  # J++ placebo pool: hint_mcq, every token, L0-60/4
+JLENS_LAYERS = (32, 40, 48, 52, 56, 60)  # the O-lens reads' layers
 
 
 def _mod():
@@ -88,6 +98,11 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     if NLA_READS.exists():  # the nla_* conditions' reads (and their placebo pool)
         (out / "reads/nla.jsonl").write_text(NLA_READS.read_text())
     print("NLA reads", "copied" if NLA_READS.exists() else f"not made yet ({NLA_READS})")
+    for src, dst, prompt_only in ((JREADS, "jreads", False), (JPOOL, "jpool", True)):  # the jlens_* conditions' reads and pool
+        if src.exists():
+            rows = [r for rs in jpp_rows(src, prompt_only).values() for r in rs]
+            (out / f"reads/{dst}.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+        print(src, "copied" if src.exists() else "missing")
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
     print(len(cs), "cases;", "reads copied" if READS.exists() else f"no reads yet ({READS})")
 
@@ -128,6 +143,8 @@ def cases(inputs: Path, versions: list[str]):
 def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
     if condition.startswith("nla"):
         return nla_inline(condition, case, base, seed)
+    if condition.startswith("jlens"):
+        return jlens_inline(condition, case, base, seed)
     question = base[0].messages[0]["content"]
     rows, extra = None, {}
     if condition != "transcript_inline":
@@ -154,3 +171,31 @@ def nla_inline(condition: str, case: dict, base: list, seed: int) -> tuple[str, 
         src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(set(by_source) - {src}))
         extra = {"placebo_sources": [src]}
     return inline.nla_prompt(base[0].messages[0]["content"], False, MODEL_NAME, by_source[src]), extra
+
+
+def jpp_rows(path: Path, prompt_only: bool = False) -> dict[str, list[dict]]:
+    """id -> J++ rows at JLENS_LAYERS in token order; `prompt_only` cuts each transcript at its first assistant (reply) token."""
+    out: dict[str, list[dict]] = {}
+    for line in path.open():
+        r = json.loads(line)
+        keep = [r["layers"].index(L) for L in JLENS_LAYERS]
+        out.setdefault(r["id"], []).append(r | {"layers": list(JLENS_LAYERS), "top": [r["top"][k] for k in keep]})
+    for i, rows in out.items():
+        rows.sort(key=lambda r: r["token_index"])
+        if prompt_only:
+            out[i] = rows[: next((k for k, r in enumerate(rows) if r["role"] == "assistant"), len(rows))]
+    return out
+
+
+def jlens_inline(condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
+    """jlens_inline / jlens_placebo_inline / jlens_inline_no60 over reads/jreads.jsonl and reads/jpool.jsonl (prep)."""
+    rows = own = inline.reads_by_source(Path(case["inputs"]) / "reads/jreads.jsonl")[base[0].source]
+    extra = {}
+    if condition == "jlens_placebo_inline":  # a seeded hint_mcq transcript's last len(own) prompt tokens
+        pool = inline.reads_by_source(Path(case["inputs"]) / "reads/jpool.jsonl")
+        src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(pool))
+        rows, extra = pool[src][-len(own) :], {"placebo_sources": [src]}
+    if condition == "jlens_inline_no60":
+        rows = [r | {"layers": r["layers"][:-1], "top": r["top"][:-1]} for r in own]
+        assert rows[0]["layers"] == [32, 40, 48, 52, 56], rows[0]["layers"]
+    return inline.jlens_prompt(base[0].messages[0]["content"], False, MODEL_NAME, rows), extra
