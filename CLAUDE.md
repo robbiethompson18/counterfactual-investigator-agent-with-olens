@@ -540,6 +540,11 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
+- [ACTIVE: cutoff_qa — read before asking Qwen dated factual questions across its knowledge cutoff, extending the question bank or building the hint arm](docs/envs/cutoff_qa.md)
+  — 1,072 web-verified short-answer questions on 2024-01..2026-09 events (bank v1 on HF,
+  `banks/cutoff_qa/`), how 25 Sonnet subagents made them and `merge.py` merged them, the 135 numeric
+  items to stratify or drop, stale analogs partly from memory, the Qwen gate placeholder, how to
+  generate more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything
