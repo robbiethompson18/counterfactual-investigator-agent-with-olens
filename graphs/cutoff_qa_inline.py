@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline"]
 LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
          "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo"}  # fmt: skip
-# J++ is purple (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
+# J++ is purple (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (Robbie, 2026-10-29)
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////"}
