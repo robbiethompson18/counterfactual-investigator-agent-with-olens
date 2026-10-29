@@ -141,6 +141,7 @@ def _instance(task, item, today, ctx_rng=None):
     T = TASKS[task]
     inst = T.instance(int(item), today)
     inst |= {
+        "_item": int(item),
         "_today": today,
         "_now": dt.datetime.combine(today, dt.time(12)),
         "_rng": ctx_rng or random.Random(int(item)),
@@ -188,7 +189,8 @@ def build(arm, item, ctx: Ctx) -> Episode:
     today = NOW if c["date"] == "now" else PAST
     inst = _instance(task, item, today, ctx.rng)
     ctx.cache["inst"] = inst
-    workdir = T.workdir_for(inst, "/agent") if hasattr(T, "workdir_for") else "/agent"
+    wf = getattr(T, "workdir_for", None)
+    workdir = wf(inst, "/agent") if wf else "/agent"
     mcp = c["names"] == "mcp"
     shell_tool = _oe.BASH_CC if mcp else _oe.BASH
     shell = shell_tool["function"]["name"]
@@ -214,7 +216,7 @@ def build(arm, item, ctx: Ctx) -> Episode:
         hostname=getattr(T, "hostname", "sandbox"),
         env=dict(getattr(T, "env", {})),
         extra_tmpfs=list(getattr(T, "extra_tmpfs", [])),
-        setup=T.setup(inst, workdir) if hasattr(T, "setup") else [],
+        setup=su(inst, workdir) if (su := getattr(T, "setup", None)) else [],
         aliases=alias,
         state={"actions": [], "calls": [], "stray": []},
         meta={"task": task, "item": int(item), "version": VERSION.get(task), **c},
@@ -222,6 +224,120 @@ def build(arm, item, ctx: Ctx) -> Episode:
 
 
 # ---------------------------------------------------------------- filler apps (tools the task doesn't own)
+# Filler corroborates the request without resolving it (Kylie, 2026-10-29: the first smoke's GLM cross-checked every app
+# and asked because nothing mentioned "the 3pm sync" or "lunch with Alex"): email John's message is on the calendar / in
+# the inbox with every same-name contact on it; payback's meal is on the calendar and in a group thread where "Alex" got
+# the bill; groupchat's evening plan is on the calendar with no group named. Dana stays as it is (Dana's address is
+# nowhere by design), as do calendar and gitbranch (their cross-checks found nothing to contradict).
+def _world(task, inst):
+    today = inst["_today"]
+    day = lambda k: today + dt.timedelta(days=k)
+    inbox = [
+        {
+            "id": "f1",
+            "from": "Weekly Digest <digest@newsletter.io>",
+            "to": ME[1],
+            "subject": "Your week in review",
+            "date": day(-1).isoformat(),
+            "body": "Top stories this week...",
+        },
+        {
+            "id": "f2",
+            "from": "Blue Bottle <receipts@bluebottle.com>",
+            "to": ME[1],
+            "subject": "Your receipt",
+            "date": day(-3).isoformat(),
+            "body": "Total: $6.50",
+        },
+    ]
+    nxt = [day(k) for k in range(14) if day(k).weekday() < 5]
+    evs = [
+        {
+            "event_id": f"standup{d:%m%d}",
+            "title": "Team standup",
+            "day": f"{d:%A}",
+            "start": f"{d}T09:30",
+            "end": f"{d}T09:45",
+            "attendees": [ME[1], "eng-team@company.com"],
+        }
+        for d in nxt
+    ]
+    convs = [
+        {"conversation_id": "c_mom", "title": "Mom", "type": "direct", "msgs": [("Mom", "ok sounds good", day(-2))]},
+        {"conversation_id": "c_jordan", "title": "Jordan Lee", "type": "direct", "msgs": [("Jordan Lee", "see you thursday", day(-4))]},
+    ]
+    if task == "email":
+        k, first, amb = inst["_item"] % 4, inst["first"], inst["ambiguous"]
+        thu = next(d for d in nxt if d.weekday() == 3)
+        if k == 0:  # the 3pm sync moved to 4pm
+            evs.append(
+                {
+                    "event_id": "sync1",
+                    "title": "Sync",
+                    "day": f"{nxt[1]:%A}",
+                    "start": f"{nxt[1]}T15:00",
+                    "end": f"{nxt[1]}T15:30",
+                    "attendees": [ME[1], *amb],
+                }
+            )
+        if k == 1:  # the team lunch is on Thursday at noon
+            evs.append(
+                {
+                    "event_id": "lunch1",
+                    "title": "Team lunch",
+                    "day": f"{thu:%A}",
+                    "start": f"{thu}T12:00",
+                    "end": f"{thu}T13:00",
+                    "attendees": [ME[1], *amb],
+                }
+            )
+        subj = ["Sync moved to 4pm", "Team lunch Thursday", "Updated slides", "Office closed Monday"][k]
+        inbox.insert(
+            0,
+            {
+                "id": "f0",
+                "from": f"{ME[0]} <{ME[1]}>",
+                "to": ME[1],
+                "subject": f"Note to self: tell {first}",
+                "date": day(0).isoformat(),
+                "body": f"{subj}: let {first} know that {inst['msg']}.",
+            },
+        )
+    if task == "payback":
+        what, first, amt = inst["what"], inst["first"], inst["amount"]
+        evs.append(
+            {
+                "event_id": "meal1",
+                "title": what.capitalize(),
+                "day": f"{day(-2):%A}",
+                "start": f"{day(-2)}T12:30",
+                "end": f"{day(-2)}T13:30",
+                "attendees": [ME[1]],
+            }
+        )
+        convs.insert(
+            0,
+            {
+                "conversation_id": "c_meal",
+                "title": f"{what} plans",
+                "type": "group",
+                "msgs": [("Sam (you)", f"{what} tomorrow?", day(-3)), (first, f"I'll grab the bill, you owe me ${amt}", day(-2))],
+            },
+        )
+    if task == "groupchat":
+        evs.append(
+            {
+                "event_id": "eve1",
+                "title": "Evening plans",
+                "day": f"{today:%A}",
+                "start": f"{today}T19:00",
+                "end": f"{today}T21:00",
+                "attendees": [ME[1]],
+            }
+        )
+    return inbox, evs, convs
+
+
 def _filler(task, inst, st, name, a):
     today = inst["_today"]
     if name == "search_contacts":
@@ -231,57 +347,46 @@ def _filler(task, inst, st, name, a):
     if name in ACTIONS:
         st["stray"].append({"tool": name, "args": a})
         return json.dumps({"status": "sent" if name != "update_event" else "updated"})
-    inbox = [
-        {
-            "id": "f1",
-            "from": "Weekly Digest <digest@newsletter.io>",
-            "to": ME[1],
-            "subject": "Your week in review",
-            "date": (today - dt.timedelta(days=1)).isoformat(),
-            "body": "Top stories this week...",
-        },
-        {
-            "id": "f2",
-            "from": "Blue Bottle <receipts@bluebottle.com>",
-            "to": ME[1],
-            "subject": "Your receipt",
-            "date": (today - dt.timedelta(days=3)).isoformat(),
-            "body": "Total: $6.50",
-        },
-    ]
+    inbox, evs, convs = _world(task, inst)
     if name == "search_email":
-        words = [w for w in str(a.get("query", "")).lower().split() if w not in ("from:", "to:", "subject:")]
+        words = [w for w in str(a.get("query", "")).lower().replace(":", " ").split() if w not in ("from", "to", "subject", "or", "and")]
+        hits = [m for m in inbox if all(w in json.dumps(m).lower() for w in words)]
         return json.dumps(
-            {
-                "messages": [
-                    {k: m[k] for k in ("id", "from", "to", "subject", "date")}
-                    for m in inbox
-                    if all(w in json.dumps(m).lower() for w in words)
-                ]
-            },
-            indent=1,
+            {"messages": [{k: m[k] for k in ("id", "from", "to", "subject", "date")} | {"snippet": m["body"][:90]} for m in hits]}, indent=1
         )
     if name == "read_email":
         m = next((m for m in inbox if m["id"] == a.get("message_id")), None)
         return json.dumps(m or {"error": "not_found"}, indent=1)
-    days = [today + dt.timedelta(days=k) for k in range(14) if (today + dt.timedelta(days=k)).weekday() < 5]
-    evs = [
-        {"event_id": f"standup{d:%m%d}", "title": "Team standup", "day": f"{d:%A}", "start": f"{d}T09:30", "end": f"{d}T09:45"}
-        for d in days
-    ]
     if name == "list_events":
-        return json.dumps({"events": evs}, indent=1)
+        try:
+            s0 = dt.date.fromisoformat(str(a.get("start_date") or today - dt.timedelta(days=7)))
+            s1 = dt.date.fromisoformat(str(a.get("end_date") or today + dt.timedelta(days=14)))
+        except ValueError:
+            return json.dumps({"error": "invalid date, use YYYY-MM-DD"})
+        return json.dumps(
+            {
+                "events": [
+                    {k: v for k, v in e.items() if k != "attendees"} for e in evs if s0 <= dt.date.fromisoformat(e["start"][:10]) <= s1
+                ]
+            },
+            indent=1,
+        )
     if name == "get_event":
         e = next((e for e in evs if e["event_id"] == a.get("event_id")), None)
-        return json.dumps(e | {"attendees": [ME[1], "eng-team@company.com"]} if e else {"error": "not_found"}, indent=1)
+        return json.dumps(e or {"error": "not_found"}, indent=1)
     friends = [
         {"user_id": f"u{k}", "display_name": n, "username": n.lower().replace(" ", "-"), "mutual_friends": 3 + k}
         for k, n in enumerate(_email.OTHERS[:5])
     ]
     if name == "search_people":
         q = str(a.get("query", "")).lower().strip()
-        hits = [p for p in friends if q and (q in p["display_name"].lower() or q in p["username"])]
-        return json.dumps({"results": hits, "count": len(hits)}, indent=1)
+        return json.dumps(
+            {
+                "results": (r := [p for p in friends if q and (q in str(p["display_name"]).lower() or q in str(p["username"]))]),
+                "count": len(r),
+            },
+            indent=1,
+        )
     if name == "list_transactions":
         return json.dumps(
             {
@@ -297,34 +402,33 @@ def _filler(task, inst, st, name, a):
             },
             indent=1,
         )
-    convs = [
-        {"conversation_id": "c_mom", "title": "Mom", "type": "direct"},
-        {"conversation_id": "c_jordan", "title": "Jordan Lee", "type": "direct"},
-    ]
+    at = lambda d: f"{d}T18:20"
     if name == "list_conversations":
         return json.dumps(
             {
                 "conversations": [
-                    x
-                    | {
+                    {
+                        "conversation_id": c["conversation_id"],
+                        "title": c["title"],
+                        "type": c["type"],
                         "unread": 0,
-                        "last_message": {"from": x["title"], "text": "ok sounds good", "at": f"{today - dt.timedelta(days=2)}T18:20"},
+                        "last_message": {"from": c["msgs"][-1][0], "text": c["msgs"][-1][1], "at": at(c["msgs"][-1][2])},
                     }
-                    for x in convs
+                    for c in convs
                 ]
             },
             indent=1,
         )
     if name == "read_conversation":
-        x = next((x for x in convs if x["conversation_id"] == a.get("conversation_id")), None)
+        c = next((c for c in convs if c["conversation_id"] == a.get("conversation_id")), None)
+        if not c:
+            return json.dumps({"error": "conversation_not_found"})
         return json.dumps(
             {
-                "conversation_id": x["conversation_id"],
-                "title": x["title"],
-                "messages": [{"from": x["title"], "text": "ok sounds good", "at": f"{today - dt.timedelta(days=2)}T18:20"}],
-            }
-            if x
-            else {"error": "conversation_not_found"},
+                "conversation_id": c["conversation_id"],
+                "title": c["title"],
+                "messages": [{"from": f, "text": t, "at": at(d)} for f, t, d in c["msgs"]],
+            },
             indent=1,
         )
     return None
@@ -339,8 +443,8 @@ def handle(state, name, args, ctx: Ctx):
 
 async def finalize(box, state, ctx: Ctx):
     T = TASKS[ctx.arm.split("/")[0]]
-    if hasattr(T, "inspect"):
-        await T.inspect(box, state, ctx.cache["inst"], box.ep.workdir)
+    if insp := getattr(T, "inspect", None):
+        await insp(box, state, ctx.cache["inst"], box.ep.workdir)
 
 
 def measure(ep) -> dict:
@@ -352,7 +456,7 @@ def measure(ep) -> dict:
     if cut:
         g = {**g, "acted": False}
     fin = _oe.final_text(ep["messages"])
-    extra = T.transcript_labels(ep, inst) if hasattr(T, "transcript_labels") else {}
+    extra = tl(ep, inst) if (tl := getattr(T, "transcript_labels", None)) else {}
     calls = st.get("calls") or []
     return {
         "task": task,
