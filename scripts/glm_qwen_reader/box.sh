@@ -21,7 +21,8 @@ if [ "$1" = setup ]; then
   export PATH=$HOME/.local/bin:$PATH HF_HUB_ENABLE_HF_TRANSFER=1
   if [ -n "${BASE_PY:-}" ]; then # a vast vLLM image: its torch 2.13 + deps, vllm 0.31 and transformers 5.17 on top (root disk is 24 GB)
     [ -x "$PY" ] || uv venv -q --system-site-packages --python "$BASE_PY" "$W/v31"
-    uv pip install -q -p "$PY" --no-deps vllm==0.31.0 "transformers>=5.16.1,<5.18" peft hf_transfer
+    uv pip install -q -p "$PY" --no-deps vllm==0.31.0 "transformers==5.17.*" peft hf_transfer "huggingface_hub>=1.5,<2.0" zstandard \
+      "humming-kernels==0.1.16" "nvidia-cutlass-dsl==4.7.1" "tokenspeed-mla==0.1.8" "xgrammar==0.2.7" # vllm 0.31's pins
   else
     [ -x "$PY" ] || uv venv -q --python 3.12 "$W/v31"
     uv pip install -q -p "$PY" vllm==0.31.0 "transformers>=5.16.1,<5.18" peft pandas pyarrow hf_transfer "huggingface_hub[cli]"
