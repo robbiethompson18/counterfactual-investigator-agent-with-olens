@@ -19,10 +19,10 @@ question is a case when its modal answer has >= MIN_SHARE of its answered sample
 **Conditions** (single turn, `core.INLINE_CONDITIONS`, Gemini 3.8 Flash at INLINE_EFFORT, no tools but submit):
 `transcript_inline` is the prompt alone (there is no transcript: the name is cfbench's); `olens_inline` adds O-lens reads
 at the newline ending each option and at the end of the prompt (the instruction's ".", <|im_end|>, "\\n", <|im_start|>,
-"assistant", "\\n"), every bullet with its FVE, layers LAYERS; `olens_placebo_inline` shows another question's bullets at
-the same positions (same option count, seeded, never its own). Placebo pools: Kylie's option-newline reads
-(POOL_NL, hinted prompts whose prefix through the options equals the no-hint prompt's) and her end-of-prompt reads
-(POOL_TAIL). Own reads (READS) come from a read job on the no-hint prompts: `requests` writes it.
+"assistant", "\\n"), every bullet with its FVE, layers LAYERS; `olens_placebo_inline` shows another question's own reads at
+the same positions (same option count, seeded, never its own), from READS. The two 2026-10-29 placebo smokes
+(`mcq-say-placebo-smoke10`, `-smoke10b`) predate the own reads and drew from Kylie's hinted-prompt pools instead. Own
+reads (READS) come from a read job on the no-hint prompts: `requests` writes it; `runs/olens_reads/2026-10-29_mcq-unselected-nohint`.
 
     uv run python -m cfbench.eval mcq_unselected --prep                 # split + cases -> cfbench_evals/<date>_mcq-unselected-inputs
     uv run python -m cfbench.eval mcq_unselected --show --conditions olens_placebo_inline --limit 1
@@ -54,13 +54,11 @@ QWEN, MODEL = "Qwen/Qwen3.6-27B", "the model"
 ARM = "nohint"
 SEED, N_SAMPLE, N_EVAL = 0, 4000, 2000
 MIN_SHARE = 7 / 8
-LAYERS = (32, 40, 48, 52)
+LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
-READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts (not run yet)
-POOL_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
-POOL_TAIL = REPO_ROOT / "data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail"
+READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, on HF
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n")
 CONTEXT = 40  # characters of prompt text each side of a read
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")
@@ -248,16 +246,14 @@ def _pool_items(path: Path) -> dict[str, str]:
     return {r["id"]: str(r["item"]) for r in map(json.loads, (path / "requests.jsonl").open())}
 
 
-def placebo(item: str, n_nl: int, seed: int) -> tuple[str, str]:
-    """(source of the option-newline bullets, source of the tail bullets): seeded picks from the pools, another question with
-    the same option count for the newlines, any other question for the tail."""
+def placebo(item: str, n_nl: int, seed: int) -> str:
+    """The source whose reads stand in for `item`'s: a seeded pick among the other questions in READS with the same option
+    count (so the positions match), as cutoff_qa_inline's placebo does; never the question's own."""
     rng = random.Random(f"{seed}:{item}")
-    nl_items = _pool_items(POOL_NL)
-    nl_ok = sorted(s for s, (nl, _) in _pool(POOL_NL).items() if len(nl) == n_nl and nl_items[s] != item)
-    tail_items = _pool_items(POOL_TAIL)
-    tail_ok = sorted(s for s, (_, tail) in _pool(POOL_TAIL).items() if len(tail) == len(TAIL) and tail_items[s] != item)
-    assert nl_ok and tail_ok, (item, n_nl)
-    return rng.choice(nl_ok), rng.choice(tail_ok)
+    items = _pool_items(READS)
+    ok = sorted(s for s, (nl, tail) in _pool(READS).items() if len(nl) == n_nl and len(tail) == len(TAIL) and items[s] != item)
+    assert ok, (item, n_nl)
+    return rng.choice(ok)
 
 
 def own(item: str) -> tuple[list[Pos], list[Pos]]:
@@ -292,9 +288,9 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         nl, tail = own(case["item"])
         parts += [READS_TEXT, blocks(env.text, nl, tail)]
     elif condition == "olens_placebo_inline":
-        nl_src, tail_src = placebo(case["item"], len(option_newlines(env.text)), seed)
-        parts += [READS_TEXT, blocks(env.text, _pool(POOL_NL)[nl_src][0], _pool(POOL_TAIL)[tail_src][1])]
-        extra = {"placebo_sources": [nl_src, tail_src]}
+        src = placebo(case["item"], len(option_newlines(env.text)), seed)
+        parts += [READS_TEXT, blocks(env.text, *_pool(READS)[src])]
+        extra = {"placebo_sources": [src]}
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 

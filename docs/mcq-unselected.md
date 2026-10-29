@@ -1,7 +1,7 @@
 # mcq_unselected: what will Qwen say? An unselected MMLU-Pro set, and the 2k/2k split
 
-**Status (2026-10-29):** ACTIVE. Super experimental: split and smoke only; no O-lens reads of the
-no-hint prompts yet, no full run.
+**Status (2026-10-29):** ACTIVE. Super experimental: split, reads and a placebo smoke; no full run
+yet.
 
 ## Why
 
