@@ -28,12 +28,13 @@ help? The label is Qwen's modal answer from the bank's stability gate, not the t
   modal answer; loose adds whole-word containment either way. Paired sign test over items on the
   per-item mean over draws.
 
-![transcript-only vs O-lens vs placebo, all / stale / not stale](img/cutoff-qa-inline.png)
+![transcript-only vs O-lens vs J++ and their placebos, all / stale / not stale](img/cutoff-qa-inline.png)
 
-![paired differences between conditions with 95% CIs](img/cutoff-qa-inline-diff.png)
+![paired differences between conditions with 95% CIs, grouped by question](img/cutoff-qa-inline-diff.png)
 
 (`uv run python -m graphs.cutoff_qa_inline` makes both; exact match, 95% bootstrap CIs over items,
-the second paired by item.)
+the second paired by item. This is the one cutoff chart: NLA (`nla_inline`, `nla_placebo_inline`)
+goes on it as soon as its reads and runs exist.)
 
 **Result** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
@@ -66,6 +67,17 @@ and 71% on the 23 whose reads don't (transcript-only 65.7% / 73.9%). Examples:
 (Qwen says Koji Sato, the reads say "Akio Toyoda (current CEO) – As of 2024, Toyota's CEO is Koji
 Sato", Haiku submits Akio Toyoda 3/3).
 
+**J++** (`jlens_inline`, `jlens_placebo_inline`, `jlens_inline_no60`; PR #393, runs
+`cfbench/2026-10-29_cutoff-qa-haiku-200-jlens{,-placebo,-no60}`). The J++ lens's top 3 next tokens
+at every token of the prompt, layers 32–60, ~4.5k tokens per prompt; placebo: the last n prompt
+tokens of a hint_mcq transcript's J++ read. Exact match: J++ 78%, J++ placebo 73%, O-lens − J++
++2.8pp [−2.0, +7.8]. J++ − its placebo is +5.2pp [+1.0, +9.2], but the J++ placebo is itself +6.5pp
+over transcript-only: Haiku calls its off-topic reads noise and then reasons about the model's
+training cutoff, so the J++ framing alone pushes it toward stale answers. Compare J++ with its own
+placebo only. The signal is at the last token, L60: its top 3 hold the first token of Qwen's answer
+on 101 of 200 items (other layers ≤ 33), which is close to reading Qwen's first output token.
+Dropping L60 costs 1.8pp (n.s.).
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens
@@ -85,4 +97,5 @@ Sato", Haiku submits Akio Toyoda 3/3).
 **Next.** (1) The text-inversion control above. (2) Positions: the `\n` after `<|im_end|>` alone
 carries nearly all the recall; a single-position, single-layer run is a 6x cheaper read. (3) The
 other 40 stable items, then a bigger bank (`scripts/cutoff_facts/BRIEF.md`). (4) Other investigators
-(Sonnet, GPT-6.1), and `olens_agentic` with the lens as a tool.
+(Sonnet, GPT-6.1), and `olens_agentic` with the lens as a tool. (5) NLA on the chart as soon as its
+reads exist.
