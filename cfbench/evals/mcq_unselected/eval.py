@@ -145,7 +145,7 @@ class Prompt:
     def __init__(self, item: str):
         self.messages = _mod().build(ARM, item).messages
         self.text = self.messages[-1]["content"]
-        self.opts = [o.strip() for _, o in OPTION.findall(self.text)]
+        self.opts = [m.group(2).strip() for m in options(self.text)]
         self.canon_answer = lambda text: canon(text, self.opts)
 
     def view(self, base_arm: str, cf_arm: str, rollout) -> tuple[str, str]:
@@ -206,10 +206,20 @@ common answer, so give the single most likely letter. Reason it through first, t
 letter."""
 
 
+def options(text: str) -> list[re.Match]:
+    """The option lines, in letter order from A: a question's "I. P is invertible." statement line before its options (7936,
+    10518) matches OPTION but is not option I, as the reader's own option parser (sequential letters) knows."""
+    out: list[re.Match] = []
+    for m in OPTION.finditer(text):
+        if m.group(1) == "ABCDEFGHIJKLMNOP"[len(out)]:
+            out.append(m)
+    return out
+
+
 def option_newlines(text: str) -> list[tuple[int, str]]:
     """(char offset, token) of the newline token ending each option line: "\\n", or "\\n\\n" after the last option."""
     out = []
-    for m in OPTION.finditer(text):
+    for m in options(text):
         nl = text.index("\n", m.end())
         out.append((nl, "\n\n" if text.startswith("\n\n", nl) else "\n"))
     return out
