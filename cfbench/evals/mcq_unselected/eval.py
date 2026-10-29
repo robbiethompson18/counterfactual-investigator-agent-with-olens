@@ -250,12 +250,14 @@ JLENS_TEXT = f"""\
 ## J-lens reads
 
 The J-lens (Jacobian lens) maps the model's internal activation at one token and one layer to the vocabulary: it lists the \
-tokens that activation is pushing the model toward, with the lens's probabilities. It was run at every token of the prompt \
-above as the model read it, including the chat template around the question (<|im_start|>, <|im_end|>, the "assistant" \
-header and the empty <think></think> block the model sees with its thinking mode off), at layers {", ".join(map(str, LAYERS))}. \
-The last position is the token just before the model's reply. Each position shows the token read, then one line per layer \
-with the lens's top {JLENS_K} tokens and their probabilities. Reads are noisy: at many positions the lens just predicts the \
-next word of the prompt, and the probabilities are the lens's, not the model's."""
+tokens that activation is pushing the model toward, with the lens's probabilities. It was run on the model's activations as it \
+read this exact prompt, at the newline ending each option and at the end of the prompt (the period ending the last line, the \
+end-of-turn token and the newline after it, and the start of the model's own turn: <|im_start|>, "assistant" and the newline, \
+just before it answers), at layers {", ".join(map(str, LAYERS))}. Reads are noisy: at many positions the lens just predicts \
+the next token of the prompt, and the probabilities are the lens's, not the model's.
+
+Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then one \
+line per layer with the lens's top {JLENS_K} tokens and their probabilities."""
 
 
 def options(text: str) -> list[re.Match]:
@@ -277,7 +279,7 @@ def option_newlines(text: str) -> list[tuple[int, str]]:
     return out
 
 
-Pos = tuple[str, dict[int, list[dict] | dict]]  # (token, {layer: bullets, or an NLA readout {text, fve}})
+Pos = tuple[str, dict[int, list[dict] | dict]]  # (token, {layer: O-lens bullets, an NLA readout {text, fve}, or a J++ read {top}})
 
 
 @cache
@@ -331,17 +333,34 @@ def nla_reads() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]
 
 
 @cache
-def jpp_rows() -> dict[str, list[dict]]:
-    """id -> J++ rows at LAYERS in token order (scripts/jpp_read_requests.py rows: token, layers, top), as cutoff_qa_inline's."""
+def jpp_pool() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]:
+    """Both batches' J++ reads (scripts/jpp_read_requests.py rows at every token: token, layers, top) cut to the O-lens block's
+    positions: id -> (nl, tail) with {layer: {"top": top}} per position, and id -> item. Every token of a ~200-token prompt at
+    six layers was a ~30k-token block (2026-10-29), so the J-lens is compared at the same positions as the other two lenses."""
     assert JREADS.exists(), f"no J++ reads yet: {JREADS}"
-    out: dict[str, list[dict]] = {}
+    items = _pool_items(JREADS.parent)
+    rows: dict[str, list[dict]] = defaultdict(list)
     for line in JREADS.open():
         r = json.loads(line)
+        rows[r["id"]].append(r)
+    pool: dict[str, tuple[list[Pos], list[Pos]]] = {}
+    for i, rs in rows.items():
+        rs.sort(key=lambda r: r["token_index"])
+        text = Prompt(items[i]).text
         keep = [r["layers"].index(L) for L in LAYERS]
-        out.setdefault(r["id"], []).append(r | {"layers": list(LAYERS), "top": [r["top"][k] for k in keep]})
-    for rows in out.values():
-        rows.sort(key=lambda r: r["token_index"])
-    return out
+
+        def pos(r: dict, keep: list[int] = keep) -> Pos:
+            return r["token"], {L: {"top": r["top"][k]} for L, k in zip(LAYERS, keep, strict=True)}
+
+        content = [r for r in rs if r["field"] == "content" and r["char_offset"] is not None]
+        # the row whose token covers each option newline's char (the J++ reader keeps a newline merged into a longer token)
+        nl = [pos(next(r for r in content if r["char_offset"] <= c < r["char_offset"] + len(r["token"]))) for c, _ in option_newlines(text)]
+        start = max(r["token_index"] for r in rs if r["token"] == "<|im_start|>")
+        by_index = {r["token_index"]: r for r in rs}
+        tail = [pos(by_index[k]) for k in range(start - 3, start + 3)]
+        assert tuple(t for t, _ in tail) == TAIL, (i, [t for t, _ in tail])
+        pool[i] = (nl, tail)
+    return pool, items
 
 
 def own(item: str) -> tuple[list[Pos], list[Pos]]:
@@ -353,23 +372,15 @@ def _bullets(layers: dict[int, list[dict] | dict]) -> list[str]:
     out = []
     for layer in sorted(layers):
         v = layers[layer]
-        if isinstance(v, dict):  # an NLA readout
+        if isinstance(v, dict) and "top" in v:  # a J++ read: the lens's top next tokens
+            out.append(f"- layer {layer}: " + " ".join(f"{json.dumps(t, ensure_ascii=False)} {p:.2f}" for t, p in v["top"][:JLENS_K]))
+        elif isinstance(v, dict):  # an NLA readout
             fve = f", FVE {v['fve']:.2f}" if v.get("fve") is not None else ""
             lines = [" ".join(line.split()) for line in v["text"].splitlines() if line.strip()]
             out.append(f"- layer {layer}{fve}:\n" + "\n".join(f"  {line}" for line in lines))
         else:
             out += [f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}" for b in sorted(v, key=lambda b: -b["fve"])]
     return out
-
-
-def jlens_block(rows: list[dict]) -> str:
-    """J++ rows in token order: the token, then a line per layer with the lens's top JLENS_K tokens (cutoff_qa_inline's format)."""
-    out = []
-    for r in rows:
-        out.append(json.dumps(r["token"], ensure_ascii=False))
-        for layer, top in zip(r["layers"], r["top"], strict=True):
-            out.append(f"<jlens layer={layer}>{' '.join(f'{json.dumps(t, ensure_ascii=False)} {p:.2f}' for t, p in top[:JLENS_K])}</jlens>")
-    return "\n".join(out)
 
 
 def blocks(text: str, nl: list[Pos], tail: list[Pos]) -> str:
@@ -404,12 +415,10 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         parts += [NLA_TEXT, blocks(env.text, *pool[src])]
         extra = {} if condition == "nla_inline" else {"placebo_sources": [src]}
     elif condition in ("jlens_inline", "jlens_placebo_inline"):
-        rows = jpp_rows()
-        src = request_id(case["item"])
-        if condition == "jlens_placebo_inline":  # another question's J++ reads, whole prompt, seeded, never its own
-            src = random.Random(f"{seed}:{case['item']}").choice(sorted(set(rows) - {src}))
-            extra = {"placebo_sources": [src]}
-        parts += [JLENS_TEXT, jlens_block(rows[src])]
+        pool, items = jpp_pool()
+        src = request_id(case["item"]) if condition == "jlens_inline" else placebo(pool, items, case["item"], n_nl, seed)
+        parts += [JLENS_TEXT, blocks(env.text, *pool[src])]
+        extra = {} if condition == "jlens_inline" else {"placebo_sources": [src]}
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 
