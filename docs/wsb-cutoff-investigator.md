@@ -76,6 +76,10 @@ of 10 items from the prompt alone, every draw, told or hidden (the census explai
 placebo bullets mislead it into submitting bare letters ("B") or off-topic phrases; telling it the
 model and cutoff changed nothing visible.
 
-## Haiku on the dev set
+## Haiku on the dev set (2026-10-29)
 
-Pending: `recall-haiku-dev109` (free text, hidden, prompt only vs placebo, 5 draws) fills this in.
+`recall-haiku-dev109`: the 40 dev items with a stable, non-numeric Qwen answer, free text, hidden, 5
+draws, Haiku 5.5 at medium. Prompt only 10% (20 of 200 draws), placebo reads 8.5%. With no model
+named, Haiku predicts what it would answer, mostly the truth, so it almost never lands on Qwen's
+stale value: the floor a lens has to lift. The 10% it gets are items where it guesses a 2024-style
+answer anyway.
