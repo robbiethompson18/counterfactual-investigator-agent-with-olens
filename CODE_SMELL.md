@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `environments run --backend vllm` records the env's OpenRouter provider
+
+`DEFAULTS["provider"]` (e.g. `deepinfra/fp8`) stays in the target when the backend is `vllm`, so
+`data/envs/supergpqa/2026-10-29_n8/meta.json` says `provider: deepinfra/fp8` and id
+`Qwen/Qwen3.6-27B@vllm:deepinfra/fp8` for a run served by the shared bf16 vLLM pod. The runner
+(`environments/_lib/run.py`) should drop `provider` when the backend isn't openrouter.
+
 ## 2026-10-29: `environments run` hangs forever on a request that never returns
 
 The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
@@ -12,19 +19,21 @@ error, like cfbench's predictor timeout, would let the run finish on its own.
 
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
-The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md / BASE_LINE / ASK / PROMPT
-/ PLACEBO source, so for the `*_inline` conditions it can't see the O-lens blocks (data, not code). A new eval with new
-reads reused another eval's `olens_inline` rows wholesale (2026-10-29, caught and deleted before scoring). It now also
-refuses a run with a different INLINE hook source, which still misses a change in the reads file behind the same hook;
+The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md /
+BASE_LINE / ASK / PROMPT / PLACEBO source, so for the `*_inline` conditions it can't see the O-lens
+blocks (data, not code). A new eval with new reads reused another eval's `olens_inline` rows
+wholesale (2026-10-29, caught and deleted before scoring). It now also refuses a run with a
+different INLINE hook source, which still misses a change in the reads file behind the same hook;
 hashing each built prompt into the row would close it.
 
 ## 2026-10-28: `environments run` crashes after the run when any eval can't import a stored row
 
-`environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every env run, before the HF
-upload. If a cfbench run on disk has rows whose `source` names an eval version the local checkout doesn't define (e.g.
-`mmlu_pro_pause` rows from another branch), `ITEM_INFO` raises `KeyError` and the env run exits 1 without uploading its
-episodes (three hint_mcq runs on 2026-10-28 had to be uploaded by hand with `runfolder.upload`). An env run shouldn't
-depend on every eval's item metadata; catch per eval or skip the evals build there.
+`environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every
+env run, before the HF upload. If a cfbench run on disk has rows whose `source` names an eval
+version the local checkout doesn't define (e.g. `mmlu_pro_pause` rows from another branch),
+`ITEM_INFO` raises `KeyError` and the env run exits 1 without uploading its episodes (three hint_mcq
+runs on 2026-10-28 had to be uploaded by hand with `runfolder.upload`). An env run shouldn't depend
+on every eval's item metadata; catch per eval or skip the evals build there.
 
 ## Codex found — Robbie has not yet reviewed
 
