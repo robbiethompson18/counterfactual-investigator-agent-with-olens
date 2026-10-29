@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `environments run` hangs forever on a request that never returns
+
+The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
+after every other episode is done: all three hint_mcq runs of 2026-10-28 (`rest`, `rest-b`,
+`rest-late`) sat at the tail with an idle pod until they were killed and finished by hand (status
+abandoned, labels, index, Docent and HF upload by script). A timeout that drops the episode as an
+error, like cfbench's predictor timeout, would let the run finish on its own.
+
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
 The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md / BASE_LINE / ASK / PROMPT

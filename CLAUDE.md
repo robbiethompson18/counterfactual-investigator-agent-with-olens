@@ -497,8 +497,9 @@ Current docs:
   / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; three legs moving the
-  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp [+5, +23], 50
-  items, not yet dissected)
+  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp on the 50 items
+  that found it, +6pp [+1, +11] p = 0.02 on 142 fresh ones, via a lower placebo baseline, not a
+  better lens; dropped for Kylie's inline evals)
 - [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
   — 718 consistent MMLU-Pro questions (half wrong): a linear probe at the newline after each option
   (L52) picks Qwen's own answer 94% / 80% (right / wrong questions) and the gold on wrong ones only
