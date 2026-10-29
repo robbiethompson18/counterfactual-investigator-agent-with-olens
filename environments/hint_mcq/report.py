@@ -38,10 +38,13 @@ def item_table(runs: list[str], filler: str = "none", min_consistency: float = 0
     meta: dict[str, dict] = {}
     for run in runs:
         for ep, values in labeled_episodes(run):
-            if values.get("positive") is None or ep.get("error") or not ep["arm"].startswith(prefix) or (not prefix and "/" in ep["arm"]):
+            arm = ep["arm"]
+            if prefix and arm == "nohint":
+                arm = prefix + arm  # the late/ arms reuse the plain nohint rollouts (env.py)
+            if values.get("positive") is None or ep.get("error") or not arm.startswith(prefix) or (not prefix and "/" in arm):
                 continue
-            answer = ep["messages"][-1]["content"].strip()[:1].upper()
-            by[str(ep["item"])][ep["arm"].removeprefix(prefix)].append(answer)
+            answer = values.get("answer") or ep["messages"][-1]["content"].strip()[:1].upper()  # measure() snaps words-arm replies
+            by[str(ep["item"])][arm.removeprefix(prefix)].append(answer)
             meta.setdefault(str(ep["item"]), ep["meta"])
     table = {}
     for item, arms in by.items():
