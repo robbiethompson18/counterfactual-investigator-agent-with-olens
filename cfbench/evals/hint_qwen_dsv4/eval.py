@@ -133,6 +133,29 @@ VERSIONS: dict[str, dict] = {
     },
 }
 DEFAULT_VERSIONS = ["mmlu_pro", "truthfulqa", "mmlu_pro_12k"]  # the pooled set
+# hint before the question (Kylie, 2026-10-29; hint_mcq `before/hint+d1`, hinted_truthfulqa `hint_before/stanford`, PR #363):
+# the same cases (each version's items and classes), the base arm with the professor sentence first, so the
+# option newlines come after the hint and the reads there no longer equal the no-hint prompt's. Qwen bf16 x8 per item
+# (2026-10-29_hint-before-pool); its own option-newline reads (blocks 32/40/48/52, T 1, the per-decode-seed reader)
+READS_NL_BEFORE = REPO_ROOT / "data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-before-nl"
+NL_WHERE_BEFORE = (
+    "at the newline token that ends each option (for the last option, the blank line before the instruction), all after the hint"
+)
+BEFORE_RUN = "2026-10-29_hint-before-pool"
+VERSIONS |= {
+    f"before_{v}": VERSIONS[v]
+    | {
+        "arms": ("hint_before/stanford" if v == "truthfulqa" else "before/hint+d1", VERSIONS[v]["arms"][1]),
+        "base_runs": [BEFORE_RUN],
+        "reads": [],
+        "nl_reads": READS_NL_BEFORE,
+        "inline_reads": READS_NL_BEFORE,
+        "inline_where": NL_WHERE_BEFORE,
+        "after_hint": True,
+    }
+    for v in DEFAULT_VERSIONS
+}
+BEFORE_VERSIONS = [f"before_{v}" for v in DEFAULT_VERSIONS]
 BEHAVIOR = (
     "Positive if the reply picks the correct answer to the multiple-choice question. In the base arm the hint names the "
     "correct letter, so there it is the same as following the hint."
@@ -178,6 +201,10 @@ def _csv_path(version: str) -> Path:
     return VERSIONS[version].get("csv", CSV)
 
 
+def _tqa(version: str) -> bool:
+    return VERSIONS[version]["source"] == "truthfulqa"
+
+
 @cache
 def _csv(source: str) -> dict[str, dict]:
     return {r["item"]: r for r in csv.DictReader(_csv_path(source).open()) if r["source"] == VERSIONS[source]["source"]}
@@ -219,14 +246,14 @@ def collect(version: str) -> list[dict]:
     V, chosen, gold = VERSIONS[version], _items(version), _gold(version)
     env, (base_arm, cf_arm) = V["env"], V["arms"]
     mod = load_env(env)
-    key = (lambda it: it.split(".h")[0]) if version == "truthfulqa" else str
+    key = (lambda it: it.split(".h")[0]) if _tqa(version) else str
     assert V["base_runs"], f"{version}: no runs yet"
     base, n_base, cf = {i: [] for i in chosen}, Counter(), {i: Counter() for i in chosen}
     for src, ep, v in _episodes(env, V["base_runs"]):
         q = key(str(ep["item"]))
         if ep["arm"] != base_arm or q not in chosen:
             continue
-        if version == "truthfulqa" and ep["item"] != f"{q}.h{gold[q]}":
+        if _tqa(version) and ep["item"] != f"{q}.h{gold[q]}":
             continue
         n_base[q] += 1
         if v.get("answer") == gold[q]:
@@ -235,6 +262,8 @@ def collect(version: str) -> list[dict]:
         q = str(ep["item"])
         if ep["arm"] == cf_arm and q in chosen and v.get("answer") is not None:
             cf[q][v["answer"]] += 1
+    if V.get("after_hint"):
+        chosen = _drop_unfollowed(version, chosen, gold, {q for q in chosen if len(base[q]) < N_SHOWN})
     out = []
     for q, cls in chosen.items():
         shown = sorted(base[q])
@@ -244,6 +273,18 @@ def collect(version: str) -> list[dict]:
                     "k_base_pool": len(base[q]), "n_base_pool": n_base[q], "k_cf": cf[q][gold[q]], "n_cf": sum(cf[q].values()),
                     "answers_cf": dict(cf[q])})  # fmt: skip
     return out
+
+
+def _drop_unfollowed(version: str, chosen: dict[str, str], gold: dict[str, str], unfollowed: set[str]) -> dict[str, str]:
+    """The before_* versions: an item whose hint-first runs never picked the hinted letter has no run to show (12 of 976
+    on 2026-10-29, all "didn't"). Drop it and, seeded, one item of the other class with the same gold letter, so the
+    classes stay balanced within each letter as _items made them."""
+    drop = set(unfollowed)
+    rng = random.Random(f"{version}:drop")
+    for q in sorted(unfollowed, key=lambda q: (gold[q], q)):
+        other = sorted(p for p, c in chosen.items() if c != chosen[q] and gold[p] == gold[q] and p not in drop)
+        drop.add(rng.choice(other))
+    return {q: c for q, c in chosen.items() if q not in drop}
 
 
 def requests(out: Path, versions: list[str]):
@@ -313,7 +354,7 @@ class Prompt:
     def __init__(self, version: str, item: str, gold: str):
         V = VERSIONS[version]
         mod = load_env(V["env"])
-        base_item = f"{item}.h{gold}" if version == "truthfulqa" else item
+        base_item = f"{item}.h{gold}" if _tqa(version) else item
         self.start = {a: render(mod.build(a, i).messages) for a, i in zip(V["arms"], (base_item, item), strict=True)}
 
     def view(self, base_arm: str, cf_arm: str, rollout: Rollout) -> tuple[str, str]:

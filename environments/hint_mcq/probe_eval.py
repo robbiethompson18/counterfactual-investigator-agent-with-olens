@@ -41,19 +41,26 @@ VERSIONS = {
     "truthfulqa": ("hinted_truthfulqa", "hint/stanford"),
     "mmlu_pro_12k": ("hint_mcq", "hint+d1"),
 }
+# hint before the question (cfbench hint_qwen_dsv4 before_*): the option newlines come after the hint, so the probe reads
+# hinted activations there; the equality check then measures how far the hint moved them
+VERSIONS |= {
+    "before_mmlu_pro": ("hint_mcq", "before/hint+d1"),
+    "before_truthfulqa": ("hinted_truthfulqa", "hint_before/stanford"),
+    "before_mmlu_pro_12k": ("hint_mcq", "before/hint+d1"),
+}
 HIDDEN = 52  # hidden_states index (the output of block 51): the frozen probe's
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
 LETTERS = "ABCDEFGHIJKLMNOP"
 
 
 def _base_item(version: str, item: str, gold: str) -> str:
-    return f"{item}.h{gold}" if version == "truthfulqa" else item
+    return f"{item}.h{gold}" if version.endswith("truthfulqa") else item
 
 
 def _sites(text: str, version: str) -> list[int]:
     """Char index of the newline after each option's text in the rendered hinted prompt (the last option ends at the
     "\\n\\n" before the hint)."""
-    pat = (lambda L: f"\n{L}. ") if version.startswith("mmlu_pro") else (lambda L: f"\n({L}) ")
+    pat = (lambda L: f"\n{L}. ") if "mmlu_pro" in version else (lambda L: f"\n({L}) ")
     starts = [text.index(pat(L)) for L in LETTERS if pat(L) in text]
     return [*starts[1:], text.index("\n\n", starts[-1])]
 
@@ -116,7 +123,7 @@ def prep(a):
 
 def _cached_no_hint(version: str, item: str) -> np.ndarray | None:
     """The cached no-hint nl activations of an item at HIDDEN, if it was in the probe's MMLU-Pro run or the TruthfulQA run."""
-    run = TRAIN if version == "mmlu_pro" else TQA
+    run = TRAIN if version.removeprefix("before_") == "mmlu_pro" else TQA
     opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
     idx = [i for i, o in enumerate(opts) if str(o["item"]) == item]
     if not idx:
