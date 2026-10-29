@@ -153,6 +153,21 @@ VARIANTS = {
         for k in ("c", "p")
         for e in ("", "_noenv")
     },
+    # the same with a plain search_contacts tool instead of the named contacts.csv (Kylie, 2026-10-29)
+    **{
+        f"core{d}_fwd{k}{e}_sc": [
+            *(["no_done", "no_criterion"] if d else []),
+            "harness",
+            "direct" if d else "ask",
+            *(["no_env"] if e else []),
+            "contacts_tool",
+            "fwd",
+            *(["conf"] if k == "c" else []),
+        ]
+        for d in ("", "_direct")
+        for k in ("c", "p")
+        for e in ("", "_noenv")
+    },
     "core_askfile_env": ["harness", "ask", "askfile", "env_cc"],  # the user's message names the file instead
     # core harness + formal task (= asst_formal), its one-edit CFs, the same with a done tool, other tool-list formats
     "core_formal": ["no_done", "no_criterion", "harness"],
