@@ -179,7 +179,7 @@ async def main():
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
                 try:
                     result = await predict(
-                        predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task, grader(args.task, case, env)
+                        predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task, grade=grader(args.task, case, env)
                     )
                     break
                 # the wrapper already retried status errors, empty choices and bad JSON; a dropped connection surfaces raw
