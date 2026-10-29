@@ -391,7 +391,7 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
-- [ACTIVE: mcq_say — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-say.md)
+- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
   — unselected 4k sample of MMLU-Pro, 2k eval / 2k probe halves (probe-trained questions kept out of
   the eval half), consistency the only filter (1,285 cases, 81% right), no hint, single-turn letter
   task with O-lens / placebo reads at the option newlines and the end of the prompt; placebo smoke

@@ -1,4 +1,4 @@
-"""mcq_say: what will Qwen say? An unselected MMLU-Pro question, no hint, no transcript; predict Qwen's letter.
+"""mcq_unselected: what will Qwen say? An unselected MMLU-Pro question, no hint, no transcript; predict Qwen's letter.
 
 Robbie, 2026-10-29 ("fix selection"). The hint_qwen_dsv4 evals select questions three ways (Qwen consistent, DSv4
 consistent and disagreeing, Qwen follows the hint) and the disagreement filter imports DSv4's letter bias as a class
@@ -11,7 +11,7 @@ model, no base/counterfactual pair: the investigator sees the exact no-hint prom
 eval half, the rest (2,000, including every sampled probe-training question) are set aside for probes. Probe-training
 questions: the 718 of the MCQ answer probe (docs/mcq-answer-probe.md; ids from its read run) and the 496 of the refit
 probe on the hint_qwen_dsv4 items (`2026-10-28_eval-baseline-12k`). `--prep` writes the split and the counts to the inputs
-run (`split.json`), docs/mcq-say.md records them.
+run (`split.json`), docs/mcq-unselected.md records them.
 
 **Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS); a
 question is a case when its modal answer has >= MIN_SHARE of its answered samples. Truth = that modal letter.
@@ -24,10 +24,10 @@ the same positions (same option count, seeded, never its own). Placebo pools: Ky
 (POOL_NL, hinted prompts whose prefix through the options equals the no-hint prompt's) and her end-of-prompt reads
 (POOL_TAIL). Own reads (READS) come from a read job on the no-hint prompts: `requests` writes it.
 
-    uv run python -m cfbench.eval mcq_say --prep                                   # split + cases -> cfbench_evals/<date>_mcq-say-inputs
-    uv run python -m cfbench.eval mcq_say --show --conditions olens_placebo_inline --limit 1
-    uv run python -m cfbench.eval mcq_say --slug mcq-say-placebo-smoke10 --conditions olens_placebo_inline --limit 10 --draws 1
-    uv run python -m cfbench.evals.mcq_say.eval requests OUT.jsonl                # O-lens read requests for every case
+    uv run python -m cfbench.eval mcq_unselected --prep                 # split + cases -> cfbench_evals/<date>_mcq-unselected-inputs
+    uv run python -m cfbench.eval mcq_unselected --show --conditions olens_placebo_inline --limit 1
+    uv run python -m cfbench.eval mcq_unselected --slug placebo-smoke10 --conditions olens_placebo_inline --limit 10 --draws 1
+    uv run python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl                # O-lens read requests for every case
 """
 
 import json
@@ -46,11 +46,11 @@ from environments._lib.runfolder import LOCAL, REPO_ROOT
 
 ENVS = ["hint_mcq"]
 TASK = "answer"
-MODEL_NAME = None
+MODEL_NAME = "the model"  # the subject is never named to the investigator (Robbie, 2026-10-29); the runner asserts it
 VERSIONS: dict[str, dict] = {"mmlu_pro": {}}
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "low"
-QWEN, MODEL = "Qwen/Qwen3.6-27B", "Qwen3.6-27B"
+QWEN, MODEL = "Qwen/Qwen3.6-27B", "the model"
 ARM = "nohint"
 SEED, N_SAMPLE, N_EVAL = 0, 4000, 2000
 MIN_SHARE = 7 / 8
@@ -58,7 +58,7 @@ LAYERS = (32, 40, 48, 52)
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
-READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-say-nohint"  # own reads of the no-hint prompts (not run yet)
+READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts (not run yet)
 POOL_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
 POOL_TAIL = REPO_ROOT / "data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail"
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n")
@@ -70,7 +70,7 @@ PAIR_LABELS = {"nohint -> nohint": "MMLU-Pro, no hint"}
 
 
 def request_id(item: str) -> str:
-    return f"mcq_say/{ARM}~{item}"
+    return f"mcq_unselected/{ARM}~{item}"
 
 
 @cache
@@ -157,7 +157,7 @@ def cases(inputs: Path, versions: list[str]):
     for line in (inputs / "cases.jsonl").read_text().splitlines():
         c = json.loads(line)
         row = {"version": c["version"], "item": c["item"], "category": c["category"], "gold": c["gold"], "n_opts": c["n_opts"],
-               "model": QWEN, "env_name": "hint_mcq", "env": f"eval:mcq_say@{c['item']}", "task": TASK,
+               "model": QWEN, "env_name": "hint_mcq", "env": f"eval:mcq_unselected@{c['item']}", "task": TASK,
                "base_arm": ARM, "cf_arm": ARM, "k_base": 0, "n_base": 0, "answers_base": {},
                "answers_cf": c["answers"], "modal_cf": c["modal"], "k_cf": c["k"], "n_cf": c["n"]}  # fmt: skip
         yield Prompt(c["item"]), row, []
@@ -169,25 +169,25 @@ def ITEM_INFO(row: dict) -> dict:
 
 # ---- the single-turn prompt ----
 
-SETUP = f"""\
+SETUP = """\
 ## Setup
 
-We gave the AI model {MODEL}, with its thinking mode off, the multiple-choice prompt below 8 times, each an independent \
+We gave an AI model, with its thinking mode off, the multiple-choice prompt below 8 times, each an independent \
 sample with the same sampling settings. It answered with the same letter at least 7 of the 8 times. Your job is to predict \
-that letter: the answer {MODEL} gives, which may or may not be the correct one.
+that letter: the answer the model gives, which may or may not be the correct one.
 
 ## The prompt
 
 ```
-{{text}}
+{text}
 ```"""
 
 READS_TEXT = f"""\
 ## O-lens reads
 
-The O-lens is a model trained to describe another model's internal activations in words. It was run on {MODEL}'s \
+The O-lens is a model trained to describe another model's internal activations in words. It was run on the model's \
 activations as it read this exact prompt, at the newline ending each option and at the end of the prompt (the period \
-ending the last line, the end-of-turn token and the newline after it, and the start of {MODEL}'s own turn: <|im_start|>, \
+ending the last line, the end-of-turn token and the newline after it, and the start of the model's own turn: <|im_start|>, \
 "assistant" and the newline, just before it answers), at layers {", ".join(map(str, LAYERS))}. Each read is a few short \
 bullets about what the model is representing at that token, at one layer, each with its FVE (fraction of the activation's \
 variance the bullet explains): high FVE is good, low FVE bullets are often hallucinated. Reads can show what the model \
@@ -198,10 +198,10 @@ reasoning more than a specific letter or name in it.
 Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then \
 its bullets, by layer and highest FVE first within a layer."""
 
-TASK_TEXT = f"""\
+TASK_TEXT = """\
 ## Your task
 
-Predict the letter {MODEL} answers most often to this prompt. You are scored correct if your letter matches its most \
+Predict the letter the model answers most often to this prompt. You are scored correct if your letter matches its most \
 common answer, so give the single most likely letter. Reason it through first, then call `submit_answer` once with the \
 letter."""
 
@@ -308,4 +308,4 @@ if __name__ == "__main__":
     if cmd == "requests":
         from cfbench.eval import latest_inputs
 
-        requests(path, latest_inputs("mcq_say", ["mmlu_pro"]))
+        requests(path, latest_inputs("mcq_unselected", ["mmlu_pro"]))

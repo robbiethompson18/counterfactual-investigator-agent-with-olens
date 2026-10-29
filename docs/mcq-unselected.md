@@ -1,4 +1,4 @@
-# mcq_say: what will Qwen say? An unselected MMLU-Pro set, and the 2k/2k split
+# mcq_unselected: what will Qwen say? An unselected MMLU-Pro set, and the 2k/2k split
 
 **Status (2026-10-29):** ACTIVE. Super experimental: split and smoke only; no O-lens reads of the
 no-hint prompts yet, no full run.
@@ -16,8 +16,8 @@ the plain question: given the prompt, what letter will Qwen say?
 
 ## The split (earmarked data)
 
-Drawn once by `cfbench/evals/mcq_say/eval.py` (`SEED` 0) and written to the inputs run
-`runs/cfbench_evals/2026-10-29_mcq-say-inputs/split.json` on HF:
+Drawn once by `cfbench/evals/mcq_unselected/eval.py` (`SEED` 0) and written to the inputs run
+`runs/cfbench_evals/2026-10-29_mcq-unselected-inputs/split.json` on HF:
 
 - `random.Random(0).sample(items(), 4000)` over all 12,032 MMLU-Pro test questions in
   `environments/hint_mcq/env.py`'s item order (all 14 categories, not only the seven of the 2,200
@@ -56,7 +56,8 @@ Single turn, no tools but `submit_answer`, Gemini 3.8 Flash at effort low
 (`core.INLINE_CONDITIONS`):
 
 - `transcript_inline`: the exact no-hint prompt, the setup (8 samples, agreed >= 7 times), "predict
-  the letter Qwen3.6-27B gives, which may or may not be the correct one". No transcript exists; the
+  the letter the model gives, which may or may not be the correct one". The subject is never named
+  (`MODEL_NAME`; the runner asserts the id never reaches the predictor). No transcript exists; the
   condition name is cfbench's.
 - `olens_inline`: plus O-lens reads at the newline ending each option and at the end of the prompt
   (the instruction's ".", `<|im_end|>`, `\n`, `<|im_start|>`, `assistant`, `\n`), layers
@@ -72,13 +73,14 @@ probe, trained on the probe half; Qwen's own letter logprob as the ceiling.
 
 ## Runs
 
-- `runs/cfbench_evals/2026-10-29_mcq-say-inputs`: split + cases.
+- `runs/cfbench_evals/2026-10-29_mcq-unselected-inputs`: split + cases (identical to the first
+  build, `2026-10-29_mcq-say-inputs`, made before the eval was renamed from `mcq_say`).
 - `runs/cfbench/2026-10-29_mcq-say-placebo-smoke10`: 10 cases, placebo condition only, 1 draw, for
   Robbie to review the prompt in Docent before anything else runs.
 
 ## Open items
 
-- Own reads: `python -m cfbench.evals.mcq_say.eval requests OUT.jsonl` writes the read requests, but
-  their end-of-prompt positions are incomplete (see the TODO in `requests()`): pass explicit token
-  positions as Kylie's tail job did.
+- Own reads: `python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl` writes the read
+  requests, but their end-of-prompt positions are incomplete (see the TODO in `requests()`): pass
+  explicit token positions as Kylie's tail job did.
 - The prompt wording is a first draft Robbie expects to tweak after the smoke.
