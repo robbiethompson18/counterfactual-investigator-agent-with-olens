@@ -19,15 +19,15 @@ question is a case when its modal answer has >= MIN_SHARE of its answered sample
 **Conditions** (single turn, `core.INLINE_CONDITIONS`, Gemini 3.8 Flash at INLINE_EFFORT, no tools but submit):
 `transcript_inline` is the prompt alone (there is no transcript: the name is cfbench's); `olens_inline` adds O-lens reads
 at the newline ending each option and at the end of the prompt (the instruction's ".", <|im_end|>, "\\n", <|im_start|>,
-"assistant", "\\n"), every bullet with its FVE, layers LAYERS; `olens_placebo_inline` shows another question's bullets at
-the same positions (same option count, seeded, never its own). Placebo pools: Kylie's option-newline reads
-(POOL_NL, hinted prompts whose prefix through the options equals the no-hint prompt's) and her end-of-prompt reads
-(POOL_TAIL). Own reads (READS) come from a read job on the no-hint prompts: `requests` writes it.
+"assistant", "\\n"), every bullet with its FVE, layers LAYERS; `olens_placebo_inline` shows another question's own reads at
+the same positions (same option count, seeded, never its own), from READS. The two 2026-10-29 placebo smokes
+(`mcq-say-placebo-smoke10`, `-smoke10b`) predate the own reads and drew from Kylie's hinted-prompt pools instead. Own
+reads (READS) come from a read job on the no-hint prompts: `requests` writes it; `runs/olens_reads/2026-10-29_mcq-unselected-nohint`.
 
     uv run python -m cfbench.eval mcq_unselected --prep                 # split + cases -> cfbench_evals/<date>_mcq-unselected-inputs
     uv run python -m cfbench.eval mcq_unselected --show --conditions olens_placebo_inline --limit 1
     uv run python -m cfbench.eval mcq_unselected --slug placebo-smoke10 --conditions olens_placebo_inline --limit 10 --draws 1
-    uv run python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl                # O-lens read requests for every case
+    uv run --with transformers --with jinja2 python -m cfbench.evals.mcq_unselected.eval requests OUT.jsonl   # O-lens read requests
 """
 
 import json
@@ -54,13 +54,11 @@ QWEN, MODEL = "Qwen/Qwen3.6-27B", "the model"
 ARM = "nohint"
 SEED, N_SAMPLE, N_EVAL = 0, 4000, 2000
 MIN_SHARE = 7 / 8
-LAYERS = (32, 40, 48, 52)
+LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
-READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts (not run yet)
-POOL_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
-POOL_TAIL = REPO_ROOT / "data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail"
+READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, on HF
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n")
 CONTEXT = 40  # characters of prompt text each side of a read
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")
@@ -145,7 +143,7 @@ class Prompt:
     def __init__(self, item: str):
         self.messages = _mod().build(ARM, item).messages
         self.text = self.messages[-1]["content"]
-        self.opts = [o.strip() for _, o in OPTION.findall(self.text)]
+        self.opts = [m.group(2).strip() for m in options(self.text)]
         self.canon_answer = lambda text: canon(text, self.opts)
 
     def view(self, base_arm: str, cf_arm: str, rollout) -> tuple[str, str]:
@@ -206,10 +204,20 @@ common answer, so give the single most likely letter. Reason it through first, t
 letter."""
 
 
+def options(text: str) -> list[re.Match]:
+    """The option lines, in letter order from A: a question's "I. P is invertible." statement line before its options (7936,
+    10518) matches OPTION but is not option I, as the reader's own option parser (sequential letters) knows."""
+    out: list[re.Match] = []
+    for m in OPTION.finditer(text):
+        if m.group(1) == "ABCDEFGHIJKLMNOP"[len(out)]:
+            out.append(m)
+    return out
+
+
 def option_newlines(text: str) -> list[tuple[int, str]]:
     """(char offset, token) of the newline token ending each option line: "\\n", or "\\n\\n" after the last option."""
     out = []
-    for m in OPTION.finditer(text):
+    for m in options(text):
         nl = text.index("\n", m.end())
         out.append((nl, "\n\n" if text.startswith("\n\n", nl) else "\n"))
     return out
@@ -238,16 +246,14 @@ def _pool_items(path: Path) -> dict[str, str]:
     return {r["id"]: str(r["item"]) for r in map(json.loads, (path / "requests.jsonl").open())}
 
 
-def placebo(item: str, n_nl: int, seed: int) -> tuple[str, str]:
-    """(source of the option-newline bullets, source of the tail bullets): seeded picks from the pools, another question with
-    the same option count for the newlines, any other question for the tail."""
+def placebo(item: str, n_nl: int, seed: int) -> str:
+    """The source whose reads stand in for `item`'s: a seeded pick among the other questions in READS with the same option
+    count (so the positions match), as cutoff_qa_inline's placebo does; never the question's own."""
     rng = random.Random(f"{seed}:{item}")
-    nl_items = _pool_items(POOL_NL)
-    nl_ok = sorted(s for s, (nl, _) in _pool(POOL_NL).items() if len(nl) == n_nl and nl_items[s] != item)
-    tail_items = _pool_items(POOL_TAIL)
-    tail_ok = sorted(s for s, (_, tail) in _pool(POOL_TAIL).items() if len(tail) == len(TAIL) and tail_items[s] != item)
-    assert nl_ok and tail_ok, (item, n_nl)
-    return rng.choice(nl_ok), rng.choice(tail_ok)
+    items = _pool_items(READS)
+    ok = sorted(s for s, (nl, tail) in _pool(READS).items() if len(nl) == n_nl and len(tail) == len(TAIL) and items[s] != item)
+    assert ok, (item, n_nl)
+    return rng.choice(ok)
 
 
 def own(item: str) -> tuple[list[Pos], list[Pos]]:
@@ -282,24 +288,34 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         nl, tail = own(case["item"])
         parts += [READS_TEXT, blocks(env.text, nl, tail)]
     elif condition == "olens_placebo_inline":
-        nl_src, tail_src = placebo(case["item"], len(option_newlines(env.text)), seed)
-        parts += [READS_TEXT, blocks(env.text, _pool(POOL_NL)[nl_src][0], _pool(POOL_TAIL)[tail_src][1])]
-        extra = {"placebo_sources": [nl_src, tail_src]}
+        src = placebo(case["item"], len(option_newlines(env.text)), seed)
+        parts += [READS_TEXT, blocks(env.text, *_pool(READS)[src])]
+        extra = {"placebo_sources": [src]}
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 
 
 def requests(out: Path, inputs: Path):
-    """The O-lens read requests for every case: the no-hint prompt, read at the option newlines and the assistant header
-    (generation_prompt + turn_starts 2: <|im_start|>, "assistant", "\\n"). TODO before the real read job: the instruction's "."
-    and <|im_end|> are not in this set (turn_starts replaces the default stop-token positions); Kylie's tail job passed explicit
-    token `positions` computed with the tokenizer (2026-10-29_hint-qwen-dsv4-tail/requests.jsonl); do the same here."""
+    """The O-lens read requests for every case: the no-hint prompt, read at the option newlines (`option_newlines`, which adds
+    to the row's other positions) and at the six TAIL tokens as explicit `positions`: token indices into the request rendered
+    as the reader renders it (`render_request`, `generation_prompt`), the three tokens each side of the last <|im_start|>, as
+    Kylie's tail job (2026-10-29_hint-qwen-dsv4-tail). Not `turn_starts`: it replaces the row's positions instead of adding.
+    Needs the tokenizer: `uv run --with transformers --with jinja2 python -m cfbench.evals.mcq_unselected.eval requests OUT`."""
+    from transformers import AutoTokenizer
+
+    from counterfactual_investigator_agent_with_olens.render import render_request
+
+    tok = AutoTokenizer.from_pretrained(QWEN)
+    im_start = tok.convert_tokens_to_ids("<|im_start|>")
     with out.open("w") as f:
         for line in (inputs / "cases.jsonl").read_text().splitlines():
             c = json.loads(line)
             row = {"id": request_id(c["item"]), "env": "hint_mcq", "arm": ARM, "item": c["item"], "tools": None, "priority": 1,
-                   "messages": Prompt(c["item"]).messages, "option_newlines": True, "generation_prompt": True, "turn_starts": 2,
-                   "last_turn_only": True}  # fmt: skip
+                   "messages": Prompt(c["item"]).messages, "option_newlines": True, "generation_prompt": True}  # fmt: skip
+            _, ids, _ = render_request(tok, row)
+            start = max(i for i, t in enumerate(ids) if t == im_start)
+            row["positions"] = list(range(start - 3, start + 3))
+            assert [tok.decode([ids[i]]) for i in row["positions"]] == list(TAIL), (row["id"], row["positions"])
             f.write(json.dumps(row) + "\n")
 
 
