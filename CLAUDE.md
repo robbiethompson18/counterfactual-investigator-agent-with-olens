@@ -552,10 +552,9 @@ Current docs:
   placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
   answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
-  — bank v2: 803 present-tense questions gated on Qwen (266 stable, 187 stable-wrong), v1: 1,072
-  dated ones (14% stable); asking present tense with no date is what fires the stale trap (2% →
-  32%); label = `qwen_modal`, truth is metadata, numeric items dropped (240 stable live); how the
-  Sonnet subagents, `merge.py` and the gate (PR #382) made them; how to generate more
+  — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
+  `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
+  agents made it and how to make more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything
