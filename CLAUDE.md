@@ -391,6 +391,11 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
+  — unselected 4k sample of MMLU-Pro, 2k eval / 2k probe halves (probe-trained questions kept out of
+  the eval half), consistency the only filter (1,285 cases, 81% right), no hint, single-turn letter
+  task with O-lens / placebo reads at the option newlines and the end of the prompt; placebo smoke
+  on Docent, own reads not run
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
   — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
   `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
@@ -540,6 +545,11 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
+- [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
+  — bank v2: 803 present-tense questions gated on Qwen (266 stable, 187 stable-wrong), v1: 1,072
+  dated ones (14% stable); asking present tense with no date is what fires the stale trap (2% →
+  32%); label = `qwen_modal`, truth is metadata, no numeric answers; how the Sonnet subagents,
+  `merge.py` and the gate (PR #382) made them; how to generate more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything

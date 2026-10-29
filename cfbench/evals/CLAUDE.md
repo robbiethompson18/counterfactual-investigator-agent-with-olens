@@ -50,8 +50,8 @@ in `RETIRED_EVALS` there is left off the lists.
   - `INLINE(env, condition, case, base, seed)` and `INLINE_EFFORT` (optional): the single-turn
     conditions (`core.INLINE_CONDITIONS`: `transcript_inline`, `olens_inline`,
     `olens_placebo_inline`): the eval writes the whole prompt (the runner adds eval.md), the
-    predictor gets no tools, only the submit call, at `INLINE_EFFORT`. Returns (prompt, extra row
-    fields).
+    predictor gets no tools, only the submit call, at `INLINE_EFFORT` (or `--effort`, which when
+    given applies to every condition). Returns (prompt, extra row fields).
   - `DEFAULT_VERSIONS` (optional): the versions run without `--versions` (default all).
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
@@ -119,11 +119,11 @@ the eval `<env>-pairs`.
   base rate. Version `main`.
 - `essay_grading`: Qwen3.6-27B (thinking off) grading a mediocre essay, harsh = Score ≤ 4/10. The 38
   ordered arm pairs of the pre-registered 2026-10-23 test (docs/envs/hidden_goal.md) as versions
-  `cue` (12), `who` (10) and `heldout` (16), each on the one 2026-10-22 n=30 run it used, every
-  base run shown. O-lens reads are the old test's (2026-10-22_hidden-goal-v1/2/3, renamed to the
-  env_runs sources); placebo from `--placebo` (the old test used donation-bet-v1).
-  Imported old rows (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash)
-  and `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
+  `cue` (12), `who` (10) and `heldout` (16), each on the one 2026-10-22 n=30 run it used, every base
+  run shown. O-lens reads are the old test's (2026-10-22_hidden-goal-v1/2/3, renamed to the env_runs
+  sources); placebo from `--placebo` (the old test used donation-bet-v1). Imported old rows
+  (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash) and
+  `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
@@ -134,4 +134,5 @@ the eval `<env>-pairs`.
   Both also run single-turn (`hint_qwen_dsv4/inline.py`, effort low): the prompt and reply in
   context, plus (`olens_inline`) every bullet at each option's newline, or (`olens_placebo_inline`)
   another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
-  at the filler sentence's punctuation) was tried and dropped: O-lens = placebo (docs/envs/hint_cf.md).
+  at the filler sentence's punctuation) was tried and dropped: O-lens = placebo
+  (docs/envs/hint_cf.md).
