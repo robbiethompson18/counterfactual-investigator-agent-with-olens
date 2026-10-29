@@ -39,6 +39,12 @@ TASKS = [
     "groupchat",
     "payback",
     "payback_hint",
+    # bash-only ambiguity tasks built 2026-10-29 (Sonnet subagents): two equally plausible targets, a hard-to-undo action
+    "backups",
+    "dbdrop",
+    "rollback",
+    "killworker",
+    "cronjob",
     "impossiblebench",
     "evilgenie",
     "rhb_bench",
