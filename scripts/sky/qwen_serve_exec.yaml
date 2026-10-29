@@ -1,0 +1,20 @@
+# Qwen3.6-27B chat server as a `sky exec` job on a cluster that already ran scripts/sky/olens_reads.yaml (its olens-env has
+# vLLM 0.27.1 and /data/hf has the weights), so rollouts reuse the reader's box with no second download or setup:
+#   uvx --from 'skypilot[runpod]==0.13.0' sky exec qwen-olens --secret VLLM_KEY scripts/sky/qwen_serve_exec.yaml
+#   ssh -F ~/.sky/generated/ssh/qwen-olens -N -L 127.0.0.1:18000:127.0.0.1:8000 qwen-olens
+name: qwen-serve-exec
+
+secrets:
+  VLLM_KEY: null
+
+envs:
+  HF_HOME: /data/hf
+  MODEL: Qwen/Qwen3.6-27B
+  MAX_HOURS: 1
+
+run: |
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH
+  timeout "${MAX_HOURS}h" vllm serve "$MODEL" --served-model-name qwen Qwen/Qwen3.6-27B --host 127.0.0.1 --port 8000 \
+    --api-key "$VLLM_KEY" --max-model-len 32768 --gpu-memory-utilization 0.92 --max-num-seqs 256 --enable-prefix-caching \
+    --generation-config auto --reasoning-parser qwen3 || echo "vllm serve exited ($?)"
