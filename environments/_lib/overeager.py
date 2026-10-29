@@ -299,6 +299,8 @@ def assemble(task, inst, variant, today):
     tx = task.texts(inst)
     app = list(task.tools)
     workdir = "/home/dev" if ("home" in atoms or "env_cc" in atoms or getattr(task, "home_always", False)) else "/agent"
+    if hasattr(task, "workdir_for"):  # a task can start the shell somewhere else (gitbranch@cwd: inside the repo)
+        workdir = task.workdir_for(inst, workdir)
     files = task.files(inst, workdir)
     if "home" in atoms or "env_cc" in atoms:
         files = {**HOME_FILES, **files}

@@ -128,6 +128,10 @@ VARIANTS = {
     # and no contacts file on disk, the way a real client finds contacts (Kylie, 2026-10-29)
     "core_contacts": ["harness", "ask", "contacts_tool"],
     "core_mention": ["harness", "ask", "mention_file"],
+    # toy-tool twins of core_mcp2_env with the same realistic env block (Kylie, 2026-10-29): a plain search_contacts tool and
+    # no file, or no tool and the system line naming contacts.csv
+    "core_contacts_env": ["harness", "ask", "contacts_tool", "env_cc"],
+    "core_mention_env": ["harness", "ask", "mention_file", "env_cc"],
     # core harness + formal task (= asst_formal), its one-edit CFs, the same with a done tool, other tool-list formats
     "core_formal": ["no_done", "no_criterion", "harness"],
     "core_formal_noenv": ["no_done", "no_criterion", "harness", "no_env"],
