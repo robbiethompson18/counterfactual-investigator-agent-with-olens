@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `environments run --backend vllm` records the env's OpenRouter provider
+
+`DEFAULTS["provider"]` (e.g. `deepinfra/fp8`) stays in the target when the backend is `vllm`, so
+`data/envs/supergpqa/2026-10-29_n8/meta.json` says `provider: deepinfra/fp8` and id
+`Qwen/Qwen3.6-27B@vllm:deepinfra/fp8` for a run served by the shared bf16 vLLM pod. The runner
+(`environments/_lib/run.py`) should drop `provider` when the backend isn't openrouter.
+
 ## 2026-10-29: a run's labels file is picked five different ways
 
 Codex's finding 6 below covers `latest_labels()` choosing a run's labels file by mtime. The choice
