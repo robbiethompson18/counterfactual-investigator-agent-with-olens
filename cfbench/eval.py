@@ -14,8 +14,9 @@ place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PR
 rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's), OLENS: overrides of the
 O-lens tools' defaults (`context: "xml"` also rewrites the prompt's read-marker sentence), and for the single-turn
 core.INLINE_CONDITIONS: INLINE(env, condition, case, base, seed) -> (the prompt up to and including "## Your task", extra
-row fields) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one submit call) unless --effort is given, which
-then applies to every condition, and DEFAULT_VERSIONS: the versions
+row fields; `case["inputs"]` is the inputs run dir) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one
+submit call) unless --effort is given, which then applies to every condition, SYSTEM: a system prompt in place of the task's
+(knowledge_cutoff), and DEFAULT_VERSIONS: the versions
 run when --versions isn't given (default all). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
@@ -33,7 +34,7 @@ from pathlib import Path
 
 import openai
 
-from cfbench import olens
+from cfbench import answer, olens
 from cfbench.core import (
     HARNESS_VERSION,
     INLINE_CONDITIONS,
@@ -44,7 +45,7 @@ from cfbench.core import (
     build_prompt,
     pick_examples,
 )
-from cfbench.predict import EFFORT, predict
+from cfbench.predict import EFFORT, grader, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -178,7 +179,7 @@ async def main():
         return ev.PROMPT(prompt, case) if hasattr(ev, "PROMPT") else prompt
 
     def inline_prompt(env, case: dict, base: list, condition: str, seed: int) -> tuple[str, dict]:
-        prompt, extra = ev.INLINE(env, condition, case, base, seed)
+        prompt, extra = ev.INLINE(env, condition, case | {"inputs": str(inputs)}, base, seed)
         return with_notes(prompt, notes), extra
 
     if args.show:
@@ -243,6 +244,7 @@ async def main():
             "prompt_hook": prompt_src,
             "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
             "inline_hook": inline_src,
+            "system": getattr(ev, "SYSTEM", None),
             "reuse": args.reuse,
         },
     )
@@ -276,7 +278,10 @@ async def main():
         async with slots:
             for attempt in range(3):
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, effort, task)
+                    system = getattr(ev, "SYSTEM", None)
+                    result = await predict(
+                        predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
+                    )
                     break
                 except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
@@ -286,8 +291,7 @@ async def main():
             for m in getattr(ev, "MODEL_IDS", [case["model"]]):
                 assert not re.search(re.escape(m), json.dumps(result["messages"])), m
         if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
-            canon = env.canon_answer(result["answer"]) if result["valid"] else None
-            result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
+            result |= answer.grade(env, case, result["answer"]) if result["valid"] else {"canon": None, "correct": None}
         row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
         row |= {"effort": effort} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}

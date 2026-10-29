@@ -27,7 +27,7 @@ from pathlib import Path
 
 import openai
 
-from cfbench import jlens, olens
+from cfbench import answer, jlens, olens
 from cfbench.core import (
     CONDITIONS,
     HARNESS_VERSION,
@@ -41,7 +41,7 @@ from cfbench.core import (
     build_prompt,
     pick_examples,
 )
-from cfbench.predict import EFFORT, predict
+from cfbench.predict import EFFORT, grader, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -178,7 +178,9 @@ async def main():
         async with slots:
             for attempt in range(3):  # a rare provider 400 (Gemini: "reasoning details to be preserved") shouldn't kill the run
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task)
+                    result = await predict(
+                        predictor, prompt, tools, args.max_calls if tools else 0, args.effort, args.task, grade=grader(args.task, case, env)
+                    )
                     break
                 # the wrapper already retried status errors, empty choices and bad JSON; a dropped connection surfaces raw
                 except (openai.APIStatusError, openai.APIConnectionError, openrouter.NoChoices, json.JSONDecodeError) as e:
@@ -186,8 +188,7 @@ async def main():
             else:
                 return  # left out of predictions.jsonl; rerun with --skip to fill it
         if args.task == "answer":
-            canon = env.canon_answer(result["answer"]) if result["valid"] else None
-            result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
+            result |= answer.grade(env, case, result["answer"]) if result["valid"] else {"canon": None, "correct": None}
         row = {
             **case,
             "harness_version": HARNESS_VERSION,

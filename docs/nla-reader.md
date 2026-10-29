@@ -1,6 +1,8 @@
-# NLA reader: Camila's multilayer NLA on the one engine, the critic as a separate job
+# NLA reader: Camila's all-layer NLA on the one engine, the critic as a separate job
 
-**Status (2026-10-27):** ACTIVE. First run on the hint_mcq transcripts; numbers below are from it.
+**Status (2026-10-29):** ACTIVE. The reader now loads the all-layer NLA
+(`agu18dec/qwen3.6-27b-all-layer-nla-rl2000`); the first-run numbers below are from the 11-layer one
+(`camilablank/qwen3.6-27b-multilayer-nla-rl600`) and haven't been redone.
 
 The NLA (natural language autoencoder, [Anthropic 2026](https://transformer-circuits.pub/2026/nla/))
 has two halves: the AV (verbalizer) writes a free-text `<explanation>` of one activation, and the AR
@@ -10,21 +12,22 @@ runs the AV on the same vLLM engine that captures the activations
 beside the reads; the critic, a separate full-size model, scores them later as its own job. No
 second engine in the reader, one model per pod.
 
-## Which NLA (survey, 2026-10-27)
+## Which NLA (survey, 2026-10-27; all-layer row 2026-10-29)
 
 Every Qwen3.6-27B NLA on HF, plus what Slack says about them:
 
-| checkpoint                                                                                                          | layers        | AV                                                 | critic                                     | quality                                     | date      |
-| ------------------------------------------------------------------------------------------------------------------- | ------------- | -------------------------------------------------- | ------------------------------------------ | ------------------------------------------- | --------- |
-| [ceselder/qwen3.6-27b-nla-L42](https://huggingface.co/ceselder/qwen3.6-27b-nla-L42)                                 | 42            | two r128 LoRAs (SFT then RL), stacked              | 43-block full fine-tune, 36 GB             | 74.5% held-out FVE                          | Jul 8     |
-| [ceselder/qwen3.6-27b-nla-rl](https://huggingface.co/ceselder/qwen3.6-27b-nla-rl)                                   | 42            | LoRA checkpoints to RL step 800                    | full model                                 | 78% FVE                                     | Jul 21    |
-| [camilablank/qwen3.6-27b-multilayer-nla-rl600](https://huggingface.co/camilablank/qwen3.6-27b-multilayer-nla-rl600) | 20..60 step 4 | one r128 rsLoRA, all modules, layer tag            | 61-block full fine-tune, 48 GB, 5120² head | WSB 0.754 (O-lens 0.768), frozen-AR FVE 68% | Oct 12    |
-| Camila's all-layer NLA (Slack #research-log-o-lens, Oct 23)                                                         | all 64        | same recipe                                        | same                                       | ≈ the 11-layer one per layer                | not on HF |
-| [adamjb111](https://huggingface.co/adamjb111) `nld27-grpo-qwen35-2b-…` (Adam Bricknell, LISA)                       | 42            | Qwen3.5-2B student, activation → 4 embedding slots | scored with ceselder's 27B AR              | FVE 0.736 vs teacher 0.754                  | Oct 13    |
+| checkpoint                                                                                                               | layers        | AV                                                 | critic                                     | quality                                                                            | date   |
+| ------------------------------------------------------------------------------------------------------------------------ | ------------- | -------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------- | ------ |
+| [ceselder/qwen3.6-27b-nla-L42](https://huggingface.co/ceselder/qwen3.6-27b-nla-L42)                                      | 42            | two r128 LoRAs (SFT then RL), stacked              | 43-block full fine-tune, 36 GB             | 74.5% held-out FVE                                                                 | Jul 8  |
+| [ceselder/qwen3.6-27b-nla-rl](https://huggingface.co/ceselder/qwen3.6-27b-nla-rl)                                        | 42            | LoRA checkpoints to RL step 800                    | full model                                 | 78% FVE                                                                            | Jul 21 |
+| [camilablank/qwen3.6-27b-multilayer-nla-rl600](https://huggingface.co/camilablank/qwen3.6-27b-multilayer-nla-rl600)      | 20..60 step 4 | one r128 rsLoRA, all modules, layer tag            | 61-block full fine-tune, 48 GB, 5120² head | WSB 0.754 (O-lens 0.768), frozen-AR FVE 68%                                        | Oct 12 |
+| [agu18dec/qwen3.6-27b-all-layer-nla-rl2000](https://huggingface.co/agu18dec/qwen3.6-27b-all-layer-nla-rl2000) (Camila's) | 0..63         | same recipe, RL to step 2000                       | 64-block full fine-tune, 51 GB, 5120² head | ≥ RL600 on WSB at every layer; any ladder layer 0.778 vs 0.758; held-out FVE 75.8% | Oct 28 |
+| [adamjb111](https://huggingface.co/adamjb111) `nld27-grpo-qwen35-2b-…` (Adam Bricknell, LISA)                            | 42            | Qwen3.5-2B student, activation → 4 embedding slots | scored with ceselder's 27B AR              | FVE 0.736 vs teacher 0.754                                                         | Oct 13 |
 
-We use Camila's: it reads the same layer grid as the agu18dec lens, so NLA and O-lens reads line up
-position for position, and it is the best-validated one (Celeste on her own L42 NLA, Oct 22: "I just
-yolo'd it for the external community"). The 2B student is the speed option (a 4 GB engine, ~10x
+We use Camila's all-layer NLA since 2026-10-29 (its model card recommends it for readouts over the
+11-layer RL600). Both cover the agu18dec lens's layer grid, so NLA and O-lens reads line up position
+for position, and Camila's are the best-validated Qwen NLAs (Celeste on her own L42 NLA, Oct 22: "I
+just yolo'd it for the external community"). The 2B student is the speed option (a 4 GB engine, ~10x
 cheaper decode) if we ever want 8-sample consensus at scale. Nothing NLA-new for Qwen appeared from
 Celeste after July; her October releases (Kimi K3, Muse Spark, DeepSeek V4.1 Flash, GLM 5.3) are
 oracle lenses.
@@ -34,7 +37,7 @@ LoRA, so I checked whether the shipped critic is base plus a low-rank delta (SVD
 and one GDN weight difference against the base): no rank cliff (64th and 65th singular values 0.40
 and 0.40, 193 directions above 1% of the top one), and the layer norms and GDN decay parameters
 changed too. It was fully fine-tuned after the LoRA stage. Every Qwen NLA critic is a separate 36 to
-49 GB model, so FVE means a second model somewhere; we put it in a separate job rather than a second
+51 GB model, so FVE means a second model somewhere; we put it in a separate job rather than a second
 engine.
 
 ## How it runs
@@ -48,12 +51,19 @@ engine.
 - `--save-acts` (always on for `nla`) appends each decoded read's activation to `OUT.acts.bf16` (one
   5120-value bf16 row) and gives the row `act_index`; cached copies of a prefix share it.
 - `scripts/nla_score.py READS.jsonl` loads the critic through transformers (prefill only,
-  left-padded batches of 64, 48 GB), runs the `critic` template on every distinct `act_index`, and
-  rewrites the file with `fve` and `cos`. FVE is the paper's, `1 - ||p - v||² / E||v - μ||²` with
-  `p` and `v` at norm √d and `μ`, `E` from the run's own activations per layer; the per-layer means
-  and counts go into `reads.provenance.json`.
+  left-padded batches of 64, 51 GB; transformers takes the 64-block depth from `ar/config.json`),
+  runs the `critic` template on every distinct `act_index`, and rewrites the file with `fve` and
+  `cos`. FVE is the paper's, `1 - ||p - v||² / E||v - μ||²` with `p` and `v` at norm √d and `μ`, `E`
+  from the run's own activations per layer; the per-layer means and counts go into
+  `reads.provenance.json`.
 - Pod: `runpod/nla_reads.sh setup|run|status|fetch|stop|score` (same image and volume as the O-lens
-  reads; `setup` adds the AV adapter, `score` downloads the critic once to the volume).
+  reads; `setup` adds the AV adapter, `score` downloads the critic once to the volume). The
+  all-layer NLA lives in `/workspace/olens_ckpt/nla64` and `/workspace/lora_vllm/nla64_av`, not the
+  11-layer one's `mlnla` dirs (`setup` skips converting an AV that is already there). If the volume
+  fills up, those two `mlnla` dirs (~55 GB) are the ones to delete.
+- The pooled whiteners behind `fve` exist for layers 0, 4, ..., 60 and 63 only, and
+  `runpod/olens_reads.sh setup` fetches 20..60 step 4: reads at other layers need their whiteners
+  fetched from `agu18dec/local-workspace`, or have no pooled ruler.
 
 ## First run: hint_mcq stop tokens (`runs/nla_reads/2026-10-27_hint-mcq-nla`)
 
