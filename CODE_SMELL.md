@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-28: `environments run` crashes after the run when any eval can't import a stored row
+
+`environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every env run, before the HF
+upload. If a cfbench run on disk has rows whose `source` names an eval version the local checkout doesn't define (e.g.
+`mmlu_pro_pause` rows from another branch), `ITEM_INFO` raises `KeyError` and the env run exits 1 without uploading its
+episodes (three hint_mcq runs on 2026-10-28 had to be uploaded by hand with `runfolder.upload`). An env run shouldn't
+depend on every eval's item metadata; catch per eval or skip the evals build there.
+
 ## Codex found — Robbie has not yet reviewed
 
 **2026-10-28: Environment grading review.** The 17 findings in this section were identified by Codex

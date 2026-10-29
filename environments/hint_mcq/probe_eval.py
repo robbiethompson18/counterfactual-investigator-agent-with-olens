@@ -36,7 +36,11 @@ from environments.hint_mcq.probe import CACHE, MODEL, _fit_listwise, _softmax_by
 TRAIN = Path("data/runs/mcq_answer_probe/2026-10-28_scale2k")  # the probe's MMLU-Pro run (questions, options, nl.npy cache)
 TQA = Path("data/runs/mcq_answer_probe/2026-10-28_tqa-oos")  # cached TruthfulQA activations (its edited prompt = the hinted prefix)
 FOLLOW = Path("environments/hint_mcq/twomodel_qwen_dsv4_follow.csv")
-VERSIONS = {"mmlu_pro": ("hint_mcq", "hint+d1"), "truthfulqa": ("hinted_truthfulqa", "hint/stanford")}
+VERSIONS = {
+    "mmlu_pro": ("hint_mcq", "hint+d1"),
+    "truthfulqa": ("hinted_truthfulqa", "hint/stanford"),
+    "mmlu_pro_12k": ("hint_mcq", "hint+d1"),
+}
 HIDDEN = 52  # hidden_states index (the output of block 51): the frozen probe's
 KNEW, DIDNT = "Qwen/Qwen3.6-27B (knew)", "Qwen/Qwen3.6-27B (didn't)"
 LETTERS = "ABCDEFGHIJKLMNOP"
@@ -49,7 +53,7 @@ def _base_item(version: str, item: str, gold: str) -> str:
 def _sites(text: str, version: str) -> list[int]:
     """Char index of the newline after each option's text in the rendered hinted prompt (the last option ends at the
     "\\n\\n" before the hint)."""
-    pat = (lambda L: f"\n{L}. ") if version == "mmlu_pro" else (lambda L: f"\n({L}) ")
+    pat = (lambda L: f"\n{L}. ") if version.startswith("mmlu_pro") else (lambda L: f"\n({L}) ")
     starts = [text.index(pat(L)) for L in LETTERS if pat(L) in text]
     return [*starts[1:], text.index("\n\n", starts[-1])]
 
@@ -101,7 +105,8 @@ def prep(a):
         offs = enc["offset_mapping"]
         nl = [next(i for i, (s, e) in enumerate(offs) if s <= ch < e) for ch in ends]
         toks = [tok.decode([enc["input_ids"][p]]) for p in nl]
-        assert toks[:-1] == ["\n"] * (n_opts - 1) and toks[-1] == "\n\n", (c["item"], toks)
+        # a few MMLU-Pro options end in a stray "\n" (8326: "B. ...\n\n") or a space (9461: " \n\n"): the site token varies
+        assert all(t.strip(" ") in ("\n", "\n\n") for t in toks) and toks[-1].strip(" ") == "\n\n", (c["item"], toks)
         inputs.append({"id": f"{c['version']}/{c['item']}", "ids": enc["input_ids"], "sites": {"nl": nl}, "cand": [enc["input_ids"][-1]]})
         meta.append({k: c[k] for k in ("version", "item", "class", "gold", "answers_cf")} | {"n_opts": n_opts})
     (run / "hs_inputs.jsonl").write_text("".join(json.dumps(x) + "\n" for x in inputs))

@@ -45,6 +45,14 @@ in `RETIRED_EVALS` there is left off the lists.
   - `OLENS` (optional): overrides of the O-lens tools' defaults for this eval, e.g.
     `{"min_fve": 0.0}` to show every bullet (each still with its FVE); `cfbench/olens.py` `Lens`
     fields.
+  - `OLENS` may also set `context: "xml"`: hits show ~10 tokens each side with the read token
+    wrapped, `not a foo<read>,</read> a bar`, in place of `⟨READ⟩` (and the prompt says so).
+  - `INLINE(env, condition, case, base, seed)` and `INLINE_EFFORT` (optional): the single-turn
+    conditions (`core.INLINE_CONDITIONS`: `transcript_inline`, `olens_inline`,
+    `olens_placebo_inline`): the eval writes the whole prompt (the runner adds eval.md), the
+    predictor gets no tools, only the submit call, at `INLINE_EFFORT`. Returns (prompt, extra row
+    fields).
+  - `DEFAULT_VERSIONS` (optional): the versions run without `--versions` (default all).
   - `LINKS(row)` (optional): per prediction, links for the env viewer's card, e.g.
     `{"transcript": {"env", "run", "episode"}, "O-lens reads": {"dataset", "item"}}`; an episode
     gets its Docent URL from the env's `links.json`.
@@ -111,3 +119,7 @@ the eval `<env>-pairs`.
   P(Qwen answers correctly without the hint), scored as % right at p >= 0.5 (its own score.py; the
   page's claim table shows % right). `letter`: the answer task, name Qwen's no-hint letter (reads
   hint_qwen_dsv4's inputs). Versions `mmlu_pro` and `truthfulqa` sources, pooled into one 86/86 set.
+  Both also run single-turn (`hint_qwen_dsv4/inline.py`, effort low): the prompt and reply in
+  context, plus (`olens_inline`) every bullet at each option's newline, or (`olens_placebo_inline`)
+  another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
+  at the filler sentence's punctuation) was tried and dropped: O-lens = placebo (docs/envs/hint_cf.md).

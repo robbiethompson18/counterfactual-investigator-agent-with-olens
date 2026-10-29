@@ -9,7 +9,8 @@ is (docs/envs/hint_cf.md). Thinking off is required: with CoT the own answer ten
 Arms: `nohint`, `hint+d1` (the hint names the gold letter), `hint+d2` (a fixed random other letter), and the same three
 with a filler sentence between the question and the hint (`pause/...`: "Take your time and consider each option.", factor
 `filler`; the filler experiment, docs/envs/hint_cf.md). Items: 200 MMLU-Pro test items from the knowledge-heavy categories
-(seeded sample; items 200:2200 are the 2026-10-28 scale-up, a second seeded sample of the same pool). Measures:
+(seeded sample; items 200:2200 are the 2026-10-28 scale-up, a second seeded sample of the same pool; items 2200: are the
+rest of the MMLU-Pro test split, every category, shuffled, for the full no-hint census). Measures:
 `positive` = the reply's letter is the hinted one
 (never for nohint; None when no letter is found), `answer` (the letter), `correct` (= gold).
 
@@ -60,11 +61,12 @@ def _table() -> pd.DataFrame:
 
         PARQUET.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(hf_hub_download("TIGER-Lab/MMLU-Pro", "data/test-00000-of-00001.parquet", repo_type="dataset"), PARQUET)
-    pool = pd.read_parquet(PARQUET)
-    pool = pool[pool.category.isin(CATEGORIES)]
+    test = pd.read_parquet(PARQUET)
+    pool = test[test.category.isin(CATEGORIES)]
     base = _sample(pool, N_ITEMS, 0)  # unchanged: same ids, same d2 letters as every stored run
     extra = _sample(pool[~pool.question_id.isin(base.question_id)], N_EXTRA, 1)
-    df = pd.concat([base, extra], ignore_index=True)
+    rest = test[~test.question_id.isin(pd.concat([base, extra]).question_id)]
+    df = pd.concat([base, extra, _sample(rest, len(rest), 2)], ignore_index=True)
     df["question_id"] = df.question_id.astype(str)
     return df.set_index("question_id", drop=False)
 

@@ -56,7 +56,8 @@ the read transcripts next to it):
   each hit's char in this condition. `search_olens(regex, over="bullets")` runs the regex over the
   bullets' own text instead (every bullet at every read, `top_k` ignored, `min_fve` kept) and
   returns only the matching bullets, so the agent can find lens content the transcript never says
-  (harness version 2). Every hit shows the run's text in `<transcript>` (`⟨READ⟩` at the read token;
+  (harness version 2). Every hit shows the run's text in `<transcript>` (`⟨READ⟩` at the read token,
+  or with an eval's `OLENS` `context: "xml"` the token wrapped in `<read></read>`, version 12;
   search hits stop at the edges of the read's message field) and the lens output in
   `<olens layer=… fve=…>` (version 6).
 - `olens_placebo_agentic`: the same tools, answered from a run of a different env at the same

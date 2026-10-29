@@ -478,6 +478,17 @@ survivor selection and its own gate (not redone: the gate is about the prompt te
 barely changes); OpenRouter reports $0 cost on the new key, so per-run spend is unknown (the same
 runs cost ~$2 each on the old key).
 
+### Filler reads in the one-turn eval: O-lens = placebo (2026-10-28, NULL, dropped)
+
+The hint_qwen_dsv4 evals' single-turn conditions (`cfbench/evals/hint_qwen_dsv4/inline.py`, Gemini 3.8 Flash effort
+low) on a `pause/` version: bf16 Qwen `pause/nohint` + `pause/hint+d1` x8 on the eval's 162 MMLU-Pro items
+(`envs/hint_mcq/2026-10-28_pause-bf16-evalitems`), re-filtered with the twomodel criteria on the pause arms and
+balanced (48 knew + 48 didn't), O-lens reads at the pre-hint "\n\n" after the options, the filler's "." and the "\n\n"
+before the hint (`runs/olens_reads/2026-10-28_hint-qwen-dsv4-pause`, layers 32/40/48/52). Knew: transcript 59.4% /
+O-lens 67.7% / placebo 66.7%; letter: 52.1 / 47.9 / 56.2 (`runs/cfbench/2026-10-28_hint-qwen-dsv4{,-letter}-pause-inline-low`;
+the `-pause-inline` high-effort runs were stopped part-way). The reads mostly paraphrase "take your time" (median best
+bullet FVE 0.05). Dropped from the eval; the option-newline block is the one that beats placebo (cfbench/evals/CLAUDE.md).
+
 ### Redo at lens temperature 1 (2026-10-27 evening)
 
 Every read above was decoded greedily (temperature 0), the WeirdChat viewer's default that the batch

@@ -28,6 +28,10 @@ NLA_CONDITIONS = ("nla_agentic", "nla_placebo_agentic")  # the O-lens tools over
 LENS_CONDITIONS = (*OLENS_CONDITIONS, *JLENS_CONDITIONS, *NLA_CONDITIONS)
 TOOL_CONDITIONS = ("transcript_agentic", *LENS_CONDITIONS)  # the predictor investigates the base-arm runs with tools
 CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
+# single-turn conditions an eval builds its own prompt for (its INLINE hook, cfbench/eval.py): no tools, one submission.
+# Not the retired two-transcript `transcript` condition (transcript_inline_retired below), which pasted hand-picked runs
+# into build_prompt's prompt; these are per-eval prompts (cfbench/evals/hint_qwen_dsv4/inline.py, 2026-10-28)
+INLINE_CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
 # two hand-picked runs is a weaker investigator, not a control for the tool conditions. Never compare the tool conditions
@@ -70,6 +74,7 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # changed (the "answer is X" / lone-capital / option-text rules); other evals' prompts and tools are unchanged (2026-10-28).
 # 11: an eval's OLENS overrides the O-lens tools' defaults; hint_qwen_dsv4 (+letter) show every bullet (min_fve 0, the
 # option-newline reads mostly score under 0.1). Other evals' tools are byte-identical to 10 (2026-10-28).
+# 12 landed twice, on disjoint evals (two branches, merged 2026-10-29); both changes are version 12:
 # 12: an eval's own placebo (PLACEBO, sources=) shows the reads on the shown run's own transcript, not on the reads
 # source's: prompt positions at their place (the prompts must be identical), reply positions moved to the same relative
 # place in the shown reply. Before, its tools showed the source transcript's text around each read, which differs once
@@ -77,7 +82,11 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # before 10 and 11 landed, which change no other eval, and are relabelled 12). Only that placebo's output changed.
 # Also in 12: a read row marked `header` (a turn's own template token, af_which_pair_real's <｜User｜> / <|user|>) sits on the
 # turn's "USER:" label, not at its first character; no other env's rows have the mark.
-HARNESS_VERSION = 12
+# 12: hint_qwen_dsv4 (+letter) O-lens tool hits show ~10 tokens each side with the read token wrapped in <read></read>
+# (OLENS context="xml") where they had ⟨READ⟩, and the prompt says so; the INLINE_CONDITIONS are new (those evals only);
+# predictions rows record token usage. Every other eval's prompts and tools are byte-identical to 11 (2026-10-28).
+# 13: the INLINE_CONDITIONS run at effort low (Kylie), not high; nothing else changes (2026-10-28).
+HARNESS_VERSION = 13
 
 
 @dataclass

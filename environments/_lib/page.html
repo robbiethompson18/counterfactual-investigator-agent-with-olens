@@ -734,15 +734,19 @@ const CONDS = {
   transcript_agentic: ["transcript tools", "var(--c-ts)", "transcript"],
   olens_agentic: ["transcript + O-lens tools", "var(--c-olens)", "O-lens"],
   olens_placebo_agentic: ["transcript + O-lens placebo", "var(--c-placebo)", "placebo"],
+  // the single-turn conditions have their own eval pages (hint_qwen_dsv4_inline), so they take the same colours
+  transcript_inline: ["transcript in context, one turn (no tools)", "var(--c-ts)", "transcript"],
+  olens_inline: ["transcript + O-lens reads in context, one turn", "var(--c-olens)", "O-lens"],
+  olens_placebo_inline: ["transcript + another question's O-lens reads (placebo), one turn", "var(--c-placebo)", "placebo"],
   probe: ["linear probe of the model's answer (deterministic, no investigator)", "var(--c-probe)", "probe"],
 };
 // each condition's % right minus transcript tools' over the same items (environments/_lib/evals.py paired_vs)
 function pairedTable(rows, caption) {
   if (!rows || !rows.length) return "";
   const sgn = v => (v >= 0 ? "+" : "") + (100 * v).toFixed(1);
-  return `<p class="lede">${caption} Paired by item (an item's score = the mean over its draws): the difference in % right with a 95% bootstrap CI over items, the sign test over the items that differ (better / worse), two-sided and one-sided (the condition beats transcript tools).</p>
+  return `<p class="lede">${caption} Paired by item (an item's score = the mean over its draws): the difference in % right with a 95% bootstrap CI over items, the sign test over the items that differ (better / worse), two-sided and one-sided (the condition beats the one in the vs column).</p>
     <div class="scroll"><table><tr><th>condition</th><th>vs</th><th>items</th><th>Δ % right [95% CI]</th><th>better / worse</th><th>p (two-sided)</th><th>p (one-sided, &gt;)</th></tr>
-    ${condOrder(rows.map(x => x.condition)).map(c => rows.find(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(condShort(x.ref))}</td><td class="num">${x.n}</td>
+    ${condOrder([...new Set(rows.map(x => x.condition))]).flatMap(c => rows.filter(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(condShort(x.ref))}</td><td class="num">${x.n}</td>
       <td class="num"><b>${sgn(x.diff)}</b> <span class="mute">[${sgn(x.ci[0])}, ${sgn(x.ci[1])}]</span></td><td class="num">${x.better} / ${x.worse}</td>
       <td class="num">${x.p_two < 0.001 ? x.p_two.toExponential(1) : x.p_two.toFixed(3)}</td><td class="num"><b>${x.p_one < 0.001 ? x.p_one.toExponential(1) : x.p_one.toFixed(3)}</b></td></tr>`).join("")}</table></div>`;
 }
@@ -1116,7 +1120,7 @@ async function evalPage(h) {
       <td class="mono">${R.predictors.map(esc).join("<br>")}<br><span class="mute">effort ${esc(R.effort)} · ${R.max_calls} calls</span></td><td>${R.n_cases}</td>
       ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(R.correct[k])}</b>`}</td>`).join("")}<td class="num">${pct(R.correct_null)}</td></tr>`).join("")}</table></div>
     ${ev.answer_paired?.pooled && !h.run ? "</div></details>" : ""}
-    ${ev.answer_paired && !h.run ? pairedTable(ev.answer_paired.rows, `Against transcript tools, pooled over ${ev.answer_paired.runs.map(esc).join(" + ")}.`) : ""}` : "";
+    ${ev.answer_paired && !h.run ? pairedTable(ev.answer_paired.rows, `Paired comparisons, pooled over ${ev.answer_paired.runs.map(esc).join(" + ")}.`) : ""}` : "";
   const ansSections = {};
   for (const R of ans) for (const g of R.groups.filter(keep)) (ansSections[[g.env, g.version || "", g.base, g.cf].join("\u0000")] ??= []).push([R, g]);
   const ansBody = Object.values(ansSections).map(gs => {
@@ -1167,7 +1171,7 @@ async function evalPage(h) {
     ${claim.length ? questionTable([...claim], h) : ""}
     ${runs.length ? `${runs.map(R => rmseCiBlock(R.rmse, R.rmse_null, R.boot, `${esc(R.slug)} · harness v${R.harness_version}`)).join("")}
       ${ev.pooled && !h.run && !h.env ? rmseCiBlock(ev.pooled.rmse, ev.pooled.rmse_null, ev.pooled.boot, `pooled over ${ev.pooled.runs.length} runs`) : ""}
-      ${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ans.length ? questionTable([...ans], h) : ""}${ansBody}
+      ${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ans.length ? questionTable([...ans], h) : ""}${ansBody ? `<details class="sec"><summary>Per dataset and run: every item's draws</summary><div class="body">${ansBody}</div></details>` : ""}
     ${older.length ? `<details class="sec"><summary>Older runs (${older.length}): superseded by the runs above</summary><div class="body"><ul>${older.map(R =>
       `<li><a class="mono" href="#${hashOf({eval: h.eval, run: R.run})}">${esc(R.slug)}</a> <span class="mute">${esc(R.date)} · ${R.n_cases} cases · ${R.versions ? esc(R.versions.join(", ")) : ""}${R.inputs ? ` · inputs ${esc(R.inputs)}` : ""}</span></li>`).join("")}</ul></div></details>` : ""}`;
 }
@@ -1195,7 +1199,7 @@ function accuracyBars(rows) {
 // claim evals whose score.py reports % right (guess = p >= 0.5, e.g. hint_qwen_dsv4): that is the headline, AUROC second
 function accuracyTable(t, models) {
   const ci = c => c ? ` <span class="mute">[${c.map(v => pct(v)).join(", ")}]</span>` : "";
-  const rows = t.rows.map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(x.version)}</td><td class="num">${x.n_items}</td>
+  const rows = condOrder([...new Set(t.rows.map(x => x.condition))]).flatMap(c => t.rows.filter(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(x.version)}</td><td class="num">${x.n_items}</td>
     <td class="num"><b>${pct(x.accuracy)}</b>${ci(x.accuracy_ci)}</td>
     ${models.map(m => `<td class="num">${x.accuracy_by_class?.[m] == null ? "–" : pct(x.accuracy_by_class[m])}</td>`).join("")}
     <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
@@ -1205,7 +1209,7 @@ function accuracyTable(t, models) {
     <p class="lede">% of guesses right (guess = p ≥ 0.5; classes balanced, so chance is 50%, dashed), with a 95% bootstrap CI over items; per class; AUROC of p (calibration-free); Brier for reference.</p>
     <div class="scroll"><table><tr><th>investigator</th><th>version</th><th>items</th><th>% right [95% CI]</th>
       ${models.map(m => `<th>% right on<br><span class="mono">${esc(shortModel(m))}</span></th>`).join("")}<th>AUROC</th><th>Brier (reference)</th><th>invalid</th></tr>${rows}</table></div>
-    ${Object.entries(t.paired || {}).map(([v, ps]) => pairedTable(ps, `Against transcript tools, ${esc(v)}.`)).join("")}`;
+    ${Object.entries(t.paired || {}).map(([v, ps]) => pairedTable(ps, `Paired comparisons, ${esc(v)}.`)).join("")}`;
 }
 function claimSection(ev, claim, keep, h) {
   const faker = m => (claim.flatMap(R => R.groups).find(g => g.model === m) || {}).k_cf === 1;
