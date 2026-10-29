@@ -194,6 +194,7 @@ async def main():
         return
     # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
     # fields are re-taken from this run's case, since the investigator never sees them
+    inline_src = inspect.getsource(ev.INLINE) if hasattr(ev, "INLINE") else None
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
     reuse = {}
     for path in filter(None, args.reuse.split(",")):
@@ -203,6 +204,8 @@ async def main():
         assert old.get("ask") == ask_src, f"{path}: ASK differs"
         assert old.get("prompt_hook") == prompt_src, f"{path}: PROMPT differs"
         assert old.get("placebo_hook") == (inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None), f"{path}: PLACEBO differs"
+        # the INLINE prompt's O-lens blocks aren't in the key: a different hook (another eval's reads) must not reuse rows
+        assert old.get("inline_hook") == inline_src or not inline, f"{path}: INLINE differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -234,6 +237,7 @@ async def main():
             "ask": ask_src,
             "prompt_hook": prompt_src,
             "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
+            "inline_hook": inline_src,
             "reuse": args.reuse,
         },
     )
