@@ -89,7 +89,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 - [REFERENCE: cutoff_qa_inline — read before claiming the O-lens predicts Qwen's stale answers, or rerunning the end-of-prompt investigator smoke](cutoff-qa-inline.md)
   — Haiku 5.5 predicting Qwen's modal answer from the question: O-lens 81% vs transcript-only 67% vs
   placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
-  answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
+  answer at the `\n` after `<|im_end|>` (176/200); with a required submit_answer tool call (answer
+  20 tokens past the last read) the gap holds: 76% vs 58% vs 62%; the lens-shares-Qwen's-cutoff
+  caveat
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)
