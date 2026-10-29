@@ -8,6 +8,9 @@ the recipe's k and template, so this reproduces it on the OpenRouter copy of the
             strictly more samples than every other option.
   answer    Qwen just answers the user turn (thinking off), k samples: per-sample gold hit, strict win over the k. The label is
             Qwen's own stable answer (>= 7 of 10 samples at the bank's gate), so this is the gate re-run on this copy of the model.
+  mcq       the question as a 5-way multiple choice over the bank's `options` (A-E, bank order), "Answer with just the letter.";
+            each letter is scored as its option's text, so the regex rule and summary are the same (wsb/cutoff_investigator.py's
+            MCQ labels come from this arm).
 
     source .envrc.local && uv run python -m wsb.knowledge_cutoff --arm answer --k 10 --limit 3     # smoke
     uv run python -m wsb.knowledge_cutoff --arm describe --k 5
@@ -53,7 +56,9 @@ TEMPLATE = (
     "What would a language model be thinking about on this token? Please write me a summary "
     "for this token."
 )
-MAX_TOKENS = {"describe": 256, "answer": 64}  # describe: the lens's max_new 256; answer: "just the <answer_type>"
+MAX_TOKENS = {"describe": 256, "answer": 64, "mcq": 8}  # describe: the lens's max_new 256; answer: "just the <answer_type>"
+LETTERS = "ABCDE"
+MCQ_TAIL = "If you are not sure, give your best guess. Answer with just the letter."
 
 # ---------------------------------------------------------------------------------------------------------------------------
 # Port of their knowledge_cutoff/score.py: per-option span forms, exclusive longest match, strict win
@@ -147,8 +152,29 @@ def strict_win(counts: Mapping[str, int], gold: str) -> bool:
 # ---------------------------------------------------------------------------------------------------------------------------
 
 
+def render_mcq(item: dict) -> str:
+    """The question over the bank's 5 options in bank order, their p1 template's closing sentence with "the letter"."""
+    opts = "\n".join(f"{c}. {o}" for c, o in zip(LETTERS, item["options"], strict=True))
+    return f"{item['question']}\n\n{opts}\n\n{MCQ_TAIL}"
+
+
+def mcq_letter(text: str) -> str | None:
+    m = re.search(r"\b([A-E])\b", text.strip().upper())
+    return m.group(1) if m else None
+
+
+def as_text(item: dict, arm: str, response: str) -> str:
+    """What the regex scorer sees: the reply itself, or for the mcq arm the text of the option its letter names."""
+    if arm != "mcq":
+        return response
+    letter = mcq_letter(response)
+    return item["options"][LETTERS.index(letter)] if letter else ""
+
+
 def prompt(item: dict, arm: str) -> str:
-    return TEMPLATE.format(prefix=item["prefix"], token=item["token"]) if arm == "describe" else item["user"]
+    if arm == "describe":
+        return TEMPLATE.format(prefix=item["prefix"], token=item["token"])
+    return render_mcq(item) if arm == "mcq" else item["user"]
 
 
 class Pacer:
@@ -240,7 +266,7 @@ def summarize(items: list[dict], scored: dict[str, dict], arm: str, k: int, rows
 
 async def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--arm", choices=["describe", "answer"], required=True)
+    ap.add_argument("--arm", choices=["describe", "answer", "mcq"], required=True)
     ap.add_argument("--k", type=int, default=5, help="samples per item (one cell)")
     ap.add_argument("--limit", type=int, default=0, help="first k items (0 = all 109)")
     ap.add_argument("--items", help="comma-separated item ids instead of --limit")
@@ -298,7 +324,7 @@ async def main():
     scored = {}
     for it in items:
         mine = [r for r in rows if r["id"] == it["id"]]
-        scored[it["id"]] = s = score_item(it, [r["response"] for r in mine])
+        scored[it["id"]] = s = score_item(it, [as_text(it, args.arm, r["response"]) for r in mine])
         view.add(
             id=it["id"],
             labels={"strict_win": s["strict_win"], "any_gold": s["any_gold"], "label_type": it["label_type"], "stratum": it["stratum"]},
@@ -308,7 +334,7 @@ async def main():
                     MODEL,
                     r["sent"],
                     output={"role": "assistant", "content": r["response"]},
-                    parsed={"named": sorted(OptionForms.build(it["option_units"]).named(r["response"]))},
+                    parsed={"named": sorted(OptionForms.build(it["option_units"]).named(as_text(it, args.arm, r["response"])))},
                 )
                 for r in mine
             ],
