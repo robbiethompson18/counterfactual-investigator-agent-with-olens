@@ -105,9 +105,10 @@ A run finishes the way `scripts/runs.py finish` did: the runner mirrors its epis
 (`scripts/docent_upload.py`, when `DOCENT_API_KEY` is set or a gitignored `docent.key` sits in the
 main checkout; otherwise it prints the backfill command and goes on), which writes
 `docent_collection` into `meta.json` and `docent_run` / `docent_url` onto every episode, then
-uploads the run folder and its indexes to HF. `--no-upload` skips the HF step (upload later with
-`environments upload ENV/RUN`). Ctrl-C finishes the run as `abandoned` and still uploads it: a run
-isn't finished until it's on HF, abandoned ones included.
+uploads the run folder and its indexes to HF. `--no-docent` skips the Docent mirror (its server-side
+processing is ~10 min per 8k episodes; backfill a subset later). `--no-upload` skips the HF step
+(upload later with `environments upload ENV/RUN`). Ctrl-C finishes the run as `abandoned` and still
+uploads it: a run isn't finished until it's on HF, abandoned ones included.
 
 A finished run is immutable: new labels or a rescore go in a new labels file. Converted runs say
 `converted_from: <old path>` in `meta.json` and keep the Docent ids their rows had. LLM-judge labels
