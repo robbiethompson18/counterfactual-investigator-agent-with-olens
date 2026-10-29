@@ -391,6 +391,11 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
+- [ACTIVE: mcq_say — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-say.md)
+  — unselected 4k sample of MMLU-Pro, 2k eval / 2k probe halves (probe-trained questions kept out of
+  the eval half), consistency the only filter (1,285 cases, 81% right), no hint, single-turn letter
+  task with O-lens / placebo reads at the option newlines and the end of the prompt; placebo smoke
+  on Docent, own reads not run
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
   — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
   `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
