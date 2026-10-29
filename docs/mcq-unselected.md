@@ -33,6 +33,17 @@ Drawn once by `cfbench/evals/mcq_unselected/eval.py` (`SEED` 0) and written to t
 - Overlap with earlier work is fine and expected: the sample is over the same 12,032 questions the
   hint evals drew from. Only probe training is kept off the eval half.
 
+## Batch 2 (2026-10-29 evening)
+
+Robbie: "draw fresh". `SEED2` = 1 draws 2,000 more questions from the 8,032 in neither half (none
+probe-trained), version `mmlu_pro_b2`: 1,272 consistent cases under the strict parse (1,034 right),
+no overlap with batch 1 or the probe half. Reads:
+`runs/olens_reads/2026-10-29_mcq-unselected-nohint-b2` (three sharded pods, six layers, over a
+1,294-prompt request file written before the strict rebuild; every strict case is in it). The inputs
+run with both batches is `runs/cfbench_evals/2026-10-29_mcq-unselected-inputs-b2`
+(`--versions mmlu_pro` / `mmlu_pro_b2` select a batch); pool them by case, same prompt, same
+harness.
+
 ## Census and cases
 
 Qwen3.6-27B, thinking off, no hint, 8 samples per question, from the four runs that together cover
