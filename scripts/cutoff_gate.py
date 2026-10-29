@@ -121,7 +121,7 @@ def classify(q: dict, row: dict) -> dict:
     return {
         "id": q["id"],
         "event_date": q["event_date"],
-        "year": q["event_date"][:4],
+        "year": (q.get("event_date") or "")[:4] or None,
         "answer_type": q["answer_type"],
         "numeric": is_numeric(q["answer_type"]),
         "question": q["question"],
@@ -151,7 +151,7 @@ def summarize(run: Path, questions: list[dict]):
     wrong_with_analog = [r for r in wrong if r["pre_cutoff_analog"]]
     totals = {
         "all": tally(rows),
-        "by_year": {y: tally([r for r in rows if r["year"] == y]) for y in sorted({r["year"] for r in rows})},
+        "by_year": {y: tally([r for r in rows if r["year"] == y]) for y in sorted({r["year"] for r in rows}, key=lambda y: y or "")},
         "by_answer_kind": {k: tally([r for r in rows if r["numeric"] == (k == "numeric")]) for k in ("numeric", "name")},
         "greedy_agrees_with_mode": sum(r["greedy_agrees"] for r in rows),
         "loose_truth_matches_by_class": {c: sum(r["matches_truth_loose"] for r in rows if r["class"] == c) for c in classes},
