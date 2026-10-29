@@ -14,7 +14,8 @@ place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PR
 rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's), OLENS: overrides of the
 O-lens tools' defaults (`context: "xml"` also rewrites the prompt's read-marker sentence), and for the single-turn
 core.INLINE_CONDITIONS: INLINE(env, condition, case, base, seed) -> (the prompt up to and including "## Your task", extra
-row fields) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one submit call), and DEFAULT_VERSIONS: the versions
+row fields) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one submit call) unless --effort is given, which
+then applies to every condition, and DEFAULT_VERSIONS: the versions
 run when --versions isn't given (default all). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
@@ -102,7 +103,11 @@ async def main():
     ap.add_argument("--versions", default="", help="comma list of the eval's versions (default: all it has)")
     ap.add_argument("--conditions", default="", help="comma list (default: the eval's CONDITIONS)")
     ap.add_argument("--predictors", default="google/gemini-3.8-flash")
-    ap.add_argument("--effort", default=EFFORT)
+    ap.add_argument(
+        "--effort",
+        default=None,
+        help=f"predictor reasoning effort for every condition (default: {EFFORT}; the eval's INLINE_EFFORT for single-turn conditions)",
+    )
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET)
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="first N cases only (smoke tests)")
@@ -224,8 +229,8 @@ async def main():
             "model_name": ev.MODEL_NAME,
             "models": sorted({c["model"] for _, c, _ in cases}),
             "task": task,
-            "effort": args.effort,
-            "inline_effort": getattr(ev, "INLINE_EFFORT", None) if inline else None,
+            "effort": args.effort or EFFORT,
+            "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
             "max_calls": args.max_calls,
             "draws": args.draws,
             "seed": args.seed,
@@ -250,10 +255,10 @@ async def main():
             with out.open("a") as f:
                 f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
             return
-        tools, read, extra, effort = {}, None, {}, args.effort
+        tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
         if condition in INLINE_CONDITIONS:
             prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
-            effort = ev.INLINE_EFFORT
+            effort = args.effort or ev.INLINE_EFFORT  # --effort, when given, applies to every condition (Robbie, 2026-10-29)
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
