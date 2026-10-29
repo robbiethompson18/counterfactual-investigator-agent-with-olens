@@ -10,10 +10,11 @@ Investigator: Claude Haiku 5.5 at effort medium (`--predictors anthropic/claude-
 Flash holds Qwen's stale answer itself on a quarter of the items (the census in the doc). The system prompt never names the model
 (MODEL_NAME; the `*_told` versions add one sentence naming Qwen and its cutoff to the user turn, kept for an ablation).
 
-Versions: `recall` (the env's free-text arm; default), `recall_told`, `mcq`, `mcq_told` (mcq changes Qwen's own answer, so it is
-not the task). Conditions (all single-turn): `transcript_inline` (the prompt), `olens_placebo_inline` (plus another prompt's
-end-of-prompt reads from the inputs' placebo file), `olens_inline` (plus the item's own reads from the inputs' reads file, once a
-read job over the env run exists: scripts/olens_requests_from_runs.py envs:knowledge_cutoff/RUN, then prep with --reads).
+Versions: `recall` (the env's arm; default) and `recall_told`. No MCQ version: a multiple-choice render changes Qwen's own
+answer (docs/envs/knowledge_cutoff.md). Conditions (all single-turn): `transcript_inline` (the prompt),
+`olens_placebo_inline` (plus another prompt's end-of-prompt reads from the inputs' placebo file), `olens_inline` (plus the
+item's own reads from the inputs' reads file, once a read job over the env run exists: scripts/olens_requests_from_runs.py
+envs:knowledge_cutoff/RUN, then prep with --reads).
 
     uv run python -m cfbench.eval knowledge_cutoff --prep \\
         --placebo data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail/reads.placebo-head.jsonl
@@ -47,16 +48,11 @@ INLINE_EFFORT = "medium"
 SYSTEM = inline.SYSTEM  # cfbench.eval passes it to predict() in place of the answer task's system prompt
 STABLE = 7 / 8
 NUMERIC = re.compile(r"[\d.,k]+")
-RUNS: dict[str, list[str]] = {"recall": ["2026-10-29_dev109-recall"], "mcq": []}  # Qwen env runs per arm (data/envs/knowledge_cutoff/)
-VERSIONS: dict[str, dict] = {
-    "recall": {"arm": "recall", "told": False},
-    "recall_told": {"arm": "recall", "told": True},
-    "mcq": {"arm": "mcq", "told": False},
-    "mcq_told": {"arm": "mcq", "told": True},
-}
+RUNS: dict[str, list[str]] = {"recall": ["2026-10-29_dev109-recall"]}  # Qwen env runs per arm (data/envs/knowledge_cutoff/)
+VERSIONS: dict[str, dict] = {"recall": {"arm": "recall", "told": False}, "recall_told": {"arm": "recall", "told": True}}
 DEFAULT_VERSIONS = ["recall"]
-ARM_LABELS = {"recall": "free-text answer", "mcq": "5-option multiple choice"}
-PAIR_LABELS = {"recall -> recall": "free text (no counterfactual)", "mcq -> mcq": "MCQ (no counterfactual)"}
+ARM_LABELS = {"recall": "free-text answer"}
+PAIR_LABELS = {"recall -> recall": "free text (no counterfactual)"}
 
 
 def _mod():

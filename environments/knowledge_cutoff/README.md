@@ -9,7 +9,7 @@ cfbench eval `knowledge_cutoff`. Decisions and results:
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Code            | [`env.py`](env.py); scorer is the ported WorkspaceBench alias regex in `wsb/knowledge_cutoff.py`                                                                                     |
 | Items           | the 109 frozen items of WorkspaceBench's family (bank on HF `banks/wsb/knowledge_cutoff.json`, dev only); Sonnet-authored 2024–2026 questions gated on Qwen are the planned main set |
-| Arms            | `recall` (their template, "Answer with just the <answer_type>."), `mcq` (the 5 bank options A–E, "Answer with just the letter.")                                                     |
+| Arms            | `recall` (their template, "Answer with just the <answer_type>."); no MCQ: shown options, Qwen switches to the true one on a third of items                                           |
 | Primary measure | `stale` = the reply names the bank's gold, Qwen3.6-27B's own stable answer; also `answer`, `correct` (= the truth)                                                                   |
 | Defaults        | `qwen/qwen3.6-27b` on OpenRouter (deepinfra/fp8), thinking off, T 1 top-p 1 (WorkspaceBench's gate sampling)                                                                         |
 

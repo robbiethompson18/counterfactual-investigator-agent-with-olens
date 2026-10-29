@@ -33,7 +33,7 @@ HF).
 - **Free text, not MCQ.** Under a 5-option render Qwen itself switches to the true option on 3 of 10
   smoke items (Kirin 9020, Kast, Apple, each 5–6 of 8 samples) and becomes unstable on a fourth:
   shown the options, it recognizes what it can't recall, so MCQ changes the subject's answer. The
-  `mcq` arm stays in the env for a probe later.
+  MCQ is gone from the env and eval (Robbie, 2026-10-29).
 - **Items: filter only on Qwen stability** (modal answer in ≥ 7 of 8 samples), no text-inversion
   gate (a collider, CLAUDE.md), no disagreement filter. Numeric answers are excluded going forward
   (31 of the 109 are numbers; token lenses can't produce multi-digit numbers). WorkspaceBench's 109
