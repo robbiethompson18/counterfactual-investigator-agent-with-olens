@@ -299,6 +299,7 @@ def build(arm, item, ctx: Ctx) -> Episode:
         handlers=handlers,
         files=T.files(inst, workdir),
         workdir=workdir,
+        image="localhost/harness-grid-sandbox",  # image/Containerfile: the overeagerness image + fuser, file, strings
         hostname=getattr(T, "hostname", "sandbox"),
         env=dict(getattr(T, "env", {})),
         extra_tmpfs=list(getattr(T, "extra_tmpfs", [])),
