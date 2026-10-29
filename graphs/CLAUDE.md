@@ -14,3 +14,5 @@ placebo black, no tools gray).
   (every Flash run, 8/8 hint followers), pooled and by hint type
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
+- `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock
+  Qwen asked directly, numbers hand-copied from the sprint doc (Wrong Bridge is a TBD placeholder)
