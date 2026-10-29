@@ -559,9 +559,9 @@ Current docs:
   placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
   answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
-  — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
-  `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
-  agents made it and how to make more
+  — bank v4: 6,411 present-tense questions gated on Qwen (2,605 stable, 861 stale); label =
+  `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 200 entity-list
+  agents made it (changed-facts-first lists double the stale yield) and how to make more
 - [ACTIVE: favorites_qa — read before asking Qwen for its own favourites/picks (basic_readout implicit, scaled up), or extending that bank](docs/envs/favorites_qa.md)
   — pilot bank v1: 290 free-response questions in 7 shapes, 62 stable under Qwen (21%); transcript-
   only Haiku gets 74% of them (name_one 95%, choose_for/be_one ~50%); O-lens reads pending
