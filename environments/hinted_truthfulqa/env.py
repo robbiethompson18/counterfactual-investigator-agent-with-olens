@@ -418,8 +418,27 @@ COMPARISONS = {
         "why": "TruthfulQA with a line after the choices naming the same letter; only who says it changes",
     },
     "hint position": {
-        "arms": ["control", "hint/stanford", "hint_before/stanford"],
-        "why": "the Stanford hint line after the choices or first, before the question",
+        "arms": ["control", "hint/stanford", "hint_before/stanford", "hint/wikipedia", "hint_before/wikipedia"],
+        "why": "the Stanford / Wikipedia hint line after the choices or first, before the question",
+    },
+    **{
+        f"flip probe: {s}": {
+            "arms": ["control", "jsonapp/control", "header/control"]
+            + [
+                f"{f}{h}/{s}"
+                for f, h in [
+                    ("", "hint"),
+                    ("", "hint_before"),
+                    ("jsonapp/", "hint"),
+                    ("jsonapp/", "hint_before"),
+                    ("", "jsonnote"),
+                    ("header/", "hint"),
+                ]
+            ],
+            "why": "the hint flip probe's 9 prompts for this source (docs/hint-flip-probe.md): no hint under each frame (none, chat-app"
+            " JSON line, 'TruthfulQA Q<id>' header), the hint at each position/frame; the probe hints the correct letter (`.h` items)",
+        }
+        for s in FLIP_SOURCES
     },
 }
 STARRED = "settled (Kylie, 2026-10-27): hint sources on TruthfulQA, cross-model would-it-change pairs"  # the env viewer lists it first

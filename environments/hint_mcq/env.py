@@ -335,6 +335,28 @@ COMPARISONS = {  # the env viewer
         "arms": ["nohint", "hint+d1", "before/hint+d1", "hint+d2", "before/hint+d2"],
         "why": "the same hint sentence after the options (before the instruction) or first, before the question",
     },
+    "flip probe: professor": {
+        "arms": [
+            "nohint",
+            "jsonapp/nohint",
+            "mmlu/nohint",
+            *(f"{p}hint+d1" for p in ["", "before/", "jsonapp/", "jsonapp-before/", "jsonnote/", "mmlu/"]),
+        ],
+        "why": "the hint flip probe's 9 professor prompts (docs/hint-flip-probe.md): no hint per frame, the gold hint per position/frame",
+    },
+    "flip probe: Wikipedia": {
+        "arms": [
+            "nohint",
+            "jsonapp/nohint",
+            "mmlu/nohint",
+            *(f"{p}wiki+d1" for p in ["", "before/", "jsonapp/", "jsonapp-before/", "jsonnote/", "mmlu/"]),
+        ],
+        "why": "the same with \"Wikipedia says it's X.\" (hinted_truthfulqa's wording) as the hint",
+    },
+    "hint source": {
+        "arms": ["nohint", "hint+d1", "wiki+d1", "before/hint+d1", "before/wiki+d1"],
+        "why": "the Stanford professor vs Wikipedia naming the gold letter, after the options or first",
+    },
 }
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}

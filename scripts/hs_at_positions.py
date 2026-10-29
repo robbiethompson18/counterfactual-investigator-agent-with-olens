@@ -2,7 +2,7 @@
 log-probs of given candidate tokens at the last position. Needs only torch, transformers and numpy, so it runs in any GPU
 venv (e.g. the one-engine reader's), with the prompts tokenized elsewhere.
 
-    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2 | --layers 32,40,52] [--chunk N]
+    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2 | --layers 32,40,52] [--chunk N] [--no-fla]
 
 INPUTS.jsonl: one row per prompt, {id, ids (token ids), sites: {name: [token index, ...]}, cand (token ids)}. OUT_DIR gets
 <site>.npy ([all rows' positions in order, saved layers, d] fp16, hidden_states index 0, stride, ..., n_layers, or
@@ -13,14 +13,13 @@ there, so a killed job resumes; concatenate the parts in order.
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
-import torch
-from transformers import AutoModelForCausalLM
 
 
-def run(model, rows, out: Path, layers: list[int]):
+def run(model, torch, rows, out: Path, layers: list[int]):
     out.mkdir(parents=True, exist_ok=True)
     acts = {s: [] for s in rows[0]["sites"]}
     with open(out / "logp.jsonl.tmp", "w") as f:
@@ -48,7 +47,13 @@ def main():
     ap.add_argument("--layer-stride", type=int, default=2)
     ap.add_argument("--layers", help="comma-separated hidden_states indices, instead of --layer-stride")
     ap.add_argument("--chunk", type=int, help="rows per part (OUT/part-K/), resumable")
+    ap.add_argument("--no-fla", action="store_true", help="hide flash-linear-attention: transformers' slow torch kernels")
     a = ap.parse_args()
+    if a.no_fla:  # transformers imports fla (and causal_conv1d) lazily and falls back to torch when the import fails
+        sys.modules["fla"] = sys.modules["causal_conv1d"] = None  # ty: ignore[invalid-assignment]
+    import torch
+    from transformers import AutoModelForCausalLM
+
     rows = [json.loads(line) for line in Path(a.inputs).read_text().splitlines()]
     model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16, device_map="auto").eval()
     n_layers = model.config.get_text_config().num_hidden_layers
@@ -56,11 +61,11 @@ def main():
     if a.layers:
         layers = [int(x) for x in a.layers.split(",")]
     if not a.chunk:
-        return run(model, rows, Path(a.out), layers)
+        return run(model, torch, rows, Path(a.out), layers)
     for k in range(0, len(rows), a.chunk):
         part = Path(a.out) / f"part-{k // a.chunk:04d}"
         if not (part / "logp.jsonl").exists():
-            run(model, rows[k : k + a.chunk], part, layers)
+            run(model, torch, rows[k : k + a.chunk], part, layers)
 
 
 if __name__ == "__main__":
