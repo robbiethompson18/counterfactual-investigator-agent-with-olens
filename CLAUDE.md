@@ -391,11 +391,6 @@ Current docs:
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our from-scratch CHIVE replacement: arm-pair cases, conditions, O-lens tools, CLI, adding an
   env; results live in the cfbench docs
-- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
-  — unselected 4k sample of MMLU-Pro, 2k eval / 2k probe halves (probe-trained questions kept out of
-  the eval half), consistency the only filter (1,285 cases, 81% right), no hint, single-turn letter
-  task with O-lens / placebo reads at the option newlines and the end of the prompt; placebo smoke
-  on Docent, own reads not run
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
   — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
   `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
@@ -545,11 +540,15 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
+- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens predicts Qwen's stale answers, or rerunning the end-of-prompt investigator smoke](docs/cutoff-qa-inline.md)
+  — Haiku 5.5 predicting Qwen's modal answer from the question: O-lens 81% vs transcript-only 67% vs
+  placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
+  answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
   — bank v2: 803 present-tense questions gated on Qwen (266 stable, 187 stable-wrong), v1: 1,072
   dated ones (14% stable); asking present tense with no date is what fires the stale trap (2% →
-  32%); label = `qwen_modal`, truth is metadata, no numeric answers; how the Sonnet subagents,
-  `merge.py` and the gate (PR #382) made them; how to generate more
+  32%); label = `qwen_modal`, truth is metadata, numeric items dropped (240 stable live); how the
+  Sonnet subagents, `merge.py` and the gate (PR #382) made them; how to generate more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything
@@ -617,6 +616,11 @@ Current docs:
   — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
+- [ACTIVE: knowledge_cutoff env + investigator eval — read before running Qwen, another model or an investigator on post-cutoff factual questions, or picking an investigator for a cutoff task](docs/envs/knowledge_cutoff.md)
+  — predict Qwen's reply from the prompt (Robbie's one-turn format) as a cfbench answer eval over
+  the `knowledge_cutoff` env; decisions (Haiku 5.5 medium, hidden model, free text not MCQ,
+  stability-only filter); the investigator census (Flash shares Qwen's stale answers 24%, Haiku 4%);
+  Flash and Haiku dev smokes
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
