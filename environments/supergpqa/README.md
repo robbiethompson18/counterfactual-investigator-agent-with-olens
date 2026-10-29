@@ -1,6 +1,6 @@
 # SuperGPQA, thinking off (a harder MCQ pool than MMLU-Pro)
 
-**Status (2026-10-29):** ACTIVE. One arm, no counterfactual yet. First run done (1,000 items × 8).
+**Status (2026-10-29):** ACTIVE. One arm, no counterfactual yet. 10,000 items × 8 done (two runs).
 
 Why: for "guess the MCQ answer Qwen gives without seeing it", the usable items are the ones where
 Qwen's no-CoT answer is consistent and wrong (a consistent right answer is guessable from the
@@ -48,9 +48,22 @@ wrong 21% / 27% / 36% (only 53 hard items survive the non-calculation filter). B
 accuracy runs from 31% (History, n = 39) and 36% (Literature and Arts, n = 112) to 58% (Engineering,
 n = 229) and 62% (Law, n = 42).
 
+`2026-10-29_scale9k`: items 1000:10000 × 8, same server and sampling, `--no-docent` (not on Docent;
+backfill a subset with `scripts/docent_upload.py` when needed). The runner hung on 111 requests that
+never returned (CODE_SMELL 2026-10-29), so it was killed and finished by hand as `abandoned` with
+71,889 of 72,000 episodes (index, labels, meta, HF upload). Both runs pooled:
+
+| pool (runs)                                  | items | accuracy | consistent | unanimous | consistent & wrong |
+| -------------------------------------------- | ----: | -------: | ---------: | --------: | -----------------: |
+| SuperGPQA non-calculation (`n8` + `scale9k`) | 9,906 |    50.6% |      65.0% |     58.4% |      24.7% (2,444) |
+
+By difficulty: easy 50% / middle 52% / hard 40% accuracy, consistent and wrong 21% / 27% / 33% (n =
+4,617 / 4,769 / 520). By discipline, accuracy runs from 32% (History, n = 419) and 40% (Literature
+and Arts, n = 1,115) to 58% (Economics) and 62% (Philosophy).
+
 So SuperGPQA is ~17pp harder than our MMLU-Pro subset and yields 1.5× the share of consistent-wrong
-items (25% vs 16.5%): 1,000 items gives ~250 usable ones, and the remaining ~14,300 non-calculation
-questions would give ~3,500 more. Caveats: the two pools were served at different precisions (bf16
+items (25% vs 16.5%): 10,000 items give 2,444 usable ones, and the remaining ~5,300 non-calculation
+questions would give ~1,300 more. Caveats: the two pools were served at different precisions (bf16
 here, fp8 for hint_mcq), and SuperGPQA's gold labels are noisier than MMLU-Pro's (some "consistently
 wrong" items are the dataset being wrong; spot-check before using one as a lens target). Qwen is
 also less consistent here (64% vs 77% of items at ≥ 80%), so more samples per item buy more.
