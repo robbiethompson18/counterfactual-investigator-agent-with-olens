@@ -1,7 +1,8 @@
 # favorites_qa: predicting Qwen's own favourites from the question
 
-**Status (2026-10-29):** ACTIVE. Pilot: 290 questions, 62 stable; transcript-only Haiku gets 74% of
-them. The O-lens conditions are waiting on reads: no H200 was free on RunPod at 14:20 PDT.
+**Status (2026-10-29):** ACTIVE. Bank v2 (2,742 questions, 790 stable under Qwen) is the env's
+default; v1 is the 290-question pilot (62 stable), whose 62 have O-lens reads and a transcript-only
+Haiku run (74%). No investigator run on v2 yet.
 
 WorkspaceBench's `basic_readout` family has 32 `implicit` items ("What is your favorite card game?
 Answer in one word." → poker), labelled with Qwen3.6-27B's own gated answer. Its text readers get
@@ -49,6 +50,33 @@ truth to verify, so the only filter is Qwen's own stability.
 - **`name_one` is mostly typicality** ("Name a swimming stroke"): the most stable shape, and the
   easiest for a text reader (below).
 
+## Bank v2: wave 1 (`cutoff_gate/2026-10-29_favorites-v2-2742`)
+
+50 Sonnet subagents, one narrow domain each (fruits and vegetables, national dishes, wild mammals,
+cities by country, classical music, Pixar/Disney/Ghibli, fictional universes, ...), 50 questions
+each, from brief v2: no `least_favorite` or `be_one`, at most 4 `name_one`, subcategories
+("Argentine dish", "Mario enemy") encouraged, the pilot's 322 categories as an avoid-list. Merged
+with the pilot's 290 (58 categories that two writers both used dropped): 2,742 questions, all gated
+together, so v2 re-gates the pilot items (61 stable this time vs 62).
+
+| shape          | n     | stable | %   |
+| -------------- | ----- | ------ | --- |
+| name_one       | 234   | 98     | 42% |
+| pick_one       | 634   | 207    | 33% |
+| recommend      | 575   | 180    | 31% |
+| choose_for     | 589   | 163    | 28% |
+| favorite       | 630   | 135    | 21% |
+| be_one         | 40    | 5      | 12% |
+| least_favorite | 40    | 2      | 5%  |
+| all            | 2,742 | 790    | 29% |
+
+- **Wave 1 yields 30% (729 of 2,452)**, up from the pilot's 21%: the shape mix and the subcategories
+  both help. Per writer it ranges 3/50 (individual sports) to 30/50 (national dishes).
+- Only 13 refusals in all, 11 of them the pilot's `least_favorite` items.
+- Two w50 questions were reworded by their writer after the merge; the bank has the wording that was
+  gated.
+- Reaching 1,000 stable takes ~700 more questions at this yield (one ~15-agent wave).
+
 ## Investigator (`cfbench/evals/favorites_qa_inline/`)
 
 cutoff_qa_inline's setup on these items: Claude Haiku 5.5 at effort medium sees only the question,
@@ -79,9 +107,7 @@ pilot size.
 
 ## Next
 
-- O-lens and placebo reads on the 62 (request file
-  `olens_reads/2026-10-29_favorites-pilot62-tail/requests.jsonl`, made by
-  `python -m cfbench.evals.favorites_qa_inline.eval OUT` with the Qwen tokenizer), then all three
-  conditions in one run.
-- Scale up: at a 21% yield, ~1,000 stable items needs ~5,000 questions (100 subagents at 50 each,
-  like cutoff_qa v3). Lean away from `name_one` and `least_favorite`.
+- One more wave (~15 agents, ~700 questions) for 1,000 stable items; the avoid-list is v2's
+  categories.
+- Then the env run, the end-of-prompt reads and the three conditions on all stable v2 items. The
+  pilot eval (`favorites_qa_inline`, RUN = the 62) reads its labels from bank v1.
