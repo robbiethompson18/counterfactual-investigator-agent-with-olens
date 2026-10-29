@@ -1,8 +1,8 @@
 # Knowledge-cutoff questions (dated facts, bare user turn)
 
-**Status (2026-10-29):** ACTIVE. New env, no runs yet: the bank's Qwen stability gate is being run
-with a standalone script against the shared Qwen server, and the `hint` arm is not built. Bank
-provenance, numbers and weaknesses: [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
+**Status (2026-10-29):** ACTIVE. New env, no runs yet: the bank's Qwen stability gate ran with a
+standalone script (115 / 1,072 stable-right), and the `hint` arm is not built. Bank provenance,
+numbers and weaknesses: [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
 
 1,072 short-answer questions about events from January 2024 to September 2026 (Qwen3.6-27B's cutoff
 is about January 2025), each asked verbatim as the only user message, no system prompt, thinking
@@ -19,12 +19,12 @@ best guess. Answer with just the `<answer_type>`." The bank is data and lives on
 | Items           | the bank's ids (`b1-*` = the 94 pilot items, `<domain>-NN` = the 20 x 50 batch); meta carries `truth`, `truth_aliases`, `pre_cutoff_analog`, `event_date`, `domain`, `answer_type`, `numeric`                                                         |
 | Requires        | thinking off                                                                                                                                                                                                                                          |
 
-Run (10 items, 4 samples each; the default target is Qwen3.6-27B on OpenRouter `deepinfra/fp8`,
-thinking off, model-card sampling):
+Run (10 items, 4 samples each; the default target is Qwen3.6-27B bf16 on the shared vLLM server,
+`$QWEN_VLLM_URL`, thinking off, temperature 1.0 / top_p 1.0: WorkspaceBench's knowledge_cutoff
+sampling and the stability gate's):
 
 ```bash
 uv run python -m environments run cutoff_qa --tag dev --items 0:10 --n 4
-uv run python -m environments run cutoff_qa --tag dev --model Qwen/Qwen3.6-27B --served-name qwen --backend vllm --url $QWEN_VLLM_URL --thinking off
 ```
 
 Offline smoke (2026-10-29, `build` + `measure`, no model): item `b1-tech-06` ("Apple released the

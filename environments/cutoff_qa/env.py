@@ -9,8 +9,11 @@ lives on the HF dataset at `banks/cutoff_qa/v1.json` (fetched on first use); `sc
 docs/envs/cutoff_qa.md says how it was made and what is wrong with it.
 
 Arms: `nohint` only, for now: the user message is the bank's `question` string verbatim (it ends "If you are not sure, give
-your best guess. Answer with just the <answer_type>."). TODO: a `hint` arm that prefixes "A Stanford professor said it's
-{truth}." (or the stale analog) the way hinted_truthfulqa's `hint/stanford` does, as the counterfactual; not built yet.
+your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server (bf16) at temperature 1.0,
+top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff sampling and the stability gate's
+(runs/cutoff_gate/2026-10-29_b1b2-1072), so O-lens reads of env transcripts match the gate's. TODO: a `hint` arm that
+prefixes "A Stanford professor said it's {truth}." (or the stale analog) the way hinted_truthfulqa's `hint/stanford` does, as
+the counterfactual; not built yet.
 
 Measures (no LLM judge anywhere): `answer` = the reply normalized (`norm`: lowercase, accents and punctuation stripped,
 leading article dropped, currency / units / digit-group commas stripped from numbers, whitespace collapsed); `correct` = it
@@ -19,10 +22,12 @@ has none); `contains_truth` / `contains_stale` = the same as a whole phrase insi
 """
 
 import json
+import os
 import re
 import unicodedata
 from functools import cache
 
+from counterfactual_investigator_agent_with_olens.qwen import MODEL as SERVED_NAME
 from counterfactual_investigator_agent_with_olens.runs import REPO
 from environments._lib.core import Ctx, Episode
 from environments._lib.runfolder import REPO_ROOT
@@ -114,6 +119,16 @@ def canon_answer(text: str) -> str | None:
 
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
-# Qwen3.6-27B, thinking off, the model-card sampling for thinking off (the runner's default for a Qwen target). The bank's
-# stability gate (docs/envs/cutoff_qa.md) ran on the shared vLLM server; OpenRouter deepinfra/fp8 is the usual fallback.
-DEFAULTS = {"model": "qwen/qwen3.6-27b", "backend": "openrouter", "provider": "deepinfra/fp8", "thinking": False, "effort": "medium"}
+# Qwen3.6-27B bf16 on the shared vLLM server ($QWEN_VLLM_URL, served as "qwen"; runpod/CLAUDE.md), thinking off, sampled at
+# temperature 1.0 / top_p 1.0 with no presence penalty: WorkspaceBench's knowledge_cutoff sampling and the bank's stability
+# gate's (runs/cutoff_gate/2026-10-29_b1b2-1072 on HF), so later O-lens reads are on transcripts sampled the same way.
+DEFAULTS = {
+    "model": "Qwen/Qwen3.6-27B",
+    "backend": "vllm",
+    "url": os.environ.get("QWEN_VLLM_URL"),
+    "served_name": SERVED_NAME,
+    "thinking": False,
+    "effort": "medium",
+    "sampling_all_models": True,
+    "sampling": {"temperature": 1.0, "top_p": 1.0},
+}

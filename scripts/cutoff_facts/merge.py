@@ -11,8 +11,8 @@ several items. It writes data/banks/cutoff_qa/v1.json (a header + `items`, each 
 v1.md, a table of every item for reading. --upload puts v1.json and BRIEF.md under banks/cutoff_qa/ on HF.
 
 Dedup was manual: same-event pairs and the two derivable answers were found by reading the table, and their ids are DROPPED
-below (6 from the pilot's own cleaning, 22 from the merge), so the script reproduces the bank exactly. FIXES repairs three pilot
-rows whose `domain` field held the question suffix.
+below (6 from the pilot's own cleaning, 20 same-event and 2 derivable from the merge), so the script reproduces the bank
+exactly. FIXES repairs three pilot rows whose `domain` field held the question suffix.
 """
 
 import argparse
@@ -45,12 +45,16 @@ KEYS = {
 VERIFIED = {"fetched page", "two search results", "batch1 (snippet)"}
 SUFFIX = "If you are not sure, give your best guess. Answer with just the {answer_type}."
 NUMERIC = re.compile(r"^[\d.,% ]+$")
-DROPPED = {  # manual (2026-10-29): same-event duplicates, keeping the better-phrased one, and two derivable answers
-    "pilot": ["b1-space-10", "b1-space-20", "b1-tech-16", "b1-tech-18", "b1-sci-04", "b1-sci-20"],
-    "merge": [
-        "ai-12", "ai-36", "ai-39", "auction-23", "corp-01", "corp-22", "infra-02", "misc-32", "pc-37", "phone-09", "phone-44",
-        "phone-46", "pol-42", "rank-11", "rank-18", "rank-21", "rank-28", "rank-45", "sci-26", "sci-31", "sw-16", "sw-32",
+DROPPED = {  # manual (2026-10-29), by reading the table
+    "pilot": ["b1-space-10", "b1-space-20", "b1-tech-16", "b1-tech-18", "b1-sci-04", "b1-sci-20"],  # the pilot's own cleaning
+    "same_event": [  # a second question on an event another item already covers; the better-phrased one kept
+        "ai-12", "ai-36", "ai-39", "auction-23", "corp-01", "corp-22", "infra-02", "pc-37", "phone-44", "phone-46", "pol-42",
+        "rank-11", "rank-18", "rank-21", "rank-28", "rank-45", "sci-26", "sci-31", "sw-16", "sw-32",
     ],
+    "derivable": {  # the brief's "could a smart reader guess it?" test
+        "misc-32": "Apple TV: the question names Apple's streaming service rebrand, so the answer follows from it",
+        "phone-09": "Camera Control: the question describes the iPhone 16 camera button, which is its name",
+    },
 }  # fmt: skip
 FIXES = {i: {"domain": "software and standards"} for i in ("b1-tech-05", "b1-tech-06", "b1-tech-15")}  # the pilot tech agent's bug
 HEADER = {
@@ -129,7 +133,7 @@ def main():
     ids = collections.Counter(r["id"] for r in rows)
     if dups := [i for i, n in ids.items() if n > 1]:
         sys.exit(f"duplicate ids across files: {dups}")
-    dropped = set(DROPPED["pilot"]) | set(DROPPED["merge"])
+    dropped = set(DROPPED["pilot"]) | set(DROPPED["same_event"]) | set(DROPPED["derivable"])
     items = [{**r, **FIXES.get(r["id"], {})} for r in rows if r["id"] not in dropped]
     print(f"{len(rows)} rows in {len(a.pilot) + len(a.batch)} files, {len(dropped & set(ids))} dropped by hand -> {len(items)} items")
     for r in items:
