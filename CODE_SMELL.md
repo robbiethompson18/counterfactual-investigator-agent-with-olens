@@ -56,6 +56,8 @@ distinguish documented behavior from implementation mistakes.
 
 ### 1. P1: MMLU extracts an earlier letter instead of the answer
 
+**Fixed 2026-10-29 (PR #404):** only a one-letter reply is scored; census rescored, cases rebuilt.
+
 [`environments/hint_mcq/env.py`](environments/hint_mcq/env.py), `LETTER`, `first_letter()` and
 `measure()` (lines 86–106): the first standalone capital A–J anywhere in the reply wins. Thus
 `I think the answer is B.` is graded I, and reproducing the options before answering grades A.
@@ -377,9 +379,3 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
   cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
   the episodes. Give it `positive` (= `stale`?) on PR #380's branch.
-
-- 2026-10-29 (mcq_unselected): `environments/_lib/index.py` `latest_labels` returns the newest
-  `measure@*.jsonl` by mtime, so any relabel of an env run (today: a `-strict` measure dropped into
-  every hint_mcq census run) silently changes the case set of every eval that reads labels that way
-  (`cfbench/evals/hint_qwen_dsv4/eval.py` `_episodes` too). mcq_unselected pins its label files; the
-  others should name theirs, or `latest_labels` should take a labeler id.

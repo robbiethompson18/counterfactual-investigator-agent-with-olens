@@ -400,9 +400,10 @@ Current docs:
   env; results live in the cfbench docs
 - [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
   — unselected 4k sample of MMLU-Pro, 2k eval / 2k probe halves (probe-trained questions kept out of
-  the eval half), consistency the only filter (1,285 cases, 81% right), no hint, single-turn letter
-  task with O-lens / placebo reads at the option newlines and the end of the prompt (six layers,
-  cutoff_qa_inline's); reads on HF, placebo smoke on Docent, no full run yet
+  the eval half), consistency the only filter (>= 7 of 8 samples the same bare letter: 1,251 cases,
+  82% right; the first build's 1,285 read worked solutions by their first capital), no hint,
+  single-turn letter task with O-lens / placebo reads at the option newlines and the end of the
+  prompt (six layers, cutoff_qa_inline's); reads on HF, placebo smoke on Docent, no full run yet
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
   — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
   `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
@@ -561,6 +562,9 @@ Current docs:
   — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
   `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
   agents made it and how to make more
+- [ACTIVE: favorites_qa — read before asking Qwen for its own favourites/picks (basic_readout implicit, scaled up), or extending that bank](docs/envs/favorites_qa.md)
+  — pilot bank v1: 290 free-response questions in 7 shapes, 62 stable under Qwen (21%); transcript-
+  only Haiku gets 74% of them (name_one 95%, choose_for/be_one ~50%); O-lens reads pending
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything

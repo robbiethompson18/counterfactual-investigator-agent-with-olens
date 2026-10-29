@@ -9,6 +9,7 @@
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments evals [NAME ...] [--pull] [--upload]  # evals/<name>.json from cfbench runs + expview
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
+    uv run python -m environments rescore ENV/RUN [...] --tag T  # labels/measure@<sha12>-T.jsonl from today's measure()
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
 no max_tokens unless --max-tokens is given (recorded), reasoning effort always sent (medium) unless the env REQUIRES
@@ -35,8 +36,9 @@ import httpx
 from .backends import Target
 from .core import Ctx, episode_id, load_env, retired_arms, select_arms
 from .index import build as build_index
+from .index import latest_labels
 from .loop import run_episode
-from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, main_checkout_file, upload
+from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, main_checkout_file, read_episodes, upload, write_labels
 
 
 def parse_items(spec: str | None, all_items: list) -> list:
@@ -205,13 +207,7 @@ def main(argv):
     except KeyboardInterrupt:
         status = "abandoned"
         print(f"interrupted after {len(results)}/{len(jobs)} episodes; finishing as abandoned", file=sys.stderr)
-    labels = []
-    for ep in results:
-        try:
-            labels.append((ep["id"], None if ep.get("error") else env.measure(ep)))
-        except Exception as e:  # noqa: BLE001
-            labels.append((ep["id"], {"_error": repr(e)[:300]}))
-    w.labels("measure", (git_sha() or "unknown")[:12], labels)
+    w.labels("measure", (git_sha() or "unknown")[:12], measure_labels(env, results))
     cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
     w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
     print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
@@ -262,6 +258,31 @@ async def _run_all(env, jobs, target, today, caps, conc, box_conc, w, out: list)
         await asyncio.gather(*(one(*j) for j in jobs))
 
 
+def measure_labels(env, episodes) -> list[tuple]:
+    """(episode id, measure() values) per episode: None for an errored episode, {"_error"} when measure() raises."""
+    labels = []
+    for ep in episodes:
+        try:
+            labels.append((ep["id"], None if ep.get("error") else env.measure(ep)))
+        except Exception as e:  # noqa: BLE001
+            labels.append((ep["id"], {"_error": repr(e)[:300]}))
+    return labels
+
+
+def rescore(runs: list[str], tag: str):
+    """A new labels/measure@<sha12>-<tag>.jsonl per ENV/RUN from the current measure() over the run's stored episodes. The
+    old labels files stay (a finished run is immutable); indexes and HF are left alone, so upload the new file yourself."""
+    sha = git_sha()
+    assert sha and not sha.endswith("+dirty"), f"commit environments/ first: the labels file is named by its sha ({sha})"
+    for spec in runs:
+        run_dir = LOCAL / spec
+        old_name, old = latest_labels(run_dir)
+        labels = measure_labels(load_env(spec.split("/")[0]), read_episodes(run_dir))
+        p = write_labels(run_dir, "measure", f"{sha[:12]}-{tag}", labels)
+        changed = sum(v != old.get(eid) for eid, v in labels)
+        print(f"{spec}: {len(labels)} episodes, {changed} labels differ from {old_name} -> {p.relative_to(LOCAL)}")
+
+
 def cli():
     cmd, rest = (sys.argv[1], sys.argv[2:]) if len(sys.argv) > 1 else ("-h", [])
     if cmd == "run":
@@ -287,6 +308,12 @@ def cli():
         from .evals import cli as evals_cli
 
         evals_cli(rest)
+    elif cmd == "rescore":
+        ap = argparse.ArgumentParser(prog="environments rescore", description=rescore.__doc__)
+        ap.add_argument("runs", nargs="+", metavar="ENV/RUN")
+        ap.add_argument("--tag", required=True, help="the new file is labels/measure@<sha12>-<tag>.jsonl")
+        a = ap.parse_args(rest)
+        rescore(a.runs, a.tag)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})

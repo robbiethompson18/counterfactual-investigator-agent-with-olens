@@ -2,12 +2,14 @@
 gate_class, the paired sign test of each condition vs transcript_inline over items (per-item mean over draws), and read-level
 recall (items whose own reads have a bullet containing Qwen's modal answer), so lens misses and investigator misses are told apart.
 
-    uv run python -m cfbench.evals.cutoff_qa_inline.report data/runs/cfbench/<date>_<slug>
+    uv run python -m cfbench.evals.cutoff_qa_inline.report data/runs/cfbench/<date>_<slug> [--by shape]
+
+--by picks the row field to stratify by (default gate_class; favorites_qa_inline rows have `shape`, `domain`, `category`).
 """
 
+import argparse
 import json
 import re
-import sys
 from collections import defaultdict
 from math import comb
 from pathlib import Path
@@ -31,7 +33,7 @@ def sign_test(wins: int, losses: int) -> float:
     return min(1.0, 2 * sum(comb(n, i) for i in range(k + 1)) / 2**n) if n else 1.0
 
 
-def main(run: Path):
+def main(run: Path, by: str = "gate_class"):
     rows = [json.loads(line) for line in (run / "predictions.jsonl").read_text().splitlines()]
     meta = json.loads((run / "meta.json").read_text())
     norm = load_env("cutoff_qa").norm
@@ -40,16 +42,18 @@ def main(run: Path):
     for r in rows:
         exact = bool(r.get("correct"))
         per[r["condition"]][r["item"]].append((exact, exact or loose(r.get("canon"), r["modal_cf"])))
-        cls[r["item"]] = r["gate_class"]
+        cls[r["item"]] = r[by]
     items = sorted({i for c in per.values() for i in c})
     print(f"{run.name}: {len(items)} items, {meta['params']['predictors']}, draws {meta['params']['draws']}, "
-          f"gate_class {dict(sorted(__import__('collections').Counter(cls.values()).items()))}\n")  # fmt: skip
-    print(f"{'condition':24} {'exact':>7} {'loose':>7} {'right':>7} {'wrong':>7} {'n':>5}   vs transcript (loose): win/loss p")
+          f"{by} {dict(sorted(__import__('collections').Counter(cls.values()).items()))}\n")  # fmt: skip
+    strata = sorted(set(cls.values()))
+    head = f"{'condition':24} {'exact':>7} {'loose':>7} " + " ".join(f"{c[:14]:>14}" for c in strata)
+    print(head + f" {'n':>5}   vs transcript (loose): win/loss p")
     mean = lambda xs: sum(xs) / len(xs) if xs else float("nan")
     for cond, by_item in per.items():
         ex = [mean([e for e, _ in by_item[i]]) for i in by_item]
         lo = [mean([lo_ for _, lo_ in by_item[i]]) for i in by_item]
-        by_cls = {c: mean([mean([lo_ for _, lo_ in by_item[i]]) for i in by_item if cls[i] == c]) for c in ("stable_right", "stable_wrong")}
+        by_cls = {c: mean([mean([lo_ for _, lo_ in by_item[i]]) for i in by_item if cls[i] == c]) for c in strata}
         test = ""
         if cond != BASE and BASE in per:
             w = l = 0
@@ -58,8 +62,8 @@ def main(run: Path):
                     d = mean([lo_ for _, lo_ in by_item[i]]) - mean([lo_ for _, lo_ in per[BASE][i]])
                     w, l = w + (d > 0), l + (d < 0)
             test = f"{w}/{l} p={sign_test(w, l):.3f}"
-        print(f"{cond:24} {100 * mean(ex):6.1f}% {100 * mean(lo):6.1f}% {100 * by_cls['stable_right']:6.1f}% "
-              f"{100 * by_cls['stable_wrong']:6.1f}% {len(by_item):5}   {test}")  # fmt: skip
+        print(f"{cond:24} {100 * mean(ex):6.1f}% {100 * mean(lo):6.1f}% " + " ".join(f"{100 * by_cls[c]:13.1f}%" for c in strata)
+              + f" {len(by_item):5}   {test}")  # fmt: skip
     reads = ROOT / meta["params"]["inputs"] / "reads/reads.jsonl"
     if reads.exists():
         hit, by_layer, by_tok = defaultdict(bool), defaultdict(lambda: defaultdict(bool)), defaultdict(lambda: defaultdict(bool))
@@ -76,10 +80,14 @@ def main(run: Path):
         print(f"\nread-level recall (any bullet contains Qwen's modal answer): {sum(hit.values())}/{n} items")
         print("  by layer: " + ", ".join(f"L{L} {sum(v.values())}/{n}" for L, v in sorted(by_layer.items())))
         print("  by position: " + ", ".join(f"{json.dumps(t)} {sum(v.values())}/{n}" for t, v in by_tok.items()))
-        for c in ("stable_right", "stable_wrong"):
+        for c in strata:
             ids = [s for s, m in modal.items() if cls[next(r["item"] for r in rows if r["shown"][0] == s)] == c]
             print(f"  {c}: {sum(hit[s] for s in ids)}/{len(ids)}")
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("run", type=Path)
+    ap.add_argument("--by", default="gate_class")
+    a = ap.parse_args()
+    main(a.run, a.by)
