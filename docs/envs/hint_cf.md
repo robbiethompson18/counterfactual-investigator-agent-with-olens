@@ -107,7 +107,9 @@ Three legs (PR #320), correct-answer hint, items that followed the hint 8/8, Fla
   every read at or after the hint sentence (harness 8; lens and placebo only, transcript-only is
   A's).
 - **C, `words/*`:** no letters (bulleted options; the hint and the reply are option text; follow
-  64%, 48 items at 8/8). Reads `olens_reads/2026-10-28_hint-mcq-words`.
+  64%, 48 items at 8/8). Reads `olens_reads/2026-10-28_hint-mcq-words`. Confound found 2026-10-29:
+  the `words/nohint` prompts put the instruction before the question (a bug, kept so stored runs
+  rebuild), so C's counterfactual moves the instruction as well as removing the hint.
 
 | leg                              | items | transcript-only | O-lens       | placebo      | O-lens − placebo | items won / lost |
 | -------------------------------- | ----- | --------------- | ------------ | ------------ | ---------------- | ---------------- |
