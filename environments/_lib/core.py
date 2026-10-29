@@ -49,7 +49,9 @@ ROOT = Path(__file__).resolve().parents[1]  # environments/
 class Episode:
     messages: list[dict]  # system / user turns (and any prefilled assistant / tool turns)
     tools: list[dict] = field(default_factory=list)  # OpenAI tool schemas; empty = one plain chat completion
-    handlers: dict[str, str] = field(default_factory=dict)  # tool name -> "shell" | "bash_raw" | "done"; others go to env.handle
+    handlers: dict[str, str] = field(
+        default_factory=dict
+    )  # tool name -> "shell" | "bash_raw" | "bash_cwd" | "done"; others go to env.handle
     files: dict[str, str] = field(default_factory=dict)  # sandbox files relative to workdir; any tools or files => a Box
     workdir: str = "/agent"
     image: str = "localhost/realism-sandbox-u200"
@@ -67,7 +69,7 @@ class Episode:
 
     @property
     def needs_box(self) -> bool:
-        return bool(self.files or self.setup or self.prefill or any(k in ("shell", "bash_raw") for k in self.handlers.values()))
+        return bool(self.files or self.setup or self.prefill or any(k in ("shell", "bash_raw", "bash_cwd") for k in self.handlers.values()))
 
 
 @dataclass

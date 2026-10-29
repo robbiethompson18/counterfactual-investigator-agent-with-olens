@@ -159,7 +159,9 @@ async def handle(box: Box, kind: str, a: dict) -> str:
     if kind == "shell":  # agent-interp-envs' execute_command
         code, out = await box.sh(cmd)
         return f"Exit code: {code}\nOutput:\n{out}"
-    if kind == "bash_raw":  # a Claude-Code-like bash tool
+    if kind in ("bash_raw", "bash_cwd"):  # a Claude-Code-like bash tool; bash_cwd keeps `cd` across calls, as its description says
+        if kind == "bash_cwd":
+            cmd = f"trap 'pwd > /tmp/.agent_cwd' EXIT; cd \"$(cat /tmp/.agent_cwd 2>/dev/null || pwd)\" 2>/dev/null\n{cmd}"
         code, out = await box.sh(cmd, 120)
         return (out if out.strip() else "(no output)") + (f"\n[exit {code}]" if code else "")
     raise ValueError(kind)
