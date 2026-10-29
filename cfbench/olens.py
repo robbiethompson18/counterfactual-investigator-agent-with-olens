@@ -257,12 +257,16 @@ def tools(
     sources: list[str] | None = None,
     kind: str = "olens",
     overrides: dict | None = None,
+    before: str | None = None,
 ) -> tuple[dict[str, Tool], set[int]]:
     """The two lens tools (`kind` in LENSES) over the base runs, and the ids of the runs that have reads. `overrides`
-    replaces fields of the lens's defaults (an eval's OLENS, e.g. {"min_fve": 0.0})."""
+    replaces fields of the lens's defaults (an eval's OLENS, e.g. {"min_fve": 0.0}). `before`: a regex; reads at or after
+    its first match in a run's transcript (the hint sentence, say) are hidden, header and stop-token reads included, so the
+    agent only sees positions the counterfactual edit leaves untouched (cfbench.run --olens-before)."""
     lens = replace(LENSES[kind], **(overrides or {}))
     unit, xml = lens.unit[:-1], lens.context == "xml"
     texts = [render_spans(r.messages)[0] for r in base]
+    cutoff = [(m.start() if (m := re.search(before, t)) else None) if before else None for t in texts]
     read_ids = [i for i, r in enumerate(base) if r.source in reads]
     source = {i: base[i].source for i in read_ids}  # whose reads answer for run i
     if sources is not None:  # an eval's own placebo (cfbench/eval.py PLACEBO): run i's reads come from sources[i]
@@ -285,7 +289,10 @@ def tools(
             if sources is not None and source[i] != base[i].source:
                 messages, rows = base[i].messages, onto(base[i].messages, messages, rows)
             text = render_spans(messages)[0]
-            cache[i] = (positions(messages, rows), len(text) / max(1, len(texts[i])), text)
+            factor, pos = len(text) / max(1, len(texts[i])), positions(messages, rows)
+            if (c := cutoff[i]) is not None:  # keep reads before the match, in run i's coordinates (placebo positions are scaled)
+                pos = [p for p in pos if p.char / factor < c]
+            cache[i] = (pos, factor, text)
         return cache[i]
 
     yes_no = ["yes" if r.label else "no" for r in base]
