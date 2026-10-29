@@ -72,6 +72,10 @@ their own mostly idle pod and each rediscovered the same startup bugs.
 - **While anything boots, check progress every 3 minutes** (`qwen_server.sh status`, or the job's
   log), with a Monitor loop or cron. Two identical checks in a row means stuck: look, kill, retry.
   Agents have sat on a silent hang for half an hour waiting for "ready".
+- **Pods on one network volume share `/workspace`, so every reader on it needs its own TAG**
+  (`olens_reads.sh run NAME REQ TAG`): two pods given the same tag append to one
+  `/workspace/reads/TAG.reads.jsonl` and overwrite each other's log (2026-10-29, the supergpqa-3k
+  O-lens shards, caught when both fetches came back byte-identical). Tag per pod, e.g. `sg3k_ol-1`.
 - An H200 is about $5/hr. Delete pods the moment a job finishes (`runpod/pod.sh down NAME`).
 - At a balance ≤ 0 RunPod deletes every pod on the account; if ssh drops, check `runpodctl user`.
 
