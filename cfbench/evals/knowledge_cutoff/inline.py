@@ -85,3 +85,55 @@ def prompt(question: str, condition: str, told: bool, model: str, rows: list[dic
 def placebo_source(path: Path, key: str, seed: int) -> str:
     """A seeded other prompt's reads from `path` (any dataset: the control is for the reads block itself)."""
     return random.Random(f"{seed}:{key}").choice(sorted(reads_by_source(path)))
+
+
+# The NLA conditions (nla_inline, nla_placebo_inline; cutoff_qa_inline, 2026-10-29): the O-lens block's positions and pattern
+# over NLA readouts (scripts/olens_read_requests.py --readout nla: one free-text `text` per position and layer, `fve` once
+# scripts/nla_score.py has run). Every readout is shown, whatever its FVE (Robbie, 2026-10-29).
+NLA_TEXT = """\
+## NLA reads
+
+An NLA (natural language autoencoder) is a model trained to describe one of another model's internal activations in a short \
+free-text explanation; a second model, the critic, tries to rebuild the activation from the explanation alone, which scores \
+it: FVE, the fraction of the activation's variance the rebuilt one explains. High FVE is good; explanations with low or \
+negative FVE are often confabulated. The NLA was run on {model}'s activations at the end of the prompt above: the period \
+that ends its last line, the end-of-turn token and the newline after it, and the start of {model}'s own turn (<|im_start|>, \
+"assistant" and the newline), just before it answers, at layers {layers}, one explanation per token and layer. Explanations \
+can show what the model registers but never says; they also often just paraphrase the nearby text, and they get fine details \
+wrong (exact numbers, letters, names) more often than broad themes.
+
+Each position below shows the end of the prompt with the token read wrapped in <read></read> (↵ is a newline), then its \
+explanations by layer, each with its FVE where it has been scored.
+
+<nla_reads_end>
+{block}
+</nla_reads_end>
+
+"""
+
+
+def nla_block(rows: list[dict], prompt: str) -> str:
+    """tail_block for NLA rows: the same position headers, then one explanation per layer, its lines kept."""
+    by_tok: dict[int, dict[int, dict]] = defaultdict(dict)
+    for r in rows:
+        by_tok[r["token_index"]][r["layer"]] = r
+    toks = [next(iter(layers.values()))["token"] for _, layers in sorted(by_tok.items())]
+    lead = "…" + prompt.rstrip()[-CONTEXT:-1].replace("\n", "↵")
+    out = []
+    for k, (_, layers) in enumerate(sorted(by_tok.items())):
+        shown = "".join(f"<read>{show_token(t)}</read>" if j == k else t.replace("\n", "↵") for j, t in enumerate(toks))
+        out.append(f"At {json.dumps(toks[k], ensure_ascii=False)}: {lead}{shown}")
+        for layer in sorted(layers):
+            r = layers[layer]
+            fve = f", FVE {r['fve']:.2f}" if r.get("fve") is not None else ""
+            lines = [" ".join(line.split()) for line in r["text"].splitlines() if line.strip()]
+            out.append(f"- layer {layer}{fve}:\n" + "\n".join(f"  {line}" for line in lines))
+        out.append("")
+    return "\n".join(out).strip()
+
+
+def nla_prompt(question: str, told: bool, model: str, rows: list[dict]) -> str:
+    assert rows
+    layers = ", ".join(map(str, sorted({r["layer"] for r in rows})))
+    reads = NLA_TEXT.format(model=model, layers=layers, block=nla_block(rows, question))
+    return USER.format(told=TOLD if told else "", prompt=question, reads=reads)
