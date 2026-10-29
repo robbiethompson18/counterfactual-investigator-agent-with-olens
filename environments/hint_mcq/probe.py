@@ -27,7 +27,7 @@ import numpy as np
 
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
-from environments.hint_mcq.env import LETTERS, build, first_letter
+from environments.hint_mcq.env import LETTERS, bare_letter, build
 
 MODEL = "Qwen/Qwen3.6-27B"
 CACHE = REPO_ROOT / "data" / "probe_cache"
@@ -41,7 +41,7 @@ def select(runs: list[str], min_count: int, n_samples: int, seed: int) -> list[d
         for ep in read_episodes(LOCAL / "hint_mcq" / run):
             if ep["arm"] != "nohint":
                 continue
-            a = first_letter((ep["messages"][-1].get("content") or "").strip())
+            a = bare_letter(ep["messages"][-1].get("content") or "")
             if a:
                 answers[str(ep["item"])].append(a)
                 gold[str(ep["item"])] = ep["meta"]["gold"]

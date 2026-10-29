@@ -56,6 +56,8 @@ distinguish documented behavior from implementation mistakes.
 
 ### 1. P1: MMLU extracts an earlier letter instead of the answer
 
+**Fixed 2026-10-29 (PR #404):** only a one-letter reply is scored; census rescored, cases rebuilt.
+
 [`environments/hint_mcq/env.py`](environments/hint_mcq/env.py), `LETTER`, `first_letter()` and
 `measure()` (lines 86–106): the first standalone capital A–J anywhere in the reply wins. Thus
 `I think the answer is B.` is graded I, and reproducing the options before answering grades A.

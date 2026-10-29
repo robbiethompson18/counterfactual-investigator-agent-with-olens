@@ -75,18 +75,7 @@ class RunWriter:
         self.index[ep["id"]] = [f"{self.shard:03d}.jsonl", off, len(line)]
 
     def labels(self, labeler: str, version: str, rows: list[tuple], kind: str = "code"):
-        """rows: (episode id, values) or (episode id, values, calls). calls = the judge's exact model calls, [{"model",
-        "messages" (input then output), "params"?}], which expview shows on the episode (kind "judge" should save them)."""
-        p = self.dir / "labels" / f"{labeler}@{version}.jsonl"
-        if p.exists():
-            raise SystemExit(f"{p} exists; label files are never overwritten")
-        lines = []
-        for eid, v, *calls in rows:
-            row = {"episode": eid, "values": v, "kind": kind}
-            if calls and calls[0]:
-                row["calls"] = calls[0]
-            lines.append(json.dumps(row, default=str) + "\n")
-        p.write_text("".join(lines))
+        write_labels(self.dir, labeler, version, rows, kind)
 
     def finish(self, status="done", **extra):
         if self.fh:
@@ -94,6 +83,23 @@ class RunWriter:
         (self.dir / "episodes" / "index.json").write_text(json.dumps(self.index) + "\n")
         self.meta.update(status=status, finished=dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), n_episodes=len(self.index), **extra)
         self._write_meta()
+
+
+def write_labels(run_dir: Path, labeler: str, version: str, rows: list[tuple], kind: str = "code") -> Path:
+    """labels/<labeler>@<version>.jsonl. rows: (episode id, values) or (episode id, values, calls). calls = the judge's exact
+    model calls, [{"model", "messages" (input then output), "params"?}], which expview shows on the episode (kind "judge"
+    should save them)."""
+    p = run_dir / "labels" / f"{labeler}@{version}.jsonl"
+    if p.exists():
+        raise SystemExit(f"{p} exists; label files are never overwritten")
+    lines = []
+    for eid, v, *calls in rows:
+        row = {"episode": eid, "values": v, "kind": kind}
+        if calls and calls[0]:
+            row["calls"] = calls[0]
+        lines.append(json.dumps(row, default=str) + "\n")
+    p.write_text("".join(lines))
+    return p
 
 
 def read_episodes(run_dir: Path):

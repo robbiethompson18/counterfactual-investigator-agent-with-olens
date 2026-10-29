@@ -72,6 +72,7 @@ uv run python -m environments run ENV --pair realism --model Qwen/Qwen3.6-27B --
     --backend vllm --url $QWEN_VLLM_URL --thinking off
 uv run python -m environments index            # rebuild data/envs/<env>/index.json and data/envs/index.json
 uv run python -m environments upload ENV/RUN   # one HF commit: the run folder + its indexes, under envs/ (re-upload, or a --no-upload run)
+uv run python -m environments rescore ENV/RUN --tag T   # a new labels/measure@<sha12>-T.jsonl from today's measure() (no index or HF change)
 ```
 
 - Backends: `vllm` (any OpenAI-compatible URL), `openrouter` (`--provider` pins one provider, no

@@ -13,8 +13,12 @@ questions: the 718 of the MCQ answer probe (docs/mcq-answer-probe.md; ids from i
 probe on the hint_qwen_dsv4 items (`2026-10-28_eval-baseline-12k`). `--prep` writes the split and the counts to the inputs
 run (`split.json`), docs/mcq-unselected.md records them.
 
-**Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS); a
-question is a case when its modal answer has >= MIN_SHARE of its answered samples. Truth = that modal letter.
+**Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS),
+read from their labels file LABELS: a reply counts only when it is one bare letter (worked solutions are unscored; the
+first-capital parser before 2026-10-29 read them as "A" or "I", CODE_SMELL P1 #1). A question is a case when its modal
+letter has >= MIN_SHARE of all its samples, an unscored reply counting against it (so >= 7 of 8 samples gave that bare
+letter, as the prompt says; a share of the scored replies alone admits questions on one or two bare letters). Truth =
+that modal letter.
 
 **Conditions** (single turn, `core.INLINE_CONDITIONS`, Gemini 3.8 Flash at INLINE_EFFORT, no tools but submit):
 `transcript_inline` is the prompt alone (there is no transcript: the name is cfbench's); `olens_inline` adds O-lens reads
@@ -41,7 +45,6 @@ from pathlib import Path
 from cfbench.evals.hint_qwen_dsv4_letter.eval import OPTION, canon
 from cfbench.olens import show_token
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
 from environments._lib.runfolder import LOCAL, REPO_ROOT
 
 ENVS = ["hint_mcq"]
@@ -56,6 +59,8 @@ SEED, N_SAMPLE, N_EVAL = 0, 4000, 2000
 MIN_SHARE = 7 / 8
 LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
+# every CENSUS run's strict-parse rescore (`environments rescore`), named: latest_labels() picks by mtime (CODE_SMELL P1 #6)
+LABELS = "measure@4f098526d544-strict.jsonl"
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
 READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, on HF
@@ -100,15 +105,14 @@ def split() -> dict:
 
 @cache
 def census() -> dict[str, Counter]:
-    """item -> Counter of Qwen's no-hint letters over the census runs."""
+    """item -> Counter of Qwen's no-hint answers over the census runs (their LABELS file): the letter, or None for an
+    unscored reply (not one bare letter), so a share is over every sample."""
     out: dict[str, Counter] = defaultdict(Counter)
     for run in CENSUS:
-        _, labels = latest_labels(LOCAL / "hint_mcq" / run)
-        assert labels, run
-        for ep, v in labels.items():
-            arm, item, _ = ep.split("~")
-            if arm == ARM and v.get("answer"):
-                out[item][v["answer"]] += 1
+        for r in map(json.loads, (LOCAL / "hint_mcq" / run / "labels" / LABELS).open()):
+            arm, item, _ = r["episode"].split("~")
+            if arm == ARM:
+                out[item][r["values"].get("answer")] += 1
     return out
 
 
@@ -117,15 +121,18 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     sp, cs, table = split(), census(), _mod()._table()
     rows = []
     for item in sp["eval"]:
-        c = cs.get(item)
-        if not c:
+        c = cs.get(item) or Counter()
+        letters = Counter({a: k for a, k in c.items() if a})
+        if not letters:
             continue
-        modal, k = c.most_common(1)[0]
-        if k / sum(c.values()) < MIN_SHARE:
+        modal, k = letters.most_common(1)[0]
+        n = sum(c.values())
+        if k / n < MIN_SHARE:
             continue
         row = table.loc[item]
         rows.append({"version": "mmlu_pro", "item": item, "category": row.category, "gold": row.answer, "n_opts": len(row.options),
-                     "modal": modal, "k": k, "n": sum(c.values()), "answers": dict(c)})  # fmt: skip
+                     "modal": modal, "k": k, "n": n, "answers": dict(letters), "unscored": c[None]})  # fmt: skip
+    sp["labels"] = LABELS
     sp["n_eval_with_census"] = sum(i in cs for i in sp["eval"])
     sp["n_cases"] = len(rows)
     sp["n_cases_right"] = sum(r["modal"] == r["gold"] for r in rows)
