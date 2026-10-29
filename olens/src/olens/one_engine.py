@@ -200,14 +200,19 @@ class OneEngine(AguLens):
         from vllm import SamplingParams
 
         greedy = sampling.temperature <= 0
-        params = SamplingParams(
-            n=n,
-            max_tokens=sampling.max_new_tokens,
-            temperature=0.0 if greedy else sampling.temperature,
-            top_p=1.0 if greedy else sampling.top_p,
-            top_k=-1 if greedy else sampling.top_k,
-            seed=None if greedy else seed,
-        )
+        # `seed` may be one seed per item: with one shared seed, equal vectors in a batch decode to the same sample
+        seeds = seed if isinstance(seed, list) else [seed] * len(vecs)
+        params = [
+            SamplingParams(
+                n=n,
+                max_tokens=sampling.max_new_tokens,
+                temperature=0.0 if greedy else sampling.temperature,
+                top_p=1.0 if greedy else sampling.top_p,
+                top_k=-1 if greedy else sampling.top_k,
+                seed=None if greedy else s,
+            )
+            for s in seeds
+        ]
         outs = self._gen([self._embeds(L, v) for v, L in zip(vecs, layers)], params, lora=self.lens_req)
         return [[self._finish(c.text, sampling) for c in o.outputs] for o in outs]
 

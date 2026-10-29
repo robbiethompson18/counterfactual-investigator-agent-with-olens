@@ -282,8 +282,9 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
             acts.write(vecs.to(torch.bfloat16).view(torch.int16).numpy().tobytes())  # row n_acts + i <-> items[i]; numpy has no bf16
             acts.flush()
         tb = time.time()
+        seeds = [item_seed(args.seed, k, L) for k, L, _ in items]
         texts = (
-            [t[0] for t in lens.read_items(vecs, item_layers, sampling(args) if args.readout == "olens" else NLA_SAMPLING, seed=args.seed)]
+            [t[0] for t in lens.read_items(vecs, item_layers, sampling(args) if args.readout == "olens" else NLA_SAMPLING, seed=seeds)]
             if items
             else []
         )
@@ -311,6 +312,12 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         print(f"[{n_done}, {len(todo) - len(jobs)} queued] batch of {len(jobs)} transcripts, {n_tok} tokens, {len(items)} reads "
               f"({n_all - len(items)} cached) | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
               flush=True)  # fmt: skip
+
+
+def item_seed(seed, key, layer):
+    """A decode's own sampling seed, from --seed, its cache key (prefix hash, transcript id at T > 0) and layer: one seed for the
+    whole batch made equal vectors (one position read for many transcripts) decode to the same sample (2026-10-29)."""
+    return int.from_bytes(hashlib.blake2b(repr((seed, key, layer)).encode(), digest_size=4).digest(), "little")
 
 
 def prefix_keys(ids, positions):
