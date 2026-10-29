@@ -7,8 +7,8 @@ schemas, env block, sandbox files, prefilled turns, app state; the source ctx ha
 is byte-identical to the source episode), then edits the last user turn:
 
     replace     the task is replaced by the question. alignment_faking keeps its <INPUT> wrapper and free/paid or
-                preview/public tag and replaces only <user_input> (v10, with no wrapper: everything after the tag). Only for sources with a system prompt or tools (a
-                single-turn chat env without one would just be `bare`).
+                preview/public tag and replaces only <user_input> (v10, with no wrapper: everything after the tag).
+                Only for sources with a system prompt or tools (a single-turn chat env without one would just be `bare`).
     after_task  the task stays and the question follows it in the same turn.
 
 `bare` is the question alone, no system prompt. The two options' order is drawn from the episode's seeded rng and saved
