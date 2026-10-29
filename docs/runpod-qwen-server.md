@@ -8,13 +8,13 @@ are in [runpod/CLAUDE.md](../runpod/CLAUDE.md); this is the reference behind the
 
 `up` creates the pod through RunPod's REST API (runpodctl can't set a start command) from the
 official `vllm/vllm-openai:v0.32.0` image. The pod mounts a network volume at `/workspace`. There
-are two, each 150 GB (about $10.50/month), and `up` tries them in order until one's datacenter has
-the GPUs free: `qwen-fastboot` (id `wwwce2mejb`, **US-CA-2**), then `qwen-fastboot-nc1` (id
-`cdde9ia5iu`, **US-NC-1**, added 2026-10-22 when US-CA-2 ran out of H200s). `VOLUMES=<id>` picks
-one. The image's start command is `runpod/qwen_server_boot.sh`, which installs sshd and starts vLLM.
-The volume holds the weights (`HF_HOME`) and every compile cache: the boot script sets
-`HOME=/workspace/home`, and vLLM's torch.compile/inductor cache, FlashInfer, Triton etc. all write
-under `~`. So only the first boot on a fresh volume downloads and compiles.
+are two, each 300 GB (about $21/month; grown from 150 GB on 2026-10-29), and `up` tries them in
+order until one's datacenter has the GPUs free: `qwen-fastboot` (id `wwwce2mejb`, **US-CA-2**), then
+`qwen-fastboot-nc1` (id `cdde9ia5iu`, **US-NC-1**, added 2026-10-22 when US-CA-2 ran out of H200s).
+`VOLUMES=<id>` picks one. The image's start command is `runpod/qwen_server_boot.sh`, which installs
+sshd and starts vLLM. The volume holds the weights (`HF_HOME`) and every compile cache: the boot
+script sets `HOME=/workspace/home`, and vLLM's torch.compile/inductor cache, FlashInfer, Triton etc.
+all write under `~`. So only the first boot on a fresh volume downloads and compiles.
 
 Measured 2026-10-21 on 1x H200 (2x H200 had no stock in any datacenter with network volumes):
 
@@ -148,8 +148,10 @@ the work; its docstring has the request and output formats. First used for the c
   sshd. On 2026-10-23 `setup` ran first, found no vLLM to kill, and the boot script then started one
   that held 127 GB, so the next job hit CUDA OOM. Wait for `vllm starting` in `/workspace/boot.log`
   before `setup`, or check `nvidia-smi` after it.
-- The merged lens (52 GB) lives on the cache volume (`/workspace/merged/agu_space_rl600`); `setup`
-  builds it once per volume (~10 min). A volume needs ~110 GB free for weights + merged lens.
+- No merged lens on disk since the one-engine reader: `setup` converts the lens and AR adapters into
+  `/workspace/lora_vllm/` (~0.9 GB). The old 52 GB `/workspace/merged/agu_space_rl600` was deleted
+  on 2026-10-29. Weights, adapters and compile caches take ~75 GB; the all-layer NLA
+  (`olens_ckpt/nla64`, critic + AV, plus `lora_vllm/nla64_av`) adds ~55 GB.
 - The vllm image lacks scipy, pyyaml and flash-linear-attention; `setup` pip-installs them into the
   image's Python (not the volume: NFS makes imports slow). HF also warns that `causal_conv1d` is
   missing and falls back to PyTorch; capture is still ~1 s per 1k tokens.
@@ -207,7 +209,10 @@ Gotchas:
   uploads work, but keep the chunk size under 500 MB.
 - `ListObjects` is slow or fails ("same next token") the first time on a prefix with more than ~10k
   files or 10 GB, e.g. `.cache/huggingface/hub/`. Don't `aws s3 sync` the whole volume; list and
-  copy specific prefixes.
+  copy specific prefixes. A prefix holding multi-GB files can time out (502/524/530) even with few
+  keys; `cp`/`rm` known keys directly (e.g. read `model.safetensors.index.json` for shard names).
+  The endpoint itself is sometimes down for minutes (NC1 answered "transport endpoint is not
+  connected" for over an hour on 2026-10-29); a pod on the volume is the fallback.
 - No batch `DeleteObjects`, presigned URLs, bucket create/delete or ACLs. Requests with the clock
   more than an hour off are rejected.
 
