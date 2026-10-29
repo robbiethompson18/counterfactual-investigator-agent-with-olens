@@ -2,6 +2,14 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `environments run` hangs forever on a request that never returns
+
+The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
+after every other episode is done: all three hint_mcq runs of 2026-10-28 (`rest`, `rest-b`,
+`rest-late`) sat at the tail with an idle pod until they were killed and finished by hand (status
+abandoned, labels, index, Docent and HF upload by script). A timeout that drops the episode as an
+error, like cfbench's predictor timeout, would let the run finish on its own.
+
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
 The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md / BASE_LINE / ASK / PROMPT
@@ -287,14 +295,6 @@ none fixed yet:
   harness v8); `char_offset` ignores a field's stripped leading whitespace (reads land a few chars
   early); per-token decoding mangles characters split across tokens in saved transcript text; J++
   provenance records a blob hash, not the commit, and J++ ignores per-request `layers`.
-
-## 2026-10-28: callers of the deleted `cfbench.envs.env_runs.rows()`
-
-`rows()` (episodes as evalcue-shaped rows) went in `b78d8bd` (2026-10-27) but two callers remain,
-silenced with `ty: ignore` in the ty-clean PR: `environments/hint_mcq/report.py` (so it and
-`gate.py`, which imports it, fail at import) and the `envs:` specs of
-`scripts/olens_requests_from_runs.py` (ported to `EnvRuns` in PR #306). Port `report.py` to
-`EnvRuns` / `read_episodes`, or restore `rows()`.
 
 ## 2026-10-27: cfbench places every chat-template token at one character, labelled as the previous message
 

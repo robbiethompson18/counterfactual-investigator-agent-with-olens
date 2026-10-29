@@ -497,8 +497,9 @@ Current docs:
   / 67 items, no gate): O-lens 28% vs placebo 25% vs transcript-only 23%, within noise, for Flash,
   Sol and Astra; the gate was a collider; the eight-item dissection: the hint overwrites the own
   answer before any readable position, it is readable only in the no-hint arm; three legs moving the
-  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp [+5, +23], 50
-  items, not yet dissected)
+  hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp on the 50 items
+  that found it, +6pp [+1, +11] p = 0.02 on 142 fresh ones, via a lower placebo baseline, not a
+  better lens; dropped for Kylie's inline evals)
 - [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
   — 718 consistent MMLU-Pro questions (half wrong): a linear probe at the newline after each option
   (L52) picks Qwen's own answer 94% / 80% (right / wrong questions) and the gold on wrong ones only
@@ -589,6 +590,9 @@ Current docs:
 - [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
   — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
   question (prompt inversion), and the predictor cites them only to back the hinted answer
+- [REFERENCE: WSB knowledge_cutoff, stock Qwen vs the lens — read before quoting the lens's knowledge_cutoff number or the "Baseline C ties the lens" line](docs/wsb-knowledge-cutoff.md)
+  — Baseline C replicated (0.46 vs their 0.49); Qwen just answering the question scores 0.89 under
+  the same strict-win rule vs the lens's 0.49; the label is Qwen's own answer
 - [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
   — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
@@ -596,6 +600,9 @@ Current docs:
   selfdescribe items: 0.81 pass@1 vs the lens's 0.20 per readout, lens wins only at any-of-~231
   (gender is Sonnet's gap); basic_readout on all 100: the lens wins the 32 own-favourite items
   (Sonnet as Qwen 0.54 vs lens 0.94 at layer 60, 0 through layer 28) by reading the next token
+- [REFERENCE: WSB wrong_bridge — read before quoting lens-vs-text numbers on WorkspaceBench's wrong-bridge family, or claiming the lens reads a model-specific error](docs/wsb-wrong-bridge.md)
+  — space lens any-layer 0.46 names Qwen's wrong bridge (true bridge 0.16); Sonnet prompt-only
+  0.35/0.48, Sonnet with the answer 0.83/0.86; item overlaps, decoder-prior and judge caveats
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas

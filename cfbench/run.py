@@ -64,6 +64,7 @@ async def main():
     ap.add_argument("--olens-reads", default="", help="comma list of O-lens reads JSONL (cfbench/olens.py), for the olens conditions")
     ap.add_argument("--jlens-reads", default="", help="comma list of J++ reads JSONL (cfbench/jlens.py), read at every token")
     ap.add_argument("--nla-reads", default="", help="comma list of NLA reads JSONL (--readout nla), for the nla conditions")
+    ap.add_argument("--olens-before", help="regex; hide every O-lens/NLA read at or after its first match in each run's transcript")
     ap.add_argument("--allow-few-reads", action="store_true", help="run olens conditions on arms with few reads; agents ask a human first")
     ap.add_argument(
         "--olens-positions",
@@ -160,14 +161,15 @@ async def main():
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in LENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
-            lens_tools, read = olens.tools(base, reads, placebo=condition == "olens_placebo_agentic", seed=args.seed + draw)
+            placebo = condition == "olens_placebo_agentic"
+            lens_tools, read = olens.tools(base, reads, placebo=placebo, seed=args.seed + draw, before=args.olens_before)
             tools |= lens_tools
         if condition in JLENS_CONDITIONS:
             lens_tools, read = jlens.tools(base, jreads, placebo=condition == "jlens_placebo_agentic", seed=args.seed + draw)
             tools |= lens_tools
         if condition in NLA_CONDITIONS:
             placebo = condition == "nla_placebo_agentic"
-            lens_tools, read = olens.tools(base, nreads, placebo=placebo, seed=args.seed + draw, kind="nla")
+            lens_tools, read = olens.tools(base, nreads, placebo=placebo, seed=args.seed + draw, kind="nla", before=args.olens_before)
             tools |= lens_tools
         note = nla_note if condition in NLA_CONDITIONS else fve_note
         prompt = build_prompt(

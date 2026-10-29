@@ -1,13 +1,16 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-28):** MIXED. Only `wrong_mcq` lives on, as
+**Status (2026-10-29):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/). The 2026-10-27 table below is superseded
 by the 2026-10-28 scale-up section right after it: on 2,000 more questions (174 correct-hint and 67
 wrong-hint items that followed the hint 8/8, no text-inversion gate) the O-lens condition is within
 noise of its placebo for three predictors, and the eight-item dissection says why. Exception: with
-the hint after the instruction and only pre-hint reads shown, the lens beats placebo by 13pp [+5,
-+23] on 50 items (one leg of three, not yet dissected; section below). `favorites` and `opinion_mcq`
-are retired (code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
+the hint after the instruction and only pre-hint reads shown (leg B), the lens beats placebo: +13pp
+[+5, +23] on the 50 items that found it, +6pp [+1, +11] (p = 0.02) on 142 fresh items from the rest
+of MMLU-Pro (2026-10-28 evening, section below). Real but small, and the lens rate itself never
+moves (27–30% in every ordering); B's gap comes from a lower placebo baseline. Not pursued further:
+Kylie's single-turn `*_inline` evals superseded this line. `favorites` and `opinion_mcq` are retired
+(code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
 `python -m graphs.hint_mcq_answer` (header runs); the scale-up figures were made with scratchpad
 scripts and live on the two artifact pages linked in the scale-up section. TruthfulQA: the same
 procedure gives Qwen survivors for hinted_truthfulqa's `gold` pair
@@ -142,6 +145,51 @@ Pages: conclusions with the figures and the dissection,
 <https://claude.ai/artifact/WjyALftMJKfx5Xoee4PUPj>. Gemini through OpenRouter: a new account is
 capped at 20 requests/min per model and a BYOK AI Studio key at 10k requests/day (Tier 1), which is
 what paced the night.
+
+### B at scale: 143 fresh items (2026-10-28 evening)
+
+Leg B again, on items no earlier result had seen: hint_mcq items `2200:` (every other MMLU-Pro test
+question, all 14 categories, STEM included). Funnel: `nohint` ×8 + ×4 on ~9,800 questions
+(`envs/hint_mcq/2026-10-28_rest`, `-rest-b`), 1,490 consistent-wrong (own answer ≥ 7/8 and not
+gold), `late/hint+d1` ×8 on those (`-rest-late`; mean follow 31%), 163 followed 8/8. Reads
+`olens_reads/2026-10-28_hint-mcq-rest-late`; cfbench harness 8, Flash medium, 3 draws, mostly on
+`vertex/gemini-3.8-flash`.
+
+**Bare-letter rule.** On some items (mostly STEM) Qwen writes a worked solution instead of a letter:
+the letter parser then grabs the article "A" or the pronoun "I", and the transcript carries CoT. An
+item counts only if every `nohint` and hinted reply fullmatches `\(?[A-J][.)]?`. That keeps 143 of
+the 163 new items and 47 of the original 50 (drops 164, 580, 5271; item 580's hinted replies are all
+worked solutions).
+
+| items                     | n   | transcript-only | O-lens       | placebo      | O-lens − placebo  | won / lost | p (sign-flip perm.) |
+| ------------------------- | --- | --------------- | ------------ | ------------ | ----------------- | ---------- | ------------------- |
+| original 47               | 47  | 18% [9, 28]     | 32% [20, 45] | 18% [9, 28]  | +14.2pp [+6, +24] | 11 / 2     | 0.006               |
+| **new**                   | 142 | 18% [12, 24]    | 26% [19, 32] | 20% [13, 26] | +5.9pp [+1, +11]  | 20 / 9     | 0.02                |
+| new, knowledge categories | 69  | 21% [12, 30]    | 31% [21, 42] | 23% [14, 33] | +8.2pp [0, +16]   | 13 / 6     |                     |
+| new, other (STEM etc.)    | 73  | 15% [7, 22]     | 20% [12, 29] | 16% [9, 25]  | +3.7pp [−2, +10]  | 7 / 3      |                     |
+| pooled                    | 189 | 18% [13, 23]    | 27% [21, 33] | 19% [14, 25] | +7.9pp [+4, +12]  | 31 / 11    | 0.0003              |
+
+One of the 143 lost draws to API errors and is left out. The new items are the clean test (the
+original 50 are the ones that made B look good); paired t p = 0.017, sign test 20/9 p = 0.06 (~80%
+of items tie). The gain is mostly on knowledge questions.
+
+**Across orderings the lens rate is flat; the baseline moves.** Same bare-letter rule on every arm:
+
+| ordering                                          | n   | transcript-only | placebo | O-lens | O-lens − placebo, p |
+| ------------------------------------------------- | --- | --------------- | ------- | ------ | ------------------- |
+| original (hint before the instruction), all reads | 143 | 25%             | 28%     | 30%    | +2.3pp, 0.37        |
+| A (instruction before the hint), all reads        | 47  | 18%             | 21%     | 27%    | +5.7pp, 0.21        |
+| B (A, pre-hint reads only)                        | 189 | 18%             | 19%     | 27%    | +7.9pp, < 0.001     |
+
+So B's edge is placebo and transcript-only dropping, not the lens finding more. Either the late-hint
+8/8 items are harder to guess from text (selection), or the late ordering removes a transcript cue;
+A on the same new items would separate the two and was not run. On the 47 shared items A vs B is
+noise-level (lens 27 → 32%, placebo 21 → 18%).
+
+Runs: `cfbench/2026-10-28_answer-mcq-late-d1-prehint-b2ca2`, `-b2ca3`, `-b2cb2` (done, Vertex);
+`-b2a`, `-b2b` (abandoned: launched before the bare-letter rule), `-b2ca`, `-b2ca1`, `-b2cb`
+(abandoned: AI Studio 429s); pool by item, condition and draw. Code: the late arms,
+`--olens-before` and the `vertex/` route (PR #320, split into separate PRs 2026-10-29).
 
 NLA tools in place of the O-lens on 23 of these items are null too (NLA 18% vs placebo 32%):
 [nla-cfbench-hint-mcq.md](../nla-cfbench-hint-mcq.md).
@@ -631,10 +679,9 @@ any item where the predictor and Qwen share a mistake scores in every condition.
    (`olens_reads/2026-10-27_hint-mcq-header`): no gain over stop tokens; at the header the lens
    reads the letter about to be emitted.
 3. ~~cfbench: more items~~ Done 2026-10-28 (the scale-up section): 174 / 67 items, lens at placebo.
-4. The late-hint, words and pre-hint-reads arms (PR #320): if the own answer is readable at the
-   instruction's period in the hinted arm, the lens condition should finally separate from placebo;
-   if not, the hint reorders the computation and this task is a null with a mechanism. Then the
-   agentic version, where the belief is formed by exploration before the misleading pointer is read.
+4. ~~The late-hint, words and pre-hint-reads arms~~ Done 2026-10-28: only pre-hint reads (B)
+   separate from placebo, +6pp on 142 fresh items, through a lower baseline rather than a better
+   lens (section above). Dropped for Kylie's `*_inline` evals.
 5. The J-lens (J++) as the predictor's tool instead of the O-lens: 19 of 50 items done, ties the
    O-lens, null so far ([jlens-cfbench.md](../jlens-cfbench.md)).
 

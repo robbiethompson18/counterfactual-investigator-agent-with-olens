@@ -3,7 +3,7 @@
 Runs a plain model (no lens, no activations) on a WorkspaceBench family and scores it with
 WorkspaceBench's own judge, so the result is comparable with the O-lens numbers in
 [camilablank/workspace-bench](https://github.com/camilablank/workspace-bench) (MIT, Camila Blank).
-`user_modeling`, `jailbreak_recognition` and `basic_readout` so far.
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff` and `wrong_bridge` so far.
 
 ```bash
 source .envrc.local && uv run python -m wsb.user_modeling --n 3 --limit 10   # 5 selfdescribe + 5 synthsys, bank order
@@ -69,4 +69,7 @@ judge/regex pass@1 and pass@n and the lens rate by subfamily.
 ```bash
 uv run python -m wsb.basic_readout --persona qwen --n 5 --slug sonnet-as-qwen   # 500 Sonnet + 500 Opus calls
 uv run python -m wsb.basic_readout --persona self --n 5 --slug sonnet-self
+```
+
+`user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff` and `wrong_bridge` so far.
 ```
