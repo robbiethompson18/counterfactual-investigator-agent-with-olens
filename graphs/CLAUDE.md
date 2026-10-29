@@ -10,7 +10,7 @@ placebo black, no tools gray).
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
-  (`docs/cutoff-qa-inline.md`)
+  (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up

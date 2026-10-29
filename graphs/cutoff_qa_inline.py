@@ -28,6 +28,8 @@ LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olen
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////"}
+# TODO(NLA): add nla_inline / nla_placebo_inline (cfbench/evals/cutoff_qa_inline, #391) to SERIES, PAIRS and RUNS as soon as
+# the NLA reads and runs exist (Robbie, 2026-10-29): this is the one cutoff chart, every lens goes on it.
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo")]
 GROUPS = {
     "all items": None,
