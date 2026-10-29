@@ -9,6 +9,47 @@ Tech debt we know about, newest first.
 `Qwen/Qwen3.6-27B@vllm:deepinfra/fp8` for a run served by the shared bf16 vLLM pod. The runner
 (`environments/_lib/run.py`) should drop `provider` when the backend isn't openrouter.
 
+## 2026-10-29: a run's labels file is picked five different ways
+
+Codex's finding 6 below covers `latest_labels()` choosing a run's labels file by mtime. The choice
+is also re-implemented across the repo, differently:
+
+- newest mtime: `latest_labels()` (the HF indexes the env viewer reads, `spec.py`,
+  `donation_bet/report.py`, the `af_refusals` and `hint_qwen_dsv4` evals, `overeager_main`'s
+  fallback), and copy-pasted in five `hinted_truthfulqa` scripts;
+- mtime, then name: `cfbench/envs/env_runs.py`, `hint_mcq/report.py`;
+- alphabetical last: `hinted_truthfulqa/judge.py`;
+- `measure@v3-curly` if present, else alphabetical last: `scripts/dsv4_olens/prep_env.py`;
+- every file at once: `census.py` on Kylie's open PR #348.
+
+Only `overeager_main` and `mcq_unselected` (PR #404) pin a file. An mtime is when the file landed on
+this machine (arbitrary after `hf download`) and names are git shas, so two machines or two scripts
+can grade one run differently. Live now: the four hint_mcq census runs hold the old-parser and
+`-strict` (#404) labels side by side (the env viewer's index still shows the old ones), and
+`notice_defect/2026-10-27_try1`'s two files disagree on 69 of 2,320 `positive` labels. Fix: one
+picker everyone imports that reads the active version from the run's `meta.json` (have
+`environments rescore` write it), takes the only file when there is one, and raises when there are
+several and no pointer. Evals that need a particular version keep pinning it.
+
+## 2026-10-29: CLAUDE.md is 60 KB and every session loads all of it
+
+`CLAUDE.md` is 649 lines, 59.6 KB (~15k tokens), loaded into every session before any work, and it
+grows with every doc: 42.7 KB of it is the docs index (105 entries), since each doc must get an
+entry, and 43 of those entries are NULL, MIXED, SUPERSEDED or ORPHAN. That's tokens on every turn,
+and the behavioural rules sit buried among a hundred doc glosses. Fix (Robbie's call, since it
+changes the index rule): keep the rules and the ACTIVE entries here, and move the rest to a
+`docs/INDEX.md` that agents read when they need it.
+
+**Fixed 2026-10-29 (PR #413):** `CLAUDE.md` 59.7 → 24.9 KB; the 73 non-ACTIVE entries moved to
+`docs/INDEX.md`.
+
+## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
+
+`scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
+by scratch scripts (clean, dedup, gate-attach, truth recheck) that were not kept. Next batch: port
+the clean into `merge.py` so a bank version is reproducible from the agents' JSONL files plus the
+gate run.
+
 ## 2026-10-29: `environments run` hangs forever on a request that never returns
 
 The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
@@ -55,6 +96,8 @@ affected results; P2 = narrower correctness or reporting issue. The two comparis
 distinguish documented behavior from implementation mistakes.
 
 ### 1. P1: MMLU extracts an earlier letter instead of the answer
+
+**Fixed 2026-10-29 (PR #404):** only a one-letter reply is scored; census rescored, cases rebuilt.
 
 [`environments/hint_mcq/env.py`](environments/hint_mcq/env.py), `LETTER`, `first_letter()` and
 `measure()` (lines 86–106): the first standalone capital A–J anywhere in the reply wins. Thus

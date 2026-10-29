@@ -1,38 +1,22 @@
-# Knowledge-cutoff questions (present tense, bare user turn)
+# cutoff_qa: present-tense factual questions across Qwen's knowledge cutoff
 
-**Status (2026-10-29):** ACTIVE. New env, no runs yet. Default bank v2: 803 present-tense questions
-("Who is the CEO of Intel?") gated on Qwen, items = the 266 stable ones (187 stable-wrong: Qwen's
-stale answer). One arm, no hints. Provenance, the gate numbers and the present-tense finding:
-[docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
+**Status (2026-10-29):** ACTIVE. Bank v4 (6,411 questions, 2,605 stable under Qwen, 861 of them
+stale) is the default. One arm, no hints. Everything else is in
+[docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md); results in
+[docs/cutoff-qa-inline.md](../../docs/cutoff-qa-inline.md).
 
-Each question is asked verbatim as the only user message, no system prompt, thinking off:
-WorkspaceBench's knowledge_cutoff render and sampling (T 1.0, top_p 1.0). The label for the
-predict-Qwen task is the gate's `qwen_modal`, not the truth. Banks are data and live on HF
-(`banks/cutoff_qa/v1.json`, `v2.json`), fetched to `data/banks/cutoff_qa/` on first use;
-`CUTOFF_QA_BANK=v1` loads the dated v1 bank, `CUTOFF_QA_ALL=1` includes unstable and refusal items.
-
-|                 |                                                                                                                                                                                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Code            | [`env.py`](env.py); the bank is built by [`scripts/cutoff_facts/merge.py`](../../scripts/cutoff_facts/merge.py) from the subagents' JSONL files                                                                                                                           |
-| Arms            | `nohint` (the question alone); hints are ruled out for this env                                                                                                                                                                                                           |
-| Primary measure | `correct`: the reply, normalized (`norm`: lowercase ASCII, no punctuation / articles / currency / units), equals the truth or an alias. Also `answer`, `stale` (equals Qwen's gated `qwen_modal`; for v1 items the pre-cutoff analog), `contains_truth`, `contains_stale` |
-| Pairs           | none (one arm)                                                                                                                                                                                                                                                            |
-| Items           | v2's stable items by default (ids as in v1: `b1-*` pilot, `<domain>-NN` batch, `f-*` fame-steered); meta carries the truth fields, `qwen_modal`, `gate_class`, `truth_now`, `numeric` and `bank`                                                                          |
-| Requires        | thinking off                                                                                                                                                                                                                                                              |
-
-Run (10 items, 4 samples each; the default target is Qwen3.6-27B bf16 on the shared vLLM server,
-`$QWEN_VLLM_URL`, thinking off, temperature 1.0 / top_p 1.0: WorkspaceBench's knowledge_cutoff
-sampling and the stability gate's):
+|       |                                                                                                                    |
+| ----- | ------------------------------------------------------------------------------------------------------------------ |
+| Code  | [`env.py`](env.py); banks on HF (`banks/cutoff_qa/v4.json`), fetched on first use                                  |
+| Arms  | `nohint`: the question as the only user message, no system prompt, thinking off, T 1.0 / top_p 1.0                 |
+| Items | the stable (≥ 7/8) items; `CUTOFF_QA_ALL=1` for every item, `CUTOFF_QA_BANK=v3` / `v2` / `v1` for older banks      |
+| Label | `qwen_modal` (Qwen's gated modal answer); `measure()` gives `correct`, `stale`, `contains_truth`, `contains_stale` |
 
 ```bash
 uv run python -m environments run cutoff_qa --tag dev --items 0:10 --n 4
 ```
 
-Offline smoke (2026-10-29, `build` + `measure`, no model): item `b1-tech-06` ("Apple released the
-15th major version of macOS in September 2024 ..."): "Sequoia" / "macOS Sequoia." / "The macOS
-Sequoia" all `correct`; "Sonoma" `stale`; "It's macOS Sonoma (version 14)." `contains_stale` only;
-"$32.5 million" normalizes to `32.5`.
-
 ## Runs
 
-None yet.
+`cutoff_qa/2026-10-29_smoke200-nohint`: the first 200 stable non-numeric v2 items, n = 1, for the
+investigator smoke in docs/cutoff-qa-inline.md.

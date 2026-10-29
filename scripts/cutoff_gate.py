@@ -4,6 +4,7 @@ Each question goes to the shared Qwen server as one user message (verbatim, no s
 WorkspaceBench knowledge_cutoff render, so O-lens reads line up later), sampled 8x at T=1 / top_p=1 plus one greedy. The
 modal normalized answer then classifies the question: stable_right (mode >= 7/8, matches truth or an alias), stable_wrong
 (>= 7/8, doesn't), unstable (< 7/8), refusal_or_null (the mode is empty / "I don't know" / "unknown" / ...). No LLM judge.
+Questions without a `truth` (favorites_qa: Qwen's own preferences) are `stable` instead of stable_right / stable_wrong.
 
     uv run python scripts/cutoff_gate.py sample QUESTIONS.json --slug b1b2-1072 [--concurrency 32] [--limit N] [--out DIR]
     uv run python scripts/cutoff_gate.py summarize RUN      # rebuild summary.json/.md from RUN/samples.jsonl
@@ -107,8 +108,8 @@ async def sample_all(questions: list[dict], out: Path, concurrency: int):
 def classify(q: dict, row: dict) -> dict:
     counts = collections.Counter(row["samples_norm"])
     modal, count = counts.most_common(1)[0]
-    truths = {normalize(q["truth"])} | {normalize(a) for a in q["truth_aliases"]}
-    analog = normalize(q["pre_cutoff_analog"]) if q["pre_cutoff_analog"] else None
+    truths = {normalize(t) for t in [q.get("truth") or "", *q.get("truth_aliases", [])]} - {""}
+    analog = normalize(q["pre_cutoff_analog"]) if q.get("pre_cutoff_analog") else None
     right = modal in truths
     # loose: a truth string is a whole-word substring of the answer ("stegosaurus skeleton apex" vs "stegosaurus")
     right_loose = right or any(t and re.search(rf"(?<!\w){re.escape(t)}(?!\w)", modal) for t in truths)
@@ -116,17 +117,19 @@ def classify(q: dict, row: dict) -> dict:
         klass = "refusal_or_null"
     elif count < STABLE_MIN:
         klass = "unstable"
+    elif not truths:
+        klass = "stable"
     else:
         klass = "stable_right" if right else "stable_wrong"
     return {
         "id": q["id"],
-        "event_date": q["event_date"],
-        "year": q["event_date"][:4],
-        "answer_type": q["answer_type"],
-        "numeric": is_numeric(q["answer_type"]),
+        "event_date": q.get("event_date"),
+        "year": (q.get("event_date") or "")[:4] or None,
+        "answer_type": q.get("answer_type", ""),
+        "numeric": is_numeric(q.get("answer_type", "")),
         "question": q["question"],
-        "truth": q["truth"],
-        "pre_cutoff_analog": q["pre_cutoff_analog"],
+        "truth": q.get("truth"),
+        "pre_cutoff_analog": q.get("pre_cutoff_analog"),
         "modal": modal,
         "modal_count": count,
         "n_distinct": len(counts),
@@ -145,13 +148,13 @@ def summarize(run: Path, questions: list[dict]):
     by_id = {q["id"]: q for q in questions}
     rows = [classify(by_id[r["id"]], r) for r in map(json.loads, (run / "samples.jsonl").read_text().splitlines())]
     rows.sort(key=lambda r: r["id"])
-    classes = ["stable_right", "stable_wrong", "unstable", "refusal_or_null"]
+    classes = ["stable_right", "stable_wrong", "stable", "unstable", "refusal_or_null"]
     tally = lambda rs: {c: sum(r["class"] == c for r in rs) for c in classes} | {"n": len(rs)}
     wrong = [r for r in rows if r["class"] == "stable_wrong"]
     wrong_with_analog = [r for r in wrong if r["pre_cutoff_analog"]]
     totals = {
         "all": tally(rows),
-        "by_year": {y: tally([r for r in rows if r["year"] == y]) for y in sorted({r["year"] for r in rows})},
+        "by_year": {y: tally([r for r in rows if r["year"] == y]) for y in sorted({r["year"] for r in rows}, key=lambda y: y or "")},
         "by_answer_kind": {k: tally([r for r in rows if r["numeric"] == (k == "numeric")]) for k in ("numeric", "name")},
         "greedy_agrees_with_mode": sum(r["greedy_agrees"] for r in rows),
         "loose_truth_matches_by_class": {c: sum(r["matches_truth_loose"] for r in rows if r["class"] == c) for c in classes},
