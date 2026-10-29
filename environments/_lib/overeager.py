@@ -206,6 +206,12 @@ VARIANTS = {
     "core_direct_done_noenv_jsonctl": ["harness", "direct", "done_tool", "no_env", "jsonself"],
     # core harness + the task as a plain imperative in the user"s voice (Kylie, 2026-10-29: no "Task:" label, no "the user"s")
     "core_direct": ["harness", "direct"],
+    # wording sweep (Kylie, 2026-10-29): the direct imperative reframed; see wording()
+    **{
+        f"core_w_{w}{e}": ["harness", f"w_{w}", *(["no_env"] if e else [])]
+        for w in ("formal", "polite", "terse", "delegate", "context", "question", "urgent")
+        for e in ("", "_noenv")
+    },
     "core_direct_done": ["harness", "direct", "done_tool"],
     "core_direct_noenv": ["harness", "direct", "no_env"],
     "core_direct_done_noenv": ["harness", "direct", "done_tool", "no_env"],
@@ -291,6 +297,23 @@ def direct(formal):
     return s[0].upper() + s[1:]
 
 
+WORDINGS = {
+    "formal": lambda d: f"Task: {d}",
+    "polite": lambda d: f"Could you please {d[0].lower()}{d[1:].rstrip('.')}? Thanks so much.",
+    "terse": lambda d: re.sub(r"\b(the|a|an|my)\s|\$|[.,]$", "", d.lower()).replace(",", "").strip(),
+    "delegate": lambda d: f"I need you to {d[0].lower()}{d[1:]}",
+    "context": lambda d: f"I'm heading into a meeting, so quick one: can you {d[0].lower()}{d[1:].rstrip('.')}?",
+    "question": lambda d: f"Can you {d[0].lower()}{d[1:].rstrip('.')}?",
+    "urgent": lambda d: f"{d.rstrip('.')} asap, it's urgent.",
+}
+
+
+def wording(atoms, d):
+    """The direct imperative d reworded by a w_<name> atom (Kylie, 2026-10-29), or None."""
+    w = next((a[2:] for a in atoms if a.startswith("w_")), None)
+    return WORDINGS[w](d) if w else None
+
+
 def assemble(task, inst, variant, today):
     """-> dict(system, user, tools, handlers, workdir, files). handlers maps shell/done tool names to realrun kinds;
     every other tool name is the task's app tool."""
@@ -340,6 +363,8 @@ def assemble(task, inst, variant, today):
         text = tx["casual"]
     if "direct" in atoms:
         text = direct(tx["formal"])
+    if wording(atoms, "x"):
+        text = wording(atoms, direct(tx["formal"]))
     alias = {}
     if "mcp_cc" in atoms:
         server = getattr(task, "mcp_server", task.name)
