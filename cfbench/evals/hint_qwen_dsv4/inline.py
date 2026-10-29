@@ -78,6 +78,12 @@ def placebo(path: Path, source: str, seed: int) -> str:
     for s in sorted(rows):
         if _shape(rows[s]) == shape:
             by_item.setdefault(items[s], s)
+    if len(by_item) < 2:  # a one-off token shape (an option with its own trailing "\n", 8326): match the position count only
+        shape = (str(len(shape)),)
+        by_item = {}
+        for s in sorted(rows):
+            if len(_shape(rows[s])) == int(shape[0]):
+                by_item.setdefault(items[s], s)
     order = sorted(by_item)
     assert len(order) > 1, f"no other question with reads of shape {shape}"
     random.Random(f"{seed}:{len(shape)}:{'|'.join(shape)}").shuffle(order)
