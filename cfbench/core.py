@@ -86,6 +86,10 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # (OLENS context="xml") where they had ⟨READ⟩, and the prompt says so; the INLINE_CONDITIONS are new (those evals only);
 # predictions rows record token usage. Every other eval's prompts and tools are byte-identical to 11 (2026-10-28).
 # 13: the INLINE_CONDITIONS run at effort low (Kylie), not high; nothing else changes (2026-10-28).
+# --olens-before (2026-10-29, no bump): hides lens reads at or after a regex match; without the flag every prompt and tool is
+# byte-identical to 13, and runs that pass it say so in meta.json params. The 2026-10-28_answer-mcq-late-d1-prehint* runs
+# were made on PR #320's branch before this landed, and their rows say harness 8: that is 7 plus --olens-before, not the 8
+# above.
 HARNESS_VERSION = 13
 
 
