@@ -139,3 +139,41 @@ def nla_prompt(question: str, told: bool, model: str, rows: list[dict]) -> str:
     layers = ", ".join(map(str, sorted({r["layer"] for r in rows})))
     reads = NLA_TEXT.format(model=model, layers=layers, block=nla_block(rows, question))
     return USER.format(told=TOLD if told else "", prompt=question, reads=reads)
+
+
+# The J++ conditions (jlens_inline, jlens_placebo_inline, jlens_inline_no60; cutoff_qa_inline, 2026-10-29): every token of the
+# rendered prompt, the lens's top JLENS_K next tokens at each layer (scripts/jpp_read_requests.py rows: token, layers, top).
+JLENS_TEXT = """\
+## J-lens reads
+
+The J-lens (Jacobian lens) maps {model}'s internal activation at one token and one layer to the vocabulary: it lists the \
+tokens that activation is pushing the model toward, with the lens's probabilities. It was run at every token of the prompt \
+above as {model} read it, including the chat template around the question (<|im_start|>, <|im_end|>, the "assistant" header \
+and the empty <think></think> block {model} sees with its thinking mode off), at layers {layers}. The last position is the \
+token just before {model}'s reply. Each position shows the token read, then one line per layer with the lens's top {k} \
+tokens and their probabilities. Reads are noisy: at many positions the lens just predicts the next word of the prompt, and \
+the probabilities are the lens's, not {model}'s.
+
+<jlens_reads>
+{block}
+</jlens_reads>
+
+"""
+JLENS_K = 3
+
+
+def jlens_block(rows: list[dict]) -> str:
+    """J++ rows in token order: the token, then a line per layer."""
+    out = []
+    for r in sorted(rows, key=lambda r: r["token_index"]):
+        out.append(json.dumps(r["token"], ensure_ascii=False))
+        for layer, top in zip(r["layers"], r["top"], strict=True):
+            out.append(f"<jlens layer={layer}>{' '.join(f'{json.dumps(t, ensure_ascii=False)} {p:.2f}' for t, p in top[:JLENS_K])}</jlens>")
+    return "\n".join(out)
+
+
+def jlens_prompt(question: str, told: bool, model: str, rows: list[dict]) -> str:
+    assert rows
+    layers = ", ".join(map(str, rows[0]["layers"]))
+    reads = JLENS_TEXT.format(model=model, layers=layers, k=JLENS_K, block=jlens_block(rows))
+    return USER.format(told=TOLD if told else "", prompt=question, reads=reads)
