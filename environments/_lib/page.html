@@ -990,7 +990,7 @@ function answerChart(P, S, top) {
     s += `<g><title>${esc(condLabel(k))}: ${pp(st.mean)}% correct, 95% item bootstrap ${pp(lo)}–${pp(hi)}% · ${st.n} items, ${st.draws} draws</title>
       <rect x="${x - 20}" width="40" y="${f(y(st.mean))}" height="${f(Math.max(0, y(0) - y(st.mean)))}" fill="${condColor(k)}"/>
       <line x1="${x}" x2="${x}" y1="${f(y(lo))}" y2="${f(y(hi))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(hi))}" y2="${f(y(hi))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(lo))}" y2="${f(y(lo))}" class="ci"/></g>
-      <text x="${x}" y="${f(y(hi) - 5)}" class="lab" text-anchor="middle">${pp(st.mean)}%${sig(k)}</text><text x="${x}" y="${H - B + 16}" class="ax" text-anchor="middle">${esc(condShort(k))}</text>`;
+      <text x="${x}" y="${f(y(hi) - 18)}" class="lab" text-anchor="middle">${sig(k)}</text><text x="${x}" y="${f(y(hi) - 5)}" class="lab" text-anchor="middle">${pp(st.mean)}%</text><text x="${x}" y="${H - B + 16}" class="ax" text-anchor="middle">${esc(condShort(k))}</text>`;
   });
   return `<svg class="anschart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="% correct by condition"><title>${esc([...P.runs].join(", "))}</title>${s}</svg>`;
 }
@@ -1005,8 +1005,7 @@ function answerChartBlock(ans, h, keep) {
   const top = Math.min(1, Math.max(0.3, Math.ceil((Math.max(0, ...Ss.flatMap(S => Object.values(S.stats).flatMap(st => [st.mean, st.ci[1]]))) + 0.08) * 10) / 10));
   return `<h3>Answer task: % correct by condition</h3>
     <p class="lede">Bars pool the runs ticked in the answer-task table below (all by default); one panel pooling every case and condition (the per-dataset panels are folded below it). A bar is the mean over items of the
-      item's fraction of correct draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options. ${STARS_NOTE}
-      <label><input type="checkbox" onchange="location.hash=setParam('unanimous', this.checked ? '1' : '')" ${unan ? "checked" : ""}> only items where the shown arm answered with one letter in every sample (e.g. followed the hint 8/8)</label></p>
+      item's fraction of correct draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options. ${STARS_NOTE}</p>
     ${Ps.length ? `<div class="anspanels">${answerChart(Ps[0], Ss[0], top)}</div>
       <details><summary class="mute">per dataset and investigator (${Ps.length - 1} panels)</summary><div class="anspanels">${Ps.slice(1).map((P, i) => answerChart(P, Ss[i + 1], top)).join("")}</div></details>
       <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the answer-task table below${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
@@ -1195,18 +1194,19 @@ const br = (x, ci) => {
   return `<span class="delta ${cls}" title="95% bootstrap CI over items ${ci ? ci.map(v => v.toFixed(3)).join("–") : ""}; 0.25 = always 0.5">${x.toFixed(3)}</span>${ci ? ` <span class="mute">[${ci.map(v => v.toFixed(2)).join(", ")}]</span>` : ""}`;
 };
 // % right per condition as bars with 95% CI whiskers, chance (50%) dashed: a claim eval's table rows of one version
-// significance stars for a paired comparison against transcript-only (sign test, two-sided): * p < .05, ** < .01, *** < .001
+// significance stars for a paired comparison against transcript-only (sign test, one-sided: this condition better):
+// * p < .05, ** < .01, *** < .001
 const stars = p => p == null ? "" : p < 1e-3 ? "***" : p < 1e-2 ? "**" : p < 0.05 ? "*" : "";
-function signP(b, w) {  // exact two-sided sign test over the items that differ
-  const n = b + w, k = Math.max(b, w);
+function signP(b, w) {  // exact one-sided sign test over the items that differ: P(at least b better of b + w)
+  const n = b + w, k = b;
   if (!n) return 1;
   let lc = (m) => { let t = 0; for (let i = 2; i <= m; i++) t += Math.log(i); return t; }, tail = 0;
   for (let i = k; i <= n; i++) tail += Math.exp(lc(n) - lc(i) - lc(n - i) - n * Math.log(2));
-  return Math.min(1, 2 * tail);
+  return Math.min(1, tail);
 }
-const STARS_NOTE = "Stars: paired sign test against transcript-only over the same items, two-sided (* p < 0.05, ** p < 0.01, *** p < 0.001).";
+const STARS_NOTE = "Stars: paired sign test against transcript-only over the same items, one-sided: the condition beats transcript-only (* p < 0.05, ** p < 0.01, *** p < 0.001).";
 function accuracyBars(rows, paired = []) {
-  const conds = condOrder(rows.map(x => x.condition)), L = 44, T = 16, B = 40, H = 240, cw = 96, W = L + 16 + cw * conds.length + 10;
+  const conds = condOrder(rows.map(x => x.condition)), L = 44, T = 30, B = 40, H = 254, cw = 96, W = L + 16 + cw * conds.length + 10;
   const y = v => T + (1 - v) * (H - T - B), f = v => v.toFixed(1);
   let s = "";
   for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="${L}" x2="${W - 10}" y1="${f(y(v))}" y2="${f(y(v))}" class="${v === 0.5 ? "null" : "grid"}"/><text x="${L - 6}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${100 * v}%</text>`;
@@ -1215,7 +1215,7 @@ function accuracyBars(rows, paired = []) {
     s += `<rect x="${f(cx - 26)}" y="${f(y(x.accuracy))}" width="52" height="${f(y(0) - y(x.accuracy))}" fill="${condColor(k)}" opacity="0.85"><title>${esc(condLabel(k))}: ${pct(x.accuracy)} right, 95% CI ${pct(lo)}–${pct(hi)}</title></rect>`;
     s += `<line x1="${cx}" x2="${cx}" y1="${f(y(hi))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(hi))}" y2="${f(y(hi))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(lo))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/>`;
     const pr = paired.find(r => r.condition === k && /^transcript_/.test(r.ref));
-    s += `<text x="${cx}" y="${f(y(hi) - 5)}" class="ax" text-anchor="middle">${pct(x.accuracy)}${stars(pr?.p_two)}</text><text x="${cx}" y="${H - B + 18}" class="lab" text-anchor="middle">${esc(condShort(k))}</text>`;
+    s += `<text x="${cx}" y="${f(y(hi) - 18)}" class="lab" text-anchor="middle">${stars(pr?.p_one)}</text><text x="${cx}" y="${f(y(hi) - 5)}" class="ax" text-anchor="middle">${pct(x.accuracy)}</text><text x="${cx}" y="${H - B + 18}" class="lab" text-anchor="middle">${esc(condShort(k))}</text>`;
   });
   return `<div class="scroll"><svg class="evchart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="% right per condition with 95% CIs">${s}</svg></div>${paired.length ? `<p class="mute" style="font-size:12px">${STARS_NOTE}</p>` : ""}`;
 }
