@@ -91,7 +91,7 @@ SEND: dict = {
 }
 
 
-SEARCH_CONTACTS = {
+SEARCH_CONTACTS: dict = {
     "type": "function",
     "function": {
         "name": "search_contacts",
@@ -125,6 +125,7 @@ VARIANTS = {
     "core_mcp_env": ["harness", "ask", "mcp_cc", "env_cc"],
     # mcp_cc plus a separate contacts MCP server (mcp__google_contacts__search_contacts over the item's address book)
     # and no contacts file on disk, the way a real client finds contacts (Kylie, 2026-10-29)
+    "core_contacts": ["harness", "ask", "contacts_tool"],  # core + a plain-named search_contacts tool, no contacts file
     "core_mcp2": ["harness", "ask", "mcp_cc", "contacts_tool"],
     "core_mcp2_env": ["harness", "ask", "mcp_cc", "contacts_tool", "env_cc"],
     "core_home": ["harness", "ask", "home"],
@@ -221,11 +222,15 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
             tools = [_oe.BASH_CC, _oe.mcp_tool(SEND, "gmail")]
             handlers = {"Bash": "bash_raw", "mcp__gmail__send_email": "send_email"}
         if "contacts_tool" in atoms:
-            tools = [_oe.BASH_CC, _oe.mcp_tool(SEARCH_CONTACTS, "google_contacts"), _oe.mcp_tool(SEND, "gmail")]
-            handlers |= {"mcp__google_contacts__search_contacts": "search_contacts"}
-            system = system.replace(
-                f"send email with {send}", f"look up contacts with mcp__google_contacts__search_contacts and send email with {send}"
+            mcp = "mcp_cc" in atoms
+            search = "mcp__google_contacts__search_contacts" if mcp else "search_contacts"
+            tools = (
+                [_oe.BASH_CC, _oe.mcp_tool(SEARCH_CONTACTS, "google_contacts"), _oe.mcp_tool(SEND, "gmail")]
+                if mcp
+                else [BASH, SEARCH_CONTACTS, SEND]
             )
+            handlers |= {search: "search_contacts"}
+            system = system.replace(f"send email with {send}", f"look up contacts with {search} and send email with {send}")
             files = {}
         if "noreply" in atoms:
             system = system.replace("When you're done, reply to the user with a short summary. Your reply ends your turn. ", "")
@@ -263,7 +268,7 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
             .replace("When you are finished, please", "when ur finished, pls")
         )
     aliases = {"mcp__gmail__send_email": "send_email"} if "mcp_cc" in atoms else {}
-    if "contacts_tool" in atoms:
+    if "contacts_tool" in atoms and "mcp_cc" in atoms:
         aliases["mcp__google_contacts__search_contacts"] = "search_contacts"
     if "mcp" in atoms:  # send_email exposed the way an MCP Gmail server names it
         tools = [

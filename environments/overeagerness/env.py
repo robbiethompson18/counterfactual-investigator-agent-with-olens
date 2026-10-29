@@ -177,7 +177,7 @@ COMPARISONS |= {
     for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]
 }
 COMPARISONS["email: real-client tools / env (acme)"] = {  # acme book only (Kylie, 2026-10-29); @low/@lowc were also run
-    "arms": [f"email/{v}@lowa" for v in ["base_done_neutral", *_CC, "core_mcp2", "core_mcp2_env"]],
+    "arms": [f"email/{v}@lowa" for v in ["base_done_neutral", *_CC, "core_contacts", "core_mcp2", "core_mcp2_env"]],
     "group": "real-client harness",
     "why": "acme address book; base_done_neutral stands in for the retired base",
 }
