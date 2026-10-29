@@ -1,24 +1,28 @@
-"""cutoff_qa: dated short-answer factual questions (events 2024-01 .. 2026-09), each asked as a bare user turn with no system
-prompt and thinking off, the way WorkspaceBench's knowledge_cutoff family renders its items (Robbie, 2026-10-29).
+"""cutoff_qa: short-answer factual questions whose answer changed around Qwen3.6-27B's knowledge cutoff (~January 2025),
+each asked as a bare user turn with no system prompt and thinking off, the way WorkspaceBench's knowledge_cutoff family
+renders its items (Robbie, 2026-10-29).
 
-The subject (Qwen3.6-27B) has a knowledge cutoff around January 2025, so it tends to answer the 2024 questions correctly and
-the later ones with a stale value (last year's winner, the previous CEO). Items are the `cutoff_qa` bank: 1,072 questions
-written by 25 Sonnet subagents from Wikipedia year pages and web search, web-verified, with a short canonical `truth`, its
-`truth_aliases`, and for 58% a `pre_cutoff_analog` (the older value a Jan-2025 model might give). The bank is data, so it
-lives on the HF dataset at `banks/cutoff_qa/v1.json` (fetched on first use); `scripts/cutoff_facts/merge.py` builds it and
-docs/envs/cutoff_qa.md says how it was made and what is wrong with it.
+Bank v2 (default; `CUTOFF_QA_BANK=v1` for the first bank): 803 present-tense, dateless questions ("Who is the CEO of
+Intel?"), 629 rewrites of v1's dated questions plus 174 fame-steered ones, every one gated on the shared Qwen server (8 samples
+at T 1 + greedy): `qwen_modal` (Qwen's modal normalized answer), `qwen_modal_count`, `gate_class` (stable_right, stable_wrong,
+unstable, refusal_or_null). By default items() is the 266 stable (>= 7/8) items; `CUTOFF_QA_ALL=1` takes every item. The
+label for the predict-Qwen task is `qwen_modal`; `truth` (the writer's answer at authoring time), `truth_now` (a web recheck
+as of 2026-10-29, stable items only) and `pre_cutoff_analog` are metadata. docs/envs/cutoff_qa.md has the provenance, the gate
+numbers and the weaknesses; `scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is scripts/cutoff_gate.py
+(PR #382). Banks are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on first use.
 
 Arms: `nohint` only, for now: the user message is the bank's `question` string verbatim (it ends "If you are not sure, give
 your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server (bf16) at temperature 1.0,
 top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff sampling and the stability gate's
-(runs/cutoff_gate/2026-10-29_b1b2-1072), so O-lens reads of env transcripts match the gate's. TODO: a `hint` arm that
-prefixes "A Stanford professor said it's {truth}." (or the stale analog) the way hinted_truthfulqa's `hint/stanford` does, as
-the counterfactual; not built yet.
+(runs/cutoff_gate/2026-10-29_*), so O-lens reads of env transcripts match the gate's. TODO: a `hint` arm that prefixes
+"A Stanford professor said it's {truth}." (or the stale analog) the way hinted_truthfulqa's `hint/stanford` does, as the
+counterfactual; not built yet.
 
 Measures (no LLM judge anywhere): `answer` = the reply normalized (`norm`: lowercase, accents and punctuation stripped,
 leading article dropped, currency / units / digit-group commas stripped from numbers, whitespace collapsed); `correct` = it
-equals the normalized truth or an alias (PRIMARY); `stale` = it equals the normalized pre-cutoff analog (None when the item
-has none); `contains_truth` / `contains_stale` = the same as a whole phrase inside the reply, for replies that add words.
+equals the normalized truth or an alias (PRIMARY); `stale` = it equals Qwen's gated modal answer `qwen_modal` (v1 items, which
+have none: the pre-cutoff analog; None without either); `contains_truth` / `contains_stale` = the same as a whole phrase inside
+the reply, for replies that add words.
 """
 
 import json
@@ -33,16 +37,20 @@ from environments._lib.core import Ctx, Episode
 from environments._lib.runfolder import REPO_ROOT
 
 ARMS = ["nohint"]
-BANK = REPO_ROOT / "data/banks/cutoff_qa/v1.json"  # HF banks/cutoff_qa/v1.json, fetched on first use
+VERSION = os.environ.get("CUTOFF_QA_BANK", "v2")  # v1: the 1,072 dated questions; v2: 803 present-tense, gated
+ALL_ITEMS = os.environ.get("CUTOFF_QA_ALL") == "1"  # include unstable and refusal items too
+META_KEYS = ("truth", "truth_aliases", "pre_cutoff_analog", "event_date", "domain", "answer_type", "numeric")
+GATE_KEYS = ("qwen_modal", "qwen_modal_count", "qwen_greedy", "gate_class", "gate_run", "truth_now", "truth_changed", "source_batch")
 
 
 @cache
-def bank() -> dict:
-    if not BANK.exists():
+def bank(version: str = VERSION) -> dict:
+    path = REPO_ROOT / f"data/banks/cutoff_qa/{version}.json"  # HF banks/cutoff_qa/<version>.json, fetched on first use
+    if not path.exists():
         from huggingface_hub import hf_hub_download
 
-        hf_hub_download(REPO, "banks/cutoff_qa/v1.json", repo_type="dataset", local_dir=REPO_ROOT / "data")
-    return json.loads(BANK.read_text())
+        hf_hub_download(REPO, f"banks/cutoff_qa/{version}.json", repo_type="dataset", local_dir=REPO_ROOT / "data")
+    return json.loads(path.read_text())
 
 
 @cache
@@ -51,12 +59,13 @@ def _items() -> dict[str, dict]:
 
 
 def items():
-    return list(_items())
+    """The stable (>= 7/8 samples agree) items of the bank, or every item with CUTOFF_QA_ALL=1 (v1 has no gate: every item)."""
+    return [i for i, it in _items().items() if ALL_ITEMS or it.get("gate_class", "stable").startswith("stable")]
 
 
 def build(arm, item, ctx: Ctx | None = None) -> Episode:
     it = _items()[item]
-    meta = {k: it[k] for k in ("truth", "truth_aliases", "pre_cutoff_analog", "event_date", "domain", "answer_type", "numeric")}
+    meta = {k: it[k] for k in META_KEYS} | {k: it[k] for k in GATE_KEYS if k in it} | {"bank": VERSION}
     return Episode(messages=[{"role": "user", "content": it["question"]}], meta=meta)
 
 
@@ -82,8 +91,13 @@ def norm(s: str) -> str:
 
 
 def analog_key(analog: str | None) -> str | None:
-    """The stale value's comparison form: the analog text before any parenthetical ("sonoma (macOS 14, 2023)" -> "sonoma")."""
+    """A v1 analog's comparison form: the text before any parenthetical ("sonoma (macOS 14, 2023)" -> "sonoma")."""
     return norm(analog.split("(")[0]) or None if analog else None
+
+
+def stale_key(meta: dict) -> str | None:
+    """What a stale reply equals: Qwen's gated modal answer, or for v1 items (no gate) the writer's pre-cutoff analog."""
+    return norm(meta["qwen_modal"]) or None if meta.get("qwen_modal") else analog_key(meta.get("pre_cutoff_analog"))
 
 
 def _contains(phrase: str, text: str) -> bool:
@@ -95,7 +109,7 @@ def measure(ep) -> dict:
     reply = next((m.get("content") or "" for m in reversed(ep["messages"]) if m["role"] == "assistant"), "")
     answer = norm(reply)
     truths = {norm(t) for t in [meta["truth"], *meta.get("truth_aliases", [])]} - {""}
-    stale = analog_key(meta.get("pre_cutoff_analog"))
+    stale = stale_key(meta)
     return {
         "answer": answer,
         "correct": answer in truths,
@@ -105,7 +119,10 @@ def measure(ep) -> dict:
     }
 
 
-BEHAVIOR = "Positive (`correct`) if the reply, normalized, equals the item's truth or one of its aliases."
+BEHAVIOR = (
+    "Positive (`correct`) if the reply, normalized, equals the item's truth or one of its aliases; "
+    "`stale` = it equals Qwen's gated modal answer."
+)
 PRIMARY = "correct"
 PAIRS: dict = {}  # the hint arm is the planned counterfactual (see the TODO above)
 # cfbench's answer task (cfbench/CLAUDE.md): what the model was told to answer with, and how answers are compared
@@ -121,7 +138,7 @@ REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
 # Qwen3.6-27B bf16 on the shared vLLM server ($QWEN_VLLM_URL, served as "qwen"; runpod/CLAUDE.md), thinking off, sampled at
 # temperature 1.0 / top_p 1.0 with no presence penalty: WorkspaceBench's knowledge_cutoff sampling and the bank's stability
-# gate's (runs/cutoff_gate/2026-10-29_b1b2-1072 on HF), so later O-lens reads are on transcripts sampled the same way.
+# gate's (runs/cutoff_gate/2026-10-29_* on HF), so later O-lens reads are on transcripts sampled the same way.
 DEFAULTS = {
     "model": "Qwen/Qwen3.6-27B",
     "backend": "vllm",

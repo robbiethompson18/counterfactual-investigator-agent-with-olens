@@ -13,6 +13,10 @@ v1.md, a table of every item for reading. --upload puts v1.json and BRIEF.md und
 Dedup was manual: same-event pairs and the two derivable answers were found by reading the table, and their ids are DROPPED
 below (6 from the pilot's own cleaning, 20 same-event and 2 derivable from the merge), so the script reproduces the bank
 exactly. FIXES repairs three pilot rows whose `domain` field held the question suffix.
+
+Bank v2 (present-tense rewrites + fame-steered items, with the Qwen gate's fields) was not made by this script: the rewrite and
+the gate (scripts/cutoff_gate.py, PR #382) ran separately; docs/envs/cutoff_qa.md describes it. BRIEF.md beside this script is
+now the v3 (present-tense) brief; the v1 brief the pilot and batch agents read is on HF at banks/cutoff_qa/BRIEF.md.
 """
 
 import argparse

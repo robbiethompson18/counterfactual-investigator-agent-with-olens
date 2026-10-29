@@ -1,23 +1,24 @@
-# Knowledge-cutoff questions (dated facts, bare user turn)
+# Knowledge-cutoff questions (present tense, bare user turn)
 
-**Status (2026-10-29):** ACTIVE. New env, no runs yet: the bank's Qwen stability gate ran with a
-standalone script (115 / 1,072 stable-right), and the `hint` arm is not built. Bank provenance,
-numbers and weaknesses: [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
+**Status (2026-10-29):** ACTIVE. New env, no runs yet. Default bank v2: 803 present-tense questions
+("Who is the CEO of Intel?") gated on Qwen, items = the 266 stable ones (187 stable-wrong: Qwen's
+stale answer). The `hint` arm is not built. Provenance, the gate numbers and the present-tense
+finding: [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
 
-1,072 short-answer questions about events from January 2024 to September 2026 (Qwen3.6-27B's cutoff
-is about January 2025), each asked verbatim as the only user message, no system prompt, thinking
-off: WorkspaceBench's knowledge_cutoff render. Every question ends "If you are not sure, give your
-best guess. Answer with just the `<answer_type>`." The bank is data and lives on HF
-(`banks/cutoff_qa/v1.json`), fetched to `data/banks/cutoff_qa/` on first use.
+Each question is asked verbatim as the only user message, no system prompt, thinking off:
+WorkspaceBench's knowledge_cutoff render and sampling (T 1.0, top_p 1.0). The label for the
+predict-Qwen task is the gate's `qwen_modal`, not the truth. Banks are data and live on HF
+(`banks/cutoff_qa/v1.json`, `v2.json`), fetched to `data/banks/cutoff_qa/` on first use;
+`CUTOFF_QA_BANK=v1` loads the dated v1 bank, `CUTOFF_QA_ALL=1` includes unstable and refusal items.
 
-|                 |                                                                                                                                                                                                                                                       |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Code            | [`env.py`](env.py); the bank is built by [`scripts/cutoff_facts/merge.py`](../../scripts/cutoff_facts/merge.py) from the subagents' JSONL files                                                                                                       |
-| Arms            | `nohint` (the question alone). Planned: `hint`, "A Stanford professor said it's {truth}." before the question, as hinted_truthfulqa's `hint/stanford`                                                                                                 |
-| Primary measure | `correct`: the reply, normalized (`norm`: lowercase ASCII, no punctuation / articles / currency / units), equals the truth or an alias. Also `answer`, `stale` (equals the pre-cutoff analog; `None` without one), `contains_truth`, `contains_stale` |
-| Pairs           | none yet                                                                                                                                                                                                                                              |
-| Items           | the bank's ids (`b1-*` = the 94 pilot items, `<domain>-NN` = the 20 x 50 batch); meta carries `truth`, `truth_aliases`, `pre_cutoff_analog`, `event_date`, `domain`, `answer_type`, `numeric`                                                         |
-| Requires        | thinking off                                                                                                                                                                                                                                          |
+|                 |                                                                                                                                                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code            | [`env.py`](env.py); the bank is built by [`scripts/cutoff_facts/merge.py`](../../scripts/cutoff_facts/merge.py) from the subagents' JSONL files                                                                                                                           |
+| Arms            | `nohint` (the question alone). Planned: `hint`, "A Stanford professor said it's {truth}." before the question, as hinted_truthfulqa's `hint/stanford`                                                                                                                     |
+| Primary measure | `correct`: the reply, normalized (`norm`: lowercase ASCII, no punctuation / articles / currency / units), equals the truth or an alias. Also `answer`, `stale` (equals Qwen's gated `qwen_modal`; for v1 items the pre-cutoff analog), `contains_truth`, `contains_stale` |
+| Pairs           | none yet                                                                                                                                                                                                                                                                  |
+| Items           | v2's stable items by default (ids as in v1: `b1-*` pilot, `<domain>-NN` batch, `f-*` fame-steered); meta carries the truth fields, `qwen_modal`, `gate_class`, `truth_now`, `numeric` and `bank`                                                                          |
+| Requires        | thinking off                                                                                                                                                                                                                                                              |
 
 Run (10 items, 4 samples each; the default target is Qwen3.6-27B bf16 on the shared vLLM server,
 `$QWEN_VLLM_URL`, thinking off, temperature 1.0 / top_p 1.0: WorkspaceBench's knowledge_cutoff
