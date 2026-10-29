@@ -24,6 +24,8 @@ Arms are `<task>/<wording>.<system>.<names>.<done>.<envblock>.<date>`:
     envblock  noenv / env (<env> working directory, platform, today's date with weekday)
     date      now (Mon 2026-11-02) / past (Mon 2025-05-05, 78 weeks earlier: same weekday, so calendar keeps its shape); the
               task's app data moves with it. The sandbox clock does not, so files and git commits made in setup keep real dates.
+Calendar is harness_grid's own week (calendar_real.py): three different meetings with the person (weekly 1:1, project
+catch-up, eng team sync), names only in the metadata.
 `cd` persists between shell calls in every task. positive = the task's own `acted`; asked = old "?" rule (use the Haiku
 asked_judge labeller for tables).
 """
@@ -186,11 +188,14 @@ class DanaContacts:
         return self.t.handle(st, inst, name, a)
 
 
+from environments.harness_grid.calendar_real import TASK as _CALENDAR
+
 TASKS = {
     "email": EmailJohn(),
     "emailfwd": EmailFwd(),
     **{t: m.TASK for t, m in TASK_MODS.items()},
     "dana": DanaContacts(TASK_MODS["dana"].TASK),
+    "calendar": _CALENDAR,  # three different Priya meetings in a realistic week (calendar_real.py)
 }
 # "task_prefixed" is overeager.WORDINGS["formal"] ("Task: Send an email to ..."), renamed here (Kylie, 2026-10-29: "formal"
 # would be the plain imperative, which is "direct"); the stored overeagerness core_w_formal arms keep their name
