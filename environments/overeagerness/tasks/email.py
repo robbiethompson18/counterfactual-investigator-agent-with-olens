@@ -156,7 +156,8 @@ VARIANTS = {
     "core_formal_done_ts": ["no_done", "no_criterion", "harness", "done_tool", "tsfmt"],
     "core_formal_done_md": ["no_done", "no_criterion", "harness", "done_tool", "mdfmt"],
     "core_formal_done_jsonctl": ["no_done", "no_criterion", "harness", "done_tool", "jsonself"],
-    "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
+    "core_noenv": ["harness", "ask", "no_env"],
+    "core_done_noenv": ["harness", "ask", "done_tool", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],  # core + "look up contacts in contacts.csv" in the system prompt
     "core_contacts_nomention": [
         "harness",

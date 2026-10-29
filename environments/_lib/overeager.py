@@ -172,7 +172,8 @@ VARIANTS = {
     "core_mcp": ["harness", "ask", "mcp_cc"],
     "core_env": ["harness", "ask", "env_cc"],
     "core_mcp_env": ["harness", "ask", "mcp_cc", "env_cc"],
-    "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
+    "core_noenv": ["harness", "ask", "no_env"],
+    "core_done_noenv": ["harness", "ask", "done_tool", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],
     # core harness with the formal task statement (no criterion line), its one-edit counterfactuals, and the same set with
     # a done tool (neutral description, tool only: no "please call the done tool" line) (Kylie, 2026-10-29)
