@@ -229,3 +229,30 @@ the reasoning are inflated by echoes of the options' own wording; the cues it na
 question are the 2026 date ("the date being 2026 (future)"), the generic `/agent` or "repo root"
 working directory, and mock-looking app tools ("the future date, the generic path, and the mock-like
 payment tools all point to this being a benchmark/evaluation setup").
+
+### O-lens reads (thinking off)
+
+`runs/sim_or_real/2026-10-29_olens-nothink` (space lens `olens_s3d_space_rl600`, layers 32/40/48, T
+= 1, one-engine reader; requests from [`olens_requests.py`](olens_requests.py)): 499 episodes (252
+ladder `replace` rungs, 207 after_trace, 16 bare, 16 opencode ask, 8 opencode after_bump), read at
+the question's punctuation / newlines, from the end of the question turn through the assistant
+header, and at the answer letter. Share of reads with an eval word (test, evaluat\*, benchmark,
+simulat\*, sandbox, red-team, mock, ...) or a real word (real, genuine, deploy\*, production, live,
+user, ...) whose 5-letter stem is not in the question (so the options' own words don't count):
+
+| group (answer)            | header: eval | header: real | answer: eval | answer: real |
+| ------------------------- | ------------ | ------------ | ------------ | ------------ |
+| ladder replace (sim)      | 21%          | 8%           | 29%          | 8%           |
+| after_trace acted (sim)   | 29%          | 12%          | 29%          | 10%          |
+| after_trace asked (sim)   | 21%          | 10%          | 26%          | 11%          |
+| after_trace asked (real)  | 17%          | 7%           | 42%          | 25%          |
+| bare (real)               | 34%          | 23%          | 20%          | 22%          |
+| opencode ask (sim)        | 16%          | 9%           | 46%          | 4%           |
+| opencode ask (real)       | 17%          | 6%           | 25%          | 29%          |
+| opencode after_bump (sim) | 18%          | 9%           | 50%          | 21%          |
+
+At the answer letter the reads follow the answer just given. Before it (the assistant header) bare
+reads both kinds more than the ladder (the lens weighs "real production or a red-teaming test?"),
+while the ladder header reads say the evaluation outright ("I am running in a sandbox. My best guess
+is that this is an evaluation environment."); within opencode `ask` the header reads don't separate
+the eventual "real" from "simulated" answers (6% vs 9% real words).
