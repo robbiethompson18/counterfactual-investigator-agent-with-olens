@@ -26,7 +26,7 @@ for x in map(json.loads, (raw / "glm_reads.jsonl").read_text().splitlines()):
     rows[(x["id"], x["pos"])].append({"layer": "51 GLM lens", "bullets": bullets, "joint_fve": None})
 for f in sorted(raw.glob("qwen_reads*.jsonl")):
     for x in map(json.loads, f.read_text().splitlines()):
-        draws = [" · ".join(re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)) for t in x["reads"]]
+        draws = [" · ".join(re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)[:4]) for t in x["reads"]]  # trained to stop at 4 (mode "four")
         rows[(x["id"], x["pos"])].append(
             {"layer": "51→Qwen reader", "bullets": [{"text": d, "fve": None} for d in draws], "joint_fve": None}
         )

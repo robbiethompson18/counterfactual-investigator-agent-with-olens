@@ -11,6 +11,7 @@ Positions are the run's read positions (every prompt token); a position whose to
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -59,7 +60,7 @@ else:
     with open(sys.argv[4], "w") as f:
         for r in rows:
             for p, cid, cp in sorted([(p, r["id"], p) for p in r["positions"]] + [tuple(d) for d in r["dups"]]):
-                draws = [" · ".join(b.removeprefix("*").strip() for b in t.splitlines() if b.strip()) for t in reads[(cid, cp)]]
+                draws = [" · ".join(re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)[:4]) for t in reads[(cid, cp)]]  # 4 bullets, as to_reads.py
                 row = {"id": r["id"], "token_index": p, "token": r["tokens"][p], "layer": "42 Qwen lens (ceselder) on Qwen",
                        "bullets": [{"text": d, "fve": None} for d in draws], "joint_fve": None}  # fmt: skip
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
