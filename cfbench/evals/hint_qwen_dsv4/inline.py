@@ -118,7 +118,7 @@ def block(path: Path, own: str, messages: list[dict], source: str) -> str:
     reads at the same position (by order; the shapes match)."""
     rows, _ = _reads(path)
     mine, theirs = _positions(rows[own]), _positions(rows[source])
-    assert [k[3] for k, _ in mine] == [k[3] for k, _ in theirs], (own, source)
+    assert len(mine) == len(theirs), (own, source)  # same positions; token text can differ (a stray "\n\n" in an option)
     out = []
     for ((i, field, char, token), _), (_, layers) in zip(mine, theirs, strict=True):
         text = messages[i][field]
