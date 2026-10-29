@@ -179,7 +179,17 @@ COMPARISONS |= {
 COMPARISONS["email: real-client tools / env (acme)"] = {  # acme book only (Kylie, 2026-10-29); @low/@lowc were also run
     "arms": [
         f"email/{v}@lowa"
-        for v in ["base_done_neutral", *_CC, "core_mention", "core_contacts", "core_contacts_nomention", "core_mcp2", "core_mcp2_env"]
+        for v in [
+            "base_done_neutral",
+            *_CC,
+            "core_mention",
+            "core_contacts",
+            "core_contacts_nomention",
+            "core_mcp2",
+            "core_mcp2_env",
+            "core_gmailfull_env",
+            "core_gmailfull_noenv",
+        ]
     ],
     "group": "real-client harness",
     "why": "acme address book; base_done_neutral stands in for the retired base",
