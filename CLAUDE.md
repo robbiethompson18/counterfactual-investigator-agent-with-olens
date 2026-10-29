@@ -590,6 +590,9 @@ Current docs:
 - [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
   — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
   question (prompt inversion), and the predictor cites them only to back the hinted answer
+- [REFERENCE: WSB knowledge_cutoff, stock Qwen vs the lens — read before quoting the lens's knowledge_cutoff number or the "Baseline C ties the lens" line](docs/wsb-knowledge-cutoff.md)
+  — Baseline C replicated (0.46 vs their 0.49); Qwen just answering the question scores 0.89 under
+  the same strict-win rule vs the lens's 0.49; the label is Qwen's own answer
 - [REFERENCE: WSB vs a text-only Gemini — read before quoting WorkspaceBench lens-vs-baseline numbers, or comparing any lens to a text-only reader](docs/wsb-flash-prompt-only.md)
   — 18/27 WorkspaceBench families already lost to a text reader (WSB's own Opus gate), why the
   contested four are scored asymmetrically (user_modeling echo rule, any-of-grid, top-ranked chain
