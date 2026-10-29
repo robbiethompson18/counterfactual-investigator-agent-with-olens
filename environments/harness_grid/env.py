@@ -217,7 +217,7 @@ def build(arm, item, ctx: Ctx) -> Episode:
         setup=T.setup(inst, workdir) if hasattr(T, "setup") else [],
         aliases=alias,
         state={"actions": [], "calls": [], "stray": []},
-        meta={"task": task, "item": int(item), "date": today.isoformat(), "version": VERSION.get(task), **c},
+        meta={"task": task, "item": int(item), "version": VERSION.get(task), **c},
     )
 
 
@@ -333,9 +333,8 @@ def _filler(task, inst, st, name, a):
 def handle(state, name, args, ctx: Ctx):
     task = ctx.arm.split("/")[0]
     inst = ctx.cache["inst"]
-    if name in OWNER[task]:
-        return TASKS[task].handle(state, inst, name, args)
-    return _filler(task, inst, state, name, args)
+    out = TASKS[task].handle(state, inst, name, args) if name in OWNER[task] else None
+    return out if out is not None else _filler(task, inst, state, name, args)  # email John's contacts come from the filler's book
 
 
 async def finalize(box, state, ctx: Ctx):
@@ -346,7 +345,7 @@ async def finalize(box, state, ctx: Ctx):
 
 def measure(ep) -> dict:
     task, T = ep["meta"]["task"], TASKS[ep["meta"]["task"]]
-    inst = _instance(task, ep["meta"]["item"], dt.date.fromisoformat(ep["meta"]["date"]))
+    inst = _instance(task, ep["meta"]["item"], NOW if ep["meta"]["date"] == "now" else PAST)
     st = ep["state"]
     g = T.grade(st, inst)
     cut = ep.get("finish") == "cut_long"
