@@ -1,7 +1,8 @@
 # MCQ answer probe: Qwen's own answer from the option tokens
 
-**Status (2026-10-28):** ACTIVE. MMLU-Pro in-sample, TruthfulQA out-of-sample done; O-lens reads at
-the same tokens on both.
+**Status (2026-10-29):** ACTIVE. MMLU-Pro in-sample, TruthfulQA out-of-sample done; O-lens reads at
+the same tokens on both; with the hint first, a probe tuned on hinted activations reads the no-hint
+answer on 45% of didn't cases (frozen 23%).
 
 Kylie's question: on multiple-choice questions Qwen3.6-27B answers consistently, does a linear probe
 on the activations at each option's tokens say which option Qwen will pick, and does it track Qwen's
@@ -170,6 +171,66 @@ Run with Kylie's go-ahead after the design above was frozen; nothing was tuned o
   at gold (W), ~0.21 elsewhere. Lens-only pick: = Qwen's answer 0.27 (R) / 0.15 (W), gold 0.08 (W).
   It never favours the gold over Qwen's answer.
 
+## Hint first: tuning the probe to read the no-hint answer
+
+The cfbench hint_qwen_dsv4 `before_*` versions put the hint before the question, so the option
+newlines come after it and their activations are hinted (cosine to the cached no-hint ones: median
+0.97, min 0.10). The frozen probe there (`2026-10-29_eval-baseline-before`, 976 cases: 966 MMLU-Pro
+and 10 TruthfulQA, 488 knew / 488 didn't) is pulled toward the hinted letter: knew-vs-didn't AUROC
+0.77, letter 55%. `probe_eval tune` (Kylie's idea, 2026-10-29) fits listwise probes on those hinted
+activations themselves, target = Qwen's no-hint modal answer (`answers_cf`), same site and layer
+(`nl`, `hidden_states[52]`). The hinted letter is read from each case (`hinted`, else the gold) and
+knew = no-hint answer is the hinted letter, so a design that also hints wrong letters re-runs as is.
+
+- **Splits.** 5-fold GroupKFold by question (one case per question; a TruthfulQA `.h<letter>`
+  suffix would be stripped); l2 by an inner 4-fold GroupKFold on the training folds only, grid
+  0.01–10⁴ (1.0 in every fold for every method). No eval item is among the frozen probe's 496
+  training questions. ± below = half-width of a 95% bootstrap over questions (2,000 draws,
+  stratified by class). No GPU or API calls: cached activations only.
+- **Methods.** _frozen_: `probe.npz` of the run, unchanged. _hinted letter_: always the hinted
+  letter (p = the training folds' knew share, the rest uniform). _frozen recalibrated_: a
+  temperature and a hinted-option offset over the frozen scores, fit on the training folds.
+  _scratch_: standardiser and probe fit on the hint-first training folds. _fine-tuned_: penalty
+  ‖w − w0‖² from the frozen w0, starting at w0, the frozen standardiser kept (so w0 means the same
+  thing). _pooled_: scratch plus the frozen probe's no-hint MMLU-Pro set from `2026-10-28_scale2k`
+  (623 questions after dropping the 95 eval items). _+hinted_: each with an unpenalised "is the
+  hinted option" feature.
+
+All sources (top-1 = Qwen's no-hint answer; bal = mean of knew and didn't; didn't cases are the
+leakage check, where the hinted-letter baseline scores 0 and chance is ~0.11):
+
+| method              | top-1 didn't | didn't: top-1 = hinted | top-1 knew   | top-1 bal    | NLL bal      | AUROC p(hinted) |
+| ------------------- | ------------ | ---------------------- | ------------ | ------------ | ------------ | --------------- |
+| hinted letter       | 0.000        | 1.000                  | 1.000        | 0.500        | 1.748 ±0.012 | 0.470 ±0.035    |
+| frozen              | 0.234 ±0.038 | 0.566 ±0.043           | 0.865 ±0.031 | 0.549 ±0.024 | 1.441 ±0.084 | 0.770 ±0.029    |
+| frozen recalibrated | 0.252 ±0.040 | 0.523 ±0.044           | 0.842 ±0.035 | 0.547 ±0.026 | 1.260 ±0.058 | 0.770 ±0.030    |
+| scratch             | 0.441 ±0.044 | 0.379 ±0.044           | 0.844 ±0.032 | 0.642 ±0.027 | 1.006 ±0.058 | 0.853 ±0.023    |
+| fine-tuned          | 0.447 ±0.044 | 0.361 ±0.042           | 0.842 ±0.032 | 0.644 ±0.028 | 0.993 ±0.063 | 0.854 ±0.024    |
+| pooled              | 0.420 ±0.043 | 0.410 ±0.044           | 0.855 ±0.032 | 0.637 ±0.027 | 0.996 ±0.056 | 0.852 ±0.024    |
+| fine-tuned +hinted  | 0.451 ±0.044 | 0.363 ±0.042           | 0.838 ±0.033 | 0.644 ±0.028 | 0.993 ±0.063 | 0.854 ±0.024    |
+
+- **Tuning on hinted activations roughly doubles the didn't-case top-1** (0.23 → 0.44–0.45) at a
+  cost of ~2 points on knew, and lifts the knew-vs-didn't AUROC 0.77 → 0.85; NLL on didn't cases
+  2.47 → 1.52. It is not winning by reading off the hint: on didn't cases its top-1 is the hinted
+  letter 36–38% of the time vs the frozen probe's 57%.
+- **The gain is in new directions, not a hint offset.** Recalibrating the frozen scores with a
+  hinted-option offset barely moves top-1 (0.25 on didn't) and leaves AUROC at 0.77, and the
+  explicit hinted-option feature adds nothing to any tuned probe (±0.01).
+- **Scratch, fine-tuned and pooled tie** (within ±0.03 everywhere). Starting from the frozen probe
+  or adding 623 no-hint questions doesn't help once ~780 hint-first training questions are there;
+  fine-tuned has the best NLL by a hair.
+- **The hint still wins often**: on didn't cases the tuned probe still picks the hinted letter
+  about a third of the time, so the hint's pull is only partly linearly subtractable at L52.
+- **Per source** (`tune.md` in the run): MMLU-Pro (162) didn't 0.22 → 0.43–0.47, AUROC 0.77 →
+  0.87; MMLU-Pro 12k (804) didn't 0.23 → 0.43–0.45, AUROC 0.78 → 0.85; TruthfulQA has 10 cases
+  (frozen 0.30 balanced, tuned 0.50–0.60), too few to say anything.
+
+Run:
+[`2026-10-29_hint-first-tune`](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/runs/mcq_answer_probe/2026-10-29_hint-first-tune)
+(`tune.md`, `tune_preds.jsonl`: every case's held-out pmf under every method, with its fold).
+Not yet a condition on the `before_*` eval pages: the held-out fine-tuned pmfs are the natural
+`probe` condition there (`cfbench-runs` would need to read them).
+
 ## Where things live
 
 - Code: [`environments/hint_mcq/probe.py`](../environments/hint_mcq/probe.py) (`collect`, `fit`,
@@ -206,6 +267,8 @@ uv run python -m environments.hint_mcq.probe lens-stats data/runs/mcq_answer_pro
 uv run --with transformers python -m environments.hint_mcq.probe tqa-prep
 python scripts/hs_at_positions.py data/tqa_oos/hs_inputs.jsonl OUT_DIR
 uv run --with scikit-learn python -m environments.hint_mcq.probe oos data/runs/mcq_answer_probe/<mmlu run> data/runs/mcq_answer_probe/<tqa run> [--acts <tqa run>_orig]
+# hint first (cfbench before_* cases, after probe_eval prep/score): probes tuned on the hinted activations, ~15 min on 16 cores
+uv run --with scikit-learn python -m environments.hint_mcq.probe_eval tune data/runs/mcq_answer_probe/<before run> --finish
 ```
 
 HF transformers falls back to the slow reference kernel for Qwen3.6's linear attention without
