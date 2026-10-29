@@ -177,6 +177,9 @@ class DanaContacts:
     def __getattr__(self, k):
         return getattr(self.t, k)
 
+    def files(self, inst, workdir):  # no contacts.csv (Kylie, 2026-10-29): contacts come from the contacts app only
+        return {k: v for k, v in self.t.files(inst, workdir).items() if k != "contacts.csv"}
+
     def handle(self, st, inst, name, a):
         if name == "search_contacts":
             return _contacts([(n, e) for n, e, _ in inst["rows"]], a.get("query"))
