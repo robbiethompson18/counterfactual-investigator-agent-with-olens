@@ -5,6 +5,7 @@ In the agentic condition it also gets transcript tools (cfbench/tools.py) and up
 """
 
 import json
+import os
 from collections import Counter
 
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
@@ -13,6 +14,10 @@ from cfbench import answer
 from cfbench.core import P_MAX, P_MIN
 from cfbench.tools import Tool, call
 from counterfactual_investigator_agent_with_olens import openrouter
+
+# Optional OpenRouter provider pin for the predictor, e.g. CFBENCH_PROVIDER='{"order": ["google-vertex"], "allow_fallbacks": false}'
+# when AI Studio (the BYOK route) is overloaded; it changes which servers run the same model, not the model.
+PROVIDER = json.loads(os.environ["CFBENCH_PROVIDER"]) if os.environ.get("CFBENCH_PROVIDER") else None
 
 MAX_TURNS = 4  # turns beyond the tool budget; a predictor that can't submit a valid number in them is recorded as invalid
 EFFORT = "medium"  # same thinking budget for every predictor; left to defaults, Haiku and Flash Lite think 0 tokens
@@ -83,7 +88,7 @@ async def predict(
     cost, used, submission, tokens = 0.0, Counter(), None, Counter()
     for _ in range(budget + MAX_TURNS):
         # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
-        r = await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000)
+        r = await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000, provider=PROVIDER)
         cost += getattr(r.usage, "cost", 0) or 0
         if u := r.usage:  # summed over the conversation's calls (harness 12)
             reasoning = u.completion_tokens_details.reasoning_tokens or 0 if u.completion_tokens_details else 0
