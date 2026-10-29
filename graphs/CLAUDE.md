@@ -9,7 +9,8 @@ placebo black, no tools gray).
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
-  placebo, for all / stale / not-stale items (`docs/cutoff-qa-inline.md`)
+  J++ and their placebos, for all / stale / not-stale items, plus paired differences
+  (`docs/cutoff-qa-inline.md`)
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up

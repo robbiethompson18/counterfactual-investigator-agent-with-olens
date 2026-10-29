@@ -1,10 +1,12 @@
-"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs placebo, one group of three
-bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date) and for the rest (stable_right).
-Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's modal answer); whiskers are 95%
-bootstrap CIs over items. A second, small figure shows the paired differences between conditions (per item, then the mean)
-with their 95% bootstrap CIs, all items. Reads the run's predictions.jsonl (docs/cutoff-qa-inline.md).
+"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs its placebo vs J++ vs its
+placebo, one group of five bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
+and for the rest (stable_right). Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's
+modal answer); whiskers are 95% bootstrap CIs over items. A second, small figure shows the paired differences between
+conditions (per item, then the mean) with their 95% bootstrap CIs, all items. Reads the runs' predictions.jsonl, pooled
+(the O-lens run has transcript_inline and the O-lens conditions, the J++ runs one condition each; docs/cutoff-qa-inline.md,
+PR #393 for J++).
 
-    uv run python -m graphs.cutoff_qa_inline [--run data/runs/cfbench/<run>] [--out docs/img/cutoff-qa-inline.png]
+    uv run python -m graphs.cutoff_qa_inline [--runs data/runs/cfbench/<run> ...] [--out docs/img/cutoff-qa-inline.png]
         [--out-diff docs/img/cutoff-qa-inline-diff.png]
 """
 
@@ -19,9 +21,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
-LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo"}
-COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#0b0b0b"}
+SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline"]
+LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
+         "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo"}  # fmt: skip
+# J++ is purple (outside CLAUDE.md's four reserved colours); each placebo is black, the J++ one hatched in J++'s purple
+COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#0b0b0b",
+         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#0b0b0b"}  # fmt: skip
+HATCH = {"jlens_placebo_inline": "////"}
+RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo")]
 GROUPS = {
     "all items": None,
     "stale (Qwen's answer\nis out of date)": "stable_wrong",
@@ -33,11 +40,11 @@ plt.rcParams.update(
 )
 
 
-def per_item(run: Path) -> dict[str, dict[str, tuple[str, float]]]:
-    """condition -> item -> (gate_class, mean accuracy over draws)."""
+def per_item(runs: list[Path]) -> dict[str, dict[str, tuple[str, float]]]:
+    """condition -> item -> (gate_class, mean accuracy over draws), pooled over the runs."""
     acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     cls = {}
-    for line in (run / "predictions.jsonl").read_text().splitlines():
+    for line in (ln for run in runs for ln in (run / "predictions.jsonl").read_text().splitlines()):
         r = json.loads(line)
         acc[r["condition"]][r["item"]].append(bool(r["correct"]))
         cls[r["item"]] = r["gate_class"]
@@ -50,13 +57,20 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
     return means[int(0.025 * n)], means[int(0.975 * n)]
 
 
-PAIRS = [("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline")]
+PAIRS = [
+    ("olens_inline", "transcript_inline"),
+    ("olens_placebo_inline", "transcript_inline"),
+    ("olens_inline", "olens_placebo_inline"),
+    ("jlens_inline", "transcript_inline"),
+    ("jlens_placebo_inline", "transcript_inline"),
+    ("jlens_inline", "jlens_placebo_inline"),
+]
 
 
-def diffs(run: Path, out: Path) -> None:
-    """Three rows: the mean paired difference in per-item accuracy (pp) with its 95% bootstrap CI over items."""
-    data = per_item(run)
-    fig, ax = plt.subplots(figsize=(5.2, 2.2))
+def diffs(runs: list[Path], out: Path) -> None:
+    """A row per pair: the mean paired difference in per-item accuracy (pp) with its 95% bootstrap CI over items."""
+    data = per_item(runs)
+    fig, ax = plt.subplots(figsize=(5.2, 0.4 + 0.45 * len(PAIRS)))
     for k, (a, b) in enumerate(PAIRS):
         ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a]]
         m, (lo, hi) = sum(ds) / len(ds), ci(ds)
@@ -76,16 +90,17 @@ def diffs(run: Path, out: Path) -> None:
     print(out)
 
 
-def main(run: Path, out: Path) -> None:
-    data = per_item(run)
-    fig, ax = plt.subplots(figsize=(6.4, 3.9))
-    width, gap = 0.25, 0.02
+def main(runs: list[Path], out: Path) -> None:
+    data = per_item(runs)
+    fig, ax = plt.subplots(figsize=(8.4, 3.9))
+    width, gap = 0.16, 0.01
     for i, (group, gate) in enumerate(GROUPS.items()):
         for j, s in enumerate(SERIES):
             xs = [a for c, a in data[s].values() if gate is None or c == gate]
             m, (lo, hi) = sum(xs) / len(xs), ci(xs)
-            x = i + (j - 1) * (width + gap)
-            ax.bar(x, 100 * m, width, color=COLOR[s], zorder=3)
+            x = i + (j - (len(SERIES) - 1) / 2) * (width + gap)
+            ax.bar(x, 100 * m, width, color=COLOR[s], hatch=HATCH.get(s), edgecolor=COLOR["jlens_inline"] if s in HATCH else None,
+                   lw=0, zorder=3)  # fmt: skip
             ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4)
             ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
         n = sum(1 for c, _ in data[SERIES[0]].values() if gate is None or c == gate)
@@ -97,8 +112,9 @@ def main(run: Path, out: Path) -> None:
     ax.set_ylabel("% of items where Haiku names Qwen's answer")
     ax.grid(axis="x", visible=False)
     ax.set_title("Predicting Qwen3.6-27B's answer to a factual question from the prompt", loc="left", fontsize=10.5, color=INK, pad=24)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[s]) for s in SERIES]
-    ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0, 1.0))
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=COLOR["jlens_inline"] if s in HATCH else None,
+                             lw=0) for s in SERIES]  # fmt: skip
+    ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=5, bbox_to_anchor=(0, 1.0))
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=180, bbox_inches="tight")
     print(out)
@@ -106,9 +122,9 @@ def main(run: Path, out: Path) -> None:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--run", type=Path, default=Path("data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200"))
+    p.add_argument("--runs", type=Path, nargs="+", default=RUNS)
     p.add_argument("--out", type=Path, default=Path("docs/img/cutoff-qa-inline.png"))
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/cutoff-qa-inline-diff.png"))
     a = p.parse_args()
-    main(a.run, a.out)
-    diffs(a.run, a.out_diff)
+    main(a.runs, a.out)
+    diffs(a.runs, a.out_diff)
