@@ -2,11 +2,17 @@
 rate task), or a non-empty answer through submit_answer (the answer task, cfbench/answer.py).
 
 In the agentic condition it also gets transcript tools (cfbench/tools.py) and up to `budget` calls to them.
+
+A valid submission ends the loop: the predictor gets no further turn, so its tool result may hold the verdict. With a `grade`
+callback (`grader` below; the callers pass one) that last tool message says what was submitted, the truth and whether it was
+right, for whoever reads the transcript (Robbie, 2026-10-29). Transcript-only, after the rollout ends: no HARNESS_VERSION
+bump, no backfill of older runs. An invalid submission's error never reveals the truth.
 """
 
 import json
 import os
 from collections import Counter
+from collections.abc import Callable
 
 from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
@@ -74,8 +80,31 @@ TASKS = {
 }
 
 
+def grader(task: str, case: dict, env=None) -> Callable[[dict], str]:
+    """The `grade` callback for `predict`: a valid submission -> the tool result stating it, the truth and the verdict.
+    `case` is the prediction row's case fields (k_cf/n_cf; the answer task's modal_cf too, with `env` for canon_answer)."""
+    if task == "answer":
+        return lambda sub: answer.verdict(env, case, sub["answer"])
+    k, n = case["k_cf"], case["n_cf"]
+
+    def rate(sub: dict) -> str:
+        truth = k / n
+        return f"Prediction recorded: p={sub['p']:.2f}. Truth: {k} of {n} runs ({truth:.2f}). Error: {sub['p'] - truth:+.2f}."
+
+    def claim(sub: dict) -> str:
+        return f"Prediction recorded: p={sub['p']:.2f}. The claim is {'TRUE' if k else 'FALSE'}. Error: {sub['p'] - k:+.2f}."
+
+    return claim if task == "claim" else rate
+
+
 async def predict(
-    predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT, task: str = "rate"
+    predictor: str,
+    prompt: str,
+    tools: dict[str, Tool] | None = None,
+    budget: int = 0,
+    effort: str = EFFORT,
+    task: str = "rate",
+    grade: Callable[[dict], str] | None = None,
 ) -> dict:
     system, submit, check_submission, nudge, empty = TASKS[task]
     submit_name = submit["function"]["name"]
@@ -103,6 +132,8 @@ async def predict(
             name = tc.function.name
             if name == submit_name:
                 result, reply = check_submission(tc.function.arguments)
+                if result and grade:  # the loop ends after this message, so the verdict can't reach the predictor
+                    reply = grade(result)
                 submission = submission or result
             elif sum(used.values()) >= budget:
                 reply = f"Tool budget ({budget} calls) used up. Call {submit_name} now."

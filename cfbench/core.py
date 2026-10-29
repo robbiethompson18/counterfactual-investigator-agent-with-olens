@@ -90,6 +90,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # byte-identical to 13, and runs that pass it say so in meta.json params. The 2026-10-28_answer-mcq-late-d1-prehint* runs
 # were made on PR #320's branch before this landed, and their rows say harness 8: that is 7 plus --olens-before, not the 8
 # above.
+# Submit verdicts (2026-10-29, no bump): a valid submit_prediction / submit_answer call's tool result now states the submission,
+# the truth and whether it was right (cfbench/predict.py `grader`). Transcript-only, written after the rollout ends (a valid
+# submission ends the predictor's loop), so nothing the predictor sees changes; older runs are not backfilled.
 HARNESS_VERSION = 13
 
 

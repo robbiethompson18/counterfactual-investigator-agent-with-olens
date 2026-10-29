@@ -33,7 +33,7 @@ from pathlib import Path
 
 import openai
 
-from cfbench import olens
+from cfbench import answer, olens
 from cfbench.core import (
     HARNESS_VERSION,
     INLINE_CONDITIONS,
@@ -44,7 +44,7 @@ from cfbench.core import (
     build_prompt,
     pick_examples,
 )
-from cfbench.predict import EFFORT, predict
+from cfbench.predict import EFFORT, grader, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -276,7 +276,7 @@ async def main():
         async with slots:
             for attempt in range(3):
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, effort, task)
+                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, effort, task, grader(task, case, env))
                     break
                 except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
@@ -286,8 +286,7 @@ async def main():
             for m in getattr(ev, "MODEL_IDS", [case["model"]]):
                 assert not re.search(re.escape(m), json.dumps(result["messages"])), m
         if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
-            canon = env.canon_answer(result["answer"]) if result["valid"] else None
-            result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
+            result |= answer.grade(env, case, result["answer"]) if result["valid"] else {"canon": None, "correct": None}
         row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
         row |= {"effort": effort} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
