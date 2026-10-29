@@ -271,21 +271,23 @@ def _softmax_by_q(s: np.ndarray, starts: np.ndarray) -> np.ndarray:
     return e / np.repeat(np.add.reduceat(e, starts), np.diff(np.append(starts, len(s))))
 
 
-def _fit_listwise(X: np.ndarray, t: np.ndarray, starts: np.ndarray, l2: float, n_free: int = 0) -> np.ndarray:
-    """Conditional logit: p(i|q) = softmax_q(X w); minimise mean over questions of CE(t, p) + l2/2 |w|^2 with L-BFGS. The
-    last `n_free` columns (per-letter biases) are not penalised."""
+def _fit_listwise(X: np.ndarray, t: np.ndarray, starts: np.ndarray, l2: float, n_free: int = 0, w0: np.ndarray | None = None) -> np.ndarray:
+    """Conditional logit: p(i|q) = softmax_q(X w); minimise mean over questions of CE(t, p) + l2/2 |w - w0|^2 with L-BFGS
+    (w0 = 0 unless given: a prior probe to fine-tune from, also the start). The last `n_free` columns (per-letter biases)
+    are not penalised."""
     from scipy.optimize import minimize
 
     n_q = len(starts)
+    w0 = np.zeros(X.shape[1]) if w0 is None else w0
 
     def f(w):
         p = _softmax_by_q(X @ w, starts)
-        wp = w.copy()
+        wp = w - w0
         wp[len(w) - n_free :] = 0
         loss = -np.sum(t * np.log(p + 1e-12)) / n_q + 0.5 * l2 * wp @ wp
         return loss, X.T @ (p - t) / n_q + l2 * wp
 
-    return minimize(f, np.zeros(X.shape[1]), jac=True, method="L-BFGS-B", options={"maxiter": 500}).x
+    return minimize(f, w0, jac=True, method="L-BFGS-B", options={"maxiter": 500}).x
 
 
 def pmf(a):
