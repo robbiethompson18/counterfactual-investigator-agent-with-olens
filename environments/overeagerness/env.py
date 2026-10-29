@@ -205,6 +205,12 @@ for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat",
         "group": "direct core counterfactuals",
         "why": "base core_direct (core harness, env block, the task as the user's plain imperative, no done tool); CFs: no env block, MCP-style tools, casual ask (= core), tools as TypeScript / markdown, jsonctl (control)",
     }
+# asst_formal on the mixed book with MCP-style tools or the env block dated 18 months back (Kylie, 2026-10-29: GLM 5.3)
+COMPARISONS["email (mixed): asst_formal tools / date"] = {
+    "arms": ["email/asst_formal@low", "email/asst_formal_mcp@low", "email/asst_formal_past@low"],
+    "group": "real-client harness",
+    "why": "asst_formal (core harness + formal task card naming contacts.csv); CFs: Bash + mcp__gmail__send_email tools, env block date 2025-04-24 instead of 2026-10-24",
+}
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
