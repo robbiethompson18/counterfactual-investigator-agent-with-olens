@@ -29,6 +29,7 @@ ap.add_argument("--shard", default="0/1")
 ap.add_argument("--samples", type=int, default=4)
 ap.add_argument("--batch", type=int, default=128, help="vectors per generate (samples multiply it)")
 ap.add_argument("--max-new", type=int, default=80)
+ap.add_argument("--no-affine", action="store_true", help="vectors already in Qwen L42 space (qwen_l42.py capture: key h)")
 a = ap.parse_args()
 
 sys.path.insert(0, str(Path(a.usage).parent))
@@ -37,8 +38,11 @@ import olens_usage as L42
 k, n = map(int, a.shard.split("/"))
 H = torch.load(a.h51)
 idx = list(range(k, len(H["pos"]), n))
-A = torch.load(f"{a.reader}/affine.pt")
-V = (H["h51"][idx].cuda() @ A["W"].cuda().T + A["b"].cuda()).float()
+if a.no_affine:
+    V = H["h"][idx].cuda().float()
+else:
+    A = torch.load(f"{a.reader}/affine.pt")
+    V = (H["h51"][idx].cuda() @ A["W"].cuda().T + A["b"].cuda()).float()
 
 tok = AutoTokenizer.from_pretrained(BASE, revision=BASE_REV)
 model = AutoModelForCausalLM.from_pretrained(BASE, revision=BASE_REV, dtype=torch.bfloat16, device_map={"": 0})

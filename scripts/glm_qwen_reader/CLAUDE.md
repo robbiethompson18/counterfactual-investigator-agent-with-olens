@@ -23,6 +23,7 @@ HF-transformers Qwen shards (one per GPU) read the saved vectors.
 | `box.sh`         | GPU box | `setup` (weights, vLLM 0.31 + glm53 fork, reader) and `run` (both lenses, raw outputs to HF `RUN/raw`)        |
 | `sky.yaml`       | bramble | one sky job running `box.sh` on RunPod 4xB200                                                                 |
 | `qwen_align.py`  | bramble | GLM prompt token → the Qwen token holding its last character, to show a Qwen-on-Qwen reads run at GLM tokens |
+| `qwen_l42.py`    | both    | control: ceselder's Qwen L42 lens on Qwen's own L42 activations (`prep` / `capture` / `rows`), decoded by `qwen_reader.py --no-affine`; `sky_l42.yaml` runs it on 1 GPU |
 | `to_reads.py`    | bramble | raw outputs → `RUN/reads.jsonl` + `reads.transcripts.jsonl` (labels `L51 GLM lens`, `L51→Qwen reader`), dups copied |
 
 Requests come from `scripts/af_v8x_olens_requests.py glm` (GLM raw empty-think render, prompt ids,

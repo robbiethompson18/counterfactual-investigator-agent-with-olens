@@ -1,0 +1,53 @@
+# Qwen L42 lens (ceselder) on Qwen's own L42 activations, the like-for-like control for the Qwen reader of GLM (qwen_l42.py): one
+# GPU, capture then qwen_reader.py --no-affine; outputs go to HF RUN/raw/l42/ before the job ends.
+#   JOB=path/to/l42_job.json RUN=runs/alignment_faking/<run> uvx --from 'skypilot[runpod]==0.13.0' sky launch -c qwen-l42 -y \
+#     -i 10 --down --secret HF_TOKEN --env JOB --env RUN scripts/glm_qwen_reader/sky_l42.yaml
+name: qwen-l42
+
+resources:
+  disk_size: 150
+  any_of:
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+    - {infra: runpod, accelerators: "B200:1"}
+    - {infra: runpod, accelerators: "H100-SXM:1"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  JOB: l42_job.json
+  RUN: ""
+  MAX_HOURS: 2
+  BATCH: 32  # vectors per generate (x4 samples); 128 nearly fills a B200
+
+file_mounts:
+  ~/code: ./scripts/glm_qwen_reader
+  ~/l42_job.json: ${JOB}
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf /data/out
+  command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH=$HOME/.local/bin:$PATH
+  cd ~ && test -x env/bin/python || uv venv -q --python 3.12 env
+  uv pip install -q -p env/bin/python torch --torch-backend=auto
+  # flash-linear-attention: transformers' torch fallback for Qwen3.6's linear attention OOMs an H100 at batch 32 x 4 samples
+  uv pip install -q -p env/bin/python "transformers==5.17.*" "peft==0.21.*" accelerate "huggingface_hub[cli]>=1.5,<2.0" flash-linear-attention
+  env/bin/hf download Qwen/Qwen3.6-27B --revision 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9 >/dev/null
+  env/bin/hf download ceselder/olens-qwen3.6-27b-l42 --revision 1d8e6377f87bcb7e899c96b715ca594b6a5aa765 --local-dir /data/l42 \
+    --include "lens/*" --include olens_usage.py >/dev/null
+  test -f /data/l42/lens/adapter_model.safetensors && test -f /data/l42/olens_usage.py
+
+run: |
+  set -euo pipefail
+  cd ~ && P=~/env/bin/python
+  export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+  timeout "${MAX_HOURS}h" bash -c "$P code/qwen_l42.py capture ~/l42_job.json /data/out/h42.pt && \
+    $P code/qwen_reader.py /data/out/h42.pt /data/l42/lens /data/l42/olens_usage.py /data/out/l42_reads.jsonl --no-affine --batch $BATCH" \
+    2>&1 | tee /data/out/l42.log | grep -vE "Loading weights|Fetching"
+  cp ~/l42_job.json /data/out/
+  ~/env/bin/hf upload Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens /data/out "$RUN/raw/l42" --repo-type dataset \
+    --commit-message "Qwen L42 lens control: $RUN"
+  echo L42_DONE

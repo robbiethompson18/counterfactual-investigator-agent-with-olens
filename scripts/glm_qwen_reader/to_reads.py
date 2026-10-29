@@ -1,13 +1,14 @@
 """The box's raw outputs -> batch reads (docs/olens-reads-format.md) with both lenses on one page per prompt: RUN/reads.jsonl +
 RUN/reads.transcripts.jsonl, so `scripts/runs.py finish RUN` makes the expview run.
 
-    uv run python scripts/glm_qwen_reader/to_reads.py REQUESTS.jsonl RUN/raw RUN [QWEN_RUN]
+    uv run python scripts/glm_qwen_reader/to_reads.py REQUESTS.jsonl RUN/raw RUN [QWEN_RUN_OR_READS ...]
 
-Per position: one row labelled "L51 GLM lens" (Celeste's one-bullet lens: greedy + 4 T=1 bullets as its lines) and one row per
-Qwen-reader draw labelled "L51→Qwen reader" (greedy first, then the T=1 samples, 4 bullets each). Shared-prefix positions (the
-request's `dups`) get copies of the canonical rows with `dup_of`. With QWEN_RUN (a Qwen-on-Qwen batch-reads run of the same prompts)
-and RUN/raw/qwen_align.jsonl (qwen_align.py), each matched GLM token also gets that run's reads of its Qwen token, labelled
-"L<layer> Qwen lens on Qwen" (with the Qwen token and whether the two tokens end at the same character).
+Per position: one row labelled "L51 GLM lens" (Celeste's one-bullet lens: greedy + 4 T=1 bullets as its lines) and one row
+"L51→Qwen reader" whose lines are its draws (greedy, then the T=1 samples), each draw's 4 bullets joined by " · ". Shared-prefix
+positions (the request's `dups`) get copies of the canonical rows with `dup_of`. With Qwen runs or reads files (a Qwen-on-Qwen
+batch-reads run of the same prompts, qwen_l42.py rows) and RUN/raw/qwen_align.jsonl (qwen_align.py), each matched GLM token also
+gets their reads of its Qwen token, labelled by their string `layer` or "L<layer> Qwen lens on Qwen" (with the Qwen token and
+whether the two tokens end at the same character).
 """
 
 import json
@@ -25,17 +26,23 @@ for x in map(json.loads, (raw / "glm_reads.jsonl").read_text().splitlines()):
     rows[(x["id"], x["pos"])].append({"layer": "51 GLM lens", "bullets": bullets, "joint_fve": None})
 for f in sorted(raw.glob("qwen_reads*.jsonl")):
     for x in map(json.loads, f.read_text().splitlines()):
-        for k, t in enumerate(x["reads"]):
-            bullets = [{"text": b, "fve": None} for b in re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)]
-            rows[(x["id"], x["pos"])].append({"layer": "51→Qwen reader", "draw": "greedy" if k == 0 else f"s{k}", "bullets": bullets,
-                                              "joint_fve": None})  # fmt: skip
+        draws = [" · ".join(re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)) for t in x["reads"]]
+        rows[(x["id"], x["pos"])].append(
+            {"layer": "51→Qwen reader", "bullets": [{"text": d, "fve": None} for d in draws], "joint_fve": None}
+        )
 if len(sys.argv) > 4:
     qrows = defaultdict(list)
-    for x in map(json.loads, (Path(sys.argv[4]) / "reads.jsonl").read_text().splitlines()):
-        qrows[(x["id"], x["token_index"])].append(x)
+    for q in sys.argv[4:]:  # Qwen batch-reads runs (dirs) or reads files (qwen_l42.py rows)
+        f = Path(q) / "reads.jsonl" if Path(q).is_dir() else Path(q)
+        for x in map(json.loads, f.read_text().splitlines()):
+            qrows[(x["id"], x["token_index"])].append(x)
     for a in map(json.loads, (raw / "qwen_align.jsonl").read_text().splitlines()):
         for x in qrows[(a["id"], a["qwen_pos"])]:
-            row = {"layer": f"{x['layer']} Qwen lens on Qwen", "bullets": x["bullets"], "joint_fve": x["joint_fve"]}
+            row = {
+                "layer": x["layer"] if isinstance(x["layer"], str) else f"{x['layer']} Qwen lens on Qwen",
+                "bullets": x["bullets"],
+                "joint_fve": x["joint_fve"],
+            }
             rows[(a["id"], a["glm_pos"])].append(
                 row | {"qwen_token_index": a["qwen_pos"], "qwen_token": a["qwen_token"], "aligned": a["exact"]}
             )

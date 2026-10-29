@@ -29,7 +29,7 @@ if [ "$1" = setup ]; then
   fi
   HF="$PY -m huggingface_hub.cli.hf download"
   $HF ceselder/glm-5.3-olens-lens --revision $LENS_REV --local-dir "$D/lens" \
-    --include "rl1b_rl1b_2_step_0100/*" "olens_glm53_usage.py" "vllm_metamodels_glm53_b26f02d.tar.gz" "glm53_stack/*"
+    --include "rl1b_rl1b_2_step_0100/*" --include olens_glm53_usage.py --include vllm_metamodels_glm53_b26f02d.tar.gz --include "glm53_stack/*"
   uv pip install -q -p "$PY" --no-deps "$D/lens/vllm_metamodels_glm53_b26f02d.tar.gz"
   uv cache clean -q
   $HF ceselder/glm-5.3-olens-qwen-reader --revision $READER_REV --local-dir "$D/reader" --include "release/*"
