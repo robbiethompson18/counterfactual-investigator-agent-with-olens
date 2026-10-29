@@ -49,11 +49,12 @@ def _mod():
 def collect() -> list[dict]:
     """One case per episode of RUN, in bank order: the prompt, Qwen's gated modal answer (the label) and the bank metadata."""
     mod = _mod()
-    order = {item: k for k, item in enumerate(mod.items())}
+    v1 = {it["id"]: it for it in mod.bank("v1")["items"]}  # RUN's bank: v2 re-gated the pilot, so its labels can differ
+    order = {item: k for k, item in enumerate(v1)}
     out = []
     for ep in read_episodes(LOCAL / ENV / RUN):
         assert not ep.get("error") and ep["target"].split("@")[0].lower() == QWEN.lower() and ep["meta"]["gate_class"] == "stable"
-        modal = mod._items()[ep["item"]]["qwen_modal"]  # the bank's (a raw sample), not the episode's older gate-normalized copy
+        modal = v1[ep["item"]]["qwen_modal"]  # the bank's (a raw sample), not the episode's older gate-normalized copy
         out.append({"version": "nohint", "item": ep["item"], "modal": mod.norm(modal), "source": f"{ENV}/{RUN}:{ep['id']}",
                     "messages": ep["messages"][:1], "meta": ep["meta"] | {"qwen_modal": modal}})  # fmt: skip
     return sorted(out, key=lambda c: order[c["item"]])

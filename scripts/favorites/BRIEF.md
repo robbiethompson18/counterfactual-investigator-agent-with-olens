@@ -1,4 +1,10 @@
-# Brief v1: write 50 free-response preference questions in your assigned domain
+# Brief v2: write 50 free-response preference questions in your assigned domain
+
+v2 (2026-10-29): wave 1 of the scale-up, 50 agents with narrow domains. The v1 pilot (290 questions,
+6 agents) kept 21% under Qwen's stability gate: `least_favorite` drew refusals, `be_one` rarely
+settled, and `name_one` settled but is guessable from the question. So v2 drops the first two, caps
+`name_one`, and asks for subcategories ("Italian city", "Baroque composer"), which settled well in
+the pilot.
 
 You are building a dataset of questions that ask a language model (Qwen3.6-27B) for its own
 preference or pick: "What is your favorite constellation?", "If you had to pick one cheese, which
@@ -12,17 +18,18 @@ reply can guess it. Your job is only to write the questions.
 - **One category per question, asked once.** Each question is about a different category. Don't ask
   the same category twice in different words ("favorite cheese" and "which cheese would you
   recommend" are the same category: keep one).
-- **Vary the shape across your 50.** Use each of these shapes several times, spread roughly evenly,
-  and record which one in `shape`:
-  - `favorite`: "What is your favorite X?"
-  - `least_favorite`: "What is your least favorite X?"
-  - `pick_one`: "If you had to pick one X, which would it be?"
-  - `recommend`: "Which X would you recommend to someone who has never tried one?" (or a similar
-    natural recommendation context)
-  - `be_one`: "If you were an X, which X would you be?"
-  - `name_one`: "Name one X." / "Name a X."
-  - `choose_for`: "Which X would you choose for <a concrete purpose>?" ("Which typeface would you
-    choose for a wedding invitation?")
+- **Use these shapes, in about these numbers out of 50**, and record which one in `shape`:
+  - `favorite` (about 12): "What is your favorite X?"
+  - `pick_one` (about 12): "If you had to pick one X, which would it be?"
+  - `recommend` (about 11): "Which X would you recommend to someone who has never tried one?" (or a
+    similar natural recommendation context)
+  - `choose_for` (about 11): "Which X would you choose for <a concrete purpose>?" ("Which typeface
+    would you choose for a wedding invitation?")
+  - `name_one` (at most 4): "Name one X." / "Name a X."
+  - No "least favorite" and no "if you were an X" questions.
+- **Subcategories are good.** Narrow a broad category by country, era, style or use: "Italian city",
+  "Baroque composer", "Hitchcock film", "Norse god", "Japanese dish". Two subcategories of one
+  parent ("Italian city", "Spanish city") are different categories and both fine.
 - **Ordinary categories, with some a little offbeat.** Most should be things anyone has an opinion
   about (fruit, board games, dog breeds); about a quarter can be a bit more specific (noble gases,
   Greek letters, cloud types, Shakespeare plays). Don't hunt for obscure ones.
