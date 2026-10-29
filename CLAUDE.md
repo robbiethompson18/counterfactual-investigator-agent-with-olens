@@ -403,7 +403,7 @@ Current docs:
   the eval half), consistency the only filter (>= 7 of 8 samples the same bare letter: 1,251 cases,
   82% right; the first build's 1,285 read worked solutions by their first capital), no hint,
   single-turn letter task with O-lens / placebo reads at the option newlines and the end of the
-  prompt; placebo smoke on Docent, no full run
+  prompt (six layers, cutoff_qa_inline's); reads on HF, placebo smoke on Docent, no full run yet
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
   — a folder per eval (eval.py: ENVS, prep, cases; eval.md shown to the investigator),
   `python -m cfbench.eval`, evals keyed by eval not env in the viewer; af_refusals (AF refusals,
