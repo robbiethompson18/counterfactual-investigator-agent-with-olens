@@ -62,7 +62,8 @@ class NLAEngine(OneEngine):
 
         greedy = sampling.temperature <= 0
         prompts, params = [], []
-        for v, L in zip(vecs, layers):
+        seeds = seed if isinstance(seed, list) else [seed] * len(vecs)
+        for v, L, s in zip(vecs, layers, seeds):
             ids, slot = self._carrier(L)
             prompts.append({"prompt_token_ids": ids})
             act = torch.as_tensor(v).float().cpu().view(1, 1, -1)
@@ -74,7 +75,7 @@ class NLAEngine(OneEngine):
                     temperature=0.0 if greedy else sampling.temperature,
                     top_p=1.0 if greedy else sampling.top_p,
                     top_k=-1 if greedy else sampling.top_k,
-                    seed=None if greedy else seed,
+                    seed=None if greedy else s,
                     stop=["</explanation>"],
                     include_stop_str_in_output=True,
                     extra_args={"apply_steering_vectors": [sv]},

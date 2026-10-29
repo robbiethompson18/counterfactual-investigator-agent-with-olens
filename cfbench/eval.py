@@ -11,7 +11,11 @@ prompt's `condition` too): the sentence
 in place of the prompt's "In the base arm, `model` showed the behavior in k of n runs." ("" drops it), TASK ("rate", or
 "claim": the probability that a claim is true, truth 0 or 1 as k_cf/n_cf), ASK(case) -> str: the body of "## Your task" in
 place of build_prompt's, INPUTS_FROM: another eval whose inputs run it reads, PROMPT(prompt, case) -> str: a last
-rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's). eval.md
+rewrite of the whole prompt, and MODEL_IDS: every model id that must never reach the predictor (default the case's), OLENS: overrides of the
+O-lens tools' defaults (`context: "xml"` also rewrites the prompt's read-marker sentence), and for the single-turn
+core.INLINE_CONDITIONS: INLINE(env, condition, case, base, seed) -> (the prompt up to and including "## Your task", extra
+row fields) and INLINE_EFFORT, the predictor's reasoning effort for them (no tools, one submit call), and DEFAULT_VERSIONS: the versions
+run when --versions isn't given (default all). eval.md
 beside it, if any, goes into every prompt as "## About this evaluation", before the task. Everything else is cfbench as
 usual: core.build_prompt, the transcript and O-lens tools, predict.predict, one predictions.jsonl row per draw in
 data/runs/cfbench/<date>_<slug>/, synced to HF.
@@ -29,7 +33,16 @@ from pathlib import Path
 import openai
 
 from cfbench import olens
-from cfbench.core import HARNESS_VERSION, JLENS_CONDITIONS, OLENS_CONDITIONS, TOOL_BUDGET, TOOL_CONDITIONS, build_prompt, pick_examples
+from cfbench.core import (
+    HARNESS_VERSION,
+    INLINE_CONDITIONS,
+    JLENS_CONDITIONS,
+    OLENS_CONDITIONS,
+    TOOL_BUDGET,
+    TOOL_CONDITIONS,
+    build_prompt,
+    pick_examples,
+)
 from cfbench.predict import EFFORT, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
@@ -68,9 +81,11 @@ def ask(prompt: str, text: str | None) -> str:
     return prompt.split("\n\n## Your task\n\n")[0] + "\n\n## Your task\n\n" + text.strip()
 
 
-def latest_inputs(name: str) -> Path:
+def latest_inputs(name: str, versions: list[str]) -> Path:
+    """The newest inputs run of `name` that has every one of `versions`."""
     runs = sorted((ROOT / "cfbench_evals").glob(f"*_{name.replace('_', '-')}-inputs*"), key=lambda p: p.stat().st_mtime)
-    assert runs, f"no inputs run for {name}: run `python -m cfbench.eval {name} --prep` first"
+    runs = [r for r in runs if set(versions) <= set(json.loads((r / "meta.json").read_text())["params"]["versions"])]
+    assert runs, f"no inputs run for {name} with {versions}: run `python -m cfbench.eval {name} --prep` first"
     return runs[-1]
 
 
@@ -99,7 +114,7 @@ async def main():
     ap.add_argument("--description", default="")
     args = ap.parse_args()
     ev = importlib.import_module(f"cfbench.evals.{args.name}.eval")
-    versions = args.versions.split(",") if args.versions else list(ev.VERSIONS)
+    versions = args.versions.split(",") if args.versions else list(getattr(ev, "DEFAULT_VERSIONS", ev.VERSIONS))
     if args.prep:
         run = new_run(
             "cfbench_evals",
@@ -112,7 +127,7 @@ async def main():
         finish(run)
         return
     assert args.slug or args.show, "--slug"
-    inputs = Path(args.inputs) if args.inputs else latest_inputs(getattr(ev, "INPUTS_FROM", args.name))
+    inputs = Path(args.inputs) if args.inputs else latest_inputs(getattr(ev, "INPUTS_FROM", args.name), versions)
     task = getattr(ev, "TASK", "rate")
     ask_src = inspect.getsource(ev.ASK) if hasattr(ev, "ASK") else None
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
@@ -120,6 +135,9 @@ async def main():
     prompt_src = inspect.getsource(ev.PROMPT) if hasattr(ev, "PROMPT") else None
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
     assert not set(JLENS_CONDITIONS) & set(conditions), "cfbench.eval has no J-lens tools yet; use cfbench.run"
+    inline = set(INLINE_CONDITIONS) & set(conditions)
+    assert not inline or hasattr(ev, "INLINE"), f"{args.name} has no INLINE prompt for {sorted(inline)}"
+    xml = (getattr(ev, "OLENS", None) or {}).get("context") == "xml"
     predictors = args.predictors.split(",")
     reads = olens.Reads(ev.reads(inputs)) if set(OLENS_CONDITIONS) & set(conditions) else None
     fve_note = olens.fve_note(reads) if reads else ""
@@ -149,13 +167,24 @@ async def main():
         prompt = base_line(prompt, ev.BASE_LINE(case | {"condition": condition}) if hasattr(ev, "BASE_LINE") else None)
         prompt = ask(prompt, ev.ASK(case) if hasattr(ev, "ASK") else None)
         prompt = with_notes(hide(prompt, case["model"], ev.MODEL_NAME) if ev.MODEL_NAME else prompt, notes)
+        if xml and condition in OLENS_CONDITIONS:
+            assert prompt.count(olens.MARKER_NOTE) == 1, "core.OLENS's read-marker sentence changed"
+            prompt = prompt.replace(olens.MARKER_NOTE, olens.XML_NOTE)
         return ev.PROMPT(prompt, case) if hasattr(ev, "PROMPT") else prompt
+
+    def inline_prompt(env, case: dict, base: list, condition: str, seed: int) -> tuple[str, dict]:
+        prompt, extra = ev.INLINE(env, condition, case, base, seed)
+        return with_notes(prompt, notes), extra
 
     if args.show:
         env, case, base = cases[0]
         print(f"# case {case['env']} {case['model']} (truth {case['k_cf']}/{case['n_cf']}), task {task}\n")
         shown = pick_examples(base, random.Random(args.seed), "answer" if task == "answer" else "rate")
         for condition in conditions:
+            if condition in INLINE_CONDITIONS:
+                prompt, extra = inline_prompt(env, case, base, condition, args.seed)
+                print(f"===== {condition} {json.dumps(extra)} =====\n{prompt}\n")
+                continue
             read = None
             if condition in OLENS_CONDITIONS and reads:
                 src = placebo_sources(case, base, args.seed) if condition == "olens_placebo_agentic" else None
@@ -193,6 +222,7 @@ async def main():
             "models": sorted({c["model"] for _, c, _ in cases}),
             "task": task,
             "effort": args.effort,
+            "inline_effort": getattr(ev, "INLINE_EFFORT", None) if inline else None,
             "max_calls": args.max_calls,
             "draws": args.draws,
             "seed": args.seed,
@@ -216,7 +246,10 @@ async def main():
             with out.open("a") as f:
                 f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
             return
-        tools, read, extra = {}, None, {}
+        tools, read, extra, effort = {}, None, {}, args.effort
+        if condition in INLINE_CONDITIONS:
+            prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
+            effort = ev.INLINE_EFFORT
         if condition in TOOL_CONDITIONS:
             tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
         if condition in OLENS_CONDITIONS:
@@ -229,11 +262,12 @@ async def main():
             if src is not None:
                 extra["placebo_sources"] = src
             tools |= lens_tools
-        prompt = prompt_of(env, case, base, shown, condition, read)
+        if condition not in INLINE_CONDITIONS:
+            prompt = prompt_of(env, case, base, shown, condition, read)
         async with slots:
             for attempt in range(3):
                 try:
-                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, args.effort, task)
+                    result = await predict(predictor, prompt, tools, args.max_calls if tools else 0, effort, task)
                     break
                 except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
@@ -245,7 +279,8 @@ async def main():
         if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
             canon = env.canon_answer(result["answer"]) if result["valid"] else None
             result |= {"canon": canon, "correct": canon == case["modal_cf"] if result["valid"] else None}
-        row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor} | extra
+        row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
+        row |= {"effort": effort} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:
             f.write(json.dumps(row) + "\n")

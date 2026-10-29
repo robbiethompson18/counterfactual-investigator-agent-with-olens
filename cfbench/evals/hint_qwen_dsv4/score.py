@@ -26,8 +26,11 @@ from environments._lib.evals import auroc
 
 CLASSES = (KNEW, DIDNT)
 BOOT = 2000
-OLENS = "olens_agentic"
-VERSUS = ("olens_placebo_agentic", "transcript_agentic", "no_transcript")
+# (O-lens condition, the conditions it is compared against): the agentic ones, and the single-turn ones (inline.py)
+PAIRS = (
+    ("olens_agentic", ("olens_placebo_agentic", "transcript_agentic", "no_transcript")),
+    ("olens_inline", ("olens_placebo_inline", "transcript_inline")),
+)
 
 
 def boot_mean(per_item: list[float], rng: np.random.Generator) -> list[float]:
@@ -45,16 +48,16 @@ def sign_test(diffs: list[float]) -> tuple[int, int, float]:
 def paired(right: dict[tuple[str, str], dict[str, list[bool]]], rng: np.random.Generator) -> list[dict]:
     """O-lens vs each other condition per version: mean over shared items of (O-lens − other) per-item % right."""
     out = []
-    for version in sorted({v for _, v in right}):
-        a = right.get((OLENS, version), {})
-        for other in VERSUS:
+    for version, (olens, versus) in ((v, p) for v in sorted({v for _, v in right}) for p in PAIRS):
+        a = right.get((olens, version), {})
+        for other in versus:
             b = right.get((other, version), {})
             items = sorted(set(a) & set(b))
             if not items:
                 continue
             d = [float(np.mean(a[i]) - np.mean(b[i])) for i in items]
             pos, neg, p = sign_test(d)
-            out.append({"version": version, "a": OLENS, "b": other, "n": len(items), "diff": float(np.mean(d)),
+            out.append({"version": version, "a": olens, "b": other, "n": len(items), "diff": float(np.mean(d)),
                         "ci": boot_mean(d, rng), "better": pos, "worse": neg, "p_sign": p})  # fmt: skip
     return out
 

@@ -79,7 +79,9 @@ Summary of the Final Pitch (2026-10-19):
 - **Don't paste O-lens reads into the predictor's prompt** (the `transcript_olens*` conditions,
   closed PR #116, 2026-10-22). It's a dead end: no gain over a placebo, and one variant read the
   lens on the counterfactual prompt, which is outside the zero-counterfactual setting. See
-  [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md).
+  [docs/envs/hidden_goal.md](docs/envs/hidden_goal.md). Exception: hint_qwen_dsv4's single-turn
+  `*_inline` conditions (2026-10-28), a deliberate retry Kylie asked for; compare them with each
+  other, not with the agentic ones.
 - **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`,
   `olens_placebo_agentic`** (renamed 2026-10-27; old rows map through `canon_condition`). The inline
   two-transcript condition is retired: never compare a tool condition against anything but

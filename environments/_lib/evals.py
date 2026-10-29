@@ -87,9 +87,12 @@ def _messages(msgs: list[dict]) -> list[dict]:
     return out
 
 
-def item_id(r: dict, cond: str) -> str:
+def item_id(r: dict, cond: str, meta: dict) -> str:
+    """The prediction's expview item id; with the eval's VERSION_IN_IDS, prefixed by its version (arm pairs repeat across
+    versions there)."""
     case = f"{r['base_arm']} -> {r['cf_arm']}" + (f"@{r['item']}" if r.get("item") else "")
-    return f"{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
+    version = f"{r['version']}/" if getattr(_eval_module(meta.get("params", {}).get("eval")), "VERSION_IN_IDS", False) else ""
+    return f"{version}{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
 
 
 def seen_tokens(reads, row: dict) -> dict | None:
@@ -166,7 +169,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
             labels["base rate"] = round(r["k_base"] / r["n_base"], 4)
             parsed = {"p": r.get("p"), "rationale": r.get("rationale")}
         run.add(
-            id=item_id(r, cond),
+            id=item_id(r, cond, meta),
             group=f"{r['model'].split('/')[-1]} · {r['base_arm']} -> {r['cf_arm']} · {cond}",
             labels=labels | {"valid": r.get("valid", True), **({"item": r["item"]} if r.get("item") else {})},
             links={"Docent": f"https://docent.transluce.org/dashboard/{cid}/agent_run/{did}"} if cid and did else {},
@@ -322,7 +325,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
                 "predictor": r["predictor"],
                 "calls": sum((r.get("tool_calls") or {}).values()),
                 "docent": did,
-                "ev": item_id(r, cond) if r.get("messages") else None,
+                "ev": item_id(r, cond, meta) if r.get("messages") else None,
                 "rationale": r.get("rationale"),
                 "links": links_of(r),
             }
@@ -491,7 +494,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
                 "predictor": r["predictor"],
                 "calls": sum((r.get("tool_calls") or {}).values()),
                 "docent": did,
-                "ev": item_id(r, cond) if r.get("messages") else None,
+                "ev": item_id(r, cond, meta) if r.get("messages") else None,
                 "rationale": r.get("rationale"),
             }
         )
@@ -537,6 +540,17 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
         "groups": out_groups,
         "item_info": item_info(meta, rows),
     }
+
+
+def paired_all(right: dict[str, dict[Any, list[float]]]) -> list[dict]:
+    """paired_vs against the eval's transcript condition (agentic, else single-turn), plus each O-lens condition against its
+    own placebo."""
+    ref = "transcript_agentic" if "transcript_agentic" in right else "transcript_inline"
+    rows = paired_vs(right, ref)
+    for ol, pl in (("olens_agentic", "olens_placebo_agentic"), ("olens_inline", "olens_placebo_inline")):
+        if ol in right and pl in right:
+            rows += paired_vs({ol: right[ol], pl: right[pl]}, pl)
+    return rows
 
 
 def paired_vs(right: dict[str, dict[Any, list[float]]], ref: str = "transcript_agentic", n_boot: int = 2000, seed: int = 0) -> list[dict]:
@@ -621,7 +635,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
                         right[r["version"]][canon_condition(r["condition"])][r["item"]].append(
                             float((r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"]))
                         )
-                paired = {v: paired_vs(by) for v, by in right.items()}
+                paired = {v: paired_all(by) for v, by in right.items()}
             tables.append({"inputs": inputs, "runs": [s["slug"] for s in runs], "rows": table, "paired": paired})
         return {"claim_tables": tables}
     if ans := [s for s in cur if s.get("task") == "answer"]:  # % correct per item (valid draws), pooled over the current runs
@@ -642,7 +656,7 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             pooled.append(
                 {"condition": k, "n": len(x), "accuracy": float(x.mean()), "ci": [float(c) for c in np.percentile(boots, [2.5, 97.5])]}
             )
-        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_vs(right), "pooled": pooled}}
+        return {"answer_paired": {"runs": [s["slug"] for s in ans], "rows": paired_all(right), "pooled": pooled}}
     cur = [s for s in cur if s.get("task", "rate") == "rate"]
     if len(cur) < 2:
         return {}
@@ -755,7 +769,11 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
             summaries = [s for s in summaries if s.get("inputs") in only]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
-        extra = mark_current(name, summaries)
+        if shown := getattr(_eval_module(name), "RUNS", None):  # the eval lists the runs it shows: each its own row, no pooling
+            summaries = [s | {"current_conds": s["conditions"], "current": True} for s in summaries if s["run"] in shown]
+            extra = {}
+        else:
+            extra = mark_current(name, summaries)
         for s in summaries:
             s.pop("_sq", None), s.pop("_sq_null", None), s.pop("_clusters", None)
         p = EVALS / f"{name}.json"
