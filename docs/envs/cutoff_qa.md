@@ -91,8 +91,6 @@ Gate runs, Qwen3.6-27B, 8 samples plus greedy:
 - **The agents padded to 50.** Lists of small countries or single-office bodies ran out of famous
   things and filled with speakers, deputy ministers and central-bank governors, which the gate
   mostly rejects. Better a short file.
-- No text-inversion gate was applied (it selects on the investigator failing; see CLAUDE.md), so
-  transcript-only baselines are honest but high on `stable_right` items.
 
 ## How to generate more
 
