@@ -188,6 +188,8 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   screens of agent-interp-envs (docs/envs-screen) were deleted; their gateway, configs and scripts
   are at commit `e145988`. A build script may read its data files (e.g. `wsb/build_banks.py` reads
   workspace-bench's `evals/*/items.json` at the pinned commit) to make a bank for HF.
+- For a GPU job, start at most 2 pods and reuse them for follow-ups that come up soon after (idle
+  autostop ~20 min), rather than booting new ones (Kylie, 2026-10-29).
 - Never cap Qwen's thinking (no `max_tokens` or thinking budget on generations): it bugs out under a
   cap, and truncated episodes are unscorable.
 - **Run Qwen with thinking off by default** (`--thinking off`; new envs set `"thinking": False` in

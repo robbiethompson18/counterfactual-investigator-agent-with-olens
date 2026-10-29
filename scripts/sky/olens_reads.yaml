@@ -21,6 +21,7 @@ envs:
   HF_XET_HIGH_PERFORMANCE: 1
   LAYERS: "32,40,48"
   MAX_HOURS: 2
+  EXTRA: ""  # extra reader flags, e.g. "--temperature 0"
   REQ: requests.jsonl
 
 file_mounts:
@@ -65,5 +66,5 @@ run: |
   export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
   cd ~/repo
   PYTHONPATH=olens/src:src timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/reads.jsonl \
-    --layers $LAYERS --lens-lora /data/lora_vllm/olens_space_rl600 --ar-lora /data/lora_vllm/ar_ptag_pooled
+    --layers $LAYERS --lens-lora /data/lora_vllm/olens_space_rl600 --ar-lora /data/lora_vllm/ar_ptag_pooled $EXTRA
   echo READS_DONE
