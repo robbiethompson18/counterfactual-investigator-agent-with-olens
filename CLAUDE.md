@@ -612,6 +612,11 @@ Current docs:
   — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
+- [ACTIVE: knowledge_cutoff env + investigator eval — read before running Qwen, another model or an investigator on post-cutoff factual questions, or picking an investigator for a cutoff task](docs/envs/knowledge_cutoff.md)
+  — predict Qwen's reply from the prompt (Robbie's one-turn format) as a cfbench answer eval over
+  the `knowledge_cutoff` env; decisions (Haiku 5.5 medium, hidden model, free text not MCQ,
+  stability-only filter); the investigator census (Flash shares Qwen's stale answers 24%, Haiku 4%);
+  Flash and Haiku dev smokes
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas

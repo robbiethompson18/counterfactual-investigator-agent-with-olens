@@ -87,12 +87,13 @@ def messages(raw: list[dict]) -> list:
                 parts.append(ContentText(text=content))
             calls = []
             for tc in m.get("tool_calls") or []:
+                fn = tc.get("function", tc)  # OpenAI's {"function": {name, arguments}}, or expview's flattened {name, arguments}
                 try:
-                    args = json.loads(tc["function"]["arguments"])
+                    args = json.loads(fn["arguments"])
                 except (json.JSONDecodeError, TypeError):
-                    args = {"raw": tc["function"]["arguments"]}
-                tool_names[tc["id"]] = tc["function"]["name"]
-                calls.append(ToolCall(id=tc["id"], function=tc["function"]["name"], arguments=args, type="function"))
+                    args = {"raw": fn["arguments"]}
+                tool_names[tc["id"]] = fn["name"]
+                calls.append(ToolCall(id=tc["id"], function=fn["name"], arguments=args, type="function"))
             out.append(AssistantMessage(content=parts or "", tool_calls=calls or None))
     return out
 

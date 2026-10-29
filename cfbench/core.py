@@ -90,6 +90,8 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # byte-identical to 13, and runs that pass it say so in meta.json params. The 2026-10-28_answer-mcq-late-d1-prehint* runs
 # were made on PR #320's branch before this landed, and their rows say harness 8: that is 7 plus --olens-before, not the 8
 # above.
+# An eval's SYSTEM (2026-10-29, no bump): replaces the predictor's system prompt for that eval only (knowledge_cutoff, Robbie's
+# predict-the-reply prompt); every other eval's prompts are byte-identical to 13.
 HARNESS_VERSION = 13
 
 
