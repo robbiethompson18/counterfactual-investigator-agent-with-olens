@@ -8,7 +8,8 @@
     uv run --script wsb/build_banks.py --upload   # ... and uploads them to banks/wsb/ in the sprint HF dataset
 
 Each bank is their `evals/<family>/items.json` verbatim under a `source` header (repo, path, commit, license);
-jailbreak_recognition also gets `prefix`/`token` per item (see `qwen_render`). Reading
+jailbreak_recognition also gets `prefix`/`token` per item (see `qwen_render`); wrong_bridge gets `token`, the final token of
+its plain-text prompt (see `plain_token`). wrong_bridge_true shares wrong_bridge's items, so it has no bank of its own. Reading
 data files from vendor/workspace-bench is fine; importing or running its code is not (vendor/CLAUDE.md)."""
 
 import argparse
@@ -34,6 +35,10 @@ NOTES = {
     "included (ids only upstream; the question text is in nocot's password-protected zip). Added per item: `prefix`, the "
     "Qwen3.6-27B chat render (thinking off) of the user turn through reply_start, and `token`, its last token (the newline pair "
     "after the empty think block): what the stock-Qwen prompt-only floor shows the model.",
+    "wrong_bridge": "100 items copied verbatim (Wikidata two-hop prompts where Qwen3.6-27B resolves the wrong bridge B'; "
+    "`intermediates` = B', `true_intermediates` = B, `target` = Qwen's surface answer). wrong_bridge_true scores the same items "
+    "against `true_intermediates`, so it has no bank of its own. Added per item: `token`, the final token of the plain-text "
+    "`prompt` as the Qwen3.6-27B tokenizer splits it (read offset -1; always ' year' or ' of').",
 }
 
 
@@ -73,7 +78,15 @@ def cutoff_render(bank: dict):
         it["token"] = tail[-1]
 
 
-EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render}
+def plain_token(bank: dict):
+    """wrong_bridge is read at the final token of the plain prompt (no chat template): store it, asserting it is the last word."""
+    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
+    for it in bank["items"]:
+        it["token"] = tok.decode(tok(it["prompt"])["input_ids"][-1:])
+        assert it["token"] == " " + it["prompt"].rsplit(" ", 1)[1], (it["name"], it["token"])
+
+
+EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render, "wrong_bridge": plain_token}
 
 
 def build(family: str, commit: str) -> dict:
