@@ -1,6 +1,6 @@
 # Qwen3.6-27B chat server as a `sky exec` job on a cluster that already ran scripts/sky/olens_reads.yaml (its olens-env has
 # vLLM 0.27.1 and /data/hf has the weights), so rollouts reuse the reader's box with no second download or setup:
-#   uvx --from 'skypilot[runpod]==0.13.0' sky exec qwen-olens --secret VLLM_KEY scripts/sky/qwen_serve_exec.yaml
+#   uvx --from 'skypilot[runpod]==0.13.0' sky exec qwen-olens --gpus H200-SXM:1 --secret VLLM_KEY scripts/sky/qwen_serve_exec.yaml
 #   ssh -F ~/.sky/generated/ssh/qwen-olens -N -L 127.0.0.1:18000:127.0.0.1:8000 qwen-olens
 name: qwen-serve-exec
 
