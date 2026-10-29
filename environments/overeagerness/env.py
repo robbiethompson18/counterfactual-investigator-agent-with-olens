@@ -216,6 +216,8 @@ RETIRED = [
 RETIRED += [a for a in ARM_FACTORS if a.split("/")[1].split("@")[0] in ("core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself")]
 # Kylie 2026-10-29: hide every "Task: ..." (core_formal*) arm; the direct wording replaces it. The arms still build.
 RETIRED += [a for a in ARM_FACTORS if a.split("/")[1].startswith("core_formal") and a not in RETIRED]
+# Kylie 2026-10-29: hide the done-tool variants of the core grid too (core_done*, core_direct_done*); they still build.
+RETIRED += [a for a in ARM_FACTORS if a.split("/")[1].split("@")[0].startswith(("core_done", "core_direct_done")) and a not in RETIRED]
 PRIMARY = "positive"
 STARRED = "settled (Kylie, 2026-10-27)"
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS
