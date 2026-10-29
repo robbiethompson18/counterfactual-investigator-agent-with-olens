@@ -88,6 +88,12 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
+- **A tool call that ends a rollout by submitting an answer returns the verdict** (added
+  2026-10-29): the tool result of a valid `submit_prediction` / `submit_answer` (or any env/eval
+  tool playing that role) states what was submitted, the correct answer and whether it was right, so
+  the verdict is in the transcript's last message (`cfbench/predict.py` `grader`). Transcript-only,
+  no harness bump; old runs are not backfilled. An invalid submission's retry message must not
+  reveal the answer.
 
 ## Background reading
 
