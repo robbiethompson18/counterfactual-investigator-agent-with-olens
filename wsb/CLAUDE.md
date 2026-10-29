@@ -87,3 +87,18 @@ uv run python -m wsb.moral_rationale --n 3   # all 200 items x 3 draws, ~10 min
 
 `user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and
 `moral_rationale` so far.
+
+`cutoff_investigator.py` turns knowledge_cutoff into an investigator task: a model (default Claude
+Haiku 5.5, effort medium) sees the question Qwen was asked and predicts Qwen's reply in one turn
+with `submit_answer`, from the prompt alone, plus end-of-prompt O-lens reads, or plus another
+prompt's reads (placebo); free-text or `mcq` render; system prompt with or without the model and
+cutoff (`--versions told,hidden`, default hidden). One expview item per conversation, the stored
+submit reply carries the verdict. `cutoff_census.py` asks a candidate investigator every question
+directly and counts how often its own answer is Qwen's stale one (pick investigators by this). Both
+write runs under `data/runs/wsb_cutoff_investigator/`. Decisions and results:
+[docs/wsb-cutoff-investigator.md](../docs/wsb-cutoff-investigator.md).
+
+```bash
+uv run python -m wsb.cutoff_investigator --slug recall-haiku-dev109          # 109 dev items x 5 draws, ~$1
+uv run python -m wsb.cutoff_census --models anthropic/claude-haiku-5.5
+```

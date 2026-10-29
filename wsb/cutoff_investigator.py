@@ -1,19 +1,23 @@
-"""Investigator smoke on WorkspaceBench's knowledge_cutoff: Gemini 3.8 Flash is shown a question Qwen3.6-27B was asked and
+"""Investigator on WorkspaceBench's knowledge_cutoff: an investigator model is shown a question Qwen3.6-27B was asked and
 predicts Qwen's reply, without seeing it (Robbie, 2026-10-29: WSB's task with an investigator at pass@1). The label is Qwen's
 own answer: the bank's gold for the free-text `recall` format, and for `mcq` (the question over the bank's 5 options, A-E)
 the modal letter of a `wsb.knowledge_cutoff --arm mcq` run (`--qwen-mcq-run`; without one the gold's letter, recorded as such).
+Decisions and results so far: docs/wsb-cutoff-investigator.md.
 
-Versions `told` / `hidden`: whether the system prompt names the model and its cutoff. Conditions: `transcript_inline` (the
-prompt alone), `olens_placebo_inline` (plus O-lens reads of another prompt's last six tokens, from `--placebo`, presented as
-reads of this one: the control for the reads block itself), `olens_inline` (the real reads, `--reads`; none exist yet). One
-turn each, no tools but submit_answer, Gemini at `--effort` (low).
+Investigator: `--investigator`, default Claude Haiku 5.5 at effort medium (Robbie, 2026-10-29, after the cutoff_census: Gemini 3.8
+Flash shares Qwen's stale answers on a quarter of the items, Haiku on 4%). Versions `told` / `hidden`: whether the system prompt
+names the model and its cutoff; default hidden only (Robbie: told makes a result harder to see). Conditions: `transcript_inline`
+(the prompt alone), `olens_placebo_inline` (plus O-lens reads of another prompt's last six tokens, from `--placebo`, presented
+as reads of this one: the control for the reads block itself), `olens_inline` (the real reads, `--reads`; none exist yet). One
+turn each, no tools but submit_answer, 5 draws.
 
     source .envrc.local && uv run python -m wsb.cutoff_investigator --show --limit 1
-    uv run python -m wsb.cutoff_investigator --formats recall --limit 10 --draws 2 --slug recall-smoke10
-    uv run python -m wsb.cutoff_investigator --formats mcq --limit 10 --draws 2 --qwen-mcq-run data/runs/wsb_knowledge_cutoff/<run>
+    uv run python -m wsb.cutoff_investigator --slug recall-haiku-dev109                 # the 109 dev items, recall, hidden
+    uv run python -m wsb.cutoff_investigator --formats mcq --limit 10 --qwen-mcq-run data/runs/wsb_knowledge_cutoff/<run>
 
-Items: `--items`, else the first `--limit` bank items whose answer the `--answer-run` (Qwen on our server, 10 samples) confirmed
-(strict win, gold in >= 70% of samples), with a non-numeric gold (token lenses can't name multi-digit numbers) and no prompt leak.
+Items: `--items`, else the bank items (first `--limit`, 0 = all) whose answer the `--answer-run` (Qwen on our server, 10 samples)
+confirmed stable (gold in >= 70% of samples), with a non-numeric gold (token lenses can't name multi-digit numbers) and no prompt
+leak. Scoring is the bank's alias regex (wsb/knowledge_cutoff.py's port of their score.py; case- and accent-insensitive).
 Run dir data/runs/wsb_cutoff_investigator/<date>_<slug>/: responses.jsonl (one row per prediction), summary.json, expview/ (one
 item per prediction: the whole conversation); `runs.py finish` syncs it to HF and Docent (collection wsb_cutoff_investigator).
 """
@@ -39,7 +43,7 @@ from wsb.knowledge_cutoff import LETTERS, OptionForms, mcq_letter, render_mcq
 sys.path.insert(0, str(Path(__file__).parents[1] / "expview"))
 from expview import Run, call
 
-PREDICTOR = "google/gemini-3.8-flash"
+INVESTIGATOR = "anthropic/claude-haiku-5.5"
 ANSWER_RUN = Path("data/runs/wsb_knowledge_cutoff/2026-10-28_qwen-answer-k10-vllm")
 PLACEBO = Path("data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail/reads.placebo-head.jsonl")  # Kylie's end-of-prompt reads
 FORMATS = ("recall", "mcq")
@@ -86,10 +90,10 @@ def smoke_items(bank: dict, n: int, answer_run: Path) -> list[dict]:
     ok = [
         it
         for it in bank["items"]
-        if (s := per_item.get(it["id"])) and s["strict_win"] and s["gold_rate"] >= 0.7
+        if (s := per_item.get(it["id"])) and s["gold_rate"] >= 0.7
         and not re.fullmatch(r"[\d.,k]+", it["gold"]) and not it.get("g3_leak")
     ]  # fmt: skip
-    return ok[:n]
+    return ok[:n] if n else ok
 
 
 def reads_by_source(path: Path) -> dict[str, list[dict]]:
@@ -133,11 +137,11 @@ def build(item: dict, fmt: str, version: str, condition: str, rows: list[dict] |
     ]
 
 
-async def investigate(messages: list[dict], effort: str) -> tuple[dict | None, list[dict], float]:
+async def investigate(model: str, messages: list[dict], effort: str) -> tuple[dict | None, list[dict], float]:
     """cfbench/predict.py's loop without tools: up to 3 turns to produce one valid submit_answer call."""
     messages, submission, cost = list(messages), None, 0.0
     for _ in range(3):
-        r = await openrouter.chat(PREDICTOR, messages, effort=effort, tools=[answer.SUBMIT], max_tokens=8000)
+        r = await openrouter.chat(model, messages, effort=effort, tools=[answer.SUBMIT], max_tokens=8000)
         cost += getattr(r.usage, "cost", 0) or 0
         msg = r.choices[0].message
         messages.append(msg.model_dump(exclude_none=True))
@@ -181,16 +185,17 @@ def grade(item: dict, fmt: str, text: str | None, label: str) -> dict:
 async def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--formats", default="recall")
-    ap.add_argument("--versions", default=",".join(VERSIONS))
+    ap.add_argument("--versions", default="hidden")
     ap.add_argument("--conditions", default="transcript_inline,olens_placebo_inline")
     ap.add_argument("--items", help="comma-separated bank item ids")
-    ap.add_argument("--limit", type=int, default=10)
+    ap.add_argument("--limit", type=int, default=0, help="first N items (0 = all)")
     ap.add_argument("--answer-run", type=Path, default=ANSWER_RUN)
     ap.add_argument("--qwen-mcq-run", type=Path, help="a `wsb.knowledge_cutoff --arm mcq` run: the mcq labels")
     ap.add_argument("--placebo", type=Path, default=PLACEBO, help="reads.jsonl of end-of-prompt reads on other prompts")
     ap.add_argument("--reads", type=Path, help="reads.jsonl of this bank's own end-of-prompt reads (olens_inline)")
-    ap.add_argument("--draws", type=int, default=2)
-    ap.add_argument("--effort", default="low")
+    ap.add_argument("--investigator", default=INVESTIGATOR)
+    ap.add_argument("--draws", type=int, default=5)
+    ap.add_argument("--effort", default="medium")
     ap.add_argument("--concurrency", type=int, default=8)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--show", action="store_true", help="print the first item's prompts and exit")
@@ -227,10 +232,10 @@ async def main():
     run = new_run(
         "wsb_cutoff_investigator",
         slug,
-        description=f"knowledge_cutoff investigator smoke: {len(items)} items x {formats} x {versions} x {conditions} x "
-        f"{args.draws} draws, Gemini 3.8 Flash effort {args.effort}, Robbie's one-turn predict-the-reply prompt",
+        description=f"knowledge_cutoff investigator: {len(items)} items x {formats} x {versions} x {conditions} x "
+        f"{args.draws} draws, {args.investigator} effort {args.effort}, Robbie's one-turn predict-the-reply prompt",
         models=[
-            {"name": PREDICTOR, "served_by": "openrouter", "role": "investigator", "effort": args.effort},
+            {"name": args.investigator, "served_by": "openrouter", "role": "investigator", "effort": args.effort},
             {"name": "Qwen/Qwen3.6-27B", "role": "subject", "note": "labels from the bank (recall) / --qwen-mcq-run (mcq)"},
         ],
         params={
@@ -243,13 +248,13 @@ async def main():
     print(run)
     slots = asyncio.Semaphore(args.concurrency)
     order = ["correct", "format", "version", "condition"]
-    view = Run(run / "expview", title=f"knowledge_cutoff investigator smoke ({slug})", description=__doc__, label_order=order)
+    view = Run(run / "expview", title=f"knowledge_cutoff investigator ({slug})", description=__doc__, label_order=order)
 
     async def one(item: dict, fmt: str, version: str, condition: str, draw: int) -> dict:
         rows, src = rows_for(item, condition, draw)
         sent = build(item, fmt, version, condition, rows)
         async with slots:
-            submission, messages, cost = await investigate(sent, args.effort)
+            submission, messages, cost = await investigate(args.investigator, sent, args.effort)
         text = submission["answer"] if submission else None
         label = labels[item["id"]][0] if fmt == "mcq" else item["gold"]
         row = {"id": item["id"], "format": fmt, "version": version, "condition": condition, "draw": draw, "answer": text,
@@ -268,7 +273,7 @@ async def main():
         view.add(
             id=f"{r['id']}~{r['format']}~{r['version']}~{r['condition']}~{r['draw']}",
             labels={k: r[k] for k in ("correct", "format", "version", "condition")} | {"label_type": it["label_type"]},
-            calls=[call("investigate", PREDICTOR, r["messages"][:2], output=r["messages"][2:], tools=[answer.SUBMIT],
+            calls=[call("investigate", args.investigator, r["messages"][:2], output=r["messages"][2:], tools=[answer.SUBMIT],
                         params={"effort": args.effort}, parsed={k: r.get(k) for k in ("answer", "named", "letter", "label")})],
             extra={"question": it["question"], "gold": it["gold"], "truth": (it.get("truth") or {}).get("canonical"),
                    "options": it["options"], "label": r["label"], "placebo_source": r["placebo_source"], "draw": r["draw"]},

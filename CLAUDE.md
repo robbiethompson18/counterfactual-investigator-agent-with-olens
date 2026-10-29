@@ -607,6 +607,10 @@ Current docs:
   — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
+- [ACTIVE: knowledge_cutoff investigator — read before running an investigator on WorkspaceBench's knowledge_cutoff items, or picking an investigator model for a cutoff task](docs/wsb-cutoff-investigator.md)
+  — predict Qwen's reply from the prompt (Robbie's one-turn format); decisions (Haiku 5.5 medium,
+  hidden model, free text not MCQ, stability-only filter); the investigator census (Flash shares
+  Qwen's stale answers 24%, Haiku 4%); Flash smoke on 10 dev items
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas
