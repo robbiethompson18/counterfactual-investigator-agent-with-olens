@@ -67,7 +67,7 @@ uv run python -m environments run sim_or_real --tag qwen --n 4 --model Qwen/Qwen
 
 ## Runs
 
-All Qwen3.6-27B, thinking off, 2026-10-29.
+All Qwen3.6-27B (except the DSv4 run), thinking off unless noted, 2026-10-29.
 
 | run                                                  | served by                     | what                                                                                               |
 | ---------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
