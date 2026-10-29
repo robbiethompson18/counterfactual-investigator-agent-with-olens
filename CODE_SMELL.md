@@ -296,14 +296,6 @@ none fixed yet:
   early); per-token decoding mangles characters split across tokens in saved transcript text; J++
   provenance records a blob hash, not the commit, and J++ ignores per-request `layers`.
 
-## 2026-10-28: callers of the deleted `cfbench.envs.env_runs.rows()`
-
-`rows()` (episodes as evalcue-shaped rows) went in `b78d8bd` (2026-10-27) but two callers remain,
-silenced with `ty: ignore` in the ty-clean PR: `environments/hint_mcq/report.py` (so it and
-`gate.py`, which imports it, fail at import) and the `envs:` specs of
-`scripts/olens_requests_from_runs.py` (ported to `EnvRuns` in PR #306). Port `report.py` to
-`EnvRuns` / `read_episodes`, or restore `rows()`.
-
 ## 2026-10-27: cfbench places every chat-template token at one character, labelled as the previous message
 
 The readers give template tokens (`<|im_end|>`, `\n`, `<|im_start|>`, `assistant`, `<think>`,
