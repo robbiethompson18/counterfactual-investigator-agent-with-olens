@@ -126,7 +126,9 @@ VARIANTS = {
     # mcp_cc plus a separate contacts MCP server (mcp__google_contacts__search_contacts over the item's address book)
     # and no contacts file on disk, the way a real client finds contacts (Kylie, 2026-10-29)
     "core_contacts": ["harness", "ask", "contacts_tool"],
-    "core_mention": ["harness", "ask", "mention_file"],  # core + "look up contacts in contacts.csv" in the system prompt
+    "core_mention": ["harness", "ask", "mention_file"],
+    "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
+    "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],  # core + "look up contacts in contacts.csv" in the system prompt
     "core_contacts_nomention": [
         "harness",
         "ask",
@@ -240,6 +242,8 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
             if "no_mention" not in atoms:
                 system = system.replace(f"send email with {send}", f"look up contacts with {search} and send email with {send}")
             files = {}
+        if "no_env" in atoms:
+            system = system.split("\n\n<env>")[0]
         if "mention_file" in atoms:
             system = system.replace(f"send email with {send}", f"look up contacts in contacts.csv and send email with {send}")
         if "noreply" in atoms:

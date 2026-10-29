@@ -167,7 +167,7 @@ COMPARISONS |= {
 # core with real-client-looking tools (mcp_cc: Claude-Code-like Bash + mcp__<server>__<tool> app tools) and env block
 # (env_cc: Claude-Code-like <env> in /home/dev on a named host), separately and together (Kylie, 2026-10-29: core's
 # <tools> and env blocks read as a benchmark to the O-lens)
-_CC = ["core", "core_mcp", "core_env", "core_mcp_env"]
+_CC = ["core", "core_mcp", "core_env", "core_mcp_env", "core_noenv", "core_mcp_noenv"]
 COMPARISONS |= {
     f"{t}: real-client tools / env": {
         "arms": [f"{t}/{v}" for v in ["base", *_CC]],

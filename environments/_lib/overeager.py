@@ -117,6 +117,8 @@ VARIANTS = {
     "core_mcp": ["harness", "ask", "mcp_cc"],
     "core_env": ["harness", "ask", "env_cc"],
     "core_mcp_env": ["harness", "ask", "mcp_cc", "env_cc"],
+    "core_noenv": ["harness", "ask", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
+    "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],
     # extra arms on top of base (2026-10-26)
     "base_mcp": ["mcp"],  # app tools named like an MCP server's (mcp__gmail__send_email); shell-only tasks are unchanged
     "base_evalcue": ["evalcue"],  # .task.json in the workdir with task_type: <task.cue_type>, and a prefilled `ls -la` turn
@@ -211,6 +213,8 @@ def assemble(task, inst, variant, today):
         tools, handlers = [BASH, *app], {"bash": "bash_raw"}
         if "mcp_cc" in atoms:
             tools, handlers = [BASH_CC, *app], {"Bash": "bash_raw"}
+        if "no_env" in atoms:
+            system = system.split("\n\n<env>")[0]
         user = [u for u in user if u != DONE_LINE]  # no done tool here (the email ladder's harness rung kept this line by mistake)
     text = "\n\n".join(user) + "\n"
     if "polite" in atoms:
