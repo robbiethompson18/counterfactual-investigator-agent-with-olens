@@ -3,26 +3,26 @@ each asked as a bare user turn with no system prompt and thinking off, the way W
 renders its items (Robbie, 2026-10-29).
 
 Bank v2 (default; `CUTOFF_QA_BANK=v1` for the first bank): 803 present-tense, dateless questions ("Who is the CEO of
-Intel?"), 629 rewrites of v1's dated questions plus 174 fame-steered ones, every one gated on the shared Qwen server (8 samples
-at T 1 + greedy): `qwen_modal` (Qwen's modal normalized answer), `qwen_modal_count`, `gate_class` (stable_right, stable_wrong,
-unstable, refusal_or_null). By default items() is the 266 stable (>= 7/8) items; `CUTOFF_QA_ALL=1` takes every item. The
-label for the predict-Qwen task is `qwen_modal`; `truth` (the writer's answer at authoring time), `truth_now` (a web recheck
-as of 2026-10-29, stable items only) and `pre_cutoff_analog` are metadata. docs/envs/cutoff_qa.md has the provenance, the gate
-numbers and the weaknesses; `scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is scripts/cutoff_gate.py
-(PR #382). Banks are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on first use.
+Intel?"), 629 rewrites of v1's dated questions plus 174 fame-steered ones, every one gated on the shared Qwen server (8
+samples at T 1 + greedy): `qwen_modal` (Qwen's modal normalized answer), `qwen_modal_count`, `gate_class` (stable_right,
+stable_wrong, unstable, refusal_or_null). By default items() is the 240 stable (>= 7/8), non-numeric items;
+`CUTOFF_QA_ALL=1` takes every non-numeric item. The label for the predict-Qwen task is `qwen_modal`; `truth` (the
+writer's answer at authoring time), `truth_now` (a web recheck as of 2026-10-29, stable items only) and
+`pre_cutoff_analog` are metadata. docs/envs/cutoff_qa.md has the provenance, the gate numbers and the weaknesses;
+`scripts/cutoff_facts/merge.py` built v1 from the subagents' files; the gate is scripts/cutoff_gate.py (PR #382). Banks
+are data: HF `banks/cutoff_qa/<version>.json`, fetched to data/banks/cutoff_qa/ on first use.
 
-Arms: `nohint` only (hints are ruled out for this env): the user message is the bank's `question` string verbatim (it ends
-"If you are not sure, give your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen server
-(bf16) at temperature 1.0, top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff sampling and the
-stability gate's (runs/cutoff_gate/2026-10-29_*), so O-lens reads of env transcripts match the gate's. PRIMARY is `correct`;
-`stale` is the field downstream code uses for the predict-Qwen task.
+Arms: `nohint` only (hints are ruled out for this env): the user message is the bank's `question` string verbatim (it
+ends "If you are not sure, give your best guess. Answer with just the <answer_type>."). DEFAULTS target the shared Qwen
+server (bf16) at temperature 1.0, top_p 1.0, no presence penalty, thinking off: WorkspaceBench's knowledge_cutoff
+sampling and the stability gate's (runs/cutoff_gate/2026-10-29_*), so O-lens reads of env transcripts match the gate's.
+PRIMARY is `correct`; `stale` is the field downstream code uses for the predict-Qwen task.
 
 Measures (no LLM judge anywhere): `answer` = the reply normalized (`norm`: lowercase, accents and punctuation stripped,
-leading article dropped, currency / units / digit-group commas stripped from numbers, whitespace collapsed); `correct` = it
-equals the normalized truth or an alias (PRIMARY); `stale` = it equals Qwen's gated modal answer `qwen_modal` (v1 items, which
-have none: the pre-cutoff analog; None without either); `contains_truth` / `contains_stale` = the same as a whole phrase inside
-the reply, for replies that add words.
-"""
+leading article dropped, currency / units / digit-group commas stripped from numbers, whitespace collapsed); `correct` =
+it equals the normalized truth or an alias (PRIMARY); `stale` = it equals Qwen's gated modal answer `qwen_modal` (v1
+items, which have none: the pre-cutoff analog; None without either); `contains_truth` / `contains_stale` = the same as a
+whole phrase inside the reply, for replies that add words."""
 
 import json
 import os
@@ -58,8 +58,10 @@ def _items() -> dict[str, dict]:
 
 
 def items():
-    """The stable (>= 7/8 samples agree) items of the bank, or every item with CUTOFF_QA_ALL=1 (v1 has no gate: every item)."""
-    return [i for i, it in _items().items() if ALL_ITEMS or it.get("gate_class", "stable").startswith("stable")]
+    """The stable (>= 7/8 samples agree), non-numeric items of the bank, or every non-numeric item with CUTOFF_QA_ALL=1 (v1 has
+    no gate: every item). Numeric items are dropped everywhere (Robbie, 2026-10-29): Qwen's numbers drift across samples and
+    a token lens can't name a multi-digit value."""
+    return [i for i, it in _items().items() if not it.get("numeric") and (ALL_ITEMS or it.get("gate_class", "stable").startswith("stable"))]
 
 
 def build(arm, item, ctx: Ctx | None = None) -> Episode:
