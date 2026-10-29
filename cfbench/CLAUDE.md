@@ -26,10 +26,14 @@ predictor sees:
   for secret_number.
 
 It answers P(behavior) for a fresh run in Y through a `submit_prediction` tool that rejects anything
-outside [0.01, 0.99] and asks again. Every predictor runs with OpenRouter reasoning effort `medium`;
-left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a lot,
-which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would leak
-the answer). Every ordered pair is a case, so there's no "the" base arm.
+outside [0.01, 0.99] and asks again. A valid submission ends the conversation, and its tool result
+(the transcript's last message) states the submitted p, the truth k_Y/n_Y and the error; on the
+answer task, the submission, the correct answer and CORRECT/WRONG (`predict.py` `grader`,
+`answer.verdict`; since 2026-10-29, no harness bump, no backfill). The retry message after an
+invalid submission never reveals the truth. Every predictor runs with OpenRouter reasoning effort
+`medium`; left to defaults, Haiku 5.5 and Gemini Flash Lite think 0 tokens and Gemini Flash thinks a
+lot, which confounds the comparison. Arm ids never reach the predictor (names like `placebo` would
+leak the answer). Every ordered pair is a case, so there's no "the" base arm.
 
 **Condition names changed on 2026-10-27** (`cfbench/core.py` `LEGACY_CONDITIONS`; every reader maps
 stored rows through `canon_condition`): `agentic` → `transcript_agentic`, `olens` → `olens_agentic`,

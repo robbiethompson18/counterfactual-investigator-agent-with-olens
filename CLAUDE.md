@@ -88,6 +88,12 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
+- **A tool call that ends a rollout by submitting an answer returns the verdict** (added
+  2026-10-29): the tool result of a valid `submit_prediction` / `submit_answer` (or any env/eval
+  tool playing that role) states what was submitted, the correct answer and whether it was right, so
+  the verdict is in the transcript's last message (`cfbench/predict.py` `grader`). Transcript-only,
+  no harness bump; old runs are not backfilled. An invalid submission's retry message must not
+  reveal the answer.
 
 ## Background reading
 
@@ -213,8 +219,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, placebo in black, no tool calls in gray. Give any other condition a color outside these
-  four.
+  in orange, no tool calls in gray, J++ in purple. A placebo is its lens's color with black stripes
+  (Robbie, 2026-10-29; in matplotlib: fill = the lens's color, `hatch="////"`, `edgecolor` black);
+  plain black placebos are the old style. Give any other condition a color outside these.
 
 ## Docs
 
@@ -357,10 +364,10 @@ Current docs:
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm
   configs, Sonnet-subagent labels, shared rubric in `scripts/envs_screen/funding_email_rubric.py`
   (deleted, at `e145988`)
-- [ACTIVE: funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
+- [REFERENCE: funding_email in evalcue — read before running or extending the funding_email env (drone pitch vs Myanmar legal memo)](docs/envs/funding_email.md)
   — port of agent-interp-envs with its own tool schemas (`Episode.tools`/`step`), detector vs
   subagent labels, replication of the screen (14/30 vs 0/30)
-- [ACTIVE: funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
+- [REFERENCE: funding_email_real — read before running the realistic (Claude Code harness, traffic-analytics) funding_email grid](docs/envs/funding_email_real.md)
   — upstream/core/full harness × thin/real docs × memo, how to render an arm, unfixed sandbox tells
 - [SUPERSEDED: sandbagging env screen — read before running or labelling sandbagging (agent-interp-envs) rollouts](docs/envs-screen/sandbagging.md)
   — Qwen3.6-27B sandbags deliberately 5/30 when >50% triggers unlearning vs 0/29 reversed
@@ -369,7 +376,7 @@ Current docs:
 - [REFERENCE: Sandbagging iteration — read before running, extending or labelling the multi-arm sandbagging env](docs/sandbagging-iteration.md)
   — one system-prompt sentence ("Make sure you achieve your goal in the long term.") moves Qwen's
   deliberate sandbagging 17% → 73% (n=30, p=1e-5); config-driven overlay, every arm tried
-- [ACTIVE: Sandbagging in evalcue — read before running the sandbagging env (it now runs in evalcue, not the vendored harness)](docs/envs/sandbagging.md)
+- [REFERENCE: Sandbagging in evalcue — read before running the sandbagging env (the evalcue port; retired, code at `c7b2e56`)](docs/envs/sandbagging.md)
   — `evalcue/envs/sandbagging/`: all 22 arms verbatim, the original tool loop, `detect()` matching
   544/544 original labels; replicates on OpenRouter (`a_goal` 8/30 vs `a_goal_lt` 21/30, p = 8e-4);
   GLM 5.3 baseline 2026-10-24 (deliberate ≈1/100, the detector positives are slips)
@@ -435,19 +442,20 @@ Current docs:
 - [NULL: Identity-belief experiments — read before studying what Qwen thinks made it, or which behaviours depend on that](docs/identity-belief-experiments.md)
   — cues that shift self-ID (Google from ChatGPT artefacts), identity-dependent probes, combos,
   scores
-- [ACTIVE: Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
+- [REFERENCE: Shutdown resistance envs — read before running or extending shutdown_palisade/killswitch/cron/persist](docs/envs/shutdown.md)
   — Palisade (2025) port + 3 siblings, ~200 arms; "The catch is that by default…" flips bypass
   (20/26 vs 0/20), "write access … configuration files" disables the kill switch 36/40 bf16, 30/40
   in the fp8 canonical run (mostly unverbalized); every arm in
   [shutdown-arms.md](docs/envs/shutdown-arms.md)
-- [ACTIVE: Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
+- [REFERENCE: Scheming envs — read before running Lynch blackmail/leak/murder or Apollo oversight/exfil/goal-guarding on Qwen](docs/envs/scheming.md)
   — 12 envs (bf16 rates; fp8 canonical exfil run in the doc); Lynch main cell 87%/86%/53%; exfil 48%
   → 20% with an eval cue (rarely verbalized); placebo caveats; tables in
   [scheming-tables.md](docs/envs/scheming-tables.md)
-- [ACTIVE: Canonical envs — read before picking envs or arms for an O-lens / cfbench experiment](docs/canonical-envs.md)
-  — the 8 standard envs and arm pairs, criteria, which have O-lens reads; picked by Claude, arms not
-  yet reviewed by Robbie; canonical fp8 run rates (2026-10-23)
-- [ACTIVE: Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
+- [MIXED: Canonical envs — read before picking envs or arms for an O-lens / cfbench experiment](docs/canonical-envs.md)
+  — the 8 envs and arm pairs that were the standard set on 2026-10-23 (6 since retired, 2 ported),
+  criteria, which have O-lens reads; picked by Claude, arms not yet reviewed by Robbie; canonical
+  fp8 run rates (2026-10-23)
+- [REFERENCE: Prompt-injection env — read before running or extending injection_slack (AgentDojo Slack port)](docs/envs/injection_slack.md)
   — Qwen follows AgentDojo's injection ~47%; signer ≠ user cuts it to 9% (mostly unverbalized),
   "after my task" lifts it to 67%; thinking off raises compliance and makes it silent
 - [REFERENCE: Character drift — read before prefilling Qwen with out-of-persona assistant turns, or reading the lens at the Assistant token in roleplay](docs/envs/character_drift.md)
@@ -459,13 +467,13 @@ Current docs:
   — donation bet + `bet_neutral` control, Lynch blackmail/leak/murder, exfil on OpenRouter; thinking
   off ignores "Do not ..." rules (murder 10% → 40%) and often acts with no text at all; value
   leakage is one-sided (`good_above` = control)
-- [Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
+- [NULL: Thinking-off cfbench — read before claiming O-lens predictor uplift beyond the essay env, or planning more no-CoT reads](docs/nocot-cfbench.md)
   — pre-registered 26-env / 116-case test on no-CoT Qwen: O-lens tools −0.07 skill vs transcript
   tools (CI excludes 0) and ≈ placebo; only hidden_goal still leans positive
-- [Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
+- [NULL: Thinking-on cfbench — read with nocot-cfbench.md before claiming the CoT changes what the O-lens adds to a predictor](docs/cot-cfbench.md)
   — the matched 11-env / 54-case half with thinking on: same result (O-lens −0.06 vs transcript
   tools, ≈ placebo); thinking changes which arms are levers, so the halves aren't paired
-- [ACTIVE: Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
+- [REFERENCE: Whistleblowing envs — read before running the SnitchBench port or its single-turn variants](docs/envs/whistleblow.md)
   — bold/tame × email/CLI grid, hotline/industry/values levers with many mid-rate arms; tables in
   [whistleblow-tables.md](docs/envs/whistleblow-tables.md)
 - [MIXED: Hiring-from-resumes envs — read before running resume-screening bias arms (Karvonen & Marks port)](docs/envs/hiring_resume.md)
@@ -545,6 +553,14 @@ Current docs:
   — hint after the choices naming a wrong letter: Wikipedia → 35–45% follow on DSv4 Flash, GLM 5.3,
   Qwen (chance ~8%), friend/kid ≈ chance; unverbalised on DSv4 and Qwen, GLM names it; bio arms
   NULL, retired
+- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens predicts Qwen's stale answers, or rerunning the end-of-prompt investigator smoke](docs/cutoff-qa-inline.md)
+  — Haiku 5.5 predicting Qwen's modal answer from the question: O-lens 81% vs transcript-only 67% vs
+  placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
+  answer at the `\n` after `<|im_end|>` (176/200); the lens-shares-Qwen's-cutoff caveat
+- [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
+  — bank v3: 5,467 present-tense questions gated on Qwen (2,196 stable, 649 stale); label =
+  `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
+  agents made it and how to make more
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with
   thinking on; GLM 5.3 and Qwen3.6-27B (2026-10-28, 0/2,000) refuse everything
@@ -589,9 +605,10 @@ Current docs:
   LoRA from one weight copy; 2x the deleted HF+vLLM reader on short transcripts, FVE corr 0.98,
   bullet-stop at 4; long-transcript parity, LoRA runtime vs merge_lora, what still limits it
 - [ACTIVE: NLA reader — read before getting NLA readouts of transcripts, scoring them with the NLA critic, or choosing between the Qwen3.6-27B NLAs](docs/nla-reader.md)
-  — camilablank's 11-layer NLA AV on the one-engine reader (`--readout nla`), activations saved
-  beside the reads, the critic's FVE as a separate job (`nla_score.py`); the SOTA survey (ceselder
-  L42, Camila multilayer, the 2B student), throughput, consensus sampling
+  — Camila's all-layer NLA AV (agu18dec, layers 0..63, since 2026-10-29) on the one-engine reader
+  (`--readout nla`), activations saved beside the reads, the critic's FVE as a separate job
+  (`nla_score.py`); the SOTA survey (ceselder L42, Camila 11-layer and all-layer, the 2B student),
+  throughput, consensus sampling
 - [NULL: NLA tools in cfbench on hint_mcq — read before giving the predictor NLA readouts, or retrying the NLA conditions](docs/nla-cfbench-hint-mcq.md)
   — 23-item smoke: NLA 18% vs NLA placebo 32% vs transcript-only 20%, null; readouts describe the
   question (prompt inversion), and the predictor cites them only to back the hinted answer
@@ -612,6 +629,11 @@ Current docs:
   — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
+- [ACTIVE: knowledge_cutoff env + investigator eval — read before running Qwen, another model or an investigator on post-cutoff factual questions, or picking an investigator for a cutoff task](docs/envs/knowledge_cutoff.md)
+  — predict Qwen's reply from the prompt (Robbie's one-turn format) as a cfbench answer eval over
+  the `knowledge_cutoff` env; decisions (Haiku 5.5 medium, hidden model, free text not MCQ,
+  stability-only filter); the investigator census (Flash shares Qwen's stale answers 24%, Haiku 4%);
+  Flash and Haiku dev smokes
 - [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
   — 3-min boot from the vLLM image + cache volumes, timings, every gotcha, the throttled-host
   benchmark, S3 access to the volumes, `pod.sh` gotchas

@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
+
+`scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
+by scratch scripts (clean, dedup, gate-attach, truth recheck) that were not kept. Next batch: port
+the clean into `merge.py` so a bank version is reproducible from the agents' JSONL files plus the
+gate run.
+
 ## 2026-10-29: `environments run` hangs forever on a request that never returns
 
 The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
@@ -12,19 +19,21 @@ error, like cfbench's predictor timeout, would let the run finish on its own.
 
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
-The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md / BASE_LINE / ASK / PROMPT
-/ PLACEBO source, so for the `*_inline` conditions it can't see the O-lens blocks (data, not code). A new eval with new
-reads reused another eval's `olens_inline` rows wholesale (2026-10-29, caught and deleted before scoring). It now also
-refuses a run with a different INLINE hook source, which still misses a change in the reads file behind the same hook;
+The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md /
+BASE_LINE / ASK / PROMPT / PLACEBO source, so for the `*_inline` conditions it can't see the O-lens
+blocks (data, not code). A new eval with new reads reused another eval's `olens_inline` rows
+wholesale (2026-10-29, caught and deleted before scoring). It now also refuses a run with a
+different INLINE hook source, which still misses a change in the reads file behind the same hook;
 hashing each built prompt into the row would close it.
 
 ## 2026-10-28: `environments run` crashes after the run when any eval can't import a stored row
 
-`environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every env run, before the HF
-upload. If a cfbench run on disk has rows whose `source` names an eval version the local checkout doesn't define (e.g.
-`mmlu_pro_pause` rows from another branch), `ITEM_INFO` raises `KeyError` and the env run exits 1 without uploading its
-episodes (three hint_mcq runs on 2026-10-28 had to be uploaded by hand with `runfolder.upload`). An env run shouldn't
-depend on every eval's item metadata; catch per eval or skip the evals build there.
+`environments/_lib/run.py` calls `build_index`, which builds `evals/` (`build_evals`) after every
+env run, before the HF upload. If a cfbench run on disk has rows whose `source` names an eval
+version the local checkout doesn't define (e.g. `mmlu_pro_pause` rows from another branch),
+`ITEM_INFO` raises `KeyError` and the env run exits 1 without uploading its episodes (three hint_mcq
+runs on 2026-10-28 had to be uploaded by hand with `runfolder.upload`). An env run shouldn't depend
+on every eval's item metadata; catch per eval or skip the evals build there.
 
 ## Codex found — Robbie has not yet reviewed
 
@@ -363,3 +372,8 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py` scripts that belong in git.
 - RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
   version or Qwen revision served a run.
+
+- 2026-10-29: `environments/cutoff_qa/env.py` `measure()` returns `correct`/`stale` but no
+  `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
+  cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
+  the episodes. Give it `positive` (= `stale`?) on PR #380's branch.

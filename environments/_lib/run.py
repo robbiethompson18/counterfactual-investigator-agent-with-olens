@@ -132,6 +132,7 @@ def main(argv):
     ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
     ap.add_argument("-d", "--description", default="")
     ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF when done")
+    ap.add_argument("--no-docent", action="store_true", help="don't mirror the run to Docent (prints the backfill command instead)")
     add_target_args(ap)
     a = ap.parse_args(argv)
 
@@ -214,18 +215,21 @@ def main(argv):
     cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
     w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
     print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
-    docent_upload(w.dir)
+    docent_upload(w.dir, skip=a.no_docent)
     written = build_index([a.env])
     if not a.no_upload:
         n, oid = upload([w.dir, *written], f"envrun {a.env} {run} ({status})")
         print(f"uploaded {n} files to envs/ ({oid[:10]})")
 
 
-def docent_upload(run_dir):
-    """Mirror the run's transcripts to Docent before the HF upload, so the Docent ids ship with the run. Never blocks it."""
+def docent_upload(run_dir, skip=False):
+    """Mirror the run's transcripts to Docent before the HF upload, so the Docent ids ship with the run. Never blocks it.
+    Docent's server-side processing takes ~10 min per 8k episodes, so bulk runs pass --no-docent and backfill a subset later."""
     cmd = ["uv", "run", "-q", "--script", str(REPO_ROOT / "scripts" / "docent_upload.py"), "upload", str(run_dir)]
     key = os.environ.get("DOCENT_API_KEY") or main_checkout_file("docent.key")  # Kylie's checkouts keep it in docent.key
-    if not key:
+    if skip:
+        print(f"--no-docent: not uploading to Docent. Later: {shlex.join(cmd)} (or `backfill`)")
+    elif not key:
         print(f"DOCENT_API_KEY unset; not uploading to Docent. Later: {shlex.join(cmd)} (or `backfill`)")
     elif subprocess.run(cmd, check=False, env={**os.environ, "DOCENT_API_KEY": key}).returncode:
         print(f"Docent upload failed; HF upload continues. Retry: {shlex.join(cmd)}")

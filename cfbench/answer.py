@@ -3,7 +3,9 @@
 The rate task (`submit_prediction`, RMSE, `cfbench.score`) and this one never share a grader: a run is one task, every row
 says which, and each scorer refuses the other's rows. A case is an ordered arm pair on one item; the truth is the
 counterfactual arm's most common canonical answer (`env.canon_answer` of each run's final reply) and a draw is correct when
-its submission canonicalises to it. The null is "the edit does nothing": the base arm's most common answer.
+its submission canonicalises to it. The null is "the edit does nothing": the base arm's most common answer. The
+submit_answer tool result on a valid submission states the submission, the truth and the verdict (`verdict`), since the
+rollout ends there (cfbench/predict.py); an invalid one is asked to try again without being told the answer.
 
     uv run python -m cfbench.answer data/runs/cfbench/<run dir> [...]
 """
@@ -48,6 +50,21 @@ def check(arguments: str) -> tuple[dict | None, str]:
     if not answer:
         return None, "answer is empty. Call submit_answer again."
     return {"answer": answer, "rationale": str(args.get("rationale", ""))}, "Answer recorded."
+
+
+def grade(env, case: dict, submission: str) -> dict:
+    """The row's grading fields: the submission's canonical form and whether it is the counterfactual arm's modal answer."""
+    canon = env.canon_answer(submission)
+    return {"canon": canon, "correct": canon == case["modal_cf"]}
+
+
+def verdict(env, case: dict, submission: str) -> str:
+    """The submit_answer tool result after a valid submission: what was submitted, the correct answer, right or wrong."""
+    g = grade(env, case, submission)
+    return (
+        f"Answer recorded: {submission!r} (canonical {g['canon']!r}). Correct answer (the counterfactual arm's most common answer, "
+        f"{case['k_cf']} of {case['n_cf']} runs): {case['modal_cf']!r}. {'CORRECT' if g['correct'] else 'WRONG'}."
+    )
 
 
 Group = tuple[str, str]  # (condition, predictor)
