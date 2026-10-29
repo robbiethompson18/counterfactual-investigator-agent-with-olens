@@ -110,8 +110,8 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .badge{display:inline-block;font:600 10.5px Inter;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;background:var(--acc2);color:var(--acc)}
 .star{color:#d9a400} .pathsep{color:var(--faint);margin:0 4px}
 /* evals: condition colours (CLAUDE.md) and the before/after chart */
-:root{--c-ts:#2f6fd0;--c-olens:#e07b10;--c-placebo:#111;--c-none:#9a9a9a;--c-other:#8e44ad;--c-probe:#11806a;--c-probe-tuned:#7a3fb0}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#c9a0f0}}
+:root{--c-ts:#2f6fd0;--c-olens:#e07b10;--c-placebo:#111;--c-none:#9a9a9a;--c-other:#8e44ad;--c-probe:#11806a;--c-probe-tuned:#7a3fb0;--c-olens-nl:#c9a227}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#c9a0f0;--c-olens-nl:#e8c860}}
 :root[data-theme="dark"]{--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#c9a0f0}
 .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
 .evcases{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,470px),1fr));gap:14px}
@@ -737,6 +737,7 @@ const CONDS = {
   // the single-turn conditions have their own eval pages (hint_qwen_dsv4_inline), so they take the same colours
   transcript_inline: ["transcript in context, one turn (no tools)", "var(--c-ts)", "transcript"],
   olens_inline: ["transcript + O-lens reads in context, one turn", "var(--c-olens)", "O-lens"],
+  olens_inline_nl: ["transcript + O-lens reads at the option newlines only, one turn (fewer positions)", "var(--c-olens-nl)", "O-lens (fewer positions)"],
   olens_placebo_inline: ["transcript + another question's O-lens reads (placebo), one turn", "var(--c-placebo)", "placebo"],
   probe: ["linear probe of the model's answer (deterministic, no investigator)", "var(--c-probe)", "probe"],
   probe_tuned: ["linear probe fine-tuned on hint-first activations (out-of-fold, no investigator)", "var(--c-probe-tuned)", "tuned probe"],
