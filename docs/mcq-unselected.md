@@ -61,12 +61,12 @@ Single turn, no tools but `submit_answer`, Gemini 3.8 Flash at effort low
   condition name is cfbench's.
 - `olens_inline`: plus O-lens reads at the newline ending each option and at the end of the prompt
   (the instruction's ".", `<|im_end|>`, `\n`, `<|im_start|>`, `assistant`, `\n`), layers
-  32/40/48/52, every bullet with its FVE. Needs a read job on the no-hint prompts (`READS` in
-  eval.py; not run).
-- `olens_placebo_inline`: the same block with another question's bullets at the same positions, from
-  Kylie's existing option-newline reads (`runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl`, whose
-  prefix through the options equals the no-hint prompt's) and end-of-prompt reads
-  (`2026-10-29_hint-qwen-dsv4-tail`). Same option count, seeded, never the question's own.
+  32/40/48/52/56/60 (cutoff_qa_inline's six), every bullet with its FVE, from
+  `runs/olens_reads/2026-10-29_mcq-unselected-nohint` (space lens, T 1; 32-52 in the first job,
+  56/60 topped up the same day).
+- `olens_placebo_inline`: the same block with another question's own reads at the same positions
+  (same option count, seeded, never the question's own), from the same reads run. The two placebo
+  smokes below predate the reads and drew from Kylie's hinted-prompt pools instead.
 
 Truth is Qwen's modal letter; scored as % right (`cfbench.answer`). Bars to add later: the frozen
 probe, trained on the probe half; Qwen's own letter logprob as the ceiling.
