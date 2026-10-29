@@ -75,9 +75,17 @@ TASKS = {
 
 
 async def predict(
-    predictor: str, prompt: str, tools: dict[str, Tool] | None = None, budget: int = 0, effort: str = EFFORT, task: str = "rate"
+    predictor: str,
+    prompt: str,
+    tools: dict[str, Tool] | None = None,
+    budget: int = 0,
+    effort: str = EFFORT,
+    task: str = "rate",
+    system: str | None = None,
 ) -> dict:
-    system, submit, check_submission, nudge, empty = TASKS[task]
+    """`system` replaces the task's system prompt (an eval's SYSTEM, cfbench/eval.py); None keeps it."""
+    default_system, submit, check_submission, nudge, empty = TASKS[task]
+    system = system or default_system
     submit_name = submit["function"]["name"]
     tools = tools or {}
     messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
