@@ -10,23 +10,17 @@ logic for other scripts.
 """
 
 import argparse
-import json
 from collections import Counter, defaultdict
 
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 
 SLOTS = ("d1", "d2")
 
 
 def labeled_episodes(run: str):
-    """(episode, measure values) per episode of a run folder, from its newest labels/measure@*.jsonl (none: {})."""
+    """(episode, measure values) per episode of a run folder, from its active measure labels (none: {})."""
     run_dir = LOCAL / "hint_mcq" / run
-    files = sorted(run_dir.glob("labels/measure@*.jsonl"), key=lambda p: (p.stat().st_mtime, p.name))
-    labels = {}
-    if files:
-        for line in files[-1].read_text().splitlines():
-            rec = json.loads(line)
-            labels[rec["episode"]] = rec["values"]
+    _, labels = active_labels(run_dir)
     for ep in read_episodes(run_dir):
         yield ep, labels.get(ep["id"]) or {}
 

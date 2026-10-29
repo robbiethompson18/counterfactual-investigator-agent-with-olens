@@ -7,8 +7,9 @@ get no new cfbench runs (the loader for them was deleted 2026-10-27, PR #272); c
     uv run python -m cfbench.run env_runs:hint_mcq/2026-10-27_pause --task answer --items 6031,6598 --pairs pause/hint+d1:pause/nohint ...
 
 The spec is `<env>/<run>`, or `<env>/<run>+<run>` to pool runs (e.g. a top-up), which must agree on every arm's starting
-context. `@label=<labeler>@<version>` picks the label file (`labels/<labeler>@<version>.jsonl`); the default is the newest
-`labels/measure@*.jsonl` (by mtime, then name). The label is its `positive`; episodes with an error or no label are skipped.
+context. `@label=<labeler>@<version>` pins the label file (`labels/<labeler>@<version>.jsonl`); the default is the run's
+active measure labels (environments/_lib/runfolder.py `active_labels`). The label is its `positive`; episodes with an error
+or no label are skipped.
 `@<item>` keeps only that item's episodes (`--items all`). The files used go in `meta` (written to the cfbench run's
 meta.json) and are printed at load. Sources are `<env>/<run>:<episode id>`, the ids O-lens read requests use
 (scripts/olens_requests_from_runs.py's `envs:` specs), so reads join to cases. BEHAVIOR, canon_answer and the answer-task
@@ -32,19 +33,21 @@ from pathlib import Path
 
 from cfbench.core import Rollout, render, unified_diff
 from environments._lib.core import load_env
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 
 SPEC = re.compile(r"^(?P<env>[^/]+)/(?P<runs>[^@]+)(?:@label=(?P<label>[^@]+@[^@]+))?(?:@(?P<item>[^@]+))?$")
 MIN_RUNS = 5  # arms with fewer labelled runs are dropped
 FILE_CHARS = 4000  # per workspace file in the starting context
 
 
-def label_file(run_dir: Path, name: str | None) -> Path:
-    if name:
-        return run_dir / "labels" / f"{name}.jsonl"
-    files = sorted(run_dir.glob("labels/measure@*.jsonl"), key=lambda p: (p.stat().st_mtime, p.name))
-    assert files, f"{run_dir} has no labels/measure@*.jsonl"
-    return files[-1]
+def run_labels(run_dir: Path, name: str | None) -> tuple[str, dict]:
+    """(file name, episode id -> values): the pinned labels/<name>.jsonl, else the run's active measure labels."""
+    if not name:
+        active, labels = active_labels(run_dir)
+        assert active, f"{run_dir} has no labels/measure@*.jsonl"
+        return active, labels
+    p = run_dir / "labels" / f"{name}.jsonl"
+    return p.name, {r["episode"]: r["values"] for r in map(json.loads, p.read_text().splitlines())}
 
 
 def initial_messages(ep: dict) -> list[dict]:
@@ -86,9 +89,7 @@ class EnvRuns:
         self.meta: dict = {"label_files": {}}
         for run in runs.split("+"):
             run_dir = LOCAL / env / run
-            labels_path = label_file(run_dir, m["label"])
-            self.meta["label_files"][run] = labels_path.name
-            labels = {r["episode"]: r["values"] for r in map(json.loads, labels_path.read_text().splitlines())}
+            self.meta["label_files"][run], labels = run_labels(run_dir, m["label"])
             for ep in read_episodes(run_dir):
                 values = labels.get(ep["id"]) or {}
                 if ep.get("error") or values.get("positive") is None or (only_item and str(ep["item"]) != only_item):

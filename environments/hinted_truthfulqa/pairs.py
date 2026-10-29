@@ -13,13 +13,12 @@ The two cases share the question text exactly, so the question alone can't tell 
 """
 
 import json
-import os
 import random
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 
 from . import env as E
 
@@ -32,8 +31,7 @@ def labelled(glob):
         if d.name in E.RETIRED_RUNS:
             continue
         model = json.loads((d / "meta.json").read_text())["target"]["model"]
-        f = max((d / "labels").glob("measure@*.jsonl"), key=os.path.getmtime)
-        lab = {r["episode"]: r["values"] for r in map(json.loads, f.read_text().splitlines())}
+        _, lab = active_labels(d)
         out[model] += [(d.name, ep, lab.get(ep["id"]) or {}) for ep in read_episodes(d) if not ep.get("error")]
     return out
 

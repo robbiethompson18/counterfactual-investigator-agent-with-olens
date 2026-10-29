@@ -50,8 +50,7 @@ from pathlib import Path
 from cfbench.core import Rollout, initial_context, render, unified_diff
 from cfbench.evals.hint_qwen_dsv4 import inline
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
-from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
+from environments._lib.runfolder import LOCAL, REPO_ROOT, active_labels, read_episodes
 
 ENVS = ["hint_mcq", "hinted_truthfulqa"]
 MODEL_NAME = "Qwen3.6-27B"
@@ -225,7 +224,7 @@ def _gold(version: str) -> dict[str, str]:
 
 def _episodes(env: str, runs: list[str]):
     for run in runs:
-        _, labels = latest_labels(LOCAL / env / run)
+        _, labels = active_labels(LOCAL / env / run)
         for ep in read_episodes(LOCAL / env / run):
             if not ep.get("error") and ep["target"].split("@")[0].lower() in ("qwen/qwen3.6-27b",):
                 yield f"{env}/{run}:{ep['id']}", ep, labels.get(ep["id"]) or {}
