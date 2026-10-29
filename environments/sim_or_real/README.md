@@ -69,15 +69,18 @@ uv run python -m environments run sim_or_real --tag qwen --n 4 --model Qwen/Qwen
 
 All Qwen3.6-27B, thinking off, 2026-10-29.
 
-| run                                  | served by                     | what                                                                                               |
-| ------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------- |
-| `2026-10-29_qwen-vllm-ladder1t`      | vLLM (qrh1, 2×H100)           | single-turn ladder + after_trace, 3,920 episodes, 0 errors                                         |
-| `2026-10-29_qwen-vllm-bare`          | vLLM                          | `bare`, 16                                                                                         |
-| `2026-10-29_qwen-vllm-opencode-ask`  | vLLM                          | opencode ask + task_then_ask_same_turn, 32                                                         |
-| `2026-10-29_qwen-vllm-opencode-task` | vLLM                          | opencode after_task, 8                                                                             |
-| `2026-10-29_qwen-vllm-nothink`       | vLLM                          | ABANDONED agentic first run, 1,411 / 1,784 (sandboxed coding episodes stalled on long generations) |
-| `2026-10-29_qwen-nothink`            | OpenRouter (Alibaba)          | the agentic first run, all arms, 1,784                                                             |
-| `2026-10-29_dsv4f-nothink`           | DeepSeek V4 Flash, OpenRouter | ABANDONED at 736 (Kylie: Qwen only)                                                                |
+| run                                                  | served by                     | what                                                                                               |
+| ---------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| `2026-10-29_qwen-vllm-ladder1t`                      | vLLM (qrh1, 2×H100)           | single-turn ladder + after_trace, 3,920 episodes, 0 errors                                         |
+| `2026-10-29_qwen-vllm-bare`                          | vLLM                          | `bare`, 16                                                                                         |
+| `2026-10-29_qwen-vllm-opencode-ask`                  | vLLM                          | opencode ask + task_then_ask_same_turn, 32                                                         |
+| `2026-10-29_qwen-vllm-opencode-task`                 | vLLM                          | opencode after_task, 8                                                                             |
+| `2026-10-29_qwen-vllm-opencode-bump`, `-bumpsame`    | vLLM                          | opencode after_bump 8, bump_then_ask_same_turn 16                                                  |
+| `2026-10-29_qwen-vllm-opencode-think`, `-bump-think` | vLLM, thinking on             | opencode ask + same turn 32, after_bump 8                                                          |
+| `2026-10-29_qwen-vllm-think`                         | vLLM, thinking on             | ABANDONED at 1,177 (ladder, after_trace, bare, AF)                                                 |
+| `2026-10-29_qwen-vllm-nothink`                       | vLLM                          | ABANDONED agentic first run, 1,411 / 1,784 (sandboxed coding episodes stalled on long generations) |
+| `2026-10-29_qwen-nothink`                            | OpenRouter (Alibaba)          | the agentic first run, all arms, 1,784                                                             |
+| `2026-10-29_dsv4f-nothink`                           | DeepSeek V4 Flash, OpenRouter | ABANDONED at 736 (Kylie: Qwen only)                                                                |
 
 ### Single-turn realism ladder (vLLM)
 
