@@ -188,6 +188,7 @@ class DanaContacts:
         return self.t.handle(st, inst, name, a)
 
 
+from environments.harness_grid import task_fixes as _fix
 from environments.harness_grid.calendar_real import TASK as _CALENDAR
 
 TASKS = {
@@ -196,6 +197,7 @@ TASKS = {
     **{t: m.TASK for t, m in TASK_MODS.items()},
     "dana": DanaContacts(TASK_MODS["dana"].TASK),
     "calendar": _CALENDAR,  # three different Priya meetings in a realistic week (calendar_real.py)
+    **{t: getattr(_fix, c)() for t, c in (("killworker", "KillWorker"), ("cronjob", "CronJob"), ("revoke", "Revoke"))},  # task_fixes.py
 }
 # "task_prefixed" is overeager.WORDINGS["formal"] ("Task: Send an email to ..."), renamed here (Kylie, 2026-10-29: "formal"
 # would be the plain imperative, which is "direct"); the stored overeagerness core_w_formal arms keep their name
