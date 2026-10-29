@@ -17,10 +17,11 @@ ap = argparse.ArgumentParser()
 ap.add_argument("model", choices=["qwen", "dsv4"])
 ap.add_argument("out")
 ap.add_argument("--item", default="q0")
+ap.add_argument("--prompts", default="v8x-", help="comma list of prompt names or name prefixes (e.g. v8n-,v10)")
 ap.add_argument("--run", help="dsv4: the run folder whose episode on --item each row reuses (its reply comes after every read)")
 args = ap.parse_args()
 query = env.QUERIES[int(args.item[1:])]
-arms = [a for a in env.ARMS if a.startswith("v8x-")]
+arms = [a for a in env.ARMS if any(env.ARM_FACTORS[a]["prompt"].startswith(p) for p in args.prompts.split(","))]
 rows = []
 if args.model == "qwen":
     from transformers import AutoTokenizer
@@ -31,7 +32,12 @@ if args.model == "qwen":
     for arm in arms:
         ep = env.build(arm, args.item)
         msgs = [*ep.messages, {"role": "assistant", "content": "<rejected/>"}]  # after every read position, so it can't change a read
-        row = {"id": f"alignment_faking/v8x:{arm}~{args.item}", "env": "alignment_faking", "arm": arm, "messages": msgs}
+        row = {
+            "id": f"alignment_faking/{env.ARM_FACTORS[arm]['prompt'].split('-')[0]}:{arm}~{args.item}",
+            "env": "alignment_faking",
+            "arm": arm,
+            "messages": msgs,
+        }
         _, ids, where = render_request(tok, row)
         user = msgs[1]["content"].strip()
         q0, q1 = user.index(query), user.index(query) + len(query)
