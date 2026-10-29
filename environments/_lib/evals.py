@@ -87,9 +87,12 @@ def _messages(msgs: list[dict]) -> list[dict]:
     return out
 
 
-def item_id(r: dict, cond: str) -> str:
+def item_id(r: dict, cond: str, meta: dict) -> str:
+    """The prediction's expview item id; with the eval's VERSION_IN_IDS, prefixed by its version (arm pairs repeat across
+    versions there)."""
     case = f"{r['base_arm']} -> {r['cf_arm']}" + (f"@{r['item']}" if r.get("item") else "")
-    return f"{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
+    version = f"{r['version']}/" if getattr(_eval_module(meta.get("params", {}).get("eval")), "VERSION_IN_IDS", False) else ""
+    return f"{version}{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
 
 
 def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
@@ -123,7 +126,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
             labels["base rate"] = round(r["k_base"] / r["n_base"], 4)
             parsed = {"p": r.get("p"), "rationale": r.get("rationale")}
         run.add(
-            id=item_id(r, cond),
+            id=item_id(r, cond, meta),
             group=f"{r['model'].split('/')[-1]} · {r['base_arm']} -> {r['cf_arm']} · {cond}",
             labels=labels | {"valid": r.get("valid", True), **({"item": r["item"]} if r.get("item") else {})},
             links={"Docent": f"https://docent.transluce.org/dashboard/{cid}/agent_run/{did}"} if cid and did else {},
@@ -278,7 +281,7 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
                 "predictor": r["predictor"],
                 "calls": sum((r.get("tool_calls") or {}).values()),
                 "docent": did,
-                "ev": item_id(r, cond) if r.get("messages") else None,
+                "ev": item_id(r, cond, meta) if r.get("messages") else None,
                 "rationale": r.get("rationale"),
                 "links": links_of(r),
             }
@@ -446,7 +449,7 @@ def answer_summary(run_dir: Path, meta: dict, envs: Envs, export=True) -> dict:
                 "predictor": r["predictor"],
                 "calls": sum((r.get("tool_calls") or {}).values()),
                 "docent": did,
-                "ev": item_id(r, cond) if r.get("messages") else None,
+                "ev": item_id(r, cond, meta) if r.get("messages") else None,
                 "rationale": r.get("rationale"),
             }
         )

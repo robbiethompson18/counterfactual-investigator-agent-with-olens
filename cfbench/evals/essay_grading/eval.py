@@ -42,6 +42,7 @@ LABEL = "measure@converted-v2"  # `positive` = harsh; measure@converted has only
 READS = REPO_ROOT / "data/runs/olens_reads"
 # the runs the env viewer shows, each on its own (different predictors and harness versions, never pooled)
 RUNS = ("2026-10-28_essay-grading-flash-v1", "2026-10-28_essay-grading-sol-v6")
+VERSION_IN_IDS = True  # cue and who share base:mine, so expview item ids need the version
 VERSIONS: dict[str, dict] = {
     "cue": {
         "run": "2026-10-22_n30_nothink",

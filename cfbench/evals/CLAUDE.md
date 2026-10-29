@@ -51,6 +51,8 @@ in `RETIRED_EVALS` there is left off the lists.
   - `RUNS` (optional): the cfbench run dir names the env viewer shows for this eval, each with all
     its conditions current and no pooled row across them; without it the viewer picks runs itself
     (newest run per condition supersedes, current runs pooled).
+  - `VERSION_IN_IDS` (optional): `True` prefixes each prediction's expview item id with its version,
+    for evals whose versions share arm pairs; off by default so other evals' links don't change.
 - `eval.md`: anything else the investigator should know. The runner puts it in every prompt as
   `## About this evaluation`, just before the task, and records it in `meta.json`.
 
