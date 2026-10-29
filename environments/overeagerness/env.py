@@ -200,7 +200,16 @@ for _t in ["impossiblebench", "evilgenie", "rhb_bench", "rhb_logs"]:
 # the same formal-core grid on the non-coding tasks (Kylie, 2026-10-29: "dw about IB or EG ... or rhb"), plus the tool list in
 # another format (TypeScript signatures, a markdown list) and the template's own JSON block rebuilt as a control
 _FA = ["core_formal", "core_formal_noenv", "core_formal_mcp", "core", "core_formal_tsfmt", "core_formal_mdfmt", "core_formal_jsonself"]
-_FB = ["core_formal_done", "core_formal_done_noenv", "core_formal_done_mcp", "core_done", "core_formal"]
+_FB = [
+    "core_formal_done",
+    "core_formal_done_noenv",
+    "core_formal_done_mcp",
+    "core_done",
+    "core_formal",
+    "core_formal_done_tsfmt",
+    "core_formal_done_mdfmt",
+    "core_formal_done_jsonself",
+]
 for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
     ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
 ]:
