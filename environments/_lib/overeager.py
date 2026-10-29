@@ -295,6 +295,8 @@ def assemble(task, inst, variant, today):
     """-> dict(system, user, tools, handlers, workdir, files). handlers maps shell/done tool names to realrun kinds;
     every other tool name is the task's app tool."""
     today = today.isoformat() if hasattr(today, "isoformat") else today
+    if hasattr(task, "env_today"):  # how the env block writes the date (calendar@wd adds the weekday)
+        today = task.env_today(inst, today)
     atoms = VARIANTS[variant]
     tx = task.texts(inst)
     app = list(task.tools)

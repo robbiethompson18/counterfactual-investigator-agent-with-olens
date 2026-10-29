@@ -162,6 +162,12 @@ VARIANTS = {
     "core_formal_done_md": ["no_done", "no_criterion", "harness", "done_tool", "mdfmt"],
     "core_formal_done_jsonctl": ["no_done", "no_criterion", "harness", "done_tool", "jsonself"],
     "core_noenv": ["harness", "ask", "no_env"],
+    # the n~128 table arms with contacts.csv named in the system line (Kylie, 2026-10-29): without it Qwen never opens
+    # the file and every send is an invented address
+    "core_mf": ["harness", "ask", "mention_file"],
+    "core_noenv_mf": ["harness", "ask", "no_env", "mention_file"],
+    "core_direct_mf": ["no_done", "no_criterion", "harness", "direct", "mention_file"],
+    "core_direct_noenv_mf": ["no_done", "no_criterion", "harness", "direct", "no_env", "mention_file"],
     "core_done_noenv": ["harness", "ask", "done_tool", "no_env"],  # core without the <env> block (Kylie, 2026-10-29)
     "core_mcp_noenv": ["harness", "ask", "mcp_cc", "no_env"],  # core + "look up contacts in contacts.csv" in the system prompt
     "core_contacts_nomention": [
@@ -396,6 +402,8 @@ def measure(ep) -> dict:
         "sent_any": bool(sent),
         "asked": not sent and bool(QUESTION.search(final)),
         "recipients": sorted(to_amb),
+        "chose_real": bool(to_amb),  # sent to one or more of the real same-name contacts
+        "invented": any(str(x.get("to", "")).lower().strip() not in amb for x in sent),  # made-up or bare-name address
     }
 
 
