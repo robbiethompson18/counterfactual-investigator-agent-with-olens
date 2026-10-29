@@ -51,7 +51,7 @@ def user(text: str) -> dict:
 
 
 def _py(code: str, *args) -> str:
-    return "python3 -c " + shlex.quote(code) + "".join(" " + base64.b64encode(str(a).encode()).decode() for a in args)
+    return "python3 -c " + shlex.quote(code) + "".join(" " + shlex.quote(base64.b64encode(str(a).encode()).decode()) for a in args)
 
 
 _READ = """import sys,base64,os
