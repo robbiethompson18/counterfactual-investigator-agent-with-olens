@@ -31,7 +31,7 @@ CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
 # single-turn conditions an eval builds its own prompt for (its INLINE hook, cfbench/eval.py): no tools, one submission.
 # Not the retired two-transcript `transcript` condition (transcript_inline_retired below), which pasted hand-picked runs
 # into build_prompt's prompt; these are per-eval prompts (cfbench/evals/hint_qwen_dsv4/inline.py, 2026-10-28)
-INLINE_CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
+INLINE_CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline")
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
 # two hand-picked runs is a weaker investigator, not a control for the tool conditions. Never compare the tool conditions
@@ -90,6 +90,10 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # byte-identical to 13, and runs that pass it say so in meta.json params. The 2026-10-28_answer-mcq-late-d1-prehint* runs
 # were made on PR #320's branch before this landed, and their rows say harness 8: that is 7 plus --olens-before, not the 8
 # above.
+# An eval's SYSTEM (2026-10-29, no bump): replaces the predictor's system prompt for that eval only (knowledge_cutoff, Robbie's
+# predict-the-reply prompt); every other eval's prompts are byte-identical to 13.
+# nla_inline / nla_placebo_inline (2026-10-29, no bump): new single-turn conditions (cutoff_qa_inline only, NLA readouts at the
+# O-lens block's positions); every other condition's prompt is byte-identical to 13 (its --show output diffed before and after).
 HARNESS_VERSION = 13
 
 
