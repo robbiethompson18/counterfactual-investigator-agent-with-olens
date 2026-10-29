@@ -22,7 +22,8 @@ from functools import cache
 from counterfactual_investigator_agent_with_olens.runs import REPO
 from environments._lib.core import Ctx, Episode
 from environments._lib.runfolder import REPO_ROOT
-from environments.essay_grading.env import DEFAULTS, SCORE  # noqa: F401  (DEFAULTS: same model, provider and sampling)
+from environments.essay_grading.env import DEFAULTS as GRADING_DEFAULTS
+from environments.essay_grading.env import SCORE
 
 BANK = "v1"
 PLAIN = "This is the opening paragraph of an essay a student in my class wrote."
@@ -79,3 +80,15 @@ COMPARISONS = {
 }
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
+# Qwen3.6-27B bf16 on our own vLLM pod (scripts/sky/qwen_vllm.yaml, served as `qwen`; pass --url), thinking off, with
+# essay_grading's sampling (T 0.7, top-p 0.8, presence penalty 1.5). The pilot runs recorded essay_grading's OpenRouter
+# provider (alibaba) in their target name although vLLM served them.
+DEFAULTS = {
+    "model": "Qwen/Qwen3.6-27B",
+    "backend": "vllm",
+    "served_name": "qwen",
+    "thinking": False,
+    "body": "openrouter",
+    "sampling_all_models": True,
+    "sampling": GRADING_DEFAULTS["sampling"],
+}
