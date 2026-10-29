@@ -39,6 +39,9 @@ NOTES = {
     "`intermediates` = B', `true_intermediates` = B, `target` = Qwen's surface answer). wrong_bridge_true scores the same items "
     "against `true_intermediates`, so it has no bank of its own. Added per item: `token`, the final token of the plain-text "
     "`prompt` as the Qwen3.6-27B tokenizer splits it (read offset -1; always ' year' or ' of').",
+    "moral_rationale": "200 items copied verbatim (166 committed + 34 deliberative, in-house). Added per item: `prefix`, the "
+    "whole Qwen3.6-27B chat render of `stimulus` (thinking off, generation prompt), `token`, its last token, and "
+    "`read_positions`, the last 5 positions (their read plan: `last_n` 5 over the `chat` render).",
 }
 
 
@@ -86,7 +89,26 @@ def plain_token(bank: dict):
         assert it["token"] == " " + it["prompt"].rsplit(" ", 1)[1], (it["name"], it["token"])
 
 
-EXTRA = {"jailbreak_recognition": qwen_render, "knowledge_cutoff": cutoff_render, "wrong_bridge": plain_token}
+def moral_render(bank: dict):
+    """moral_rationale reads the last 5 positions of the chat render (user turn = `stimulus`, thinking off, generation
+    prompt), so the gate's prefix is the whole render and its token the last one (`<|im_start|>assistant<think></think>`)."""
+    tok = AutoTokenizer.from_pretrained("Qwen/Qwen3.6-27B")
+    kw = {"skip_special_tokens": False, "clean_up_tokenization_spaces": False}
+    for it in bank["items"]:
+        msgs = [{"role": "user", "content": it["stimulus"]}]
+        out = tok.apply_chat_template(msgs, tokenize=True, add_generation_prompt=True, enable_thinking=False)
+        ids = list(out["input_ids"] if hasattr(out, "keys") else out)
+        it["prefix"] = tok.decode(ids, **kw)
+        it["token"] = tok.decode([ids[-1]], **kw)
+        it["read_positions"] = list(range(len(ids) - 5, len(ids)))
+
+
+EXTRA = {
+    "jailbreak_recognition": qwen_render,
+    "knowledge_cutoff": cutoff_render,
+    "wrong_bridge": plain_token,
+    "moral_rationale": moral_render,
+}
 
 
 def build(family: str, commit: str) -> dict:
@@ -99,7 +121,8 @@ def build(family: str, commit: str) -> dict:
         "license": "MIT",
         "note": NOTES[family],
     }
-    return {"source": source, **json.loads((WSB / path).read_text())}
+    data = json.loads((WSB / path).read_text())
+    return {"source": source, **(data if isinstance(data, dict) else {"items": data})}  # moral_rationale's file is a bare list
 
 
 def main():

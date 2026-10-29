@@ -16,3 +16,6 @@ placebo black, no tools gray).
   (`docs/honest-grader-envs.md`)
 - `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock
   Qwen asked directly, numbers hand-copied from the sprint doc (Wrong Bridge is a TBD placeholder)
+- `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
+  Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
+  (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
