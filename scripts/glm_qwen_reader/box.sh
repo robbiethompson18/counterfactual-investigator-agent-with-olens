@@ -4,7 +4,7 @@
 # On a vast box (24 GB root disk, /dev/shm noexec): stop the image's own vLLM first (it holds ~169 GB/GPU), then D=/dev/shm/w
 # for the weights and caches; the venv stays in W on the root disk.
 #   bash box.sh setup                    # weights, lens, reader, vLLM 0.31 + the glm53 fork (~464 GB GLM download)
-#   RUN=<date>_<slug> bash box.sh run    # GLM worker (capture + lens, h51 kept) -> 4 Qwen reader shards -> HF runs/alignment_faking/$RUN/raw
+#   RUN=<date>_<slug> [FREE_GLM=1] bash box.sh run    # GLM worker (capture + lens, h51 kept) -> 4 Qwen reader shards -> HF runs/alignment_faking/$RUN/raw
 set -euo pipefail
 W=${W:-/root/w}
 D=${D:-$W} # weights, lens, reader, HF cache
@@ -25,9 +25,9 @@ if [ "$1" = setup ]; then
   $HF ceselder/glm-5.3-olens-lens --revision $LENS_REV --local-dir "$D/lens" \
     --include "rl1b_rl1b_2_step_0100/*" "olens_glm53_usage.py" "vllm_metamodels_glm53_b26f02d.tar.gz" "glm53_stack/*"
   uv pip install -q -p "$PY" --no-deps "$D/lens/vllm_metamodels_glm53_b26f02d.tar.gz"
+  uv cache clean -q
   $HF ceselder/glm-5.3-olens-qwen-reader --revision $READER_REV --local-dir "$D/reader" --include "release/*"
   $HF ceselder/olens-qwen3.6-27b-l42 --revision $L42_REV --local-dir "$D/l42" --include olens_usage.py
-  $HF Qwen/Qwen3.6-27B --revision 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9 >/dev/null # HF cache, for qwen_reader.py
   $HF nvidia/GLM-5.3-NVFP4 --local-dir "$D/GLM-5.3-NVFP4"
   echo SETUP_DONE
   exit
@@ -50,6 +50,9 @@ cp "$D/lens/olens_glm53_usage.py" "$HERE/../glm_olens_dense/worker.py" "$HERE/..
   wait
   $PY "$HERE/make_job.py" collect "$REQ" "$J/000_af.out.pt" "$O"
 }
+# Qwen after GLM: a 440 GiB /dev/shm holds GLM (432 GiB) or Qwen (50 GiB), not both; FREE_GLM=1 deletes GLM's weights first
+[ "${FREE_GLM:-0}" = 1 ] && rm -rf "$D/GLM-5.3-NVFP4"
+HF_HUB_ENABLE_HF_TRANSFER=1 $W/v31/bin/hf download Qwen/Qwen3.6-27B --revision 6a9e13bd6fc8f0983b9b99948120bc37f49c13e9 >/dev/null
 for i in 0 1 2 3; do
   CUDA_VISIBLE_DEVICES=$i $PY "$HERE/qwen_reader.py" "$O/h51.pt" "$D/reader/release" "$D/l42/olens_usage.py" "$O/qwen_reads_$i.jsonl" \
     --shard $i/4 >"$O/qwen_reader_$i.log" 2>&1 &
