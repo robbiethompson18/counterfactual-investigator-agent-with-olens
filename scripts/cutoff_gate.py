@@ -30,6 +30,7 @@ QWEN_REVISION = "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9"  # HF head of Qwen/Qw
 N_SAMPLES = 8
 STABLE_MIN = 7
 MAX_TOKENS = 256  # thinking is off and answers are a few tokens
+SYSTEM_PROMPT: str | None = None  # --system; None = WorkspaceBench's no-system-prompt render
 NULL_ANSWERS = {"", "i don't know", "i dont know", "i do not know", "unknown", "none", "n/a", "na", "not sure", "no idea", "unsure"}
 NULL_PREFIXES = ("i don't know", "i dont know", "i do not know", "i'm not sure", "i am not sure", "i cannot", "i can't", "as an ai")
 NUMERIC_TYPES = {"year", "date", "day of month", "month and year", "version number", "software version", "build number"}
@@ -57,7 +58,8 @@ def is_numeric(answer_type: str) -> bool:
 
 
 async def ask(cl, question: str, sem: asyncio.Semaphore, **sampling) -> list[dict]:
-    body = dict(model=MODEL, messages=[{"role": "user", "content": question}], max_tokens=MAX_TOKENS, **sampling)
+    messages = ([{"role": "system", "content": SYSTEM_PROMPT}] if SYSTEM_PROMPT else []) + [{"role": "user", "content": question}]
+    body = dict(model=MODEL, messages=messages, max_tokens=MAX_TOKENS, **sampling)
     body["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
     async with sem:
         for attempt in range(4):
@@ -203,6 +205,7 @@ def main():
     p.add_argument("--limit", type=int)
     p.add_argument("--out", type=Path, help="write here instead of making a run (smoke tests)")
     p.add_argument("--served-by", default="runpod:qwen-shared, vLLM 0.32.0")
+    p.add_argument("--system", help="system prompt (default none, the WorkspaceBench render)")
     p = sub.add_parser("summarize")
     p.add_argument("run", type=Path)
     args = ap.parse_args()
@@ -210,6 +213,8 @@ def main():
     if args.cmd == "summarize":
         summarize(args.run, json.loads((args.run / "questions.json").read_text()))
         return
+    global SYSTEM_PROMPT
+    SYSTEM_PROMPT = args.system
     questions = json.loads(args.questions.read_text())[: args.limit]
     if args.out:
         run = args.out
@@ -227,7 +232,7 @@ def main():
                 "greedy": True,
                 "max_tokens": MAX_TOKENS,
                 "thinking": False,
-                "system_prompt": None,
+                "system_prompt": SYSTEM_PROMPT,
                 "stable_min": STABLE_MIN,
                 "concurrency": args.concurrency,
                 "questions_sha256": hashlib.sha256(args.questions.read_bytes()).hexdigest(),
