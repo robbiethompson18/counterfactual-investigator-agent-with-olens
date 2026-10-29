@@ -1,4 +1,4 @@
-"""cfbench evals for the env viewer: evals/index.json and evals/<name>.json (local data/evals/, HF evals/).
+"""cfbench evals for the env viewer: evals/<name>.json, one file per eval (local data/evals/, HF evals/).
 
     uv run python -m environments evals [NAME ...] [--pull] [--upload]
 
@@ -21,7 +21,7 @@ an eval. --upload ships evals/ and the expview exports. `index` rebuilds evals/ 
 """
 
 import ast
-import datetime as dt
+import itertools
 import json
 import math
 import re
@@ -33,7 +33,6 @@ from typing import Any
 
 from .backends import canonical_id
 from .core import load_env
-from .index import hf_index
 from .runfolder import LOCAL, REPO, REPO_ROOT, hf_token
 
 CFBENCH = REPO_ROOT / "data" / "runs" / "cfbench"
@@ -93,8 +92,45 @@ def item_id(r: dict, cond: str) -> str:
     return f"{r['model'].split('/')[-1]}/{case}/{cond}/{r['predictor'].split('/')[-1]}/d{r['draw']}"
 
 
+def seen_tokens(reads, row: dict) -> dict | None:
+    """An expview tokens object of the base runs exactly as the investigator's tools gave them: each run's transcript as
+    read_transcript renders it, split at the reads its O-lens tools could return there (the inputs' reads for olens_agentic;
+    for olens_placebo_agentic the eval's PLACEBO sources, placed as olens.tools places them), every bullet of each read.
+    None when the row's runs aren't in `reads`, or for a placebo it can't reproduce (other-env placebo, harness < 12)."""
+    from cfbench import olens
+    from cfbench.core import canon_condition, render_spans
+    from expview import read
+
+    cond, base = canon_condition(row["condition"]), row.get("sources") or row["shown"]
+    if not all(s in reads for s in base):
+        return None
+    if cond == "olens_placebo_agentic" and (not row.get("placebo_sources") or row.get("harness_version", 1) < 12):
+        return None
+    given = row["placebo_sources"] if cond == "olens_placebo_agentic" else base if cond.startswith("olens") else [None] * len(base)
+    toks, sections, out = [], [], {}
+    for i, (src, by) in enumerate(zip(base, given, strict=True)):
+        messages = reads.messages[src]
+        text, start = render_spans(messages)[0], len(toks)
+        pos = []
+        if by is not None:
+            m, rows = reads[by]
+            pos = olens.positions(messages, rows if by == src else olens.onto(messages, m, rows))
+        # a read sits at the start of the token after it (the tools' ⟨READ⟩ is just before its char)
+        spans = list(itertools.pairwise(sorted({0, len(text), *(min(len(text), p.char) for p in pos)}))) or [(0, 0)]
+        first = {a: start + k for k, (a, _) in enumerate(spans)}
+        toks += [text[a:b] for a, b in spans]
+        for p in pos:
+            k = first.get(min(len(text), p.char), len(toks) - 1)
+            for layer, r in sorted(p.layers.items()):
+                lines = [[b["text"]] for b in r["bullets"]]
+                out.setdefault(str(k), []).append(read("O-lens", lines, label=f"{p.where} · token {json.dumps(p.token)} · layer {layer}"))
+        sections.append([f"run {i}" + (f" (model {'AB'[i]})" if len(base) == 2 else ""), start, len(toks)])
+    return {"tokens": toks, "sections": sections, "reads": out}
+
+
 def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
-    """One expview item per prediction: the predictor's whole conversation as one call."""
+    """One expview item per prediction: the predictor's whole conversation as one call, and (where the eval's inputs have
+    them) the base runs with the reads its tools could return as the item's tokens (seen_tokens)."""
     from cfbench.core import canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
@@ -111,6 +147,12 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
         label_order=["condition", "model", "p", "answer", "truth", "correct", "base rate"],
     )
     run.reset()
+    reads = None
+    params, ev = meta["params"], _eval_module(meta["params"].get("eval"))
+    if ev is not None and hasattr(ev, "reads") and params.get("inputs"):
+        from cfbench import olens
+
+        reads = olens.Reads(ev.reads(REPO_ROOT / "data" / "runs" / params["inputs"]))
     cid, ids = docent.get("collection_id"), docent.get("runs") or [None] * len(rows)
     for r, did in zip(rows, ids, strict=True):
         if not r.get("messages"):
@@ -140,6 +182,7 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
                 )
             ],
             extra={k: r[k] for k in EXTRA if k in r},
+            tokens=seen_tokens(reads, r) if reads is not None else None,
         )
     return run.path
 
@@ -697,8 +740,8 @@ def defined() -> list[dict]:
 
 
 def build(names: list[str] | None = None, export=True) -> list[Path]:
-    """Write data/evals/<name>.json for `names` (default: every eval with a local run) and data/evals/index.json
-    (HF's entries plus the local evals)."""
+    """Write data/evals/<name>.json for `names` (default: every eval with a local run). There is no shared index (the
+    page lists evals from spec/evals.json and reads each one's own file), so concurrent uploads can't clobber each other."""
     runs, envs, written = eval_runs(), Envs(), []
     EVALS.mkdir(parents=True, exist_ok=True)
     for name in names or list(runs):
@@ -722,28 +765,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
-    # start from HF's index, so evals this machine has no runs of stay listed (an upload used to replace it with only the local ones)
-    built = {p.stem for p in written}
-    top = {e["name"]: e for e in hf_index("index.json", root="evals/").get("evals", [])}
-    for p in sorted(EVALS.glob("*.json")):
-        if p.name == "index.json" or (p.stem not in built and p.stem in top):  # an eval not rebuilt here: HF's entry is current
-            continue
-        e = json.loads(p.read_text())
-        rs = e["runs"]
-        top[e["name"]] = {
-            "name": e["name"],
-            "title": e["title"],
-            "envs": e["envs"],
-            "n_runs": len(rs),
-            "latest": max((r["date"] or "" for r in rs), default=""),
-            "models": sorted({m for r in rs for m in r["models"]}),
-            "conditions": sorted({c for r in rs for c in r["conditions"]}),
-            "n_cases": sum(r["n_cases"] for r in rs),
-        }
-    p = EVALS / "index.json"
-    index = [top[n] for n in sorted(top)]
-    p.write_text(json.dumps({"generated": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"), "evals": index}, indent=1) + "\n")
-    return [*written, p]
+    return written
 
 
 def pull():

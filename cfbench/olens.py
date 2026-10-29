@@ -184,7 +184,9 @@ def positions(messages: list[dict], rows: list[dict]) -> list[Position]:
         i, field, c = r["msg_index"], r["field"] or "", r["char_offset"]
         if r["token"] == "<|im_end|>" and not field:
             im_end.setdefault(i, t)
-        if (i, field) in spans and c is not None and not field.startswith("tool_call"):
+        if r.get("header") and i in starts:  # a turn's own template token (af_refusals' user_header): on its "USER:" label
+            char, where = text.rfind("\n\n", 0, min(starts[i])) + 2, f"{r['role']} (start of turn)"
+        elif (i, field) in spans and c is not None and not field.startswith("tool_call"):
             char, where = spans[i, field] + c, f"{r['role']} {field}"
         elif not field and i in im_end and t > im_end[i]:  # the header of the next turn
             char = min(starts[i + 1]) if i + 1 in starts else len(text)
@@ -230,6 +232,23 @@ def _context(text: str, char: int, token: str = "", xml: bool = False) -> str:
     return f"{_flat(before)}{mark}{_flat(after)}".strip()
 
 
+def onto(shown: list[dict], messages: list[dict], rows: list[dict]) -> list[dict]:
+    """Another transcript's read rows placed on `shown` (an eval's own placebo, cfbench/eval.py PLACEBO): the messages before
+    the last must be identical, so those rows keep their place; rows in the last message's text move to the same relative
+    place in `shown`'s, so the tools show reads on the transcript the investigator was given."""
+    assert len(shown) == len(messages) and shown[:-1] == messages[:-1], "placebo reads need the same prompt"
+    last = len(shown) - 1
+    out = []
+    for r in rows:
+        if r["msg_index"] == last and r["field"] and r["char_offset"] is not None:
+            a, b = messages[last].get(r["field"]) or "", shown[last].get(r["field"]) or ""
+            if not b:
+                continue
+            r = r | {"char_offset": min(len(b) - 1, round(r["char_offset"] * len(b) / max(1, len(a))))}
+        out.append(r)
+    return out
+
+
 def tools(
     base: list[Rollout],
     reads: Reads,
@@ -263,6 +282,8 @@ def tools(
         transcript they are placed in."""
         if i not in cache:
             messages, rows = reads[source[i]]
+            if sources is not None and source[i] != base[i].source:
+                messages, rows = base[i].messages, onto(base[i].messages, messages, rows)
             text = render_spans(messages)[0]
             cache[i] = (positions(messages, rows), len(text) / max(1, len(texts[i])), text)
         return cache[i]
