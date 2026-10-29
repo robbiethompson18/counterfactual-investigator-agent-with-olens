@@ -26,5 +26,16 @@ uv run python -m environments run essay_intro --tag dev --arms plain,mine_hope -
 
 ## Runs
 
-| run | target | episodes | arms | notes |
-| --- | ------ | -------- | ---- | ----- |
+Both pilot runs: `Qwen/Qwen3.6-27B` bf16 on vLLM 0.25.1 (SkyPilot cluster `qwen-essay`, RunPod 1x
+H200), thinking off, essay_grading's sampling (T 0.7, top-p 0.8, presence penalty 1.5).
+Summary: `PYTHONPATH=. uv run python scripts/essay_intro_pilot.py BLIND_RUN MOTIVE_RUN`.
+
+| run                         | episodes | arms                   | notes                                                                                            |
+| --------------------------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------ |
+| `2026-10-29_pilot-blind60`  | 600      | plain                  | blind screen: 60 paragraphs, 10 per human score, × 10                                            |
+| `2026-10-29_pilot-motives10`| 500      | plain + the 4 motives  | 10 of those paragraphs, picked to spread over blind means 1.0–8.0, × 10                          |
+
+Pilot findings (2026-10-29): blind means 1.0–8.0 (mean 4.35), r = 0.71 with the human score, but
+within-paragraph SD only 0.46, so a paragraph's thresholded rate is nearly always 0 or 1. Down
+motives move grades (`coworker` −1.56, `enemy` −1.10 points vs plain); up motives barely do
+(`mine_hope` +0.29, `stakes` −0.38).
