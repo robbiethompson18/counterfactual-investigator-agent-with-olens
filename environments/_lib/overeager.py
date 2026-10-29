@@ -11,6 +11,7 @@ workdir), async inspect(box, st, inst, workdir), hostname, extra_tmpfs, env, hom
 """
 
 import json
+import re
 import zlib
 
 # agent-interp-envs' EvilGenie lcb.yaml system prompt (donehack/evilgenie/run.py SYSTEM), the base harness for every task
@@ -189,6 +190,19 @@ VARIANTS = {
     "core_formal_ts": ["harness", "no_criterion", "tsfmt"],
     "core_formal_md": ["harness", "no_criterion", "mdfmt"],
     "core_formal_jsonctl": ["harness", "no_criterion", "jsonself"],
+    # core harness + the task as a plain imperative in the user"s voice (Kylie, 2026-10-29: no "Task:" label, no "the user"s")
+    "core_direct": ["harness", "direct"],
+    "core_direct_done": ["harness", "direct", "done_tool"],
+    "core_direct_noenv": ["harness", "direct", "no_env"],
+    "core_direct_done_noenv": ["harness", "direct", "done_tool", "no_env"],
+    "core_direct_mcp": ["harness", "direct", "mcp_cc"],
+    "core_direct_done_mcp": ["harness", "direct", "done_tool", "mcp_cc"],
+    "core_direct_ts": ["harness", "direct", "tsfmt"],
+    "core_direct_done_ts": ["harness", "direct", "done_tool", "tsfmt"],
+    "core_direct_md": ["harness", "direct", "mdfmt"],
+    "core_direct_done_md": ["harness", "direct", "done_tool", "mdfmt"],
+    "core_direct_jsonctl": ["harness", "direct", "jsonself"],
+    "core_direct_done_jsonctl": ["harness", "direct", "done_tool", "jsonself"],
     "core_formal_done_ts": ["harness", "no_criterion", "done_tool", "tsfmt"],
     "core_formal_done_md": ["harness", "no_criterion", "done_tool", "mdfmt"],
     "core_formal_done_jsonctl": ["harness", "no_criterion", "done_tool", "jsonself"],
@@ -255,6 +269,14 @@ def assistant_system(workdir, today, bash="bash", env_cc=False):
     )
 
 
+def direct(formal):
+    """The formal task statement as the user's own plain imperative: "delete the user's login page branch, ..." ->
+    "Delete the login page branch, ..." (Kylie's wording); otherwise "the user's" -> "my", "the user is" -> "I'm"."""
+    s = formal.replace("the user is", "I'm")
+    s = re.sub(r"the user's ([\w -]+ branch)", r"the \1", s).replace("the user's", "my")
+    return s[0].upper() + s[1:]
+
+
 def assemble(task, inst, variant, today):
     """-> dict(system, user, tools, handlers, workdir, files). handlers maps shell/done tool names to realrun kinds;
     every other tool name is the task's app tool."""
@@ -296,6 +318,8 @@ def assemble(task, inst, variant, today):
         text = tx["polite"]
     if "ask" in atoms:
         text = tx["casual"]
+    if "direct" in atoms:
+        text = direct(tx["formal"])
     alias = {}
     if "mcp_cc" in atoms:
         server = getattr(task, "mcp_server", task.name)

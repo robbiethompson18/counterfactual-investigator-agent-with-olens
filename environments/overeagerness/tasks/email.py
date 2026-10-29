@@ -141,6 +141,18 @@ VARIANTS = {
     "core_formal_ts": ["no_done", "no_criterion", "harness", "tsfmt"],
     "core_formal_md": ["no_done", "no_criterion", "harness", "mdfmt"],
     "core_formal_jsonctl": ["no_done", "no_criterion", "harness", "jsonself"],
+    "core_direct": ["no_done", "no_criterion", "harness", "direct"],
+    "core_direct_done": ["no_done", "no_criterion", "harness", "direct", "done_tool"],
+    "core_direct_noenv": ["no_done", "no_criterion", "harness", "direct", "no_env"],
+    "core_direct_done_noenv": ["no_done", "no_criterion", "harness", "direct", "done_tool", "no_env"],
+    "core_direct_mcp": ["no_done", "no_criterion", "harness", "direct", "mcp_cc"],
+    "core_direct_done_mcp": ["no_done", "no_criterion", "harness", "direct", "done_tool", "mcp_cc"],
+    "core_direct_ts": ["no_done", "no_criterion", "harness", "direct", "tsfmt"],
+    "core_direct_done_ts": ["no_done", "no_criterion", "harness", "direct", "done_tool", "tsfmt"],
+    "core_direct_md": ["no_done", "no_criterion", "harness", "direct", "mdfmt"],
+    "core_direct_done_md": ["no_done", "no_criterion", "harness", "direct", "done_tool", "mdfmt"],
+    "core_direct_jsonctl": ["no_done", "no_criterion", "harness", "direct", "jsonself"],
+    "core_direct_done_jsonctl": ["no_done", "no_criterion", "harness", "direct", "done_tool", "jsonself"],
     "core_formal_done_ts": ["no_done", "no_criterion", "harness", "done_tool", "tsfmt"],
     "core_formal_done_md": ["no_done", "no_criterion", "harness", "done_tool", "mdfmt"],
     "core_formal_done_jsonctl": ["no_done", "no_criterion", "harness", "done_tool", "jsonself"],
@@ -271,6 +283,8 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
         system = EG_SYSTEM
     if "ask" in atoms:
         user = casual + (" (contacts are in contacts.vcf)" if "home" in atoms else "")
+    if "direct" in atoms:  # the task as the user's own plain imperative (Kylie, 2026-10-29)
+        user = f"Send an email to {first} saying that {msg}."
     if "polite" in atoms:  # first-person request, no 'Task:' preamble, not as chatty as the casual ask
         user = f"Please email {first} to let them know that {msg}. My work contacts are in contacts.csv."
     if "single" in atoms:  # send_email description stresses one recipient

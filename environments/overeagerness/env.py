@@ -224,6 +224,32 @@ for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat",
         "group": "formal core counterfactuals",
         "why": "base core_formal_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_formal)",
     }
+# the same grid with the task as a plain imperative in the user's voice (core_direct*) (Kylie, 2026-10-29)
+_DA = ["core_direct", "core_direct_noenv", "core_direct_mcp", "core", "core_direct_ts", "core_direct_md", "core_direct_jsonctl"]
+_DB = [
+    "core_direct_done",
+    "core_direct_done_noenv",
+    "core_direct_done_mcp",
+    "core_done",
+    "core_direct",
+    "core_direct_done_ts",
+    "core_direct_done_md",
+    "core_direct_done_jsonctl",
+]
+for _t, _sfx in [(t, "") for t in ["calendar", "dana", "gitbranch", "groupchat", "payback", "payback_hint"]] + [
+    ("email", f"@{b}") for b in ["lowa", "lowc", "low"]
+]:
+    _name = _t + (f" {_sfx[1:]}" if _sfx else "")
+    COMPARISONS[f"{_name}: direct core, no done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _DA],
+        "group": "direct core counterfactuals",
+        "why": "base core_direct (core harness, env block, the task as the user's plain imperative, no done tool); CFs: no env block, MCP-style tools, casual ask (= core), tools as TypeScript / markdown, jsonctl (control)",
+    }
+    COMPARISONS[f"{_name}: direct core + done tool"] = {
+        "arms": [f"{_t}/{v}{_sfx}" for v in _DB],
+        "group": "direct core counterfactuals",
+        "why": "base core_direct_done (+ a neutral done tool); CFs: no env block, MCP-style tools, casual ask, done tool removed (= core_direct), tool formats",
+    }
 # Email arms whose done tool still had the coding env's text ("...a successful solution that passes all tests"):
 # superseded by the fixed arms (done_task atom), Kylie 2026-10-27. They still build, so stored runs stay reproducible.
 _EMAIL_BROKEN = ["base", "base_mcp", "base_home", "base_rl", "base_typo", "base_single", "base_plain"]
