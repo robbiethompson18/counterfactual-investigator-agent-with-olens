@@ -234,9 +234,8 @@ def read_overlays(env: str, runs: set[str]) -> dict:
 
 
 def build_links(env: str) -> Path | None:
-    """envs/<env>/links.json from the local run folders (labels from the latest measure@ file, as index.py uses)."""
-    from .index import latest_labels
-    from .runfolder import read_episodes
+    """envs/<env>/links.json from the local run folders (each run's active measure labels, as index.py uses)."""
+    from .runfolder import active_labels, read_episodes
 
     if not (LOCAL / env).exists():
         return None
@@ -246,7 +245,7 @@ def build_links(env: str) -> Path | None:
     reads = read_overlays(env, {p.name for p in dirs})
     for run_dir in dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
-        _, labels = latest_labels(run_dir)
+        _, labels = active_labels(run_dir)
         eps, skip = {}, retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
             if ep["arm"] in skip:

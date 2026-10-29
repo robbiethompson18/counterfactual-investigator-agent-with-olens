@@ -29,8 +29,7 @@ import pandas as pd
 
 from cfbench.core import Rollout, initial_context, render, unified_diff
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
-from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
+from environments._lib.runfolder import LOCAL, REPO_ROOT, active_labels, read_episodes
 
 ENVS = ["alignment_faking"]  # the environments/ envs it is about (the env viewer links them); ENV is the one it reads
 ENV = ENVS[0]
@@ -83,7 +82,7 @@ def _episodes(model: str, runs: list[str]) -> list[tuple[str, dict, bool]]:
     """(source, episode, label) for every labelled episode of the runs."""
     out = []
     for run in runs:
-        _, labels = latest_labels(LOCAL / ENV / run)
+        _, labels = active_labels(LOCAL / ENV / run)
         for ep in read_episodes(LOCAL / ENV / run):
             v = (labels.get(ep["id"]) or {}).get("positive")
             if v is not None and not ep.get("error"):

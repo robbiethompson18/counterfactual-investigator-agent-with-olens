@@ -64,7 +64,7 @@ SEED2, N_EVAL2 = 1, 2000  # batch 2 (Robbie, 2026-10-29: "draw fresh"): a second
 MIN_SHARE = 7 / 8
 LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
-# every CENSUS run's strict-parse rescore (`environments rescore`), named: latest_labels() picks by mtime (CODE_SMELL P1 #6)
+# every CENSUS run's strict-parse rescore (`environments rescore`), pinned by name (their meta.json `active_labels` names it too)
 LABELS = "measure@4f098526d544-strict.jsonl"
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items

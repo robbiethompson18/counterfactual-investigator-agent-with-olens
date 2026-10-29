@@ -2,7 +2,26 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `links.json` is built from the local runs only
+
+`spec.build_links` writes `envs/<env>/links.json` (per episode: Docent run, primary value, O-lens
+reads; the env viewer's episode chips) from the run folders in this checkout, unlike `env_index`,
+which merges HF's index. `environments run` and `upload` ship it, so a checkout without every run of
+an env drops the others' chips: HF's hint_mcq `links.json` covers 17 of its 25 runs. It is also why
+the hint_mcq census runs' chips still show pre-strict ✓/✗ after PR #416 (a rebuild from a sparse
+checkout would drop runs). Index uploads race too: hint_mcq's index had lost four runs
+(`2026-10-28_rest*`, `_words`) until PR #416 rebuilt it. Fix: merge with HF's `links.json` the way
+`env_index` merges the index.
+
 ## 2026-10-29: a run's labels file is picked five different ways
+
+**Fixed 2026-10-29 (PR #416):** `active_labels()` in `environments/_lib/runfolder.py` is the one
+picker: the version `meta.json`'s `active_labels` names (`rescore` and `environments activate` set
+it), else the only file, else an error. Every reader listed below calls it except `census.py` (PR
+#348), and the 98 HF runs with several `measure@` files have pointers. Not in the list and left as
+they were: the standalone `expview.py` search builder (alphabetical last per labeler) and
+`docent_upload.py` (merges every file). HF's hinted_truthfulqa index still shows pre-`1501476`
+labels for 6 runs: rebuild it from a checkout that holds them.
 
 Codex's finding 6 below covers `latest_labels()` choosing a run's labels file by mtime. The choice
 is also re-implemented across the repo, differently:
@@ -148,6 +167,10 @@ incomplete final-answer measures unscorable. Already observed irreversible actio
 separately measurable (finding 4).
 
 ### 6. P1: the selected grading version depends on download order
+
+**Fixed 2026-10-29 (PR #416):** `meta.json` names the active version (`active_labels`), and one
+shared `active_labels()` reads it in the indexes, reports, evals and `judge.py`; see the 2026-10-29
+entry at the top.
 
 [`environments/_lib/index.py`](environments/_lib/index.py), `latest_labels()` (lines 22–26), selects
 by local filesystem mtime. Copying/downloading old labels after a corrected file makes the old

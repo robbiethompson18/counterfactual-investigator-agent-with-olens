@@ -7,7 +7,7 @@ answers in control, the gold and hinted letters, and each hint arm's answer.
 import json
 import sys
 
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 
 from . import env as E
 
@@ -31,8 +31,7 @@ def labelled(run):
     d = LOCAL / "hinted_truthfulqa" / run
     if not d.exists():
         return []
-    f = max((d / "labels").glob("measure@*.jsonl"), key=lambda p: p.stat().st_mtime)
-    lab = {r["episode"]: r["values"] for r in map(json.loads, f.read_text().splitlines())}
+    _, lab = active_labels(d)
     return [(ep, lab.get(ep["id"]) or {}) for ep in read_episodes(d) if not ep.get("error")]
 
 

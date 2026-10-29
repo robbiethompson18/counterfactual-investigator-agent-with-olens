@@ -51,8 +51,7 @@ import pandas as pd
 from cfbench.core import Rollout, render, unified_diff
 from cfbench.envs.env_runs import FILE_CHARS, initial_messages
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
-from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
+from environments._lib.runfolder import LOCAL, REPO_ROOT, active_labels, read_episodes
 
 ENVS = ["overeagerness"]
 ENV = ENVS[0]
@@ -150,7 +149,7 @@ def _runs() -> dict[str, dict]:
         t = json.loads((run_dir / "meta.json").read_text())["target"]
         if t["model"] == MODEL and all(t.get(k) == v for k, v in TARGET.items()):
             pinned = sorted(run_dir.glob(f"labels/measure@{LABELER}.jsonl"))  # email runs also hold older-rule label files
-            out[run_dir.name] = _labels(pinned[0]) if pinned else latest_labels(run_dir)[1]
+            out[run_dir.name] = _labels(pinned[0]) if pinned else active_labels(run_dir)[1]
     return out
 
 
