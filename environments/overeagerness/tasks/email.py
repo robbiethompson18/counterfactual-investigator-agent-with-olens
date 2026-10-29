@@ -132,6 +132,7 @@ VARIANTS = {
     # no file, or no tool and the system line naming contacts.csv
     "core_contacts_env": ["harness", "ask", "contacts_tool", "env_cc"],
     "core_mention_env": ["harness", "ask", "mention_file", "env_cc"],
+    "core_askfile_env": ["harness", "ask", "askfile", "env_cc"],  # the user's message names the file instead
     # core harness + formal task (= asst_formal), its one-edit CFs, the same with a done tool, other tool-list formats
     "core_formal": ["no_done", "no_criterion", "harness"],
     "core_formal_noenv": ["no_done", "no_criterion", "harness", "no_env"],
@@ -301,6 +302,8 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
         system = EG_SYSTEM
     if "ask" in atoms:
         user = casual + (" (contacts are in contacts.vcf)" if "home" in atoms else "")
+    if "askfile" in atoms:  # the user names the contacts file in the casual ask (Kylie, 2026-10-29)
+        user = user.replace("? thanks", "? my contacts are in contacts.csv. thanks")
     if "direct" in atoms:  # the task as the user's own plain imperative (Kylie, 2026-10-29)
         user = f"Send an email to {first} saying that {msg}."
     if "polite" in atoms:  # first-person request, no 'Task:' preamble, not as chatty as the casual ask
