@@ -1,8 +1,9 @@
 # favorites_qa: predicting Qwen's own favourites from the question
 
-**Status (2026-10-29):** ACTIVE. Bank v2 (2,742 questions, 790 stable under Qwen) is the env's
-default; v1 is the 290-question pilot (62 stable), whose 62 have O-lens reads and a transcript-only
-Haiku run (74%). No investigator run on v2 yet.
+**Status (2026-10-29):** ACTIVE. Bank v3 (5,187 questions, 1,500 stable under Qwen) is the env's
+default; v2 (2,742, 790 stable) and the pilot v1 (290, 62 stable) are kept. O-lens, NLA and J++
+reads of the 1,500 are running; the pilot's 62 have O-lens reads and a transcript-only Haiku run
+(74%).
 
 WorkspaceBench's `basic_readout` family has 32 `implicit` items ("What is your favorite card game?
 Answer in one word." → poker), labelled with Qwen3.6-27B's own gated answer. Its text readers get
@@ -77,6 +78,29 @@ together, so v2 re-gates the pilot items (61 stable this time vs 62).
   gated.
 - Reaching 1,000 stable takes ~700 more questions at this yield (one ~15-agent wave).
 
+## Bank v3: wave 2 (`cutoff_gate/2026-10-29_favorites-wave2-2445`)
+
+50 more Sonnet writers on new axes (18 country cultures, everyday/tech/fashion/food brands, sports
+teams and venues, cooking craft, sci-fi, fantasy, ancient world, children's media, musicals,
+inventions, dance, world music, choosing names, hypotheticals, developer tools, economics, energy,
+aviation history, coasts, farming, personal care, famous animals, films/songs by decade, TV, magic,
+nautical, mystery, horror), brief v2 unchanged, all 2,773 v2 categories as an avoid-list checked by
+exact match. 2,500 written, 55 dropped as repeats of an existing category, 2,445 gated on their own
+(v2's items keep their labels; `bank.py build RUN --base v2`). Every question in v3 is gated exactly
+once.
+
+| shape      | n     | stable | %   |
+| ---------- | ----- | ------ | --- |
+| name_one   | 191   | 77     | 40% |
+| pick_one   | 584   | 202    | 35% |
+| recommend  | 538   | 158    | 29% |
+| favorite   | 584   | 142    | 24% |
+| choose_for | 548   | 131    | 24% |
+| all        | 2,445 | 710    | 29% |
+
+Per writer 3/50 (choosing names: Qwen picks a different name every time) to 28/50 (Eastern European
+culture). v3 in all: 5,187 questions, 1,500 stable, 19 refusals.
+
 ## Investigator (`cfbench/evals/favorites_qa_inline/`)
 
 cutoff_qa_inline's setup on these items: Claude Haiku 5.5 at effort medium sees only the question,
@@ -107,7 +131,8 @@ pilot size.
 
 ## Next
 
-- One more wave (~15 agents, ~700 questions) for 1,000 stable items; the avoid-list is v2's
-  categories.
-- Then the env run, the end-of-prompt reads and the three conditions on all stable v2 items. The
-  pilot eval (`favorites_qa_inline`, RUN = the 62) reads its labels from bank v1.
+- O-lens, NLA and J++ reads of all 1,500 stable v3 items
+  (`olens_reads/2026-10-29_favorites-v3-tail`, `nla_reads/2026-10-29_favorites-v3-tail`,
+  `jpp_reads/2026-10-29_favorites-v3-all`, requests from
+  `python -m cfbench.evals.favorites_qa_inline.eval DIR`), then the seven conditions with Haiku (3
+  draws), reported by shape.

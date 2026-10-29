@@ -24,7 +24,7 @@ from environments._lib.runfolder import REPO_ROOT
 from environments.cutoff_qa import env as cutoff_qa
 
 ARMS = ["nohint"]
-VERSION = os.environ.get("FAVORITES_QA_BANK", "v2")  # v1: the 290-question pilot; v2: pilot + wave 1, all re-gated
+VERSION = os.environ.get("FAVORITES_QA_BANK", "v3")  # v1: 290-question pilot; v2: pilot + wave 1 (one gate); v3: v2 + wave 2
 ALL_ITEMS = os.environ.get("FAVORITES_QA_ALL") == "1"
 norm = cutoff_qa.norm
 DEFAULTS, REQUIRES = cutoff_qa.DEFAULTS, cutoff_qa.REQUIRES  # the shared server, T 1 / top_p 1, thinking off

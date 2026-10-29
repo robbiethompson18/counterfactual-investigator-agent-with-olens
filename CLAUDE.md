@@ -563,7 +563,7 @@ Current docs:
   `qwen_modal`, no dates, no numeric answers; every gate run in one table; how the 100 entity-list
   agents made it and how to make more
 - [ACTIVE: favorites_qa — read before asking Qwen for its own favourites/picks (basic_readout implicit, scaled up), or extending that bank](docs/envs/favorites_qa.md)
-  — bank v2: 2,742 free-response questions from 56 Sonnet writers, 790 stable under Qwen (29%);
+  — bank v3: 5,187 free-response questions from 106 Sonnet writers, 1,500 stable under Qwen (29%);
   pilot v1 (62 stable): transcript-only Haiku gets 74% (name_one 95%, choose_for ~56%)
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — no-CoT prompt, 100 AdvBench; DSV4 Flash thinking off has a ~10pp gap (13% vs 3%), gone with

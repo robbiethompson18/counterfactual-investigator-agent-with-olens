@@ -3,6 +3,7 @@
     uv run python scripts/favorites/bank.py merge OUT.json DIR/*.jsonl          # validate, drop repeated categories
     uv run python scripts/cutoff_gate.py sample OUT.json --slug favorites-v1   # 8 samples at T 1 + greedy, thinking off
     uv run python scripts/favorites/bank.py build data/runs/cutoff_gate/<date>_favorites-v1 [--version v1] [--upload]
+    uv run python scripts/favorites/bank.py build RUN --base v2 --version v3 --upload   # v2's items (as gated) + RUN's new ones
 
 `build` writes data/banks/favorites_qa/<version>.json (every question with the gate's `qwen_modal`, `qwen_modal_count`,
 `qwen_greedy`, `gate_class`, `gate_run`) and with --upload puts it on HF at banks/favorites_qa/<version>.json.
@@ -35,7 +36,7 @@ def merge(out: Path, files: list[Path]):
     print(collections.Counter(r["shape"] for r in keep))
 
 
-def build(run: Path, version: str, upload: bool):
+def build(run: Path, version: str, upload: bool, base: str | None = None):
     questions = json.loads((run / "questions.json").read_text())
     gate = {r["id"]: r for r in json.loads((run / "summary.json").read_text())["questions"]}
     # qwen_modal is a raw sample whose gate normal form is the mode, so consumers normalize it with their own norm (the gate's
@@ -45,6 +46,10 @@ def build(run: Path, version: str, upload: bool):
         raw[r["id"]] = next(t.strip() for t, n in zip(r["samples"], r["samples_norm"], strict=True) if n == gate[r["id"]]["modal"])
     fields = lambda g: {"qwen_modal_count": g["modal_count"], "qwen_greedy": g["greedy"], "gate_class": g["class"]}
     items = [q | {"qwen_modal": raw[q["id"]]} | fields(gate[q["id"]]) | {"gate_run": f"cutoff_gate/{run.name}"} for q in questions]
+    if base:  # earlier waves keep their own gate runs' labels
+        old = json.loads((BANK_DIR / f"{base}.json").read_text())["items"]
+        assert not {it["id"] for it in old} & {it["id"] for it in items}
+        items = old + items
     print(collections.Counter(it["gate_class"] for it in items))
     bank = {"version": version, "description": __doc__.split("\n\n")[0], "brief": "scripts/favorites/BRIEF.md", "items": items}
     BANK_DIR.mkdir(parents=True, exist_ok=True)
@@ -69,8 +74,9 @@ p = sub.add_parser("build")
 p.add_argument("run", type=Path)
 p.add_argument("--version", default="v1")
 p.add_argument("--upload", action="store_true")
+p.add_argument("--base", help="an earlier bank version whose items come first, unchanged")
 args = ap.parse_args()
 if args.cmd == "merge":
     merge(args.out, args.files)
 else:
-    build(args.run, args.version, args.upload)
+    build(args.run, args.version, args.upload, args.base)
