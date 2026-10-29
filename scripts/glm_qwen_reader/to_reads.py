@@ -1,11 +1,13 @@
 """The box's raw outputs -> batch reads (docs/olens-reads-format.md) with both lenses on one page per prompt: RUN/reads.jsonl +
 RUN/reads.transcripts.jsonl, so `scripts/runs.py finish RUN` makes the expview run.
 
-    uv run python scripts/glm_qwen_reader/to_reads.py REQUESTS.jsonl RUN/raw RUN
+    uv run python scripts/glm_qwen_reader/to_reads.py REQUESTS.jsonl RUN/raw RUN [QWEN_RUN]
 
 Per position: one row labelled "L51 GLM lens" (Celeste's one-bullet lens: greedy + 4 T=1 bullets as its lines) and one row per
 Qwen-reader draw labelled "L51→Qwen reader" (greedy first, then the T=1 samples, 4 bullets each). Shared-prefix positions (the
-request's `dups`) get copies of the canonical rows with `dup_of`.
+request's `dups`) get copies of the canonical rows with `dup_of`. With QWEN_RUN (a Qwen-on-Qwen batch-reads run of the same prompts)
+and RUN/raw/qwen_align.jsonl (qwen_align.py), each matched GLM token also gets that run's reads of its Qwen token, labelled
+"L<layer> Qwen lens on Qwen" (with the Qwen token and whether the two tokens end at the same character).
 """
 
 import json
@@ -27,17 +29,28 @@ for f in sorted(raw.glob("qwen_reads*.jsonl")):
             bullets = [{"text": b, "fve": None} for b in re.findall(r"^\*\s*(.+)$", t, re.MULTILINE)]
             rows[(x["id"], x["pos"])].append({"layer": "51→Qwen reader", "draw": "greedy" if k == 0 else f"s{k}", "bullets": bullets,
                                               "joint_fve": None})  # fmt: skip
+if len(sys.argv) > 4:
+    qrows = defaultdict(list)
+    for x in map(json.loads, (Path(sys.argv[4]) / "reads.jsonl").read_text().splitlines()):
+        qrows[(x["id"], x["token_index"])].append(x)
+    for a in map(json.loads, (raw / "qwen_align.jsonl").read_text().splitlines()):
+        for x in qrows[(a["id"], a["qwen_pos"])]:
+            row = {"layer": f"{x['layer']} Qwen lens on Qwen", "bullets": x["bullets"], "joint_fve": x["joint_fve"]}
+            rows[(a["id"], a["glm_pos"])].append(
+                row | {"qwen_token_index": a["qwen_pos"], "qwen_token": a["qwen_token"], "aligned": a["exact"]}
+            )
 n = 0
 with open(run / "reads.jsonl", "w") as fr, open(run / "reads.transcripts.jsonl", "w") as ft:
     for r in req:
         sites = [(p, r["id"], p) for p in r["positions"]] + [tuple(d) for d in r["dups"]]
         for p, cid, cp in sorted(sites):
             assert tokens[cid][cp] == r["tokens"][p], (r["id"], p)
-            for x in rows[(cid, cp)]:
+            own = [x for x in rows[(r["id"], p)] if "qwen_token_index" in x] if cid != r["id"] else []  # Qwen rows are per transcript
+            for x in [y for y in rows[(cid, cp)] if cid == r["id"] or "qwen_token_index" not in y] + own:
                 dup = {"dup_of": [cid, cp]} if cid != r["id"] else {}
                 fr.write(json.dumps({"id": r["id"], "token_index": p, "token": r["tokens"][p], **x, **dup}, ensure_ascii=False) + "\n")
                 n += 1
         meta = {k: r[k] for k in ("id", "env", "arm", "prompt", "item", "tokens", "sections")}
         ft.write(json.dumps(meta | {"version": r["prompt"], "stage": r["arm"].rpartition("/")[2]}, ensure_ascii=False) + "\n")
-missing = sum(1 for r in req for p in r["positions"] if len(rows[(r["id"], p)]) < 2)
+missing = sum(1 for r in req for p in r["positions"] if sum("qwen_token_index" not in x for x in rows[(r["id"], p)]) < 2)
 print(f"{len(req)} transcripts, {n:,} rows -> {run}; {missing} positions missing a lens")
