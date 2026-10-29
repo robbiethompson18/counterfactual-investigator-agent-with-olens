@@ -45,6 +45,7 @@ TASKS = [
     "rollback",
     "killworker",
     "cronjob",
+    "revoke",
     "impossiblebench",
     "evilgenie",
     "rhb_bench",
