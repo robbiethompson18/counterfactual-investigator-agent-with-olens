@@ -1,15 +1,17 @@
 # Knowledge-cutoff questions (present tense, bare user turn)
 
-**Status (2026-10-29):** ACTIVE. New env, no runs yet. Default bank v2: 803 present-tense questions
-("Who is the CEO of Intel?") gated on Qwen, items = the 266 stable ones (187 stable-wrong: Qwen's
-stale answer). One arm, no hints. Provenance, the gate numbers and the present-tense finding:
+**Status (2026-10-29):** ACTIVE. New env, no runs yet. Default bank v3: 5,467 present-tense
+questions ("Who is the CEO of Intel?"; v2's 803 plus 4,664 from 100 entity-list agents) gated on
+Qwen, items = the 2,196 stable ones (649 stable-wrong: Qwen's stale answer). One arm, no hints.
+Provenance, the gate numbers and the present-tense finding:
 [docs/envs/cutoff_qa.md](../../docs/envs/cutoff_qa.md).
 
 Each question is asked verbatim as the only user message, no system prompt, thinking off:
 WorkspaceBench's knowledge_cutoff render and sampling (T 1.0, top_p 1.0). The label for the
 predict-Qwen task is the gate's `qwen_modal`, not the truth. Banks are data and live on HF
-(`banks/cutoff_qa/v1.json`, `v2.json`), fetched to `data/banks/cutoff_qa/` on first use;
-`CUTOFF_QA_BANK=v1` loads the dated v1 bank, `CUTOFF_QA_ALL=1` includes unstable and refusal items.
+(`banks/cutoff_qa/v1.json`, `v2.json`, `v3.json`), fetched to `data/banks/cutoff_qa/` on first use;
+`CUTOFF_QA_BANK=v2` / `v1` load the older banks, `CUTOFF_QA_ALL=1` includes unstable and refusal
+items.
 
 |                 |                                                                                                                                                                                                                                                                           |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,7 +19,7 @@ predict-Qwen task is the gate's `qwen_modal`, not the truth. Banks are data and 
 | Arms            | `nohint` (the question alone); hints are ruled out for this env                                                                                                                                                                                                           |
 | Primary measure | `correct`: the reply, normalized (`norm`: lowercase ASCII, no punctuation / articles / currency / units), equals the truth or an alias. Also `answer`, `stale` (equals Qwen's gated `qwen_modal`; for v1 items the pre-cutoff analog), `contains_truth`, `contains_stale` |
 | Pairs           | none (one arm)                                                                                                                                                                                                                                                            |
-| Items           | v2's stable items by default (ids as in v1: `b1-*` pilot, `<domain>-NN` batch, `f-*` fame-steered); meta carries the truth fields, `qwen_modal`, `gate_class`, `truth_now`, `numeric` and `bank`                                                                          |
+| Items           | v3's stable items by default (ids: `b1-*` pilot, `<domain>-NN` batch, `f-*` fame-steered, `e0NN-*` entity-list); meta carries the truth fields, `qwen_modal`, `gate_class`, `truth_now`, `numeric`, `category` and `bank`                                                 |
 | Requires        | thinking off                                                                                                                                                                                                                                                              |
 
 Run (10 items, 4 samples each; the default target is Qwen3.6-27B bf16 on the shared vLLM server,

@@ -2,6 +2,13 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
+
+`scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
+by scratch scripts (clean, dedup, gate-attach, truth recheck) that were not kept. Next batch: port
+the clean into `merge.py` so a bank version is reproducible from the agents' JSONL files plus the
+gate run.
+
 ## 2026-10-29: `environments run` hangs forever on a request that never returns
 
 The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
