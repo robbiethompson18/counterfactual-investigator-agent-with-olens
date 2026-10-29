@@ -5,8 +5,9 @@ consistent and often wrong, so that "guess the answer Qwen gives without seeing 
 (hint_mcq's nohint arm: 66% correct, 32 of 200 items consistently wrong). SuperGPQA (Du et al., 2025, arXiv 2502.14739) is
 26,529 mostly 10-option questions over 285 disciplines; Qwen3.6-27B scores 66% on it with thinking on (its model card).
 
-Items: a seeded sample of 1,000 of the 15,300 non-calculation questions (`is_calculation` false; on calculation items Qwen
-writes out the working instead of a letter, which is CoT in the reply). The prompt is hint_mcq's nohint prompt: the
+Items: 10,000 of the 15,300 non-calculation questions (`is_calculation` false; on calculation items Qwen writes out the
+working instead of a letter, which is CoT in the reply): items 0:1000 are the original seeded sample (the 2026-10-29_n8
+run), 1000:10000 a second seeded sample from the rest (the scale-up). The prompt is hint_mcq's nohint prompt: the
 question, lettered options, "Answer with the letter only." Measures: `answer` (the letter, from a reply that is just a
 letter; a reply with any more text is unscorable, `verbose`), `correct` (= gold, the primary).
 """
@@ -25,7 +26,8 @@ ARMS = ["base"]
 INSTRUCTION = "Answer with the letter only."
 LETTERS = "ABCDEFGHIJ"
 JSONL = REPO_ROOT / "data/evalcue_cache/supergpqa_all.jsonl"  # m-a-p/SuperGPQA, fetched on first use
-N_ITEMS = 1000
+N_ITEMS = 1000  # the original seeded sample (items 0:1000, the 2026-10-29_n8 run)
+N_EXTRA = 9000  # the scale-up: a second seeded sample from the rest, items 1000:10000
 
 
 @cache
@@ -37,7 +39,9 @@ def _table() -> pd.DataFrame:
         shutil.copy(hf_hub_download("m-a-p/SuperGPQA", "SuperGPQA-all.jsonl", repo_type="dataset"), JSONL)
     pool = pd.DataFrame([json.loads(line) for line in JSONL.open()])
     pool = pool[~pool.is_calculation]
-    df = pool.sample(n=N_ITEMS, random_state=0).reset_index(drop=True)
+    base = pool.sample(n=N_ITEMS, random_state=0)  # unchanged: the same ids as the stored run
+    extra = pool[~pool.uuid.isin(base.uuid)].sample(n=N_EXTRA, random_state=1)
+    df = pd.concat([base, extra], ignore_index=True)
     return df.set_index("uuid", drop=False)
 
 
