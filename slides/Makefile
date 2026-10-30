@@ -1,6 +1,6 @@
-# make                  the example deck: figures, then example/build/example.pdf
+# make                  the presentation: figures, then talk/build/talk.pdf
 # make deck=talk        slides/talk/talk.tex, its figures from `python -m slides.talk.figures` (if that module exists)
-deck ?= example
+deck ?= talk
 export TEXINPUTS := $(CURDIR):
 
 all:
