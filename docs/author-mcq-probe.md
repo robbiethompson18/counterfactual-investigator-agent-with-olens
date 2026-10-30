@@ -1,8 +1,8 @@
 # Author MCQ probe: what Qwen thinks about a passage's author
 
-**Status (2026-10-30):** ACTIVE. Pilot done (SynthPAI, Qwen3.6-27B): label probes per site and
-layer, Qwen's own answers, DSv4 Flash answers. Sentence ablations and O-lens reads are the next
-steps and are not done.
+**Status (2026-10-30):** ACTIVE. SynthPAI pilot, Qwen3.6-27B: label probes per site and layer,
+Qwen's own answers, DSv4 Flash answers, leave-one-comment-out ablations (the "?" probe moves with
+Qwen, the passage-only probe does not). O-lens reads are next.
 
 Kylie's question: Qwen3.6-27B (thinking off) answers multiple-choice questions about the person who
 wrote a passage. Can a linear probe read Qwen's view of the author from activations, ideally before
@@ -143,6 +143,53 @@ question, so nothing in its signal can come from the question or the options (no
 from the prompt). It is weaker: near the TF-IDF baseline for age, education and relationship.
 `qmark` (L55 / L30 / L59 / L34 / L57) is the stronger alternative when reading Qwen's view after it
 has been asked.
+
+## Leave-one-comment-out ablations (2026-10-30)
+
+Run `runs/author_mcq_probe/2026-10-30_ablate-loo` (`scripts/author_probe/ablate.py`). Candidates:
+confident pairs, c = (p_top − 1/K)/(1 − 1/K) ≥ 0.5 with both option orders agreeing, relationship
+dropped; one passage per author: 283 passages, 796 (passage, attribute) pairs, 3,249 deletions. For
+each comment i, Qwen's order-averaged pmf without it (d_i = TV to the full pmf) and both frozen
+probes of record (fit on all full passages, at their best layers) on the deleted passage. Stable =
+median d_i < 0.05; evidence comment = d_i > max(0.15, 5 × median).
+
+| attribute | pairs | stable | stable (argmax survives ≥ 90%) | stable with an evidence comment |
+| --------- | ----- | ------ | ------------------------------ | ------------------------------- |
+| sex       | 142   | 138    | 135                            | 63                              |
+| age       | 254   | 186    | 224                            | 79                              |
+| education | 202   | 179    | 188                            | 69                              |
+| income    | 198   | 174    | 186                            | 43                              |
+
+On the stable set. Shift r = Pearson r over all deletions between Qwen's change in p(original
+answer) and the scorer's change in the same class; null = the scorer's shifts permuted within each
+pair (95th percentile of 1,000 draws in brackets). Probe AUROCs are out-of-fold on the full
+passages, restricted to the stable set.
+
+| attribute | Qwen acc | `im_end` AUROC vs label / Qwen | "?" AUROC vs label / Qwen | r(Qwen, `im_end`) | r(Qwen, "?") | r(Qwen, TF-IDF) | evidence comments human-guessed (vs all comments) |
+| --------- | -------- | ------------------------------ | ------------------------- | ----------------- | ------------ | --------------- | ------------------------------------------------- |
+| sex       | 0.91     | 0.77 / 0.78                    | 0.92 / 0.96               | 0.04 [0.05]       | 0.36 [0.07]  | 0.05 [0.06]     | 0.62 (0.07)                                       |
+| age       | 0.57     | 0.81 / 0.77                    | 0.82 / 0.85               | 0.06 [0.07]       | 0.13 [0.09]  | 0.03 [0.13]     | 0.24 (0.08)                                       |
+| education | 0.78     | 0.85 / 0.85                    | 0.91 / 0.94               | 0.02 [0.05]       | 0.25 [0.07]  | 0.05 [0.03]     | 0.49 (0.10)                                       |
+| income    | 0.66     | 0.71 / 0.72                    | 0.81 / 0.91               | 0.01 [0.05]       | 0.24 [0.09]  | 0.16 [0.11]     | 0.43 (0.07)                                       |
+
+- Most confident pairs are stable (87–97%); a third to a half of those have one or more evidence
+  comments.
+- **The passage-only `<|im_end|>` probe does not move with Qwen when a comment is deleted** (r at
+  the null for every attribute), although it predicts the label and Qwen's answer across passages.
+  It reads features of the text that correlate with the attribute, not the evidence Qwen uses: the
+  "random bullshit" risk, measured. **The "?" probe moves with Qwen** (r 0.36 / 0.13 / 0.25 / 0.24
+  vs null ≤ 0.09; age is marginal), and on the stable set it predicts Qwen's answer at AUROC 0.85–
+  0.96. The TF-IDF scorer does not track Qwen's shifts either (income slightly).
+- Evidence comments are the ones a human also reads the attribute from: the SynthPAI reviewer
+  guessed the attribute from 62% / 24% / 49% / 43% of evidence comments vs 7–10% of all comments.
+- Qwen's age errors have a visible mechanism: several wrong 30-44 answers hinge on one comment about
+  turning 30 ("Hit 30 farming...", "Turning 30? Cue responsibility's crescendo.") from authors aged
+  45+.
+- Key passages (ten per attribute, the clearest single evidence comment) are listed in the run's
+  `ablate.md`; every stable pair with per-comment shifts is on the page
+  [claude.ai/artifact/8BHQhsDWXZ8mFmxhPhmzjk](https://claude.ai/artifact/8BHQhsDWXZ8mFmxhPhmzjk)
+  (and the public expview, `#dataset=runs/author_mcq_probe/2026-10-30_ablate-loo`).
+- Cost ~$8 of H200 (~1.5 h incl. setup).
 
 ## Where things live
 
