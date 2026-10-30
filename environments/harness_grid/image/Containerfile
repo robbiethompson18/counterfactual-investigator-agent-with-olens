@@ -1,0 +1,6 @@
+# harness_grid's sandbox: the overeagerness image plus the commands GLM reached for in the 2026-10-29 smoke and didn't
+# find (fuser 75x in killworker, file 26x, strings 10x). No sudo (it isn't installed in the base image either).
+# Build: podman build -t localhost/harness-grid-sandbox environments/harness_grid/image
+FROM localhost/realism-sandbox-u200
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends psmisc file binutils && rm -rf /var/lib/apt/lists/*
