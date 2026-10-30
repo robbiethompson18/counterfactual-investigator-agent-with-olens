@@ -71,6 +71,12 @@ PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-1
 READS = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint"  # own reads of the no-hint prompts, batch 1, on HF
 READS_B2 = REPO_ROOT / "data/runs/olens_reads/2026-10-29_mcq-unselected-nohint-b2"  # batch 2 (three sharded pods)
 READS_DIRS = (READS, READS_B2)
+# NLA readouts (the all-layer NLA, agu18dec/qwen3.6-27b-all-layer-nla-rl2000, critic-scored) and J++ reads of both batches'
+# prompts, the knowledge-cutoff eval's two other metamodels (cfbench/evals/cutoff_qa_inline); conditions nla_inline,
+# nla_placebo_inline, jlens_inline, jlens_placebo_inline, not in CONDITIONS: pass them with --conditions
+NLA_DIR = REPO_ROOT / "data/runs/nla_reads/2026-10-29_mcq-unselected-nohint"
+JREADS = REPO_ROOT / "data/runs/jpp_reads/2026-10-29_mcq-unselected-nohint/reads.jsonl"
+JLENS_K = 3  # top next tokens shown per layer
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n")
 CONTEXT = 40  # characters of prompt text each side of a read
 OPTION_LINE = re.compile(r"^\(?([A-P])[.)] ")
@@ -224,6 +230,36 @@ common answer, so give the single most likely letter. Reason it through first, t
 letter."""
 
 
+NLA_TEXT = f"""\
+## NLA reads
+
+An NLA (natural language autoencoder) is a model trained to describe one of another model's internal activations in a short \
+free-text explanation; a second model, the critic, tries to rebuild the activation from the explanation alone, which scores \
+it: FVE, the fraction of the activation's variance the rebuilt one explains. High FVE is good; explanations with low or \
+negative FVE are often confabulated. The NLA was run on the model's activations as it read this exact prompt, at the newline \
+ending each option and at the end of the prompt (the period ending the last line, the end-of-turn token and the newline after \
+it, and the start of the model's own turn: <|im_start|>, "assistant" and the newline, just before it answers), at layers \
+{", ".join(map(str, LAYERS))}, one explanation per token and layer. Explanations can show what the model registers but never \
+says; they also often just paraphrase the nearby text, and they get fine details wrong (exact numbers, letters, names) more \
+often than broad themes.
+
+Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then its \
+explanations by layer, each with its FVE."""
+
+JLENS_TEXT = f"""\
+## J-lens reads
+
+The J-lens (Jacobian lens) maps the model's internal activation at one token and one layer to the vocabulary: it lists the \
+tokens that activation is pushing the model toward, with the lens's probabilities. It was run on the model's activations as it \
+read this exact prompt, at the newline ending each option and at the end of the prompt (the period ending the last line, the \
+end-of-turn token and the newline after it, and the start of the model's own turn: <|im_start|>, "assistant" and the newline, \
+just before it answers), at layers {", ".join(map(str, LAYERS))}. Reads are noisy: at many positions the lens just predicts \
+the next token of the prompt, and the probabilities are the lens's, not the model's.
+
+Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then one \
+line per layer with the lens's top {JLENS_K} tokens and their probabilities."""
+
+
 def options(text: str) -> list[re.Match]:
     """The option lines, in letter order from A: a question's "I. P is invertible." statement line before its options (7936,
     10518) matches OPTION but is not option I, as the reader's own option parser (sequential letters) knows."""
@@ -243,7 +279,7 @@ def option_newlines(text: str) -> list[tuple[int, str]]:
     return out
 
 
-Pos = tuple[str, dict[int, list[dict]]]  # (token, {layer: bullets})
+Pos = tuple[str, dict[int, list[dict] | dict]]  # (token, {layer: O-lens bullets, an NLA readout {text, fve}, or a J++ read {top}})
 
 
 @cache
@@ -257,7 +293,8 @@ def _pool(path: Path) -> dict[str, tuple[list[Pos], list[Pos]]]:
             continue
         where = nl if r["field"] == "content" and r["token"].strip() == "" else tail
         key = r["char_offset"] if where is nl else r["token_index"]
-        where[r["id"]].setdefault(key, (r["token"], {}))[1][r["layer"]] = r["bullets"]
+        payload = r["bullets"] if "bullets" in r else {"text": r["text"], "fve": r.get("fve")}  # O-lens bullets or an NLA readout
+        where[r["id"]].setdefault(key, (r["token"], {}))[1][r["layer"]] = payload
     ids = set(nl) | set(tail)
     return {i: ([nl[i][k] for k in sorted(nl[i])], [tail[i][k] for k in sorted(tail[i])]) for i in ids}
 
@@ -279,23 +316,71 @@ def reads() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]:
     return pool, items
 
 
-def placebo(item: str, n_nl: int, seed: int) -> str:
+def placebo(pool: dict, items: dict[str, str], item: str, n_nl: int, seed: int) -> str:
     """The source whose reads stand in for `item`'s: a seeded pick among the other questions (either batch) with the same
     option count (so the positions match), as cutoff_qa_inline's placebo does; never the question's own."""
     rng = random.Random(f"{seed}:{item}")
-    pool, items = reads()
     ok = sorted(s for s, (nl, tail) in pool.items() if len(nl) == n_nl and len(tail) == len(TAIL) and items[s] != item)
     assert ok, (item, n_nl)
     return rng.choice(ok)
+
+
+@cache
+def nla_reads() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]:
+    """Both batches' NLA readouts at the O-lens positions: id -> (nl, tail) and id -> item (NLA_DIR holds reads.jsonl + requests.jsonl)."""
+    assert (NLA_DIR / "reads.jsonl").exists(), f"no NLA reads yet: {NLA_DIR}"
+    return _pool(NLA_DIR), _pool_items(NLA_DIR)
+
+
+@cache
+def jpp_pool() -> tuple[dict[str, tuple[list[Pos], list[Pos]]], dict[str, str]]:
+    """Both batches' J++ reads (scripts/jpp_read_requests.py rows at every token: token, layers, top) cut to the O-lens block's
+    positions: id -> (nl, tail) with {layer: {"top": top}} per position, and id -> item. Every token of a ~200-token prompt at
+    six layers was a ~30k-token block (2026-10-29), so the J-lens is compared at the same positions as the other two lenses."""
+    assert JREADS.exists(), f"no J++ reads yet: {JREADS}"
+    items = _pool_items(JREADS.parent)
+    rows: dict[str, list[dict]] = defaultdict(list)
+    for line in JREADS.open():
+        r = json.loads(line)
+        rows[r["id"]].append(r)
+    pool: dict[str, tuple[list[Pos], list[Pos]]] = {}
+    for i, rs in rows.items():
+        rs.sort(key=lambda r: r["token_index"])
+        text = Prompt(items[i]).text
+        keep = [r["layers"].index(L) for L in LAYERS]
+
+        def pos(r: dict, keep: list[int] = keep) -> Pos:
+            return r["token"], {L: {"top": r["top"][k]} for L, k in zip(LAYERS, keep, strict=True)}
+
+        content = [r for r in rs if r["field"] == "content" and r["char_offset"] is not None]
+        # the row whose token covers each option newline's char (the J++ reader keeps a newline merged into a longer token)
+        nl = [pos(next(r for r in content if r["char_offset"] <= c < r["char_offset"] + len(r["token"]))) for c, _ in option_newlines(text)]
+        start = max(r["token_index"] for r in rs if r["token"] == "<|im_start|>")
+        by_index = {r["token_index"]: r for r in rs}
+        tail = [pos(by_index[k]) for k in range(start - 3, start + 3)]
+        assert tuple(t for t, _ in tail) == TAIL, (i, [t for t, _ in tail])
+        pool[i] = (nl, tail)
+    return pool, items
 
 
 def own(item: str) -> tuple[list[Pos], list[Pos]]:
     return reads()[0][request_id(item)]
 
 
-def _bullets(layers: dict[int, list[dict]]) -> list[str]:
-    return [f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}"
-            for layer in sorted(layers) for b in sorted(layers[layer], key=lambda b: -b["fve"])]  # fmt: skip
+def _bullets(layers: dict[int, list[dict] | dict]) -> list[str]:
+    """One line per O-lens bullet (highest FVE first within a layer), or per NLA readout its explanation's lines indented."""
+    out = []
+    for layer in sorted(layers):
+        v = layers[layer]
+        if isinstance(v, dict) and "top" in v:  # a J++ read: the lens's top next tokens
+            out.append(f"- layer {layer}: " + " ".join(f"{json.dumps(t, ensure_ascii=False)} {p:.2f}" for t, p in v["top"][:JLENS_K]))
+        elif isinstance(v, dict):  # an NLA readout
+            fve = f", FVE {v['fve']:.2f}" if v.get("fve") is not None else ""
+            lines = [" ".join(line.split()) for line in v["text"].splitlines() if line.strip()]
+            out.append(f"- layer {layer}{fve}:\n" + "\n".join(f"  {line}" for line in lines))
+        else:
+            out += [f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}" for b in sorted(v, key=lambda b: -b["fve"])]
+    return out
 
 
 def blocks(text: str, nl: list[Pos], tail: list[Pos]) -> str:
@@ -316,13 +401,24 @@ def blocks(text: str, nl: list[Pos], tail: list[Pos]) -> str:
 
 def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
     parts, extra = [SETUP.format(text=env.text)], {}
+    n_nl = len(option_newlines(env.text))
     if condition == "olens_inline":
         nl, tail = own(case["item"])
         parts += [READS_TEXT, blocks(env.text, nl, tail)]
     elif condition == "olens_placebo_inline":
-        src = placebo(case["item"], len(option_newlines(env.text)), seed)
+        src = placebo(*reads(), case["item"], n_nl, seed)
         parts += [READS_TEXT, blocks(env.text, *reads()[0][src])]
         extra = {"placebo_sources": [src]}
+    elif condition in ("nla_inline", "nla_placebo_inline"):
+        pool, items = nla_reads()
+        src = request_id(case["item"]) if condition == "nla_inline" else placebo(pool, items, case["item"], n_nl, seed)
+        parts += [NLA_TEXT, blocks(env.text, *pool[src])]
+        extra = {} if condition == "nla_inline" else {"placebo_sources": [src]}
+    elif condition in ("jlens_inline", "jlens_placebo_inline"):
+        pool, items = jpp_pool()
+        src = request_id(case["item"]) if condition == "jlens_inline" else placebo(pool, items, case["item"], n_nl, seed)
+        parts += [JLENS_TEXT, blocks(env.text, *pool[src])]
+        extra = {} if condition == "jlens_inline" else {"placebo_sources": [src]}
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 
