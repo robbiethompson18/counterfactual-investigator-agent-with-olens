@@ -196,8 +196,8 @@ def placebo(inputs: str, arm: str, item: str, seed: int) -> str:
     is one (94% of cases), else any (aligned()); the essay, instruction and tail segments always match."""
     lays, me = _layout(inputs), _layout(inputs)[request_id(arm, item)]
     ok = sorted(i for i, lay in lays.items() if i != me["id"] and i.endswith(f"~{item}") and i in _pool())
+    ok = ok or sorted(i for i in lays if i != me["id"] and i in _pool())  # no other arm on this essay read yet: any prompt
     same = [i for i in ok if segments(lays[i]) == segments(me)]
-    assert ok, (arm, item)
     return random.Random(f"{seed}:{arm}~{item}").choice(same or ok)
 
 
