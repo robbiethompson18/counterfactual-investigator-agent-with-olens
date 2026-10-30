@@ -13,18 +13,23 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+from scipy.stats import rankdata
 
 from cfbench.core import canon_condition
-from environments._lib.evals import auroc
 
-BOOT = 2000
+BOOT = 1000
 PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
+
+
+def auroc(p: np.ndarray, y: np.ndarray) -> float:
+    n1, n0 = y.sum(), len(y) - y.sum()
+    return float((rankdata(p)[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * n0)) if n1 and n0 else float("nan")
 
 
 def metrics(ps: dict, truth: dict, keys: list) -> dict[str, float]:
     p, y = np.array([ps[k] for k in keys]), np.array([truth[k] for k in keys])
     return {"right": float(((p >= 0.5) == y).mean()), "brier": float(((p - y) ** 2).mean()),
-            "auroc": auroc(list(p[y == 1]), list(p[y == 0])) or float("nan")}  # fmt: skip
+            "auroc": auroc(p, y)}  # fmt: skip
 
 
 def boot(f, keys: list, rng) -> list[dict]:
