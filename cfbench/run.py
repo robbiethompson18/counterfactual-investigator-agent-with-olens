@@ -39,6 +39,7 @@ from cfbench.core import (
     TOOL_BUDGET,
     TOOL_CONDITIONS,
     build_prompt,
+    check_agentic,
     pick_examples,
 )
 from cfbench.predict import EFFORT, grader, predict
@@ -92,6 +93,7 @@ async def main():
     }
     conditions, predictors = args.conditions.split(","), args.predictors.split(",")
     assert set(conditions) <= set(CONDITIONS), conditions
+    check_agentic(conditions)
     reads = olens.Reads(args.olens_reads.split(",") if args.olens_reads else [], args.olens_positions)
     assert reads or not set(OLENS_CONDITIONS) & set(conditions), "the olens conditions need --olens-reads"
     fve_note = olens.fve_note(reads) if reads else ""
