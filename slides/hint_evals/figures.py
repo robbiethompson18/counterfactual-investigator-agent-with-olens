@@ -64,6 +64,40 @@ def claim_bars(name: str) -> tuple[dict, float, int]:
     return bars, 0.5, max(r["n_items"] for r in rows.values())
 
 
+def auroc(pos: np.ndarray, neg: np.ndarray) -> float:
+    """P(a knew case's p > a didn't case's), ties half."""
+    d = pos[:, None] - neg[None, :]
+    return float((d > 0).mean() + 0.5 * (d == 0).mean())
+
+
+def auroc_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
+    """condition -> (AUROC of P(knew), 95% bootstrap CI over cases, stars), chance 0.5 (Kylie, 2026-10-30: in place of % right,
+    which rewards a shift in the investigator's bias at the 0.5 threshold). An item's p is the mean over its draws, as
+    score.py; stars: one-sided paired bootstrap that the condition's AUROC beats transcript-only's on the same cases."""
+    p: dict[str, dict[tuple, list[float]]] = {}
+    truth: dict[tuple, int] = {}
+    for R in load(name)["runs"]:
+        for g in R["groups"]:
+            for c, ds in g.get("draws", {}).items():
+                for d in ds:
+                    k = (g["env"], d["item"])
+                    p.setdefault(c, {}).setdefault(k, []).append(d["p"])
+                    truth[k] = g["k_cf"]
+    keys = sorted(truth)
+    y = np.array([truth[k] for k in keys])
+    rng = np.random.default_rng(0)
+    idx = rng.integers(0, len(keys), (reps, len(keys)))
+    score = lambda x, i: auroc(x[i][y[i] == 1], x[i][y[i] == 0])
+    xs = {c: np.array([np.mean(v[k]) for k in keys]) for c, v in p.items()}
+    ref = np.array([score(xs["transcript_inline"], i) for i in idx])
+    bars = {}
+    for c, x in xs.items():
+        boot = np.array([score(x, i) for i in idx])
+        st = "" if c == "transcript_inline" else stars(float((boot - ref <= 0).mean()))
+        bars[c] = (auroc(x[y == 1], x[y == 0]), np.quantile(boot, [0.025, 0.975]).tolist(), st)
+    return bars, 0.5, len(keys)
+
+
 def errors(bars_of):
     """bars_of as error rates (Kylie, 2026-10-30): 1 - % right, lower is better; stars unchanged."""
 
@@ -112,7 +146,7 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     return bars, chance, len(items)
 
 
-def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path: Path) -> None:
+def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path: Path, pct: bool = True) -> None:
     """One panel per eval in the template's (and the Evals page's answer chart's) style: lower-case title with the count
     under it, % gridlines every 20, solid bars (placebo hatched), gray 95% CI whisker, the value in ink above it with the
     stars over that, muted names under the bars, a dotted chance line labelled at the right."""
@@ -128,7 +162,7 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
             v, (lo, hi), st = bars[c]
             ax.bar(x, v, 0.8, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-            ax.text(x, hi + 0.015, f"{v:.1%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+            ax.text(x, hi + 0.015, f"{v:.1%}" if pct else f"{v:.3f}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
@@ -144,7 +178,7 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
     top = max(hi for d in data.values() for _, (_, hi), _ in d[0].values()) + 0.07
     ticks = np.arange(0, top, 0.1)
     axes[0].set_ylim(0, top)
-    axes[0].set_yticks(ticks, [f"{t:.0%}" for t in ticks])
+    axes[0].set_yticks(ticks, [f"{t:.0%}" if pct else f"{t:.1f}" for t in ticks])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
     axes[0].set_ylabel(ylabel)
     if data[list(evals)[-1]][1] <= top:
@@ -171,5 +205,5 @@ def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
 if __name__ == "__main__":
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    panels(knew, errors(claim_bars), "chance", "error rate (lower is better)", OUT / "knew.pdf")
+    panels(knew, auroc_bars, "chance", "AUROC of P(knew)", OUT / "knew.pdf", pct=False)
     panels(letter, hinted_baseline(errors(answer_bars)), "always the hinted letter", "error rate (lower is better)", OUT / "letter.pdf")

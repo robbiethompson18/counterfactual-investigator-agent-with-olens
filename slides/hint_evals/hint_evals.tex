@@ -59,18 +59,18 @@
 \begin{frame}{Summary}
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.315\textwidth}
-      \stat{−8.5pp}{olens}{error rate on ``did Qwen know it?'' with \olens{}, hint after the options: 33\% vs 41\% for the transcript alone (976 cases)}
+      \stat{0.739}{olens}{AUROC of P(knew) with \olens{}, hint after the options, vs 0.613 for the transcript alone (976 cases)}
     \end{column}
     \begin{column}{0.315\textwidth}
-      \stat{−12.5pp}{olens}{error rate of \olens{} vs its placebo with the hint after the options (−12.2pp with it first)}
+      \stat{+0.167}{olens}{AUROC of \olens{} over its placebo with the hint after the options (+0.145 with it first)}
     \end{column}
     \begin{column}{0.315\textwidth}
-      \stat{15\%}{probe}{error rate of a frozen linear probe at the option newlines, hint after; 23\% retuned when the hint comes first}
+      \stat{0.937}{probe}{AUROC of a frozen linear probe at the option newlines, hint after; 0.851 retuned when the hint comes first}
     \end{column}
   \end{columns}
   \medskip
   \begin{itemize}
-    \item The six end-of-prompt reads add 1.6–1.9pp over the option-newline reads alone (\cond{olensnl}{O-lens (nl)})
+    \item ``Did Qwen know it?'': the six end-of-prompt reads add 0.035 / 0.016 AUROC (hint after / first) over the option-newline reads alone (\cond{olensnl}{O-lens (nl)})
     \item Which letter without the hint: \olens{} cuts the error rate by 1.6–1.7pp, the probe by 23pp (hint after)
   \end{itemize}
 \end{frame}
@@ -140,9 +140,9 @@
   \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
 
-\begin{frame}{Did Qwen know it? The O-lens cuts the error rate from 41.3\% to 32.8\%, the probe to 14.5\%}
+\begin{frame}{Did Qwen know it? AUROC 0.613 from the transcript, 0.739 with the O-lens, 0.937 from the probe}
   \slidefig{fig/knew.pdf}
-  \source{Error rate = 100\% − \% right (guess = p $\geq$ 0.5); 95\% item bootstrap CI; stars: one-sided paired sign test that the condition beats transcript-only (* p < .05, ** < .01, *** < .001); hatched: placebo.}
+  \source{AUROC of the investigator's P(knew) over cases (knew vs didn't); 95\% bootstrap CI over cases; stars: one-sided paired bootstrap that the condition's AUROC beats transcript-only's on the same cases (* p < .05, ** < .01, *** < .001); hatched: placebo.}
 \end{frame}
 
 \begin{frame}{Which letter without the hint? The O-lens cuts the error rate by 1.6–1.7pp, the probe by 23.2pp with the hint after}
