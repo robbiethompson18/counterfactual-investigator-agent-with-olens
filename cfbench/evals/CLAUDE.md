@@ -124,6 +124,13 @@ the eval `<env>-pairs`.
   sources); placebo from `--placebo` (the old test used donation-bet-v1). Imported old rows
   (`import_old.py`, no rerun): `2026-10-28_essay-grading-flash-v1` (harness v1, Flash) and
   `2026-10-28_essay-grading-sol-v6` (harness v6, GPT-6.1 Sol), not comparable to new runs.
+- `essay_grading_inline`: the scaled essay_grading eval (2026-10-30). Every essay_grading arm (21 old
+  + the 205-arm wide set, `environments/essay_grading/wide.py`, written before any was run) × 8
+  essays = 1,808 prompts; the investigator sees one prompt and names the score Qwen gives most often
+  (single-turn). Headline: share of Qwen's samples matching the submitted score (`score.py`, CIs
+  resample arms). Versions `bare` and `anchored` (plus the base arm's scores on that essay). Reads:
+  every punctuation token + the ten thinking-off tail tokens, layers 32-60; placebo = another arm's
+  reads on the same essay, segment for segment.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the
