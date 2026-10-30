@@ -274,10 +274,11 @@ Active docs:
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our CHIVE replacement
-- [ACTIVE: supergpqa_inline — read before predicting Qwen's SuperGPQA letter from the bare prompt with O-lens / NLA / J++ reads, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
-  — mcq_unselected's question on the harder pool: 3,000 consistent cases (seed 0) as the eval set,
-  the other 3,328 consistent questions as the probe pool; reads at 20 positions incl. the empty
-  think block; seven single-turn Haiku conditions; chart `graphs.supergpqa_inline`
+- [REFERENCE: supergpqa_inline — read before claiming the O-lens predicts Qwen's MCQ letter, giving an investigator lens reads of an MCQ prompt, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
+  — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
+  single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
+  cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic
