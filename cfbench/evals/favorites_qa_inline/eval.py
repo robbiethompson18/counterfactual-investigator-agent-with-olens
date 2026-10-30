@@ -1,5 +1,7 @@
-"""favorites_qa_inline: predict Qwen3.6-27B's own pick ("What is your favorite constellation? Answer in one word.") from the
-question alone: cutoff_qa_inline's setup on the favorites_qa env (WorkspaceBench basic_readout's implicit items, scaled up).
+"""favorites_qa_inline: predict Qwen3.6-27B's own pick for a free-response preference question from the prompt alone.
+
+Example: "What is your favorite constellation? Answer in one word." cutoff_qa_inline's setup on the favorites_qa env
+(WorkspaceBench basic_readout's implicit items, scaled up).
 
 Robbie, 2026-10-29. The investigator sees the question Qwen was asked (not the reply) and predicts the reply in one turn with one
 submit_answer call (cutoff_qa_inline's prompt, its inline.py). The label is Qwen's modal answer from the bank's stability gate
@@ -130,6 +132,24 @@ def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str,
             extra = {"placebo_sources": [src]}
         rows = by_source[src]
     return inline.prompt(question, condition, False, MODEL_NAME, rows), extra
+
+
+POSITION_CHART = {  # the env viewer's read-position bars (page.html positionChart; docs/favorites-qa-inline.md)
+    "title": "O-lens read positions",
+    "caption": "Which read positions carry the signal. The question's punctuation is read before the assistant turn begins.",
+    "panels": [
+        {
+            "title": "every read set",
+            "groups": [
+                ['final "."', "olens_pos1_inline", "olens_pos1_placebo_inline"],
+                ['final "."\n+ <|im_end|>', "olens_pos2_inline", "olens_pos2_placebo_inline"],
+                ["question\npunctuation", "olens_qpunct_inline", "olens_qpunct_placebo_inline"],
+                ["question punct.\n+ <|im_end|>", "olens_qpunct_imend_inline", "olens_qpunct_imend_placebo_inline"],
+                ["six tail tokens\n(to assistant↵)", "olens_inline", "olens_placebo_inline"],
+            ],
+        }
+    ],
+}
 
 
 def LINKS(row: dict) -> dict[str, dict]:

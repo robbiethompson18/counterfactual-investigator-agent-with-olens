@@ -461,6 +461,7 @@ def run_header(run_dir: Path, meta: dict, docent: dict) -> dict:
         "slug": meta.get("slug") or (m[2] if m else run_dir.name),
         "description": meta.get("description"),
         "status": meta.get("status"),
+        "inputs": Path(meta["params"]["inputs"]).name if meta["params"].get("inputs") else None,  # for the eval's INPUTS_RUNS
         "harness_version": meta["params"].get("harness_version", 1),
         "predictors": meta["params"].get("predictors", "").split(","),
         "effort": meta["params"].get("effort"),
@@ -773,6 +774,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
+        if skip := getattr(_eval_module(name), "SKIP_RUNS", None):  # superseded runs of a kept inputs run, left out too
+            summaries = [s for s in summaries if s["run"] not in skip]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
         if shown := getattr(_eval_module(name), "RUNS", None):  # the eval lists the runs it shows: each its own row, no pooling
@@ -788,6 +791,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         doc["error_rate"] = getattr(_eval_module(name), "ERROR_RATE", False)  # answer task shown as error rate (lower is better)
+        doc["position_chart"] = getattr(_eval_module(name), "POSITION_CHART", None)  # page.html positionChart
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     return written
