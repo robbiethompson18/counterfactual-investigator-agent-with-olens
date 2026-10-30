@@ -95,11 +95,13 @@ positions shown. Runs `cfbench/2026-10-30_cutoff-qa-1k-olens-{pos1,pos2,qpunct,q
 | all six tail (through `assistant\n`)  | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
 
 **On cutoff the question's own punctuation is as good as the six tail tokens** (15.2 vs 15.0, and
-28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The commas inside the question carry
-what Qwen knows about the entities named before them (e.g. after "co-founded by Ilya Sutskever," the
-bullets list his co-founders); those reads name Qwen's modal answer on 709 of 999 items (209 of 339
-stale). The "." and `<|im_end|>` alone are at their placebo. Every placebo beats transcript-only by
-1–3pp: any reads push Haiku towards the stale answer.
+28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The signal is at the "?" that ends the
+question proper, before the boilerplate ("If you are not sure, give your best guess. Answer with
+just the person name."): some read there names Qwen's modal answer on 659 of 986 items (190 of 339
+stale), e.g. at "Who is the CEO of Intel?" L32: "The current CEO of Intel is **Pat Gelsinger**." The
+commas (all in the boilerplate) name it on 40, the final "." on 316. The "." and `<|im_end|>` alone
+are at their placebo. Every placebo beats transcript-only by 1–3pp: any reads push Haiku towards the
+stale answer.
 
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
