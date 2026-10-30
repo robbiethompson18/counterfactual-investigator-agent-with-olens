@@ -225,3 +225,12 @@ gets the 6 gate-killed items right almost every time in every condition (they ar
 wrong answer the text gives away), so the baselines rise from 0% to 22%, the O-lens − transcript gap
 shrinks from +24 to +18pp, and O-lens − placebo stays +12 to +19pp but on 24 items is no longer
 significant by the sign test (6 vs 1, p = 0.13; bootstrap CI +3 to +25pp).
+
+## Frame arms for the hint flip probe (2026-10-29)
+
+hint_mcq's frames on TruthfulQA ([hint-flip-probe.md](../hint-flip-probe.md)): `jsonapp/<arm>`
+(chat-app request JSON on top of the user turn) over `control`, `hint/{stanford,wikipedia}` and
+`hint_before/{stanford,wikipedia}`; `header/<arm>` ("TruthfulQA Q<n>") over `control` and
+`hint/{stanford,wikipedia}`; `jsonnote/{stanford,wikipedia}` (the hint sentence as the JSON's
+`note`); and `hint_before/wikipedia`. Factor `frame` on every arm. Used on `tqa-N.h<gold>` items for
+bf16 letter-argmax labels only; no sampled runs.
