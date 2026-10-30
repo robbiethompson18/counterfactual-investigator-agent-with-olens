@@ -30,7 +30,7 @@ OLENS_TEXT = """\
 ## O-lens reads
 
 The O-lens is a model trained to describe another model's internal activations in words. It was run on {model}'s activations \
-at the end of the prompt above: {where}, at layers {layers}. Each read \
+{where}, at layers {layers}. Each read \
 is a few short bullets about what the model is representing at that token, at one layer, each with its FVE (fraction of the \
 activation's variance the bullet explains): high FVE is good, low FVE bullets are often hallucinated. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text. The O-lens is more likely to get fine details \
@@ -74,12 +74,47 @@ def tail_block(rows: list[dict], prompt: str) -> str:
     return "\n".join(out).strip()
 
 
-WHERE = {  # the O-lens block's positions in words, by how many of the six end-of-prompt reads it shows
-    1: "the period that ends its last line",
-    2: "the period that ends its last line and the end-of-turn token after it",
-    6: "the period that ends its last line, the end-of-turn token and the newline after it, and the start of {model}'s own turn "
-    '(<|im_start|>, "assistant" and the newline), just before it answers',
+END = "at the end of the prompt above: "
+QPUNCT = "at every punctuation token inside the question above (its question marks, commas, full stops and so on)"
+WHERE = {  # the O-lens block's positions in words (read-position ablation, Kylie, 2026-10-30)
+    "pos1": END + "the period that ends its last line",
+    "pos2": END + "the period that ends its last line and the end-of-turn token after it",
+    "tail6": END + "the period that ends its last line, the end-of-turn token and the newline after it, and the start of {model}'s own "
+    'turn (<|im_start|>, "assistant" and the newline), just before it answers',
+    "qpunct": QPUNCT,
+    "qpunct_imend": QPUNCT + " and the end-of-turn token after it",
 }
+
+
+def where_of(rows: list[dict]) -> str:
+    """Which WHERE the rows' positions are: the six-token tail or its first one or two, or the question's punctuation (+ <|im_end|>)."""
+    pos, toks = sorted({r["token_index"] for r in rows}), {r["token"] for r in rows}
+    if "\n" in toks:
+        return "tail6"
+    if len(pos) == 1 and toks == {"."}:
+        return "pos1"
+    if "<|im_end|>" not in toks:
+        return "qpunct"
+    return "pos2" if len(pos) == 2 else "qpunct_imend"
+
+
+def sites_block(rows: list[dict]) -> str:
+    """Scattered read positions (not one contiguous tail): each with the prompt text just before it, the read token
+    wrapped, then its bullets by layer."""
+    by_tok: dict[int, dict[int, dict]] = defaultdict(dict)
+    for r in rows:
+        by_tok[r["token_index"]][r["layer"]] = r
+    out = []
+    for _, layers in sorted(by_tok.items()):
+        r0 = next(iter(layers.values()))
+        lead = r0["prefix"][: len(r0["prefix"]) - len(r0["token"])] if r0["prefix"].endswith(r0["token"]) else r0["prefix"]
+        lead = lead[-CONTEXT:].replace("\n", "↵")
+        out.append(f"At {json.dumps(r0['token'], ensure_ascii=False)}: …{lead}<read>{show_token(r0['token'])}</read>")
+        for layer in sorted(layers):
+            for b in sorted(layers[layer]["bullets"], key=lambda b: -b["fve"]):
+                out.append(f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}")
+        out.append("")
+    return "\n".join(out).strip()
 
 
 def prompt(question: str, condition: str, told: bool, model: str, rows: list[dict] | None) -> str:
@@ -87,9 +122,11 @@ def prompt(question: str, condition: str, told: bool, model: str, rows: list[dic
     if condition != "transcript_inline":
         assert rows, condition
         layers = ", ".join(map(str, sorted({r["layer"] for r in rows})))
-        n_pos = len({r["token_index"] for r in rows})  # read-position ablation (Kylie, 2026-10-30): describe only the positions shown
-        where = WHERE.get(n_pos, WHERE[6]).format(model=model)
-        reads = OLENS_TEXT.format(model=model, layers=layers, where=where, block=tail_block(rows, question))
+        w = where_of(rows)  # describe only the positions shown; scattered positions (the question's punctuation) get sites_block
+        pos, toks = sorted({r["token_index"] for r in rows}), {r["token"] for r in rows}
+        tail = len(pos) == 1 or ("<|im_end|>" in toks and pos == list(range(pos[0], pos[-1] + 1)))  # one run of tokens ending the prompt
+        block = tail_block(rows, question) if tail else sites_block(rows)
+        reads = OLENS_TEXT.format(model=model, layers=layers, where=WHERE[w].format(model=model), block=block)
     return USER.format(told=TOLD if told else "", prompt=question, reads=reads)
 
 

@@ -94,25 +94,31 @@ WorkspaceBench's `basic_readout` implicit family scaled from 32 items to 1,500
 ## Read-position ablation (2026-10-30)
 
 Kylie asked whether the gain needs the assistant-turn tokens. Same items, investigator, draws and
-placebo rule as above, with the O-lens block cut to the first one or two of the six positions:
-`pos1` = the "." ending the question only, `pos2` = "." and `<|im_end|>`. The block's preamble names
-only the positions shown (`cfbench/evals/cutoff_qa_inline/inline.py`). Runs
-`cfbench/2026-10-30_favorites-haiku-v3-olens-pos{1,2}` (conditions renamed `olens_pos{1,2}_inline`
-and `olens_pos{1,2}_placebo_inline` after the run so they never pool with the six-position ones),
-inputs `cfbench_evals/2026-10-30_favorites-qa-inline-inputs-v3-olens-pos{1,2}`, 18,000 predictions,
-0 invalid. Error rate, paired by item, 95% bootstrap CIs:
+placebo rule as above, with only some reads shown: the first one or two of the six tail positions
+(`pos1` = the "." ending the question, `pos2` = "." and `<|im_end|>`), or every punctuation token
+inside the question (`qpunct`, 2.3 per prompt: "?", ",", "."), alone or with `<|im_end|>`
+(`qpunct_imend`). The question's other punctuation was never read before: those reads are
+`olens_reads/2026-10-30_favorites-fill-kylie` (the requests of `scripts/fill_read_requests.py`, PR
+#432, for this set; same lens, layers and T 1). The block's preamble names only the positions shown
+(`cfbench/evals/cutoff_qa_inline/inline.py` `where_of`). Runs
+`cfbench/2026-10-30_favorites-haiku-v3-olens-{pos1,pos2,qpunct,qpunct-imend}` (conditions renamed
+after the run, e.g. `olens_qpunct_inline` / `olens_qpunct_placebo_inline`, so they never pool with
+the six-position ones), inputs `cfbench_evals/2026-10-30_favorites-qa-inline-inputs-v3-olens-*`,
+36,000 predictions, 0 invalid. Error rate, paired by item, 95% bootstrap CIs:
 
-| reads                           | O-lens | its placebo | O-lens − transcript-only | O-lens − placebo       |
-| ------------------------------- | ------ | ----------- | ------------------------ | ---------------------- | ------------------- | ------------------- |
-| none (transcript-only)          | 19.7%  |             |                          |                        |
-| "." only                        | 19.6%  | 23.2%       | −0.1pp [−1.8, +1.5]      | −3.6pp [−5.0, −2.2]    |
-| "." + `<                        | im_end | >`          | 17.8%                    | 18.8%                  | −1.9pp [−3.6, −0.3] | −1.1pp [−2.3, +0.1] |
-| all six (through `assistant\n`) | 12.4%  | 29.5%       | −7.3pp [−9.0, −5.5]      | −17.2pp [−18.8, −15.3] |
+| reads                                 | O-lens | its placebo | O-lens − transcript-only | O-lens − placebo       |
+| ------------------------------------- | ------ | ----------- | ------------------------ | ---------------------- |
+| none (transcript-only)                | 19.7%  |             |                          |                        |
+| "." only                              | 19.6%  | 23.2%       | −0.1pp [−1.8, +1.5]      | −3.6pp [−5.0, −2.2]    |
+| "." + `<\|im_end\|>`                  | 17.8%  | 18.8%       | −1.9pp [−3.6, −0.3]      | −1.1pp [−2.3, +0.1]    |
+| question punctuation                  | 17.6%  | 19.2%       | −2.1pp [−3.9, −0.4]      | −1.6pp [−3.2, −0.1]    |
+| question punctuation + `<\|im_end\|>` | 16.8%  | 18.1%       | −2.9pp [−4.6, −1.2]      | −1.3pp [−2.9, +0.2]    |
+| all six tail (through `assistant\n`)  | 12.4%  | 29.5%       | −7.3pp [−9.0, −5.5]      | −17.2pp [−18.8, −15.3] |
 
-**Without the assistant-turn reads the O-lens adds about nothing.** Almost all of the 7pp comes from
-`\n`, `<|im_start|>`, `assistant`, `\n` after `<|im_end|>`. The "." reads still name Qwen's modal
-answer on 486 of 1,500 items (`<|im_end|>` 186; the four later positions 1,138–1,408), but Haiku
-doesn't turn that into accuracy.
+**Without the assistant-turn reads the O-lens adds about 1–2pp.** Most of the 7pp comes from `\n`,
+`<|im_start|>`, `assistant`, `\n` after `<|im_end|>`. The question-punctuation reads name Qwen's
+modal answer on 946 of 1,500 items (the "." alone 486, `<|im_end|>` 186; the four later positions
+1,138–1,408), but Haiku turns little of it into accuracy.
 
 ## Caveats
 
