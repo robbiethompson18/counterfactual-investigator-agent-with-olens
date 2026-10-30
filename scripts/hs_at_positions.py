@@ -2,7 +2,7 @@
 log-probs of given candidate tokens at the last position. Needs only torch, transformers and numpy, so it runs in any GPU
 venv (e.g. the one-engine reader's), with the prompts tokenized elsewhere.
 
-    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2]
+    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2 | --layers 52 ...]
 
 INPUTS.jsonl: one row per prompt, {id, ids (token ids), sites: {name: [token index, ...]}, cand (token ids)}. OUT_DIR gets
 <site>.npy ([all rows' positions in order, saved layers, d] fp16, hidden_states index 0, stride, ..., n_layers) and
@@ -24,13 +24,14 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B")
     ap.add_argument("--layer-stride", type=int, default=2)
+    ap.add_argument("--layers", type=int, nargs="+", help="save only these hidden_states indices (default: every --layer-stride)")
     a = ap.parse_args()
     rows = [json.loads(line) for line in Path(a.inputs).read_text().splitlines()]
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     model = AutoModelForCausalLM.from_pretrained(a.model, dtype=torch.bfloat16, device_map="auto").eval()
     n_layers = model.config.get_text_config().num_hidden_layers
-    layers = list(range(0, n_layers + 1, a.layer_stride)) + ([n_layers] if n_layers % a.layer_stride else [])
+    layers = a.layers or list(range(0, n_layers + 1, a.layer_stride)) + ([n_layers] if n_layers % a.layer_stride else [])
     acts = {s: [] for s in rows[0]["sites"]}
     with open(out / "logp.jsonl", "w") as f:
         for i, r in enumerate(rows):
