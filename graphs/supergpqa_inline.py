@@ -31,7 +31,7 @@ COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_place
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
          "nla_inline": "#2e9e5b", "nla_placebo_inline": "#2e9e5b"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
-RUNS = [Path("data/runs/cfbench/2026-10-29_supergpqa-haiku-3k")]
+RUNS = [Path(f"data/runs/cfbench/2026-10-29_supergpqa-haiku-3k-{s}") for s in ("ts", "olens", "jlens", "nla")]
 GROUPS = {
     "all cases": None,
     "Qwen wrong (its letter\nis not the gold one)": "wrong",
