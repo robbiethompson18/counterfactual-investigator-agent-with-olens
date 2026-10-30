@@ -220,7 +220,9 @@ def del_analyze(a):
     run = Path(a.run)
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     labels = {q["id"]: q["label"] for q in load(BANK / "questions.jsonl")}
-    logp = [r for part in sorted((REPO_ROOT / "data" / "probe_cache" / run.name).glob("*part-*")) for r in load(part / "logp.jsonl")]
+    parts = sorted((REPO_ROOT / "data" / "probe_cache" / run.name).glob("*part-*"))
+    logp = {r["id"]: r for part in parts for r in load(part / "logp.jsonl")}
+    logp = list(logp.values())  # a chunk computed on two pods counts once
     pm = pmfs(run, logp)
     rows: list[dict] = []
     for pr in load(run / "pairs.jsonl"):
