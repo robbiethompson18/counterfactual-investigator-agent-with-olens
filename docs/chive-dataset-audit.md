@@ -9,34 +9,43 @@ complaints about CHIVE from reading cases. This doc puts numbers on each. Where 
 with the report, the number wins. Reproduce with `uv run python scripts/chive_audit.py`; the hand
 labels it reads are in the HF dataset at `runs/chive_audit/2026-10-30_inert-contradictions/`.
 
-## 1. "More than half the dataset is off-policy" → 39% (41% of the held-out 204)
+## 1. "More than half the dataset is off-policy" → 40% of the prompt pool, 36–40% of claims
 
-An incident is a WildChat (281/300), SystemChat2, Hermes or ToolACE prompt whose earlier assistant
-turns were written by whatever model the source dataset logged (ChatGPT for WildChat); only the
-final completion is Qwen3.6-27B. Counting incidents with at least one such prior assistant turn:
+An incident is a WildChat (or SystemChat2 / Hermes / ToolACE) prompt whose earlier assistant turns
+were written by whatever model the source dataset logged (ChatGPT for WildChat); only the final
+completion is the target model. Counting prompts with at least one such prior assistant turn, on
+Adam's release (`scripts/chive_adam_eliminations.py offpolicy`):
 
-| Set          | ≥1 prior assistant turn | 0   | 1   | 2   | 3   | 4   |
-| ------------ | ----------------------- | --- | --- | --- | --- | --- |
-| all 300      | 118 (39%)               | 182 | 58  | 29  | 20  | 11  |
-| held-out 204 | 84 (41%)                | 120 | 43  | 20  | 14  | 7   |
+| Set (Adam's data)                          | ≥1 prior assistant turn |
+| ------------------------------------------ | ----------------------- |
+| the 4,714-prompt pool every eval run uses  | 1,880 (40%)             |
+| Gemma 3 27B: investigations / eval claims  | 36% / 38%               |
+| Qwen3-8B: investigations / eval claims     | 37% / 37%               |
+| Qwen3.5-397B: investigations / eval claims | 39% / 40%               |
 
-So "more than half" is wrong; it is two fifths. The single-turn remainder is still off-distribution
-in the weaker sense that the user turns are ChatGPT users' prompts, but Qwen wrote every assistant
-token in those.
+So "more than half" is wrong; it is two fifths, and the screening stage does not enrich for it
+(multi-turn prompts yield an investigation slightly less often than single-turn ones, 33–34% vs
+35–41%). The single-turn remainder is still off-distribution in the weaker sense that the user turns
+are ChatGPT users' prompts, but the target model wrote every assistant token in those.
 
-**The O-lens uplift in Agam's held-out run lives entirely in the off-policy slice.** Pass rate
-(judge ≥ 7, 5 draws per arm, paired by incident) of `olens_rl_B` minus `transcript`:
+**Do the tools do better on the off-policy slice?** On Adam's own arms (Opus 4.8 answerer, quality
+slice, paired per claim) no: every activation tool is within noise of transcript-only on both
+slices, and the sign is mostly negative.
 
-| Slice                   | n   | transcript pass | O-lens − transcript |
-| ----------------------- | --- | --------------- | ------------------- |
-| ≥1 prior assistant turn | 84  | 0.60            | +9.5pp (SE 3.7)     |
-| 0 prior assistant turns | 120 | 0.77            | −1.5pp (SE 2.4)     |
-| all                     | 204 | 0.70            | +3.0pp (SE 2.1)     |
+| Quality slice        | n   | transcript-only | AO − plain      | NLA − plain     | SAE − plain     |
+| -------------------- | --- | --------------- | --------------- | --------------- | --------------- |
+| Gemma, off-policy    | 494 | 0.709           | −0.4pp (SE 1.4) | −1.4pp (SE 1.6) | −0.2pp (SE 1.5) |
+| Gemma, on-policy     | 800 | 0.754           | −1.3pp (SE 1.2) | −2.9pp (SE 1.3) | −2.8pp (SE 1.1) |
+| Qwen3-8B, off-policy | 562 | 0.763           | −0.9pp (SE 1.4) | −3.2pp (SE 1.4) | −1.8pp (SE 1.3) |
+| Qwen3-8B, on-policy  | 935 | 0.737           | −0.5pp (SE 1.1) | +0.5pp (SE 1.2) | +0.2pp (SE 1.1) |
 
-A plausible reading: when a ChatGPT turn is in the prefix, the "cause" is often "the earlier turn
-said X" (e.g. [000054](https://chive-cases.pages.dev/?case=prompt_000054), where Qwen corrects the
-prior model's advice), and any tool that points the agent at the prefix helps. That is not workspace
-access. Treat the +3pp overall as a selection artifact until shown otherwise.
+In Agam's 204-incident Qwen3.6-27B harness (free-form explanation judged 1–10, 5 draws per arm) the
+picture differs: O-lens − transcript is +9.5pp (SE 3.7) on the 84 off-policy incidents and −1.5pp
+(SE 2.4) on the 120 single-turn ones, i.e. his whole +3pp lives in the off-policy slice. A plausible
+reading is that when a ChatGPT turn is in the prefix the "cause" is often "the earlier turn said X"
+(e.g. [000054](https://chive-cases.pages.dev/?case=prompt_000054), where Qwen corrects the prior
+model's advice) and anything that points the agent at the prefix helps. Adam's claim format doesn't
+show that effect, so treat it as a property of Agam's harness until replicated.
 
 ## 2. "About half is Qwen being wrong without a great reason" → 53%
 
@@ -125,8 +134,17 @@ three main-body WildChat eval runs, every experiment in `investigations.jsonl`;
 So: on 8,623 experiments the behaviour had a baseline rate between 10% and 50% and the edit took it
 to 0 of 30, and because of the ≥ 50pp rule none of them is a claim (the released claim banks hold
 only ≥ 50pp "supported" and ≤ 15pp "inert" items, nothing in between). That is one experiment in
-nine, in a third of investigations; in 18% of investigations it is the only kind of decisive result
-there is, so those investigations contribute no positive claim at all.
+nine, in a third of investigations (1,648 / 5,172 = 32%); in 18% of investigations (914) it is the
+only kind of decisive result there is, so those investigations contribute no positive claim at all.
+
+**How much bigger the usable set would be.** Of the 3,946 investigations that passed verification
+into the three claim banks, 3,344 have at least one true claim and 602 have only false ones; 576 of
+those 602 hold a stuck elimination. Counting them as positives takes investigations with a true
+claim from 3,344 to 3,920 (+17%), and true claims from 6,276 to about 7,400 (+18%, at up to two per
+gained investigation; Gemma +15%, Qwen3-8B +24%, Qwen3.5-397B +16%). The balanced eval sets would
+grow by about the same fraction after the concreteness filter (roughly +490 true claims on 2,415).
+Dropping the band entirely (any Fisher-significant change counts) would add far more: 56% of the
+excluded band is significant at p < 0.01 in Agam's run.
 
 ## 5. Layers of LLM between the behaviour and the label
 
