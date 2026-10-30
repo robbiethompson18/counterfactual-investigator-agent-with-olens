@@ -83,12 +83,17 @@ PAIRS = [
 ]
 
 
+SW_W, SW_MINUS, SW_GAP = 14, 12, 8  # the label swatches: width, the gap holding the minus sign, gap to the axis (points)
+
+
 def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
-    bootstrap CI over items, filled when the CI excludes 0. One ink for every row: the label says which conditions."""
+    bootstrap CI over items, filled when the CI excludes 0. One ink for the marks; each label is followed by the two conditions'
+    bar swatches (A − B, with the bar chart's colours and placebo hatching), so a row reads like the bars it compares."""
     data = per_item(runs)
     rows: list[tuple[str, tuple[str, str] | None]] = [r for q, pairs in PAIRS for r in [(q, None), *((q, p) for p in pairs)]]
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
+    pt = 1 / (ax.get_position().width * fig.get_figwidth() * 72)  # one point in axes fraction
     labels = []
     for k, (q, pair) in enumerate(rows):
         y = len(rows) - 1 - k
@@ -102,6 +107,10 @@ def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) ->
         ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else "white")
         ax.text(hi + 1, y, f"{m:+.1f}  [{lo:+.1f}, {hi:+.1f}]", va="center", fontsize=8, color=INK)
         labels.append(f"{LABEL[a]} − {LABEL[b]}")
+        for s, x in ((a, -(SW_GAP + 2 * SW_W + SW_MINUS)), (b, -(SW_GAP + SW_W))):  # in points left of the axis
+            ax.add_patch(plt.Rectangle((x * pt, y - 0.3), SW_W * pt, 0.6, transform=ax.get_yaxis_transform(), clip_on=False,
+                                       facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else "none", lw=0))  # fmt: skip
+        ax.text(-(SW_GAP + SW_W + SW_MINUS / 2) * pt, y, "−", transform=ax.get_yaxis_transform(), ha="center", va="center", fontsize=9)
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_yticks(range(len(rows)))
     ax.set_yticklabels(reversed(labels), fontsize=9)
@@ -109,7 +118,7 @@ def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) ->
         if pair is None:
             tick.set_fontweight("bold")
             tick.set_color(MUTED)
-    ax.tick_params(axis="y", length=0)
+    ax.tick_params(axis="y", length=0, pad=2 * SW_GAP + 2 * SW_W + SW_MINUS)
     ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     ax.set_xlim(*xlim)
     ax.grid(axis="y", visible=False)
