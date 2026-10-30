@@ -373,6 +373,25 @@ of the transcript (Brier +0.010, +0.011, CIs touching 0) and beats the placebo i
 investigator's probabilities stay too low and poorly calibrated throughout (RMSE 0.49-0.58 at a 0.50
 base rate); its ranking (AUROC) carries the signal.
 
+### Base-rate-free tests and the doubled blog set (2026-10-30)
+
+`scripts/author_probe/pvalues_drop.py`: pooled qwen_wrong + qwen_right, 95% CIs and one-sided p from
+a 10k bootstrap over authors; raw Brier also by an author-level sign-flip test; AUROC difference;
+Brier after Platt recalibration of each condition (5-fold CV by author).
+
+| eval (cases, authors)                      | O-lens − transcript: raw Brier / AUROC / recal. Brier | O-lens − placebo: raw Brier / AUROC / recal. Brier     |
+| ------------------------------------------ | ----------------------------------------------------- | ------------------------------------------------------ |
+| blog batch 1 (660, 264)                    | +0.010 (p 0.008) / +0.012 (p 0.22) / +0.004 (p 0.26)  | +0.014 (p 0.001) / +0.006 (p 0.36) / +0.001 (p 0.42)   |
+| blog batches 1+2 (1,316, 520; `-haiku-b2`) | +0.004 (p 0.09) / +0.006 (p 0.30) / +0.002 (p 0.36)   | +0.016 (p < 0.001) / +0.016 (p 0.07) / +0.006 (p 0.11) |
+| SynthPAI ×2 (904, 209)                     | −0.009 (p 0.99) / −0.000 (p 0.51) / −0.001 (p 0.57)   | +0.010 (p 0.005) / +0.006 (p 0.28) / +0.004 (p 0.28)   |
+
+The raw-Brier wins are calibration: with reads in the prompt Haiku's probabilities sit a little
+higher, closer to the 0.50 base rate. Ranking (AUROC) and recalibrated Brier show no O-lens gain
+over the transcript; with twice the bloggers the batch-1 edge shrank to noise. Over the placebo the
+O-lens keeps a marginal AUROC edge (p 0.07): the reads carry some case-specific signal, but not
+beyond what the transcript already gives the investigator. Batch 2 reused batch 1's draws (its
+prompts are byte-identical; the placebo is drawn within a batch).
+
 ## Where things live
 
 - Code: [`scripts/author_probe/`](../scripts/author_probe/CLAUDE.md) (`bank.py`, `fit.py`,
