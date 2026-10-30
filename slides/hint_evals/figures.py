@@ -150,8 +150,8 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
     """One row of the grid, a panel per hint position, in the template's (and the Evals page's answer chart's) style:
     solid bars (placebo hatched, beside its lens), gray 95% CI whisker, the value in ink above it with the stars over
     that, muted group names under the bars, a dotted baseline labelled at the right. `head`: the column titles and case
-    counts above the panels. `base`: where the bars and the axis start (0.5 for AUROC, Kylie 2026-10-30; its chance line is
-    then the axis itself)."""
+    counts above the panels. `base`: where the bars and the axis start (Kylie 2026-10-30: 0.5 for AUROC, whose chance
+    line is then the axis itself, and 0.4 for % correct)."""
     data = {k: bars_of(name) for k, name in evals.items()}
     for k, name in evals.items():
         data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
@@ -210,7 +210,7 @@ def grid() -> None:
     fig, axes = figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
     row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
-        pct=True, head=False)  # fmt: skip
+        pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     save(fig, OUT / "grid.pdf")
 
