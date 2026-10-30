@@ -89,9 +89,9 @@ def cases(inputs: Path, versions: list[str]):
     for c in map(json.loads, (inputs / "cases.jsonl").read_text().splitlines()):
         if c["arm"] == "base":
             continue
-        up = mean(c["base"]) > mean(c["answers"])
+        up = mean(c["base"]) > mean(c["answers"])  # k_base/n_base = 1/2: the viewer's null is p = 0.5 (not shown in the prompt)
         row = {"version": "cf", "item": c["item"], "model": QWEN, "env_name": ENV, "env": "eval:essay_grading_cf_inline/cf",
-               "task": TASK, "base_arm": c["arm"], "cf_arm": "base", "k_base": 0, "n_base": 0, "answers_base": c["answers"],
+               "task": TASK, "base_arm": c["arm"], "cf_arm": "base", "k_base": 1, "n_base": 2, "answers_base": c["answers"],
                "answers_cf": c["base"], "shift": mean(c["base"]) - mean(c["answers"]), "k_cf": int(up), "n_cf": 1}  # fmt: skip
         yield Prompt(c["arm"], c["item"]), row, []
 
