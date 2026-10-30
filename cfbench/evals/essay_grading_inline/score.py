@@ -33,7 +33,8 @@ def per_case(rows: list[dict]) -> dict[str, dict[str, dict[str, dict[tuple, floa
         a, dist = canon(r.get("answer")), r["answers_cf"]
         n = sum(dist.values())
         mean = sum(float(s) * k for s, k in dist.items()) / n
-        key, cond = (r["cf_arm"], r["item"]), canon_condition(r["condition"])
+        arm = r["base_arm"] if r["cf_arm"] == "base" else r["cf_arm"]  # cf version: the observed arm
+        key, cond = (arm, r["item"]), canon_condition(r["condition"])
         acc[r["version"]]["share"][cond][key].append(dist.get(a, 0) / n)
         acc[r["version"]]["modal"][cond][key].append(float(a == r["modal_cf"]))
         acc[r["version"]]["mae"][cond][key].append(abs(float(a) - mean) if a else 10.0)
@@ -41,11 +42,11 @@ def per_case(rows: list[dict]) -> dict[str, dict[str, dict[str, dict[tuple, floa
     return {v: {m: {c: mean(ks) for c, ks in cs.items()} for m, cs in ms.items()} for v, ms in acc.items()}
 
 
-def boot(vals: dict[tuple, float], rng, w: dict[tuple, float] | None = None) -> tuple[float, float, float]:
-    """(Weighted) mean over cases, 95% CI resampling arms."""
+def boot(vals: dict[tuple, float], rng, w: dict[tuple, float] | None = None, by: int = 0) -> tuple[float, float, float]:
+    """(Weighted) mean over cases, 95% CI resampling arms (by=0) or essays (by=1: the cf version, whose truths are per essay)."""
     by_arm = defaultdict(list)
     for k, x in vals.items():
-        by_arm[k[0]].append((x * (w[k] if w else 1), w[k] if w else 1))
+        by_arm[k[by]].append((x * (w[k] if w else 1), w[k] if w else 1))
     arms = list(by_arm)
     sums, ns = np.array([sum(x for x, _ in by_arm[a]) for a in arms]), np.array([sum(v for _, v in by_arm[a]) for a in arms])
     idx = rng.integers(len(arms), size=(BOOT, len(arms)))
@@ -57,21 +58,22 @@ def boot(vals: dict[tuple, float], rng, w: dict[tuple, float] | None = None) -> 
 def main(paths: list[str]):
     rows = [json.loads(line) for p in paths for line in (Path(p) / "predictions.jsonl").open()]
     rng = np.random.default_rng(0)
-    modal = {(r["version"], r["cf_arm"], r["item"]): r["modal_cf"] for r in rows}
+    modal = {(r["version"], r["base_arm"] if r["cf_arm"] == "base" else r["cf_arm"], r["item"]): r["modal_cf"] for r in rows}
     for v, ms in sorted(per_case(rows).items()):
         print(f"== {v}")
         count = Counter(m for (ver, *_), m in modal.items() if ver == v)
         w = {(a, i): 1 / count[m] for (ver, a, i), m in modal.items() if ver == v}
         ms = {"share_bal": ms["share"]} | ms
+        by = int(v == "cf")
         for m, cs in ms.items():
             wm = w if m == "share_bal" else None
             for c, vals in sorted(cs.items()):
-                mu, lo, hi = boot(vals, rng, wm)
+                mu, lo, hi = boot(vals, rng, wm, by)
                 print(f"  {m:5} {c:22} {mu:7.3f} [{lo:.3f}, {hi:.3f}]  n={len(vals)}")
             for a, b in PAIRS:
                 if a in cs and b in cs:
                     common = cs[a].keys() & cs[b].keys()
-                    mu, lo, hi = boot({k: cs[a][k] - cs[b][k] for k in common}, rng, wm)
+                    mu, lo, hi = boot({k: cs[a][k] - cs[b][k] for k in common}, rng, wm, by)
                     print(f"  {m:5} {a} - {b}: {mu:+.3f} [{lo:+.3f}, {hi:+.3f}]  n={len(common)}")
 
 
