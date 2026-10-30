@@ -130,6 +130,23 @@ from 5 to 20 tokens past the last read costs the lens nothing.
 
 (`uv run python -m graphs.cutoff_qa_tool_inline`.)
 
+**Split by whether Qwen wants the tool.** The reads are on the prompt, which is the same under
+`tool_choice` auto and required, so forcing the call changes nothing the lens sees. What matters is
+whether Qwen, at the end of that prompt, is about to open the call wrapper or to blurt the answer.
+Bucketed by its unforced tool-call rate in `cutoff_gate/2026-10-29_v2-tool` (8 samples), exact
+match:
+
+| unforced tool calls | items | transcript | O-lens | placebo | O-lens − placebo [95% CI] | reads name answer |
+| ------------------- | ----- | ---------- | ------ | ------- | ------------------------- | ----------------- |
+| 8/8 (always)        | 90    | 56%        | 79%    | 64%     | +15 [+7, +23]             | 76/90             |
+| 1–7/8 (mixed)       | 77    | 63%        | 79%    | 64%     | +15 [+8, +23]             | 65/77             |
+| 0/8 (never)         | 33    | 53%        | 63%    | 52%     | +11 [−2, +24]             | 29/33             |
+
+Stale items only: always 78% vs placebo 58% (n = 74), never 37% vs 10% (n = 17). The lens gains as
+much on items where Qwen always opens the tool call as on the rest, so it isn't only reading items
+where the answer is Qwen's intended next output. The buckets aren't randomized (the never-tool items
+include the ones Qwen answers in hedged prose), and the shared-cutoff caveat below still applies.
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens
