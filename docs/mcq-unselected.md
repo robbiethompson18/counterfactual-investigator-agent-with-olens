@@ -2,8 +2,8 @@
 
 **Status (2026-10-29):** ACTIVE. Full runs done on 2,523 cases with Haiku 5.5: the O-lens and the
 J-lens each add a small, replicated gain over prompt-only; a linear probe on the same activations
-reads far more (results below). NLA pending. Cases rebuilt the same day with the strict bare-letter
-parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
+reads far more; the NLA adds the least (results below). Cases rebuilt the same day with the strict
+bare-letter parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
 
 ## Why
 
@@ -130,7 +130,8 @@ questions, never an eval question) and Qwen's own letter-logit argmax as the cei
 
 2,523 cases: 2,065 where Qwen's letter is the gold, 458 where it isn't. Accuracy = the submitted
 letter equals Qwen's modal letter, over draws. Runs `cfbench/2026-10-29_mcq-unselected-haiku-b1r`,
-`-haiku-b2`, `-haiku-jlens-b1`, `-haiku-jlens-b2` ($32 of Haiku in all).
+`-haiku-b2`, `-haiku-jlens-b1`, `-haiku-jlens-b2`, `-haiku-nla-b1`, `-haiku-nla-b2` (NLA at one
+draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45 of Haiku in all.
 
 | reader                             | all      | Qwen right | Qwen wrong |
 | ---------------------------------- | -------- | ---------- | ---------- |
@@ -139,7 +140,8 @@ letter equals Qwen's modal letter, over draws. Runs `cfbench/2026-10-29_mcq-unse
 | Haiku + O-lens placebo             | 81.7     | 93.4       | 29.0       |
 | Haiku + J-lens                     | 84.9     | 95.1       | 38.9       |
 | Haiku + J-lens placebo             | 72.3     | 82.5       | 26.6       |
-| Haiku + NLA                        | pending  |            |            |
+| Haiku + NLA (1 draw)               | 83.4     | 95.0       | 31.4       |
+| Haiku + NLA placebo (1 draw)       | 82.2     | 93.9       | 29.3       |
 | linear probe, hidden_states[52]    | **91.9** | 94.1       | **82.1**   |
 | Qwen's own letter logits (ceiling) | 99.8     | 99.9       | 99.3       |
 
@@ -153,6 +155,9 @@ Paired by case, 95% bootstrap over cases (3,000 resamples):
 | J-lens − prompt only         | +2.3 [+1.5, +3.0]   | +9.4 [+6.8, +12.0] |
 | J-lens − O-lens              | +0.6 [−0.1, +1.4]   | +5.7 [+3.1, +8.3]  |
 | J-lens placebo − prompt only | −10.3 [−11.2, −9.4] | −3.0 [−5.0, −0.9]  |
+| NLA − prompt only            | +0.8 [−0.0, +1.6]   | +1.9 [−0.6, +4.3]  |
+| NLA − NLA placebo            | +1.3 [+0.5, +2.1]   | +2.2 [+0.0, +4.6]  |
+| J-lens − NLA                 | +1.5 [+0.6, +2.4]   | +7.5 [+4.7, +10.3] |
 
 The two batches agree (batch 1: O-lens − prompt +2.1 [+1.1, +3.1]; batch 2, the fresh draw: +1.2
 [+0.2, +2.2]; on Qwen-wrong +3.8 and +3.6).
@@ -167,6 +172,10 @@ What it says:
   sentence that may or may not name one. But its placebo is a disaster (−10pp): another question's
   letter tokens are followed as if they were this question's. "J-lens minus its placebo" is not a
   usable number; compare the J-lens with prompt-only.
+- **The NLA is the weakest of the three** (+0.8pp over prompt-only, CI touching zero; +1.3 over its
+  placebo). Its explanations at the option newlines are long, confident and often about a different
+  question (a moon-gravity item gets paragraphs on time dilation and Doppler shift, FVE up to 0.45);
+  only the end-of-prompt readouts tend to carry the answer. One draw, so the CIs are wider.
 - **Most of the signal is left on the table.** A linear probe on the same positions and layer reads
   Qwen's letter on 82% of the Qwen-wrong cases; the best lens gets the investigator to 39%, the
   O-lens to 33%, from a prompt-only 30%. The metamodels recover about a sixth (J-lens) and a
@@ -203,8 +212,8 @@ What it says:
 
 - Investigator runs (Haiku 5.5 medium, 3 draws): `runs/cfbench/2026-10-29_mcq-unselected-haiku-b1r`
   (batch 1; `-haiku-b1` is the same slug's first attempt, abandoned on a `--versions` bug before any
-  prediction), `-haiku-b2`, `-haiku-jlens-b1`, `-haiku-jlens-b2`. All on Docent (collection
-  `cfbench`).
+  prediction), `-haiku-b2`, `-haiku-jlens-b1`, `-haiku-jlens-b2`, `-haiku-nla-b1`, `-haiku-nla-b2`.
+  All on Docent (collection `cfbench`).
 - Reads: `runs/olens_reads/2026-10-29_mcq-unselected-nohint` (batch 1, 117,966 rows: 32-52 then a
   56/60 top-up), `-nohint-b2` (batch 2, 119,118 rows, three sharded pods, one replaced for a
   thermally throttled host), `runs/jpp_reads/2026-10-29_mcq-unselected-nohint` (every token, six
@@ -216,8 +225,7 @@ What it says:
 
 ## Open items
 
-- NLA conditions: reads are made, critic scoring in progress; the Haiku runs and the table row
-  follow.
+- NLA has one draw; two more would cost ~$20 and only narrow a ~1pp effect.
 - Mirror the probe run under `runs/cfbench/` so the env viewer shows it beside the Haiku bars.
 - Tooling notes from the read campaign: `runpod/olens_reads.sh fetch` truncates the local files if
   the pod is already gone (write to a temp name first); `runpod/watch_pod.sh`'s pre-delete fetch

@@ -277,8 +277,8 @@ Active docs:
 - [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, comparing O-lens / J-lens / NLA / probe readers on it, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
   — unselected 4k sample of MMLU-Pro, two 2k eval batches + a 2k probe half (probe-trained questions
   kept out of eval), strict consistency the only filter (2,523 cases, 82% right), no hint,
-  single-turn letter task; Haiku 5.5 results: O-lens +1.6pp and J-lens +2.3pp over prompt-only,
-  probe 92% (82% on Qwen-wrong vs 33-39% for the lenses); NLA pending
+  single-turn letter task; Haiku 5.5 results: O-lens +1.6pp and J-lens +2.3pp over prompt-only, NLA
+  +0.8pp, probe 92% (82% on Qwen-wrong vs 31-39% for the three lenses)
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate
