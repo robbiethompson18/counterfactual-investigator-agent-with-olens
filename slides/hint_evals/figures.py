@@ -64,10 +64,14 @@ def claim_bars(name: str) -> tuple[dict, float, int]:
     return bars, 0.5, max(r["n_items"] for r in rows.values())
 
 
-def claim_error_bars(name: str) -> tuple[dict, float, int]:
-    """claim_bars as error rates (Kylie, 2026-10-30): 1 - % right, lower is better; stars unchanged."""
-    bars, chance, n = claim_bars(name)
-    return {c: (1 - v, [1 - hi, 1 - lo], st) for c, (v, (lo, hi), st) in bars.items()}, 1 - chance, n
+def errors(bars_of):
+    """bars_of as error rates (Kylie, 2026-10-30): 1 - % right, lower is better; stars unchanged."""
+
+    def f(name: str) -> tuple[dict, float, int]:
+        bars, chance, n = bars_of(name)
+        return {c: (1 - v, [1 - hi, 1 - lo], st) for c, (v, (lo, hi), st) in bars.items()}, 1 - chance, n
+
+    return f
 
 
 def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
@@ -115,7 +119,7 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             ax.text(x, hi + 0.015, f"{v:.0%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
-        ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
+        ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
         ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
@@ -131,8 +135,9 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
     axes[0].set_yticks(ticks, [f"{t:.0%}" for t in ticks])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
     axes[0].set_ylabel(ylabel)
-    axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S,
-                  color=MUTED, va="center")  # fmt: skip
+    if data[list(evals)[-1]][1] <= top:
+        chance = data[list(evals)[-1]][1]
+        axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
     axes[-1].text(1.0, 1.04, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     save(fig, path)
 
@@ -152,7 +157,7 @@ def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
 
 
 if __name__ == "__main__":
-    panels({"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}, claim_error_bars, "chance",
+    panels({"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}, errors(claim_bars), "chance",
            "error rate (lower is better)", OUT / "knew.pdf")  # fmt: skip
-    panels({"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}, answer_bars,
-           "chance", "% correct", OUT / "letter.pdf")  # fmt: skip
+    panels({"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}, errors(answer_bars),
+           "chance", "error rate (lower is better)", OUT / "letter.pdf")  # fmt: skip
