@@ -43,6 +43,12 @@ WorkspaceBench's `basic_readout` implicit family scaled from 32 items to 1,500
 
 ## Result
 
+![transcript-only vs O-lens, J++ and NLA and their placebos, all items and by shape](img/favorites-qa-inline.png)
+
+![paired differences between conditions with 95% CIs](img/favorites-qa-inline-diff.png)
+
+(`uv run python -m graphs.favorites_qa_inline` makes both.)
+
 | condition            | all   | pick_one | recommend | choose_for | favorite | name_one |
 | -------------------- | ----- | -------- | --------- | ---------- | -------- | -------- |
 | transcript_inline    | 80.3% | 80.0%    | 78.7%     | 77.0%      | 84.8%    | 82.5%    |

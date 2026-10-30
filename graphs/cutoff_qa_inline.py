@@ -44,14 +44,14 @@ plt.rcParams.update(
 )
 
 
-def per_item(runs: list[Path]) -> dict[str, dict[str, tuple[str, float]]]:
-    """condition -> item -> (gate_class, mean accuracy over draws), pooled over the runs."""
+def per_item(runs: list[Path], by: str = "gate_class") -> dict[str, dict[str, tuple[str, float]]]:
+    """condition -> item -> (the row's `by` field, mean accuracy over draws), pooled over the runs."""
     acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     cls = {}
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").read_text().splitlines()):
         r = json.loads(line)
         acc[r["condition"]][r["item"]].append(bool(r["correct"]))
-        cls[r["item"]] = r["gate_class"]
+        cls[r["item"]] = r[by]
     return {c: {i: (cls[i], sum(v) / len(v)) for i, v in items.items()} for c, items in acc.items()}
 
 
@@ -83,7 +83,7 @@ PAIRS = [
 ]
 
 
-def diffs(runs: list[Path], out: Path) -> None:
+def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
     bootstrap CI over items, filled when the CI excludes 0. One ink for every row: the label says which conditions."""
     data = per_item(runs)
@@ -111,7 +111,7 @@ def diffs(runs: list[Path], out: Path) -> None:
             tick.set_color(MUTED)
     ax.tick_params(axis="y", length=0)
     ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_xlim(-12, 30)
+    ax.set_xlim(*xlim)
     ax.grid(axis="y", visible=False)
     ax.set_title(f"All {len(data['transcript_inline'])} items", loc="left", fontsize=10, color=INK)
     out.parent.mkdir(parents=True, exist_ok=True)
