@@ -160,10 +160,37 @@ OLD_SHOWN, NEW_SHOWN = (
     "shows the end of the prompt with the token read wrapped",
     "shows the text just before it with the token read wrapped",
 )
-TEXTS = {}
+# read-position ablation (Kylie, 2026-10-30): the question's punctuation only (its final "." included), or that plus <|im_end|>;
+# inputs whose reads were cut to those positions (cut_reads), the block's preamble naming only them
+QPUNCT_WHERE = "at every punctuation mark in the user's question above, including the period that ends it,"
+QPUNCT_IMEND_WHERE = QPUNCT_WHERE + " and at the end-of-turn token after it,"
+TEXTS, NTAIL = {}, {"tail10": 10, "qpunct": 1, "qpunct_imend": 2}  # positions at the end mapped one to one by the placebo
 for _kind, _text in (("olens", inline.OLENS_TEXT), ("nla", inline.NLA_TEXT)):
     assert OLD_WHERE in _text and OLD_SHOWN in _text, _kind
-    TEXTS[_kind] = _text.replace(OLD_WHERE, NEW_WHERE).replace(OLD_SHOWN, NEW_SHOWN)
+    _text = _text.replace(OLD_SHOWN, NEW_SHOWN)
+    for _cut, _where in (("tail10", NEW_WHERE), ("qpunct", QPUNCT_WHERE), ("qpunct_imend", QPUNCT_IMEND_WHERE)):
+        TEXTS[_kind, _cut] = _text.replace(OLD_WHERE, _where)
+
+
+def cut_of(rows: list[dict]) -> str:
+    """Which positions an item's reads cover: the full set (last 10 included), or cut_reads' question punctuation (+ <|im_end|>)."""
+    toks = {r["token"] for r in rows}
+    if "</think>" in toks:
+        return "tail10"
+    return "qpunct_imend" if "<|im_end|>" in toks else "qpunct"
+
+
+def cut_reads(src: Path, dst: Path, cut: str):
+    """Keep each item's reads up to the question's final "." (qpunct) or <|im_end|> (qpunct_imend): drop the last 9 or 8 of the 10."""
+    by: dict[str, list[dict]] = defaultdict(list)
+    rows = [json.loads(line) for line in src.read_text().splitlines()]
+    for r in rows:
+        by[r["id"]].append(r)
+    keep = {s: set(sorted({r["token_index"] for r in rs})[: -10 + NTAIL[cut]]) for s, rs in by.items()}
+    out = [r for r in rows if r["token_index"] in keep[r["id"]]]
+    assert {cut_of([r for r in rs if r["token_index"] in keep[s]]) for s, rs in by.items()} == {cut}
+    dst.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in out))
+    print(cut, len(rows), "->", len(out), "rows")
 
 
 def _by_pos(rows: list[dict]) -> dict[int, dict[int, dict]]:
@@ -173,10 +200,11 @@ def _by_pos(rows: list[dict]) -> dict[int, dict[int, dict]]:
     return dict(sorted(out.items()))
 
 
-def _align(own: list[int], other: list[int]) -> dict[int, int]:
-    """Map this item's read positions onto another item's: the last 10 one to one, the punctuation before them in order (cycling)."""
-    mine, theirs = own[:-10], other[:-10] or other[-10:-9]  # no punctuation: the question's final "."
-    return {p: theirs[k % len(theirs)] for k, p in enumerate(mine)} | dict(zip(own[-10:], other[-10:], strict=True))
+def _align(own: list[int], other: list[int], n: int = 10) -> dict[int, int]:
+    """Map this item's read positions onto another item's: the last n (10, or a cut's 1 or 2) one to one, the punctuation
+    before them in order (cycling)."""
+    mine, theirs = own[:-n], other[:-n] or other[-n : -n + 1]  # no punctuation: the question's final "."
+    return {p: theirs[k % len(theirs)] for k, p in enumerate(mine)} | dict(zip(own[-n:], other[-n:], strict=True))
 
 
 def _context(row: dict) -> str:
@@ -189,7 +217,8 @@ def _context(row: dict) -> str:
 def reads_block(kind: str, own: list[dict], shown: list[dict]) -> str:
     """Per position of `own` (this item's reads, for the context), the bullets / explanation of `shown` at the aligned position."""
     mine, theirs = _by_pos(own), _by_pos(shown)
-    where = _align(list(mine), list(theirs))
+    assert cut_of(own) == cut_of(shown)
+    where = _align(list(mine), list(theirs), NTAIL[cut_of(own)])
     out = []
     for p, layers in mine.items():
         out.append(f"At {json.dumps(next(iter(layers.values()))['token'], ensure_ascii=False)}: {_context(next(iter(layers.values())))}")
@@ -219,7 +248,7 @@ def INLINE(env, condition: str, case: dict, base_runs: list, seed: int) -> tuple
             src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(set(by_source) - {base_runs[0].source}))
             shown, extra = by_source[src], {"placebo_sources": [src]}
         layers = ", ".join(map(str, sorted({r["layer"] for r in own})))
-        reads = TEXTS[kind].format(model=MODEL_NAME, layers=layers, block=reads_block(kind, own, shown))
+        reads = TEXTS[kind, cut_of(own)].format(model=MODEL_NAME, layers=layers, block=reads_block(kind, own, shown))
         prompt = inline.USER.format(told="", prompt=question, reads=reads)
     else:
         prompt, extra = base.INLINE(env, condition, case, base_runs, seed)
