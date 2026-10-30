@@ -113,7 +113,7 @@ Fisher's exact test, and adaptive sampling when the baseline is under about 20%.
 the interval excludes a large effect, not "not significant"; at n = 30 the 15pp negatives are weaker
 than the positives under any rule.
 
-## 3. Contradictory ground truth: 12% of incidents (25% counting negated causes)
+## 3. Contradictory ground truth: one investigation in eight
 
 Each incident's ground truth lists 1–3 supported causes (the investigator's prose, first person,
 with evidence) and 0–9 ruled-out items. The judge is told a hypothesis matching any cause is correct
@@ -148,7 +148,29 @@ poor, 4 to 24 flags per ~100-item chunk, so the item count is soft by a few):
   contradiction vs +4.4pp (SE 2.3) on the other 177. Noisy, but the sign is what a noisy label
   should do.
 
-ADAM_SAMPLE_PLACEHOLDER
+**On Adam's data, a sample.** We drew 50 investigations per model (seed 0) among those with at least
+one inert claim in the claim bank (85–90% of verified investigations) and labelled every inert claim
+against the investigation's own `structured_answer` the same way: three Sonnet subagents, one per
+model, then the main session re-read all 35 flags and kept 20 (`adam_inert_labels.jsonl` in the run
+dir has both labels and the reason for each decision).
+
+| Run          | Inert claims | CONTRADICTS | CONFIRMS_NEGATION | UNRELATED | Investigations with a contradiction |
+| ------------ | ------------ | ----------- | ----------------- | --------- | ----------------------------------- |
+| Gemma 3 27B  | 88           | 6           | 53                | 29        | 6/50 = 12%                          |
+| Qwen3-8B     | 92           | 10          | 48                | 33        | 10/50 = 20%                         |
+| Qwen3.5-397B | 83           | 4           | 54                | 25        | 4/50 = 8%                           |
+| **Total**    | **263**      | **20**      | **155**           | **87**    | **20/150 = 13%**                    |
+
+So the rate is the same on Adam's data as on Agam's: about one investigation in eight has a false
+claim that negates one of its own stated causes (a binomial 95% interval on 20/150 is 8–20%). The
+commonest form is a mismatch between the write-up's own evidence and the claim bank's number for the
+same edit: the write-up says swapping the cheese festival for a kite festival drops cheese to 10%
+and the bank records 16/30 (003654); the write-up says the brown-dwarf first turn alone gives 0% and
+the bank records 25/30 (001871); the write-up says `nn.Conv2d` nearly eliminates the error and the
+bank records 26/30 (000093). Also notable: 59% of Adam's inert claims are CONFIRMS_NEGATION, i.e.
+the investigator's own negative controls. The false half of the claim bank is mostly edits the
+investigator predicted would do nothing, which is why a transcript-reading predictor that thinks
+like the investigator finds them easy.
 
 ## 4. Most of the behaviours are the model being wrong
 
