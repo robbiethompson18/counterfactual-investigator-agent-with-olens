@@ -21,9 +21,13 @@ STYLE = {
     "nla": (GREEN, None, "NLA"),
     "nla_placebo": (GREEN, PLACEBO_HATCH, "NLA placebo"),
     "no_transcript": (GRAY, None, "no transcript"),
+    # the hint evals' extra bars, in the Evals page's colours (page.html --c-olens-nl, --c-probe, --c-probe-tuned)
+    "olens_nl": ("#c9a227", None, "O-lens (nl)"),
+    "probe": ("#11806a", None, "probe"),
+    "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
     "null": ("#ffffff", PLACEBO_HATCH, "edit does nothing"),
 }
-ALIASES = {"agentic": "transcript", "transcript_agentic": "transcript", "env_diff": "no_transcript"}
+ALIASES = {"agentic": "transcript", "transcript_agentic": "transcript", "env_diff": "no_transcript", "olens_inline_nl": "olens_nl"}
 
 
 def canon(c: str) -> str:
