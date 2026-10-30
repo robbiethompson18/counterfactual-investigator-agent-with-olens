@@ -132,6 +132,30 @@ one. Examples: Nike CEO,
 (Elettrica, the real one). The NLA has the O-lens's caveat below: its AV is a Qwen3.6-27B LoRA with
 Qwen's cutoff.
 
+**Tool-call ablation: the answer 20 tokens away** (`cfbench/evals/cutoff_qa_tool_inline/`, PR #403;
+runs `cutoff_gate/2026-10-29_v2-tool-required`, `olens_reads/2026-10-29_cutoff-tool200-tail`,
+`cfbench/2026-10-29_cutoff-qa-tool-haiku-200`). Without a tool, the last read (`\n` after
+`assistant`) is 5 tokens before the answer (the empty think block). Here Qwen gets a
+`submit_answer(answer)` tool with `tool_choice: "required"`, so the template puts the tool schema in
+a system block and the reply opens with the call wrapper; in Qwen's native format the answer is then
+20 tokens past the last read. The bank v2 gate re-run under the tool: 325 stable (95 right, 230
+stale) vs 266 without it, and of the 209 items stable both ways 207 keep the same modal answer.
+Cases: the first 200 non-numeric v2 items stable under the tool gate (57 right, 143 stale; 117
+overlap this section's 200), labels from that gate, reads at the same six tokens and layers on the
+tool render, the same Haiku prompt (question only, no tool schema), 3 draws.
+
+| condition            | exact | stable_right | stable_wrong | vs transcript, win/loss | p      |
+| -------------------- | ----- | ------------ | ------------ | ----------------------- | ------ |
+| transcript_inline    | 58.0% | 93.6%        | 46.4%        |                         |        |
+| olens_inline         | 76.0% | 89.5%        | 71.8%        | 59 / 13                 | <0.001 |
+| olens_placebo_inline | 61.7% | 91.2%        | 51.7%        | 34 / 23                 | 0.19   |
+
+The O-lens − placebo gap is the same (+14.3pp vs +14.2pp without the tool); the lower absolute
+numbers are the item set (72% stale vs 69%). On the 117 shared items, exact match without → with the
+tool: transcript 70.9% → 70.1%, O-lens 85.8% → 89.7%, placebo 72.4% → 74.6%. Read-level recall 170
+of 200 (127/143 stale); the newline after `<|im_end|>` still carries it (166). So moving the answer
+from 5 to 20 tokens past the last read costs the lens nothing.
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens
