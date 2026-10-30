@@ -1,10 +1,9 @@
-"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and the NLA, each with
-its placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
+"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and NLA, each with its
+placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
 and for the rest (stable_right). Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's
 modal answer); whiskers are 95% bootstrap CIs over items. A second, small figure shows the paired differences between
 conditions (per item, then the mean) with their 95% bootstrap CIs, all items. Reads the runs' predictions.jsonl, pooled
-(the O-lens run has transcript_inline and the O-lens conditions, the J++ runs one condition each, the NLA run both NLA
-conditions; docs/cutoff-qa-inline.md, PR #393 for J++).
+(one run per condition on the 999-item inputs, cfbench_evals/2026-10-29_cutoff-qa-inline-inputs-1k; docs/cutoff-qa-inline.md).
 
     uv run python -m graphs.cutoff_qa_inline [--runs data/runs/cfbench/<run> ...] [--out docs/img/cutoff-qa-inline.png]
         [--out-diff docs/img/cutoff-qa-inline-diff.png]
@@ -26,13 +25,13 @@ SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_in
 LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
          "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo",
          "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo"}  # fmt: skip
-# J++ is purple and the NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes
-# (Robbie, 2026-10-29)
+# J++ purple, NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
          "nla_inline": "#2e9e5b", "nla_placebo_inline": "#2e9e5b"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo", "-nla")]
+SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
+RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
     "all items": None,
     "stale (Qwen's answer\nis out of date)": "stable_wrong",
@@ -44,14 +43,14 @@ plt.rcParams.update(
 )
 
 
-def per_item(runs: list[Path]) -> dict[str, dict[str, tuple[str, float]]]:
-    """condition -> item -> (gate_class, mean accuracy over draws), pooled over the runs."""
+def per_item(runs: list[Path], by: str = "gate_class") -> dict[str, dict[str, tuple[str, float]]]:
+    """condition -> item -> (the row's `by` field, mean accuracy over draws), pooled over the runs."""
     acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     cls = {}
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").read_text().splitlines()):
         r = json.loads(line)
         acc[r["condition"]][r["item"]].append(bool(r["correct"]))
-        cls[r["item"]] = r["gate_class"]
+        cls[r["item"]] = r[by]
     return {c: {i: (cls[i], sum(v) / len(v)) for i, v in items.items()} for c, items in acc.items()}
 
 
@@ -63,32 +62,24 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
 
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
-    (
-        "Does the lens beat its placebo?",
-        [("olens_inline", "olens_placebo_inline"), ("jlens_inline", "jlens_placebo_inline"), ("nla_inline", "nla_placebo_inline")],
-    ),
-    (
-        "Does the placebo alone help?",
-        [
-            ("olens_placebo_inline", "transcript_inline"),
-            ("jlens_placebo_inline", "transcript_inline"),
-            ("nla_placebo_inline", "transcript_inline"),
-        ],
-    ),
-    (
-        "Lens vs transcript only",
-        [("olens_inline", "transcript_inline"), ("jlens_inline", "transcript_inline"), ("nla_inline", "transcript_inline")],
-    ),
-    ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("nla_inline", "jlens_inline")]),
+    ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
 ]
 
 
-def diffs(runs: list[Path], out: Path) -> None:
+SW_W, SW_MINUS, SW_GAP = 14, 12, 8  # the label swatches: width, the gap holding the minus sign, gap to the axis (points)
+
+
+def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16)) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
-    bootstrap CI over items, filled when the CI excludes 0. One ink for every row: the label says which conditions."""
+    bootstrap CI over items, filled when the CI excludes 0. One ink for the marks; each label is followed by the two conditions'
+    bar swatches (A − B, with the bar chart's colours and placebo hatching), so a row reads like the bars it compares."""
     data = per_item(runs)
     rows: list[tuple[str, tuple[str, str] | None]] = [r for q, pairs in PAIRS for r in [(q, None), *((q, p) for p in pairs)]]
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
+    pt = 1 / (ax.get_position().width * fig.get_figwidth() * 72)  # one point in axes fraction
     labels = []
     for k, (q, pair) in enumerate(rows):
         y = len(rows) - 1 - k
@@ -102,6 +93,10 @@ def diffs(runs: list[Path], out: Path) -> None:
         ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else "white")
         ax.text(hi + 1, y, f"{m:+.1f}  [{lo:+.1f}, {hi:+.1f}]", va="center", fontsize=8, color=INK)
         labels.append(f"{LABEL[a]} − {LABEL[b]}")
+        for s, x in ((a, -(SW_GAP + 2 * SW_W + SW_MINUS)), (b, -(SW_GAP + SW_W))):  # in points left of the axis
+            ax.add_patch(plt.Rectangle((x * pt, y - 0.3), SW_W * pt, 0.6, transform=ax.get_yaxis_transform(), clip_on=False,
+                                       facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else "none", lw=0))  # fmt: skip
+        ax.text(-(SW_GAP + SW_W + SW_MINUS / 2) * pt, y, "−", transform=ax.get_yaxis_transform(), ha="center", va="center", fontsize=9)
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_yticks(range(len(rows)))
     ax.set_yticklabels(reversed(labels), fontsize=9)
@@ -109,9 +104,9 @@ def diffs(runs: list[Path], out: Path) -> None:
         if pair is None:
             tick.set_fontweight("bold")
             tick.set_color(MUTED)
-    ax.tick_params(axis="y", length=0)
+    ax.tick_params(axis="y", length=0, pad=2 * SW_GAP + 2 * SW_W + SW_MINUS)
     ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_xlim(-12, 30)
+    ax.set_xlim(*xlim)
     ax.grid(axis="y", visible=False)
     ax.set_title(f"All {len(data['transcript_inline'])} items", loc="left", fontsize=10, color=INK)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -121,8 +116,8 @@ def diffs(runs: list[Path], out: Path) -> None:
 
 def main(runs: list[Path], out: Path) -> None:
     data = per_item(runs)
-    fig, ax = plt.subplots(figsize=(9.6, 3.9))
-    width, gap = 0.12, 0.008
+    fig, ax = plt.subplots(figsize=(10.5, 4.1))
+    width, gap = 0.115, 0.008
     for i, (group, gate) in enumerate(GROUPS.items()):
         for j, s in enumerate(SERIES):
             xs = [a for c, a in data[s].values() if gate is None or c == gate]

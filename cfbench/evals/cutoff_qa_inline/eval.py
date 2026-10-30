@@ -4,7 +4,8 @@ Robbie, 2026-10-29. The investigator sees the question Qwen was asked (not the r
 submit_answer call (knowledge_cutoff's prompt, PR #378; inline.py here is a copy). The label is Qwen's modal answer from
 the bank's stability gate (`qwen_modal`, >= 7/8 samples agree), not the truth; stable_wrong items are the stale-belief ones. No
 counterfactual: base arm = cf arm = `nohint`, truth = the modal answer, so cfbench.answer's "edit does nothing" column is always
-yes. Cases: the episodes of the Qwen env run RUN (the first 200 stable, non-numeric v2 items by bank order), in bank order.
+yes. Cases: the episodes of the Qwen env runs RUNS, in bank order: the first 200 stable, non-numeric v2 items by bank order
+(smoke200), plus 800 seeded-random stable non-numeric v3 items not among them (new800; the 1k scale-up, 2026-10-29).
 
 Conditions (single-turn, no tools): `transcript_inline` (the question), `olens_inline` (plus the item's own end-of-prompt reads:
 the "." ending the question, <|im_end|>, "\\n", <|im_start|>, "assistant", "\\n", layers 32-60, from READS),
@@ -21,7 +22,7 @@ a quarter of WorkspaceBench's items (docs/envs/knowledge_cutoff.md).
 Scoring: `correct` = the submission's `norm` (environments/cutoff_qa/env.py, the same form as `qwen_modal`) equals the modal
 answer; report.py adds a loose whole-word match, per gate_class, the paired sign test vs transcript_inline and read-level recall.
 
-NLA conditions (2026-10-29; not in CONDITIONS, pass `--conditions nla_inline,nla_placebo_inline` once NLA_READS exists and
+NLA conditions (2026-10-29; not in CONDITIONS, pass `--conditions nla_inline,nla_placebo_inline` once NLA_READS exist and
 the inputs are re-prepped): `nla_inline` puts the item's own NLA readouts (agu18dec/qwen3.6-27b-all-layer-nla-rl2000,
 olens/src/olens/nla.py) at the O-lens block's 6 positions and layers in place of the O-lens block, one readout per (position,
 layer), every readout shown with its critic FVE; `nla_placebo_inline` is an unrelated prompt's readouts at the same 6 tokens,
@@ -55,8 +56,8 @@ from environments._lib.runfolder import LOCAL, read_episodes
 
 ENV = "cutoff_qa"
 ENVS = [ENV]
-RUN = "2026-10-29_smoke200-nohint"  # the Qwen env run whose prompts (and O-lens reads) the cases are
-READS = Path("data/runs/olens_reads/2026-10-29_cutoff200-tail/reads.jsonl")  # end-of-prompt reads of RUN's episodes
+RUNS = ("2026-10-29_smoke200-nohint", "2026-10-29_new800-nohint")  # the Qwen env runs whose prompts (and reads) the cases are
+READS = [Path(f"data/runs/olens_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # end-of-prompt reads of RUNS
 QWEN = "Qwen/Qwen3.6-27B"
 MODEL_NAME = "the model"
 TASK = "answer"
@@ -66,8 +67,8 @@ SYSTEM = inline.SYSTEM
 VERSIONS: dict[str, dict] = {"nohint": {"arm": "nohint"}}
 ARM_LABELS = {"nohint": "the question, verbatim"}
 PAIR_LABELS = {"nohint -> nohint": "no counterfactual"}
-NLA_READS = Path("data/runs/nla_reads/2026-10-29_cutoff200-tail/reads.jsonl")  # NLA readouts at READS's positions and layers
-JREADS = Path("data/runs/jpp_reads/2026-10-29_cutoff200-all/reads.jsonl")  # J++ at every token of RUN's prompts
+NLA_READS = [Path(f"data/runs/nla_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # at READS's positions, layers
+JREADS = [Path(f"data/runs/jpp_reads/2026-10-29_cutoff{n}-all/reads.jsonl") for n in (200, 800)]  # J++ at every token of RUNS
 JPOOL = Path("data/runs/jpp_reads/2026-10-27_hint-mcq-header/reads.jsonl")  # J++ placebo pool: hint_mcq, every token, L0-60/4
 JLENS_LAYERS = (32, 40, 48, 52, 56, 60)  # the O-lens reads' layers
 
@@ -77,35 +78,30 @@ def _mod():
 
 
 def collect() -> list[dict]:
-    """One case per episode of RUN, in bank order: the prompt, Qwen's gated modal answer (the label) and the bank metadata."""
+    """One case per episode of RUNS, in bank order: the prompt, Qwen's gated modal answer (the label) and the bank metadata."""
     mod = _mod()
     order = {item: k for k, item in enumerate(mod.items())}
     out = []
-    for ep in read_episodes(LOCAL / ENV / RUN):
+    for run, ep in ((r, ep) for r in RUNS for ep in read_episodes(LOCAL / ENV / r)):
         assert not ep.get("error") and ep["target"].split("@")[0].lower() == QWEN.lower(), ep["id"]
         meta = ep["meta"]
         assert not meta["numeric"] and meta["gate_class"].startswith("stable"), ep["id"]
-        out.append({"version": "nohint", "item": ep["item"], "modal": mod.norm(meta["qwen_modal"]), "source": f"{ENV}/{RUN}:{ep['id']}",
+        out.append({"version": "nohint", "item": ep["item"], "modal": mod.norm(meta["qwen_modal"]), "source": f"{ENV}/{run}:{ep['id']}",
                     "messages": ep["messages"][:1], "meta": meta})  # fmt: skip
     return sorted(out, key=lambda c: order[c["item"]])
 
 
 def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
-    """cases.jsonl plus reads/reads.jsonl (READS, if it exists yet); the placebo is drawn from the same file (another item)."""
+    """cases.jsonl plus reads/reads.jsonl (READS, all of them); the placebo is drawn from the same file (another item)."""
     (out / "reads").mkdir(parents=True)
-    if READS.exists():
-        (out / "reads/reads.jsonl").write_text(READS.read_text())
+    (out / "reads/reads.jsonl").write_text("".join(p.read_text() for p in READS))
     cs = collect()[: n_items or None]
-    if NLA_READS.exists():  # the nla_* conditions' reads (and their placebo pool)
-        (out / "reads/nla.jsonl").write_text(NLA_READS.read_text())
-    print("NLA reads", "copied" if NLA_READS.exists() else f"not made yet ({NLA_READS})")
-    for src, dst, prompt_only in ((JREADS, "jreads", False), (JPOOL, "jpool", True)):  # the jlens_* conditions' reads and pool
-        if src.exists():
-            rows = [r for rs in jpp_rows(src, prompt_only).values() for r in rs]
-            (out / f"reads/{dst}.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-        print(src, "copied" if src.exists() else "missing")
+    (out / "reads/nla.jsonl").write_text("".join(p.read_text() for p in NLA_READS))  # the nla_* conditions' reads and placebo pool
+    for srcs, dst, prompt_only in ((JREADS, "jreads", False), ([JPOOL], "jpool", True)):  # the jlens_* conditions' reads and pool
+        rows = [r for src in srcs for rs in jpp_rows(src, prompt_only).values() for r in rs]
+        (out / f"reads/{dst}.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
-    print(len(cs), "cases;", "reads copied" if READS.exists() else f"no reads yet ({READS})")
+    print(len(cs), "cases")
 
 
 def reads(inputs: Path) -> list[str]:

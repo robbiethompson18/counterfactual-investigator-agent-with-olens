@@ -282,7 +282,11 @@ Active docs:
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic
-- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
+- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, comparing O-lens / J-lens / NLA / probe readers on it, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
+  — unselected 4k sample of MMLU-Pro, two 2k eval batches + a 2k probe half (probe-trained questions
+  kept out of eval), strict consistency the only filter (2,523 cases, 82% right), no hint,
+  single-turn letter task; Haiku 5.5 results: O-lens +1.6pp and J-lens +2.3pp over prompt-only, NLA
+  +0.8pp, probe 92% (82% on Qwen-wrong vs 31-39% for the three lenses)
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate
@@ -296,6 +300,10 @@ Active docs:
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
 - [ACTIVE: Hinted TruthfulQA (formerly vulnerable users) — read before running bio-conditioned factual MCQ (Poole-Dayan et al.) or "my friend / professor / Wikipedia says it's X" hints](docs/envs/hinted_truthfulqa.md)
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
+- [REFERENCE: favorites_qa_inline — read before claiming metamodel reads predict Qwen's own preferences, or rerunning the 1,500-item favourites investigator](docs/favorites-qa-inline.md)
+  — Haiku guesses Qwen's free-response pick: transcript-only 80%, O-lens 87.6%, NLA 87.4% (tie,
+  +7pp), J++ 79% (+0, though L60 top-3 holds the answer's first token on 61%); O-lens placebo −10pp,
+  NLA placebo neutral; the answer sits at the "\n" after `<|im_end|>`
 - [ACTIVE: favorites_qa — read before asking Qwen for its own favourites/picks (basic_readout implicit, scaled up), or extending that bank](docs/envs/favorites_qa.md)
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — DSV4 Flash ~10pp gap, GLM and Qwen refuse all
