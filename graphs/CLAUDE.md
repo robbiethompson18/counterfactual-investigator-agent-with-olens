@@ -15,6 +15,9 @@ labelled by its two conditions' swatches, A − B) come from `style.py` (`bar_kw
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
+- `cutoff_qa_notail`: the v3 tool run's O-lens cut to the question's punctuation (± `<|im_end|>`) vs the full
+  set, each with its placebo, error rate, stale / not stale / all, plus paired differences on stale items
+  (`docs/cutoff-qa-inline.md`)
 - `favorites_qa_inline`: the same seven bars and paired-difference figure for the 1,500-item
   favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
 - `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right
