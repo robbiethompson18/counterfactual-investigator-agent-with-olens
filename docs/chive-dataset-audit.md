@@ -108,6 +108,26 @@ experiments in the dataset:
   Fisher or likelihood-ratio test would relabel the 253 full eliminations as positives and leave the
   ≤ 15pp items alone. `CLAUDE.md` already says to do this for our own envs.
 
+### The same count on Adam's released data
+
+The numbers above are Agam's 300-incident Qwen3.6-27B run. The same rule on Adam Karvonen's own
+release ([adamkarvonen/chive-data](https://huggingface.co/datasets/adamkarvonen/chive-data), the
+three main-body WildChat eval runs, every experiment in `investigations.jsonl`;
+`scripts/chive_adam_eliminations.py`, extracted rates in the run dir under `adam_rates/`):
+
+| Run            | Investigations | Experiments | 15–50pp (excluded) | Baseline 10–50% → 0/30 | Investigations with one | … and no ≥ 50pp experiment |
+| -------------- | -------------- | ----------- | ------------------ | ---------------------- | ----------------------- | -------------------------- |
+| Gemma 3 27B IT | 1,820          | 26,257      | 9,565 (36%)        | 2,933 (11.2%)          | 524 (29%)               | 284 (16%)                  |
+| Qwen3-8B       | 1,736          | 24,940      | 10,620 (43%)       | 3,164 (12.7%)          | 639 (37%)               | 368 (21%)                  |
+| Qwen3.5-397B   | 1,616          | 23,349      | 9,161 (39%)        | 2,526 (10.8%)          | 485 (30%)               | 262 (16%)                  |
+| **Total**      | **5,172**      | **74,546**  | **29,346 (39%)**   | **8,623 (11.6%)**      | **1,648 (32%)**         | **914 (18%)**              |
+
+So: on 8,623 experiments the behaviour had a baseline rate between 10% and 50% and the edit took it
+to 0 of 30, and because of the ≥ 50pp rule none of them is a claim (the released claim banks hold
+only ≥ 50pp "supported" and ≤ 15pp "inert" items, nothing in between). That is one experiment in
+nine, in a third of investigations; in 18% of investigations it is the only kind of decisive result
+there is, so those investigations contribute no positive claim at all.
+
 ## 5. Layers of LLM between the behaviour and the label
 
 From the paper's pipeline (Appendix B) plus Agam's harness: a screening judge finds the behaviour
