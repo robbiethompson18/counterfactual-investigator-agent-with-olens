@@ -85,7 +85,9 @@ Summary of the Final Pitch (2026-10-19):
 - **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`,
   `olens_placebo_agentic`** (renamed 2026-10-27; old rows map through `canon_condition`). The inline
   two-transcript condition is retired: never compare a tool condition against anything but
-  `transcript_agentic`.
+  `transcript_agentic`. **Every `*_agentic` condition is stale (2026-10-30): run one only with
+  Robbie's approval** (`CFBENCH_ALLOW_AGENTIC=1`); the single-turn `*_inline` conditions are
+  current.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 - **A tool call that ends a rollout by submitting an answer returns the verdict** (added

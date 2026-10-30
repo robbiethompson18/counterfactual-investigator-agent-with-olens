@@ -18,6 +18,7 @@ The two tasks are scored by two graders and never mixed: `rate` by `cfbench.scor
 
 import difflib
 import json
+import os
 import random
 from collections import Counter
 from dataclasses import dataclass
@@ -51,6 +52,16 @@ LEGACY_CONDITIONS = {
     "olens_placebo": "olens_placebo_agentic",
     "transcript": "transcript_inline_retired",
 }
+
+
+def check_agentic(conditions) -> None:
+    """Refuse the *_agentic conditions unless CFBENCH_ALLOW_AGENTIC=1: stale since 2026-10-30, the *_inline ones are current."""
+    stale = sorted(c for c in conditions if c.endswith("_agentic"))
+    if stale and os.environ.get("CFBENCH_ALLOW_AGENTIC") != "1":
+        raise SystemExit(
+            f"{', '.join(stale)}: *_agentic conditions are stale (Robbie, 2026-10-30): human approval required; use the *_inline "
+            "conditions (or set CFBENCH_ALLOW_AGENTIC=1 once Robbie approves)"
+        )
 
 
 def canon_condition(name: str) -> str:
