@@ -38,8 +38,8 @@
 \newcommand{\dts}[1]{\tikz[baseline=0pt]{\path (0, 0) -- (0, 2.9pt);
   \foreach \c [count=\i] in {#1} \fill[\c] (0, 3.05pt - 1.3pt * \i + 1.3pt) circle (0.55pt);}}
 \newcommand{\br}[1]{{\bfseries\color{ink}[}#1{\bfseries\color{ink}]}}
-\newcommand{\rd}[1]{\br{#1}\,\dts{olens}}
-\newcommand{\ro}[1]{\br{#1}\,\dts{olens, olensnl, probe}}
+\newcommand{\rd}[1]{\br{#1}\kern0.4pt\dts{olens}\kern1.2pt}
+\newcommand{\ro}[1]{\br{#1}\kern0.4pt\dts{olens, olensnl, probe}\kern1.2pt}
 \newcommand{\st}[1]{\mbox{<}\mbox{|}#1\mbox{|}\mbox{>}}
 \newcommand{\tok}[1]{{\color{muted}#1}}
 \newcommand{\hint}[1]{{\bfseries #1}}
