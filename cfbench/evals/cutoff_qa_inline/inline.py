@@ -30,8 +30,7 @@ OLENS_TEXT = """\
 ## O-lens reads
 
 The O-lens is a model trained to describe another model's internal activations in words. It was run on {model}'s activations \
-at the end of the prompt above: the period that ends its last line, the end-of-turn token and the newline after it, and the \
-start of {model}'s own turn (<|im_start|>, "assistant" and the newline), just before it answers, at layers {layers}. Each read \
+at the end of the prompt above: {where}, at layers {layers}. Each read \
 is a few short bullets about what the model is representing at that token, at one layer, each with its FVE (fraction of the \
 activation's variance the bullet explains): high FVE is good, low FVE bullets are often hallucinated. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text. The O-lens is more likely to get fine details \
@@ -75,12 +74,22 @@ def tail_block(rows: list[dict], prompt: str) -> str:
     return "\n".join(out).strip()
 
 
+WHERE = {  # the O-lens block's positions in words, by how many of the six end-of-prompt reads it shows
+    1: "the period that ends its last line",
+    2: "the period that ends its last line and the end-of-turn token after it",
+    6: "the period that ends its last line, the end-of-turn token and the newline after it, and the start of {model}'s own turn "
+    '(<|im_start|>, "assistant" and the newline), just before it answers',
+}
+
+
 def prompt(question: str, condition: str, told: bool, model: str, rows: list[dict] | None) -> str:
     reads = ""
     if condition != "transcript_inline":
         assert rows, condition
         layers = ", ".join(map(str, sorted({r["layer"] for r in rows})))
-        reads = OLENS_TEXT.format(model=model, layers=layers, block=tail_block(rows, question))
+        n_pos = len({r["token_index"] for r in rows})  # read-position ablation (Kylie, 2026-10-30): describe only the positions shown
+        where = WHERE.get(n_pos, WHERE[6]).format(model=model)
+        reads = OLENS_TEXT.format(model=model, layers=layers, where=where, block=tail_block(rows, question))
     return USER.format(told=TOLD if told else "", prompt=question, reads=reads)
 
 

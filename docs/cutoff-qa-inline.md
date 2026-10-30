@@ -74,6 +74,26 @@ the second paired by item. This is the one cutoff chart: every lens goes on it.)
   +6.9pp), but most of that is the placebo effect.
 - O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8]; J++ − NLA −2.7pp [−4.5, −1.0].
 
+**Read-position ablation** (2026-10-30, Kylie: does the gain need the assistant-turn tokens?). The
+1k run's O-lens block cut to the first one or two of the six positions: `pos1` = the "." ending the
+question only, `pos2` = "." and `<|im_end|>`; the preamble names only the positions shown. Runs
+`cfbench/2026-10-30_cutoff-qa-1k-olens-pos{1,2}` (conditions renamed `olens_pos{1,2}_inline` /
+`olens_pos{1,2}_placebo_inline` after the run), inputs
+`cfbench_evals/2026-10-30_cutoff-qa-inline-inputs-1k-pos{1,2}`, 11,988 predictions, 0 invalid. Error
+rate (all / stale / not stale), paired by item, 95% bootstrap CIs:
+
+| reads                           | O-lens            | its placebo        | O-lens − transcript-only | O-lens − placebo    |
+| ------------------------------- | ----------------- | ------------------ | ------------------------ | ------------------- | ------------------- | ------------------- |
+| none (transcript-only)          | 21.9 / 53.3 / 5.8 |                    |                          |                     |
+| "." only                        | 17.9 / 38.2 / 7.5 | 19.3 / 42.7 / 7.3  | −4.0pp [−5.7, −2.2]      | −1.4pp [−2.9, +0.2] |
+| "." + `<                        | im_end            | >`                 | 18.4 / 40.9 / 6.8        | 19.3 / 45.1 / 6.0   | −3.6pp [−5.2, −2.0] | −0.9pp [−2.4, +0.4] |
+| all six (through `assistant\n`) | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
+
+**Without the assistant-turn reads, the O-lens is no better than its placebo.** The two-position
+placebos themselves beat transcript-only by 2.6pp (both), the same way the J++ and NLA placebos do
+above: any reads nudge Haiku towards the stale answer. The "." reads name Qwen's modal answer on 316
+of 999 items, `<|im_end|>` on 67.
+
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
