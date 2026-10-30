@@ -23,7 +23,8 @@ the `nl` site (the newline token after each option), hidden_states[52], l2 1. Co
 
 `prep mcq_unselected` also writes FROZEN's 718 questions (set `mmlu718`, rebuilt with today's prompt code) so `score` can
 check the new activations against the cached ones. predictions.jsonl rows are cfbench answer-task rows (the case fields of
-`cases()`, draw 0, cost 0), so `cfbench.answer RUN` scores them; the env viewer only indexes runs under data/runs/cfbench/.
+`cases()`, draw 0, cost 0), so `cfbench.answer RUN` scores them. The env viewer only indexes runs under data/runs/cfbench/,
+so `mirror RUN --finish` copies them into one there; then `python -m environments evals NAME --upload`.
 """
 
 import argparse
@@ -205,6 +206,28 @@ def score(a):
         finish(run)
 
 
+def mirror(a):
+    """Copy a scored run's predictions into a cfbench run (meta params `eval`, `task` answer), so the env viewer's eval page
+    shows the probe conditions beside the investigator's (environments/_lib/evals.py indexes data/runs/cfbench/ only)."""
+    src = Path(a.run)
+    meta = json.loads((src / "meta.json").read_text())
+    p = meta["params"]
+    ev = _ev(p["eval"])
+    rows = (src / "predictions.jsonl").read_text()
+    run = new_run(
+        "cfbench",
+        a.slug or src.name.split("_", 1)[1],
+        description=f"{p['eval']}: linear probes and Qwen's letter logits (no investigator), mirrored from mcq_answer_probe/{src.name}",
+        models=meta["models"],
+        params={"env": f"eval:{p['eval']}", "eval": p["eval"], "envs": ev.ENVS, "inputs": str(Path(p["inputs"]).relative_to("data/runs")),
+                "versions": list(ev.VERSIONS), "conditions": ",".join(CONDS), "predictors": "linear probes (no investigator)",
+                "models": [ev.QWEN], "task": "answer", "draws": 1, "source": f"mcq_answer_probe/{src.name}"},
+    )  # fmt: skip
+    (run / "predictions.jsonl").write_text(rows)
+    if a.finish:
+        finish(run)
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -217,8 +240,12 @@ def main():
     s.add_argument("--pod", help="which pod ran hs_at_positions.py, for meta.json")
     s.add_argument("--cost", type=float, help="its GPU cost in dollars")
     s.add_argument("--finish", action="store_true", help="mark the run done and sync it to HF")
+    m = sub.add_parser("mirror")
+    m.add_argument("run", help="a scored probe run")
+    m.add_argument("--slug", help="default: the probe run's slug")
+    m.add_argument("--finish", action="store_true", help="mark the run done and sync it to HF")
     a = ap.parse_args()
-    {"prep": prep, "score": score}[a.cmd](a)
+    {"prep": prep, "score": score, "mirror": mirror}[a.cmd](a)
 
 
 if __name__ == "__main__":

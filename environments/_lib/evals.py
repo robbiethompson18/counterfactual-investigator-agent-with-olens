@@ -134,7 +134,7 @@ def seen_tokens(reads, row: dict) -> dict | None:
 def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     """One expview item per prediction: the predictor's whole conversation as one call, and (where the eval's inputs have
     them) the base runs with the reads its tools could return as the item's tokens (seen_tokens)."""
-    from cfbench.core import canon_condition
+    from cfbench.core import OLENS_CONDITIONS, canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
     from expview import Run, call
@@ -152,7 +152,13 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     run.reset()
     reads = None
     params, ev = meta["params"], _eval_module(meta["params"].get("eval"))
-    if ev is not None and hasattr(ev, "reads") and params.get("inputs"):
+    # as cfbench.eval: only the agentic O-lens conditions read `reads(inputs)` (single-turn evals' reads() differ)
+    if (
+        ev is not None
+        and hasattr(ev, "reads")
+        and params.get("inputs")
+        and {canon_condition(r["condition"]) for r in rows} & set(OLENS_CONDITIONS)
+    ):
         from cfbench import olens
 
         reads = olens.Reads(ev.reads(REPO_ROOT / "data" / "runs" / params["inputs"]))

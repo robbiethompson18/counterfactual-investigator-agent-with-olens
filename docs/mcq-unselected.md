@@ -265,7 +265,9 @@ answer format, one row per case and condition).
 ## Open items
 
 - NLA has one draw; two more would cost ~$20 and only narrow a ~1pp effect.
-- Mirror the probe run under `runs/cfbench/` so the env viewer shows it beside the Haiku bars.
+- Done 2026-10-30: the probe conditions are mirrored under
+  `runs/cfbench/2026-10-30_mcq-unselected-probe` and show on the eval page beside the Haiku bars
+  (`probe_unselected.py mirror`).
 - Tooling notes from the read campaign: `runpod/olens_reads.sh fetch` truncates the local files if
   the pod is already gone (write to a temp name first); `runpod/watch_pod.sh`'s pre-delete fetch
   uses rsync, which the vLLM image lacks; a reads file on the NC-1 volume once began with 5 MB of
