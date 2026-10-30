@@ -739,15 +739,15 @@ const CONDS = {
   olens_inline: ["transcript + O-lens reads in context, one turn", "var(--c-olens)", "O-lens"],
   olens_inline_nl: ["transcript + O-lens reads at the option newlines only, one turn (fewer positions: no end-of-prompt reads)", "var(--c-olens-nl)", "O-lens (nl)"],
   // read-position ablation (cutoff_qa_inline, favorites_qa_inline; Kylie, 2026-10-30): the six end-of-prompt reads cut to the first one or two
-  olens_pos1_inline: ["transcript + O-lens reads at the question's final \".\" only, one turn (no assistant-turn reads)", "var(--c-olens-nl)", "O-lens (.)"],
-  olens_pos2_inline: ["transcript + O-lens reads at the final \".\" and <|im_end|> only, one turn (no assistant-turn reads)", "var(--c-olens-nl)", "O-lens (. + im_end)"],
-  olens_qpunct_inline: ["transcript + O-lens reads at every punctuation token inside the question only, one turn", "var(--c-olens-nl)", "O-lens (question punct)"],
-  olens_qpunct_imend_inline: ["transcript + O-lens reads at the question's punctuation and <|im_end|>, one turn", "var(--c-olens-nl)", "O-lens (punct + im_end)"],
+  olens_pos1_inline: ["transcript + O-lens reads at the question's final \".\" only, one turn (no assistant-turn reads)", "var(--c-olens-nl)", "O-lens ."],
+  olens_pos2_inline: ["transcript + O-lens reads at the final \".\" and <|im_end|> only, one turn (no assistant-turn reads)", "var(--c-olens-nl)", "O-lens .+end"],
+  olens_qpunct_inline: ["transcript + O-lens reads at every punctuation token inside the question only, one turn", "var(--c-olens-nl)", "O-lens punct"],
+  olens_qpunct_imend_inline: ["transcript + O-lens reads at the question's punctuation and <|im_end|>, one turn", "var(--c-olens-nl)", "O-lens p+end"],
   olens_placebo_inline: ["transcript + another question's O-lens reads (placebo), one turn", "var(--c-placebo)", "placebo"],
-  olens_qpunct_placebo_inline: ["transcript + another question's O-lens reads at its punctuation (placebo), one turn", "var(--c-placebo)", "placebo (question punct)"],
-  olens_qpunct_imend_placebo_inline: ["transcript + another question's O-lens reads at its punctuation and <|im_end|> (placebo), one turn", "var(--c-placebo)", "placebo (punct + im_end)"],
-  olens_pos1_placebo_inline: ["transcript + another question's O-lens reads at its final \".\" only (placebo), one turn", "var(--c-placebo)", "placebo (.)"],
-  olens_pos2_placebo_inline: ["transcript + another question's O-lens reads at its final \".\" and <|im_end|> (placebo), one turn", "var(--c-placebo)", "placebo (. + im_end)"],
+  olens_qpunct_placebo_inline: ["transcript + another question's O-lens reads at its punctuation (placebo), one turn", "var(--c-placebo)", "placebo punct"],
+  olens_qpunct_imend_placebo_inline: ["transcript + another question's O-lens reads at its punctuation and <|im_end|> (placebo), one turn", "var(--c-placebo)", "placebo p+end"],
+  olens_pos1_placebo_inline: ["transcript + another question's O-lens reads at its final \".\" only (placebo), one turn", "var(--c-placebo)", "placebo ."],
+  olens_pos2_placebo_inline: ["transcript + another question's O-lens reads at its final \".\" and <|im_end|> (placebo), one turn", "var(--c-placebo)", "placebo .+end"],
   jlens_inline: ["prompt + J-lens reads in context, one turn", "var(--c-jlens)", "J-lens"],
   jlens_placebo_inline: ["prompt + another question's J-lens reads (placebo), one turn", "var(--c-placebo)", "J placebo"],
   nla_inline: ["prompt + NLA reads in context, one turn", "var(--c-nla)", "NLA"],
@@ -1027,6 +1027,49 @@ function answerChartBlock(ans, h, keep) {
       <details><summary class="mute">per dataset and investigator (${Ps.length - 1} panels)</summary><div class="anspanels">${Ps.slice(1).map((P, i) => answerChart(P, Ss[i + 1], top)).join("")}</div></details>
       <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the answer-task table below${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
 }
+// read-position chart (an eval's POSITION_CHART, evals/NAME.json position_chart; Kylie, 2026-10-30): per panel and item
+// subset, a pair of bars per read set (O-lens, then its placebo hatched), transcript-only as a dashed line with its 95% band,
+// every bar over the same items (those with transcript-only and every condition of the panel); pools the ticked runs
+function positionChart(ans, spec, h, keep) {
+  const picked = h.runs ? ans.filter(R => h.runs.split(",").includes(R.run)) : ans;
+  const items = {}, cls = {};
+  for (const R of picked) {
+    for (const [it, info] of Object.entries(R.item_info || {})) if (info.class) cls[it] = info.class;
+    for (const g of R.groups.filter(keep)) for (const it of g.items) {
+      const I = items[it.item] ??= {};
+      for (const [k, ds] of Object.entries(it.draws)) (I[k] ??= []).push(...ds.map(d => ERR ? 1 - d.correct : +d.correct));
+    }
+  }
+  const mean = xs => xs.reduce((a, b) => a + b, 0) / xs.length, f = v => v.toFixed(1);
+  const svgs = [];
+  for (const P of spec.panels) for (const [sub, subLabel] of spec.subsets || [["", ""]]) {
+    const conds = ["transcript_inline", ...P.groups.flatMap(g => [g[1], g[2]])];
+    const its = Object.entries(items).filter(([it, I]) => conds.every(c => I[c]?.length) && (!sub || cls[it] === sub)).map(([, I]) => I);
+    if (!its.length) continue;
+    const st = c => { const per = its.map(I => mean(I[c])); return {m: mean(per), ci: bootMean(per)}; };
+    const S = Object.fromEntries(conds.map(c => [c, st(c)])), top = Math.min(1, Math.ceil((Math.max(...conds.map(c => S[c].ci[1])) + 0.06) * 20) / 20);
+    const L = 40, Rm = 12, T = 48, B = 46, H = 300, gw = 104, W = Math.max(L + gw * P.groups.length + Rm, L + 7 * (P.title.length + subLabel.length + 3)), y = v => T + (1 - v / top) * (H - T - B);
+    const tr = S.transcript_inline;
+    let s = `<defs><pattern id="ph" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="var(--c-olens)"/><line x1="0" y1="0" x2="0" y2="5" stroke="var(--c-placebo)" stroke-width="2"/></pattern></defs>
+      <text x="${L}" y="14" class="ttl">${esc(P.title)}${subLabel ? " · " + esc(subLabel) : ""}</text><text x="${L}" y="30" class="ax">${its.length} items · transcript only ${f(100 * tr.m)}%</text>`;
+    for (let v = 0; v <= top + 1e-9; v += top > 0.5 ? 0.1 : 0.05)
+      s += `<line x1="${L}" x2="${W - Rm}" y1="${f(y(v))}" y2="${f(y(v))}" class="grid"/><text x="${L - 5}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${(100 * v).toFixed(0)}%</text>`;
+    s += `<rect x="${L}" width="${W - Rm - L}" y="${f(y(tr.ci[1]))}" height="${f(y(tr.ci[0]) - y(tr.ci[1]))}" fill="var(--c-ts)" opacity="0.13"><title>transcript only: ${f(100 * tr.m)}%, 95% item bootstrap ${f(100 * tr.ci[0])}–${f(100 * tr.ci[1])}%</title></rect>
+      <line x1="${L}" x2="${W - Rm}" y1="${f(y(tr.m))}" y2="${f(y(tr.m))}" stroke="var(--c-ts)" stroke-width="1.5" stroke-dasharray="5 3"/>`;
+    P.groups.forEach(([label, o, p], i) => [[o, "var(--c-olens)", "O-lens"], [p, "url(#ph)", "placebo"]].forEach(([c, fill, kind], j) => {
+      const {m, ci} = S[c], x = L + gw * i + gw / 2 + (j - 0.5) * 38;
+      s += `<g><title>${esc(label)}, ${kind} (${esc(c)}): ${f(100 * m)}% ${ERR ? "error" : "correct"}, 95% item bootstrap ${f(100 * ci[0])}–${f(100 * ci[1])}% · ${its.length} items</title>
+        <rect x="${x - 17}" width="34" y="${f(y(m))}" height="${f(Math.max(0, y(0) - y(m)))}" fill="${fill}"/>
+        <line x1="${x}" x2="${x}" y1="${f(y(ci[0]))}" y2="${f(y(ci[1]))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(ci[1]))}" y2="${f(y(ci[1]))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(ci[0]))}" y2="${f(y(ci[0]))}" class="ci"/></g>
+        <text x="${x}" y="${f(y(ci[1]) - 5)}" class="lab" text-anchor="middle">${f(100 * m)}</text>`;
+      if (j === 0) label.split("\n").forEach((ln, k) => s += `<text x="${L + gw * i + gw / 2}" y="${H - B + 16 + 13 * k}" class="ax" text-anchor="middle">${esc(ln)}</text>`);
+    }));
+    svgs.push(`<svg class="anschart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(P.title)}">${s}</svg>`);
+  }
+  return svgs.length ? `<h3>${esc(spec.title || "O-lens read positions")}</h3>
+    <p class="lede">${spec.caption ? esc(spec.caption) + " " : ""}Each pair: the O-lens with that read set (solid), then its placebo (hatched: another question's reads at the same kind of positions). Dashed line and band: transcript only with its 95% CI. ${ERR ? "Error rate, lower is better" : "% correct"}; every bar in a panel is over the same items (those with every condition); whiskers are a 95% item bootstrap. Pools the runs ticked below.</p>
+    <div class="anspanels">${svgs.join("")}</div>` : "";
+}
 function ansPick() {
   const all = [...document.querySelectorAll(".anspick")], on = all.filter(c => c.checked).map(c => c.value);
   location.hash = setParam("runs", on.length === all.length ? "" : on.join(","));
@@ -1191,6 +1234,7 @@ async function evalPage(h) {
       ${h.env ? ` · <a href="#${hashOf({eval: h.eval})}">all envs</a>` : ""}</p>
     <p>Every investigator conversation in expview: ${all.filter(R => R.expview).map(R => `<a class="chip" href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">${esc(R.slug)} ↗</a>`).join(" ")}</p>
     ${ans.length ? answerChartBlock(ans, h, keep) : ""}
+    ${ans.length && ev.position_chart ? positionChart(ans, ev.position_chart, h, keep) : ""}
     <details class="sec"><summary>About this eval</summary><div class="body readme">${md(ev.description || "")}</div></details>
     ${runs.length ? `<p class="lede">Each chart has the observed rate before (base arm) and after (counterfactual arm), bands = 95% credible intervals (Beta(1,1)), and every investigator
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
