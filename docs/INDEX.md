@@ -86,12 +86,12 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 - [REFERENCE: Overnight 2026-10-28 handoff (super experimental) — read before picking up debug_pointer, style_transfer, todo_suppressed or notice_defect](overnight-2026-10-28-handoff.md)
   — what the four gated envs are, survivors per env, O-lens vs placebo (null on debug_pointer and
   style_transfer), where code and runs live, caveats, what to do next
-- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens predicts Qwen's stale answers, or rerunning the end-of-prompt investigator smoke](cutoff-qa-inline.md)
-  — Haiku 5.5 predicting Qwen's modal answer from the question: O-lens 81% vs transcript-only 67% vs
-  placebo 67% on 200 stable items (sign test 53/12), carried by stale items; the lens writes the
-  answer at the `\n` after `<|im_end|>` (176/200); with a required submit_answer tool call (answer
-  20 tokens past the last read) the gap holds: 76% vs 58% vs 62%; the lens-shares-Qwen's-cutoff
-  caveat
+- [REFERENCE: cutoff_qa_inline — read before claiming the O-lens, J++ or NLA predicts Qwen's stale answers, or rerunning the end-of-prompt investigator](cutoff-qa-inline.md)
+  — Haiku 5.5 predicting Qwen's modal answer from the question, 999 items: only the O-lens beats its
+  own placebo by much (+7.6pp; NLA +2.8pp, J++ +1.7pp), the J++ and NLA placebos alone add +3–5pp
+  (cutoff framing); the lens writes the answer at the ` ` after `<|im_end|>`; with a required
+  submit_answer tool call (200 items, answer 20 tokens past the last read) the O-lens gap holds (76%
+  vs 58% vs 62%); the one cutoff chart; the lens-shares-Qwen's-cutoff caveat
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)

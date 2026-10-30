@@ -1,10 +1,9 @@
-"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and the NLA, each with
-its placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
+"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and NLA, each with its
+placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
 and for the rest (stable_right). Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's
 modal answer); whiskers are 95% bootstrap CIs over items. A second, small figure shows the paired differences between
 conditions (per item, then the mean) with their 95% bootstrap CIs, all items. Reads the runs' predictions.jsonl, pooled
-(the O-lens run has transcript_inline and the O-lens conditions, the J++ runs one condition each, the NLA run both NLA
-conditions; docs/cutoff-qa-inline.md, PR #393 for J++).
+(one run per condition on the 999-item inputs, cfbench_evals/2026-10-29_cutoff-qa-inline-inputs-1k; docs/cutoff-qa-inline.md).
 
     uv run python -m graphs.cutoff_qa_inline [--runs data/runs/cfbench/<run> ...] [--out docs/img/cutoff-qa-inline.png]
         [--out-diff docs/img/cutoff-qa-inline-diff.png]
@@ -26,13 +25,13 @@ SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_in
 LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
          "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo",
          "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo"}  # fmt: skip
-# J++ is purple and the NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes
-# (Robbie, 2026-10-29)
+# J++ purple, NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
          "nla_inline": "#2e9e5b", "nla_placebo_inline": "#2e9e5b"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200{s}") for s in ("", "-jlens", "-jlens-placebo", "-nla")]
+SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
+RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
     "all items": None,
     "stale (Qwen's answer\nis out of date)": "stable_wrong",
@@ -63,30 +62,17 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
 
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
-    (
-        "Does the lens beat its placebo?",
-        [("olens_inline", "olens_placebo_inline"), ("jlens_inline", "jlens_placebo_inline"), ("nla_inline", "nla_placebo_inline")],
-    ),
-    (
-        "Does the placebo alone help?",
-        [
-            ("olens_placebo_inline", "transcript_inline"),
-            ("jlens_placebo_inline", "transcript_inline"),
-            ("nla_placebo_inline", "transcript_inline"),
-        ],
-    ),
-    (
-        "Lens vs transcript only",
-        [("olens_inline", "transcript_inline"), ("jlens_inline", "transcript_inline"), ("nla_inline", "transcript_inline")],
-    ),
-    ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("nla_inline", "jlens_inline")]),
+    ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
 ]
 
 
 SW_W, SW_MINUS, SW_GAP = 14, 12, 8  # the label swatches: width, the gap holding the minus sign, gap to the axis (points)
 
 
-def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) -> None:
+def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16)) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
     bootstrap CI over items, filled when the CI excludes 0. One ink for the marks; each label is followed by the two conditions'
     bar swatches (A − B, with the bar chart's colours and placebo hatching), so a row reads like the bars it compares."""
@@ -130,8 +116,8 @@ def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-12, 30)) ->
 
 def main(runs: list[Path], out: Path) -> None:
     data = per_item(runs)
-    fig, ax = plt.subplots(figsize=(9.6, 3.9))
-    width, gap = 0.12, 0.008
+    fig, ax = plt.subplots(figsize=(10.5, 4.1))
+    width, gap = 0.115, 0.008
     for i, (group, gate) in enumerate(GROUPS.items()):
         for j, s in enumerate(SERIES):
             xs = [a for c, a in data[s].values() if gate is None or c == gate]
