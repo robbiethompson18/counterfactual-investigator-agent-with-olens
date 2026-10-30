@@ -17,6 +17,8 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from graphs.style import GRID, INK, MUTED, bar_kw, color, marker_kw, use
+
 CONDS = ["no_transcript_score", "agentic_score", "olens_score", "olens_placebo_score"]
 LABEL = {
     "no_transcript_score": "No transcript",
@@ -24,11 +26,8 @@ LABEL = {
     "olens_score": "O-lens",
     "olens_placebo_score": "O-lens placebo",
 }
-COLOR = {"no_transcript_score": "#8c8c8c", "agentic_score": "#2a78d6", "olens_score": "#eb6834", "olens_placebo_score": "#1a1a1a"}
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
+COLOR = {c: color(c) for c in CONDS}  # graphs.style: a placebo is its tool's colour, hatched (an open dot in the scatter)
+use()
 N_BOOT = 4000
 
 
@@ -81,7 +80,7 @@ def main():
     fig, ax = plt.subplots(figsize=(6.4, 3.8))
     for i, c in enumerate(conds):
         m, lo, hi = stats[c]
-        ax.bar(i, m, color=COLOR[c], width=0.65)
+        ax.bar(i, m, width=0.65, **bar_kw(c))
         ax.errorbar(i, m, yerr=[[m - lo], [hi - m]], color=MUTED, capsize=4, lw=1)
         ax.text(i, hi + 0.05, f"{m:.2f}", ha="center", color=INK)
     ax.axhline(stats["null"][0], color=MUTED, ls="--", lw=1)
@@ -104,11 +103,13 @@ def main():
         ax.scatter([base], [i], marker="|", s=120, color=MUTED, zorder=2)
         ax.scatter([cf], [i], marker="D", s=40, color=INK, zorder=4)
         for c in conds:
-            ax.scatter(by[c][k], [i + off[c]] * len(by[c][k]), s=14, color=COLOR[c], alpha=0.75, zorder=3, edgecolor="none")
+            ax.scatter(by[c][k], [i + off[c]] * len(by[c][k]), s=14, alpha=0.75, zorder=3, **marker_kw(c))
     ax.set_yticks(range(len(order)), [f"{item}, {arm}" for item, arm in order], fontsize=8)
     ax.set_xlim(0, 10.3)
     ax.set_xlabel("score out of 10   (| scenario arm's mean,  ◆ no-scenario mean = truth,  dots = predictions)")
-    handles = [plt.Line2D([], [], marker="o", ls="", color=COLOR[c], label=LABEL[c]) for c in conds]
+    handles = [
+        plt.Line2D([], [], marker="o", ls="", color=COLOR[c], markerfacecolor=marker_kw(c)["facecolor"], label=LABEL[c]) for c in conds
+    ]
     ax.legend(handles=handles, loc="lower right", fontsize=8, frameon=False)
     ax.set_title("Every prediction per case, sorted by the no-scenario mean", fontsize=10, color=INK, loc="left")
     fig.tight_layout()

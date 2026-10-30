@@ -20,16 +20,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from graphs.style import INK, MUTED, bar_kw, diff_rows, use
+from graphs.style import color as _color
+from graphs.style import label as _label
+
+use()
 SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline", "nla_inline",
           "nla_placebo_inline"]  # fmt: skip
-LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
-         "jlens_inline": "J++", "jlens_placebo_inline": "J++ placebo",
-         "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo"}  # fmt: skip
-# J++ purple, NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
-COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
-         "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
-         "nla_inline": "#2e9e5b", "nla_placebo_inline": "#2e9e5b"}  # fmt: skip
-HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
+LABEL = {s: _label(s) for s in SERIES}  # graphs.style's, kept here for the modules that import them
+COLOR = {s: _color(s) for s in SERIES}
+HATCH = {s: bar_kw(s)["hatch"] for s in SERIES if bar_kw(s)["hatch"]}
 SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
@@ -37,10 +37,6 @@ GROUPS = {
     "stale (Qwen's answer\nis out of date)": "stable_wrong",
     "not stale (Qwen's\nanswer still true)": "stable_right",
 }
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
 
 
 def per_item(runs: list[Path], by: str = "gate_class") -> dict[str, dict[str, tuple[str, float]]]:
@@ -69,79 +65,58 @@ PAIRS = [
 ]
 
 
-SW_W, SW_MINUS, SW_GAP = 14, 12, 8  # the label swatches: width, the gap holding the minus sign, gap to the axis (points)
-
-
 def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16)) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
-    bootstrap CI over items, filled when the CI excludes 0. One ink for the marks; each label is followed by the two conditions'
-    bar swatches (A − B, with the bar chart's colours and placebo hatching), so a row reads like the bars it compares."""
+    bootstrap CI over items (graphs.style.diff_rows: filled when the CI excludes 0, labelled by the two conditions' swatches)."""
     data = per_item(runs)
-    rows: list[tuple[str, tuple[str, str] | None]] = [r for q, pairs in PAIRS for r in [(q, None), *((q, p) for p in pairs)]]
+    rows: list = []
+    for q, pairs in PAIRS:
+        rows.append(q)
+        for a, b in pairs:
+            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a]]
+            rows.append((a, b, sum(ds) / len(ds), *ci(ds)))
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
-    pt = 1 / (ax.get_position().width * fig.get_figwidth() * 72)  # one point in axes fraction
-    labels = []
-    for k, (q, pair) in enumerate(rows):
-        y = len(rows) - 1 - k
-        if pair is None:  # a group header
-            labels.append(q)
-            continue
-        a, b = pair
-        ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a]]
-        m, (lo, hi) = sum(ds) / len(ds), ci(ds)
-        ax.plot([lo, hi], [y, y], color=INK, lw=1.6, solid_capstyle="butt", zorder=3)
-        ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else "white")
-        ax.text(hi + 1, y, f"{m:+.1f}  [{lo:+.1f}, {hi:+.1f}]", va="center", fontsize=8, color=INK)
-        labels.append(f"{LABEL[a]} − {LABEL[b]}")
-        for s, x in ((a, -(SW_GAP + 2 * SW_W + SW_MINUS)), (b, -(SW_GAP + SW_W))):  # in points left of the axis
-            ax.add_patch(plt.Rectangle((x * pt, y - 0.3), SW_W * pt, 0.6, transform=ax.get_yaxis_transform(), clip_on=False,
-                                       facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else "none", lw=0))  # fmt: skip
-        ax.text(-(SW_GAP + SW_W + SW_MINUS / 2) * pt, y, "−", transform=ax.get_yaxis_transform(), ha="center", va="center", fontsize=9)
-    ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
-    ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(reversed(labels), fontsize=9)
-    for tick, (_, pair) in zip(reversed(ax.get_yticklabels()), rows, strict=True):
-        if pair is None:
-            tick.set_fontweight("bold")
-            tick.set_color(MUTED)
-    ax.tick_params(axis="y", length=0, pad=2 * SW_GAP + 2 * SW_W + SW_MINUS)
-    ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     ax.set_xlim(*xlim)
-    ax.grid(axis="y", visible=False)
+    diff_rows(ax, rows)
+    ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     ax.set_title(f"All {len(data['transcript_inline'])} items", loc="left", fontsize=10, color=INK)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=180, bbox_inches="tight")
     print(out)
 
 
-def main(runs: list[Path], out: Path) -> None:
-    data = per_item(runs)
-    fig, ax = plt.subplots(figsize=(10.5, 4.1))
+def bar_chart(runs: list[Path], out: Path, by: str, groups: dict, title: str, figsize: tuple[float, float] = (10.5, 4.1)) -> None:
+    """Seven bars (SERIES) per group: the mean over items of per-item accuracy over draws, 95% bootstrap CIs over items. `groups`
+    maps a group's label to a value of the rows' `by` field (None: every item)."""
+    data = per_item(runs, by=by)
+    fig, ax = plt.subplots(figsize=figsize)
     width, gap = 0.115, 0.008
-    for i, (group, gate) in enumerate(GROUPS.items()):
+    for i, value in enumerate(groups.values()):
         for j, s in enumerate(SERIES):
-            xs = [a for c, a in data[s].values() if gate is None or c == gate]
+            xs = [a for c, a in data[s].values() if value is None or c == value]
             m, (lo, hi) = sum(xs) / len(xs), ci(xs)
             x = i + (j - (len(SERIES) - 1) / 2) * (width + gap)
-            ax.bar(x, 100 * m, width, color=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
-                   lw=0, zorder=3)  # fmt: skip
+            ax.bar(x, 100 * m, width, zorder=3, **bar_kw(s))
             ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4)
-            ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
-        n = sum(1 for c, _ in data[SERIES[0]].values() if gate is None or c == gate)
+            ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8 if len(groups) < 5 else 7.5, color=INK)
+        n = sum(1 for c, _ in data[SERIES[0]].values() if value is None or c == value)
         ax.text(i, -0.15, f"n = {n}", ha="center", va="top", fontsize=8, color=MUTED, transform=ax.get_xaxis_transform())
-    ax.set_xticks(range(len(GROUPS)))
-    ax.set_xticklabels(GROUPS.keys(), fontsize=9)
-    ax.set_xlim(-0.55, len(GROUPS) - 0.45)
+    ax.set_xticks(range(len(groups)))
+    ax.set_xticklabels(groups.keys(), fontsize=9)
+    ax.set_xlim(-0.55, len(groups) - 0.45)
     ax.set_ylim(0, 108)
     ax.set_ylabel("% of items where Haiku names Qwen's answer")
     ax.grid(axis="x", visible=False)
-    ax.set_title("Predicting Qwen3.6-27B's answer to a factual question from the prompt", loc="left", fontsize=10.5, color=INK, pad=24)
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
-                             lw=0) for s in SERIES]  # fmt: skip
+    ax.set_title(title, loc="left", fontsize=10.5, color=INK, pad=24)
+    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(s)) for s in SERIES]
     ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=7, bbox_to_anchor=(0, 1.0))
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=180, bbox_inches="tight")
     print(out)
+
+
+def main(runs: list[Path], out: Path) -> None:
+    bar_chart(runs, out, "gate_class", GROUPS, "Predicting Qwen3.6-27B's answer to a factual question from the prompt")
 
 
 if __name__ == "__main__":
