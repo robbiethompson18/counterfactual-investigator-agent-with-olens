@@ -1,9 +1,10 @@
 # mcq_unselected: what will Qwen say? An unselected MMLU-Pro set, and the 2k/2k split
 
-**Status (2026-10-29):** ACTIVE. Full runs done on 2,523 cases with Haiku 5.5: the O-lens and the
-J-lens each add a small, replicated gain over prompt-only; a linear probe on the same activations
-reads far more; the NLA adds the least (results below). Cases rebuilt the same day with the strict
-bare-letter parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
+**Status (2026-10-30):** ACTIVE. Probe row rechecked 2026-10-30 (reproduces; Kylie's frozen 718
+probe 1 point lower). Full runs done on 2,523 cases with Haiku 5.5: the O-lens and the J-lens each
+add a small, replicated gain over prompt-only; a linear probe on the same activations reads far
+more; the NLA adds the least (results below). Cases rebuilt the same day with the strict bare-letter
+parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
 
 ## Why
 
@@ -197,6 +198,44 @@ What it says:
 - On Qwen-wrong cases the investigator still submits the gold in over half its draws in every
   condition (prompt-only 56%, O-lens 53%); the lens moves a few percent of draws from gold to Qwen's
   letter.
+
+## Probe check (2026-10-30): Kylie's frozen probe vs Robbie's refit
+
+Kylie's question: is the probe row right, and does her original probe (the 718 balanced MMLU-Pro
+questions, [mcq-answer-probe.md](mcq-answer-probe.md)) do as well when applied unchanged? All on the
+same 2,523 cases. Fresh layer-52 forward pass for every prompt on one H200, then
+`environments/hint_mcq/probe_unselected.py` (now takes the eval: `prep mcq_unselected INPUTS`). Run
+`runs/mcq_answer_probe/2026-10-30_mcq-unselected-probe` (`scores.md`, `predictions.jsonl` in cfbench
+answer format, one row per case and condition).
+
+| reader                                                         | all         | Qwen right  | Qwen wrong    |
+| -------------------------------------------------------------- | ----------- | ----------- | ------------- |
+| Haiku, prompt only                                             | 82.6        | 94.4        | 29.5          |
+| Haiku + J-lens (best lens)                                     | 84.9        | 95.1        | 38.9          |
+| probe on the 1,360 probe-half questions (Robbie's, rerun)      | 91.9        | 94.2        | 81.7          |
+| Kylie's 718-question probe, frozen (diag)                      | 90.6        | 92.8        | 80.8          |
+| Kylie's 718-question probe, frozen, no scaling (raw h)         | 90.6        | 93.0        | 79.9          |
+| Qwen's own letter logits (ceiling)                             | 99.8        | 99.9        | 99.3          |
+| _gain over prompt only: Robbie's probe / Kylie's frozen probe_ | +9.3 / +8.0 | −0.2 / −1.6 | +52.2 / +51.3 |
+
+- **Robbie's number reproduces.** Rerunning `prep` gives byte-identical inputs (the same 3,883
+  prompts, token ids and newline sites). Rescoring on fresh activations gives 91.9 / 94.2 / 81.7
+  against PR #421's 91.9 / 94.1 / 82.1: 2 of 458 Qwen-wrong cases flip, which is bf16 noise between
+  two pods.
+- **Kylie's frozen probe is ~1 point behind** on 2,523 cases it never saw (−1.3 all, −0.9 on
+  Qwen-wrong). It has half the training questions, and they come from a different 7-category subset.
+  Her 718 were balanced 50:50 right/wrong, where the eval is 82:18. So the probe row in the results
+  table stands, and either probe is fine as the baseline.
+- **Prompt format is the same.** Her 718 were collected with `build("nohint", item)` as a single
+  user message under the thinking-off template, the same prompt as this eval. The rebuilt 718
+  prompts give the same tokens before every site. Fresh vs cached activations at `nl` h[52]: median
+  cosine 0.9999, but 42 of 6,623 options are below 0.99 (min 0.45) with identical tokens. That is
+  kernel drift between the two forward passes (this pod's transformers fell back to the reference
+  `causal_conv1d`). The frozen probe still scores 98.7% in-sample on the fresh activations.
+- **Site edge case.** In 3 of the 4,601 MMLU-Pro prompts (2 eval cases: 4771, 11610), an option's
+  text contains a newline: broken LaTeX (`\nho` for `\rho`) or a two-line option. There,
+  `option_newlines` takes the first newline inside the option, where Kylie's `option_sites` took the
+  last one before the next option. That's too few to matter.
 
 ## Runs
 

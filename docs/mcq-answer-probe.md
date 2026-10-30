@@ -1,7 +1,8 @@
 # MCQ answer probe: Qwen's own answer from the option tokens
 
-**Status (2026-10-28):** ACTIVE. MMLU-Pro in-sample, TruthfulQA out-of-sample done; O-lens reads at
-the same tokens on both.
+**Status (2026-10-30):** ACTIVE. MMLU-Pro in-sample, TruthfulQA out-of-sample done; O-lens reads at
+the same tokens on both. 2026-10-30: per-dimension scaling ablated (no effect), and the frozen probe
+scored on mcq_unselected and supergpqa_inline (~90%).
 
 Kylie's question: on multiple-choice questions Qwen3.6-27B answers consistently, does a linear probe
 on the activations at each option's tokens say which option Qwen will pick, and does it track Qwen's
@@ -102,6 +103,44 @@ whitening needs shrinkage: ~5.3k training options vs d = 5,120.
 Full whitening hurts, and both whitening families pick the least-whitening end of their grids
 (isotropic L2 in whitened space makes low-variance noise directions cheap). Within-question centring
 only nudges NLL. Diag is kept; the layer check (L44–56) puts L50 and L52 within noise.
+
+### Standardisation ablation: diag vs de-meaned only (2026-10-30)
+
+Kylie asked whether the per-dimension scaling matters. Same nested CV as `whiten` (outer 5, inner 4
+by question), the λ grid 1e-3 … 1e5 by decades, `--variants diag demean`. De-meaned only means
+subtracting the training mean with no scaling. A global mean is a no-op under the per-question
+softmax, so this is the probe on raw h. Run `runs/mcq_answer_probe/2026-10-30_standardise-ablation`
+(`standardise.md`, `dims.md`).
+
+| variant      | chosen λ per outer fold | top-1 all / right / wrong | NLL   | KL    | ECE   |
+| ------------ | ----------------------- | ------------------------- | ----- | ----- | ----- |
+| diag         | 1, 1, 1, 1, 0.1         | 0.894 / 0.958 / 0.830     | 0.303 | 0.294 | 0.023 |
+| de-mean only | 1, 1, 1, 1, 1           | 0.893 / 0.961 / 0.825     | 0.309 | 0.269 | 0.034 |
+
+The scaling makes no difference, and the chosen λ doesn't move either. That's because the median
+dimension's std at `nl` h[52] is already 0.9, so raw h is close to unit scale everywhere but one
+dimension:
+
+- **One massive, axis-aligned dim.** Dim 3994 has mean +67 and is in the top 10 by |h| on 100% of
+  options. It holds 29% of ‖h‖² (median ‖h‖ 127). Its std is 12.2, 13.5× the median dim's, and it
+  varies within questions (within-question std 10.8), so it is not a constant offset.
+- **The rest are mild.** The next dims by std (2154, 310, 4781, 2813, …) are only 4–5× the median.
+  Dim 310 (mean −10) is in the top 10 by |h| on 70% of options; the others on under 15%.
+- Under L2, raw scale gives dim 3994's weight a ~13× cheaper penalty per unit of logit than diag
+  does. The probe doesn't exploit that: the two fits score within noise.
+
+Applied frozen to the eval sets as `probe_mmlu718_raw`, the raw-h fit tracks the diag fit within a
+point (next section).
+
+## Frozen on the cfbench eval sets (2026-10-30)
+
+The chosen probe, fit once on the 718, applied unchanged as `probe_mmlu718`, top-1 = Qwen's modal
+letter, all / Qwen right / Qwen wrong:
+
+- [mcq_unselected](mcq-unselected.md), 2,523 MMLU-Pro cases: 90.6 / 92.8 / 80.8, against 91.9 / 94.2
+  / 81.7 for the same recipe refit on 1,360 probe-half questions.
+- [supergpqa_inline](supergpqa-inline.md), 3,000 SuperGPQA cases: 90.4 / 92.7 / 86.5, against 91.9 /
+  94.4 / 87.8 for a refit on the 3,328-question SuperGPQA probe pool.
 
 ## O-lens reads at the same tokens
 

@@ -433,6 +433,8 @@ class Whitener:
         Xc = _center(X, q, self.within, self.mu)
         if kind == "diag":
             return Xc / self.std
+        if kind == "none":  # de-meaned only: a global mean is a no-op under the per-question softmax, so this is raw h
+            return Xc
         if kind == "pca":
             return Xc @ self.V[:, -param:] / np.sqrt(self.e[-param:] + 1e-12)
         alpha = self.lw if param == "lw" else param
@@ -441,6 +443,7 @@ class Whitener:
 
 WHITEN = {  # variant -> (within-question centering, kind, hyperparameter grid)
     "diag": (False, "diag", [None]),
+    "demean": (False, "none", [None]),
     "shrink": (False, "shrink", ["lw", 0.01, 0.1, 0.3]),
     "pca": (False, "pca", [64, 128, 256, 512, 1024, 2048]),
     "within_diag": (True, "diag", [None]),
@@ -456,6 +459,7 @@ def whiten(a):
     from sklearn.model_selection import GroupKFold
 
     run = Path(a.run)
+    out_dir = Path(a.out or run)
     layers = json.loads((run / "meta.json").read_text())["params"]["layers"]
     opts = [json.loads(line) for line in (run / "options.jsonl").read_text().splitlines()]
     qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
@@ -538,7 +542,7 @@ def whiten(a):
         Xl = np.asarray(acts[:, layers.index(layer)], dtype=np.float64)
         out["layer_check"]["layers"][layer] = metrics(_softmax_by_q(nested(Xl, best, fixed)[0], starts))
         print(f"layer {layer}: {out['layer_check']['layers'][layer]['all']}", flush=True)
-    (run / "whiten.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
+    (out_dir / f"{a.name}.json").write_text(json.dumps(out, indent=1, default=str) + "\n")
     cols = ("top1_answer", "top1_gold", "nll_answer", "kl_qwen", "ece")
     lines = [
         f"Listwise pmf probe (one-hot target), `{a.site}` L{a.layer}, by whitening; nested CV (outer {a.folds}, inner 4 by question).",
@@ -566,7 +570,40 @@ def whiten(a):
     ]
     for layer, r in out["layer_check"]["layers"].items():
         lines.append(f"| {layer} | " + " | ".join(f"{r['all'][c]:.3f}" for c in cols) + " |")
-    (run / "whiten.md").write_text("\n".join(lines) + "\n")
+    (out_dir / f"{a.name}.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
+def dims(a):
+    """Per-dimension spread of one (site, layer)'s activations: std and mean |h| over options, the top dims by std against
+    the median, and whether those dims are large in every option (axis-aligned massive activations) or in a few."""
+    run = Path(a.run)
+    layers = json.loads((run / "meta.json").read_text())["params"]["layers"]
+    X = np.asarray(np.load(CACHE / run.name / f"{a.site}.npy", mmap_mode="r")[:, layers.index(a.layer)], dtype=np.float64)
+    q = np.array([json.loads(line)["q"] for line in (run / "options.jsonl").read_text().splitlines()])
+    sd, mabs, mean = X.std(0), np.abs(X).mean(0), X.mean(0)
+    n = np.bincount(q)
+    within = (X - np.repeat(np.add.reduceat(X, np.flatnonzero(np.r_[True, q[1:] != q[:-1]])) / n[:, None], n, 0)).std(0)
+    top = np.argsort(-sd)[: a.top]
+    rank = np.argsort(np.argsort(-np.abs(X), 1), 1)  # per option, each dim's rank by |h|
+    norm2 = (X**2).sum(1)
+    lines = [
+        (
+            f"`{a.site}` hidden_states[{a.layer}], {len(X)} options of {len(set(q))} questions, d = {X.shape[1]}. "
+            f"Median std {np.median(sd):.3g}, median mean |h| {np.median(mabs):.3g}; |h| norm median {np.median(np.sqrt(norm2)):.3g}."
+        ),
+        "",
+        "| dim | std | std / median | within-question std | mean | mean abs | share of options with it in top-10 abs | share of norm^2 |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for d in top:
+        lines.append(
+            f"| {d} | {sd[d]:.3g} | {sd[d] / np.median(sd):.1f} | {within[d]:.3g} | {mean[d]:.3g} | {mabs[d]:.3g} | "
+            f"{(rank[:, d] < 10).mean():.2f} | {np.mean(X[:, d] ** 2 / norm2):.3f} |"
+        )
+    top_abs = np.argsort(-mabs)[: a.top]
+    lines += ["", f"Top {a.top} dims by mean |h|: " + ", ".join(f"{d} ({mabs[d] / np.median(mabs):.0f}x)" for d in top_abs)]
+    (Path(a.out) / "dims.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
 
@@ -976,6 +1013,14 @@ def main():
     w.add_argument("--folds", type=int, default=5)
     w.add_argument("--C", type=float, default=0.01)
     w.add_argument("--l2", type=float, nargs="+", default=[1e-2, 1e-1, 1.0, 10.0, 100.0])
+    w.add_argument("--out", help="directory for the outputs (default: the run)")
+    w.add_argument("--name", default="whiten", help="output file stem")
+    d = sub.add_parser("dims")
+    d.add_argument("run")
+    d.add_argument("out")
+    d.add_argument("--site", default="nl")
+    d.add_argument("--layer", type=int, default=52)
+    d.add_argument("--top", type=int, default=10)
     s = sub.add_parser("dump")
     s.add_argument("run")
     s.add_argument("--site", default="nl")
@@ -1011,6 +1056,7 @@ def main():
         "fit": fit,
         "pmf": pmf,
         "whiten": whiten,
+        "dims": dims,
         "dump": dump,
         "lens-requests": lens_requests,
         "lens-stats": lens_stats,
