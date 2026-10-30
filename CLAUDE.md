@@ -73,6 +73,13 @@ Summary of the Final Pitch (2026-10-19):
   record: T 1.0, top-p 0.95, top-k 64, one continuation of up to 4 bullets per site). Every read
   before that was greedy, the viewer's default; `--temperature 0` restores it. At T 1 each rollout
   is its own lens draw; at T 0 rollouts sharing a prompt share one read (docs/envs/hint_cf.md).
+- **Read everywhere, at all six layers (Robbie, 2026-10-30).** Default O-lens / NLA / J++ read
+  positions are every punctuation token and `<|im_end|>`, each MCQ option's newline, and the ten
+  tail tokens of the thinking-off render through `</think>\n\n`, at layers 32/40/48/52/56/60 for
+  every lens. Never hand-pick a few tail tokens; pick positions when building the investigator's
+  block instead. A `messages` row with `generation_prompt` renders the thinking-on `<think>\n`, so
+  think-block reads need a `text` row of the thinking-off render
+  ([docs/read-positions.md](docs/read-positions.md)).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -314,6 +321,9 @@ Active docs:
 - [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/CLAUDE.md)
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — for Qwen completions use the shared server, not your own pod
+- [ACTIVE: Default read positions — read before requesting any O-lens / NLA / J++ reads, or building an investigator block from reads](docs/read-positions.md)
+  — every punctuation token + option newlines + the ten thinking-off tail tokens, layers 32–60,
+  thinking off; the inline sets' fill runs and `cfbench.evals.inline_reads`
 - [ACTIVE: Batch reads format — read before writing a reader, or showing batch O-lens/J++/NLA reads in expview](docs/olens-reads-format.md)
   — `X.jsonl` + `X.transcripts.jsonl`
 - [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
