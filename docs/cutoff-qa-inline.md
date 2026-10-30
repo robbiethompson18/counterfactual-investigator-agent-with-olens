@@ -310,6 +310,11 @@ run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
   with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
   Every conversation is in expview: `#dataset=runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct-full` (and `-qpunct-imend-full`).
 
+![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
+![paired differences, stale items](img/cutoff-qa-notail-diff.png)
+
+Charts: `uv run python -m graphs.cutoff_qa_notail`.
+
 Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
 
 **Caveats.**
