@@ -8,10 +8,10 @@ letter >= MIN_SHARE of all samples), not balanced, no eval question. Test set: e
 (`cases.jsonl` of the inputs run). The probe is Kylie's chosen one (probe.py): one-hot listwise, diagonal standardisation,
 the `nl` site (the newline token after each option), hidden_states[52], l2 1. Conditions in predictions.jsonl:
 
-- `probe`: that probe fit on the eval's probe pool (Robbie's, PR #421).
-- `probe_mmlu718`: Kylie's frozen probe, fit once on the 718 balanced MMLU-Pro questions of FROZEN (its cached activations
+- `probe`: Kylie's frozen probe, fit once on the 718 balanced MMLU-Pro questions of FROZEN (its cached activations
   in data/probe_cache/), applied unchanged, as probe.py's `oos` does.
-- `probe_mmlu718_raw`: the same 718-question fit without per-dimension scaling (raw h, l2 RAW_L2 from probe.py's
+- `probe_tuned`: the same recipe refit on the eval's own probe pool (Robbie's, PR #421).
+- `probe_raw`: the 718-question fit without per-dimension scaling (raw h, l2 RAW_L2 from probe.py's
   `standardise` ablation; a global mean is a no-op under the per-question softmax).
 - `qwen_logits`: Qwen's own letter-logit argmax at the answer position (ceiling).
 
@@ -45,7 +45,7 @@ LETTERS = "ABCDEFGHIJKLMNOP"
 TRAIN, CHECK = "train", "mmlu718"  # `set` of a training question / of a FROZEN question; test questions carry their version
 FROZEN = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_scale2k"  # Kylie's 718 (questions/options.jsonl; acts in CACHE)
 QWEN_LOGITS = "Qwen/Qwen3.6-27B letter-logit argmax at the answer position (ceiling)"
-CONDS = ("probe", "probe_mmlu718", "probe_mmlu718_raw", "qwen_logits")
+CONDS = ("probe", "probe_tuned", "probe_raw", "qwen_logits")
 
 
 def _ev(name: str):
@@ -121,8 +121,8 @@ def frozen() -> tuple[dict[str, tuple[np.ndarray, np.ndarray, np.ndarray]], np.n
     mu, sd = X.mean(0), X.std(0)
     one = np.ones_like(sd)
     return {
-        "probe_mmlu718": (mu, sd, _fit_listwise((X - mu) / sd, y, starts, L2)),
-        "probe_mmlu718_raw": (mu, one, _fit_listwise(X - mu, y, starts, RAW_L2)),
+        "probe": (mu, sd, _fit_listwise((X - mu) / sd, y, starts, L2)),
+        "probe_raw": (mu, one, _fit_listwise(X - mu, y, starts, RAW_L2)),
     }, X
 
 
@@ -146,7 +146,7 @@ def score(a):
     w = _fit_listwise((X[tr] - mu) / sd, y[tr], np.flatnonzero(np.r_[True, qi[tr][1:] != qi[tr][:-1]]), L2)
     np.savez(run / "probe.npz", mean=mu, scale=sd, w=w, hidden=HIDDEN, site=SITE, l2=L2)
     probes, X718 = frozen()
-    probes = {"probe": (mu, sd, w)} | probes
+    probes = {"probe_tuned": (mu, sd, w)} | probes
     p = {c: _softmax_by_q((X - m) / s @ v, starts) for c, (m, s, v) in probes.items()}
     check = np.array([q["set"] == CHECK for q in qs])[qi]
     if check.any():  # today's prompts and forward pass vs the cached activations the frozen probe was fit on
@@ -155,9 +155,9 @@ def score(a):
     n_train = int(train.sum())
     desc = f"listwise, {SITE} hidden_states[{HIDDEN}]"
     predictors = {
-        "probe": f"MCQ answer probe ({desc}, diag, l2 {L2:g}; {n_train} consistent {name} probe-pool questions)",
-        "probe_mmlu718": f"MCQ answer probe ({desc}, diag, l2 {L2:g}; Kylie's 718 balanced MMLU-Pro questions, frozen)",
-        "probe_mmlu718_raw": f"MCQ answer probe ({desc}, no scaling, l2 {RAW_L2:g}; Kylie's 718 balanced MMLU-Pro questions, frozen)",
+        "probe_tuned": f"MCQ answer probe ({desc}, diag, l2 {L2:g}; {n_train} consistent {name} probe-pool questions)",
+        "probe": f"MCQ answer probe ({desc}, diag, l2 {L2:g}; Kylie's 718 balanced MMLU-Pro questions, frozen)",
+        "probe_raw": f"MCQ answer probe ({desc}, no scaling, l2 {RAW_L2:g}; Kylie's 718 balanced MMLU-Pro questions, frozen)",
         "qwen_logits": QWEN_LOGITS,
     }
     rows, hits = [], Counter()
@@ -207,20 +207,23 @@ def score(a):
 
 
 def mirror(a):
-    """Copy a scored run's predictions into a cfbench run (meta params `eval`, `task` answer), so the env viewer's eval page
-    shows the probe conditions beside the investigator's (environments/_lib/evals.py indexes data/runs/cfbench/ only)."""
+    """Copy a scored run's probe predictions into a cfbench run (meta params `eval`, `task` answer), so the env viewer's eval
+    page shows the probe conditions beside the investigator's (environments/_lib/evals.py indexes data/runs/cfbench/ only).
+    Only `probe` and `probe_tuned` (Kylie, 2026-10-30: no logits, no raw variant on the page); scores.md keeps all four."""
     src = Path(a.run)
     meta = json.loads((src / "meta.json").read_text())
     p = meta["params"]
     ev = _ev(p["eval"])
-    rows = (src / "predictions.jsonl").read_text()
+    conds = ["probe", "probe_tuned"]
+    lines = (src / "predictions.jsonl").read_text().splitlines()
+    rows = "".join(line + "\n" for line in lines if json.loads(line)["condition"] in conds)
     run = new_run(
         "cfbench",
         a.slug or src.name.split("_", 1)[1],
-        description=f"{p['eval']}: linear probes and Qwen's letter logits (no investigator), mirrored from mcq_answer_probe/{src.name}",
+        description=f"{p['eval']}: linear probes (no investigator), mirrored from mcq_answer_probe/{src.name}",
         models=meta["models"],
         params={"env": f"eval:{p['eval']}", "eval": p["eval"], "envs": ev.ENVS, "inputs": str(Path(p["inputs"]).relative_to("data/runs")),
-                "versions": list(ev.VERSIONS), "conditions": ",".join(CONDS), "predictors": "linear probes (no investigator)",
+                "versions": list(ev.VERSIONS), "conditions": ",".join(conds), "predictors": "linear probes (no investigator)",
                 "models": [ev.QWEN], "task": "answer", "draws": 1, "source": f"mcq_answer_probe/{src.name}"},
     )  # fmt: skip
     (run / "predictions.jsonl").write_text(rows)

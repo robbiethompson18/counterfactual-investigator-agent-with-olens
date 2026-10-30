@@ -129,13 +129,13 @@ dimension:
 - Under L2, raw scale gives dim 3994's weight a ~13× cheaper penalty per unit of logit than diag
   does. The probe doesn't exploit that: the two fits score within noise.
 
-Applied frozen to the eval sets as `probe_mmlu718_raw`, the raw-h fit tracks the diag fit within a
-point (next section).
+Applied frozen to the eval sets as `probe_raw`, the raw-h fit tracks the diag fit within a point
+(next section).
 
 ## Frozen on the cfbench eval sets (2026-10-30)
 
-The chosen probe, fit once on the 718, applied unchanged as `probe_mmlu718`, top-1 = Qwen's modal
-letter, all / Qwen right / Qwen wrong:
+The chosen probe, fit once on the 718, applied unchanged as `probe`, top-1 = Qwen's modal letter,
+all / Qwen right / Qwen wrong:
 
 - [mcq_unselected](mcq-unselected.md), 2,523 MMLU-Pro cases: 90.6 / 92.8 / 80.8, against 91.9 / 94.2
   / 81.7 for the same recipe refit on 1,360 probe-half questions.

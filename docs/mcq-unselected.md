@@ -208,6 +208,12 @@ same 2,523 cases. Fresh layer-52 forward pass for every prompt on one H200, then
 `runs/mcq_answer_probe/2026-10-30_mcq-unselected-probe` (`scores.md`, `predictions.jsonl` in cfbench
 answer format, one row per case and condition).
 
+Condition ids, here and on the env viewer's eval page: `probe` is Kylie's frozen probe ("718" = the
+718 balanced MMLU-Pro questions it was fit on), `probe_tuned` the refit on this eval's probe half,
+`probe_raw` the 718 fit without per-dimension scaling, `qwen_logits` the ceiling. The eval page
+(mirror run `runs/cfbench/2026-10-30_mcq-unselected-probe`) shows only `probe` and `probe_tuned`,
+and shows the whole eval as error rate (`ERROR_RATE`, Kylie 2026-10-30).
+
 | reader                                                         | all         | Qwen right  | Qwen wrong    |
 | -------------------------------------------------------------- | ----------- | ----------- | ------------- |
 | Haiku, prompt only                                             | 82.6        | 94.4        | 29.5          |

@@ -787,6 +787,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
+        doc["error_rate"] = getattr(_eval_module(name), "ERROR_RATE", False)  # answer task shown as error rate (lower is better)
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     return written

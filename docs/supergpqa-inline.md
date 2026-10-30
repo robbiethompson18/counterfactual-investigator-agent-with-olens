@@ -154,6 +154,10 @@ LLM is involved. Run `runs/mcq_answer_probe/2026-10-30_supergpqa-inline-probe` (
 `environments/hint_mcq/probe_unselected.py prep supergpqa_inline INPUTS` then `score`. One H200 job
 covered this and mcq_unselected.
 
+Conditions: `probe` (Kylie's frozen MMLU-Pro probe), `probe_tuned` (fit on the probe pool),
+`probe_raw`, `qwen_logits`. The env viewer's eval page (mirror run
+`runs/cfbench/2026-10-30_supergpqa-inline-probe`) shows `probe` and `probe_tuned`, as error rate.
+
 | reader                                                          |           all |    Qwen wrong |    Qwen right |
 | --------------------------------------------------------------- | ------------: | ------------: | ------------: |
 | Haiku, prompt only (transcript_inline)                          |         68.9% |         46.2% |         82.5% |
