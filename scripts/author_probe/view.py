@@ -100,7 +100,11 @@ def pairs(a):
     load = lambda p: [json.loads(line) for line in Path(p).read_text().splitlines()]
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     qwen = {r["id"]: r for r in load(run / "qwen_answers.jsonl")}
-    abl = {f"{r['passage']}:{r['attr']}": r for r in load(run.parent / "2026-10-30_ablate-loo-qfirst" / "pairs_scored.jsonl")}
+    abl = {
+        f"{r['passage']}:{r['attr']}": r
+        for d in ("2026-10-30_ablate-loo-qfirst", "2026-10-30_ablate-loo-qfirst-b")
+        for r in load(run.parent / d / "pairs_scored.jsonl")
+    }
     trans = {r["id"]: r for r in load(reads_dir / "reads.transcripts.jsonl")}
     by_id: dict[str, list[dict]] = {}
     for r in load(reads_dir / "reads.jsonl"):
