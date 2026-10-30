@@ -1,0 +1,122 @@
+# CHIVE dataset audit: off-policy prefixes, thresholds, contradictory ground truth
+
+**Status (2026-10-30):** REFERENCE. Numbers over all 300 incidents of
+[agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics) and Agam's 204
+held-out incidents; `scripts/chive_audit.py` reprints every table.
+
+Robbie's Oct 25 progress report (sprint doc, "Issue with CHIVE Data / Grader") listed five
+complaints about CHIVE from reading cases. This doc puts numbers on each. Where a number disagrees
+with the report, the number wins. Reproduce with `uv run python scripts/chive_audit.py`; the hand
+labels it reads are in the HF dataset at `runs/chive_audit/2026-10-30_inert-contradictions/`.
+
+## 1. "More than half the dataset is off-policy" → 39% (41% of the held-out 204)
+
+An incident is a WildChat (281/300), SystemChat2, Hermes or ToolACE prompt whose earlier assistant
+turns were written by whatever model the source dataset logged (ChatGPT for WildChat); only the
+final completion is Qwen3.6-27B. Counting incidents with at least one such prior assistant turn:
+
+| Set          | ≥1 prior assistant turn | 0   | 1   | 2   | 3   | 4   |
+| ------------ | ----------------------- | --- | --- | --- | --- | --- |
+| all 300      | 118 (39%)               | 182 | 58  | 29  | 20  | 11  |
+| held-out 204 | 84 (41%)                | 120 | 43  | 20  | 14  | 7   |
+
+So "more than half" is wrong; it is two fifths. The single-turn remainder is still off-distribution
+in the weaker sense that the user turns are ChatGPT users' prompts, but Qwen wrote every assistant
+token in those.
+
+**The O-lens uplift in Agam's held-out run lives entirely in the off-policy slice.** Pass rate
+(judge ≥ 7, 5 draws per arm, paired by incident) of `olens_rl_B` minus `transcript`:
+
+| Slice                   | n   | transcript pass | O-lens − transcript |
+| ----------------------- | --- | --------------- | ------------------- |
+| ≥1 prior assistant turn | 84  | 0.60            | +9.5pp (SE 3.7)     |
+| 0 prior assistant turns | 120 | 0.77            | −1.5pp (SE 2.4)     |
+| all                     | 204 | 0.70            | +3.0pp (SE 2.1)     |
+
+A plausible reading: when a ChatGPT turn is in the prefix, the "cause" is often "the earlier turn
+said X" (e.g. [000054](https://chive-cases.pages.dev/?case=prompt_000054), where Qwen corrects the
+prior model's advice), and any tool that points the agent at the prefix helps. That is not workspace
+access. Treat the +3pp overall as a selection artifact until shown otherwise.
+
+## 2. "About half is Qwen being wrong without a great reason" → 53%
+
+Our single-rater hand labels of the 204 held-out behaviours (`viewer/behavior_kind.tsv`,
+2026-10-19): **wrong** (factual or logic slip, self-contradiction, misread context, ignored
+instruction) 108 = 53%; **content** (coherent but unprompted content or style choice, e.g.
+[000106](https://chive-cases.pages.dev/?case=prompt_000106)'s tired character) 72 = 35%; **policy**
+(refusal or persona scope) 24 = 12%. O-lens uplift by kind: wrong +1.7pp (SE 2.7), content +6.9pp
+(SE 4.0), policy −2.5pp (SE 5.3). None is significant on its own.
+
+## 3. Contradictory ground truth → 12% of incidents (13% of the held-out), 25% counting negated "causes"
+
+Each incident's ground truth has 1–3 `targets` (the investigator's causes, first person, with prose
+evidence) and 0–9 `ruled_out` items. Ruled-out items come in three kinds: 360 `refuted` (the
+investigator's own alternative hypotheses), 344 `inert` from the `claim_bank` (experiments whose
+edit moved the rate ≤ 15pp) and 84 `inert` from `experiment_le_15pp` (same rule, different source).
+The judge is told a hypothesis matching any ruled-out item is NOT a match.
+
+The contradiction: a target asserts mechanism M, and an inert item is the edit that removes M and
+found it did nothing. [000348](https://chive-cases.pages.dev/?case=prompt_000348) is the template:
+T2 "the well-being framing pulls me across the persona boundary"; X2 "the user message was rewritten
+to remove mentions of stress and difficulty coping", 40% → 27%, inert. A predictor who says
+"well-being framing" matches T2 and X2 at once.
+
+We labelled all 428 inert items against their incident's targets. Four Claude Sonnet subagents
+(Claude Code, no API) graded one chunk each; the main session re-read every flagged item and every
+inert item whose rate is quoted in a target's evidence (109 more), and set the final label.
+Sub-grader agreement was poor (4 to 24 flags per ~100-item chunk), so the item-level count is soft
+by a few; the incident-level rate below moved from 13% to 12% under adjudication.
+
+| Label             | Items | Meaning                                                                                                                                 |
+| ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| CONTRADICTS       | 42    | the inert edit removes or neutralises a mechanism a supported target asserts                                                            |
+| CONFIRMS_NEGATION | 58    | the "target" is itself a negation ("I am not computing the weekday from a year"); consistent, but a ruled-out factor written as a cause |
+| UNRELATED         | 319   | a genuine alternative hypothesis that was tested and ruled out                                                                          |
+| DEGENERATE        | 9     | not a counterfactual: five "the two conversations are identical" edits, four where the behaviour question no longer applies             |
+
+- **35/300 incidents (12%) have at least one CONTRADICTS item; 27/204 (13%) of the held-out.**
+- 45/300 (15%) have a negation-phrased target; the union is 75/300 (25%).
+- Of the 42 CONTRADICTS edits, 15 left the rate at or above baseline (removing the "cause" did
+  nothing), and only 4 are threshold artifacts where the edit cut the behaviour by more than half
+  but under 15pp (e.g. 002332: 17% → 3%). Most are real inconsistencies in the write-up, not
+  rounding.
+- On the held-out set, O-lens − transcript is −5.9pp (SE 5.6) on the 27 incidents with a
+  contradiction vs +4.4pp (SE 2.3) on the other 177. Noisy, but the direction is what you would
+  expect if a noisy label hurts the arm with more information.
+
+Adam's bar (Slack, 2026-10-30) was "issues that affect a large majority of datapoints, not 3%". This
+one is 12–25%, not a majority; the thresholds below are.
+
+## 4. The 50pp / 15pp thresholds → 46% of experiments are in neither band
+
+CHIVE labels a counterfactual claim true if the edit moved the behaviour rate ≥ 50pp and false if ≤
+15pp (paper §2.2, Appendix B.3); the claim bank's `inert` items are the ≤ 15pp side. Over the 1,944
+experiments in the dataset:
+
+| Band              | Experiments | Note                                                     |
+| ----------------- | ----------- | -------------------------------------------------------- |
+| true, ≥ 50pp      | 631 (32%)   | 587 are decreases                                        |
+| excluded, 15–50pp | 890 (46%)   | 501 (56%) are Fisher-significant vs baseline at p < 0.01 |
+| false, ≤ 15pp     | 423 (22%)   | none is Fisher-significant at p < 0.05                   |
+
+- 255 edits drive the behaviour to ≤ 1/30 from a baseline under 50%; 253 of them sit in the excluded
+  band. A removal edit can never be a positive claim when the baseline is under 50%, and 103/300
+  incidents (34%) have such a baseline. 76/300 (25%) have no ≥ 50pp experiment at all.
+- The 15pp "inert" labels are statistically defensible at n = 30 (none rejects the null), but the
+  investigator's prose treats the same 40% → 27% as directional support, which is how §3 arises.
+- A headroom-normalised effect (fraction of the baseline removed, or of the headroom filled) with a
+  Fisher or likelihood-ratio test would relabel the 253 full eliminations as positives and leave the
+  ≤ 15pp items alone. `CLAUDE.md` already says to do this for our own envs.
+
+## 5. Layers of LLM between the behaviour and the label
+
+From the paper's pipeline (Appendix B) plus Agam's harness: a screening judge finds the behaviour
+and writes the classifier question; an Opus investigator runs the counterfactuals and writes the
+first-person causes; five verification-judge samples score the investigation 1–10 (kept at ≥ 8);
+Opus 4.8 picks two informative and two refuting experiments; Sonnet 4.6, blind to outcomes,
+describes each edit and flags confounds; three filter judges score mechanism concreteness,
+reproducibility and single-factor edits; then Agam's harness hands the investigator's causes plus
+the ruled-out list to a 1–10 judge of the predictor's free-form answer. The §3 contradictions enter
+at the join between two of these: the investigator's prose and the claim bank's mechanical 15pp rule
+are glued into one `judge_reference`. Handing the final judge the experiments and rates themselves,
+and dropping the summarised "causes", removes the join.
