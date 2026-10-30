@@ -10,7 +10,8 @@ letter). Truth: the score distribution of RUN's N samples of that prompt (thinki
 Qwen's samples that match the submitted score (score.py; cfbench.answer's exact match on the modal score is secondary).
 
 Versions: `bare` (the prompt only), `anchored` (plus the base arm's score distribution on the same essay: what one
-zero-edit run says; base cases are left out of it).
+zero-edit run says; base cases are left out of it), `cf` (the zero-counterfactual one: the base prompt, Qwen's base scores
+and the edited prompt, with O-lens reads of the BASE prompt only; placebo = another essay's base reads, aligned by segment).
 
 Conditions (core.INLINE_CONDITIONS): `transcript_inline` (the prompt), `olens_inline` (O-lens bullets with FVE at every
 punctuation token of the prompt, <|im_end|> and the ten thinking-off tail tokens, layers 32-60; docs/read-positions.md),
@@ -44,7 +45,7 @@ QWEN, MODEL_NAME = "Qwen/Qwen3.6-27B", "the model"
 TASK = "answer"
 RUN = "2026-10-30_inline-n8"  # the Qwen env run (every arm x essay, N samples each); set once it exists
 READS = REPO_ROOT / "data/runs/olens_reads/2026-10-30_essay-grading-inline/reads.jsonl"
-VERSIONS: dict[str, dict] = {"bare": {"anchor": False}, "anchored": {"anchor": True}}
+VERSIONS: dict[str, dict] = {"bare": {"anchor": False}, "anchored": {"anchor": True}, "cf": {"anchor": True, "cf": True}}
 DEFAULT_VERSIONS = ["bare"]
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "low"  # Kylie, 2026-10-30
@@ -237,7 +238,51 @@ def block(lay: dict, reads: list[Pos]) -> str:
     return "\n".join(out).strip()
 
 
+CF_SETUP = """\
+## Setup
+
+We gave an AI model, with its thinking mode off, the base prompt below several times, each an independent sample with the \
+same sampling settings. Each time it wrote a short justification and ended with a line `Score: N/10`. Its scores were: \
+{dist}.
+
+## The base prompt
+
+```
+{base}
+```
+
+## The edit
+
+We then changed the opening of the prompt (everything before <essay>) and gave the model the edited prompt {n} times with \
+the same settings. The essay and the instruction after it are unchanged. The edited prompt:
+
+```
+{text}
+```"""
+CF_OLENS_NOTE = """\
+The reads below are of the model reading the BASE prompt (no read was taken of the edited prompt): use them for what they \
+say about how the model sees this essay and this kind of request."""
+CF_TASK_TEXT = """\
+## Your task
+
+Predict the score out of 10 the model gives most often to the EDITED prompt. You are scored by how often the model's own \
+score on the edited prompt matches yours, so give the single most likely score as a number. Reason it through first, then \
+call `submit_answer` once with the number."""
+
+
+def _dist(answers: dict) -> str:
+    return ", ".join(f"{k} x {s}/10" for s, k in sorted(answers.items(), key=lambda x: float(x[0])))
+
+
+def cf_placebo(inputs: str, item: str, seed: int) -> str:
+    """The base prompt of another essay, seeded per (draw, case)."""
+    ok = sorted(i for i in _layout(inputs) if i.startswith(f"{ENV}/base~") and not i.endswith(f"~{item}") and i in _pool())
+    return random.Random(f"cf:{seed}:{item}").choice(ok)
+
+
 def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
+    if VERSIONS[case["version"]].get("cf"):
+        return _cf_inline(env, condition, case, seed)
     setup = SETUP.format(n=case["n_cf"], text=env.text)
     if VERSIONS[case["version"]]["anchor"]:
         dist = ", ".join(f"{k} x {s}/10" for s, k in sorted(case["answers_base"].items(), key=lambda x: float(x[0])))
@@ -252,6 +297,22 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         lays = _layout(case["inputs"])
         parts += [OLENS_TEXT, block(lays[me], aligned(lays[me], lays[src], _pool()[src]))]
     parts.append(TASK_TEXT)
+    return "\n\n".join(parts), extra
+
+
+def _cf_inline(env: Prompt, condition: str, case: dict, seed: int) -> tuple[str, dict]:
+    """The zero-counterfactual version: base prompt + Qwen's base scores + the edited prompt; reads of the base prompt only."""
+    me = request_id("base", case["item"])
+    parts = [CF_SETUP.format(dist=_dist(case["answers_base"]), base=Prompt("base", case["item"]).text, n=case["n_cf"], text=env.text)]
+    extra = {}
+    if condition != "transcript_inline":
+        src = me
+        if condition == "olens_placebo_inline":
+            src = cf_placebo(case["inputs"], case["item"], seed)
+            extra = {"placebo_sources": [src]}
+        lays = _layout(case["inputs"])
+        parts += [OLENS_TEXT + "\n\n" + CF_OLENS_NOTE, block(lays[me], aligned(lays[me], lays[src], _pool()[src]))]
+    parts.append(CF_TASK_TEXT)
     return "\n\n".join(parts), extra
 
 
