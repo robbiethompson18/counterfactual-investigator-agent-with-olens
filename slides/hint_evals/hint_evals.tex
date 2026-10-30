@@ -115,11 +115,6 @@
   \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens,
   \dt{olensnl}\,\cond{olensnl}{O-lens (nl)} and \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
   Qwen answers B in 7 of 8 samples.
-  \par\smallskip
-  {\footnotesize
-  \sw{transcript}\ \transcript \quad \sw{olens}\ \olens{} \quad \swp{olens}\ \muted{placebo (another question's reads)}
-  \\[2pt] \sw{olensnl}\ \cond{olensnl}{O-lens (nl)} \muted{option newlines only, earlier run} \quad \sw{probe}\ \cond{probe}{probe}
-  \quad \sw{probetuned}\ \cond{probetuned}{tuned probe} \muted{(hint first only)}\par}
   \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
 
@@ -127,7 +122,8 @@
   \slidefig{fig/grid.pdf}
   \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
     95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001.}
+    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; O-lens (nl): the option-newline
+    reads only (earlier run); tuned probe: the probe refit on hint-first prompts (out-of-fold).}
 \end{frame}
 
 \end{document}
