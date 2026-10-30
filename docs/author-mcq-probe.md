@@ -320,6 +320,32 @@ selector (`bank.is_read_token`: any punctuation, symbol or newline token, e.g. q
 reads inline and the deletion tables:
 `#dataset=runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst/pairs`.
 
+## SynthPAI ×2 and the Blog Authorship Corpus (2026-10-30, set up, predictor not run)
+
+**SynthPAI, a second passage per author** (`runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst-b`,
+`ablate.py prep --qfirst --exclude`): 232 more passages, 706 confident pairs; stable / with
+evidence: sex 128 / 53, age 135 / 59, education 146 / 56, income 137 / 32. Drop eval with both
+passages (`AUTHOR_X2=1`, inputs `runs/cfbench_evals/2026-10-30_author-mcq-drop-inline-inputs-x2`):
+904 cases (qwen_wrong 242 from 77 authors, qwen_right 662), base rate 0.50; score with CIs clustered
+by author.
+
+**Blog Authorship Corpus** (`scripts/author_probe/blog.py`; Schler et al. 2006,
+`tasksource/blog_authorship_corpus`): 2,004 one-post passages (200-450 words) balanced over gender ×
+the corpus's three age groups (13-17 / 23-27 / 33-48, asked as Under 20 / 20-29 / 30 or older), bank
+on HF `banks/author_mcq_blog/`; question-first prompts ("... based on the blog post I wrote
+below?"), the sentence as the deletion unit (median 19 per post).
+
+| attribute | Qwen acc (chance) | confident | ablated | stable | stable with evidence | stable, Qwen wrong / right |
+| --------- | ----------------- | --------- | ------- | ------ | -------------------- | -------------------------- |
+| sex       | 0.83 (0.50)       | 1,279     | 413     | 395    | 107                  | 111 / 284                  |
+| age       | 0.76 (0.33)       | 1,667     | 615     | 536    | 165                  | 256 / 280                  |
+
+Ablated = every confident Qwen-wrong pair plus 300 Qwen-right pairs per attribute
+(`runs/author_mcq_blog/2026-10-30_ablate-loo`, 42,696 prompts on two H200s). Drop eval
+`cfbench/evals/author_blog_drop_inline` (same rule, prompt, conditions and investigator): qwen_wrong
+366 cases (183 positive, 143 pairs), qwen_right 294 (147, 129). O-lens reads for its 272 pairs
+(13,876 positions × layers 32/40/48) go to `runs/olens_reads/2026-10-30_author-blog`.
+
 ## Where things live
 
 - Code: [`scripts/author_probe/`](../scripts/author_probe/CLAUDE.md) (`bank.py`, `fit.py`,
