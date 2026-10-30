@@ -74,6 +74,17 @@ def errors(bars_of):
     return f
 
 
+def hinted_baseline(bars_of):
+    """bars_of with the dotted line at always naming the hinted (correct) letter: right exactly on the knew half, so 50%
+    either way (Kylie, 2026-10-30: in place of the 1-in-10 chance line)."""
+
+    def f(name: str) -> tuple[dict, float, int]:
+        bars, _, n = bars_of(name)
+        return bars, 0.5, n
+
+    return f
+
+
 def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     """condition -> (% correct, CI, stars) over every item of every run, as the page's headline answer panel."""
     items: dict[tuple, dict[str, list[float]]] = {}
@@ -157,7 +168,7 @@ def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
 
 
 if __name__ == "__main__":
-    panels({"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}, errors(claim_bars), "chance",
-           "error rate (lower is better)", OUT / "knew.pdf")  # fmt: skip
-    panels({"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}, errors(answer_bars),
-           "chance", "error rate (lower is better)", OUT / "letter.pdf")  # fmt: skip
+    knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
+    letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
+    panels(knew, errors(claim_bars), "chance", "error rate (lower is better)", OUT / "knew.pdf")
+    panels(letter, hinted_baseline(errors(answer_bars)), "always the hinted letter", "error rate (lower is better)", OUT / "letter.pdf")
