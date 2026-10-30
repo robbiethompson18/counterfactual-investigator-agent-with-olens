@@ -64,12 +64,15 @@ def build(a):
     ok = ok[ok.text.map(lambda t: sum(c.isascii() for c in t) / len(t) > 0.98)]
     band = lambda age: 0 if age < 20 else 1 if age < 30 else 2
     rng = random.Random(a.seed)
+    old_p = load(BANK / "passages.jsonl") if a.append else []  # --append: new bloggers only, added to the bank
+    old_q = load(BANK / "questions.jsonl") if a.append else []
+    taken = {p["author"] for p in old_p}
     cells: dict[tuple, list] = {}
-    for bid, g in ok.groupby("id"):
+    for bid, g in ok[~ok.id.astype(str).isin(taken)].groupby("id"):
         r = g.iloc[rng.randrange(len(g))]
         cells.setdefault((r.gender, band(r.age)), []).append(r)
     per = a.n // len(cells)
-    passages, questions = [], []
+    passages, questions = list(old_p), list(old_q)
     for (gender, b), rows in sorted(cells.items()):
         for r in rng.sample(rows, min(per, len(rows))):
             sents = sentences(r.text)
@@ -118,8 +121,9 @@ def prompts(a):
     from transformers import AutoTokenizer
 
     tok, run = AutoTokenizer.from_pretrained(MODEL), Path(a.run)
+    done = {r["passage"] for x in a.skip for r in load(Path(x) / "qwen_answers.jsonl")}  # passages answered in earlier runs
     with open(run / "inputs_answer.jsonl", "w") as f:
-        for p in load(BANK / "passages.jsonl"):
+        for p in (p for p in load(BANK / "passages.jsonl") if p["id"] not in done):
             for attr, opts in ATTRS.items():
                 f.writelines(
                     json.dumps(_row(tok, f"{p['id']}:{attr}:o{o}", p["text"], attr, order)) + "\n"
@@ -160,7 +164,7 @@ def answers(a):
             "|---|---|---|---|---|---|---|",
         ],
     )
-    for q in load(BANK / "questions.jsonl"):
+    for q in (q for q in load(BANK / "questions.jsonl") if q["id"] in pm):  # this run's passages
         p = pm[q["id"]]
         picks = [orders(len(q["options"]))[o][int(np.argmax(raw[f"{q['id']}:o{o}"]["logp"]))] for o in (0, 1)]
         agree = picks[0] == picks[1]
@@ -343,8 +347,12 @@ def main():
     b.add_argument("--n", type=int, default=2000)
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--upload", action="store_true")
-    for name in ("prompts", "answers", "del-analyze"):
+    b.add_argument("--append", action="store_true", help="add --n posts from bloggers not yet in the bank")
+    for name in ("answers", "del-analyze"):
         sub.add_parser(name).add_argument("run")
+    pr = sub.add_parser("prompts")
+    pr.add_argument("run")
+    pr.add_argument("--skip", nargs="*", default=[], help="runs whose passages are already answered")
     d = sub.add_parser("del-prep")
     d.add_argument("run")
     d.add_argument("--src", required=True)
