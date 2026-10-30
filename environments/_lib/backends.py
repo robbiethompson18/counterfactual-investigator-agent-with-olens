@@ -273,7 +273,10 @@ def request(t: Target, messages: list[dict], tools: list[dict] | None) -> tuple[
     if t.backend == "vllm":
         if not t.url:
             raise SystemExit("--backend vllm needs --url")
-        body["chat_template_kwargs"] = {"enable_thinking": t.thinking, "preserve_thinking": True}
+        kw: dict = {"enable_thinking": t.thinking, "preserve_thinking": True}
+        if "glm" in t.model.lower() and t.thinking and t.effort:  # GLM 5.3's template: reasoning_effort low / high, else max
+            kw["reasoning_effort"] = t.effort
+        body["chat_template_kwargs"] = kw
         return body, t.url.rstrip("/") + "/chat/completions", vllm_key()
     raise SystemExit(f"unknown backend {t.backend}")
 
