@@ -73,3 +73,30 @@ def main(paths: list[str]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
+
+def stats(rows: list[dict]) -> list[dict]:
+    """The env viewer's claim table (environments/_lib/evals.py), hint_qwen_dsv4's % right schema: one row per condition,
+    a case = (arm, intro), its score the mean of its draws; CI resampling essays."""
+    invalid: dict[str, int] = defaultdict(int)
+    by: dict = defaultdict(lambda: defaultdict(list))
+    truth = {}
+    for r in rows:
+        cond = canon_condition(r["condition"])
+        if not r["valid"]:
+            invalid[cond] += 1
+            continue
+        k = (r["base_arm"], r["item"])
+        by[cond][k].append(r["p"])
+        truth[k] = r["k_cf"]
+    rng, out = np.random.default_rng(0), []
+    for cond, d in sorted(by.items()):
+        keys = list(d)
+        right = lambda ks, d=d: float(np.mean([np.mean([(p >= 0.5) == truth[k] for p in d[k]]) for k in ks]))
+        bs = np.array(boot(right, keys, rng), dtype=float)
+        mp = {k: float(np.mean(v)) for k, v in d.items()}
+        m = metrics(mp, truth, keys)
+        out.append({"condition": cond, "version": "cf", "invalid": invalid[cond], "n": sum(map(len, d.values())), "n_items": len(keys),
+                    "accuracy": right(keys), "accuracy_ci": [float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
+                    "auroc": m["auroc"], "mean_brier": float(np.mean([(p - truth[k]) ** 2 for k in keys for p in d[k]]))})  # fmt: skip
+    return out
