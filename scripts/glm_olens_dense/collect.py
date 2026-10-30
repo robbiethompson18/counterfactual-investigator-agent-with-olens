@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import torch
 
@@ -79,6 +80,28 @@ def to_table(df: pd.DataFrame, kind: str, dense: bool) -> pa.Table:
     return pa.Table.from_pandas(df[[c for c, _ in COLS]], schema=SCHEMA, preserve_index=False)
 
 
+def add_copies(prep: Path, out: Path, fill_root: Path):
+    """Positions another read already covers (copies.parquet: an earlier upload's readouts_dense, or another fill run's): copy the
+    canonical row's reads under this run's tid/pos, kind=copied, so the episode shows every read in one upload."""
+    C = pd.read_parquet(prep / "copies.parquet")
+    C = C[C.tid.isin(set(pd.read_parquet(out / "episodes.parquet", columns=["tid"]).tid))]  # the episodes the first pass kept (--tids)
+    if not len(C):
+        return
+    src = []
+    for (kind, d), g in C.groupby(["src", "src_dir"]):
+        f = Path(d) / "readouts_dense.parquet" if kind == "old" else fill_root / d / "readouts_dense.parquet"
+        S = pd.read_parquet(f, columns=["tid", "pos", "h51_norm", *[c for c, _ in COLS if c.startswith(("rl_", "sft_", "fve_"))]])
+        S = S.drop_duplicates(["tid", "pos"]).rename(columns={"tid": "src_tid", "pos": "src_pos"})
+        src.append(g.merge(S, on=["src_tid", "src_pos"], how="inner", validate="one_to_one"))
+    S = pd.concat(src).drop(columns=["src", "src_dir", "src_tid", "src_pos"])
+    P = pd.read_parquet(prep / "positions.parquet").drop(columns=["is_special", "copied"])
+    rows = P.merge(S, on=["tid", "pos"], how="inner", validate="one_to_one")
+    old = pq.read_table(out / "readouts_dense.parquet")
+    old = old.filter(pc.field("kind") != "copied") if old.num_rows else old
+    pq.write_table(pa.concat_tables([old, to_table(rows, "copied", True)]), out / "readouts_dense.parquet", compression="zstd")
+    print(f"{prep.name}: {len(rows):,} copied rows of {len(C):,} ({old.num_rows:,} read here)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prep", required=True)
@@ -90,20 +113,29 @@ def main():
     )
     ap.add_argument("--keep", default=None, help="parquet of (tid, pos) to keep (drops extra reads of an earlier, wider job)")
     ap.add_argument("--tids", default=None, help="JSON list of the sampled episode views: episodes + prefix dups restricted to them")
+    ap.add_argument("--jobs-glob", default=None, help="job files to scan when jobs mix runs (prep_envs.py: p<tier>__NNNN.job.pt)")
+    ap.add_argument(
+        "--copies-from", default=None, help="second pass (prep_envs.py): append copies.parquet's reads; fill sources under this root"
+    )
     a = ap.parse_args()
+    if a.copies_from:
+        return add_copies(Path(a.prep), Path(a.out), Path(a.copies_from))
     prep, out = Path(a.prep), Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    P = pd.read_parquet(prep / "positions.parquet").drop(columns=["is_special"])
-    jobs = sorted(Path(p) for p in glob.glob(f"{a.jobs}/{prep.name}*__*.job.pt"))
+    P = pd.read_parquet(prep / "positions.parquet").drop(columns=["is_special", "copied"], errors="ignore")
+    jobs = sorted(Path(p) for p in glob.glob(a.jobs_glob or f"{a.jobs}/{prep.name}*__*.job.pt"))
     done = [j for j in jobs if Path(str(j).replace(".job.pt", ".out.pt")).exists()]
     w = pq.ParquetWriter(out / "readouts_dense.parquet", SCHEMA, compression="zstd")
     keep = pd.read_parquet(a.keep).drop_duplicates() if a.keep else None
     tids = set(json.loads(Path(a.tids).read_text())) if a.tids else None
-    n, read_pos = 0, []
+    n, read_pos, seen = 0, [], set()
     for j in done:
         kind = "head" if "head__" in j.name else a.kind  # --head jobs: every position through the first user message
         rows = shard_rows(j, P)
-        if keep is not None:
+        # a position read by two passes' jobs: keep the first
+        rows = rows[np.array([k not in seen for k in zip(rows.tid, rows.pos)], dtype=bool)]
+        seen.update(zip(rows.tid, rows.pos))
+        if a.keep:
             rows = rows.merge(keep, on=["tid", "pos"])
         t = to_table(rows, kind, not a.subset)
         read_pos.append(t.select(["tid", "pos"]).to_pandas())
