@@ -128,7 +128,7 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
             v, (lo, hi), st = bars[c]
             ax.bar(x, v, 0.8, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-            ax.text(x, hi + 0.015, f"{v:.0%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+            ax.text(x, hi + 0.015, f"{v:.1%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
