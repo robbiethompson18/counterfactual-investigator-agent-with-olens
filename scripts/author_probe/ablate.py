@@ -14,14 +14,16 @@ activation (all candidate attributes share it) and the "?" activation (order 0) 
 
 import argparse
 import json
+from collections.abc import Collection
 from pathlib import Path
 
 import numpy as np
 
 from environments._lib.runfolder import REPO_ROOT
-from scripts.author_probe.bank import ATTRS, BANK, LETTERS, MODEL, answer_message, orders
+from scripts.author_probe.bank import ATTRS, BANK, LETTERS, MODEL, answer_message, orders, qf_message
 
 CACHE = REPO_ROOT / "data" / "probe_cache"
+OLD = Path("data/runs/author_mcq_probe/2026-10-30_ablate-loo")  # the original-format run
 USE = ("sex", "age", "education", "income")
 # probes of record: label-trained, layer = best out-of-sample AUROC (probes.md of the src run)
 LAYERS = {"im_end": {"sex": 28, "age": 5, "education": 8, "income": 10}, "qmark": {"sex": 55, "age": 30, "education": 59, "income": 57}}
@@ -43,7 +45,7 @@ def comments_by_id() -> dict[str, dict]:
     return {c["id"]: c for c in map(json.loads, Path(raw).read_text().splitlines())}
 
 
-def select(src: Path) -> dict[str, list[str]]:
+def select(src: Path, prefer: Collection[str] = ()) -> dict[str, list[str]]:
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     ok: dict[str, list[str]] = {}
     for r in load(src / "qwen_answers.jsonl"):
@@ -52,7 +54,7 @@ def select(src: Path) -> dict[str, list[str]]:
     best: dict[str, str] = {}
     for p, attrs in sorted(ok.items()):
         a = passages[p]["author"]
-        if a not in best or len(attrs) > len(ok[best[a]]):
+        if a not in best or (p in prefer, len(attrs)) > (best[a] in prefer, len(ok[best[a]])):
             best[a] = p
     return {p: ok[p] for p in sorted(best.values())}
 
@@ -65,15 +67,19 @@ def prep(a):
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     qs = {q["id"]: q for q in load(BANK / "questions.jsonl")}
     com = comments_by_id()
-    picked = select(src)
+    # question-first (--qfirst): prefer the passages the original-format run ablated, whose O-lens reads exist
+    prefer = {r["passage"] for r in load(OLD / "pairs.jsonl")} if a.qfirst else set()
+    picked = select(src, prefer)
     pairs = []
     with open(run / "inputs_del_passage.jsonl", "w") as fp, open(run / "inputs_del_answer.jsonl", "w") as fa:
-        write_rows(tok, picked, passages, qs, com, pairs, fp, fa)
+        write_rows(tok, picked, passages, qs, com, pairs, fp, fa, a.qfirst)
     (run / "pairs.jsonl").write_text("".join(json.dumps(p) + "\n" for p in pairs))
     print(f"{len(picked)} passages, {len(pairs)} pairs; layers {sorted({v for d in LAYERS.values() for v in d.values()})}")
 
 
-def write_rows(tok, picked, passages, qs, com, pairs, fp, fa):
+def write_rows(tok, picked, passages, qs, com, pairs, fp, fa, qfirst: bool = False):
+    """Original format: passage-only rows (`im_end`) and answer rows (order 0 with the `qmark` site). Question-first: the
+    answer rows only, no activations (letter log-probs for the drop truth)."""
     letter_ids = [tok.encode(c, add_special_tokens=False)[0] for c in LETTERS]
     im_end = tok.convert_tokens_to_ids("<|im_end|>")
     for pid, attrs in picked.items():
@@ -83,17 +89,20 @@ def write_rows(tok, picked, passages, qs, com, pairs, fp, fa):
             text = "\n\n".join(t for j, t in enumerate(texts) if j != i)
             rendered = tok.apply_chat_template([{"role": "user", "content": text}], tokenize=False, enable_thinking=False)
             ids = tok(rendered, add_special_tokens=False)["input_ids"]
-            fp.write(json.dumps({"id": f"{pid}~{i}", "ids": ids, "sites": {"im_end": [ids.index(im_end)]}, "cand": letter_ids}) + "\n")
+            if not qfirst:
+                fp.write(json.dumps({"id": f"{pid}~{i}", "ids": ids, "sites": {"im_end": [ids.index(im_end)]}, "cand": letter_ids}) + "\n")
             for attr in attrs:
                 q = qs[f"{pid}:{attr}"]
                 for o, order in enumerate(orders(len(q["options"]))):
-                    user = answer_message(text, q["question"], [q["options"][k] for k in order])
+                    shown = [q["options"][k] for k in order]
+                    user = qf_message(text, attr, shown) if qfirst else answer_message(text, q["question"], shown)
                     rendered = tok.apply_chat_template(
                         [{"role": "user", "content": user}], tokenize=False, add_generation_prompt=True, enable_thinking=False
                     )
                     enc = tok(rendered, return_offsets_mapping=True, add_special_tokens=False)
                     qchar = rendered.index(user) + len(text) + 2 + len(q["question"]) - 1
-                    sites = {"qmark": [next(k for k, (s, e) in enumerate(enc["offset_mapping"]) if s <= qchar < e)]} if o == 0 else {}
+                    hit = next((k for k, (s, e) in enumerate(enc["offset_mapping"]) if s <= qchar < e), None)
+                    sites = {"qmark": [hit]} if o == 0 and not qfirst else {}
                     row = {"id": f"{pid}:{attr}~{i}:o{o}", "ids": enc["input_ids"], "sites": sites, "cand": letter_ids[: len(order)]}
                     fa.write(json.dumps(row | {"order": order}) + "\n")
         pairs += [{"passage": pid, "attr": attr, "n_comments": len(texts)} for attr in attrs]
@@ -156,7 +165,6 @@ def analyze(a):
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     qs = {q["id"]: q for q in load(BANK / "questions.jsonl")}
     com = comments_by_id()
-    layers = json.loads((cache / "passage" / "layers.json").read_text())
     # Qwen's pmf per (pair, deletion), averaged over orders in option space
     order_of = {r["id"]: r["order"] for r in load(run / "inputs_del_answer.jsonl")}
     pmf: dict[str, np.ndarray] = {}
@@ -169,13 +177,16 @@ def analyze(a):
         canon[order_of[r["id"]]] = p / p.sum()
         pmf[key] = pmf.get(key, 0) + canon / 2
     # activations: passage rows in input order (im_end), answer rows with a qmark site (order 0) in input order
-    pid_rows = [r["id"] for r in load(run / "inputs_del_passage.jsonl")]
-    q_rows = [r["id"].rsplit(":o", 1)[0] for r in load(run / "inputs_del_answer.jsonl") if r["sites"]]
-    acts = {
-        "im_end": dict(zip(pid_rows, np.load(cache / "passage" / "im_end.npy"), strict=True)),
-        "qmark": dict(zip(q_rows, np.concatenate([np.load(part / "qmark.npy") for part in parts]), strict=True)),
-    }
-    models, oof = frozen_probes(src)
+    sites = () if a.qfirst else tuple(LAYERS)  # question-first: Qwen's pmf only, no probe activations
+    if sites:
+        pid_rows = [r["id"] for r in load(run / "inputs_del_passage.jsonl")]
+        q_rows = [r["id"].rsplit(":o", 1)[0] for r in load(run / "inputs_del_answer.jsonl") if r["sites"]]
+        acts = {
+            "im_end": dict(zip(pid_rows, np.load(cache / "passage" / "im_end.npy"), strict=True)),
+            "qmark": dict(zip(q_rows, np.concatenate([np.load(part / "qmark.npy") for part in parts]), strict=True)),
+        }
+        models, oof = frozen_probes(src)
+        layers = json.loads((cache / "passage" / "layers.json").read_text())
     vec, tf = tfidf(src)
 
     def probe(site: str, pid: str, attr: str, i: int) -> np.ndarray:
@@ -206,7 +217,7 @@ def analyze(a):
                     "tv": float(0.5 * np.abs(p - full).sum()),
                     "qwen_shift": float(p[ans] - full[ans]),
                     "argmax_kept": int(p.argmax()) == ans,
-                    "probe_shift": {s: float(probe(s, pid, attr, i)[ans] - probe(s, pid, attr, -1)[ans]) for s in LAYERS},
+                    "probe_shift": {s: float(probe(s, pid, attr, i)[ans] - probe(s, pid, attr, -1)[ans]) for s in sites},
                     "tfidf_shift": float(tf[attr].predict_proba(vec.transform([rest]))[0][ans] - tf_full[ans]),
                     "human": {"estimate": str(hum.get("estimate") or ""), "certainty": hum.get("certainty", 0)},
                     "pmf": p.round(4).tolist(),
@@ -221,8 +232,8 @@ def analyze(a):
             pr
             | {"label": label, "answer": ans, "pmf": full.round(4).tolist(), "conf": conf(full.tolist()), "median_tv": med}
             | {"stable": med < 0.05, "stable_argmax": bool(np.mean([d["argmax_kept"] for d in dels]) >= 0.9), "deletions": dels}
-            | {"probe_full": {s: probe(s, pid, attr, -1).round(4).tolist() for s in LAYERS}}
-            | {"probe_oof": {s: oof[s, attr][pid].round(4).tolist() for s in LAYERS}}
+            | {"probe_full": {s: probe(s, pid, attr, -1).round(4).tolist() for s in sites}}
+            | {"probe_oof": {s: oof[s, attr][pid].round(4).tolist() for s in sites}}
         )
     (run / "pairs_scored.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
 
@@ -529,10 +540,12 @@ def main():
     p = sub.add_parser("prep")
     p.add_argument("run")
     p.add_argument("--src", required=True)
+    p.add_argument("--qfirst", action="store_true", help="question-first prompts (bank.qf_message), Qwen's pmf only")
     z = sub.add_parser("analyze")
     z.add_argument("run")
     z.add_argument("--src", required=True)
     z.add_argument("--key", type=int, default=10)
+    z.add_argument("--qfirst", action="store_true")
     v = sub.add_parser("view")
     v.add_argument("run")
     v.add_argument("--all", action="store_true")

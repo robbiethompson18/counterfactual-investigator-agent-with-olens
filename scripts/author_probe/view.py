@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-from scripts.author_probe.bank import ATTRS, BANK, LETTERS, answer_message
+from scripts.author_probe.bank import ATTRS, BANK, LETTERS, answer_message, qf_message
 from scripts.author_probe.dsv4 import MODEL as DSV4
 
 sys.path.insert(0, "expview")
@@ -19,6 +19,7 @@ from expview import Run, call
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
+    ap.add_argument("--qfirst", action="store_true", help="question-first prompts (bank.qf_message); stability from ablate-loo-qfirst")
     a = ap.parse_args()
     run = Path(a.run)
     load = lambda p: [json.loads(line) for line in Path(p).read_text().splitlines()]
@@ -26,11 +27,13 @@ def main():
     qs = {q["id"]: q for q in load(BANK / "questions.jsonl")}
     qwen = {r["id"]: r for r in load(run / "qwen_answers.jsonl")}
     dsv4 = {r["id"]: r for r in load(run / "dsv4_answers.jsonl")} if (run / "dsv4_answers.jsonl").exists() else {}
-    abl = run.parent / "2026-10-30_ablate-loo" / "pairs_scored.jsonl"  # stable = median single-comment-deletion TV < 0.05
+    abl = (
+        run.parent / ("2026-10-30_ablate-loo-qfirst" if a.qfirst else "2026-10-30_ablate-loo") / "pairs_scored.jsonl"
+    )  # stable = median single-comment-deletion TV < 0.05
     stable = {f"{r['passage']}:{r['attr']}": r["stable"] for r in load(abl)} if abl.exists() else {}
     ex = Run(
         run / "expview",
-        title="SynthPAI author MCQs: Qwen3.6-27B letter pmf",
+        title="SynthPAI author MCQs: Qwen3.6-27B letter pmf" + (" (question first)" if a.qfirst else ""),
         description=(
             "One item per passage (random comments of one SynthPAI author). For each attribute, Qwen3.6-27B (thinking off) "
             "is asked the question in two option orders; the 'reply' shown is its letter probabilities at the answer position "
@@ -60,7 +63,7 @@ def main():
                 order = list(range(len(opts))) if o == 0 else list(range(len(opts)))[::-1]
                 shown = [opts[i] for i in order]
                 pm = "\n".join(f"{LETTERS[j]}. {shown[j]}: {rec['pmf'][i]:.3f}" for j, i in enumerate(order))
-                msg = answer_message(p["text"], q["question"], shown)
+                msg = qf_message(p["text"], attr, shown) if a.qfirst else answer_message(p["text"], q["question"], shown)
                 calls.append(
                     call(
                         f"{attr} order {o} (Qwen letter pmf)",
