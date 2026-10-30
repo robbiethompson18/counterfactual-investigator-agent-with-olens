@@ -240,6 +240,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   — 20 arm pairs × 8 shown acting runs (160 cases), 1 draw: env 18.3 / transcript 18.6 / O-lens
   18.1pp vs null 22.2, O-lens − transcript [−2.8, +2.4]; every condition misses the no-done-tool
   drop (30–56pp)
+- [NULL: Hint flip probe — read before predicting whether removing a hint or a frame line (JSON line, eval header) changes Qwen's MCQ letter, or reusing the Wikipedia / jsonapp-before / TruthfulQA frame arms](hint-flip-probe.md)
+  — 1,533 questions × 20 removals, bf16 argmax: frame removal flips 0.47% of consistent cases (94%
+  of frame flips are wavering answers); hint removal (20%) duplicates the knew/didn't evals
 - [NULL: Residual reads (dead end) — read before projecting the realized continuation out of an activation to find "unverbalized" content](olens-residual-reads.md)
   — lens on h minus AR(next 32 tokens): null vs a norm-matched wrong-continuation control (~2% new
   on-topic reads in every arm, blind-graded); code only on closed PR #125

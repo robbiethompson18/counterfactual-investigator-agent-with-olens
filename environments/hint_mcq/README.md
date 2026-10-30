@@ -71,3 +71,8 @@ The hint inside the JSON (2026-10-29, `2026-10-29_json-hint-qwen36`; questions w
 Qwen's no-hint answer): plain gold 79% / wrong letter 30%; hint line under the app JSON (`jsonapp/`)
 60% / 20%; professor sentence as the JSON's `note` (`jsonnote/`) 68% / 21%; a bare
 `"suggested_answer": "X"` field (`jsonans/`) 72% / 33% (wrong letter +3pp [−3, +9] vs plain).
+
+Hint flip probe arms (2026-10-29, [docs/hint-flip-probe.md](../../docs/hint-flip-probe.md)):
+`wiki+d1`, `before/`, `jsonapp/`, `mmlu/`, `jsonnote/wiki+d1` ("Wikipedia says it's X." as the hint,
+factor `source`), and `jsonapp-before/hint+d1`, `jsonapp-before/wiki+d1` (the jsonapp line on top,
+then the hint, then the question). No sampled runs; used for bf16 letter-argmax labels only.
