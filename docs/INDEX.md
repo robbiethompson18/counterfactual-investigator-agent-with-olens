@@ -91,7 +91,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   own placebo by much (+7.6pp; NLA +2.8pp, J++ +1.7pp), the J++ and NLA placebos alone add +3–5pp
   (cutoff framing); the lens writes the answer at the ` ` after `<|im_end|>`; with a required
   submit_answer tool call (200 items, answer 20 tokens past the last read) the O-lens gap holds (76%
-  vs 58% vs 62%); the one cutoff chart; the lens-shares-Qwen's-cutoff caveat
+  vs 58% vs 62%), and at scale (v3, 1,849 items, stale items: O-lens +17pp over its placebo, J++ +9,
+  NLA +8, the same where Qwen always calls the tool unforced); the one cutoff chart; the
+  lens-shares-Qwen's-cutoff caveat
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)
