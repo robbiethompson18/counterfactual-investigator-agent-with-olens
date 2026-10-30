@@ -277,7 +277,7 @@ cases are not hard from the prompt: Qwen's wrong answers are the ones a reader o
 gives (and age/income answers are mostly the modal 30-44 / Middle), so the transcript-only
 investigator is already near the majority-answer rate or above it.
 
-## Comment-deletion eval, question first (2026-10-30, set up, not run)
+## Comment-deletion eval, question first (2026-10-30)
 
 **Deletions:** `runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst`
 (`ablate.py prep/analyze --qfirst`, one H100, ~$4): 287 passages (one per author, preferring the
@@ -290,9 +290,29 @@ three conditions). Claim: deleting this comment lowers Qwen's probability on its
 max(0.15, 5 × the pair's median drop). Stable pairs, all positives + as many negatives per pair
 (base rate 0.50), versions `qwen_wrong` (Qwen ≠ label: 124 cases, 62 positive, 54 pairs) and
 `qwen_right` (346 cases, 173 positive, 161 pairs). Positive drops: median 0.23 / 0.26; 16 / 49 of
-them flip the argmax. Investigator Haiku 5.5 at effort low. Inputs run
-`runs/cfbench_evals/2026-10-30_author-mcq-drop-inline-inputs`, whose `expview/` has every rendered
-prompt (case × condition, not sent) with the pair's deletion table and a link to the pair's item.
+them flip the argmax. Investigator Haiku 5.5 at effort low (not the repo's default Gemini 3.8
+Flash). Inputs run `runs/cfbench_evals/2026-10-30_author-mcq-drop-inline-inputs`, whose `expview/`
+has every rendered prompt (case × condition, not sent) with the pair's deletion table and a link to
+the pair's item.
+
+**Results** (`runs/cfbench/2026-10-30_author-mcq-drop-haiku`, 1 draw, Haiku 5.5 effort low, $3.56;
+base rate 0.50):
+
+| version (n)      | condition  | AUROC | RMSE  | acc at p ≥ 0.5 |
+| ---------------- | ---------- | ----- | ----- | -------------- |
+| qwen_wrong (124) | transcript | 0.89  | 0.494 | 0.58           |
+|                  | O-lens     | 0.91  | 0.491 | 0.63           |
+|                  | placebo    | 0.91  | 0.502 | 0.60           |
+| qwen_right (346) | transcript | 0.88  | 0.486 | 0.61           |
+|                  | O-lens     | 0.90  | 0.492 | 0.59           |
+|                  | placebo    | 0.88  | 0.506 | 0.58           |
+
+Paired (bootstrap over cases): O-lens − transcript Brier gain +0.003 [−0.013, +0.020] (wrong),
+−0.006 [−0.018, +0.006] (right); AUROC +0.02 in both, CIs over 0. O-lens − placebo Brier +0.011
+[−0.007, +0.031] (wrong), +0.014 [+0.003, +0.027] (right). The investigator ranks evidence comments
+well from the text alone (AUROC ~0.88) but its probabilities are poorly calibrated (RMSE ~0.49 at a
+0.50 base rate); the O-lens adds nothing significant over the transcript and a little over the
+placebo on qwen_right. Env viewer: `#eval=author_mcq_drop_inline` (after merge).
 
 **Reads:** `runs/olens_reads/2026-10-30_author-qfirst` was topped up with the broader read-position
 selector (`bank.is_read_token`: any punctuation, symbol or newline token, e.g. quotes, dashes, `&`):
