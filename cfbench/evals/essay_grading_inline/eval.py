@@ -1,12 +1,13 @@
-"""essay_grading_inline: what score out of 10 will Qwen give this essay? ~1,800 grading prompts, single-turn (Kylie, 2026-10-30).
+"""essay_grading_inline: what score out of 10 will Qwen give this essay? 2,004 grading prompts, single-turn (Kylie, 2026-10-30).
 
 The old essay_grading eval (38 base<->cf pairs, agentic) can't separate conditions: 25 of 38 cases sit at 0-2/30 or 28-30/30
-because Qwen only says 4, 5 or 6 and the harsh cut is at 4, and 38 cases are 19 arm pairs. This one scales the env instead:
-every essay_grading arm (the 21 old ones plus the 205-arm wide set, environments/essay_grading/wide.py, written before any
-was run) x all 8 essays is a case, 1,808 prompts. The investigator sees the prompt Qwen was asked, never its reply, and
-predicts the score Qwen gives most often (supergpqa_inline's setup with a number in place of a letter). Truth: the score
-distribution of RUN's N samples of that prompt (thinking off); the headline is the share of Qwen's samples that match the
-submitted score (scored in score.py; cfbench.answer's exact match on the modal score is the secondary).
+because Qwen only says 4, 5 or 6 and the harsh cut is at 4, and 38 cases are 19 arm pairs. This one scales the env instead,
+on real essays: 204 student intro paragraphs from PERSUADE 2.0 (34 per human holistic score 1-6; the env's `p-*` items) and
+226 arms (the 21 old ones plus the 205-arm wide set, environments/essay_grading/wide.py, written before any was run). base
+grades every intro and every other arm 8 of them (env items_for), 2,004 cases. The investigator sees the prompt Qwen was
+asked, never its reply, and predicts the score Qwen gives most often (supergpqa_inline's setup with a number in place of a
+letter). Truth: the score distribution of RUN's N samples of that prompt (thinking off); the headline is the share of
+Qwen's samples that match the submitted score (score.py; cfbench.answer's exact match on the modal score is secondary).
 
 Versions: `bare` (the prompt only), `anchored` (plus the base arm's score distribution on the same essay: what one
 zero-edit run says; base cases are left out of it).
@@ -16,7 +17,7 @@ punctuation token of the prompt, <|im_end|> and the ten thinking-off tail tokens
 `olens_placebo_inline` (the reads of another arm's prompt on the same essay, seeded per (draw, case), position by position:
 header, essay and instruction segments line up, so only what the lens says differs).
 
-    uv run python -m environments run essay_grading --tag inline-n8 --n 8 --backend vllm      # every arm x essay, shared pod
+    uv run python -m environments run essay_grading --tag inline-n8 --n 8 --backend vllm      # every arm x its items, shared pod
     uv run python -m cfbench.eval essay_grading_inline --prep
     uv run --with transformers --with jinja2 python -m cfbench.evals.essay_grading_inline.eval requests OUT_DIR
     runpod/olens_reads.sh run essay-inline OUT_DIR/olens.requests.jsonl essay-grading-inline --layers 32,40,48,52,56,60
@@ -83,6 +84,8 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     """cases.jsonl: one row per (arm, item) of RUN with >= MIN_SCORED scored samples; reads are read from READS, not copied."""
     cs, rows = census(), []
     for (arm, item), c in sorted(cs.items()):
+        if not item.startswith("p-"):  # the three written essays aren't cases
+            continue
         scored = Counter({s: k for s, k in c.items() if s})
         if sum(scored.values()) < MIN_SCORED:
             continue
@@ -189,11 +192,30 @@ def segments(lay: dict) -> dict[str, int]:
 
 
 def placebo(inputs: str, arm: str, item: str, seed: int) -> str:
-    """Another arm's prompt on the same essay with the same number of reads in each segment, seeded per (draw, case)."""
+    """Another arm's prompt on the same essay, seeded per (draw, case): one with the same number of header reads when there
+    is one (94% of cases), else any (aligned()); the essay, instruction and tail segments always match."""
     lays, me = _layout(inputs), _layout(inputs)[request_id(arm, item)]
-    ok = sorted(i for i, lay in lays.items() if i != me["id"] and i.endswith(f"~{item}") and segments(lay) == segments(me) and i in _pool())
+    ok = sorted(i for i, lay in lays.items() if i != me["id"] and i.endswith(f"~{item}") and i in _pool())
+    same = [i for i in ok if segments(lays[i]) == segments(me)]
     assert ok, (arm, item)
-    return random.Random(f"{seed}:{arm}~{item}").choice(ok)
+    return random.Random(f"{seed}:{arm}~{item}").choice(same or ok)
+
+
+def aligned(me: dict, src: dict, reads: list[Pos]) -> list[Pos]:
+    """`src`'s reads laid onto `me`'s positions segment by segment: in order, the header cut short or its last read repeated."""
+    by: dict[str, list[Pos]] = defaultdict(list)
+    for (*_, seg), r in zip(src["pos"], reads, strict=True):
+        by[seg].append(r)
+    return [by[seg][min(k, len(by[seg]) - 1)] for seg, k in _slots(me)]
+
+
+def _slots(lay: dict) -> list[tuple[str, int]]:
+    seen: Counter = Counter()
+    out = []
+    for *_, seg in lay["pos"]:
+        out.append((seg, seen[seg]))
+        seen[seg] += 1
+    return out
 
 
 def _lines(layers: dict[int, dict]) -> list[str]:
@@ -227,7 +249,8 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         if condition == "olens_placebo_inline":
             src = placebo(case["inputs"], case["cf_arm"], case["item"], seed)
             extra = {"placebo_sources": [src]}
-        parts += [OLENS_TEXT, block(_layout(case["inputs"])[me], _pool()[src])]
+        lays = _layout(case["inputs"])
+        parts += [OLENS_TEXT, block(lays[me], aligned(lays[me], lays[src], _pool()[src]))]
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
 
