@@ -14,6 +14,8 @@ placebo black, no tools gray).
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
+- `favorites_qa_inline`: the same seven bars and paired-difference figure for the 1,500-item
+  favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up
