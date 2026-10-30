@@ -506,6 +506,7 @@ def view(a):
                 "attribute": r["attr"],
                 "qwen_correct": "right" if r["answer"] == r["label"] else "wrong",
                 "has_evidence": any(d["evidence"] for d in r["deletions"]),
+                "stable": r["stable"],
                 "judge_bucket": bucket,
                 "evidence_comments": sum(d["evidence"] for d in r["deletions"]),
                 "median_tv": round(r["median_tv"], 3),

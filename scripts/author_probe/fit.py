@@ -23,7 +23,7 @@ from scripts.author_probe.bank import ATTRS, BANK
 
 CACHE = REPO_ROOT / "data" / "probe_cache"
 SITES = ("text_end", "im_end")  # passage-only prompt
-Q_SITES = ("qmark", "last")  # order-0 answer prompt, one capture part per attribute (bank.py qprompts)
+Q_SITES = ("qmark", "last", "qtop", "qend")  # order-0 answer prompt, one capture part per attribute (bank.py qprompts)
 MIN_CLASS = 10  # a class enters macro AUROC only with >= this many positives
 
 
@@ -291,9 +291,11 @@ def report(run: Path):
             f"| {attr} ({unit}) | {b[0]} L{layers[b[1]]} | {r['spearman']:.3f} | {r['mae']:.2f} | {cut(r['cut_auroc'])} | "
             f"{b4[0]} L{layers[b4[1]]} | {r4['spearman']:.3f} | {q['spearman']:.3f} | {cut(q['cut_auroc'])} |"
         )
-    lines += ["", "## Secondary: probe trained on Qwen's own answer", ""]
-    lines += ["| attribute | best (site, layer) | AUROC vs Qwen answer | acc | best, every 4th layer | AUROC | acc |", "|" + "---|" * 7]
-    for attr in ATTRS:
+    has_qwen = any(f"{s}|sex|qwen|{C}" in res for s in sites)
+    if has_qwen:
+        lines += ["", "## Secondary: probe trained on Qwen's own answer", ""]
+        lines += ["| attribute | best (site, layer) | AUROC vs Qwen answer | acc | best, every 4th layer | AUROC | acc |", "|" + "---|" * 7]
+    for attr in ATTRS if has_qwen else ():
         f = lambda s, attr=attr: res[f"{s}|{attr}|qwen|{C}"]
         b, b4 = best(f, "auroc", qwen_only=True), best(f, "auroc", True, qwen_only=True)
         r, r4 = f(b[0])[b[1]], f(b4[0])[b4[1]]

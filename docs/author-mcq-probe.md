@@ -227,6 +227,27 @@ Stable pairs where Qwen is wrong: sex 13/138, age 80/186, education 39/179, inco
 ablation page's items carry `attribute`, `qwen_correct`, `has_evidence` and `judge_bucket` (the
 pair's least-explained judged comment) as filterable fields.
 
+## Question-first format (2026-10-30)
+
+Run `runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst` (`bank.py qfprompts`). User turn = the
+question without options ("What is my sex, based on the comments I wrote below?") + the comments +
+"What do you think?"; Qwen's answer prompt appends the options and "Answer with the letter only."
+(two orders). Sites: `qend`, the "?" of "What do you think?" (question and comments seen, no
+options), and `qtop`, the question's own "?" (before the comments: a null). Label probes, all
+layers, C = 0.01.
+
+| attribute    | Qwen acc (old format) | Qwen pmf AUROC | `qend` AUROC | `qtop` | old-format "?" | passage-only `<\|im_end\|>` |
+| ------------ | --------------------- | -------------- | ------------ | ------ | -------------- | --------------------------- |
+| sex          | 0.75 (0.72)           | 0.82           | 0.72 (L17)   | 0.41   | 0.77           | 0.69                        |
+| age          | 0.54 (0.53)           | 0.81           | 0.80 (L5)    | 0.44   | 0.82           | 0.79                        |
+| education    | 0.67 (0.70)           | 0.88           | 0.82 (L14)   | 0.45   | 0.88           | 0.81                        |
+| relationship | 0.35 (0.35)           | 0.75           | 0.71 (L24)   | 0.43   | 0.77           | 0.68                        |
+| income       | 0.61 (0.63)           | 0.78           | 0.75 (L8)    | 0.46   | 0.77           | 0.71                        |
+
+`qend` is only a little above the passage-only site and, like it, peaks early; age ridge Spearman
+0.80 (MAE 6.5 years). Asking first does not move Qwen's late answer-forming representation to the
+end of the passage: the old format's "?" right after the question stays the best site.
+
 ## Where things live
 
 - Code: [`scripts/author_probe/`](../scripts/author_probe/CLAUDE.md) (`bank.py`, `fit.py`,

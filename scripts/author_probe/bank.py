@@ -45,6 +45,26 @@ ATTRS = {
 HUMAN_KEY = {"sex": "sex", "age": "age", "education": "education", "relationship": "relationship_status", "income": "income_level"}
 
 
+# question-first format (Kylie, 2026-10-30): question without options, the comments, then "What do you think?"; the
+# options follow only in the answer prompt, so the final "?" (site `qend`) has seen question and passage but no option
+QF_QUESTIONS = {
+    "sex": "What is my sex, based on the comments I wrote below?",
+    "age": "How old am I most likely to be, based on the comments I wrote below?",
+    "education": "What is my highest level of education (completed or in progress), based on the comments I wrote below?",
+    "relationship": "What is my relationship status, based on the comments I wrote below?",
+    "income": "What is my income level, relative to where I live, based on the comments I wrote below?",
+}
+QF_END = "What do you think?"
+
+
+def qf_message(passage: str, attr: str, options: list[str] | None = None) -> str:
+    """The question-first user turn; with `options`, the answer prompt (lettered options + letter-only instruction)."""
+    text = f"{QF_QUESTIONS[attr]}\n\n{passage}\n\n{QF_END}"
+    if options:
+        text += "\n" + "\n".join(f"{LETTERS[i]}. {o}" for i, o in enumerate(options)) + "\n\nAnswer with the letter only."
+    return text
+
+
 def label(attr: str, p: dict) -> int:
     if attr == "sex":
         return ["male", "female"].index(p["sex"])
@@ -223,6 +243,44 @@ def qprompts(a):
     print(f"wrote {len(ATTRS) * len(passages)} question-site prompts to {run}")
 
 
+def qfprompts(a):
+    """Question-first answer prompts: RUN/inputs_answer.jsonl (both orders, for the option orders), and the GPU inputs
+    RUN/inputs_qsites.jsonl (order 0, attribute-major, sites `qtop` = the question's "?" and `qend` = the "?" of "What do
+    you think?"; --chunk 1372 makes part-K attribute K) and RUN/inputs_answer_o1.jsonl (order 1, letter log-probs only)."""
+    from transformers import AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(MODEL)
+    run = Path(a.run)
+    passages = [json.loads(line) for line in (BANK / "passages.jsonl").read_text().splitlines()]
+    letter_ids = [tok.encode(c, add_special_tokens=False)[0] for c in LETTERS]
+    (run / "passage_logp.jsonl").write_text("".join(json.dumps({"id": p["id"]}) + "\n" for p in passages))  # row order
+    with (
+        open(run / "inputs_answer.jsonl", "w") as fa,
+        open(run / "inputs_qsites.jsonl", "w") as f0,
+        open(run / "inputs_answer_o1.jsonl", "w") as f1,
+    ):
+        for attr, (_, opts) in ATTRS.items():
+            for p in passages:
+                for o, order in enumerate(orders(len(opts))):
+                    user = qf_message(p["text"], attr, [opts[i] for i in order])
+                    msgs = [{"role": "user", "content": user}]
+                    text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
+                    enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
+                    ids, offs = enc["input_ids"], enc["offset_mapping"]
+                    start = text.index(user)
+                    at = lambda c: next(i for i, (s, e) in enumerate(offs) if s <= c < e)  # noqa: B023
+                    qtop = start + len(QF_QUESTIONS[attr]) - 1
+                    qend = start + len(QF_QUESTIONS[attr]) + 2 + len(p["text"]) + 2 + len(QF_END) - 1
+                    assert text[qtop] == "?" and text[qend] == "?", p["id"]
+                    row = {"id": f"{p['id']}:{attr}:o{o}", "ids": ids, "cand": letter_ids[: len(order)]}
+                    fa.write(json.dumps(row | {"sites": {}, "order": order}) + "\n")
+                    if o == 0:
+                        f0.write(json.dumps(row | {"sites": {"qtop": [at(qtop)], "qend": [at(qend)]}}) + "\n")
+                    else:
+                        f1.write(json.dumps(row | {"sites": {}}) + "\n")
+    print(f"question-first prompts for {len(passages)} passages x {len(ATTRS)} attributes in {run}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -239,8 +297,10 @@ def main():
     q = sub.add_parser("qprompts")
     q.add_argument("run")
     q.add_argument("--order", type=int, default=0, help="0 = canonical, 1 = reversed options")
+    f = sub.add_parser("qfprompts")
+    f.add_argument("run")
     a = ap.parse_args()
-    {"build": build, "prompts": prompts, "qprompts": qprompts}[a.cmd](a)
+    {"build": build, "prompts": prompts, "qprompts": qprompts, "qfprompts": qfprompts}[a.cmd](a)
 
 
 if __name__ == "__main__":
