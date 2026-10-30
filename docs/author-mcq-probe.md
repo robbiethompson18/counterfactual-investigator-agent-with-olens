@@ -320,7 +320,7 @@ selector (`bank.is_read_token`: any punctuation, symbol or newline token, e.g. q
 reads inline and the deletion tables:
 `#dataset=runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst/pairs`.
 
-## SynthPAI ×2 and the Blog Authorship Corpus (2026-10-30, set up, predictor not run)
+## SynthPAI ×2 and the Blog Authorship Corpus (2026-10-30)
 
 **SynthPAI, a second passage per author** (`runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst-b`,
 `ablate.py prep --qfirst --exclude`): 232 more passages, 706 confident pairs; stable / with
@@ -345,6 +345,33 @@ Ablated = every confident Qwen-wrong pair plus 300 Qwen-right pairs per attribut
 `cfbench/evals/author_blog_drop_inline` (same rule, prompt, conditions and investigator): qwen_wrong
 366 cases (183 positive, 143 pairs), qwen_right 294 (147, 129). O-lens reads for its 272 pairs
 (13,876 positions × layers 32/40/48) go to `runs/olens_reads/2026-10-30_author-blog`.
+
+### Drop-eval results, SynthPAI ×2 and blog (Haiku 5.5 effort low, 1 draw)
+
+`scripts/author_probe/score_drop.py`; CIs bootstrap over authors. AUROC / RMSE / accuracy at p ≥ 0.5
+(base rate 0.50):
+
+| eval (run, $)                                              | version (cases)  | transcript          | O-lens              | placebo             |
+| ---------------------------------------------------------- | ---------------- | ------------------- | ------------------- | ------------------- |
+| SynthPAI ×2 (`2026-10-30_author-mcq-drop-haiku-x2`, $6.95) | qwen_wrong (242) | 0.87 / 0.490 / 0.63 | 0.89 / 0.494 / 0.62 | 0.88 / 0.510 / 0.57 |
+|                                                            | qwen_right (662) | 0.88 / 0.487 / 0.61 | 0.87 / 0.498 / 0.61 | 0.87 / 0.506 / 0.60 |
+| blog (`2026-10-30_author-blog-drop-haiku`, $6.61)          | qwen_wrong (366) | 0.73 / 0.575 / 0.52 | 0.75 / 0.567 / 0.52 | 0.73 / 0.579 / 0.52 |
+|                                                            | qwen_right (294) | 0.82 / 0.553 / 0.54 | 0.83 / 0.543 / 0.55 | 0.83 / 0.556 / 0.54 |
+
+Paired Brier gain (positive = O-lens better) and AUROC difference:
+
+| eval, version      | O-lens − transcript: Brier / AUROC                | O-lens − placebo: Brier / AUROC                   |
+| ------------------ | ------------------------------------------------- | ------------------------------------------------- |
+| SynthPAI ×2, wrong | −0.004 [−0.016, +0.007] / +0.020 [−0.021, +0.060] | +0.016 [+0.003, +0.029] / +0.010 [−0.036, +0.054] |
+| SynthPAI ×2, right | −0.010 [−0.018, −0.001] / −0.007 [−0.031, +0.017] | +0.008 [−0.001, +0.017] / +0.004 [−0.017, +0.027] |
+| blog, wrong        | +0.010 [−0.000, +0.020] / +0.015 [−0.029, +0.058] | +0.014 [+0.002, +0.026] / +0.013 [−0.035, +0.057] |
+| blog, right        | +0.011 [−0.002, +0.025] / +0.006 [−0.035, +0.049] | +0.014 [+0.001, +0.027] / −0.001 [−0.041, +0.035] |
+
+On SynthPAI the O-lens beats the placebo but not the transcript (slightly worse on qwen_right). On
+the blog corpus, where the transcript is harder (AUROC 0.73 on qwen_wrong), the O-lens leans ahead
+of the transcript (Brier +0.010, +0.011, CIs touching 0) and beats the placebo in both versions. The
+investigator's probabilities stay too low and poorly calibrated throughout (RMSE 0.49-0.58 at a 0.50
+base rate); its ranking (AUROC) carries the signal.
 
 ## Where things live
 
