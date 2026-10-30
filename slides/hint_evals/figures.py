@@ -29,10 +29,11 @@ FAINT = "#a29d92"  # the Evals page's --faint
 S = 2 / 3  # this deck's text is 2/3 of the theme's (Kylie, 2026-10-30), so the figures' is too
 plt.rcParams.update({k: plt.rcParams[k] * S for k in ["font.size", "axes.titlesize", "axes.labelsize", "xtick.labelsize",
                                                       "ytick.labelsize", "legend.fontsize"]})  # fmt: skip
-# the page's order, with the placebo moved beside its O-lens (the deck's convention); labels as the page's condShort
-ORDER = ["transcript_inline", "olens_inline", "olens_placebo_inline", "olens_inline_nl", "probe", "probe_tuned"]
-SHORT = {"transcript_inline": "transcript", "olens_inline": "O-lens", "olens_placebo_inline": "placebo",
-         "olens_inline_nl": "O-lens\n(nl)", "probe": "probe", "probe_tuned": "tuned\nprobe"}  # fmt: skip
+# the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30). The
+# O-lens (nl) placebo isn't on the tail pages: it is the placebo of the option-newlines-only eval the O-lens (nl) bar
+# comes from (NAME without "_tail", same cases).
+GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+          ("O-lens (nl)", ["olens_inline_nl", "olens_nl_placebo"]), ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
 PANELS = {"after": "hint after the options", "before": "hint first"}
 
 
@@ -101,19 +102,22 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
     under it, % gridlines every 20, solid bars (placebo hatched), gray 95% CI whisker, the value in ink above it with the
     stars over that, muted names under the bars, a dotted chance line labelled at the right."""
     data = {k: bars_of(name) for k, name in evals.items()}
-    widths = [len(d[0]) for d in data.values()]
+    for k, name in evals.items():
+        data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
+    layout = {k: positions(d[0]) for k, d in data.items()}
+    widths = [lay[1][-1] + 1 for lay in layout.values()]
     fig, axes = figure(FULL_W, 50, ncols=len(evals), sharey=True, gridspec_kw={"width_ratios": widths})
     for ax, (k, (bars, chance, n)) in zip(axes, data.items(), strict=True):
-        conds = [c for c in ORDER if c in bars]
-        for x, c in enumerate(conds):
+        xs, ticks = layout[k]
+        for c, x in xs.items():
             v, (lo, hi), st = bars[c]
-            ax.bar(x, v, 0.66, **bar_kw(c))
+            ax.bar(x, v, 0.8, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             ax.text(x, hi + 0.015, f"{v:.0%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
-        ax.set_xticks(range(len(conds)), [SHORT[c] for c in conds])
-        ax.set_xlim(-0.6, len(conds) - 0.4)
+        ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
+        ax.set_xlim(-0.6, ticks[-1] + 0.6)
         ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
         ax.text(0, 1.13, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
         ax.text(0, 1.04, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
@@ -126,7 +130,22 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
     axes[0].set_ylabel(ylabel)
     axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S,
                   color=MUTED, va="center")  # fmt: skip
+    axes[-1].text(1.0, 1.04, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     save(fig, path)
+
+
+def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
+    """x of every bar (a lens and its placebo touch, groups 0.6 apart) and the tick under each group's centre."""
+    xs, ticks, x = {}, [], 0.0
+    for _, cs in GROUPS:
+        cs = [c for c in cs if c in bars]
+        if not cs:
+            continue
+        for i, c in enumerate(cs):
+            xs[c] = x + 0.85 * i
+        ticks.append(x + 0.85 * (len(cs) - 1) / 2)
+        x += 0.85 * (len(cs) - 1) + 1.45
+    return xs, ticks
 
 
 if __name__ == "__main__":
