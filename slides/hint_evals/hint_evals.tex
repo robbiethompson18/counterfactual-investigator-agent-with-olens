@@ -62,25 +62,6 @@
 
 \maketitle
 
-\begin{frame}{Summary}
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.315\textwidth}
-      \stat{0.739}{olens}{AUROC of P(knew) with \olens{}, hint after the options, vs 0.613 for the transcript alone (976 cases)}
-    \end{column}
-    \begin{column}{0.315\textwidth}
-      \stat{+0.167}{olens}{AUROC of \olens{} over its placebo with the hint after the options (+0.145 with it first)}
-    \end{column}
-    \begin{column}{0.315\textwidth}
-      \stat{0.937}{probe}{AUROC of a frozen linear probe at the option newlines, hint after; 0.851 retuned when the hint comes first}
-    \end{column}
-  \end{columns}
-  \medskip
-  \begin{itemize}
-    \item ``Did Qwen know it?'': the six end-of-prompt reads add 0.035 / 0.016 AUROC (hint after / first) over the option-newline reads alone (\cond{olensnl}{O-lens (nl)})
-    \item Which letter without the hint: \olens{} adds 1.6–1.7pp correct over the transcript, the probe 23pp (hint after)
-  \end{itemize}
-\end{frame}
-
 \begin{frame}
   \parthead{1}{Hinted multiple choice}
   \begin{itemize}
