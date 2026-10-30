@@ -103,6 +103,26 @@ commas (all in the boilerplate) name it on 40, the final "." on 316. The "." and
 are at their placebo. Every placebo beats transcript-only by 1–3pp: any reads push Haiku towards the
 stale answer.
 
+**Second 1k** (2026-10-30, Kylie). 1,000 more seeded stable, non-numeric bank-v4 questions not among
+the 999 (326 stale), built from the bank by `cfbench/evals/cutoff_qa_inline/extend.py` (the label is
+the bank's 8-sample modal answer; reads are of the prompt alone, so no Qwen episode). Reads
+`olens_reads/2026-10-30_cutoff-new1k` (question punctuation + the six tail tokens), runs
+`cfbench/2026-10-30_cutoff-qa-new1k-tail6` (transcript-only, six-tail O-lens + placebo) and
+`..._cutoff-qa-new1k-olens-qpunct`, 15,000 predictions, $11, 0 invalid. Pooled with the first 999
+(1,999 questions, 665 stale), error rate:
+
+| condition            | all  | stale | − transcript-only, all | − its placebo, all  |
+| -------------------- | ---- | ----- | ---------------------- | ------------------- |
+| transcript-only      | 22.2 | 53.9  |                        |                     |
+| question punctuation | 17.4 | 33.6  | −4.8pp [−6.3, −3.3]    | −4.4pp [−5.8, −3.2] |
+| its placebo          | 21.8 | 47.0  |                        |                     |
+| six tail tokens      | 17.2 | 32.2  | −5.0pp [−6.6, −3.5]    | −6.5pp [−8.0, −5.2] |
+| its placebo          | 23.7 | 46.7  |                        |                     |
+
+Question punctuation − six tail: +0.2pp [−0.9, +1.2] (stale +1.4 [−0.9, +3.5]); the same in each
+half. The new 1k shows a smaller gain overall (O-lens − transcript −2.9pp vs −6.7pp on the
+first 999) but the same on stale items (−15.7pp vs −24.8pp, CIs overlapping).
+
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
