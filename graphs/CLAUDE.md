@@ -20,6 +20,10 @@ placebo black, no tools gray).
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up
   (every Flash run, 8/8 hint followers), pooled and by hint type
+- `mcq_unselected`: Haiku predicting Qwen's MMLU-Pro letter from the bare prompt on the unselected
+  set, prompt only vs O-lens, J-lens and NLA with their placebos, beside the linear probe and Qwen's
+  own logits, for all / Qwen-right / Qwen-wrong cases, plus paired differences
+  (`docs/mcq-unselected.md`)
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
 - `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock

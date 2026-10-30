@@ -145,6 +145,12 @@ draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45
 | linear probe, hidden_states[52]    | **91.9** | 94.1       | **82.1**   |
 | Qwen's own letter logits (ceiling) | 99.8     | 99.9       | 99.3       |
 
+![prompt only vs O-lens, J-lens, NLA and their placebos, the linear probe and Qwen's logits; all / Qwen right / Qwen wrong](img/mcq-unselected.png)
+
+![paired differences between conditions with 95% CIs, all cases and Qwen-wrong cases](img/mcq-unselected-diff.png)
+
+(`uv run python -m graphs.mcq_unselected` makes both; 95% bootstrap CIs over cases.)
+
 Paired by case, 95% bootstrap over cases (3,000 resamples):
 
 | comparison                   | all                 | Qwen wrong         |
@@ -226,6 +232,11 @@ What it says:
 ## Open items
 
 - NLA has one draw; two more would cost ~$20 and only narrow a ~1pp effect.
+- The "Qwen's logits" ceiling is read at the thinking-off template's last token, the `\n\n` after
+  the empty `<think></think>` block, four forced tokens after the lens tail's last position
+  (`assistant\n`) and well after the option newlines the probe reads. No sampling: one forward pass
+  over the rendered prompt. Position, not only method, favours it; the fix (Robbie, 2026-10-30,
+  later) is a probe at that same final position, and/or lens reads there.
 - Mirror the probe run under `runs/cfbench/` so the env viewer shows it beside the Haiku bars.
 - Tooling notes from the read campaign: `runpod/olens_reads.sh fetch` truncates the local files if
   the pod is already gone (write to a temp name first); `runpod/watch_pod.sh`'s pre-delete fetch
