@@ -567,6 +567,10 @@ Current docs:
 - [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/CLAUDE.md)
   — render/prep/worker/collect pipeline matching her format, box setup, throughput (~44 positions/s
   on 4xB200, so subsample long coding episodes)
+- [ACTIVE: GLM 5.3 O-lens coverage — read before asking which GLM env episodes have O-lens reads, or before reading more of them](docs/glm53-olens-coverage.md)
+  — per-env/task share of template and punctuation positions read (head vs later turns, exact-prefix
+  matched), the 2026-10-27 fill (every template token in ≤64 positive episodes per run × arm,
+  punctuation on email/AF/essay/hinted TQA) and what is still unread
 - [NULL: Prompt-side O-lens eval awareness — read before using O-lens reads on the prompt to predict whether GLM-5.3 will verbalise eval awareness](docs/olens-prompt-eval-awareness.md)
   — final pass: DeepSeek-judged eval framing in punctuation-token prompt reads vs VEA over 16
   settings, pooled AUROC 0.72 driven by donation bet, 0.50 within every condition (earlier keyword
