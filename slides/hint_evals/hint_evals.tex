@@ -140,15 +140,11 @@
   \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
 
-\begin{frame}{Did Qwen know it? AUROC 0.613 from the transcript, 0.739 with the O-lens, 0.937 from the probe}
-  \slidefig{fig/knew.pdf}
-  \source{AUROC of the investigator's P(knew) over cases (knew vs didn't); 95\% bootstrap CI over cases; stars: one-sided paired bootstrap that the condition's AUROC beats transcript-only's on the same cases (* p < .05, ** < .01, *** < .001); hatched: placebo.}
-\end{frame}
-
-\begin{frame}{Which letter without the hint? The O-lens cuts the error rate by 1.6–1.7pp, the probe by 23.2pp with the hint after}
-  \slidefig{fig/letter.pdf}
-  \source{Error rate = 1 − the mean over items of the fraction of correct draws, all runs pooled; 95\% item bootstrap; dotted: always naming the hinted letter (50\%; chance, 1 of 10 letters, is 90\%);
-    stars: one-sided paired sign test that the condition beats transcript-only (* p < .05, ** < .01, *** < .001); hatched: placebo.}
+\begin{frame}{Did Qwen know it? AUROC 0.613 → 0.739 with the O-lens. Which letter? Error rate down 1.6–1.7pp}
+  \slidefig{fig/grid.pdf}
+  \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: error rate,
+    95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 90\%).
+    * p < .05, ** < .01, *** < .001.}
 \end{frame}
 
 \end{document}

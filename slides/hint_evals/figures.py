@@ -146,21 +146,20 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     return bars, chance, len(items)
 
 
-def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path: Path, pct: bool = True) -> None:
-    """One panel per eval in the template's (and the Evals page's answer chart's) style: lower-case title with the count
-    under it, % gridlines every 20, solid bars (placebo hatched), gray 95% CI whisker, the value in ink above it with the
-    stars over that, muted names under the bars, a dotted chance line labelled at the right."""
+def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pct: bool, head: bool, base: float = 0) -> None:
+    """One row of the grid, a panel per hint position, in the template's (and the Evals page's answer chart's) style:
+    solid bars (placebo hatched, beside its lens), gray 95% CI whisker, the value in ink above it with the stars over
+    that, muted group names under the bars, a dotted baseline labelled at the right. `head`: the column titles and case
+    counts above the panels. `base`: where the bars and the axis start (0.5 for AUROC, Kylie 2026-10-30; its chance line is
+    then the axis itself)."""
     data = {k: bars_of(name) for k, name in evals.items()}
     for k, name in evals.items():
         data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
-    layout = {k: positions(d[0]) for k, d in data.items()}
-    widths = [lay[1][-1] + 1 for lay in layout.values()]
-    fig, axes = figure(FULL_W, 50, ncols=len(evals), sharey=True, gridspec_kw={"width_ratios": widths})
     for ax, (k, (bars, chance, n)) in zip(axes, data.items(), strict=True):
-        xs, ticks = layout[k]
+        xs, ticks = positions(bars)
         for c, x in xs.items():
             v, (lo, hi), st = bars[c]
-            ax.bar(x, v, 0.8, **bar_kw(c))
+            ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             ax.text(x, hi + 0.015, f"{v:.1%}" if pct else f"{v:.3f}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
@@ -168,24 +167,23 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
         ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
-        ax.text(0, 1.13, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
-        ax.text(0, 1.04, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
+        if head:
+            ax.text(0, 1.2, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
+            ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
         for side in ("left", "bottom"):
             ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
     # the axis stops just above the tallest whisker's labels, not at the next round number (Kylie, 2026-10-30); gridlines
     # every 10% below it
     top = max(hi for d in data.values() for _, (_, hi), _ in d[0].values()) + 0.07
-    ticks = np.arange(0, top, 0.1)
-    axes[0].set_ylim(0, top)
+    ticks = np.arange(base, top, 0.1)
+    axes[0].set_ylim(base, top)
     axes[0].set_yticks(ticks, [f"{t:.0%}" if pct else f"{t:.1f}" for t in ticks])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
     axes[0].set_ylabel(ylabel)
-    if data[list(evals)[-1]][1] <= top:
+    if base < data[list(evals)[-1]][1] <= top:
         chance = data[list(evals)[-1]][1]
         axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
-    axes[-1].text(1.0, 1.04, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
-    save(fig, path)
 
 
 def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
@@ -202,8 +200,18 @@ def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
     return xs, ticks
 
 
-if __name__ == "__main__":
+def grid() -> None:
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as error rate), hint position as columns."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    panels(knew, auroc_bars, "chance", "AUROC of P(knew)", OUT / "knew.pdf", pct=False)
-    panels(letter, hinted_baseline(errors(answer_bars)), "always the hinted letter", "error rate (lower is better)", OUT / "letter.pdf")
+    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0})[1][-1] + 1 for n in knew.values()]
+    fig, axes = figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
+    row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
+    row(axes[1], letter, hinted_baseline(errors(answer_bars)), "always the hinted letter", "which letter?\nerror rate (lower is better)",
+        pct=True, head=False)  # fmt: skip
+    axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    save(fig, OUT / "grid.pdf")
+
+
+if __name__ == "__main__":
+    grid()
