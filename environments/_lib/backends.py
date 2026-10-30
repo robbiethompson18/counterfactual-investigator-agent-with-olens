@@ -199,6 +199,12 @@ async def chat(client: httpx.AsyncClient, t: Target, messages: list[dict], tools
     j = await _post(client, url, body, key)
     c = j["choices"][0]
     m = c["message"]
+    if t.backend == "vllm" and not t.thinking and "glm" in t.model.lower():
+        # vLLM's glm45 reasoning parser files everything before a missing </think> as reasoning; with thinking off (empty think
+        # block prefilled) that is the visible reply, so put it back in content
+        r = m.pop("reasoning", None) or m.pop("reasoning_content", None)
+        if r:
+            m["content"] = r + (m.get("content") or "")
     if t.body == "realism":  # the old loop sent back the assistant message as returned (minus None fields and refusal)
         raw = {k: v for k, v in m.items() if v is not None and k != "refusal"}
         provider = j.get("provider")
