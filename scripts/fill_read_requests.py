@@ -15,7 +15,7 @@ Checks, per prompt: the old O-lens and NLA reads sit at the same positions at ev
 the old transcript's tokens up to its last read; every old position is PUNCT, a tail token or a newline (an option's);
 the new positions are disjoint from the old.
 
-    uv run --with transformers --with jinja2 python scripts/fill_read_requests.py OUT_DIR
+    PYTHONPATH=. uv run --with transformers --with jinja2 python scripts/fill_read_requests.py OUT_DIR
 """
 
 import json
@@ -24,17 +24,12 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+from cfbench.evals.inline_reads import SETS
+
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # scripts/olens_read_requests.py's (transcript-viewer/web/build.py)
 TAIL = (".", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n", "<think>", "\n\n", "</think>", "\n\n")
 LAYERS = (32, 40, 48, 52, 56, 60)
 RUNS = Path("data/runs")
-# set -> (O-lens runs, NLA runs); the first O-lens runs' requests are the set's prompts
-SETS = {
-    "cutoff": (["2026-10-29_cutoff200-tail", "2026-10-29_cutoff800-tail"], ["2026-10-29_cutoff200-tail", "2026-10-29_cutoff800-tail"]),
-    "favorites": (["2026-10-29_favorites-v3-tail"], ["2026-10-29_favorites-v3-tail"]),
-    "mcq_unselected": (["2026-10-29_mcq-unselected-nohint", "2026-10-29_mcq-unselected-nohint-b2"], ["2026-10-29_mcq-unselected-nohint"]),
-    "supergpqa": (["2026-10-29_supergpqa-3k"], ["2026-10-29_supergpqa-3k"]),
-}
 
 
 def positions(reader: str, runs: list[str], ids: set[str]) -> dict[str, dict[int, set[int]]]:
