@@ -161,8 +161,10 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
             v, (lo, hi), st = bars[c]
             ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-            ax.text(x, hi + 0.015, f"{v:.1%}" if pct else f"{v:.3f}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
-            ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+            # offsets in points, so the labels clear the whisker whatever the row's height
+            label = f"{v:.1%}" if pct else f"{v:.3f}"
+            ax.annotate(label, (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+            ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
@@ -201,13 +203,13 @@ def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
 
 
 def grid() -> None:
-    """The two questions as rows (did Qwen know it? as AUROC, which letter? as error rate), hint position as columns."""
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
     widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0})[1][-1] + 1 for n in knew.values()]
     fig, axes = figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
     row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
-    row(axes[1], letter, hinted_baseline(errors(answer_bars)), "always the hinted letter", "which letter?\nerror rate (lower is better)",
+    row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     save(fig, OUT / "grid.pdf")
