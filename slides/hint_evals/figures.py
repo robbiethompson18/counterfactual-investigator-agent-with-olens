@@ -63,6 +63,12 @@ def claim_bars(name: str) -> tuple[dict, float, int]:
     return bars, 0.5, max(r["n_items"] for r in rows.values())
 
 
+def claim_error_bars(name: str) -> tuple[dict, float, int]:
+    """claim_bars as error rates (Kylie, 2026-10-30): 1 - % right, lower is better; stars unchanged."""
+    bars, chance, n = claim_bars(name)
+    return {c: (1 - v, [1 - hi, 1 - lo], st) for c, (v, (lo, hi), st) in bars.items()}, 1 - chance, n
+
+
 def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     """condition -> (% correct, CI, stars) over every item of every run, as the page's headline answer panel."""
     items: dict[tuple, dict[str, list[float]]] = {}
@@ -90,7 +96,7 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     return bars, chance, len(items)
 
 
-def panels(evals: dict[str, str], bars_of, chance_label: str, path: Path) -> None:
+def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path: Path) -> None:
     """One panel per eval in the template's (and the Evals page's answer chart's) style: lower-case title with the count
     under it, % gridlines every 20, solid bars (placebo hatched), gray 95% CI whisker, the value in ink above it with the
     stars over that, muted names under the bars, a dotted chance line labelled at the right."""
@@ -117,13 +123,14 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, path: Path) -> Non
     axes[0].set_ylim(0, 1)
     axes[0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1], ["0%", "20%", "40%", "60%", "80%", "100%"])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
+    axes[0].set_ylabel(ylabel)
     axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S,
                   color=MUTED, va="center")  # fmt: skip
     save(fig, path)
 
 
 if __name__ == "__main__":
-    panels({"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}, claim_bars, "chance",
-           OUT / "knew.pdf")  # fmt: skip
+    panels({"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}, claim_error_bars, "chance",
+           "error rate (lower is better)", OUT / "knew.pdf")  # fmt: skip
     panels({"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}, answer_bars,
-           "chance", OUT / "letter.pdf")  # fmt: skip
+           "chance", "% correct", OUT / "letter.pdf")  # fmt: skip
