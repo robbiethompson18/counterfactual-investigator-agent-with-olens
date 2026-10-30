@@ -133,9 +133,14 @@ target = the letter of the gold option, pooled over orders.
   letter, which is right about as often as the probe. Cross-order transfer loses 0.02–0.08 (most for
   sex), so part of the `last` signal is order-specific.
 - `qmark` has none of this problem (no options seen, identical in both orders) and is within 0.03 of
-  pooled `last` except relationship. **`qmark` is the recommended site** for a label probe of Qwen's
-  view after the question: L55 sex, L30 age (ridge L52), L59 education (ridge L31), L34
-  relationship, L57 income.
+  pooled `last` except relationship.
+
+**Probe of record (Kylie, 2026-10-30): `im_end` of the passage-only prompt**, label-trained: L28
+sex, L5 age (ridge L5), L8 education (ridge L8), L18 relationship, L10 income. It has seen no
+question, so nothing in its signal can come from the question or the options (no "random bullshit"
+from the prompt). It is weaker: near the TF-IDF baseline for age, education and relationship.
+`qmark` (L55 / L30 / L59 / L34 / L57) is the stronger alternative when reading Qwen's view after it
+has been asked.
 
 ## Where things live
 
