@@ -23,6 +23,7 @@ STYLE = {
     "no_transcript": (GRAY, None, "no transcript"),
     # the hint evals' extra bars, in the Evals page's colours (page.html --c-olens-nl, --c-probe, --c-probe-tuned)
     "olens_nl": ("#c9a227", None, "O-lens (nl)"),
+    "olens_nl_placebo": ("#c9a227", PLACEBO_HATCH, "O-lens (nl) placebo"),
     "probe": ("#11806a", None, "probe"),
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
     "null": ("#ffffff", PLACEBO_HATCH, "edit does nothing"),
