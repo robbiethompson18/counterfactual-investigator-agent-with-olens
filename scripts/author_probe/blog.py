@@ -248,6 +248,93 @@ def del_analyze(a):
     print("\n".join(lines))
 
 
+def view(a):
+    """expview, one item per (passage, attribute): Qwen's prompts and pmf, the sentence-deletion table (evidence in bold)
+    for ablated pairs, and the O-lens reads inline (tokens=) where --reads has them."""
+    import sys
+
+    sys.path.insert(0, "expview")
+    from expview import Run, call, read
+
+    run = Path(a.run)
+    passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
+    qwen = {r["id"]: r for r in load(run / "qwen_answers.jsonl")}
+    abl = {r["id"]: r for r in load(Path(a.ablate) / "pairs_scored.jsonl")} if a.ablate else {}
+    trans, by_id = {}, {}
+    if a.reads:
+        trans = {r["id"]: r for r in load(Path(a.reads) / "reads.transcripts.jsonl")}
+        for r in load(Path(a.reads) / "reads.jsonl"):
+            by_id.setdefault(r["id"], []).append(r)
+    ex = Run(
+        run / "expview" / "pairs",
+        title="Blog Authorship Corpus author MCQs, question first",
+        description="One item per (blog post, attribute): Qwen3.6-27B's question-first prompt in both option orders with its letter "
+        "probabilities (not a generation), the sentence-deletion table for ablated pairs (**bold** = evidence sentence: drop in "
+        "p(answer) > max(0.15, 5 x the pair's median)), and O-lens reads on the token view where read.",
+        label_order=["attribute", "qwen_correct", "confident", "stable", "has_evidence", "has_reads"],
+    )
+    ex.reset()
+    for key, r in qwen.items():
+        attr, opts, p = r["attr"], ATTRS[r["attr"]], passages[r["passage"]]
+        calls = []
+        for o, order in enumerate(orders(len(opts))):
+            shown = [opts[i] for i in order]
+            pm = "\n".join(f"{LETTERS[j]}. {shown[j]}: {r['pmf'][i]:.3f}" for j, i in enumerate(order))
+            calls.append(
+                call(
+                    f"order {o} (Qwen letter pmf, order-averaged)",
+                    MODEL,
+                    messages=[{"role": "user", "content": message(p["text"], attr, shown)}],
+                    output={"role": "assistant", "content": pm},
+                )
+            )
+        ab, n_ev = abl.get(key), 0
+        if ab:
+            rows = ["| # | drop in p(answer) | TV | sentence |", "|---|---|---|---|"]
+            for d in ab["deletions"]:
+                b = "**" if d["evidence"] else ""
+                n_ev += d["evidence"]
+                rows.append(f"| {d['i']} | {b}{-d['qwen_shift']:+.3f}{b} | {d['tv']:.3f} | {b}{d['text'].replace('|', '/')}{b} |")
+            head = f"Qwen: {opts[ab['answer']]} (p {ab['pmf'][ab['answer']]:.2f}); "
+            head += f"median TV {ab['median_tv']:.3f}; threshold {ab['threshold']:.2f}\n\n"
+            calls.append(
+                call(
+                    "sentence deletions",
+                    MODEL,
+                    messages=[{"role": "user", "content": "(deletion table)"}],
+                    output={"role": "assistant", "content": head + "\n".join(rows)},
+                )
+            )
+        tokens = None
+        if key in trans and key in by_id:
+            rd: dict[str, list] = {}
+            for x in sorted(by_id[key], key=lambda x: (x["token_index"], x["layer"])):
+                lines = [[b["text"], b["fve"]] for b in sorted(x["bullets"], key=lambda b: -b["fve"])]
+                rd.setdefault(str(x["token_index"]), []).append(
+                    read("O-lens", lines, label=f"L{x['layer']}", score=x["joint_fve"], score_name="joint FVE")
+                )
+            tokens = {"tokens": trans[key]["tokens"], "sections": trans[key]["sections"], "reads": rd}
+        ex.add(
+            id=key,
+            group=attr,
+            tokens=tokens,
+            calls=calls,
+            labels={
+                "attribute": attr,
+                "label": opts[r["label"]],
+                "qwen": opts[r["answer"]],
+                "qwen_correct": ("right" if r["answer"] == r["label"] else "wrong"),
+                "confident": conf(r["pmf"]) >= 0.5 and r["order_agree"],
+                "stable": "n/a" if not ab else "yes" if ab["stable"] else "no",
+                "has_evidence": n_ev > 0,
+                "has_reads": tokens is not None,
+                "gender": p["profile"]["gender"],
+                "age": p["profile"]["age"],
+            },
+        )
+    print("items in", ex.path)
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -262,8 +349,12 @@ def main():
     d.add_argument("run")
     d.add_argument("--src", required=True)
     d.add_argument("--n-right", type=int, default=300)
+    v = sub.add_parser("view")
+    v.add_argument("run")
+    v.add_argument("--ablate")
+    v.add_argument("--reads")
     a = ap.parse_args()
-    {"build": build, "prompts": prompts, "answers": answers, "del-prep": del_prep, "del-analyze": del_analyze}[a.cmd](a)
+    {"view": view, "build": build, "prompts": prompts, "answers": answers, "del-prep": del_prep, "del-analyze": del_analyze}[a.cmd](a)
 
 
 if __name__ == "__main__":
