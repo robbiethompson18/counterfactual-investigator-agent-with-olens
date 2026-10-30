@@ -182,12 +182,18 @@ def answers(a):
 
 
 def del_prep(a):
-    """Leave-one-sentence-out answer prompts (both orders) for the confident pairs of SRC (c >= 0.5, orders agree)."""
+    """Leave-one-sentence-out answer prompts (both orders) for confident pairs of SRC (c >= 0.5, orders agree): all the
+    Qwen-wrong ones and a seeded sample of Qwen-right ones."""
     from transformers import AutoTokenizer
 
     tok, run = AutoTokenizer.from_pretrained(MODEL), Path(a.run)
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
-    pairs = [r for r in load(Path(a.src) / "qwen_answers.jsonl") if conf(r["pmf"]) >= 0.5 and r["order_agree"]]
+    confident = [r for r in load(Path(a.src) / "qwen_answers.jsonl") if conf(r["pmf"]) >= 0.5 and r["order_agree"]]
+    rng = random.Random(0)  # every confident Qwen-wrong pair, plus --n-right Qwen-right pairs per attribute (the GPU budget)
+    pairs = [r for r in confident if r["answer"] != r["label"]]
+    for attr in ATTRS:
+        right = [r for r in confident if r["attr"] == attr and r["answer"] == r["label"]]
+        pairs += rng.sample(right, min(a.n_right, len(right)))
     with open(run / "inputs_del_answer.jsonl", "w") as f:
         for r in pairs:
             sents = passages[r["passage"]]["sentences"]
@@ -255,6 +261,7 @@ def main():
     d = sub.add_parser("del-prep")
     d.add_argument("run")
     d.add_argument("--src", required=True)
+    d.add_argument("--n-right", type=int, default=300)
     a = ap.parse_args()
     {"build": build, "prompts": prompts, "answers": answers, "del-prep": del_prep, "del-analyze": del_analyze}[a.cmd](a)
 

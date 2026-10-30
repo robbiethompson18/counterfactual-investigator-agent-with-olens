@@ -25,6 +25,7 @@ Investigator: Claude Haiku 5.5 at effort low (Kylie, 2026-10-30).
 """
 
 import json
+import os
 import random
 import sys
 from pathlib import Path
@@ -33,7 +34,8 @@ from cfbench.core import Rollout
 from cfbench.evals.hint_qwen_dsv4 import inline
 from scripts.author_probe.bank import ATTRS, BANK, LETTERS, MODEL, qf_message
 
-ABLATE = Path("data/runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst")
+ABLATES = [Path("data/runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst")]  # + "-b" (a second passage per author) once read
+ABLATES_X2 = ABLATES + [Path("data/runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst-b")]
 READS = [Path("data/runs/olens_reads/2026-10-30_author-qfirst")]  # topped up in place (16:45 UTC)
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
@@ -43,6 +45,7 @@ CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "low"  # Kylie, 2026-10-30
 VERSIONS: dict[str, dict] = {"qwen_wrong": {"wrong": True}, "qwen_right": {"wrong": False}}  # Qwen vs the SynthPAI label
 SEED = 0
+X2 = os.environ.get("AUTHOR_X2") == "1"  # both passages per author: `AUTHOR_X2=1 ... --prep --tag x2`; cluster CIs by author
 WHERE = 'at every punctuation and newline token of the question and the comments, up to "What do you think?" (before the options)'
 TIMING = "These reads are of the full message, with the comment still in it."
 TASK_TEXT = """\
@@ -59,7 +62,7 @@ def load(p: Path) -> list[dict]:
 def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dict]:
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     rng, out = random.Random(SEED), []
-    for r in load(ABLATE / "pairs_scored.jsonl"):
+    for r in (r for d in (ABLATES_X2 if X2 else ABLATES) for r in load(d / "pairs_scored.jsonl")):
         version = "qwen_wrong" if r["answer"] != r["label"] else "qwen_right"
         if not r["stable"] or version not in versions:
             continue
@@ -223,10 +226,11 @@ follows. Everything else is identical.
 
 
 def topup(out: Path):
-    """olens_read_requests.py rows (2026-10-30_author-qfirst's settings) for the cases' pairs that have no reads yet."""
+    """olens_read_requests.py rows for the cases' pairs that have no reads yet: the prompt up to "What do you think?",
+    read at bank.is_read_token's positions (any punctuation, symbol or newline token)."""
     from transformers import AutoTokenizer
 
-    from scripts.author_probe.bank import QF_END
+    from scripts.author_probe.bank import QF_END, read_positions
 
     tok = AutoTokenizer.from_pretrained(MODEL)
     have = {r["id"] for d in READS if (d / "requests.jsonl").exists() for r in load(d / "requests.jsonl")}
@@ -235,35 +239,10 @@ def topup(out: Path):
         for pair, c in pairs.items():
             user = c["prompt"][: c["prompt"].index(QF_END) + len(QF_END)]
             msgs = [{"role": "user", "content": user}]
-            text = tok.apply_chat_template(msgs, tokenize=False, enable_thinking=False)
-            enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
-            s0, ids = text.index(user), enc["input_ids"]
-            pos = [
-                i
-                for i, (a, b) in enumerate(enc["offset_mapping"])
-                if a >= s0 and b <= s0 + len(user) and (inline_punct(t := tok.decode([ids[i]])) or (not t.strip() and "\n" in t))
-            ]
-            f.write(
-                json.dumps(
-                    {
-                        "id": pair,
-                        "messages": msgs,
-                        "tools": None,
-                        "prompt_ids": ids,
-                        "positions": pos,
-                        "env": "author_mcq",
-                        "arm": c["attr"],
-                    }
-                )
-                + "\n"
-            )
+            ids, pos = read_positions(tok, tok.apply_chat_template(msgs, tokenize=False, enable_thinking=False), user)
+            row = {"id": pair, "messages": msgs, "tools": None, "prompt_ids": ids, "positions": pos, "env": "author_mcq", "arm": c["attr"]}
+            f.write(json.dumps(row) + "\n")
     print("wrote", len(pairs), "requests to", out)
-
-
-def inline_punct(token: str) -> bool:
-    import re
-
-    return bool(re.match(r"^\s*[.,;:!?]+[\"')\]*]*\s*$", token))  # scripts/olens_read_requests.py's stop tokens
 
 
 PAIRS_DATASET = "runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst/pairs"  # per-pair items: reads inline, deletions
@@ -287,7 +266,7 @@ def show_expview(inputs: Path, out: Path):
     from expview import Run, call
 
     notes = (Path(__file__).parent / "eval.md").read_text()
-    abl = {f"{r['passage']}:{r['attr']}": r for r in load(ABLATE / "pairs_scored.jsonl")}
+    abl = {f"{r['passage']}:{r['attr']}": r for d in ABLATES_X2 for r in load(d / "pairs_scored.jsonl")}
     run = Run(out, title="author_mcq_drop_inline: rendered prompts (not sent)",
               description="One item per case and condition: exactly what the investigator would be sent (--show), no reply.",
               label_order=["condition", "attr", "truth", "drop"])  # fmt: skip
