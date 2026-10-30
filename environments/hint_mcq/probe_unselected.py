@@ -127,7 +127,7 @@ def score(a):
     versions = [v for v in dict.fromkeys(q["set"] for q in qs) if v != TRAIN]
     lines = [
         (
-            f"MCQ answer probe ({predictor}) and Qwen's own letter-logit argmax on the mcq_unselected cases. Accuracy = share of "
+            f"{predictor} and Qwen's own letter-logit argmax on the mcq_unselected cases. Accuracy = share of "
             "questions whose predicted letter is Qwen's modal letter; right / wrong = Qwen's modal letter is / isn't the gold."
         ),
         "",
