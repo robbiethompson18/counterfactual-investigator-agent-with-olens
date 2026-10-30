@@ -283,7 +283,7 @@ Active docs:
 - [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
   — picks Qwen's own answer 94% / 80%
 - [ACTIVE: Author MCQ probe — read before asking Qwen about a passage's author (SynthPAI sex/age/education/relationship/income) or probing its view of the author](docs/author-mcq-probe.md)
-  — label probe at the question's "?" matches Qwen's own pmf; passage-only sites ~ TF-IDF
+  — probe of record at passage-only `<|im_end|>` (~ TF-IDF except sex/income); at the "?" it matches Qwen's pmf
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
 - [ACTIVE: style_transfer env (super experimental) — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
 - [ACTIVE: todo_suppressed (super experimental) — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)

@@ -10,9 +10,11 @@ the question is asked? The probe is meant as the ground truth for later sentence
 O-lens reads. Its label probe is "good by construction" only up to what the numbers below show: it
 is trained on the dataset label, not on Qwen's answer.
 
-Short answer: the passage-only sites (before any question) give a weak probe, about at the level of
-a TF-IDF bag of words. As soon as the question has been read (the "?" token, before any option), a
-label probe matches Qwen's own answer pmf, and beats it for age.
+Short answer: the probe of record is the label probe at the passage-only `<|im_end|>` (it never sees
+the question): AUROC 0.69 / 0.79 / 0.81 / 0.68 / 0.71 (sex / age / education / relationship /
+income). That is near a TF-IDF bag of words for age, education and relationship (0.76 / 0.81 / 0.68)
+and above it for sex and income (0.56 / 0.62). Once the question has been read (the "?" token,
+before any option), a label probe matches Qwen's own answer pmf, and beats it for age.
 
 Page with every passage, the exact answer prompts, Qwen's letter pmf in both option orders and DSv4
 Flash's replies (private artifact):
