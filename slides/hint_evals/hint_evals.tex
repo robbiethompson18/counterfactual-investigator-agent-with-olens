@@ -70,10 +70,9 @@
   \end{columns}
   \medskip
   \begin{itemize}
-    \item The six end-of-prompt reads add only 1.6–1.9pp over the option-newline reads alone (\cond{olensnl}{O-lens (nl)})
-    \item Naming Qwen's no-hint letter is harder: \olens{} cuts the error rate by 1.6–1.7pp, the probe by 23pp (hint after)
+    \item The six end-of-prompt reads add 1.6–1.9pp over the option-newline reads alone (\cond{olensnl}{O-lens (nl)})
+    \item Which letter without the hint: \olens{} cuts the error rate by 1.6–1.7pp, the probe by 23pp (hint after)
   \end{itemize}
-  \takeaway{The O-lens reads help Gemini tell whether Qwen knew the answer, but a probe at the same tokens does far better.}
 \end{frame}
 
 \section{The hint eval: O-lens at the option newlines and the end of the prompt}
@@ -94,7 +93,6 @@
   \sw{transcript}\ \transcript \quad \sw{olens}\ \olens{} \quad \swp{olens}\ \muted{placebo (another question's reads)}
   \\[2pt] \sw{olensnl}\ \cond{olensnl}{O-lens (nl)} \muted{option newlines only, earlier run} \quad \sw{probe}\ \cond{probe}{probe}
   \quad \sw{probetuned}\ \cond{probetuned}{tuned probe} \muted{(hint first only)}\par}
-  \takeaway{With the hint after the options, the option-newline reads can't see it.}
 \end{frame}
 
 \begin{frame}{The O-lens is read at the four option newlines and the six tokens that end the prompt}
@@ -144,14 +142,12 @@
 
 \begin{frame}{Did Qwen know it? The O-lens cuts the error rate from 41\% to 33\%, the probe to 15\%}
   \slidefig{fig/knew.pdf}
-  \takeaway{The end-of-prompt reads add little over the option newlines alone.}
   \source{Error rate = 100\% − \% right (guess = p $\geq$ 0.5); 95\% item bootstrap CI; stars: one-sided paired sign test vs transcript (* .05,
     ** .01, *** .001); hatched: placebo.}
 \end{frame}
 
 \begin{frame}{Which letter without the hint? The O-lens cuts the error rate by 2pp; only the probes cut it much more}
   \slidefig{fig/letter.pdf}
-  \takeaway{Investigators name the hinted letter in 85–95\% of draws, so every investigator sits near that line.}
   \source{Error rate = 1 − the mean over items of the fraction of correct draws, all runs pooled; 95\% item bootstrap; dotted: always naming the hinted letter (50\%; chance, 1 of 10 letters, is 90\%);
     stars as before.}
 \end{frame}
