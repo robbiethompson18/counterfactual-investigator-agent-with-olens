@@ -51,7 +51,7 @@ def eval_of(meta: dict) -> tuple[str, list[str], list[str]] | None:
     """A cfbench run's (eval name, envs, env runs it read), or None if it belongs to no eval."""
     p = meta.get("params", {})
     if p.get("eval"):
-        return p["eval"], p.get("envs") or [p["eval_env"]], []
+        return p["eval"], p["envs"] if "envs" in p else [p["eval_env"]], []  # an eval may use no environments/ env (author_mcq_drop_inline)
     m = re.match(r"(env|evalcue)_runs:([^/]+)/([^@]+)", p.get("env", ""))
     if not m:
         return None

@@ -113,7 +113,8 @@ def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | No
             have |= {r["id"] for r in new}
     (out / "reads").mkdir(parents=True)
     (out / "reads/reads.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-    (out / "reads/requests.jsonl").write_text("".join(json.dumps({"id": p, "item": p}) + "\n" for p in sorted(have)))
+    msgs = {r["id"]: r["messages"] for d in READS for r in load(d / "requests.jsonl")}  # cfbench.olens.Reads wants them
+    (out / "reads/requests.jsonl").write_text("".join(json.dumps({"id": p, "item": p, "messages": msgs[p]}) + "\n" for p in sorted(have)))
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
     print(f"{len(cs)} cases ({sum(c['positive'] for c in cs)} positive) from {len(need)} pairs; reads for {len(have & need)} pairs")
 

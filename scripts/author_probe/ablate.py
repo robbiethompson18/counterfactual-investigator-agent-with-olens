@@ -50,11 +50,11 @@ def comments_by_id() -> dict[str, dict]:
     return {c["id"]: c for c in map(json.loads, Path(raw).read_text().splitlines())}
 
 
-def select(src: Path, prefer: Collection[str] = ()) -> dict[str, list[str]]:
+def select(src: Path, prefer: Collection[str] = (), exclude: Collection[str] = ()) -> dict[str, list[str]]:
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     ok: dict[str, list[str]] = {}
     for r in load(src / "qwen_answers.jsonl"):
-        if r["attr"] in USE and conf(r["pmf"]) >= 0.5 and r["order_agree"]:
+        if r["attr"] in USE and conf(r["pmf"]) >= 0.5 and r["order_agree"] and r["passage"] not in exclude:
             ok.setdefault(r["passage"], []).append(r["attr"])
     best: dict[str, str] = {}
     for p, attrs in sorted(ok.items()):
@@ -74,7 +74,8 @@ def prep(a):
     com = comments_by_id()
     # question-first (--qfirst): prefer the passages the original-format run ablated, whose O-lens reads exist
     prefer = {r["passage"] for r in load(OLD / "pairs.jsonl")} if a.qfirst else set()
-    picked = select(src, prefer)
+    exclude = {r["passage"] for x in a.exclude for r in load(Path(x) / "pairs.jsonl")}  # a second passage per author
+    picked = select(src, prefer, exclude)
     pairs = []
     with open(run / "inputs_del_passage.jsonl", "w") as fp, open(run / "inputs_del_answer.jsonl", "w") as fa:
         write_rows(tok, picked, passages, qs, com, pairs, fp, fa, a.qfirst)
@@ -550,6 +551,7 @@ def main():
     p.add_argument("run")
     p.add_argument("--src", required=True)
     p.add_argument("--qfirst", action="store_true", help="question-first prompts (bank.qf_message), Qwen's pmf only")
+    p.add_argument("--exclude", nargs="*", default=[], help="runs whose passages to skip (e.g. the first passage per author)")
     z = sub.add_parser("analyze")
     z.add_argument("run")
     z.add_argument("--src", required=True)
