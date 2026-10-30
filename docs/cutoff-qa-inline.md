@@ -126,6 +126,10 @@ tool: transcript 70.9% → 70.1%, O-lens 85.8% → 89.7%, placebo 72.4% → 74.6
 of 200 (127/143 stale); the newline after `<|im_end|>` still carries it (166). So moving the answer
 from 5 to 20 tokens past the last read costs the lens nothing.
 
+![no tool vs tool call: transcript-only, O-lens, placebo](img/cutoff-qa-tool-inline.png)
+
+(`uv run python -m graphs.cutoff_qa_tool_inline`.)
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens
