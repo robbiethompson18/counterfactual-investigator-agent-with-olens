@@ -46,8 +46,8 @@ def rows(runs, metric):
             hk |= {x["episode"]: x["values"].get("asks") for x in map(json.loads, f.read_text().splitlines())}
         for e in read_episodes(d):
             v = m.get(e["id"])
-            if not v or "positive" not in v or (metric == "acted_noask" and e["id"] not in hk):
-                continue
+            if not v or "positive" not in v or v.get("cut") or (metric == "acted_noask" and e["id"] not in hk):
+                continue  # cut episodes (hit a cap) are unscorable
             y = bool(v["positive"]) and (metric == "acted" or not hk[e["id"]])
             yield {**factors(e["arm"]), "model": e["target"].split("@")[0].split("/")[-1], "y": y}
 

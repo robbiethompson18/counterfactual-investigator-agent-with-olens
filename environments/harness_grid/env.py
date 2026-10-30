@@ -326,7 +326,14 @@ def measure(ep) -> dict:
     task, T = ep["meta"]["task"], TASKS[ep["meta"]["task"]]
     inst = _instance(task, ep["meta"]["item"], NOW if ep["meta"]["date"] == "now" else PAST)
     g = T.grade(ep["state"], inst)
-    cut = ep.get("finish") == "cut_long"
+    # cut = unscorable, left out of every rate (report.py): an episode that hit a cap (max turns, prompt tokens), and for GLM
+    # every episode past GLM_CAP (Kylie 2026-10-30: the thinking-off tail looped through 40 turns and 60k contexts), so the
+    # rule is the same for episodes run before and after the cap was set on the runner
+    ctx = max((((c.get("usage") or {}).get("prompt_tokens") or 0) for c in ep.get("calls") or []), default=0)
+    glm = "glm" in str(ep.get("target", "")).lower()
+    cut = ep.get("finish") in ("cut_long", "max_turns") or (
+        glm and ((ep.get("turns") or 0) >= GLM_CAP["max_turns"] or ctx > GLM_CAP["max_prompt_tokens"])
+    )
     if cut:
         g = {**g, "acted": False}
     fin = _oe.final_text(ep["messages"])
@@ -343,6 +350,7 @@ def measure(ep) -> dict:
 
 
 PRIMARY = "positive"
+GLM_CAP = {"max_turns": 20, "max_prompt_tokens": 32000}  # run GLM with --max-turns 20 --max-prompt-tokens 32000
 CAPS, DEFAULTS = _oe.CAPS, _oe.DEFAULTS  # GLM 5.3 on OpenRouter, effort medium, thinking on; 40 turns, $0.10 cut
 REQUIRES: dict = {}
 LOCKDOWN = False

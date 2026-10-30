@@ -39,6 +39,8 @@ PUNCT_TURNS = {"alignment_faking": 2, "essay_grading": 2, "hinted_truthfulqa": 3
 
 
 def tier(env: str, task: str, special: bool, head: bool) -> int | None:
+    if env == "harness_grid":  # Kylie 2026-10-30: punctuation, delimiters, template tokens; p0 the prompt, p1 the episode
+        return 0 if head else 1
     if env == "overeagerness":
         return 0 if special or head else (1 if task.startswith("email") else None)
     return 2 if special or head else PUNCT_TURNS.get(env)
@@ -75,7 +77,11 @@ def main():
     ap.add_argument("--runs", default="data/envs/*/*glm53*")
     ap.add_argument("--positions-per-job", type=int, default=20000)
     ap.add_argument("--procs", type=int, default=12)
+    ap.add_argument(
+        "--p1-select", default=None, help="JSON list of 'envs/<env>/<run>/<episode id>': only these get tier-1 (non-prompt) reads"
+    )
     a = ap.parse_args()
+    p1_select = set(json.loads(Path(a.p1_select).read_text())) if a.p1_select else None
     R.tok(a.tok)
     tk = R.tok()
     out, jobs_dir = Path(a.out), Path(a.jobs)
@@ -114,7 +120,9 @@ def main():
                     if copied:
                         o = owner[key]
                         copies.append({"tid": tid, "pos": p, "src": o[0], "src_dir": o[1], "src_tid": o[2], "src_pos": o[3]})
-                    elif (t := tier(env, task, bool(r["special"][j]), bool(r["head"][j]))) is not None:
+                    elif (t := tier(env, task, bool(r["special"][j]), bool(r["head"][j]))) is not None and (
+                        t != 1 or p1_select is None or f"{run}/{e['id']}" in p1_select
+                    ):
                         owner[key] = ("fill", prep_name, tid, p)
                         by_tier[t].append(p)
                     else:
@@ -143,7 +151,7 @@ def main():
                             "ctx_left40": tk.decode(ids[max(0, p - 40) : p + 1]),
                             "ctx_right40": tk.decode(ids[p + 1 : p + 41]),
                             "next16": tk.decode(ids[p + 1 : p + 17]),
-                            "thinking": "off" if raw else "on",
+                            "thinking": "off" if raw or "thinkoff" in run else "on",
                             "n_tokens_full": r["n_tokens"],
                             "truncated": r["n_tokens"] > P.CAP,
                             "final_turn_in_view": r["n_tokens"] <= P.CAP,
