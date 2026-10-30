@@ -266,6 +266,19 @@ def _load(run: Path):
     return qs, prompts[: len(logp)], [np.array(x["logp"]) for x in logp], parts
 
 
+def consistent(logp: np.ndarray, temp: float = 0.7, top_p: float = 0.8, n: int = 8, k: int = 7) -> tuple[bool, float]:
+    """Would Qwen give the same letter in >= k of n samples (the other evals' consistency rule), from the letter logits
+    alone: temper to the envs' thinking-off sampling (T 0.7, top-p 0.8), take the argmax letter's probability p in the
+    nucleus, and call it consistent if P(Binomial(n, p) >= k) >= 0.5. -> (consistent, p)."""
+    from math import comb
+
+    q = np.exp((logp - logp.max()) / temp)
+    q = np.sort(q / q.sum())[::-1]
+    keep = q[: int(np.searchsorted(np.cumsum(q), top_p) + 1)]
+    pt = float(keep[0] / keep.sum())
+    return sum(comb(n, j) * pt**j * (1 - pt) ** (n - j) for j in range(k, n + 1)) >= 0.5, pt
+
+
 def cases(qs, prompts, logp) -> list[dict]:
     """One row per (question, removal) with both prompts' letter pmfs over the question's options."""
     by = {(p["q"], p["key"]): p["p"] for p in prompts}
@@ -294,6 +307,8 @@ def cases(qs, prompts, logp) -> list[dict]:
                     "entropy_with": float(-(mw * np.log(mw + 1e-12)).sum()),
                 }
                 | {"mass_with": float(fw.sum()), "mass_without": float(fo.sum())}
+                | {"top_with": float(mw.max()), "top_without": float(mo.max())}
+                | {"consistent": consistent(logp[pw])[0] and consistent(logp[po])[0]}
             )
     return out
 
@@ -313,9 +328,25 @@ def labels(a):
             xs = [letters[int(np.argmax(lp))] == q["census"] for q, lp in nh if q["pool"] == pool and q["dataset"] == ds]
             if xs:
                 rep.append(f"- {pool}/{ds}: bf16 no-hint argmax = census modal letter on {np.mean(xs):.1%} of {len(xs)}")
+    # the logit consistency call vs the empirical >= 7/8 call on the MMLU-Pro no-hint census (fp8 OpenRouter, 8 samples)
+    cs = _mmlu_census()
+    pairs = [(consistent(lp)[0], cs[q["qid"]].most_common(1)[0][1] >= 7) for q, lp in nh if q["dataset"] == "mmlu_pro" and q["qid"] in cs]
+    if pairs:
+        tab = Counter(pairs)
+        rep.append(
+            f"- consistency, logits vs census >= 7/8 (MMLU-Pro no-hint, {len(pairs)} questions):"
+            f" agree {np.mean([x == y for x, y in pairs]):.1%};"
+            f" both {tab[(True, True)]}, logits only {tab[(True, False)]}, census only {tab[(False, True)]}, neither {tab[(False, False)]}"
+        )
     mass = np.array([r["mass_with"] for r in rows])
     rep += [f"- letter-token mass at the answer position: median {np.median(mass):.3f}, 5th pct {np.percentile(mass, 5):.3f}", ""]
-    rep += ["| pool | dataset | element | with | without | n | flip | flip (Qwen right / wrong) | TV | Δp(hinted) |", "|" + " --- |" * 10]
+    rep += [
+        (
+            "| pool | dataset | element | with | without | n | flip | flip (Qwen right / wrong) | TV | Δp(hinted) | n consistent"
+            " | flip (consistent) |"
+        ),
+        "|" + " --- |" * 12,
+    ]
     groups = defaultdict(list)
     for r in rows:
         groups[(r["pool"], r["dataset"], r["element"], r["with"], r["without"])].append(r)
@@ -323,11 +354,55 @@ def labels(a):
         f = np.mean([r["flip"] for r in rs])
         fr = [np.mean([r["flip"] for r in rs if r["right"] == v]) if any(r["right"] == v for r in rs) else np.nan for v in (True, False)]
         tv, dp = np.mean([r["tv"] for r in rs]), np.mean([r["dp_hint"] for r in rs])
-        rep.append(f"| {' | '.join(g)} | {len(rs)} | {f:.2f} | {fr[0]:.2f} / {fr[1]:.2f} | {tv:.2f} | {dp:+.2f} |")
+        rc = [r["flip"] for r in rs if r["consistent"]]
+        fc = f"{np.mean(rc):.2f}" if rc else ""
+        rep.append(f"| {' | '.join(g)} | {len(rs)} | {f:.2f} | {fr[0]:.2f} / {fr[1]:.2f} | {tv:.2f} | {dp:+.2f} | {len(rc)} | {fc} |")
     n_flip = sum(r["flip"] for r in rows)
-    rep += ["", f"Overall: {n_flip} flips of {len(rows)} cases ({n_flip / len(rows):.1%})"]
+    rep += ["", f"Overall: {n_flip} flips of {len(rows)} cases ({n_flip / len(rows):.1%})", ""]
+    for pool in ("balanced", "twomodel", None):
+        for e in ("hint", "frame"):
+            rc = [r for r in rows if r["element"] == e and pool in (None, r["pool"])]
+            kc = [r["flip"] for r in rc if r["consistent"]]
+            rep.append(
+                f"- consistent on both prompts, {pool or 'pooled'} / {e}: {len(kc)} of {len(rc)} cases, {sum(kc)} flips ({np.mean(kc):.1%})"
+            )
     (run / "labels.md").write_text("\n".join(rep) + "\n")
     print("\n".join(rep))
+
+
+def split(a):
+    """Hold out questions for a later investigator eval (Kylie, 2026-10-30): a seeded, per-(pool, dataset) stratified share
+    of questions, the smallest share whose consistent cases hold >= n/2 flips, and from those n removal cases 50:50 flip.
+    Writes RUN/split.json; `probe` drops these questions entirely."""
+    run = Path(a.run)
+    C = [json.loads(line) for line in (run / "cases.jsonl").read_text().splitlines()]
+    qs = [json.loads(line) for line in (run / "questions.jsonl").read_text().splitlines()]
+    rng = random.Random(a.seed)
+    strata = defaultdict(list)
+    for q in qs:
+        strata[(q["pool"], q["dataset"])].append(q["q"])
+    order = {k: rng.sample(v, len(v)) for k, v in sorted(strata.items())}
+    for share in np.arange(0.05, 0.51, 0.01):
+        held = {q for v in order.values() for q in v[: max(1, round(share * len(v)))]}
+        cs = [i for i, c in enumerate(C) if c["q"] in held and c["consistent"]]
+        flips = [i for i in cs if C[i]["flip"]]
+        if len(flips) >= a.n // 2:
+            break
+    rest = [i for i in cs if not C[i]["flip"]]
+    picked = sorted(rng.sample(flips, a.n // 2) + rng.sample(rest, a.n // 2))
+    key = lambda i: f"{C[i]['q']}|{C[i]['with']}|{C[i]['without']}"
+    out = {
+        "seed": a.seed,
+        "share": round(float(share), 2),
+        "eval_questions": sorted(held),
+        "n_eval_questions": len(held),
+        "per_stratum": {"/".join(k): sum(q in held for q in v) for k, v in order.items()},
+        "n_cases_in_eval_questions": len(cs),
+        "n_flips_in_eval_questions": len(flips),
+        "eval_cases": [key(i) for i in picked],
+    }
+    (run / "split.json").write_text(json.dumps(out, indent=1) + "\n")
+    print({k: v for k, v in out.items() if k not in ("eval_questions", "eval_cases")})
 
 
 class Acts:
@@ -395,6 +470,15 @@ def probe(a):
     qs = {q["q"]: q for q in map(json.loads, (run / "questions.jsonl").read_text().splitlines())}
     prompts = [json.loads(line) for line in (run / "prompts.jsonl").read_text().splitlines()]
     C = [json.loads(line) for line in (run / "cases.jsonl").read_text().splitlines()]
+    held = set(json.loads((run / "split.json").read_text())["eval_questions"]) if (run / "split.json").exists() else set()
+    C = [c for c in C if c["q"] not in held]  # the investigator-eval questions: never trained, tuned or scored on here
+    # consistent cases only (Kylie, 2026-10-30, as the other hint evals' >= 7/8 samples): both prompts' letter logits say
+    # Qwen would give its argmax letter >= 7/8 times (consistent()), so a flip is a change between two consistent answers
+    n0 = len(C)
+    if not a.all_cases:
+        C = [c for c in C if c["consistent"]]
+    print(f"{len(C)} of {n0} cases kept ({'all' if a.all_cases else 'consistent on both prompts'})")
+    print(f"{len(held)} eval questions held out")
     acts = Acts(run)
     y = np.array([c["flip"] for c in C])
     g = np.array([c["q"] for c in C])
@@ -481,7 +565,7 @@ def probe(a):
         put("letter only", idx, cv(lett[idx], idx, 1.0)[0])
         put("answer probe mismatch", idx, (top0 != ans_with)[idx] + 1e-3 * ent0[idx])
         put("hand logistic", idx, cv(np.column_stack([hand[idx], onehot[idx]]), idx, 1.0)[0])
-        put("stratum only", idx, cv(onehot[idx], idx, 1.0)[0])
+        put("arm only", idx, cv(onehot[idx], idx, 1.0)[0])
         # (2) counterfactual-answer probe: listwise from the answer probe, |w - w0|^2, target = the letter without
         t = np.concatenate([np.arange(n) == ans_wo[i] for i, n in zip(idx, n_opts[idx])]).astype(float)
         r_of = {i: np.arange(st[i], st[i] + n_opts[i]) for i in idx}
@@ -505,8 +589,16 @@ def probe(a):
                 chosen[(e, variant)] = c
                 put(f"flip probe {variant} L{layer}", idx, s)
                 print(e, variant, layer, f"AUROC bal {_auc(y[idx][bal[idx]], s[bal[idx]]):.3f} all {_auc(y[idx], s):.3f}", flush=True)
+    # stacked on the best flip probe's held-out logit (chosen as _report does): does it add anything beyond which arm the
+    # case is in, and beyond the arm and Qwen's own letter confidence?
+    for e in elements:
+        idx = np.flatnonzero(el == e)
+        flips = {m: s for m, s in S.items() if m.startswith("flip probe") and not m.startswith("flip probe +")}
+        best = max(flips, key=lambda m: _auc(y[(el == e) & bal], flips[m][(el == e) & bal]))
+        put("flip probe + arm", idx, cv(np.column_stack([S[best][idx], onehot[idx]]), idx, 1.0)[0])
+        put("flip probe + arm + hand", idx, cv(np.column_stack([S[best][idx], hand[idx], onehot[idx]]), idx, 1.0)[0])
     _report(a, run, C, S, y, bal, g, el, pi, fold, chosen, ap)
-    with (run / "case_preds.jsonl").open("w") as f:
+    with (run / f"{a.out}_case_preds.jsonl").open("w") as f:
         for i, c in enumerate(C):
             f.write(
                 json.dumps(
@@ -545,20 +637,20 @@ def _report(a, run, C, S, y, bal, g, el, pi, fold, chosen, ap):
     best = {}
     for e in ("hint", "frame"):
         m_e = el == e
-        flips = {m: s for m, s in S.items() if m.startswith("flip probe")}
+        flips = {m: s for m, s in S.items() if m.startswith("flip probe") and not m.startswith("flip probe +")}
         best[e] = max(flips, key=lambda m: _auc(y[m_e & bal], flips[m][m_e & bal]))
         rep += [f"## Removing the {e}", "", f"Best flip probe by pooled balanced AUROC (chosen on the same folds): **{best[e]}**", ""]
         cols = [("pooled", np.ones(len(C), bool)), ("balanced pool", pool == "balanced"), ("twomodel pool", pool == "twomodel")]
         rep += ["| method | " + " | ".join(f"{n}: bal / natural" for n, _ in cols) + " |", "|" + " --- |" * (len(cols) + 1)]
         show = [m for m in S if not m.startswith("flip probe")] + [
-            m for m in S if m.startswith("flip probe") and (m.endswith("L52") or m == best[e])
+            m for m in S if m.startswith("flip probe") and (m.endswith("L52") or m == best[e] or m.startswith("flip probe +"))
         ]
         for m in dict.fromkeys(show):
             cells = [f"{_auc(y[m_e & bal & c], S[m][m_e & bal & c]):.3f} / {_auc(y[m_e & c], S[m][m_e & c]):.3f}" for _, c in cols]
             rep.append(f"| {m} | " + " | ".join(cells) + " |")
         # gain over the hand logistic, bootstrap over questions, balanced and natural
         for name, mask in (("balanced", m_e & bal), ("natural", m_e)):
-            for m in (best[e], "cf-answer probe"):
+            for m in (best[e], "cf-answer probe", "flip probe + arm", "flip probe + arm + hand"):
                 qs_ = np.unique(g[mask])
                 by_q = {q: np.flatnonzero(mask & (g == q)) for q in qs_}
                 d0 = _auc(y[mask], S[m][mask]) - _auc(y[mask], S["hand logistic"][mask])
@@ -589,7 +681,15 @@ def _report(a, run, C, S, y, bal, g, el, pi, fold, chosen, ap):
             for q in np.unique(g[m_e & c]):
                 ii = np.flatnonzero(m_e & c & (g == q))
                 if 0 < y[ii].sum() < len(ii):
-                    for m in ("hand logistic", "-margin", "cf-answer probe", best[e]):
+                    for m in (
+                        "hand logistic",
+                        "arm only",
+                        "-margin",
+                        "cf-answer probe",
+                        best[e],
+                        "flip probe + arm",
+                        "flip probe + arm + hand",
+                    ):
                         per[m].append(_auc(y[ii], S[m][ii]))
             n_q = len(per["hand logistic"])
             rep.append(f"- {pn} ({n_q} questions): " + ", ".join(f"{m} {np.mean(v):.3f}" for m, v in per.items()))
@@ -645,7 +745,7 @@ def _report(a, run, C, S, y, bal, g, el, pi, fold, chosen, ap):
             f" | {auc} | {auch} |"
         )
     rep += ["", "## Chosen C (logistic, inner 3-fold on fold 0's training cases)", "", *[f"- {k}: {v}" for k, v in chosen.items()]]
-    (run / "probe.md").write_text("\n".join(rep) + "\n")
+    (run / f"{a.out}.md").write_text("\n".join(rep) + "\n")
     print("\n".join(rep))
 
 
@@ -701,7 +801,7 @@ def transfer(a, run, C, y, bal, g, el, features, logistic, fold):
         cells = [f"{_auc(y[B & bal], s[B & bal]):.3f} / {_auc(y[B], s[B]):.3f}" for s in (out, own)]
         rep.append(f"| {name} | {variant} | {cells[0]} | {cells[1]} |")
         print(rep[-1], flush=True)
-    (run / "transfer.md").write_text("\n".join(rep) + "\n")
+    (run / f"{a.out}_transfer.md").write_text("\n".join(rep) + "\n")
 
 
 def main():
@@ -713,9 +813,15 @@ def main():
     p.add_argument("--smoke", type=int, help="only the first N questions per (pool, dataset)")
     s = sub.add_parser("labels")
     s.add_argument("run")
+    h = sub.add_parser("split")
+    h.add_argument("run")
+    h.add_argument("--n", type=int, default=1000, help="eval removal cases, half flips")
+    h.add_argument("--seed", type=int, default=0)
     t = sub.add_parser("probe")
     t.add_argument("run")
     t.add_argument("--seed", type=int, default=0)
+    t.add_argument("--all-cases", action="store_true", help="no consistency filter (the secondary table)")
+    t.add_argument("--out", default="probe", help="report name: OUT.md, OUT_case_preds.jsonl")
     t.add_argument("--folds", type=int, default=5)
     t.add_argument("--boot", type=int, default=1000)
     t.add_argument("--c-grid", type=float, nargs="+", default=[1e-4, 1e-3, 1e-2])
@@ -724,7 +830,7 @@ def main():
     t.add_argument("--transfer-layer", type=int, default=52)
     t.add_argument("--transfer-c", type=float, default=1e-3)
     a = ap.parse_args()
-    {"prep": prep, "labels": labels, "probe": probe}[a.cmd](a)
+    {"prep": prep, "labels": labels, "split": split, "probe": probe}[a.cmd](a)
 
 
 if __name__ == "__main__":
