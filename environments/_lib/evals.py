@@ -753,6 +753,17 @@ def defined() -> list[dict]:
     return [e | {"retired": True} if e["name"] in RETIRED_EVALS else e for e in out]
 
 
+def _finite(o):
+    """`o` with every NaN or infinite float replaced by None, so the page's JSON.parse accepts it."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: _finite(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_finite(v) for v in o]
+    return o
+
+
 def build(names: list[str] | None = None, export=True) -> list[Path]:
     """Write data/evals/<name>.json for `names` (default: every eval with a local run). There is no shared index (the
     page lists evals from spec/evals.json and reads each one's own file), so concurrent uploads can't clobber each other."""
@@ -781,7 +792,9 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
-        p.write_text(json.dumps(doc) + "\n")
+        tmp = p.with_suffix(".json.tmp")  # NaN (e.g. a Brier of p-bar over one-case groups) is not JSON: null, strictly
+        tmp.write_text(json.dumps(_finite(doc), allow_nan=False) + "\n")
+        tmp.replace(p)
         written.append(p)
     return written
 
