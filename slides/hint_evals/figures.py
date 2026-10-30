@@ -116,7 +116,7 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
         ax.set_xlim(-0.6, len(conds) - 0.4)
         ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
         ax.text(0, 1.13, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
-        ax.text(0, 1.04, f"{n:,} cases · {evals[k]}", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
+        ax.text(0, 1.04, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
         for side in ("left", "bottom"):
             ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
