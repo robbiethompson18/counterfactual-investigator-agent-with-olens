@@ -40,7 +40,16 @@ and other reads). One run per condition,
 `cfbench/2026-10-29_cutoff-qa-1k-{transcript,olens,olens-placebo,jlens,jlens-placebo,nla,nla-placebo-mmlu}`,
 Haiku 5.5 medium, 3 draws: 20,979 predictions, ~$20 of Haiku (OpenRouter-reported).
 `…-1k-nla-placebo` is superseded: its placebo pool mixed in other cutoff items' reads (86 / 84 / 65
-/ 94 there).
+/ 94 there). Docent, one filtered view per run:
+[transcript](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=97253028-1431-411b-a65a-4363587ffc84),
+[O-lens](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=f84d47a6-0273-4864-a3e1-61180360be58),
+[O-lens placebo](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=85c438e4-605d-4af1-9f35-a166135f6323),
+[J++](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=c8c29354-a7c0-4f8e-9b31-300532ba602a),
+[J++ placebo](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=eb576b08-acdf-487b-877f-3eac2f978ba9),
+[NLA](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=66489f62-7303-48fb-9a99-795aad0891d6),
+[NLA placebo](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=edfed094-ab42-40a6-ac9f-b12e40bed607),
+superseded
+[NLA placebo, old pool](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run?filter=cb531331-7c54-445d-adc8-0d190aa4fabd).
 
 ![transcript-only vs O-lens, J++ and NLA and their placebos, all / stale / not stale](img/cutoff-qa-inline.png)
 
