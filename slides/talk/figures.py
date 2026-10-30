@@ -8,7 +8,7 @@ evals/NAME.json (data/evals/, or HF's evals/ when it isn't local).
   fraction right, a 95% item bootstrap (2000 resamples; the page's own RNG differs, so a CI end can move by a point), the
   exact one-sided sign test against transcript-only over the items that differ, chance = 1 / the most options.
 
-    uv run python -m slides.hint_evals.figures   # -> slides/hint_evals/fig/*.pdf
+    uv run python -m slides.talk.figures   # -> slides/talk/fig/*.pdf
 """
 
 import json
