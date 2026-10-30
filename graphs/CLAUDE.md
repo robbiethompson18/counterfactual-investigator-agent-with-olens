@@ -16,6 +16,8 @@ placebo black, no tools gray).
   (`docs/cutoff-qa-inline.md`)
 - `favorites_qa_inline`: the same seven bars and paired-difference figure for the 1,500-item
   favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
+- `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right
+  cases (`docs/supergpqa-inline.md`)
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up

@@ -274,6 +274,14 @@ Active docs:
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our CHIVE replacement
+- [REFERENCE: supergpqa_inline — read before claiming the O-lens predicts Qwen's MCQ letter, giving an investigator lens reads of an MCQ prompt, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
+  — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
+  single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
+  cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`
+- [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
+  — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
+  shared pod, and the arithmetic
 - [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, comparing O-lens / J-lens / NLA / probe readers on it, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
   — unselected 4k sample of MMLU-Pro, two 2k eval batches + a 2k probe half (probe-trained questions
   kept out of eval), strict consistency the only filter (2,523 cases, 82% right), no hint,
