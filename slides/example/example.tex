@@ -1,0 +1,134 @@
+% The theme's example deck: title, one-page summary, section, figure, table, two-column and panel frames, on the supergpqa_inline
+% results (docs/supergpqa-inline.md). Copy this file to start a deck; `make -C slides` builds it.
+\documentclass[aspectratio=169, 9pt, t]{beamer}
+\usetheme{olens}
+
+\title[Make a good benchmark for whitebox techniques]{%
+  \struck{Make a really good investigator agent}\\[3pt]
+  \struck{Make a better counterfactual behaviour benchmark}\\[3pt]
+  Make a good benchmark for whitebox techniques.}
+\author{Robbie Thompson \& Kylie}
+\institute{MATS sprint with Neel Nanda}
+\date{30 October 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Summary}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.315\textwidth}
+      \stat{+8.0pp}{olens}{\olens{} over the prompt alone: 76.9\% vs 68.9\% of 3,000 cases}
+    \end{column}
+    \begin{column}{0.315\textwidth}
+      \stat{+9.3pp}{olens}{\olens{} over its placebo, so it isn't just a longer prompt}
+    \end{column}
+    \begin{column}{0.315\textwidth}
+      \stat{+11pp}{olens}{\olens{} over the prompt on the 1,122 cases Qwen gets wrong}
+    \end{column}
+  \end{columns}
+  \medskip
+  \begin{itemize}
+    \item Haiku predicts Qwen3.6-27B's SuperGPQA letter from the prompt, with and without lens reads
+    \item \jlens{} and \nla{} beat their placebos by about 3pp; no placebo beats the prompt alone
+  \end{itemize}
+  \takeaway{The O-lens reads Qwen's answer before Qwen writes it, most of all when Qwen is wrong.}
+\end{frame}
+
+\begin{frame}{The question}
+  Given only the prompt, predict the letter Qwen3.6-27B will answer.
+  \begin{itemize}
+    \item 3,000 SuperGPQA questions where Qwen gives one letter in $\geq$ 7 of 8 samples
+    \item Investigator: Claude Haiku 5.5, one draw, a single \texttt{submit\_answer} call
+    \item Seven conditions: \transcript, and the \olens, \jlens{} and \nla{} reads of the prompt, each with a placebo
+      \begin{itemize}
+        \item a placebo is another case's reads, presented as this case's
+      \end{itemize}
+    \item Truth is Qwen's modal letter, not the gold answer
+  \end{itemize}
+  \takeaway{If the lens only paraphrases the prompt, the placebo should score as well as the lens.}
+\end{frame}
+
+\section{Results}
+
+\begin{frame}{The O-lens adds 8pp over the prompt alone}
+  \slidefig{fig/accuracy.pdf}
+  \source{Hatched bars are placebos; whiskers are 95\% CIs. Haiku 5.5 at effort medium, one draw per case. Runs \texttt{cfbench/2026-10-29\_supergpqa-haiku-3k-*};
+    docs/supergpqa-inline.md.}
+\end{frame}
+
+\begin{frame}{Every lens beats its placebo; no placebo beats the prompt}
+  \centering\tablefont
+  \begin{tabular}{@{}l rrr@{}}
+    \toprule
+    condition & all cases & Qwen wrong & Qwen right \\
+              & \muted{n = 3,000} & \muted{n = 1,122} & \muted{n = 1,878} \\
+    \midrule
+    \sw{transcript}\ \ transcript only & 68.9 & 46.2 & 82.5 \\
+    \addlinespace[2pt]
+    \sw{olens}\ \ O-lens               & \best{76.9} & \best{57.0} & \best{88.8} \\
+    \swp{olens}\ \ \muted{O-lens placebo} & 67.6 & 46.1 & 80.4 \\
+    \addlinespace[2pt]
+    \sw{jlens}\ \ J++                  & 71.1 & 49.6 & 83.9 \\
+    \swp{jlens}\ \ \muted{J++ placebo} & 67.5 & 44.7 & 81.1 \\
+    \addlinespace[2pt]
+    \sw{nla}\ \ NLA                    & 71.5 & 49.6 & 84.6 \\
+    \swp{nla}\ \ \muted{NLA placebo}   & 68.4 & 47.1 & 81.2 \\
+    \bottomrule
+  \end{tabular}
+  \par\medskip
+  {\footnotesize\muted{\% of cases where Haiku names Qwen's modal letter. Guessing the gold letter scores 62.6.}}
+\end{frame}
+
+\begin{frame}{The gain is largest where Qwen is wrong}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.47\textwidth}
+      \begin{itemize}
+        \item \olens{} beats its placebo by \textbf{+9.3pp}; J++ and the NLA by about 3pp
+        \item +11pp on the cases Qwen gets wrong, where solving the question fails
+        \item No placebo helps: the gain isn't just a longer prompt
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \slidefig{fig/diffs.pdf}
+    \end{column}
+  \end{columns}
+  \source{Paired differences over cases, 95\% bootstrap CIs. A filled dot is a CI that excludes 0.}
+\end{frame}
+
+\section{Using the theme}
+
+\begin{frame}[fragile]{Indigo is structure; every other colour is a condition}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.47\textwidth}
+      \begin{block}{Conditions}
+        \tablefont
+        \begin{tabular}{@{}ll@{}}
+          \sw{transcript}\ \transcript & \sw{notool}\ \cond{notool}{no tool calls} \\
+          \sw{olens}\ \olens{} & \swp{olens}\ \muted{O-lens placebo} \\
+          \sw{jlens}\ \jlens{} & \swp{jlens}\ \muted{J++ placebo} \\
+          \sw{nla}\ \nla{} & \swp{nla}\ \muted{NLA placebo} \\
+        \end{tabular}
+      \end{block}
+      \begin{alertblock}{Structure}
+        Progress bar, takeaways and \alert{\texttt{\textbackslash alert}} are indigo.
+      \end{alertblock}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \footnotesize
+\begin{verbatim}
+\olens{} beats its placebo
+\sw{olens} \swp{olens}
+\slidefig{fig/accuracy.pdf}
+\takeaway{The one sentence.}
+\source{Run, doc, date.}
+\begin{panel}[Title] ... \end{panel}
+\stat{+8.0pp}{olens}{what it is}
+\end{verbatim}
+      \normalsize
+      Figures come from \texttt{slides/figure.py} at their slide size and are included unscaled.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

@@ -283,6 +283,8 @@ Active docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) —
   `python -m graphs.<module>` → `docs/img/`
+- [ACTIVE: slides — read before making a talk or slide deck, or a figure for one](slides/CLAUDE.md)
+  — Beamer + Metropolis theme in the Evals page's style, `make -C slides`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our CHIVE replacement
 - [REFERENCE: supergpqa_inline — read before claiming the O-lens predicts Qwen's MCQ letter, giving an investigator lens reads of an MCQ prompt, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
