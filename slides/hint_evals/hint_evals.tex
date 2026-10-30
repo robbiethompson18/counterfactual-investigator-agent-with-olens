@@ -22,8 +22,8 @@
 \newcommand{\rnote}[1]{\hfill{\sffamily\scriptsize\color{muted}#1}}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 
-\title[Hint evals with end-of-prompt reads]{Did Qwen know it?\\[3pt]
-  \large\mdseries Hint evals with O-lens reads at the option newlines and the end of the prompt}
+\title[Hint eval with end-of-prompt reads]{Did Qwen know it?\\[3pt]
+  \large\mdseries The hint eval with O-lens reads at the option newlines and the end of the prompt}
 \author{Robbie Thompson \& Kylie MacFarquharson}
 \institute{MATS sprint with Neel Nanda}
 \date{October 2026}
@@ -52,9 +52,9 @@
   \takeaway{The O-lens reads help Gemini tell whether Qwen knew the answer, but a probe at the same tokens does far better.}
 \end{frame}
 
-\section{Hint evals: O-lens at the option newlines and the end of the prompt}
+\section{The hint eval: O-lens at the option newlines and the end of the prompt}
 
-\begin{frame}{Four evals: two hint positions, two questions}
+\begin{frame}{One eval, four variants: hint after or before the options, “knew?” or “which letter?”}
   \begin{itemize}
     \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
       no-hint samples, with different answers
@@ -115,8 +115,8 @@
   \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens,
   \dt{olensnl}\,\cond{olensnl}{O-lens (nl)} and \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
   Qwen answers B in 7 of 8 samples.
-  \source{MMLU-Pro item 10808, the run each eval shows; reads \texttt{olens\_reads/2026-10-29\_hint-qwen-dsv4-tail} and the
-    evals' inputs runs.}
+  \source{MMLU-Pro item 10808, the run each variant shows; reads \texttt{olens\_reads/2026-10-29\_hint-qwen-dsv4-tail} and the
+    variants' inputs runs.}
 \end{frame}
 
 \begin{frame}{Did Qwen know it? The O-lens beats the transcript by 6–9pp, the probe by far more}
