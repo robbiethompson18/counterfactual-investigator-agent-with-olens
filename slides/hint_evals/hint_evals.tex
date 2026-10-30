@@ -44,6 +44,12 @@
 \newcommand{\tok}[1]{{\color{muted}#1}}
 \newcommand{\hint}[1]{{\bfseries #1}}
 \newcommand{\rnote}[1]{\hfill{\sffamily\scriptsize\color{muted}#1}}
+% \parthead{n}{title}: a section's first frame without a section page (Kylie, 2026-10-30): the section page's indigo "PART n"
+% over a title a step bigger than a frame title, underlined with the accent rule
+\newcommand{\parthead}[2]{%
+  {\color{accent}\usebeamerfont{date}\bfseries\addfontfeatures{LetterSpace=8}PART #1\par}\vspace{0.3mm}
+  {\displayfont\bfseries\fontsize{12}{14}\selectfont #2\par}\vspace{0.6mm}
+  {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 
 \title[Hint eval with end-of-prompt reads]{Did Qwen know it?\\[3pt]
@@ -75,7 +81,8 @@
   \end{itemize}
 \end{frame}
 
-\begin{frame}{The hint eval: one eval, four variants (hint after the options or first; “knew?” or “which letter?”)}
+\begin{frame}
+  \parthead{1}{Hinted multiple choice}
   \begin{itemize}
     \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
       no-hint samples, with different answers
