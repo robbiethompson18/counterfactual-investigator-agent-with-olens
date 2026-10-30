@@ -232,6 +232,11 @@ What it says:
 ## Open items
 
 - NLA has one draw; two more would cost ~$20 and only narrow a ~1pp effect.
+- The "Qwen's logits" ceiling is read at the thinking-off template's last token, the `\n\n` after
+  the empty `<think></think>` block, four forced tokens after the lens tail's last position
+  (`assistant\n`) and well after the option newlines the probe reads. No sampling: one forward pass
+  over the rendered prompt. Position, not only method, favours it; the fix (Robbie, 2026-10-30,
+  later) is a probe at that same final position, and/or lens reads there.
 - Mirror the probe run under `runs/cfbench/` so the env viewer shows it beside the Haiku bars.
 - Tooling notes from the read campaign: `runpod/olens_reads.sh fetch` truncates the local files if
   the pod is already gone (write to a temp name first); `runpod/watch_pod.sh`'s pre-delete fetch
