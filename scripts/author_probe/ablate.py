@@ -304,6 +304,146 @@ def analyze(a):
     print("\n".join(lines))
 
 
+JUDGE = "anthropic/claude-haiku-5.5"
+JUDGE_PROMPT = """A language model read a set of short social-media comments, all written by one person, and was asked: \
+"{question}" with options {options}.
+
+Deleting one of those comments changed the model's answer. With the comment present, it gave "{supported}" probability \
+{before:.2f}; without it, {after:.2f}. So the model treated this comment as evidence that the author's {attr} is \
+"{supported}".
+
+The comment:
+\"\"\"
+{comment}
+\"\"\"
+
+Does the comment itself give evidence that the author's {attr} is "{supported}"? Classify:
+- "explicit": it states or directly implies it (e.g. names their gender, age, degree, or money situation).
+- "indirect": no direct statement, but a reasonable reader could infer it (stereotyped interests, life stage, wording).
+- "none": no apparent reason it should point to "{supported}".
+
+Reply with JSON only: {{"category": "explicit" | "indirect" | "none", "reason": "<one line>"}}"""
+
+
+def judge_items(run: Path) -> list[tuple[dict, dict, str]]:
+    """Evidence comments of stable pairs, plus (tier 2) each stable pair's top comment when its TV > 0.1 and it is not
+    already evidence. The supported class is the one whose probability fell most when the comment was deleted."""
+    out = []
+    for r in load(run / "pairs_scored.jsonl"):
+        if not r["stable"]:
+            continue
+        top = max(r["deletions"], key=lambda d: d["tv"])
+        for d in r["deletions"]:
+            tier = "evidence" if d["evidence"] else "tier2" if d is top and d["tv"] > 0.1 else None
+            if tier:
+                out.append((r, d, tier))
+    return out
+
+
+def judge(a):
+    import asyncio
+    import re
+
+    from counterfactual_investigator_agent_with_olens import openrouter
+
+    run = Path(a.run)
+    qs = {q["id"]: q for q in load(BANK / "questions.jsonl")}
+    items = judge_items(run)
+
+    async def one(r, d, tier, sem):
+        q, opts = qs[f"{r['passage']}:{r['attr']}"], ATTRS[r["attr"]][1]
+        k = int(np.argmin(np.array(d["pmf"]) - np.array(r["pmf"])))
+        msg = JUDGE_PROMPT.format(
+            question=q["question"], options=" / ".join(opts), supported=opts[k], before=r["pmf"][k], after=d["pmf"][k],
+            attr=r["attr"], comment=d["text"],
+        )  # fmt: skip
+        async with sem:
+            resp = await openrouter.chat(JUDGE, [{"role": "user", "content": msg}], effort="medium")
+        text = resp.choices[0].message.content or ""
+        m = re.search(r"\{.*\}", text, re.DOTALL)
+        try:
+            parsed = json.loads(m.group(0)) if m else {}
+        except json.JSONDecodeError:
+            parsed = {}
+        return {
+            "passage": r["passage"], "attr": r["attr"], "i": d["i"], "tier": tier, "supported": opts[k],
+            "before": r["pmf"][k], "after": d["pmf"][k], "tv": d["tv"], "label": opts[r["label"]],
+            "qwen_answer": opts[r["answer"]], "human": d["human"]["estimate"], "probe_shift": d["probe_shift"],
+            "comment": d["text"], "category": parsed.get("category"), "reason": parsed.get("reason"),
+            "judge": {"model": JUDGE, "messages": [{"role": "user", "content": msg}], "output": text,
+                      "reasoning": getattr(resp.choices[0].message, "reasoning", None), "cost": getattr(resp.usage, "cost", None)},
+        }  # fmt: skip
+
+    async def go():
+        sem = asyncio.Semaphore(32)
+        return await asyncio.gather(*(one(*it, sem) for it in items))
+
+    rows = asyncio.run(go())
+    (run / "judge.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
+    print(f"{len(rows)} judged, ${sum(r['judge']['cost'] or 0 for r in rows):.2f}")
+
+
+def judge_report(a):
+    import sys
+
+    sys.path.insert(0, "expview")
+    from expview import Run, call
+
+    run = Path(a.run)
+    rows = load(run / "judge.jsonl")
+    cats = ("explicit", "indirect", "none")
+    lines = ["# Why did Qwen move? Evidence comments judged", ""]
+    lines += [
+        (
+            f"Judge: {JUDGE} (effort medium, 1 replicate), given only the comment, the question and options, and the option whose"
+            " probability fell when the comment was deleted. Evidence = TV > max(0.15, 5 x median) on stable pairs; tier 2 = a"
+            " stable pair's top comment with TV > 0.1 that is not evidence. 'not human' = the SynthPAI reviewer did not guess the"
+            " attribute from this comment."
+        ),
+        "",
+        "| attribute | tier | n | explicit | indirect | none | none and not human-guessed |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for attr in USE:
+        for tier in ("evidence", "tier2"):
+            rs = [r for r in rows if r["attr"] == attr and r["tier"] == tier]
+            c = [sum(r["category"] == k for r in rs) for k in cats]
+            nn = sum(r["category"] == "none" and not r["human"] for r in rs)
+            lines.append(f"| {attr} | {tier} | {len(rs)} | {c[0]} | {c[1]} | {c[2]} | {nn} |")
+    lines += ["", "## 'none' cases (largest TV first)", ""]
+    pick = sorted([r for r in rows if r["category"] == "none"], key=lambda r: -r["tv"])
+    for r in pick:
+        lines.append(
+            f"- **{r['attr']}** `{r['passage']}` #{r['i']} ({r['tier']}): p({r['supported']}) {r['before']:.2f} → {r['after']:.2f};"
+            f" Qwen {r['qwen_answer']}, label {r['label']}; probe shift <|im_end|> {r['probe_shift']['im_end']:+.2f}, ?"
+            f' {r["probe_shift"]["qmark"]:+.2f}; human: {r["human"] or "-"}. Judge: {r["reason"]}. Comment: "{r["comment"][:300]}"'
+        )
+    (run / "judge.md").write_text("\n".join(lines) + "\n")
+    ex = Run(
+        run / "expview" / "judge",
+        title="SynthPAI ablations: why did Qwen move? (Haiku judge)",
+        description="One item per judged comment: the judge's exact input and output. Labels: category, tier, attribute.",
+        label_order=["category", "tier", "attr"],
+    )
+    ex.reset()
+    for r in rows:
+        ex.add(
+            id=f"{r['passage']}:{r['attr']}#{r['i']}",
+            group=r["category"] or "unparsed",
+            labels={"category": r["category"], "tier": r["tier"], "attr": r["attr"], "tv": round(r["tv"], 3), "human": r["human"] or "-"},
+            calls=[
+                call(
+                    "judge (Haiku 5.5)",
+                    JUDGE,
+                    messages=r["judge"]["messages"],
+                    output={"role": "assistant", "content": r["judge"]["output"]},
+                    parsed={"category": r["category"], "reason": r["reason"]},
+                )
+            ],
+        )
+    print("\n".join(lines[:20]))
+
+
 def view(a):
     """expview: one item per stable pair (all pairs with --all): the order-0 answer prompt, then a per-comment table of
     the deletion's TV, Qwen's shift, both probe shifts, the SynthPAI human's guess from that comment; evidence in bold."""
@@ -326,17 +466,31 @@ def view(a):
         ),
     )
     ex.reset()
+    jpath = run / "judge.jsonl"
+    judged = {(j["passage"], j["attr"], j["i"]): j for j in load(jpath)} if jpath.exists() else {}
     for r in load(run / "pairs_scored.jsonl"):
         if not (r["stable"] or a.all):
             continue
         q, opts = qs[f"{r['passage']}:{r['attr']}"], ATTRS[r["attr"]][1]
-        rows = ["| # | TV | Qwen shift | probe <\\|im_end\\|> | probe ? | human guess | comment |", "|---|---|---|---|---|---|---|"]
+
+        def jud(d, r=r):
+            j = judged.get((r["passage"], r["attr"], d["i"]))
+            return f"{j['category']}: {j['reason']}".replace("|", "/").replace("\n", " ") if j else ""
+
+        cats = [judged[k]["category"] for k in ((r["passage"], r["attr"], d["i"]) for d in r["deletions"]) if k in judged]
+        # the pair's least-explained judged comment: no apparent reason > indirect > explicit
+        bucket = next((c for c in ("none", "indirect", "explicit") if c in cats), "not judged")
+        bucket = {"none": "no apparent reason"}.get(bucket, bucket)
+        rows = [
+            "| # | TV | Qwen shift | probe <\\|im_end\\|> | probe ? | human guess | judge | comment |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
         for d in r["deletions"]:
             b = "**" if d["evidence"] else ""
             text = d["text"].replace("\n", " ").replace("|", "/")
             rows.append(
                 f"| {d['i']} | {b}{d['tv']:.3f}{b} | {d['qwen_shift']:+.3f} | {d['probe_shift']['im_end']:+.3f} | "
-                f"{d['probe_shift']['qmark']:+.3f} | {d['human']['estimate'] or '-'} | {b}{text}{b} |"
+                f"{d['probe_shift']['qmark']:+.3f} | {d['human']['estimate'] or '-'} | {jud(d)} | {b}{text}{b} |"
             )
         head = (
             f"Qwen: {opts[r['answer']]} (pmf {dict(zip(opts, r['pmf'], strict=True))}); label: {opts[r['label']]}; "
@@ -349,7 +503,10 @@ def view(a):
             labels={
                 "label": opts[r["label"]],
                 "qwen": opts[r["answer"]],
-                "correct": r["answer"] == r["label"],
+                "attribute": r["attr"],
+                "qwen_correct": "right" if r["answer"] == r["label"] else "wrong",
+                "has_evidence": any(d["evidence"] for d in r["deletions"]),
+                "judge_bucket": bucket,
                 "evidence_comments": sum(d["evidence"] for d in r["deletions"]),
                 "median_tv": round(r["median_tv"], 3),
             },
@@ -378,8 +535,12 @@ def main():
     v = sub.add_parser("view")
     v.add_argument("run")
     v.add_argument("--all", action="store_true")
+    j = sub.add_parser("judge")
+    j.add_argument("run")
+    jr = sub.add_parser("judge-report")
+    jr.add_argument("run")
     a = ap.parse_args()
-    {"prep": prep, "analyze": analyze, "view": view}[a.cmd](a)
+    {"prep": prep, "analyze": analyze, "view": view, "judge": judge, "judge-report": judge_report}[a.cmd](a)
 
 
 if __name__ == "__main__":

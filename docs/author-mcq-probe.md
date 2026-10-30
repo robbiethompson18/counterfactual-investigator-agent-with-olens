@@ -191,6 +191,42 @@ passages, restricted to the stable set.
   (and the public expview, `#dataset=runs/author_mcq_probe/2026-10-30_ablate-loo`).
 - Cost ~$8 of H200 (~1.5 h incl. setup).
 
+### Why did Qwen move? (judge, 2026-10-30)
+
+Every evidence comment of a stable pair, plus each stable pair's top comment with TV > 0.1 that is
+not evidence ("tier 2"), judged by Haiku 5.5 (effort medium, 1 replicate). The judge sees only the
+comment, the question and the option whose probability fell when the comment was deleted, and
+answers explicit / indirect / none ("no apparent reason"). All calls are in the run's
+`expview/judge` and on
+[claude.ai/artifact/52TF6yU4z8sJoXck5yrHBJ](https://claude.ai/artifact/52TF6yU4z8sJoXck5yrHBJ); the
+list is in `judge.md`.
+
+| attribute | tier     | n   | explicit | indirect | none | none, not human-guessed |
+| --------- | -------- | --- | -------- | -------- | ---- | ----------------------- |
+| sex       | evidence | 64  | 7        | 52       | 5    | 2                       |
+| sex       | tier 2   | 25  | 0        | 17       | 8    | 7                       |
+| age       | evidence | 88  | 8        | 70       | 10   | 9                       |
+| age       | tier 2   | 43  | 0        | 29       | 14   | 14                      |
+| education | evidence | 74  | 14       | 57       | 3    | 2                       |
+| education | tier 2   | 51  | 1        | 38       | 12   | 12                      |
+| income    | evidence | 49  | 10       | 35       | 4    | 4                       |
+| income    | tier 2   | 50  | 3        | 34       | 13   | 11                      |
+
+- Most evidence comments are "indirect" (life stage, stereotyped hobbies, wording); only 7–20% are
+  explicit. "No apparent reason" is 5–11% of evidence comments and ~25% of tier 2.
+- The judge is wrong on some "none" calls: "pretty rare for guys over here" (ikebana, Male), "psych
+  wasn't always seen as 'masculine'" (Male) and "old 'woman' blueprints" (Female) are first-person
+  cues a reader would take. Read the "none" list, don't count it.
+- Patterns among the genuinely non-obvious ones: (1) numbers pull age to 30-44 ("Raskolnikov was
+  23", "Caesar ... 25 ... his 40s", alongside the "turning 30" comments above); (2) complaining
+  about gender stereotypes pulls sex toward Female, also for male authors ("gender stereotypes suck
+  even in 'progressive' spots": Female 0.86 → 0.69, label Male); (3) Reddit-style "Question: ...
+  Question description: ..." posts with no attribute content move income and sex by 0.1–0.3.
+
+Stable pairs where Qwen is wrong: sex 13/138, age 80/186, education 39/179, income 59/174. The
+ablation page's items carry `attribute`, `qwen_correct`, `has_evidence` and `judge_bucket` (the
+pair's least-explained judged comment) as filterable fields.
+
 ## Where things live
 
 - Code: [`scripts/author_probe/`](../scripts/author_probe/CLAUDE.md) (`bank.py`, `fit.py`,
