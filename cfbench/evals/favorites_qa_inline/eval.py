@@ -27,6 +27,7 @@ from cfbench.evals.cutoff_qa_inline import inline
 from environments._lib.core import load_env
 from environments._lib.runfolder import LOCAL, read_episodes
 
+ERROR_RATE = True  # the env viewer shows this eval as error rate, lower is better (Kylie, 2026-10-30)
 ENV = "favorites_qa"
 ENVS = [ENV]
 RUN = "2026-10-29_pilot62-nohint"  # the Qwen env run whose prompts (and O-lens reads) the cases are
