@@ -6,8 +6,9 @@ Truth from runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst, the leave-one-com
 (bank.qf_message: the question without options, the comments, "What do you think?", then the options and "Answer with the
 letter only."; both option orders, pmf averaged). With p0 = Qwen's probability on its answer and p1 the same without the
 comment, drop = p0 - p1; a case is positive when drop > max(0.15, 5 x the pair's median drop over its comments). Cases:
-the stable pairs (confident c >= 0.5 with both orders agreeing, median single-comment TV < 0.05) on which Qwen's answer
-differs from the SynthPAI label; every positive comment plus as many negatives from the same pair (seeded). TASK "claim",
+the stable pairs (confident c >= 0.5 with both orders agreeing, median single-comment TV < 0.05), split into versions
+`qwen_wrong` (Qwen's answer differs from the SynthPAI label) and `qwen_right` (it matches); every positive comment plus as
+many negatives from the same pair (seeded). TASK "claim",
 truth 0/1; p0, p1, drop and TV kept as fields.
 
 Prompt: hint_qwen_dsv4/inline.py's layout (## Setup with <prompt>/<reply>, ## The counterfactual, ## O-lens reads with its
@@ -40,7 +41,7 @@ MODEL_NAME = "the model"
 TASK = "claim"
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "low"  # Kylie, 2026-10-30
-VERSIONS: dict[str, dict] = {"qfirst": {}}
+VERSIONS: dict[str, dict] = {"qwen_wrong": {"wrong": True}, "qwen_right": {"wrong": False}}  # Qwen vs the SynthPAI label
 SEED = 0
 WHERE = 'at every punctuation and newline token of the question and the comments, up to "What do you think?" (before the options)'
 TIMING = "These reads are of the full message, with the comment still in it."
@@ -55,11 +56,12 @@ def load(p: Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text().splitlines()]
 
 
-def collect() -> list[dict]:
+def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dict]:
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     rng, out = random.Random(SEED), []
     for r in load(ABLATE / "pairs_scored.jsonl"):
-        if not r["stable"] or r["answer"] == r["label"]:
+        version = "qwen_wrong" if r["answer"] != r["label"] else "qwen_right"
+        if not r["stable"] or version not in versions:
             continue
         drops = [-d["qwen_shift"] for d in r["deletions"]]
         thr = max(0.15, 5 * sorted(drops)[len(drops) // 2])
@@ -67,7 +69,7 @@ def collect() -> list[dict]:
         neg = [d for d, x in zip(r["deletions"], drops, strict=True) if x <= thr]
         opts = ATTRS[r["attr"]][1]
         for d in pos + rng.sample(neg, min(len(pos), len(neg))):
-            out.append({"version": "qfirst", "item": f"{r['passage']}:{r['attr']}#{d['i']}", "pair": f"{r['passage']}:{r['attr']}",
+            out.append({"version": version, "item": f"{r['passage']}:{r['attr']}#{d['i']}", "pair": f"{r['passage']}:{r['attr']}",
                         "attr": r["attr"], "comment": d["text"], "positive": -d["qwen_shift"] > thr, "threshold": thr,
                         "answer": LETTERS[r["answer"]], "label": LETTERS[r["label"]], "p0": r["pmf"][r["answer"]],
                         "p1": d["pmf"][r["answer"]], "drop": -d["qwen_shift"], "tv": d["tv"], "flip": not d["argmax_kept"],
@@ -101,7 +103,7 @@ def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | No
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL)
-    cs = collect()
+    cs = collect(versions)
     need = {c["pair"] for c in cs}
     rows, have = [], set()
     for d in READS:  # the first reads run that has a pair wins
@@ -135,7 +137,7 @@ the options and their order stay the same):\n\n<deleted_comment>\n{self.comment}
 
 
 def cases(inputs: Path, versions: list[str]):
-    for c in load(inputs / "cases.jsonl"):
+    for c in (c for c in load(inputs / "cases.jsonl") if c["version"] in versions):
         msgs = [{"role": "user", "content": c["prompt"]}, {"role": "assistant", "content": c["answer"]}]
         base = [Rollout(source=f"author_mcq/{c['pair']}", messages=msgs, label=False)]
         row = {"version": c["version"], "item": c["item"], "pair": c["pair"], "attr": c["attr"], "model": QWEN,
@@ -155,8 +157,8 @@ def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str,
         f"""\
 ## Setup
 
-We gave the AI model {model} a multiple-choice question about the author of some social-media comments, asked in the \
-first person. This is the exact prompt and its reply (one letter).
+We gave an AI model a multiple-choice question about the author of some social-media comments, asked in \
+the first person. This is the exact prompt and its reply (one letter).
 
 <prompt>
 {start}
@@ -234,6 +236,18 @@ def inline_punct(token: str) -> bool:
     return bool(re.match(r"^\s*[.,;:!?]+[\"')\]*]*\s*$", token))  # scripts/olens_read_requests.py's stop tokens
 
 
+PAIRS_DATASET = "runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst/pairs"  # per-pair items: reads inline, deletions
+
+
+def _links(case: dict) -> dict[str, str]:
+    base = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
+    return {"pair: O-lens reads + comment deletions": f"{base}#dataset={PAIRS_DATASET}&item={case['pair']}"}
+
+
+def LINKS(row: dict) -> dict[str, dict]:
+    return {"pair: O-lens reads + comment deletions": {"dataset": PAIRS_DATASET, "item": row["pair"]}}
+
+
 def show_expview(inputs: Path, out: Path):
     """The exact prompts --show prints, for every case and condition, as an expview run (no API calls): the predictor's
     system prompt and the user prompt with eval.md, nothing sent."""
@@ -243,18 +257,33 @@ def show_expview(inputs: Path, out: Path):
     from expview import Run, call
 
     notes = (Path(__file__).parent / "eval.md").read_text()
+    abl = {f"{r['passage']}:{r['attr']}": r for r in load(ABLATE / "pairs_scored.jsonl")}
     run = Run(out, title="author_mcq_drop_inline: rendered prompts (not sent)",
               description="One item per case and condition: exactly what the investigator would be sent (--show), no reply.",
               label_order=["condition", "attr", "truth", "drop"])  # fmt: skip
     run.reset()
-    for env, case, base in cases(inputs, ["qfirst"]):
+    for env, case, base in cases(inputs, list(VERSIONS)):
         for cond in CONDITIONS:
             prompt, extra = INLINE(env, cond, case | {"inputs": str(inputs)}, base, 0)
             msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": with_notes(prompt, notes)}]
-            run.add(id=f"{case['item']}/{cond}", group=cond,
-                    labels={"condition": cond, "attr": case["attr"], "truth": case["k_cf"], "drop": round(case["drop"], 3),
-                            "p0": round(case["p0"], 3), "p1": round(case["p1"], 3), **extra},
-                    calls=[call(f"investigator prompt ({cond})", "anthropic/claude-haiku-5.5", messages=msgs)])  # fmt: skip
+            ab, i = abl[case["pair"]], int(case["item"].rsplit("#", 1)[1])
+            table = ["| # | drop in p(answer) | TV | comment |", "|---|---|---|---|"]
+            for d in ab["deletions"]:
+                x, b = -d["qwen_shift"], "**" if -d["qwen_shift"] > case["threshold"] else ""
+                mark = " ← THIS CASE" if d["i"] == i else ""
+                table.append(
+                    f"| {d['i']}{mark} | {b}{x:+.3f}{b} | {d['tv']:.3f} | {b}{d['text'].replace(chr(10), ' ').replace('|', '/')}{b} |"
+                )
+            head = f"p0 {case['p0']:.2f} → p1 {case['p1']:.2f} (drop {case['drop']:+.3f}, threshold {case['threshold']:.2f}, "
+            head += f"truth {case['k_cf']}); **bold** = evidence comments of this pair\n\n"
+            msgs2 = [{"role": "user", "content": "(not sent: the pair's comment deletions)"}]
+            deletions = call(
+                "comment deletions (not sent)", QWEN, messages=msgs2, output={"role": "assistant", "content": head + "\n".join(table)}
+            )
+            labels = {"condition": cond, "version": case["version"], "attr": case["attr"], "truth": case["k_cf"]}
+            labels |= {"drop": round(case["drop"], 3), "p0": round(case["p0"], 3), "p1": round(case["p1"], 3), **extra}
+            calls = [call(f"investigator prompt ({cond})", "anthropic/claude-haiku-5.5", messages=msgs), deletions]
+            run.add(id=f"{case['item']}/{cond}", group=f"{case['version']} · {cond}", links=_links(case), labels=labels, calls=calls)
     print("wrote", run.path)
 
 

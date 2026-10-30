@@ -65,6 +65,29 @@ def qf_message(passage: str, attr: str, options: list[str] | None = None) -> str
     return text
 
 
+READ_SYMBOLS = set("&/*+=~^|…")
+
+
+def is_read_token(tok: str) -> bool:
+    """O-lens read positions (Kylie, 2026-10-30): a newline token, or a token whose stripped text is all Unicode punctuation
+    (category P*: quotes, dashes, brackets, ...) or the symbols & / * + = ~ ^ | …, whitespace or newlines around it allowed."""
+    import unicodedata
+
+    t = tok.strip()
+    if not t:
+        return "\n" in tok
+    return all(unicodedata.category(c).startswith("P") or c in READ_SYMBOLS for c in t)
+
+
+def read_positions(tok, text: str, user: str) -> tuple[list[int], list[int]]:
+    """(token ids of the rendered `text`, indices of the read tokens inside the user message `user`)."""
+    enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
+    s0 = text.index(user)
+    ids = enc["input_ids"]
+    pos = [i for i, (a, b) in enumerate(enc["offset_mapping"]) if a >= s0 and b <= s0 + len(user) and is_read_token(tok.decode([ids[i]]))]
+    return ids, pos
+
+
 def label(attr: str, p: dict) -> int:
     if attr == "sex":
         return ["male", "female"].index(p["sex"])

@@ -29,6 +29,11 @@ USE = ("sex", "age", "education", "income")
 LAYERS = {"im_end": {"sex": 28, "age": 5, "education": 8, "income": 10}, "qmark": {"sex": 55, "age": 30, "education": 59, "income": 57}}
 
 
+def ps(x: dict, site: str) -> float:
+    """A deletion's (or judged comment's) probe shift at `site`; NaN in the question-first run, which has no probes."""
+    return x["probe_shift"].get(site, float("nan"))
+
+
 def load(p: Path) -> list[dict]:
     return [json.loads(line) for line in Path(p).read_text().splitlines()]
 
@@ -274,12 +279,16 @@ def analyze(a):
         acc = np.mean([r["answer"] == r["label"] for r in ks])
 
         def auc(site, key, ks=ks, K=K):
+            if site not in ks[0]["probe_oof"]:  # question-first run: no probe activations
+                return float("nan")
             P = np.array([r["probe_oof"][site] for r in ks])
             y = np.array([r[key] for r in ks])
             cls = [k for k in range(K) if 3 <= (y == k).sum() <= len(y) - 3]
             return np.mean([roc_auc_score(y == k, P[:, k]) for k in cls]) if cls else float("nan")
 
         def corr(get, ks=ks):
+            if get(ks[0]["deletions"][0]) is None:
+                return "-"
             q = np.concatenate([[d["qwen_shift"] for d in r["deletions"]] for r in ks])
             s = [np.array([get(d) for d in r["deletions"]]) for r in ks]
             r0 = pearsonr(q, np.concatenate(s))[0]
@@ -291,8 +300,8 @@ def analyze(a):
         hum = lambda ds: np.mean([bool(d["human"]["estimate"]) for d in ds]) if ds else float("nan")
         lines.append(
             f"| {attr} | {len(ks)} | {acc:.2f} | {auc('im_end', 'label'):.2f} / {auc('im_end', 'answer'):.2f} | "
-            f"{auc('qmark', 'label'):.2f} / {auc('qmark', 'answer'):.2f} | {corr(lambda d: d['probe_shift']['im_end'])} | "
-            f"{corr(lambda d: d['probe_shift']['qmark'])} | {corr(lambda d: d['tfidf_shift'])} | {len(ev)} | "
+            f"{auc('qmark', 'label'):.2f} / {auc('qmark', 'answer'):.2f} | {corr(lambda d: d['probe_shift'].get('im_end'))} | "
+            f"{corr(lambda d: d['probe_shift'].get('qmark'))} | {corr(lambda d: d['tfidf_shift'])} | {len(ev)} | "
             f"{hum(ev):.2f} / {hum(alld):.2f} |"
         )
     lines += ["", "## Key passages (stable, clearest single evidence comment)", ""]
@@ -307,7 +316,7 @@ def analyze(a):
             lines.append(
                 f"- `{r['passage']}`: Qwen {opts[r['answer']]} (p {max(r['pmf']):.2f}), label {opts[r['label']]}; without the comment"
                 f" p({opts[r['answer']]}) {r['pmf'][r['answer']]:.2f} → {d['pmf'][r['answer']]:.2f} (TV {d['tv']:.2f}, median"
-                f" {r['median_tv']:.3f}); probe shift im_end {d['probe_shift']['im_end']:+.2f}, ? {d['probe_shift']['qmark']:+.2f};"
+                f" {r['median_tv']:.3f}); probe shift im_end {ps(d, 'im_end'):+.2f}, ? {ps(d, 'qmark'):+.2f};"
                 f' human guess from this comment: {d["human"]["estimate"] or "-"}. Comment: "{text[:300]}"'
             )
         lines.append("")
@@ -426,8 +435,8 @@ def judge_report(a):
     for r in pick:
         lines.append(
             f"- **{r['attr']}** `{r['passage']}` #{r['i']} ({r['tier']}): p({r['supported']}) {r['before']:.2f} → {r['after']:.2f};"
-            f" Qwen {r['qwen_answer']}, label {r['label']}; probe shift <|im_end|> {r['probe_shift']['im_end']:+.2f}, ?"
-            f' {r["probe_shift"]["qmark"]:+.2f}; human: {r["human"] or "-"}. Judge: {r["reason"]}. Comment: "{r["comment"][:300]}"'
+            f" Qwen {r['qwen_answer']}, label {r['label']}; probe shift <|im_end|> {ps(r, 'im_end'):+.2f}, ?"
+            f' {ps(r, "qmark"):+.2f}; human: {r["human"] or "-"}. Judge: {r["reason"]}. Comment: "{r["comment"][:300]}"'
         )
     (run / "judge.md").write_text("\n".join(lines) + "\n")
     ex = Run(
@@ -500,8 +509,8 @@ def view(a):
             b = "**" if d["evidence"] else ""
             text = d["text"].replace("\n", " ").replace("|", "/")
             rows.append(
-                f"| {d['i']} | {b}{d['tv']:.3f}{b} | {d['qwen_shift']:+.3f} | {d['probe_shift']['im_end']:+.3f} | "
-                f"{d['probe_shift']['qmark']:+.3f} | {d['human']['estimate'] or '-'} | {jud(d)} | {b}{text}{b} |"
+                f"| {d['i']} | {b}{d['tv']:.3f}{b} | {d['qwen_shift']:+.3f} | {ps(d, 'im_end'):+.3f} | "
+                f"{ps(d, 'qmark'):+.3f} | {d['human']['estimate'] or '-'} | {jud(d)} | {b}{text}{b} |"
             )
         head = (
             f"Qwen: {opts[r['answer']]} (pmf {dict(zip(opts, r['pmf'], strict=True))}); label: {opts[r['label']]}; "

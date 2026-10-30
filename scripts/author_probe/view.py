@@ -90,5 +90,100 @@ def main():
     print(f"{len(passages)} items in {ex.path}")
 
 
+def pairs(a):
+    """Question-first run, one item per (passage, attribute): Qwen's prompts and pmf (both orders), the comment-deletion
+    table (evidence comments in bold) when the pair was ablated, and the O-lens reads of the prompt inline (tokens=, every
+    bullet with its FVE, by layer) when READS has them."""
+    from expview import read
+
+    run, reads_dir = Path(a.run), Path(a.reads)
+    load = lambda p: [json.loads(line) for line in Path(p).read_text().splitlines()]
+    passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
+    qwen = {r["id"]: r for r in load(run / "qwen_answers.jsonl")}
+    abl = {f"{r['passage']}:{r['attr']}": r for r in load(run.parent / "2026-10-30_ablate-loo-qfirst" / "pairs_scored.jsonl")}
+    trans = {r["id"]: r for r in load(reads_dir / "reads.transcripts.jsonl")}
+    by_id: dict[str, list[dict]] = {}
+    for r in load(reads_dir / "reads.jsonl"):
+        by_id.setdefault(r["id"], []).append(r)
+    ex = Run(
+        run / "expview" / "pairs",
+        title="SynthPAI author MCQs, question first: per question, with O-lens reads and comment deletions",
+        description=(
+            "One item per (passage, attribute). Calls: Qwen3.6-27B's question-first prompt in both option orders with its letter "
+            "probabilities (not a generation), and, for ablated pairs, every comment's deletion effect (TV, change in p(answer)); "
+            "**bold** = evidence comment, drop in p(answer) > max(0.15, 5 x the pair's median). The token view shows the O-lens "
+            "reads (space lens, layers 32/40/48, every punctuation and newline token of the question and comments) when the pair "
+            "has them. Labels: confident (c >= 0.5, orders agree), stable (median deletion TV < 0.05; n/a = not ablated), "
+            "qwen_correct, has_evidence, has_reads."
+        ),
+        label_order=["attribute", "qwen_correct", "confident", "stable", "has_evidence", "has_reads"],
+    )
+    ex.reset()
+    for pid, p in passages.items():
+        for attr, (_, opts) in ATTRS.items():
+            key = f"{pid}:{attr}"
+            r, ab = qwen[key], abl.get(key)
+            K = len(opts)
+            calls = []
+            for o, rec in enumerate(r["orders"]):
+                order = list(range(K)) if o == 0 else list(range(K))[::-1]
+                shown = [opts[i] for i in order]
+                pm = "\n".join(f"{LETTERS[j]}. {shown[j]}: {rec['pmf'][i]:.3f}" for j, i in enumerate(order))
+                msgs = [{"role": "user", "content": qf_message(p["text"], attr, shown)}]
+                calls.append(
+                    call(f"order {o} (Qwen letter pmf)", "Qwen/Qwen3.6-27B", messages=msgs, output={"role": "assistant", "content": pm})
+                )
+            n_ev = 0
+            if ab:
+                drops = [-d["qwen_shift"] for d in ab["deletions"]]
+                thr = max(0.15, 5 * sorted(drops)[len(drops) // 2])
+                rows = ["| # | drop in p(answer) | TV | human guess | comment |", "|---|---|---|---|---|"]
+                for d, x in zip(ab["deletions"], drops, strict=True):
+                    b = "**" if x > thr else ""
+                    n_ev += x > thr
+                    text = d["text"].replace("\n", " ").replace("|", "/")
+                    rows.append(f"| {d['i']} | {b}{x:+.3f}{b} | {d['tv']:.3f} | {d['human']['estimate'] or '-'} | {b}{text}{b} |")
+                head = f"Qwen: {opts[ab['answer']]} (p {ab['pmf'][ab['answer']]:.2f}); median deletion TV {ab['median_tv']:.3f}; "
+                head += f"evidence threshold {thr:.2f}\n\n"
+                calls.append(call("comment deletions", "Qwen/Qwen3.6-27B", messages=[{"role": "user", "content": "(deletion table)"}],
+                                  output={"role": "assistant", "content": head + "\n".join(rows)}))  # fmt: skip
+            tokens = None
+            if key in trans and key in by_id:
+                rd: dict[str, list] = {}
+                for x in sorted(by_id[key], key=lambda x: (x["token_index"], x["layer"])):
+                    lines = [[b["text"], b["fve"]] for b in sorted(x["bullets"], key=lambda b: -b["fve"])]
+                    rd.setdefault(str(x["token_index"]), []).append(
+                        read("O-lens", lines, label=f"L{x['layer']}", score=x["joint_fve"], score_name="joint FVE")
+                    )
+                tokens = {"tokens": trans[key]["tokens"], "sections": trans[key]["sections"], "reads": rd}
+            conf = (max(r["pmf"]) - 1 / K) / (1 - 1 / K) >= 0.5 and r["order_agree"]
+            ex.add(
+                id=key,
+                group=attr,
+                labels={
+                    "attribute": attr,
+                    "label": opts[r["label"]],
+                    "qwen": opts[r["answer"]],
+                    "qwen_correct": "right" if r["answer"] == r["label"] else "wrong",
+                    "confident": conf,
+                    "stable": "n/a" if not ab else "yes" if ab["stable"] else "no",
+                    "has_evidence": n_ev > 0,
+                    "has_reads": tokens is not None,
+                },
+                calls=calls,
+                tokens=tokens,
+            )
+    print("items in", ex.path)
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "pairs":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd")
+    ap.add_argument("run")
+    ap.add_argument("--reads", required=True)
+    pairs(ap.parse_args())
+    sys.exit()
+
+
 if __name__ == "__main__":
     main()
