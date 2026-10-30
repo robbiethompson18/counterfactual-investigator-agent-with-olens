@@ -13,10 +13,10 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
-- [REFERENCE: CHIVE dataset audit — read before quoting what is wrong with CHIVE's data or ground truth, or Agam's O-lens uplift](chive-dataset-audit.md)
-  — 39% off-policy prefixes (all of the O-lens uplift is there), 53% "Qwen wrong", 12% of incidents
-  with a ruled-out item that negates a supported cause (25% counting negated causes), 46% of
-  experiments in the excluded 15–50pp band
+- [REFERENCE: CHIVE critique — read before quoting what is wrong with CHIVE's data, thresholds or ground truth, or before replicating those numbers](chive-critique.md)
+  — on Adam's release and Agam's run: 40% off-policy prefixes, 8,623 clean kills (12% of
+  experiments, 32% of investigations) the 50pp rule discards, 12% of incidents with
+  self-contradicting ground truth; `python -m chive_critique`
 - [REFERENCE: Qwen self-report baseline — read before comparing anything to Qwen explaining itself](qwen-self-report-baseline.md)
   — setup, results on dev96, Sonnet 5.5 judge gotcha
 - [REFERENCE: Why the O-lens writes Chinese — read before interpreting Chinese in O-lens readouts](olens-chinese.md)
