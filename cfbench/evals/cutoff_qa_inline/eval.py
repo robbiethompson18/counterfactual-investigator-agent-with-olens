@@ -25,14 +25,15 @@ answer; report.py adds a loose whole-word match, per gate_class, the paired sign
 NLA conditions (2026-10-29; not in CONDITIONS, pass `--conditions nla_inline,nla_placebo_inline` once NLA_READS exist and
 the inputs are re-prepped): `nla_inline` puts the item's own NLA readouts (agu18dec/qwen3.6-27b-all-layer-nla-rl2000,
 olens/src/olens/nla.py) at the O-lens block's 6 positions and layers in place of the O-lens block, one readout per (position,
-layer), every readout shown with its critic FVE; `nla_placebo_inline` is another item's readouts from the same file, chosen as
-the O-lens placebo is. A readout is ~140-185 tokens, so the 36 make a ~5.5-6.5k-token block, about the O-lens block's size
-(5.7k Qwen tokens on the first case, 4 bullets x 36 reads). The reads are
-the O-lens tail run's requests through the NLA reader, then the critic (runpod/nla_reads.sh, docs/nla-reader.md), in a
-`scripts/runs.py new nla_reads cutoff200-tail` run, finished with `scripts/runs.py finish`:
+layer), every readout shown with its critic FVE; `nla_placebo_inline` is an unrelated prompt's readouts at the same 6 tokens,
+from the 200 MMLU-Pro no-hint prompts NLA_READS also holds (Robbie, 2026-10-29: the placebo is "some totally unrelated
+thing", not another cutoff item), chosen with the O-lens placebo's seed. A readout is ~140-185 tokens, so the 36 make a
+~5.5-6.5k-token block, about the O-lens block's size (5.7k Qwen tokens on the first case, 4 bullets x 36 reads). The reads
+are the O-lens tail run's requests plus the MMLU-Pro pool's through the NLA reader, then the critic (runpod/nla_reads.sh,
+docs/nla-reader.md), in a `scripts/runs.py new nla_reads cutoff200-tail` run, finished with `scripts/runs.py finish`:
 
     runpod/nla_reads.sh setup NAME
-    runpod/nla_reads.sh run NAME data/runs/olens_reads/2026-10-29_cutoff200-tail/requests.jsonl cutoff200-nla --layers 32,40,48,52,56,60
+    runpod/nla_reads.sh run NAME data/runs/nla_reads/2026-10-29_cutoff200-tail/requests.jsonl cutoff200-nla --layers 32,40,48,52,56,60
     runpod/nla_reads.sh score NAME cutoff200-nla
     runpod/nla_reads.sh fetch NAME cutoff200-nla data/runs/nla_reads/2026-10-29_cutoff200-tail/reads.jsonl
 
@@ -163,8 +164,9 @@ def nla_inline(condition: str, case: dict, base: list, seed: int) -> tuple[str, 
     """nla_inline / nla_placebo_inline: the O-lens conditions' pattern over the NLA readouts (reads/nla.jsonl, NLA_READS)."""
     by_source = inline.reads_by_source(Path(case["inputs"]) / "reads/nla.jsonl")
     src, extra = base[0].source, {}
-    if condition == "nla_placebo_inline":  # another item's readouts, seeded per (draw, case) as the O-lens placebo is
-        src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(set(by_source) - {src}))
+    if condition == "nla_placebo_inline":  # an unrelated prompt's readouts (NLA_READS' MMLU-Pro pool), seeded per (draw, case)
+        pool = sorted(s for s in by_source if not s.startswith(f"{ENV}/"))
+        src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(pool)
         extra = {"placebo_sources": [src]}
     return inline.nla_prompt(base[0].messages[0]["content"], False, MODEL_NAME, by_source[src]), extra
 

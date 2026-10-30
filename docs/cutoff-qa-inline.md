@@ -33,35 +33,37 @@ help? The label is Qwen's modal answer from the bank's stability gate, not the t
 stable non-numeric bank-v3 items (`cutoff_qa/2026-10-29_new800-nohint`; the 800th hung on the Qwen
 server and was dropped): 339 stale, 660 not. Reads at the same positions and layers as the smoke:
 `olens_reads/2026-10-29_cutoff{200,800}-tail`, `jpp_reads/2026-10-29_cutoff{200,800}-all`,
-`nla_reads/2026-10-29_cutoff{200,800}-tail` (all-layer NLA, greedy, critic FVE; its placebo pool
-also holds 200 MMLU-Pro prompts' reads). Inputs
+`nla_reads/2026-10-29_cutoff{200,800}-tail` (all-layer NLA, greedy, critic FVE; its placebo draws
+only from 200 MMLU-Pro prompts' reads, PR #405). Inputs
 `cfbench_evals/2026-10-29_cutoff-qa-inline-inputs-1k` (`-1k-nla` for the NLA conditions, same cases
 and other reads). One run per condition,
-`cfbench/2026-10-29_cutoff-qa-1k-{transcript,olens,olens-placebo,jlens,jlens-placebo,nla,nla-placebo}`,
+`cfbench/2026-10-29_cutoff-qa-1k-{transcript,olens,olens-placebo,jlens,jlens-placebo,nla,nla-placebo-mmlu}`,
 Haiku 5.5 medium, 3 draws: 20,979 predictions, ~$20 of Haiku (OpenRouter-reported).
+`…-1k-nla-placebo` is superseded: its placebo pool mixed in other cutoff items' reads (86 / 84 / 65
+/ 94 there).
 
 ![transcript-only vs O-lens, J++ and NLA and their placebos, all / stale / not stale](img/cutoff-qa-inline.png)
 
 ![paired differences between conditions with 95% CIs, grouped by question](img/cutoff-qa-inline-diff.png)
 
 (`uv run python -m graphs.cutoff_qa_inline` makes both; exact match, 95% bootstrap CIs over items,
-the second paired by item. This is the one cutoff chart.)
+the second paired by item. This is the one cutoff chart: every lens goes on it.)
 
 | exact match (%)      | all     | stale   | not stale |
 | -------------------- | ------- | ------- | --------- |
 | transcript only      | 78      | 47      | 94        |
 | O-lens / its placebo | 85 / 77 | 72 / 55 | 92 / 89   |
 | J++ / its placebo    | 83 / 81 | 67 / 59 | 91 / 93   |
-| NLA / its placebo    | 86 / 84 | 73 / 65 | 92 / 94   |
+| NLA / its placebo    | 86 / 83 | 73 / 60 | 92 / 95   |
 
-- **Only the O-lens clearly beats its own placebo:** +7.6pp [+5.7, +9.5]. J++ and NLA each beat
-  theirs by +1.7pp [+0.1, +3.3].
-- **The J++ and NLA placebos aren't neutral:** +3.2pp and +5.9pp over transcript-only (the O-lens
-  placebo −0.7pp). Haiku reads off-topic reads as noise, then reasons about the model's training
-  cutoff and gives the stale answer more often; the NLA placebo's other-item readouts describe
-  factual-recall prompts, which primes this most. Against transcript-only NLA looks as good as the
-  O-lens (+7.6 vs +6.9pp), but most of that is the placebo effect.
-- O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8].
+- **Only the O-lens clearly beats its own placebo by much:** +7.6pp [+5.7, +9.5]. NLA beats its
+  MMLU-Pro placebo by +2.8pp [+1.0, +4.6], J++ its placebo by +1.7pp [+0.1, +3.3].
+- **The J++ and NLA placebos aren't neutral:** +3.2pp [+1.7, +4.7] and +4.8pp [+3.5, +6.2] over
+  transcript-only (the O-lens placebo −0.7pp). Haiku reads off-topic reads as noise, then reasons
+  about the model's training cutoff and gives the stale answer more often; the gain is all on stale
+  items (NLA placebo 60 vs 47). Against transcript-only NLA looks as good as the O-lens (+7.6 vs
+  +6.9pp), but most of that is the placebo effect.
+- O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8]; J++ − NLA −2.7pp [−4.5, −1.0].
 
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
@@ -104,6 +106,31 @@ training cutoff, so the J++ framing alone pushes it toward stale answers. Compar
 placebo only. The signal is at the last token, L60: its top 3 hold the first token of Qwen's answer
 on 101 of 200 items (other layers ≤ 33), which is close to reading Qwen's first output token.
 Dropping L60 costs 1.8pp (n.s.).
+
+**NLA** (`nla_inline`, `nla_placebo_inline`; run `cfbench/2026-10-29_cutoff-qa-haiku-200-nla`, reads
+`nla_reads/2026-10-29_cutoff200-tail`). Camila Blank's all-layer NLA
+(`agu18dec/qwen3.6-27b-all-layer-nla-rl2000`, [docs/nla-reader.md](nla-reader.md)), greedy, one
+free-text readout per position and layer at the O-lens block's six end-of-prompt tokens and layers,
+every readout shown with its critic FVE (no filter). The block is ~5.6k tokens, the O-lens block's
+size. Placebo: the readouts of an unrelated MMLU-Pro no-hint prompt at the same six tokens (200 read
+in the same job), not another cutoff item. Mean critic FVE (pooled ruler) 0.35 at L32 to 0.53 at
+L52; the old 11-layer NLA scored 0.11–0.23 on hint_mcq. Exact match: NLA 81.8%, NLA placebo 73.3%,
+O-lens − NLA −0.7pp [−5.0, +3.7], NLA − its placebo +8.5pp [+4.5, +12.5]. The NLA placebo is +6.7pp
+over transcript-only, the same size as the J++ placebo's: an off-topic reads block alone moves Haiku
+toward the stale answer (stale items 55% → 65%). Read-level recall is the O-lens's: some readout
+names Qwen's modal answer on 177 of 200 items (L52 160, L60 157, L32 131); Haiku is right on 87% of
+draws where it does and 42% where it doesn't. The readouts are genre-and-format descriptions ("terse
+Q&A prompt, expects a single name") with a guessed answer in them, and the guess is Qwen's stale
+one. Examples: Nike CEO,
+[NLA](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/91106e8f-c7c9-41d3-865c-66be78faba98)
+(John Donahoe, Qwen's answer) vs
+[placebo](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/c6696534-fba0-47eb-8167-7154dfbe45db)
+(Elliott Hill, the current one); Ferrari's first fully electric car,
+[NLA](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/57a1de6c-a98f-4980-8825-4009f773c099)
+(Purosangue, Qwen's wrong answer) vs
+[placebo](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/f96fa1a0-e3ef-4ddc-8669-269b2ace3d66)
+(Elettrica, the real one). The NLA has the O-lens's caveat below: its AV is a Qwen3.6-27B LoRA with
+Qwen's cutoff.
 
 **Caveats.**
 

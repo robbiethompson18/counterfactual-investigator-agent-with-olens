@@ -28,9 +28,9 @@ LABEL = {"transcript_inline": "transcript only", "olens_inline": "O-lens", "olen
 # J++ purple, NLA green (outside CLAUDE.md's reserved colours); a placebo is its lens's colour with black stripes (CLAUDE.md)
 COLOR = {"transcript_inline": "#2a78d6", "olens_inline": "#eb6834", "olens_placebo_inline": "#eb6834",
          "jlens_inline": "#8e44ad", "jlens_placebo_inline": "#8e44ad",
-         "nla_inline": "#2f9e44", "nla_placebo_inline": "#2f9e44"}  # fmt: skip
+         "nla_inline": "#2e9e5b", "nla_placebo_inline": "#2e9e5b"}  # fmt: skip
 HATCH = {"olens_placebo_inline": "////", "jlens_placebo_inline": "////", "nla_placebo_inline": "////"}
-SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo")
+SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
     "all items": None,
@@ -65,7 +65,7 @@ PAIRS = [
     ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
     ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
     ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Lens vs lens", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
+    ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
 ]
 
 
