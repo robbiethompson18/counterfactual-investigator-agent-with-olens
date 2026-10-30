@@ -32,20 +32,21 @@ So a read job costs about `positions × layers / rate / 3600 × $5.29`, plus ~$0
 | Claude Haiku 5.5 | 0.10      | 0.50       | prompts ≤ 100k tokens; batch API is half                                     |
 | Gemini 3.8 Flash | ~0        | ~0         | BYOK on Robbie's Google project: per-day caps, not dollars (CLAUDE.local.md) |
 
-Measured per draw on `mcq_unselected` (Haiku 5.5, effort medium, one `submit_answer`, run
-`cfbench/2026-10-29_mcq-unselected-haiku-b2`):
+Measured per draw, Haiku 5.5 at effort medium, one `submit_answer` (runs
+`cfbench/2026-10-29_mcq-unselected-haiku-b2` and `2026-10-29_supergpqa-haiku-3k-{ts,jlens}`):
 
-| condition                              | prompt tokens | $ per draw |
-| -------------------------------------- | ------------- | ---------- |
-| `transcript_inline` (the prompt only)  | ~700          | 0.00023    |
-| `olens_inline`, 6 layers, 16 positions | ~18,400       | 0.0016     |
-| `olens_placebo_inline`                 | ~18,000       | 0.0017     |
+| condition                                              | prompt tokens | output tokens | $ per draw |
+| ------------------------------------------------------ | ------------- | ------------- | ---------- |
+| `transcript_inline` (the prompt only)                  | ~1,000        | ~500          | 0.0002     |
+| `olens_inline`, 6 layers, 16 positions, 4 bullets each | ~19,000       | ~480          | 0.0016     |
+| `jlens_inline`, every token (~190) × 6 layers × top 3  | ~44,000       | ~690          | 0.0067     |
 
-An NLA block at 3 layers is about the same size as the O-lens block (a readout is ~150 tokens, a
-read is 4 bullets); a J++ block is ~4.5k tokens. Rule of thumb: **$0.0015 per lens draw, $0.0005 per
-J++ draw, $0.0002 per prompt-only draw**, so 3,000 cases × 7 conditions × 1 draw ≈ $27, and 3 draws
-≈ $80. Only consistent questions become cases (65% of SuperGPQA items, 63% of MMLU-Pro), so count
-cases, not items.
+The block size is what matters: a J++ every-token block on a 10-option MCQ is 44k tokens and costs
+4x an O-lens block. Rule of thumb: **$0.0002 per prompt-only draw, ~$0.0001 per 1k prompt tokens of
+reads block**, so count the block's tokens first (`cfbench.eval NAME --show`, then `count_tokens`).
+A 20-position O-lens block at 6 layers is ~22k tokens, a 3-layer NLA block ~9k. For 3,000 cases × 1
+draw: prompt only $0.50, O-lens or its placebo ~$6, NLA ~$4, J++ $20. Only consistent questions
+become cases (65% of SuperGPQA items, 63% of MMLU-Pro), so count cases, not items.
 
 ## Rollouts (Qwen3.6-27B on OpenRouter)
 
