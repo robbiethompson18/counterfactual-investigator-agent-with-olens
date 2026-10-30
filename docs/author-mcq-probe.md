@@ -2,7 +2,8 @@
 
 **Status (2026-10-30):** ACTIVE. SynthPAI pilot, Qwen3.6-27B: label probes per site and layer,
 Qwen's own answers, DSv4 Flash answers, leave-one-comment-out ablations (the "?" probe moves with
-Qwen, the passage-only probe does not). O-lens reads are next.
+Qwen, the passage-only probe does not). Question-first rerun, O-lens reads and a single-turn eval
+(no O-lens gain) done.
 
 Kylie's question: Qwen3.6-27B (thinking off) answers multiple-choice questions about the person who
 wrote a passage. Can a linear probe read Qwen's view of the author from activations, ideally before
@@ -247,6 +248,34 @@ layers, C = 0.01.
 `qend` is only a little above the passage-only site and, like it, peaks early; age ridge Spearman
 0.80 (MAE 6.5 years). Asking first does not move Qwen's late answer-forming representation to the
 end of the passage: the old format's "?" right after the question stays the best site.
+
+## O-lens reads and the single-turn eval (2026-10-30)
+
+**Reads:** `runs/olens_reads/2026-10-30_author-qfirst` (expview:
+`#dataset=runs/olens_reads/2026-10-30_author-qfirst`). The 677 stable pairs, question-first prompt
+without options, agu18dec space lens, one-engine reader, T 1, up to 4 bullets, layers 32/40/48, at
+every punctuation or newline token from the question to the final "?" (22,644 positions, 67,932
+reads; two H200 readers, merged). The lens often names an age range or other attribute guesses at
+the comments' punctuation ("20s or early 30s", ...).
+
+**Eval:** `cfbench/evals/author_mcq_inline`. Cases: the stable pairs where Qwen's question-first
+answer differs from the SynthPAI label (196: sex 14, age 79, education 40, income 63). The
+investigator sees the question-first answer prompt and names Qwen's letter; `olens_inline` adds the
+pair's reads. Investigator **Claude Haiku 5.5 at reasoning effort low** (Kylie; not the repo's
+default Gemini 3.8 Flash), 3 draws, run `runs/cfbench/2026-10-30_author-mcq-haiku`, $1.78.
+
+| attribute | `transcript_inline` | `olens_inline` | Qwen's most common answer on these cases |
+| --------- | ------------------- | -------------- | ---------------------------------------- |
+| sex       | 0.95                | 0.86           | 0.71                                     |
+| age       | 0.82                | 0.76           | 0.78                                     |
+| education | 0.77                | 0.72           | 0.60                                     |
+| income    | 0.81                | 0.86           | 0.83                                     |
+| all       | 0.82                | 0.79           | -                                        |
+
+Paired O-lens − transcript: −0.024 (95% bootstrap CI −0.062 to +0.012, 585 draws): no gain. These
+cases are not hard from the prompt: Qwen's wrong answers are the ones a reader of the comments also
+gives (and age/income answers are mostly the modal 30-44 / Middle), so the transcript-only
+investigator is already near the majority-answer rate or above it.
 
 ## Where things live
 
