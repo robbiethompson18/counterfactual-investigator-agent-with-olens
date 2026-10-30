@@ -1,7 +1,8 @@
 # supergpqa_inline: what letter will Qwen say? 3,000 SuperGPQA cases, seven single-turn conditions
 
-**Status (2026-10-29):** REFERENCE. One investigator (Haiku 5.5), one draw, 3,000 cases, all seven
-conditions run; the caveats at the end are open.
+**Status (2026-10-30):** REFERENCE. Linear probe baseline added 2026-10-30 (91.9%, 87.8% on
+Qwen-wrong). One investigator (Haiku 5.5), one draw, 3,000 cases, all seven conditions run; the
+caveats at the end are open.
 
 **Question.** [mcq_unselected](mcq-unselected.md)'s question on a harder pool: given only the
 prompt, can an investigator predict the letter Qwen3.6-27B (thinking off) answers, and do O-lens,
@@ -141,7 +142,41 @@ lenses the Haiku conditions are the only usable readout here.
 - The all-layer NLA's critic FVE is low here (mean 0.12 at L32, 0.27 at L40, 0.35 at L48, vs
   0.35–0.53 on cutoff_qa), and layers 52–60 were not read for it.
 
+## Linear probe baseline (2026-10-30)
+
+A linear probe on the option-newline activations reads Qwen's letter on 88% of the Qwen-wrong cases,
+against 57% for Haiku with the O-lens and 76% for the O-lens last-token rule. Probe: Kylie's one-hot
+listwise conditional logit ([mcq-answer-probe.md](mcq-answer-probe.md)), `nl` site (the newline
+token ending each option, the same tokens the O-lens reads used: `option_newlines`; every site
+decodes to "\n" or "\n\n" for the last option), `hidden_states[52]`, diag standardisation, λ 1. No
+LLM is involved. Run `runs/mcq_answer_probe/2026-10-30_supergpqa-inline-probe` (`scores.md`;
+`predictions.jsonl` in cfbench answer format), made by
+`environments/hint_mcq/probe_unselected.py prep supergpqa_inline INPUTS` then `score`. One H200 job
+covered this and mcq_unselected.
+
+Conditions: `probe` (Kylie's frozen MMLU-Pro probe), `probe_tuned` (fit on the probe pool),
+`probe_raw`, `qwen_logits`. The env viewer's eval page (mirror run
+`runs/cfbench/2026-10-30_supergpqa-inline-probe`) shows `probe` and `probe_tuned`, as error rate.
+
+| reader                                                          |           all |    Qwen wrong |    Qwen right |
+| --------------------------------------------------------------- | ------------: | ------------: | ------------: |
+| Haiku, prompt only (transcript_inline)                          |         68.9% |         46.2% |         82.5% |
+| Haiku + O-lens (olens_inline)                                   |         76.9% |         57.0% |         88.8% |
+| O-lens rule, last token, L60, top-FVE bullet                    |         79.7% |         75.8% |         82.1% |
+| probe fit on the 3,328-question probe pool                      |         91.9% |         87.8% |         94.4% |
+| Kylie's MMLU-Pro probe (718 questions), frozen                  |         90.4% |         86.5% |         92.7% |
+| Kylie's MMLU-Pro probe, frozen, no scaling (raw h)              |         90.5% |         87.1% |         92.6% |
+| Qwen's own letter logits (ceiling)                              |         99.8% |         99.5% |         99.9% |
+| _gain over prompt only: own-pool probe / frozen MMLU-Pro probe_ | +23.0 / +21.5 | +41.6 / +40.3 | +11.9 / +10.2 |
+
+- **The MMLU-Pro probe transfers unchanged.** Fit on 718 MMLU-Pro questions, it is 1.5 points behind
+  a probe fit on 3,328 SuperGPQA questions. The probe reads a "this option is the one" direction
+  that does not depend on the dataset, as it did on TruthfulQA.
+- **The probe beats every lens condition by more on Qwen-wrong cases** (+31pp over Haiku + O-lens,
+  +12pp over the lens rule), where answering the question yourself fails.
+- The probe pool is 38% Qwen-wrong, the same mix as the eval set; it is not balanced.
+
 **Next.** (1) The lens rule as an investigator tool: give Haiku the last-token top bullet only, or
-make the agent's `olens_at` default to that position. (2) Probe on the 3,328-question probe pool and
-score it on this eval set. (3) A text-inversion gate (Sonnet given the prompt text). (4) More draws
-on the O-lens conditions, which cost $6.50 per draw.
+make the agent's `olens_at` default to that position. (2) Done: the probe baseline above. (3) A
+text-inversion gate (Sonnet given the prompt text). (4) More draws on the O-lens conditions, which
+cost $6.50 per draw.

@@ -110,9 +110,9 @@ a.card:hover{border-color:var(--acc);transform:translateY(-1px)}
 .badge{display:inline-block;font:600 10.5px Inter;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;background:var(--acc2);color:var(--acc)}
 .star{color:#d9a400} .pathsep{color:var(--faint);margin:0 4px}
 /* evals: condition colours (CLAUDE.md) and the before/after chart */
-:root{--c-ts:#2f6fd0;--c-olens:#e07b10;--c-placebo:#111;--c-none:#9a9a9a;--c-other:#8e44ad;--c-probe:#11806a;--c-probe-tuned:#7a3fb0;--c-olens-nl:#c9a227}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#c9a0f0;--c-olens-nl:#e8c860}}
-:root[data-theme="dark"]{--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#c9a0f0}
+:root{--c-ts:#2f6fd0;--c-olens:#e07b10;--c-placebo:#111;--c-none:#9a9a9a;--c-other:#8e44ad;--c-probe:#11806a;--c-probe-tuned:#45a393;--c-olens-nl:#c9a227;--c-jlens:#7d3c98;--c-nla:#2e8b57}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#a3e4d7;--c-olens-nl:#e8c860;--c-jlens:#c39bd3;--c-nla:#6fcf97}}
+:root[data-theme="dark"]{--c-ts:#6fa0ff;--c-olens:#ffa040;--c-placebo:#f2f2f2;--c-none:#8a8a8a;--c-other:#c39bd3;--c-probe:#3fd0b0;--c-probe-tuned:#a3e4d7;--c-olens-nl:#e8c860;--c-jlens:#c39bd3;--c-nla:#6fcf97}
 .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:0}
 .evcases{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,470px),1fr));gap:14px}
 .evchart{display:block;max-width:100%;height:auto;font:11px Inter,system-ui} .evchart .grid{stroke:var(--line)} .evchart .ax{fill:var(--mute)} .evchart .ax.mono{font:10.5px var(--mono)}
@@ -739,17 +739,21 @@ const CONDS = {
   olens_inline: ["transcript + O-lens reads in context, one turn", "var(--c-olens)", "O-lens"],
   olens_inline_nl: ["transcript + O-lens reads at the option newlines only, one turn (fewer positions: no end-of-prompt reads)", "var(--c-olens-nl)", "O-lens (nl)"],
   olens_placebo_inline: ["transcript + another question's O-lens reads (placebo), one turn", "var(--c-placebo)", "placebo"],
-  probe: ["linear probe of the model's answer (deterministic, no investigator)", "var(--c-probe)", "probe"],
-  probe_tuned: ["linear probe fine-tuned on hint-first activations (out-of-fold, no investigator)", "var(--c-probe-tuned)", "tuned probe"],
+  jlens_inline: ["prompt + J-lens reads in context, one turn", "var(--c-jlens)", "J-lens"],
+  jlens_placebo_inline: ["prompt + another question's J-lens reads (placebo), one turn", "var(--c-placebo)", "J placebo"],
+  nla_inline: ["prompt + NLA reads in context, one turn", "var(--c-nla)", "NLA"],
+  nla_placebo_inline: ["prompt + another question's NLA reads (placebo), one turn", "var(--c-placebo)", "NLA placebo"],
+  probe: ["linear probe of the model's answer (MCQ evals: Kylie's, fit on 718 MMLU-Pro questions, frozen) (deterministic, no investigator)", "var(--c-probe)", "probe"],
+  probe_tuned: ["linear probe tuned on this eval's own data (hint evals: hint-first activations, out-of-fold; MCQ evals: the probe pool) (no investigator)", "var(--c-probe-tuned)", "tuned probe"],
 };
 // each condition's % right minus transcript tools' over the same items (environments/_lib/evals.py paired_vs)
 function pairedTable(rows, caption) {
   if (!rows || !rows.length) return "";
-  const sgn = v => (v >= 0 ? "+" : "") + (100 * v).toFixed(1);
-  return `<p class="lede">${caption} Paired by item (an item's score = the mean over its draws): the difference in % right with a 95% bootstrap CI over items, the sign test over the items that differ (better / worse), two-sided and one-sided (the condition beats the one in the vs column).</p>
-    <div class="scroll"><table><tr><th>condition</th><th>vs</th><th>items</th><th>Δ % right [95% CI]</th><th>better / worse</th><th>p (two-sided)</th><th>p (one-sided, &gt;)</th></tr>
+  const sgn = v => (v >= 0 ? "+" : "") + (100 * v).toFixed(1), scD = ci => ERR ? [-ci[1], -ci[0]] : ci;
+  return `<p class="lede">${caption} Paired by item (an item's score = the mean over its draws): ${ERR ? "the difference in error rate (condition − vs: negative = fewer errors)" : "the difference in % right"} with a 95% bootstrap CI over items, the sign test over the items that differ (better / worse), two-sided and one-sided (the condition beats the one in the vs column).</p>
+    <div class="scroll"><table><tr><th>condition</th><th>vs</th><th>items</th><th>${ERR ? "Δ error rate (cond − vs) [95% CI]" : "Δ % right [95% CI]"}</th><th>better / worse</th><th>p (two-sided)</th><th>p (one-sided, &gt;)</th></tr>
     ${condOrder([...new Set(rows.map(x => x.condition))]).flatMap(c => rows.filter(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(condShort(x.ref))}</td><td class="num">${x.n}</td>
-      <td class="num"><b>${sgn(x.diff)}</b> <span class="mute">[${sgn(x.ci[0])}, ${sgn(x.ci[1])}]</span></td><td class="num">${x.better} / ${x.worse}</td>
+      <td class="num"><b>${sgn(ERR ? -x.diff : x.diff)}</b> <span class="mute">[${sgn(scD(x.ci)[0])}, ${sgn(scD(x.ci)[1])}]</span></td><td class="num">${x.better} / ${x.worse}</td>
       <td class="num">${x.p_two < 0.001 ? x.p_two.toExponential(1) : x.p_two.toFixed(3)}</td><td class="num"><b>${x.p_one < 0.001 ? x.p_one.toExponential(1) : x.p_one.toFixed(3)}</b></td></tr>`).join("")}</table></div>`;
 }
 const condOrder = cs => [...cs].sort((a, b) => (Object.keys(CONDS).indexOf(a) + 99 * !(a in CONDS)) - (Object.keys(CONDS).indexOf(b) + 99 * !(b in CONDS)));
@@ -907,6 +911,10 @@ function evalCard(R, g) {
 // answer task (cfbench/answer.py): one row per item, the truth (the cf arm's most common answer) and every draw's submitted
 // answer, green when it matches; scored as % correct, never pooled with the rate task's RMSE
 const pct = x => x == null ? "–" : (100 * x).toFixed(0) + "%";
+// evals with ERROR_RATE (evals/NAME.json error_rate) show the answer task as error rate (1 - % correct): lower is better
+let ERR = false;
+const sc = x => x == null ? x : ERR ? 1 - x : x, scCI = ci => ERR ? [1 - ci[1], 1 - ci[0]] : ci;
+const scoreName = () => ERR ? "error rate (lower is better)" : "% correct";
 const counts = o => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).map(([a, n]) => `${esc(a === "null" ? "(none)" : a)}×${n}`).join(" ");
 function answerCard(R, g) {
   const conds = condOrder(Object.keys(g.correct));
@@ -916,9 +924,9 @@ function answerCard(R, g) {
     <td class="mono mute" title="the base-arm runs the investigator was shown">${counts(it.answers_base)}</td>${conds.map(k => `<td>${(it.draws[k] || []).map(d => chip(it, k, d)).join("")}</td>`).join("")}</tr>`).join("");
   return `<div class="card evcase"><div class="row" style="margin:0 0 4px;justify-content:space-between"><b title="${esc(g.target)}">${esc(modelName(g.target))}</b>
       <span class="mute">${g.items.length} items · ${g.pair ? (g.reverse ? "pair, reversed" : "pair") : "arms"} · <a href="${cmp}">what changes ↗</a></span></div>
-    <div class="scroll"><table class="evt"><tr><th>item</th><th>truth (${esc(armLab(g.cf))})</th><th>shown (${esc(armLab(g.base))})</th>${conds.map(k => `<th>${swatch(k)}${esc(condShort(k))} <b>${pct(g.correct[k])}</b></th>`).join("")}</tr>${rows}</table></div>
+    <div class="scroll"><table class="evt"><tr><th>item</th><th>truth (${esc(armLab(g.cf))})</th><th>shown (${esc(armLab(g.base))})</th>${conds.map(k => `<th>${swatch(k)}${esc(condShort(k))} <b>${pct(sc(g.correct[k]))}</b></th>`).join("")}</tr>${rows}</table></div>
     <p class="mute" style="margin:6px 0 0;font-size:12px">Answer task: each draw submits the answer it expects in <span class="mono">${esc(g.cf)}</span>; green = matches the truth.
-      "Edit does nothing" (the shown arm's most common answer) scores <b>${pct(g.correct_null)}</b>.</p></div>`;
+      "Edit does nothing" (the shown arm's most common answer) scores <b>${pct(sc(g.correct_null))}</b>${ERR ? " error" : ""}.</p></div>`;
 }
 
 // answer-task chart: a panel per (env, version, base → cf, investigator) pooling the ticked runs, one bar per condition =
@@ -943,7 +951,7 @@ function answerPanels(ans, keep, unan) {
     for (const it of g.items) {
       if (unan && !unanimous(it)) continue;
       const I = P.items[it.item ?? ""] ??= {};
-      for (const [k, ds] of Object.entries(it.draws)) (I[k] ??= []).push(...ds.map(d => +d.correct));
+      for (const [k, ds] of Object.entries(it.draws)) (I[k] ??= []).push(...ds.map(d => ERR ? 1 - d.correct : +d.correct));
       for (const a of [it.truth, ...Object.keys(it.answers_base || {}), ...Object.keys(it.answers_cf || {})]) if (a !== "null") P.letters.add(a);
     }
   }
@@ -964,7 +972,7 @@ function answerStats(P) {
     stats[k] = {n: per.length, draws: Is.reduce((t, I) => t + (I[k]?.length || 0), 0), mean, ci: per.length > 1 ? bootMean(per) : [mean, mean]};
   }
   const L = [...P.letters];
-  const chance = L.length && L.every(a => /^[A-Z]$/.test(a)) ? 1 / (Math.max(...L.map(a => a.charCodeAt(0))) - 64) : null;
+  const c = L.length && L.every(a => /^[A-Z]$/.test(a)) ? 1 / (Math.max(...L.map(a => a.charCodeAt(0))) - 64) : null, chance = c != null && ERR ? 1 - c : c;
   return {conds, stats, chance};
 }
 function answerChart(P, S, top) {
@@ -974,25 +982,25 @@ function answerChart(P, S, top) {
   let s = `<text x="${L}" y="14" class="ttl">${esc(title)}</text><text x="${L}" y="30" class="ax">${n} item${n === 1 ? "" : "s"}${P.pred ? ` · ${esc(P.pred.replace(/^[^/]+\//, ""))}` : ""}${P.runs.size > 1 ? ` · ${P.runs.size} runs` : ""}</text>`;
   for (let v = 0; v <= top + 1e-9; v += top > 0.5 ? 0.2 : 0.1)
     s += `<line x1="${L}" x2="${W - Rm}" y1="${f(y(v))}" y2="${f(y(v))}" class="grid"/><text x="${L - 5}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${(100 * v).toFixed(0)}%</text>`;
-  if (chance != null && chance <= top) s += `<line x1="${L}" x2="${W - Rm + 2}" y1="${f(y(chance))}" y2="${f(y(chance))}" class="chance"><title>chance: one of ${Math.round(1 / chance)} letters, ${pp(chance)}%</title></line><text x="${W - 2}" y="${f(y(chance) + 3)}" class="ax" style="font-size:9.5px" text-anchor="end">chance</text>`;
+  if (chance != null && chance <= top) s += `<line x1="${L}" x2="${W - Rm + 2}" y1="${f(y(chance))}" y2="${f(y(chance))}" class="chance"><title>chance: one of ${Math.round(1 / (ERR ? 1 - chance : chance))} letters, ${pp(chance)}%</title></line><text x="${W - 2}" y="${f(y(chance) + 3)}" class="ax" style="font-size:9.5px" text-anchor="end">chance</text>`;
   const ref = conds.find(c => /^transcript_/.test(c));
   const sig = k => {  // per item: this condition's mean right minus the transcript condition's, sign test over items that differ
     if (!ref || k === ref) return "";
     let b = 0, w = 0;
     for (const I of Object.values(P.items)) if (I[k]?.length && I[ref]?.length) {
       const d = I[k].reduce((a, c) => a + c, 0) / I[k].length - I[ref].reduce((a, c) => a + c, 0) / I[ref].length;
-      b += d > 0; w += d < 0;
+      b += ERR ? d < 0 : d > 0; w += ERR ? d > 0 : d < 0;
     }
     return stars(signP(b, w));
   };
   conds.forEach((k, i) => {
     const st = stats[k], x = L + 12 + cw * i + cw / 2, [lo, hi] = st.ci;
-    s += `<g><title>${esc(condLabel(k))}: ${pp(st.mean)}% correct, 95% item bootstrap ${pp(lo)}–${pp(hi)}% · ${st.n} items, ${st.draws} draws</title>
+    s += `<g><title>${esc(condLabel(k))}: ${pp(st.mean)}% ${ERR ? "error" : "correct"}, 95% item bootstrap ${pp(lo)}–${pp(hi)}% · ${st.n} items, ${st.draws} draws</title>
       <rect x="${x - 20}" width="40" y="${f(y(st.mean))}" height="${f(Math.max(0, y(0) - y(st.mean)))}" fill="${condColor(k)}"/>
       <line x1="${x}" x2="${x}" y1="${f(y(lo))}" y2="${f(y(hi))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(hi))}" y2="${f(y(hi))}" class="ci"/><line x1="${x - 5}" x2="${x + 5}" y1="${f(y(lo))}" y2="${f(y(lo))}" class="ci"/></g>
       <text x="${x}" y="${f(y(hi) - 18)}" class="lab" text-anchor="middle">${sig(k)}</text><text x="${x}" y="${f(y(hi) - 5)}" class="lab" text-anchor="middle">${pp(st.mean)}%</text><text x="${x}" y="${H - B + 16}" class="ax" text-anchor="middle">${esc(condShort(k))}</text>`;
   });
-  return `<svg class="anschart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="% correct by condition"><title>${esc([...P.runs].join(", "))}</title>${s}</svg>`;
+  return `<svg class="anschart" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${scoreName()} by condition"><title>${esc([...P.runs].join(", "))}</title>${s}</svg>`;
 }
 function answerChartBlock(ans, h, keep) {
   const picked = h.runs ? ans.filter(R => h.runs.split(",").includes(R.run)) : ans, unan = h.unanimous === "1";
@@ -1003,9 +1011,9 @@ function answerChartBlock(ans, h, keep) {
   for (const P of parts) for (const [it, I] of Object.entries(P.items)) Object.assign(all.items[[P.env, P.version || "", P.base, P.cf, it].join("\u0000")] ??= {}, I);
   const Ps = parts.length ? [all, ...parts] : [], Ss = Ps.map(answerStats);
   const top = Math.min(1, Math.max(0.3, Math.ceil((Math.max(0, ...Ss.flatMap(S => Object.values(S.stats).flatMap(st => [st.mean, st.ci[1]]))) + 0.08) * 10) / 10));
-  return `<h3>Answer task: % correct by condition</h3>
+  return `<h3>Answer task: ${scoreName()} by condition</h3>
     <p class="lede">Bars pool the runs ticked in the answer-task table below (all by default); one panel pooling every case and condition (the per-dataset panels are folded below it). A bar is the mean over items of the
-      item's fraction of correct draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options. ${STARS_NOTE}</p>
+      item's fraction of ${ERR ? "wrong" : "correct"} draws; whiskers are a 95% item-level bootstrap (2000 resamples); the dotted line is chance over the letter options. ${STARS_NOTE}</p>
     ${Ps.length ? `<div class="anspanels">${answerChart(Ps[0], Ss[0], top)}</div>
       <details><summary class="mute">per dataset and investigator (${Ps.length - 1} panels)</summary><div class="anspanels">${Ps.slice(1).map((P, i) => answerChart(P, Ss[i + 1], top)).join("")}</div></details>
       <p class="mute" style="font-size:12px;margin:4px 0 0">Runs: ${picked.map(R => `<span class="mono">${esc(R.slug)}</span>`).join(", ")}</p>` : `<p class="mute">No cases: tick a run in the answer-task table below${unan ? ", or drop the unanimous filter" : ""}.</p>`}`;
@@ -1107,7 +1115,7 @@ const pairHtml = (b, cf) => `<span title="${esc(b)} → ${esc(cf)}">${esc(pairTe
 async function evalPage(h) {
   DRAWS = [];
   const [ev, defs] = await Promise.all([getEval(`${h.eval}.json`), evalDefs(true)]);
-  ARMLAB = ev.arm_labels || {}, PAIRLAB = ev.pair_labels || {};
+  ARMLAB = ev.arm_labels || {}, PAIRLAB = ev.pair_labels || {}, ERR = !!ev.error_rate;
   const retired = defs.find(e => e.name === h.eval)?.retired;
   setCrumb([["evals", "evals=1"], [ev.title, hashOf({eval: h.eval})], ...(h.env ? [[h.env]] : [])]);
   const every = ev.runs.filter(R => !h.run || R.run === h.run);
@@ -1118,18 +1126,18 @@ async function evalPage(h) {
   const keep = g => !h.env || g.env === h.env;
   const allConds = condOrder([...new Set(runs.flatMap(R => R.conditions))]);
   const ansConds = condOrder([...new Set(ans.flatMap(R => R.conditions))]);
-  const ansSummary = ans.length ? `<h3>Answer task: % correct over all cases</h3>
-    <p class="lede">These runs predict the model's <i>answer</i> in the counterfactual arm (<a href="https://github.com/${GH}/blob/main/cfbench/answer.py" target="_blank" rel="noopener">cfbench/answer.py</a>), scored as % correct per case, then averaged over cases.
+  const ansSummary = ans.length ? `<h3>Answer task: ${scoreName()} over all cases</h3>
+    <p class="lede">These runs predict the model's <i>answer</i> in the counterfactual arm (<a href="https://github.com/${GH}/blob/main/cfbench/answer.py" target="_blank" rel="noopener">cfbench/answer.py</a>), scored as ${ERR ? "error rate (1 − % correct)" : "% correct"} per case, then averaged over cases.
       They are never pooled with the rate task's RMSE. "Edit does nothing" predicts the shown base arm's most common answer.</p>
-    ${ev.answer_paired?.pooled && !h.run ? `<div class="scroll"><table><tr><th>condition</th><th>items</th><th>% correct [95% CI]</th></tr>
+    ${ev.answer_paired?.pooled && !h.run ? `<div class="scroll"><table><tr><th>condition</th><th>items</th><th>${ERR ? "error rate" : "% correct"} [95% CI]</th></tr>
       ${condOrder(ev.answer_paired.pooled.map(x => x.condition)).map(c => ev.answer_paired.pooled.find(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condLabel(x.condition))}</td><td class="num">${x.n}</td>
-        <td class="num"><b>${pct(x.accuracy)}</b> <span class="mute">[${pct(x.ci[0])}, ${pct(x.ci[1])}]</span></td></tr>`).join("")}</table></div>
+        <td class="num"><b>${pct(sc(x.accuracy))}</b> <span class="mute">[${pct(scCI(x.ci)[0])}, ${pct(scCI(x.ci)[1])}]</span></td></tr>`).join("")}</table></div>
       <details class="sec"><summary>Per run (${ans.length})</summary><div class="body">` : ""}
     <div class="scroll"><table><tr><th title="tick the runs the chart below pools">chart</th><th>run</th><th>models</th><th>investigator</th><th>cases</th>${ansConds.map(k => `<th>${swatch(k)}${esc(condShort(k))}</th>`).join("")}<th>edit does nothing</th></tr>
     ${ans.map(R => `<tr><td><input type="checkbox" class="anspick" value="${esc(R.run)}" onchange="ansPick()" ${!h.runs || h.runs.split(",").includes(R.run) ? "checked" : ""}></td><td><b class="mono" title="${esc(R.description || "")}">${esc(R.slug)}</b><br><span class="mute">${esc(R.date)} · harness v${R.harness_version}${R.status === "abandoned" ? " · abandoned" : ""}</span>
         ${R.expview ? `<br><a href="${evq({dataset: R.expview})}" target="_blank" rel="noopener">conversations ↗</a>` : ""}</td><td>${R.models.map(m => esc(shortModel(m))).join("<br>")}</td>
       <td class="mono">${R.predictors.map(esc).join("<br>")}<br><span class="mute">effort ${esc(R.effort)} · ${R.max_calls} calls</span></td><td>${R.n_cases}</td>
-      ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(R.correct[k])}</b>`}</td>`).join("")}<td class="num">${pct(R.correct_null)}</td></tr>`).join("")}</table></div>
+      ${ansConds.map(k => `<td class="num">${R.correct[k] == null ? '<span class="mute">–</span>' : `<b>${pct(sc(R.correct[k]))}</b>`}</td>`).join("")}<td class="num">${pct(sc(R.correct_null))}</td></tr>`).join("")}</table></div>
     ${ev.answer_paired?.pooled && !h.run ? "</div></details>" : ""}
     ${ev.answer_paired && !h.run ? pairedTable(ev.answer_paired.rows, `Paired comparisons, pooled over ${ev.answer_paired.runs.map(esc).join(" + ")}.`) : ""}` : "";
   const ansSections = {};
