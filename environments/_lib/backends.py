@@ -3,13 +3,17 @@
     vllm            any OpenAI-compatible URL (the shared Qwen server, or a pod started for one sweep)
     openrouter      provider pinned (--provider) with no fallbacks, reasoning effort always sent
     openrouter-raw  GLM 5.x thinking off: the chat template rendered here, an empty think block prefilled, raw completions
+                    (single-turn prompts, or multi-turn tool episodes via GLM 5.3's own template: glm_prompt / glm_parse)
 
 `Target` is everything that decides which model answered; its `id` names a deployment, so runs from different deployments
 are never pooled. Every call returns the provider that actually served it.
 """
 
 import asyncio
+import json
 import os
+import re
+import zlib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -86,10 +90,94 @@ class Transient(Exception):
     pass
 
 
+GLM_STOP = ["<|observation|>", "<|user|>", "<|endoftext|>"]
+
+
+def glm_prompt(messages: list[dict], tools: list[dict]) -> str:
+    """GLM 5.3's own chat template (glm53_chat_template.jinja, from zai-org/GLM-5.3) over a multi-turn tool conversation,
+    ending in an empty think block: thinking off for agent episodes, which OpenRouter's chat endpoint refuses
+    ("Reasoning is mandatory"). Prior turns render with empty think blocks too, as the template does."""
+    import jinja2
+
+    env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"], keep_trailing_newline=True)
+    env.filters["tojson"] = lambda v, ensure_ascii=True, indent=None: json.dumps(v, ensure_ascii=ensure_ascii, indent=indent)
+    tpl = env.from_string((Path(__file__).parent / "glm53_chat_template.jinja").read_text())
+    msgs = []
+    for m in messages:
+        m = {k: v for k, v in m.items() if k not in ("reasoning_content", "reasoning", "provider")}
+        if m.get("tool_calls"):
+            m["tool_calls"] = [
+                {**tc, "function": {**tc["function"], "arguments": _args_dict(tc["function"].get("arguments"))}} for tc in m["tool_calls"]
+            ]
+        msgs.append(m)
+    return tpl.render(messages=msgs, tools=tools, add_generation_prompt=False) + "<|assistant|><think></think>"
+
+
+def _args_dict(a):
+    if isinstance(a, dict):
+        return a
+    try:
+        d = json.loads(a or "{}")
+        return d if isinstance(d, dict) else {"_raw": a}
+    except json.JSONDecodeError:
+        return {"_raw": a}
+
+
+def glm_parse(text: str, tools: list[dict]) -> tuple[str, list[dict]]:
+    """GLM's raw output -> (visible text, OpenAI-style tool calls). Calls are `<tool_call>NAME<arg_key>K</arg_key>
+    <arg_value>V</arg_value>...</tool_call>`; a value whose schema type isn't string is JSON-decoded."""
+    schema = {t["function"]["name"]: t["function"].get("parameters", {}).get("properties", {}) for t in tools}
+    content, _, rest = text.partition("<tool_call>")
+    calls = []
+    for k, body in enumerate(re.split(r"<tool_call>", rest) if rest or "<tool_call>" in text else []):
+        body = body.split("</tool_call>")[0]
+        name = body.split("<arg_key>")[0].strip()
+        args = {}
+        for key, val in re.findall(r"<arg_key>(.*?)</arg_key>\s*<arg_value>(.*?)</arg_value>", body, re.DOTALL):
+            key = key.strip()
+            if schema.get(name, {}).get(key, {}).get("type", "string") != "string":
+                try:
+                    val = json.loads(val)
+                except json.JSONDecodeError:
+                    pass
+            args[key] = val
+        calls.append(
+            {
+                "id": f"call_{k}_{zlib.crc32(body.encode()):08x}",
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(args, ensure_ascii=False)},
+            }
+        )
+    return content.strip(), calls
+
+
+async def _glm_raw_turn(client: httpx.AsyncClient, t: Target, messages: list[dict], tools: list[dict]) -> dict:
+    body = {
+        "model": t.served_name or t.model,
+        "prompt": glm_prompt(messages, tools),
+        "max_tokens": t.max_tokens or 16384,
+        "stop": GLM_STOP,
+        **t.sampling,
+        "provider": {"only": [t.provider] if t.provider else RAW_PROVIDERS, "allow_fallbacks": False},
+    }
+    j = await _post(client, f"{OPENROUTER}/completions", body, openrouter_key())
+    c = j["choices"][0]
+    text = c.get("text") or ""
+    content, calls = glm_parse(text, tools)
+    msg = {"role": "assistant", "content": content, "provider": j.get("provider")}
+    if c.get("reasoning"):
+        msg["reasoning_content"] = c["reasoning"]
+    if calls:
+        msg["tool_calls"] = calls
+    finish = "tool_calls" if calls else c.get("finish_reason")
+    return {"message": msg, "finish": finish, "provider": j.get("provider"), "usage": j.get("usage") or {}}
+
+
 async def chat(client: httpx.AsyncClient, t: Target, messages: list[dict], tools: list[dict] | None = None) -> dict:
     """One completion. -> {"message": {...}, "finish": str, "provider": str | None, "usage": {...}}"""
+    if t.backend == "openrouter-raw" and (tools or any(m["role"] not in GLM_TURN for m in messages)):
+        return await _glm_raw_turn(client, t, messages, tools or [])
     if t.backend == "openrouter-raw":
-        assert not tools and all(m["role"] in GLM_TURN for m in messages), "openrouter-raw: GLM, single turn, no tools"
         prompt = GLM_PREFIX + "".join(GLM_TURN[m["role"]] + m["content"] for m in messages) + GLM_EMPTY_THINK
         body = {
             "model": t.served_name or t.model,
