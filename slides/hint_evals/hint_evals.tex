@@ -59,13 +59,13 @@
 \begin{frame}{Summary}
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.315\textwidth}
-      \stat{+8.5pp}{olens}{\olens{} over the transcript alone on ``did Qwen know it?'' with the hint after the options: 67\% vs 59\% of 976}
+      \stat{−8.5pp}{olens}{error rate on ``did Qwen know it?'' with \olens{}, hint after the options: 33\% vs 41\% for the transcript alone (976 cases)}
     \end{column}
     \begin{column}{0.315\textwidth}
-      \stat{+12.5pp}{olens}{\olens{} over its placebo with the hint after the options (+12.2pp with it first)}
+      \stat{−12.5pp}{olens}{error rate of \olens{} vs its placebo with the hint after the options (−12.2pp with it first)}
     \end{column}
     \begin{column}{0.315\textwidth}
-      \stat{85\%}{probe}{a frozen linear probe at the option newlines, hint after; 77\% retuned when the hint comes first}
+      \stat{15\%}{probe}{error rate of a frozen linear probe at the option newlines, hint after; 23\% retuned when the hint comes first}
     \end{column}
   \end{columns}
   \medskip
@@ -143,10 +143,10 @@
     variants' inputs runs.}
 \end{frame}
 
-\begin{frame}{Did Qwen know it? The O-lens beats the transcript by 6–9pp, the probe by far more}
+\begin{frame}{Did Qwen know it? The O-lens cuts the error rate from 41\% to 33\%, the probe to 15\%}
   \slidefig{fig/knew.pdf}
   \takeaway{The end-of-prompt reads add little over the option newlines alone.}
-  \source{\% right (guess = p $\geq$ 0.5), 95\% item bootstrap CI; stars: one-sided paired sign test vs transcript (* .05,
+  \source{Error rate = 100\% − \% right (guess = p $\geq$ 0.5); 95\% item bootstrap CI; stars: one-sided paired sign test vs transcript (* .05,
     ** .01, *** .001); hatched: placebo.}
 \end{frame}
 
