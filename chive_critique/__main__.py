@@ -22,6 +22,8 @@ if what in ("all", "adam"):
     adam.thresholds()
     print("\n## §3 Contradictory ground truth (sampled)")
     adam.contradictions()
+    print("\n## §4 Behaviours that are mistakes")
+    adam.mistakes()
 if what in ("all", "agam"):
     print("\n# Agam's 300-incident Qwen3.6-27B run: agu18dec/chive-forensics\n")
     agam.report()

@@ -141,3 +141,12 @@ def contradictions():
         counts = dict(collections.Counter(i["label"] for i in items))
         print(f"{ADAM_LABELS[run]:13s} {len(items)} inert claims in {len(sampled)} sampled investigations: {counts}")
         print(f"{'':13s} investigations with a CONTRADICTS claim: {pct(len(contra), len(sampled))}")
+
+
+def mistakes():
+    """§4: Adam's own concreteness judge flags each investigated behaviour as a mistake or not (mechanism_concreteness.jsonl)."""
+    for run in ADAM_RUNS:
+        rows = adam(f"{run}/mechanism_concreteness.jsonl")
+        n_mistake = sum(bool(r["is_mistake"]) for r in rows)
+        cats = collections.Counter(c for r in rows for c in r["categories"]).most_common(6)
+        print(f"{ADAM_LABELS[run]:13s} is_mistake {pct(n_mistake, len(rows))} of labelled investigations; top categories {cats}")

@@ -33,9 +33,9 @@ what we started from.
    removes the very mechanism a supported cause asserts, because the inert list is assembled by the
    mechanical 15pp rule and never checked against the investigator's prose. 25% once you count
    "causes" that are themselves negations.
-4. **Half the behaviours are the model being plainly wrong** (53% of Agam's held-out incidents by
-   our hand labels), which is a judgment call, not a defect, but it shapes what the benchmark
-   measures.
+4. **Most of the behaviours are the model being wrong**: Adam's own judge flags 58–86% of
+   investigated behaviours as mistakes (per target model), our hand labels 53% of Agam's. A judgment
+   call, not a defect, but it shapes what the benchmark measures.
 5. **Seven LLM roles sit between the behaviour and the label**; the contradictions in §3 enter at
    one join between them.
 
@@ -150,16 +150,25 @@ poor, 4 to 24 flags per ~100-item chunk, so the item count is soft by a few):
 
 ADAM_SAMPLE_PLACEHOLDER
 
-## 4. Half the behaviours are the model being wrong
+## 4. Most of the behaviours are the model being wrong
 
-Our single-rater hand labels of Agam's 204 held-out behaviours (`viewer/behavior_kind.tsv`):
-**wrong** (factual or logic slip, self-contradiction, misread context, ignored instruction) 108 =
-53%; **content** (coherent but unprompted content or style choice, e.g.
+Adam's own concreteness judge flags each investigated behaviour as a mistake or not
+(`mechanism_concreteness.jsonl`, `is_mistake`; `python -m chive_critique adam`, §4):
+
+| Run          | Labelled investigations | `is_mistake` | Top categories                                                                    |
+| ------------ | ----------------------- | ------------ | --------------------------------------------------------------------------------- |
+| Gemma 3 27B  | 1,407                   | 976 (69%)    | known_then_fixable, surprising_influence, entity_or_register_association          |
+| Qwen3-8B     | 1,317                   | 1,137 (86%)  | known_then_fixable, surprising_influence, misinterpretation                       |
+| Qwen3.5-397B | 1,265                   | 740 (58%)    | surprising_influence, statistical_or_lexical_artifact, coherent_quirk_non_mistake |
+
+Our own single-rater labels of Agam's 204 held-out behaviours (`viewer/behavior_kind.tsv`) say the
+same thing more coarsely: **wrong** (factual or logic slip, self-contradiction, misread context,
+ignored instruction) 108 = 53%; **content** (coherent but unprompted content or style choice, e.g.
 [000106](https://chive-cases.pages.dev/?case=prompt_000106)'s tired character) 72 = 35%; **policy**
-(refusal or persona scope) 24 = 12%. O-lens uplift by kind: wrong +1.7pp (SE 2.7), content +6.9pp
-(SE 4.0), policy −2.5pp (SE 5.3), none significant. Adam's release carries a per-investigation
-`is_mistake` flag in `mechanism_concreteness.jsonl` that would give the same split on his data; we
-have not tabulated it.
+(refusal or persona scope) 24 = 12%. O-lens uplift by kind in Agam's run: wrong +1.7pp (SE 2.7),
+content +6.9pp (SE 4.0), policy −2.5pp (SE 5.3), none significant. This is a judgment call rather
+than a defect, but it says what the benchmark measures: mostly "why did a small model slip here",
+which is not obviously what a lens for unverbalised goals is for.
 
 ## 5. Layers of LLM between the behaviour and the label
 
