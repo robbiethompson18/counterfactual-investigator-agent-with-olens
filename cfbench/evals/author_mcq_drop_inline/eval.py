@@ -12,11 +12,11 @@ many negatives from the same pair (seeded). TASK "claim",
 truth 0/1; p0, p1, drop and TV kept as fields.
 
 Prompt: hint_qwen_dsv4/inline.py's layout (## Setup with <prompt>/<reply>, ## The counterfactual, ## O-lens reads with its
-OLENS_TEXT, block() and placebo(), ## Your task). The reads are of the full question-first prompt up to "What do you
-think?" (no options), at every punctuation and newline token of the question and comments, layers 32/40/48
-(runs/olens_reads/2026-10-30_author-qfirst plus READS_TOPUP for pairs it lacks). `olens_placebo_inline`: another pair's
-reads with the same read-token shape (inline.placebo, falling back to the same position count). Investigator: Claude Haiku
-5.5 at effort low (Kylie, 2026-10-30).
+OLENS_TEXT and its position labels and context, ## Your task). The reads are of the full question-first prompt up to "What
+do you think?" (no options), at every punctuation, symbol and newline token of the question and comments
+(bank.is_read_token), layers 32/40/48, runs/olens_reads/2026-10-30_author-qfirst. `olens_placebo_inline`: another pair's
+reads of the same attribute with at least as many positions (`placebo`), its bullets placed position by position (`block`).
+Investigator: Claude Haiku 5.5 at effort low (Kylie, 2026-10-30).
 
     uv run --with transformers --with jinja2 python -m cfbench.eval author_mcq_drop_inline --prep
     uv run python -m cfbench.eval author_mcq_drop_inline --show
@@ -34,7 +34,7 @@ from cfbench.evals.hint_qwen_dsv4 import inline
 from scripts.author_probe.bank import ATTRS, BANK, LETTERS, MODEL, qf_message
 
 ABLATE = Path("data/runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst")
-READS = [Path("data/runs/olens_reads/2026-10-30_author-qfirst"), Path("data/runs/olens_reads/2026-10-30_author-qfirst-topup")]
+READS = [Path("data/runs/olens_reads/2026-10-30_author-qfirst")]  # topped up in place (16:45 UTC)
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
 MODEL_NAME = "the model"
@@ -148,6 +148,35 @@ def cases(inputs: Path, versions: list[str]):
         yield Prompt(c["comment"]), row, base
 
 
+def placebo(path: Path, own: str, seed: int) -> str:
+    """Another pair's reads as the placebo: a seeded pick among the other pairs of the same attribute with at least as many
+    read positions (passages differ, so inline.placebo's exact-shape match rarely exists); the longest ones if none."""
+    rows, _ = inline._reads(path)
+    n = lambda s: len(inline._positions(rows[s]))
+    attr = own.split(":")[1]
+    same = [s for s in sorted(rows) if s != own and s.split(":")[1] == attr]
+    pool = [s for s in same if n(s) >= n(own)] or sorted(same, key=n)[-5:]
+    return random.Random(f"{seed}:{own}").choice(pool)
+
+
+def block(path: Path, own: str, messages: list[dict], source: str) -> str:
+    """inline.block's format: `own`'s positions in the case's prompt, `source`'s bullets position by position (its first
+    ones; cycled if it has fewer positions)."""
+    rows, _ = inline._reads(path)
+    mine, theirs = inline._positions(rows[own]), inline._positions(rows[source])
+    out = []
+    for k, ((i, field, char, token), _) in enumerate(mine):
+        layers = theirs[k % len(theirs)][1]
+        text = messages[i][field]
+        assert text.startswith(token, char), (own, i, char, token)
+        out.append(f"{inline._label(text, char, token)}: {inline._context(text, char, token)}")
+        for layer in sorted(layers):
+            for b in sorted(layers[layer]["bullets"], key=lambda b: -b["fve"]):
+                out.append(f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}")
+        out.append("")
+    return "\n".join(out).strip()
+
+
 def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
     """inline.prompt's layout with this eval's setup text (no hint): the shared O-lens pieces, our task."""
     run = base[0]
@@ -179,14 +208,14 @@ follows. Everything else is identical.
     if condition != "transcript_inline":
         path = Path(case["inputs"]) / "reads"
         own = run.source.split("/", 1)[1]
-        source = inline.placebo(path, own, seed) if condition == "olens_placebo_inline" else own
+        source = placebo(path, own, seed) if condition == "olens_placebo_inline" else own
         if source != own:
             extra["placebo_sources"] = [source]
         layers = sorted({r["layer"] for r in inline._reads(path)[0][own]})
         text = inline.OLENS_TEXT.format(
             model=model, where=WHERE, layers=", ".join(map(str, layers)), fve_note=inline.fve_note(path), timing=TIMING
         )
-        parts.append(f"## O-lens reads\n\n{text}\n\n<olens_reads>\n{inline.block(path, own, run.messages, source)}\n</olens_reads>")
+        parts.append(f"## O-lens reads\n\n{text}\n\n<olens_reads>\n{block(path, own, run.messages, source)}\n</olens_reads>")
     task = TASK_TEXT.format(model=model, answer=case["answer"], p0=case["p0"])
     parts.append(f"## Your task\n\n{task}")
     return "\n\n".join(parts), extra
@@ -281,7 +310,8 @@ def show_expview(inputs: Path, out: Path):
                 "comment deletions (not sent)", QWEN, messages=msgs2, output={"role": "assistant", "content": head + "\n".join(table)}
             )
             labels = {"condition": cond, "version": case["version"], "attr": case["attr"], "truth": case["k_cf"]}
-            labels |= {"drop": round(case["drop"], 3), "p0": round(case["p0"], 3), "p1": round(case["p1"], 3), **extra}
+            labels |= {"drop": round(case["drop"], 3), "p0": round(case["p0"], 3), "p1": round(case["p1"], 3)}
+            labels |= {k: ", ".join(v) for k, v in extra.items()}
             calls = [call(f"investigator prompt ({cond})", "anthropic/claude-haiku-5.5", messages=msgs), deletions]
             run.add(id=f"{case['item']}/{cond}", group=f"{case['version']} · {cond}", links=_links(case), labels=labels, calls=calls)
     print("wrote", run.path)

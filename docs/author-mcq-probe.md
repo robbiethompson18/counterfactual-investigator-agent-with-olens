@@ -277,6 +277,29 @@ cases are not hard from the prompt: Qwen's wrong answers are the ones a reader o
 gives (and age/income answers are mostly the modal 30-44 / Middle), so the transcript-only
 investigator is already near the majority-answer rate or above it.
 
+## Comment-deletion eval, question first (2026-10-30, set up, not run)
+
+**Deletions:** `runs/author_mcq_probe/2026-10-30_ablate-loo-qfirst`
+(`ablate.py prep/analyze --qfirst`, one H100, ~$4): 287 passages (one per author, preferring the
+original-format run's passages), 738 confident pairs, 18,634 prompts. Stable / with an evidence
+comment: sex 139/147, 56; age 156/226, 58; education 153/184, 66; income 138/181, 33. Evidence
+comments are human-guessed 65 / 24 / 59 / 49% vs 7-10% of all comments.
+
+**Eval:** `cfbench/evals/author_mcq_drop_inline` (hint_qwen_dsv4/inline.py's single-turn layout,
+three conditions). Claim: deleting this comment lowers Qwen's probability on its answer by more than
+max(0.15, 5 × the pair's median drop). Stable pairs, all positives + as many negatives per pair
+(base rate 0.50), versions `qwen_wrong` (Qwen ≠ label: 124 cases, 62 positive, 54 pairs) and
+`qwen_right` (346 cases, 173 positive, 161 pairs). Positive drops: median 0.23 / 0.26; 16 / 49 of
+them flip the argmax. Investigator Haiku 5.5 at effort low. Inputs run
+`runs/cfbench_evals/2026-10-30_author-mcq-drop-inline-inputs`, whose `expview/` has every rendered
+prompt (case × condition, not sent) with the pair's deletion table and a link to the pair's item.
+
+**Reads:** `runs/olens_reads/2026-10-30_author-qfirst` was topped up with the broader read-position
+selector (`bank.is_read_token`: any punctuation, symbol or newline token, e.g. quotes, dashes, `&`):
++7,109 positions on the 677 pairs and 31 new pairs, 93,117 reads in all. Per-pair items with the
+reads inline and the deletion tables:
+`#dataset=runs/author_mcq_probe/2026-10-30_synthpai-qwen36-qfirst/pairs`.
+
 ## Where things live
 
 - Code: [`scripts/author_probe/`](../scripts/author_probe/CLAUDE.md) (`bank.py`, `fit.py`,
