@@ -32,11 +32,14 @@
 % the example prompt: a read token on O-lens orange; newlines as ↵ (Inter has the glyph); special tokens spelled with {}
 % boxed one by one so the mono font's ligatures don't turn <| and |> into arrows
 \newcommand{\nlg}{{\sffamily ↵}}
-% a read token in brackets, then a dot per condition that gets it: O-lens orange, O-lens (nl) gold, probe teal
+% a read token in brackets, then a column of dots, top down, one per condition that gets it: O-lens orange, O-lens (nl)
+% gold, probe teal
 \newcommand{\dt}[1]{\tikz[baseline=-0.1ex]\fill[#1] (0, 0.45ex) circle (0.85pt);}
+\newcommand{\dts}[1]{\tikz[baseline=0pt]{\path (0, 0) -- (0, 2.9pt);
+  \foreach \c [count=\i] in {#1} \fill[\c] (0, 3.05pt - 1.3pt * \i + 1.3pt) circle (0.55pt);}}
 \newcommand{\br}[1]{{\bfseries\color{ink}[}#1{\bfseries\color{ink}]}}
-\newcommand{\rd}[1]{\br{#1}\dt{olens}}
-\newcommand{\ro}[1]{\br{#1}\dt{olens}\,\dt{olensnl}\,\dt{probe}}
+\newcommand{\rd}[1]{\br{#1}\,\dts{olens}}
+\newcommand{\ro}[1]{\br{#1}\,\dts{olens, olensnl, probe}}
 \newcommand{\st}[1]{\mbox{<}\mbox{|}#1\mbox{|}\mbox{>}}
 \newcommand{\tok}[1]{{\color{muted}#1}}
 \newcommand{\hint}[1]{{\bfseries #1}}
