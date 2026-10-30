@@ -31,7 +31,7 @@ for d in sorted(Path(".").glob(a.runs)):
     mode = "off" if "thinkoff" in d.name else "on"
     for e in read_episodes(d):
         v = m.get(e["id"]) or {}
-        if "positive" not in v or e["id"] not in hk:
+        if "positive" not in v or v.get("cut") or e["id"] not in hk:
             continue
         task, _, var = e["arm"].partition("/")
         f = dict(zip(["wording", *FACTORS], var.split(".")))
@@ -39,8 +39,9 @@ for d in sorted(Path(".").glob(a.runs)):
         if kind:
             cells[(task, f["wording"], mode)][kind].append((f"envs/harness_grid/{d.name}/{e['id']}", tuple(f[k] for k in FACTORS)))
 rng = random.Random(20261030)
-pick = []
+picks = {}  # cell -> its picks; written round-robin over cells so any prefix of the list is balanced
 for key, c in sorted(cells.items()):
+    pick = picks.setdefault(key, [])
     used = collections.Counter()
     want = {"acted": a.k // 2 + a.k % 2, "asked": a.k // 2}
     if len(c["acted"]) < want["acted"]:  # top up from the other kind when one is rare
@@ -53,6 +54,7 @@ for key, c in sorted(cells.items()):
             pool.remove(best)
             pick.append(best[0])
             used.update(enumerate(best[1]))
+pick = [p[r] for r in range(a.k) for p in picks.values() if r < len(p)]
 Path(a.out).write_text(json.dumps(pick))
 by = collections.Counter(("off" if "thinkoff" in p else "on") for p in pick)
 print(len(pick), "episodes", dict(by), "cells", len(cells))

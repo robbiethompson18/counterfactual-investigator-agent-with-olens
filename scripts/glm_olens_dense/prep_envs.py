@@ -194,6 +194,10 @@ def main():
             n_new = int((~Pd.copied).sum()) if len(Pd) else 0
             stats.append({"prep": prep_name, "episodes": len(ep_rows), "new": n_new, "copies": len(copies), "dups": len(dups)})
             print(json.dumps(stats[-1]), flush=True)
+    if p1_select is not None and 1 in views_by_tier:  # tier-1 jobs in the selection's order (a priority queue)
+        rank = {k: i for i, k in enumerate(json.loads(Path(a.p1_select).read_text()))}
+        tid_key = {"cfi4:" + hashlib.md5(k.encode()).hexdigest()[:12]: i for k, i in rank.items()}
+        views_by_tier[1].sort(key=lambda v: tid_key.get(v["tid"], len(rank)))
     for t, vs in sorted(views_by_tier.items()):
         k, cur, n = 0, [], 0
         for i, v in enumerate(vs):
