@@ -1,10 +1,13 @@
 """The critique's numbers on Adam Karvonen's released CHIVE data (docs/chive-critique.md). Each function prints one section."""
 
 import collections
+import functools
 import json
 import statistics
 
+import numpy as np
 import requests
+from scipy.stats import fisher_exact
 
 from chive_critique.data import ADAM_ARMS, ADAM_LABELS, ADAM_RUNS, RUN, adam, adam_url, band, jsonl, pct, run_file
 
@@ -124,6 +127,61 @@ def thresholds():
     pos, gain, true, true_gain = tot["bank_positive"], tot["bank_gain"], tot["true_claims"], tot["true_gain"]
     print(f"  claim bank: investigations with a true claim {pos:,} -> {pos + gain:,} (+{100 * gain / pos:.0f}%);", end=" ")
     print(f"true claims {true:,} -> +{true_gain:,} (+{100 * true_gain / true:.0f}%) at up to 2 per gained investigation")
+
+
+@functools.cache
+def fisher(k0: int, k: int, n: int = 30) -> float:
+    return fisher_exact([[k0, n - k0], [k, n - k]]).pvalue
+
+
+def bh(p: np.ndarray) -> np.ndarray:
+    """Benjamini-Hochberg q-values."""
+    order = np.argsort(p)
+    q = np.minimum.accumulate((p[order] * len(p) / np.arange(1, len(p) + 1))[::-1])[::-1]
+    out = np.empty_like(q)
+    out[order] = np.minimum(q, 1)
+    return out
+
+
+def significance():
+    """§2: positives under Fisher's exact test (BH within each run) vs the >=50pp rule, and how many <=15pp negatives are shown null.
+    Every experiment and baseline in the three runs is 30 samples at T=1, so the 30-vs-30 table is the whole story."""
+    rows = [(run, d["prompt_id"], d["k0"], e["k"]) for run in ADAM_RUNS for d in rates(run) for e in d["exps"]]
+    assert all(d["n0"] == 30 and e["n"] == 30 for run in ADAM_RUNS for d in rates(run) for e in d["exps"])
+    inv = np.array([f"{run}/{pid}" for run, pid, _, _ in rows])
+    p = np.array([fisher(k0, k) for _, _, k0, k in rows])
+    move = np.array([abs(k - k0) / 30 for _, _, k0, k in rows])
+    q = np.empty_like(p)
+    for run in ADAM_RUNS:
+        m = np.array([r[0] == run for r in rows])
+        q[m] = bh(p[m])
+    chive = move >= 0.5
+    pmax = p[chive].max()
+    print(f"{len(rows):,} experiments in {len(set(inv)):,} investigations; weakest >=50pp positive has Fisher p = {pmax:.1g}")
+    print(f"  share of experiments with no effect (Storey pi0, lambda 0.5): {min(1, 2 * (p > 0.5).mean()):.2f}")
+    base = set(inv[chive])
+    for name, m in [
+        ("CHIVE >=50pp", chive),
+        (f"Fisher p <= {pmax:.1g} (same stringency)", p <= pmax),
+        ("Fisher p < 0.001", p < 0.001),
+        ("BH q < 0.01", q < 0.01),
+        ("BH q < 0.05", q < 0.05),
+    ]:
+        pos = set(inv[m])
+        print(f"  {name:36s} {m.sum():6,d} experiments ({m.sum() / chive.sum():.2f}x), {len(pos):,} investigations (+{len(pos - base):,})")
+    extra = (q < 0.05) & ~chive
+    to_zero = (extra & (np.array([k for *_, k in rows]) == 0)).sum()
+    print(f"  q < 0.05 but < 50pp: {extra.sum():,}, median move {100 * np.median(move[extra]):.0f}pp, to 0/30: {to_zero:,}")
+    # TOST at alpha 0.05: the 90% Agresti-Caffo interval of the rate difference inside +-margin
+    a = np.array([(k0 + 1) / 32 for _, _, k0, _ in rows])
+    b = np.array([(k + 1) / 32 for _, _, _, k in rows])
+    reach = np.abs(b - a) + 1.645 * np.sqrt((a * (1 - a) + b * (1 - b)) / 32)
+    inert = move <= 0.15
+    n_inert = int(inert.sum())
+    print(f"  <=15pp 'inert': {n_inert:,}; shown within +-15pp {pct(int((inert & (reach <= 0.15)).sum()), n_inert)},", end=" ")
+    print(f"within +-25pp {pct(int((inert & (reach <= 0.25)).sum()), n_inert)}")
+    k0s = collections.Counter(d["k0"] for run in ADAM_RUNS for d in rates(run))
+    print("  baseline k0 of investigations (0-12/30):", [k0s[k] for k in range(13)])
 
 
 def contradictions():
