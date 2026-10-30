@@ -8,6 +8,27 @@
 \definecolor{probe}{HTML}{11806A}
 \definecolor{probetuned}{HTML}{C2408A}
 
+% every size at 2/3 of the 9pt class's (Kylie, 2026-10-30: denser, for reading on a monitor); the title slide keeps the
+% theme's sizes (set in points below)
+\makeatletter
+\renewcommand\normalsize{\@setfontsize\normalsize{6}{7.3}}
+\renewcommand\small{\@setfontsize\small{5.35}{6.5}}
+\renewcommand\footnotesize{\@setfontsize\footnotesize{4.7}{5.6}}
+\renewcommand\scriptsize{\@setfontsize\scriptsize{4}{4.9}}
+\renewcommand\tiny{\@setfontsize\tiny{3.35}{4}}
+\renewcommand\large{\@setfontsize\large{6.7}{8}}
+\renewcommand\Large{\@setfontsize\Large{7.35}{8.7}}
+\renewcommand\LARGE{\@setfontsize\LARGE{8}{9.4}}
+\renewcommand\huge{\@setfontsize\huge{9.4}{12}}
+\renewcommand\Huge{\@setfontsize\Huge{11.4}{14.7}}
+\makeatother
+\AtBeginDocument{\normalsize}
+\setbeamerfont{title}{size=\fontsize{14.4}{17}}
+\setbeamerfont{subtitle}{size=\fontsize{9}{11}}
+\setbeamerfont{author}{size=\fontsize{8}{9.5}}
+\setbeamerfont{institute}{size=\fontsize{8}{9.5}}
+\setbeamerfont{date}{size=\fontsize{8}{9.5}}
+
 % the example prompt: a read token on O-lens orange; newlines as ↵ (Inter has the glyph); special tokens spelled with {}
 % boxed one by one so the mono font's ligatures don't turn <| and |> into arrows
 \newcommand{\nlg}{{\sffamily ↵}}
@@ -23,7 +44,7 @@
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 
 \title[Hint eval with end-of-prompt reads]{Did Qwen know it?\\[3pt]
-  \large\mdseries The hint eval with O-lens reads at the option newlines and the end of the prompt}
+  \fontsize{10}{12}\selectfont\mdseries The hint eval with O-lens reads at the option newlines and the end of the prompt}
 \author{Robbie Thompson \& Kylie MacFarquharson}
 \institute{MATS sprint with Neel Nanda}
 \date{October 2026}

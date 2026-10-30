@@ -16,6 +16,7 @@ import math
 import urllib.request
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs.style import INK, MUTED
@@ -25,6 +26,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).with_name("fig")
 HF = "https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/resolve/main/evals/"
 FAINT = "#a29d92"  # the Evals page's --faint
+S = 2 / 3  # this deck's text is 2/3 of the theme's (Kylie, 2026-10-30), so the figures' is too
+plt.rcParams.update({k: plt.rcParams[k] * S for k in ["font.size", "axes.titlesize", "axes.labelsize", "xtick.labelsize",
+                                                      "ytick.labelsize", "legend.fontsize"]})  # fmt: skip
 # the page's order, with the placebo moved beside its O-lens (the deck's convention); labels as the page's condShort
 ORDER = ["transcript_inline", "olens_inline", "olens_placebo_inline", "olens_inline_nl", "probe", "probe_tuned"]
 SHORT = {"transcript_inline": "transcript", "olens_inline": "O-lens", "olens_placebo_inline": "placebo",
@@ -99,21 +103,21 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, path: Path) -> Non
             v, (lo, hi), st = bars[c]
             ax.bar(x, v, 0.66, **bar_kw(c))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-            ax.text(x, hi + 0.015, f"{v:.0%}", ha="center", va="bottom", fontsize=6.5, color=INK)
-            ax.text(x, hi + 0.075, st, ha="center", va="bottom", fontsize=6.5, color=INK)
+            ax.text(x, hi + 0.015, f"{v:.0%}", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+            ax.text(x, hi + 0.05, st, ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
         ax.set_xticks(range(len(conds)), [SHORT[c] for c in conds])
         ax.set_xlim(-0.6, len(conds) - 0.4)
-        ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7)
-        ax.text(0, 1.13, PANELS[k], transform=ax.transAxes, fontsize=8.5, fontweight="semibold", color=INK)
-        ax.text(0, 1.04, f"{n:,} cases · {evals[k]}", transform=ax.transAxes, fontsize=6.5, color=MUTED)
+        ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
+        ax.text(0, 1.13, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
+        ax.text(0, 1.04, f"{n:,} cases · {evals[k]}", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
         for side in ("left", "bottom"):
             ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
     axes[0].set_ylim(0, 1)
     axes[0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1], ["0%", "20%", "40%", "60%", "80%", "100%"])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
-    axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7,
+    axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S,
                   color=MUTED, va="center")  # fmt: skip
     save(fig, path)
 
