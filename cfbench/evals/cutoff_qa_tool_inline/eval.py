@@ -26,6 +26,7 @@ from cfbench.evals.cutoff_qa_inline import inline
 from cfbench.evals.cutoff_qa_inline.eval import INLINE, Prompt  # noqa: F401  (the runner reads INLINE off this module)
 from environments._lib.core import load_env
 
+ERROR_RATE = True  # the env viewer shows this eval as error rate, lower is better (Kylie, 2026-10-30)
 ENV = "cutoff_qa"
 ENVS = [ENV]
 GATE = "cutoff_gate/2026-10-29_v2-tool-required"  # the tool-call gate whose labels and prompts the cases are
