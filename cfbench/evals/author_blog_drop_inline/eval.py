@@ -26,10 +26,13 @@ from scripts.author_probe.blog import ATTRS as BLOG_ATTRS
 from scripts.author_probe.blog import BANK, END
 from scripts.author_probe.blog import message as qf_message
 
-ABLATES = [Path("data/runs/author_mcq_blog/2026-10-30_ablate-loo")]
+ABLATES = [
+    Path("data/runs/author_mcq_blog/2026-10-30_ablate-loo"),
+    Path("data/runs/author_mcq_blog/2026-10-30_ablate-loo-b"),
+]  # 2 x 2,004 bloggers
 ABLATES_X2 = ABLATES
 ATTRS = {k: ("", v) for k, v in BLOG_ATTRS.items()}  # bank.ATTRS shape: (question, options)
-READS = [Path("data/runs/olens_reads/2026-10-30_author-blog")]
+READS = [Path("data/runs/olens_reads/2026-10-30_author-blog"), Path("data/runs/olens_reads/2026-10-30_author-blog-b")]
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
 MODEL_NAME = "the model"
@@ -55,7 +58,7 @@ def load(p: Path) -> list[dict]:
 def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dict]:
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     rng, out = random.Random(SEED), []
-    for r in (r for d in (ABLATES_X2 if X2 else ABLATES) for r in load(d / "pairs_scored.jsonl")):
+    for r in (r for d in (ABLATES_X2 if X2 else ABLATES) if (d / "pairs_scored.jsonl").exists() for r in load(d / "pairs_scored.jsonl")):
         version = "qwen_wrong" if r["answer"] != r["label"] else "qwen_right"
         if not r["stable"] or version not in versions:
             continue
@@ -103,14 +106,18 @@ def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | No
     need = {c["pair"] for c in cs}
     rows, have = [], set()
     for d in READS:  # the first reads run that has a pair wins
-        if (d / "reads.jsonl").exists():
+        if (d / "reads.jsonl").exists() and (d / "requests.jsonl").exists():
             new = [r for r in _with_offsets(d, tok) if r["id"] in need and r["id"] not in have]
             rows += new
             have |= {r["id"] for r in new}
     (out / "reads").mkdir(parents=True)
     (out / "reads/reads.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
-    msgs = {r["id"]: r["messages"] for d in READS for r in load(d / "requests.jsonl")}  # cfbench.olens.Reads wants them
-    (out / "reads/requests.jsonl").write_text("".join(json.dumps({"id": p, "item": p, "messages": msgs[p]}) + "\n" for p in sorted(have)))
+    msgs = {
+        r["id"]: r["messages"] for d in READS if (d / "requests.jsonl").exists() for r in load(d / "requests.jsonl")
+    }  # cfbench.olens.Reads
+    batch = {r["id"]: k for k, d in enumerate(READS) if (d / "requests.jsonl").exists() for r in load(d / "requests.jsonl")}
+    rows_req = [{"id": p, "item": p, "messages": msgs[p], "batch": batch[p]} for p in sorted(have)]  # batch: the placebo stays within it
+    (out / "reads/requests.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows_req))
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
     print(f"{len(cs)} cases ({sum(c['positive'] for c in cs)} positive) from {len(need)} pairs; reads for {len(have & need)} pairs")
 
@@ -151,7 +158,8 @@ def placebo(path: Path, own: str, seed: int) -> str:
     rows, _ = inline._reads(path)
     n = lambda s: len(inline._positions(rows[s]))
     attr = own.split(":")[1]
-    same = [s for s in sorted(rows) if s != own and s.split(":")[1] == attr]
+    batch = {r["id"]: r.get("batch", 0) for r in load(path / "requests.jsonl")}  # the first 2,004 bloggers' cases keep their placebos
+    same = [s for s in sorted(rows) if s != own and s.split(":")[1] == attr and batch[s] == batch[own]]
     pool = [s for s in same if n(s) >= n(own)] or sorted(same, key=n)[-5:]
     return random.Random(f"{seed}:{own}").choice(pool)
 
