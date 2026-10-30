@@ -124,8 +124,11 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
         for side in ("left", "bottom"):
             ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
-    axes[0].set_ylim(0, 1)
-    axes[0].set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1], ["0%", "20%", "40%", "60%", "80%", "100%"])
+    # the axis stops just above the tallest whisker and its labels, as the page's answer chart does
+    top = min(1, math.ceil((max(hi for d in data.values() for _, (_, hi), _ in d[0].values()) + 0.1) * 10) / 10)
+    ticks = np.arange(0, top + 1e-9, 0.1 if top <= 0.6 else 0.2)
+    axes[0].set_ylim(0, top)
+    axes[0].set_yticks(ticks, [f"{t:.0%}" for t in ticks])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
     axes[0].set_ylabel(ylabel)
     axes[-1].text(1.0, data[list(evals)[-1]][1], f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S,
