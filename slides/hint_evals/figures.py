@@ -139,9 +139,10 @@ def panels(evals: dict[str, str], bars_of, chance_label: str, ylabel: str, path:
         for side in ("left", "bottom"):
             ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
-    # the axis stops just above the tallest whisker and its labels, as the page's answer chart does
-    top = min(1, math.ceil((max(hi for d in data.values() for _, (_, hi), _ in d[0].values()) + 0.1) * 10) / 10)
-    ticks = np.arange(0, top + 1e-9, 0.1 if top <= 0.6 else 0.2)
+    # the axis stops just above the tallest whisker's labels, not at the next round number (Kylie, 2026-10-30); gridlines
+    # every 10% below it
+    top = max(hi for d in data.values() for _, (_, hi), _ in d[0].values()) + 0.07
+    ticks = np.arange(0, top, 0.1)
     axes[0].set_ylim(0, top)
     axes[0].set_yticks(ticks, [f"{t:.0%}" for t in ticks])
     axes[0].tick_params(axis="y", labelcolor=MUTED)
