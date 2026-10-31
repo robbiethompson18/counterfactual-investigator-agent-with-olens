@@ -75,6 +75,20 @@ TODO @Kylie plz add your appendices with your data here
 
 TODO fix this to use qwen 3.6 27b if we can, then use our jlens / olens / NLA.
 
+### Blog sentence deletion
+
+On 1,316 selected sentence deletions from 520 bloggers, we predict whether deleting a sentence
+substantially lowers Qwen's confidence in its answer about the author's age or sex. Text-only Haiku
+scores 0.797 AUROC, Haiku with O-lens reads 0.803, and a standalone linear probe 0.784. The O-lens
+gain over text-only is not statistically significant; the standalone probe is also below text-only
+on this metric. The probe is supervised on this deletion task with bloggers held out, and its
+configuration was chosen during exploration of this dataset.
+
+<img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with O-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
+
+The chart shows the probe alone. Details and the separate ensemble analysis are in
+[Author evidence](author-mcq-probe.md). Regenerate with `uv run python -m graphs.author_blog_drop`.
+
 ## Part 1: Simple Investigations That Work
 
 All of our environments that work, with the exception of essay grading, are ideas stolen from

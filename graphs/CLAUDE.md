@@ -62,6 +62,8 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `chive_inline`: AUROC on CHIVE's official yes/no claims, Haiku with vs without the model's reply,
   beside CHIVE's Opus 4.8 transcript and resampling arms, one panel per target, plus the paired
   difference (`docs/chive-inline.md`)
+- `author_blog_drop`: blog sentence-deletion AUROC, text-only Haiku, Haiku with O-lens and the
+  standalone L2 probe; reported blogger-bootstrap CIs, no ensemble (`docs/author-mcq-probe.md`)
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)
