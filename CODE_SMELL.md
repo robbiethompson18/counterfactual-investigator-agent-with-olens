@@ -23,15 +23,6 @@ lists, checked against the source evals' saved counts. The same-count placebo gu
 effect on uplift is unmeasured, and Robbie deferred these reruns too; historical inputs and results,
 including the two missing cases, remain unchanged.
 
-## 2026-10-31: `honest_score_predict --provider` is a no-op
-
-`scripts/honest_score_predict.py` pins a provider by wrapping `openrouter.chat` in
-`functools.partial(..., provider=...)`, but `cfbench.predict.predict` passes `provider=PROVIDER`
-(None unless `$CFBENCH_PROVIDER`) explicitly, and a call's keyword beats the partial's, so the pin
-never reaches OpenRouter. Use `CFBENCH_PROVIDER='{"order": [...], "allow_fallbacks": false}'`
-instead, or drop the flag. (`--google-key` wraps `chat` the same way with `key_env`, which `predict`
-doesn't pass, so that one works.)
-
 ## 2026-10-29: `links.json` is built from the local runs only
 
 `spec.build_links` writes `envs/<env>/links.json` (per episode: Docent run, primary value, O-lens
@@ -138,11 +129,6 @@ answer task.
 id, and then needed a derived `cfbench/wrong_mcq/` dir that merges the header rows back under the
 plain id so they join rollout sources. Fix: let `turn_starts` add to the stop positions in one row
 (or have `olens.Reads` strip a `|suffix`).
-
-## 2026-10-26: old-lens w/ CoT runs still in `cfbench.scoring.groups()`
-
-`2026-10-22_gflash-olens-v2-{exfil,inline-b}` stay in `groups()` only for `--allow-old-lens`; drop
-them when the thinking-on reruns land.
 
 ## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
 
