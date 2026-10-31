@@ -32,6 +32,8 @@ def auroc(p: np.ndarray, y: np.ndarray) -> float:
 
 def metrics(ps: dict, truth: dict, keys: list) -> dict[str, float]:
     """`ps`: case -> its draws' scores (or one score, for a rule with no draws), each draw one prediction."""
+    if not keys:  # a small run may have no clear cases, or two conditions no shared ones
+        return {"right": float("nan"), "brier": float("nan"), "auroc": float("nan")}
     draws = [np.atleast_1d(ps[k]) for k in keys]
     p, y = np.concatenate(draws), np.repeat([truth[k] for k in keys], [len(d) for d in draws])
     return {"right": float(((p >= 0.5) == y).mean()), "brier": float(((p - y) ** 2).mean()),

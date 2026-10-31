@@ -237,16 +237,16 @@ def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
 def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.ndarray]:
     """keys (arm, intro), truth (base mean > arm mean), condition -> scores (cases x draws; a probe has one per case), the
     observed arm mean."""
-    ps: dict[str, dict[tuple, list[float]]] = {}
+    ps: dict[str, dict[tuple, dict[int, float]]] = {}
     truth, arm_mean = {}, {}
     for run in ESSAY_LENS_RUNS:
         for r in essay_lens_rows(run):
             if r.get("valid", True) and r.get("p") is not None:
                 k = (r["base_arm"], r["item"])
-                ps.setdefault(r["condition"], {}).setdefault(k, []).append(r["p"])
+                ps.setdefault(r["condition"], {}).setdefault(k, {})[r["draw"]] = r["p"]  # rows are in completion order
                 truth[k], arm_mean[k] = r["k_cf"], mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
     keys = sorted(truth)
-    xs = {c: np.array([d[k] for k in keys]) for c, d in ps.items()}
+    xs = {c: np.array([[d[k][i] for i in sorted(d[k])] for k in keys]) for c, d in ps.items()}
     for site in ("user_end", "response_start"):
         pr = essay_probe_scores(site)
         assert all(pr[k]["truth"] == truth[k] for k in keys)
