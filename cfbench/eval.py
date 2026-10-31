@@ -30,7 +30,7 @@ import inspect
 import json
 import random
 import re
-from hashlib import sha1, sha256
+from hashlib import sha256
 from pathlib import Path
 
 import anthropic
@@ -369,7 +369,7 @@ async def main():
                 await send()
                 size = 32
             chunk.append(request)
-            keys.append([*key(case | {"predictor": predictor, "draw": draw}, condition), sha1(prompt.encode()).hexdigest()])
+            keys.append(key(case | {"predictor": predictor, "draw": draw}, condition))
             size += request_size
         if chunk:
             await send()
@@ -389,35 +389,32 @@ async def main():
         api = openrouter.anthropic_client()
         jobs = {key(case | {"predictor": p, "draw": d}, c): (env, case, base, c, p, d) for env, case, base, c, p, d in everything}
         done = {key(r, r["condition"]) for r in map(json.loads, out.open())} if out.exists() else set()
-        manifest = run / "batches.jsonl"
-        pending = [json.loads(line) for line in manifest.open()] if manifest.exists() else []
+        pending = [json.loads(line) for line in (run / "batches.jsonl").open()]
         while pending:
             for b in list(pending):
                 if (await api.messages.batches.retrieve(b["batch"])).processing_status != "ended":
                     continue
                 results = {e.custom_id: e.result async for e in await api.messages.batches.results(b["batch"])}
 
-                async def finish_one(i: int, k: list, results: dict, hashes: list | None):
-                    if tuple(k[:-1]) in done:
+                async def finish_one(i: int, k: tuple, results: dict, hashes: list):
+                    if k in done:
                         return
-                    env, case, base, condition, predictor, draw = jobs[tuple(k[:-1])]
+                    env, case, base, condition, predictor, draw = jobs[k]
                     shown = shown_of(base, draw)
                     async with slots:
                         prompt, tools, extra, effort = job(env, case, base, condition, draw, shown)
-                        assert sha1(prompt.encode()).hexdigest() == k[-1], f"{k}: prompt differs from the one submitted"
-                        if hashes:  # older manifests rely on the prompt hash and saved params above
-                            assert request_hash(batch_request(predictor, prompt, tools, effort)) == hashes[i], (
-                                f"{k}: request differs from the one submitted (system, tools, model or effort)"
-                            )
+                        assert request_hash(batch_request(predictor, prompt, tools, effort)) == hashes[i], (
+                            f"{k}: request differs from the one submitted (prompt, system, tools, model or effort)"
+                        )
                         r = results.get(str(i))
                         first = openrouter.claude_reply(r.message) if r and r.type == "succeeded" else None
                         direct = predictor.replace(openrouter.BATCH, openrouter.CLAUDE)
                         result = await predicted(env, case, condition, direct, draw, prompt, tools, effort, first=first)
                     if result:
                         record(env, case, condition, predictor, draw, shown, effort, extra, result)
-                        done.add(tuple(k[:-1]))
+                        done.add(k)
 
-                await asyncio.gather(*(finish_one(i, k, results, b.get("request_hashes")) for i, k in enumerate(b["keys"])))
+                await asyncio.gather(*(finish_one(i, tuple(k), results, b["request_hashes"]) for i, k in enumerate(b["keys"])))
                 pending.remove(b)
                 print(f"collected {b['batch']}; {len(pending)} batches left", flush=True)
             if pending:

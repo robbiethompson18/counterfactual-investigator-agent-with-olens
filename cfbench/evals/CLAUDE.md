@@ -83,23 +83,19 @@ uv run python -m cfbench.eval NAME ... --predictors anthropic-batch/claude-haiku
 uv run python -m environments evals NAME --upload   # the viewer's evals/NAME.json + expview of every conversation
 ```
 
-`--batch submit` builds and sends one batch (1,000 requests) at a time, so memory holds one batch whatever the run's
-size, and writes `batches.jsonl` (each batch id with its requests' predictions and prompt hashes). `--batch collect`, with
-the same other arguments (`--slug` not needed), can run any time after and be rerun: it waits for each batch, writes its
-rows (a reply without a valid submission gets its further turns, an errored request its whole conversation, from
-`anthropic-direct/`), and finishes the run once all have ended. Inline conditions only; `--reuse` works as usual at submit.
-Batches of 1,000 inline prompts took ~10 min on 2026-10-31; Anthropic's cap is 24 h, after which requests expire unbilled.
+`--batch submit` builds and sends one batch (1,000 requests) at a time, so memory holds one batch
+whatever the run's size, and writes `batches.jsonl` (each batch id with its requests' predictions
+and request hashes). `--batch collect`, with the same other arguments (`--slug` not needed), can run
+any time after and be rerun: it waits for each batch, writes its rows (a reply without a valid
+submission gets its further turns, an errored request its whole conversation, from
+`anthropic-direct/`), and finishes the run once all have ended. Inline conditions only; `--reuse`
+works as usual at submit. Batches of 1,000 inline prompts took ~10 min on 2026-10-31; Anthropic's
+cap is 24 h, after which requests expire unbilled.
 
-Collection checks the saved run configuration and each full request (including system prompt, tools
-and effort), and marks a run done only when every expected prediction has a row. Older manifests use
-their saved configuration and user-prompt hashes. Keep `--inputs` pinned to the submitted run if
-newer inputs have since appeared. If predictions are missing, collection saves the partial run as
-abandoned and raises: retry collection for failed replies, or, after an interrupted submission,
-submit a new run with `--reuse OLD_RUN/predictions.jsonl`. Fully reused runs need no API batches.
-API failures and interruptions save the partial run as abandoned through the usual run cleanup. Both
-batch paths count serialized UTF-8 payload bytes, including system prompts and tools, and split at a
-conservative 150 MB budget.
-
+Collect refuses arguments that differ from the submit's (pin `--inputs` if a newer inputs run
+appeared) or a rebuilt request that differs from the one sent, and finishes the run only when every
+prediction has a row; otherwise it marks it abandoned and says so: rerun collect, or after an
+interrupted submit, submit a new run with `--reuse` of this one's rows.
 
 Runs land in `data/runs/cfbench/<date>_<slug>/` like any cfbench run (meta params `eval`, `envs`),
 synced to HF at the end. Slugs ending `-smoke` are left out of the viewer. Gemini 3.8 Flash with 20
