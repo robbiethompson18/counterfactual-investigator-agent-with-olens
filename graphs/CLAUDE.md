@@ -37,7 +37,11 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `menus_inline`: which read positions help (cfbench/evals/menus_inline): O-lens, NLA and J++ each
   at four position menus (prompt punctuation, 9 tail tokens, all, last token) beside their placebos
   and prompt only, pooled over cutoff_qa, favorites_qa, MMLU-Pro and SuperGPQA with each set
-  weighted equally
+  weighted equally; plus `menus-inline-position.png`, each lens's question-reads minus tail-reads
+  with a paired CI
+- `read_positions_diagram`: one real MMLU-Pro prompt as Qwen sees it, every read position coloured
+  by menu (question vs tail, last token boxed), tokens copied from the menus_inline inputs; for the
+  final write-up's "By token position"
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
 - `olens_mandarin`: Mandarin in O-lens bullets and output tokens, before vs after the leading-space
