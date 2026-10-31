@@ -18,6 +18,7 @@ Deviations from the protocol: 5-fold outer CV (not 2), a binary target ("deletin
 Qwen's letter), the eval's own site (the sentence's last token, not user_end / response_start), one fixed layer, no cap.
 
     uv run --with scikit-learn --with scipy python -m scripts.author_probe.period_check RUN   # appends to RUN/results.md
+    uv run --with scikit-learn --with scipy python -m scripts.author_probe.period_check noq RUN ALT   # vs the post-alone capture
 """
 
 import json
@@ -224,5 +225,74 @@ def main(run: Path):
     (run / "scores_l2.jsonl").write_text("".join(json.dumps(r) + "\n" for r in scores))  # seed 0 out-of-fold (slides)
 
 
+def noq(run: Path, alt: Path):
+    """Kylie, 2026-10-31: does the probe need the question asked first? The same cases, labels, sites (the sentence's last
+    token), L48, standard probe and nested combiner, on `alt`'s activations (period_probe inputs-noq: the post alone as the
+    user turn) next to `run`'s (question first). Same folds and seeds. Appends to alt/results.md."""
+    A, index = activations(run)
+    B, alt_index = activations(alt)
+    li = json.loads(next((run / "hs").glob("part-*/layers.json")).read_text()).index(LAYER)
+    lj = json.loads(next((alt / "hs").glob("part-*/layers.json")).read_text()).index(LAYER)
+    by, alt_by = {r["id"]: r for r in index}, {r["id"]: r for r in alt_index}
+    preds: dict[str, dict] = {}
+    for r in load(PRED):
+        if r.get("valid", True) and r.get("p") is not None:
+            preds.setdefault(r["item"], {})[r["condition"]] = r["p"]
+    rows = []
+    for c in load(INPUTS / "cases.jsonl"):
+        if "transcript_inline" not in preds.get(c["item"], {}):
+            continue
+        k = int(c["item"].rsplit("#", 1)[1])
+        ix, jx = by[c["pair"]], alt_by[c["pair"]]
+        n = sum(kd.startswith("s") for kd in ix["kinds"])
+        length = len(c["comment"])
+        rows.append((ix["rows"][ix["kinds"].index(f"s{k}")], jx["rows"][jx["kinds"].index(f"s{k}")], int(c["positive"]),
+                     c["pair"].split(":")[0], preds[c["item"]]["transcript_inline"],
+                     [np.log(length), length, k, n, k / n, k == n - 1, k == 0], c["attr"]))  # fmt: skip
+    Hq = A[[r[0] for r in rows], li].astype(np.float64)
+    Hn = B[[r[1] for r in rows], lj].astype(np.float64)
+    y = np.array([r[2] for r in rows])
+    post = np.array([r[3] for r in rows])
+    haiku = logit(np.array([r[4] for r in rows]))[:, None]
+    struct = np.array([r[5] for r in rows], float)
+    attr = np.array([r[6] for r in rows])
+    res = {
+        (name, sd): nested(H, y, post, haiku, struct, sd) for name, H in (("question first", Hq), ("post alone", Hn)) for sd in range(SEEDS)
+    }
+    out = [
+        "\n## Question first vs post alone (2026-10-31)\n",
+        (
+            f"{len(y)} cases; standard L2 probe at L{LAYER} on the sentence's last token, fully nested, the same folds. Seed 0 with "
+            f"95% CIs resampling bloggers and one-sided p (H1: + probe better); mean ± SD over {SEEDS} fold seeds.\n"
+        ),
+        "| prompt | subset | probe alone | + over Haiku | + over Haiku + length/position | seeds: alone / + Haiku / + len/pos |",
+        "|---|---|---|---|---|---|",
+    ]
+    for name in ("question first", "post alone"):
+        for sub in ("all", "sex", "age"):
+            m = np.ones(len(y), bool) if sub == "all" else attr == sub
+            r = res[name, 0]
+            cells = []
+            for a, b in (("probe", "base"), ("probe_struct", "base_struct")):
+                d, lo, hi, pv = boot_diff(y[m], r[a][m], r[b][m], post[m])
+                cells.append(f"{d:+.3f} [{lo:+.3f}, {hi:+.3f}], p {pv:.3f}")
+            seeds = []
+            for sd in range(SEEDS):
+                q = res[name, sd]
+                seeds.append([auc(y[m], q["probe_alone"][m]), auc(y[m], q["probe"][m]) - auc(y[m], q["base"][m]),
+                              auc(y[m], q["probe_struct"][m]) - auc(y[m], q["base_struct"][m])])  # fmt: skip
+            mu, sdv = np.mean(seeds, 0), np.std(seeds, 0, ddof=1)
+            sd_cell = " / ".join(f"{a_:.3f} ± {b_:.3f}" for a_, b_ in zip(mu, sdv, strict=True))
+            out.append(f"| {name} | {sub} | {auc(y[m], r['probe_alone'][m]):.3f} | {cells[0]} | {cells[1]} | {sd_cell} |")
+    d, lo, hi, pv = boot_diff(y, res["question first", 0]["probe_alone"], res["post alone", 0]["probe_alone"], post)
+    out.append(f"\nProbe alone, question first − post alone: {d:+.3f} [{lo:+.3f}, {hi:+.3f}], one-sided p {pv:.3f}.")
+    with open(alt / "results.md", "a") as f:
+        f.write("\n".join(out) + "\n")
+    print("\n".join(out))
+
+
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    if sys.argv[1] == "noq":  # period_check noq RUN ALT
+        noq(Path(sys.argv[2]), Path(sys.argv[3]))
+    else:
+        main(Path(sys.argv[1]))
