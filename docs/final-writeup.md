@@ -88,19 +88,12 @@ MMLU-Pro questions (Qwen right on 82%) and a random 3,000 of SuperGPQA's 6,328 c
 (Qwen right on 63%). We never filter on Qwen being wrong, so most labels are also the correct
 answer, and we report the Qwen-wrong slice separately.
 
-<!-- @c three sentences on this dataset. Mention how we don't filter on qwen wrong.
-@robbie done. -->
-
 #### Knowledge Cutoff Q&A
 
 We ask Qwen present-tense factual questions whose answer changed around its knowledge cutoff, such
 as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the question. The label
 is Qwen's own modal answer, not the truth, and the only filter is the same 7-of-8 consistency gate.
-We don't filter on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one
-([cutoff-qa-inline.md](cutoff-qa-inline.md), [envs/cutoff_qa.md](envs/cutoff_qa.md)).
-
-<!-- @c three sentences on this dataset. We don't filter on qwen wrong here either
-@robbie done. Correct: no wrong filter, stale and current are both in. -->
+We don't filter on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one.
 
 #### Idiosyncratic Preferences
 
