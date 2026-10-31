@@ -190,11 +190,11 @@
 
 \begin{frame}{Results: “does Qwen's grade go up with the base opener?”}
   \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.58\textwidth}
+    \begin{column}{0.6\textwidth}
       \slidefig{fig/essay.pdf}
     \end{column}
-    \begin{column}{0.4\textwidth}
-      {\bfseries\small Paired differences}{\small\color{muted}\ \ AUROC, 95\% essay bootstrap, one-sided p}\par\smallskip
+    \begin{column}{0.38\textwidth}
+      {\bfseries\small Paired differences}{\small\color{muted}\ \ AUROC, one-sided p (essay bootstrap)}\par\smallskip
       {\tablefont\input{fig/essay_pairs.tex}}
       \medskip
 
@@ -205,7 +205,9 @@
   \source{AUROC of P(up), 1,800 cases (a case's p is the mean of its 3 draws), 95\% CI resampling the 204 essays (a case's
     truth is shared within its essay), stars: one-sided paired bootstrap vs transcript-only, * p < .05, ** < .01, *** < .001.
     Dotted, bet at the mean: rank by minus the arm's observed mean score. Placebo: another opener's reads on the same intro,
-    aligned by position. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.\\
+    aligned by position. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.
+    + bet at mean: logistic regression on [logit of the investigator's p, Qwen's observed mean grade with the arm opener],
+    fit out-of-fold (5 folds grouped by essay); its stars are vs transcript + bet at mean.\\
     † Kylie: probably cursed — a ridge regression trained on Qwen's own grades (5-fold out-of-fold, grouped by essay), fed the
     observed prompt's activations at the last token before the reply, L52.}
 \end{frame}

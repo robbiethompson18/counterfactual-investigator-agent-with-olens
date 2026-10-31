@@ -226,9 +226,12 @@ ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
 # #450) over the essay_probe run 2026-10-31_essay-grading-acts, dumped per case (its probe.json has the summary only);
 # from HF's runs/ when it isn't local; the probe bar is left out if neither has it
 ESSAY_PROBE = "runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
+ESSAY_INVESTIGATORS = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
 ESSAY_GROUPS = [
     ("transcript", ["transcript_inline"]),
     ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+    ("transcript\n+ bet at mean", ["transcript_inline+mean"]),
+    ("O-lens\n+ bet at mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
     ("probe †", ["probe"]),
 ]  # † Kylie: probably cursed (the slide's footnote)
 
@@ -282,11 +285,34 @@ def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.nd
     return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
 
 
+def _logistic(x: np.ndarray, y: np.ndarray, l2: float = 1e-3) -> np.ndarray:
+    w = np.zeros(x.shape[1])
+    for _ in range(50):  # Newton
+        p = 1 / (1 + np.exp(-x @ w))
+        w -= np.linalg.solve(x.T @ (x * (p * (1 - p))[:, None]) + l2 * np.eye(len(w)), x.T @ (p - y) + l2 * w)
+    return w
+
+
+def recalibrated(keys: list[tuple], y: np.ndarray, p: np.ndarray, am: np.ndarray) -> np.ndarray:
+    """The investigator plus bet at the mean, as the essay eval page's combined() (branch claude/essay-grading-probe,
+    score.py): out-of-fold logistic regression on [1, logit(p), the observed arm mean grade], 5 folds grouped by essay."""
+    lp = np.log(np.clip(p, 0.01, 0.99) / (1 - np.clip(p, 0.01, 0.99)))
+    x = np.column_stack([np.ones(len(p)), lp, am])
+    essays = sorted({k[1] for k in keys})
+    fold = {e: i % 5 for i, e in enumerate(np.random.default_rng(0).permutation(essays))}
+    f = np.array([fold[k[1]] for k in keys])
+    out = np.zeros(len(p))
+    for i in range(5):
+        out[f == i] = x[f == i] @ _logistic(x[f != i], y[f != i].astype(float))
+    return out
+
+
 @cache
 def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
     """condition -> (AUROC, 95% CI resampling essays as score.py does, stars: one-sided paired bootstrap vs transcript-only);
     the null (minus the observed arm mean: regression to the mean); n cases; paired differences -> (est, CI, one-sided p)."""
     keys, y, xs, am = essay_cases()
+    xs = xs | {f"{c}+mean": recalibrated(keys, y, xs[c], am) for c in ESSAY_INVESTIGATORS}
     items = sorted({k[1] for k in keys})
     of = {i: np.array([n for n, k in enumerate(keys) if k[1] == i]) for i in items}
     rng = np.random.default_rng(0)
@@ -294,11 +320,14 @@ def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
     boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
     bars = {}
     for c, x in xs.items():
-        st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+        ref = "transcript_inline+mean" if c.endswith("+mean") else "transcript_inline"
+        st = "" if c == ref else stars(float((boot[c] - boot[ref] <= 0).mean()))
         bars[c] = (rank_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     pairs = {}
     for a, b in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"),
-                 ("olens_placebo_inline", "transcript_inline"), ("probe", "transcript_inline")]:  # fmt: skip
+                 ("olens_placebo_inline", "transcript_inline"), ("probe", "transcript_inline"),
+                 ("olens_inline+mean", "transcript_inline+mean"), ("olens_inline+mean", "olens_placebo_inline+mean"),
+                 ("olens_placebo_inline+mean", "transcript_inline+mean")]:  # fmt: skip
         if a in boot:
             d = boot[a] - boot[b]
             pairs[a, b] = (bars[a][0] - bars[b][0], np.quantile(d, [0.025, 0.975]).tolist(), float((d <= 0).mean()))
@@ -324,12 +353,12 @@ def essay_flips() -> tuple[int, int]:
 def essay() -> None:
     """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null."""
     bars, null, n, _ = essay_auroc_bars()
-    fig, ax = figure(84, FULL_H)
+    fig, ax = figure(90, FULL_H)
     xs, ticks = positions(bars, ESSAY_GROUPS)
     base = 0.5
     for c, x in xs.items():
         v, (lo, hi), st = bars[c]
-        ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
+        ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c.removesuffix("+mean")))
         ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
         ax.annotate(f"{v:.3f}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
@@ -360,10 +389,12 @@ def essay_tables() -> None:
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
             "olens_placebo_inline": r"\swp{olens}\ placebo", "probe": r"\sw{probe}\ probe†"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
-    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {d:+.3f} & [{lo:+.3f}, {hi:+.3f}] & {pf(p)}\\\\"
-            for (a, b), (d, (lo, hi), p) in pairs.items()]  # fmt: skip
+    cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
+    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
+            for a, b in pairs if not a.endswith("+mean")]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
-    (OUT / "essay_pairs.tex").write_text(tab("lrrr", [" & $\\Delta$ & 95\\% CI & p\\\\", "\\hline", *rows]))
+    head = [r" & \multicolumn{2}{c}{investigator} & \multicolumn{2}{c}{+ bet at mean}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
+    (OUT / "essay_pairs.tex").write_text(tab("lrrrr", [*head, "\\hline", *rows]))
     cols = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
     head = " & ".join(["arm's mean", "cases", *(name[c] for c in cols)]) + "\\\\"
     body = []
