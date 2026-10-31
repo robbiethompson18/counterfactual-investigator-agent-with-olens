@@ -310,6 +310,8 @@ Active docs:
   names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
   linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
   90%
+- [REFERENCE: essay_grading_cf_inline — read before quoting the essay counterfactual eval, or comparing O-lens, NLA and J++ on it](docs/essay-grading-cf-inline.md)
+  — 1,800 cases, Haiku at medium, per-draw AUROC: O-lens 0.775 vs placebo 0.757 vs transcript 0.753; NLA and J++ about level; probes 0.86-0.89
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic

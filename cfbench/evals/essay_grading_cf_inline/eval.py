@@ -35,6 +35,7 @@ INPUTS_FROM = "essay_grading_inline"
 VERSIONS: dict[str, dict] = {"cf": {}}  # pass --inputs (the essay_grading_inline inputs run, made as version "bare")
 CONDITIONS = base_eval.CONDITIONS
 INLINE_EFFORT = base_eval.INLINE_EFFORT
+RUNS = ["2026-10-31_essay-cf-b-ts", "2026-10-31_essay-cf-b-olens2", "2026-10-31_essay-cf-b-nla4", "2026-10-31_essay-cf-b-jlens"]
 BEHAVIOR = "Whether the model's mean score on the edited prompt is higher than on the prompt shown."
 
 SETUP = """\

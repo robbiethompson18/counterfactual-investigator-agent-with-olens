@@ -200,10 +200,11 @@
       intros, 1,800 cases; the counterfactual is the \cond{basetpl}{base opener} ``A student in my class wrote this essay.''
     \item Qwen3.6-27B (thinking off) grades every prompt 7--8 times; truth: its mean score with the base opener is higher
       than with the arm's (54\% of cases)
-    \item The investigator (Haiku 5.5, effort low, one turn, no tools) sees the arm prompt and all of Qwen's replies and
+    \item The investigator (Haiku 5.5, effort medium, one turn, no tools) sees the arm prompt and all of Qwen's replies and
       scores, and gives P(the mean score goes up with the base opener)
     \item \olens: bullets with FVE at the \ert{read tokens} of the arm prompt (every punctuation token and the last 10),
-      layers 32--60; never the base prompt. Placebo: another opener's reads on the same intro, by position
+      layers 32--60, as for \cond{nla}{NLA} and \cond{jlens}{J++}; never the base prompt. Placebo: another opener's reads on a
+      different intro of the same topic, by position
   \end{itemize}
   \medskip
   \begin{columns}[T, onlytextwidth]
@@ -226,7 +227,7 @@
         {\color{basetpl}base}:\ \ \ \ \ \ \ \ \ 3/10 ×\,5, 4/10 ×\,2 (mean 3.29): up\par
       \end{prompt}
       \medskip
-      {\sffamily\scriptsize\color{muted}P(up), mean of 3 draws:}\ {\tablefont\transcript\ 0.65,\ \ \olens\ 0.82,\ \ \swp{olens}\ placebo 0.43}
+      {\sffamily\scriptsize\color{muted}P(up), mean of this case's 3 draws:}\ {\tablefont\transcript\ 0.47,\ \ \olens\ 0.77,\ \ \swp{olens}\ placebo 0.70}
     \end{column}
     \begin{column}{0.5\textwidth}
       {\bfseries\small O-lens at the \ert{\nlg} after \st{im\_end}}{\small\color{muted}\ \ L52, bullets with FVE}\par\smallskip
@@ -258,9 +259,9 @@
       \slidefig{fig/essay_diffs.pdf}
     \end{column}
   \end{columns}
-  \source{AUROC of P(up) (a case's p: the mean of its 3 draws), 95\% CI resampling the 204 essays, per condition; stars and the difference plot are paired (same resamples),
+  \source{AUROC of P(up) over all 5,400 draws (each draw is one prediction), 95\% CI resampling the 204 essays, per condition; stars and the difference plot are paired (same resamples),
     stars one-sided vs transcript-only, * p < .05, ** < .01, *** < .001.
-    Dotted, bet at the mean: rank by minus the arm's observed mean score. Legacy placebo (contaminated): another opener's reads on the same intro, sometimes the counterfactual itself. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.
+    Dotted, bet at the mean: rank by minus the arm's observed mean score. Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
     + bet at mean: logistic regression on [logit of the investigator's p, Qwen's observed mean grade with the arm opener],
     fit out-of-fold (5 folds grouped by essay); stars vs transcript + bet at mean.\\
     Probes: ridge predicting Qwen's plain-opener grade from the observed prompt's activations, minus its observed grade.
