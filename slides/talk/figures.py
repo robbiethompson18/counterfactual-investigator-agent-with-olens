@@ -461,7 +461,7 @@ def grader() -> None:
     for g, (_, bars, hatch) in enumerate(groups):
         for j, r in enumerate(("A", "B")):
             x, (v, lo, hi) = g * 2.4 + j * 0.85, bars[r]
-            ax.bar(x, v, 0.8, color=RUNS[r][0], hatch=hatch, edgecolor="none", hatchcolor=to_hex(np.array(to_rgb(RUNS[r][0])) * 0.6))
+            ax.bar(x, v, 0.8, color=RUNS[r][0], hatch=hatch, edgecolor=to_hex(np.array(to_rgb(RUNS[r][0])) * 0.6), lw=0)
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             ax.annotate(
                 f"{v:.1%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK

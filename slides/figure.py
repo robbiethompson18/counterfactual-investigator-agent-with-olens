@@ -30,9 +30,12 @@ _bar_kw = graphs.style.bar_kw
 
 
 def bar_kw(c: str) -> dict:
-    """graphs.style.bar_kw with a placebo's stripes in the slide background colour instead of black (Kylie, 2026-10-30)."""
+    """graphs.style.bar_kw with a placebo's stripes in the slide background colour instead of black (Kylie, 2026-10-30).
+    The stripes take their colour from edgecolor, not `hatchcolor`: Chrome's PDF viewer (PDFium) draws a hatch with
+    edgecolor "none" as a solid bar, so the placebo bars had no stripes there (Preview and pdftoppm showed them). lw 0
+    keeps the outline invisible (2026-10-31)."""
     kw = _bar_kw(c)
-    return {**kw, "edgecolor": "none", "hatchcolor": BG} if kw["hatch"] else kw
+    return {**kw, "edgecolor": BG, "lw": 0} if kw["hatch"] else kw
 
 
 graphs.style.bar_kw = bar_kw  # ty: ignore[invalid-assignment]  # so diff_rows' swatches get the slide stripes too
