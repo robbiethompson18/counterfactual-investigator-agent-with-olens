@@ -4,7 +4,7 @@
 
 Per condition: % right (guess = p >= 0.5, per case the mean over draws), AUROC of the mean p (up vs not), Brier, each with
 a 95% CI resampling essays (truths are per essay); the same on the clear cases (|shift| >= 0.5 points); then every paired
-difference against olens_inline over the same cases.
+difference in PAIRS (each lens vs its placebo, vs transcript-only and vs the O-lens) over the same cases.
 """
 
 import json
@@ -19,7 +19,9 @@ from cfbench.core import canon_condition
 
 BOOT = 1000
 PROBE = Path("data/runs/essay_probe/2026-10-31_essay-grading-acts/probe.json")  # probe.py's output
-PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
+PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"),
+         ("nla_inline", "nla_placebo_inline"), ("nla_inline", "transcript_inline"), ("nla_inline", "olens_inline"),
+         ("jlens_inline", "jlens_placebo_inline"), ("jlens_inline", "transcript_inline"), ("jlens_inline", "olens_inline"))  # fmt: skip
 
 
 def auroc(p: np.ndarray, y: np.ndarray) -> float:
@@ -145,7 +147,8 @@ def PAGE(rows: list[dict]) -> str:
             ps[canon_condition(r["condition"])][k].append(r["p"])
             truth[k], shift[k] = r["k_cf"], r["shift"]
     mp = {c: {k: float(np.mean(v)) for k, v in d.items()} for c, d in ps.items()}
-    order = [c for c in ("transcript_inline", "olens_inline", "olens_placebo_inline") if c in mp]
+    order = [c for c in ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline", "jlens_inline",
+                         "jlens_placebo_inline") if c in mp]  # fmt: skip
     rng = np.random.default_rng(0)
     f3 = lambda x: f"{x:.3f}"
     pfmt = lambda p: "< 0.001" if p < 0.001 else f"= {p:.3f}"
@@ -225,14 +228,14 @@ def PAGE(rows: list[dict]) -> str:
         )
         out.append(table(["difference", "AUROC", "% right", "Brier (lower is better)"], pair_rows))
     out.append("<h3>AUROC by opener group</h3>")
+    lenses = [x for x in ("olens_inline", "nla_inline", "jlens_inline") if x in mp and x.replace("_inline", "_placebo_inline") in mp]
     body = []
     for g in sorted({group.get(a, "old arms") for a, _ in truth}):
         keys = [k for k in truth if group.get(k[0], "old arms") == g]
         a = {c: metrics(mp[c], truth, [k for k in keys if k in mp[c]])["auroc"] for c in order}
-        body.append(
-            [g, str(len(keys)), *(f3(a[c]) for c in order), f"{a.get('olens_inline', np.nan) - a.get('olens_placebo_inline', np.nan):+.3f}"]
-        )
-    out.append(table(["group", "cases", *(swatch(c) for c in order), "O-lens − placebo"], body))
+        lift = [f"{a[x] - a[x.replace('_inline', '_placebo_inline')]:+.3f}" for x in lenses]
+        body.append([g, str(len(keys)), *(f3(a[c]) for c in order), *lift])
+    out.append(table(["group", "cases", *(swatch(c) for c in order), *(f"{label(x)} − placebo" for x in lenses)], body))
     if PROBE.exists():
         b = json.loads(PROBE.read_text())["best"]
         out.append(

@@ -130,7 +130,10 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
 # think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
 # are byte-identical to 13.
-HARNESS_VERSION = 14
+# 15: essay_grading_inline / essay_grading_cf_inline (Robbie, 2026-10-31): placebo from another arm on a different essay of the
+# same topic, never base (it was the same essay, base allowed), new NLA and J++ conditions, single-turn effort medium. Every
+# other eval's prompts are byte-identical to 14.
+HARNESS_VERSION = 15
 
 
 @dataclass

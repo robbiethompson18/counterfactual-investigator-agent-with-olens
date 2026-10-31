@@ -9,7 +9,10 @@ essays (score.py).
 
 Conditions: `transcript_inline` (prompt + replies), `olens_inline` (plus O-lens reads of the arm's prompt, the one
 observed: every punctuation token and the ten thinking-off tail tokens, layers 32-60), `olens_placebo_inline` (another
-arm's reads on the same essay, segment by segment). No read of the counterfactual prompt is shown.
+arm's reads on a different essay about the same topic, never base's; essay_grading_inline.eval.placebo), and the same pair
+for the all-layer NLA and J++ (essay_grading_inline's docstring). No read of the counterfactual prompt is shown.
+The 2026-10-30 Haiku runs used a same-essay placebo that could pick base (12.7% of draws showed the counterfactual prompt's
+reads) at effort low; compare only runs of the current code (HARNESS_VERSION 15).
 
     uv run python -m cfbench.eval essay_grading_cf_inline --show --conditions olens_inline --limit 1
     uv run python -m cfbench.eval essay_grading_cf_inline --slug essay-cf-haiku --predictors anthropic/claude-haiku-5.5 --draws 3
@@ -22,7 +25,7 @@ from functools import cache
 from pathlib import Path
 
 from cfbench.evals.essay_grading_inline import eval as base_eval
-from cfbench.evals.essay_grading_inline.eval import ENV, OLENS_TEXT, QWEN, RUN, Prompt, _layout, _pool, aligned, block, placebo, request_id
+from cfbench.evals.essay_grading_inline.eval import ENV, QWEN, RUN, Prompt, lens_parts
 from environments._lib.runfolder import LOCAL, read_episodes
 
 ENVS = [ENV]
@@ -31,7 +34,7 @@ TASK = "claim"
 INPUTS_FROM = "essay_grading_inline"
 VERSIONS: dict[str, dict] = {"cf": {}}  # pass --inputs (the essay_grading_inline inputs run, made as version "bare")
 CONDITIONS = base_eval.CONDITIONS
-INLINE_EFFORT = "low"
+INLINE_EFFORT = base_eval.INLINE_EFFORT
 BEHAVIOR = "Whether the model's mean score on the edited prompt is higher than on the prompt shown."
 
 SETUP = """\
@@ -106,11 +109,6 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
     m = mean(obs)
     parts, extra = [SETUP.format(n=sum(obs.values()), dist=_dist(obs), mean=m, text=env.text, replies=replies)], {}
     if condition != "transcript_inline":
-        me = src = request_id(arm, item)
-        if condition == "olens_placebo_inline":
-            src = placebo(case["inputs"], arm, item, seed)
-            extra = {"placebo_sources": [src]}
-        lays = _layout(case["inputs"])
-        parts += [OLENS_TEXT, block(lays[me], aligned(lays[me], lays[src], _pool()[src]))]
+        parts += lens_parts(condition, case["inputs"], arm, item, seed, extra)
     parts.append(TASK_TEXT.format(mean=m))
     return "\n\n".join(parts), extra

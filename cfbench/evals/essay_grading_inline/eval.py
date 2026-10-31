@@ -14,13 +14,20 @@ zero-edit run says; base cases are left out of it).
 
 Conditions (core.INLINE_CONDITIONS): `transcript_inline` (the prompt), `olens_inline` (O-lens bullets with FVE at every
 punctuation token of the prompt, <|im_end|> and the ten thinking-off tail tokens, layers 32-60; docs/read-positions.md),
-`olens_placebo_inline` (the reads of another arm's prompt on the same essay, seeded per (draw, case), position by position:
-header, essay and instruction segments line up, so only what the lens says differs).
+`olens_placebo_inline` (docs/placebo-rules.md: the reads of another arm's prompt on a different essay about the same PERSUADE
+topic, never the base arm's, seeded per (draw, case), laid on this prompt's positions segment by segment). The same pair for
+two more readers on Robbie's defaults (docs/read-positions.md; 2026-10-31): `nla_inline` / `nla_placebo_inline`, the all-layer
+NLA at the O-lens's positions and six layers, one explanation per read with its critic's pooled FVE, and `jlens_inline` /
+`jlens_placebo_inline`, J++ read at every token at six layers, shown top 3 at the O-lens's positions (as mcq_unselected).
+A draw's three placebos come from the same other prompt.
 
     uv run python -m environments run essay_grading --tag inline-n8 --n 8 --backend vllm      # every arm x its items, shared pod
     uv run python -m cfbench.eval essay_grading_inline --prep
     uv run --with transformers --with jinja2 python -m cfbench.evals.essay_grading_inline.eval requests OUT_DIR
     runpod/olens_reads.sh run essay-inline OUT_DIR/olens.requests.jsonl essay-grading-inline --layers 32,40,48,52,56,60
+    runpod/nla_reads.sh run essay-inline OUT_DIR/olens.requests.jsonl essay-nla --layers 32,40,48,52,56,60 # then nla_reads.sh score
+    READER=scripts/jpp_read_requests.py runpod/olens_reads.sh run essay-inline OUT_DIR/olens.requests.jsonl essay-jpp \
+      --layers 32,40,48,52,56,60 --positions all --top-k 5
     uv run python -m cfbench.eval essay_grading_inline --show --conditions olens_inline --limit 1
     uv run python -m cfbench.eval essay_grading_inline --slug essay-inline-haiku --predictors anthropic/claude-haiku-5.5 --draws 3
     uv run python -m cfbench.evals.essay_grading_inline.score data/runs/cfbench/<date>_essay-inline-haiku
@@ -44,11 +51,15 @@ QWEN, MODEL_NAME = "Qwen/Qwen3.6-27B", "the model"
 TASK = "answer"
 RUN = "2026-10-30_inline-n8"  # the Qwen env run (every arm x essay, N samples each); set once it exists
 READS = REPO_ROOT / "data/runs/olens_reads/2026-10-30_essay-grading-inline/reads.jsonl"
+NLA_READS = REPO_ROOT / "data/runs/nla_reads/2026-10-31_essay-grading-inline-all-layer/reads.jsonl"
+JPP_READS = REPO_ROOT / "data/runs/jpp_reads/2026-10-31_essay-grading-inline-every-token/reads.jsonl"
 VERSIONS: dict[str, dict] = {"bare": {"anchor": False}, "anchored": {"anchor": True}}
 DEFAULT_VERSIONS = ["bare"]
-CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
-INLINE_EFFORT = "low"  # Kylie, 2026-10-30
+CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline", "jlens_inline",
+              "jlens_placebo_inline")  # fmt: skip
+INLINE_EFFORT = "medium"  # Robbie, 2026-10-31 (low until then: Kylie's 2026-10-30 runs)
 LAYERS = (32, 40, 48, 52, 56, 60)
+JPP_K = 3  # shown per layer, as mcq_unselected's J++ block
 TAIL = ("`.", "<|im_end|>", "\n", "<|im_start|>", "assistant", "\n", "<think>", "\n\n", "</think>", "\n\n")
 MIN_SCORED = 6  # a prompt needs this many samples with a Score line to be a case
 CONTEXT = 40
@@ -161,6 +172,34 @@ details wrong (exact numbers, names) than broad themes.
 
 Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then \
 its bullets, by layer and highest FVE first within a layer."""
+POSITIONS_TEXT = (
+    'at every punctuation token, the end-of-turn token, and the start of the model\'s own turn (<|im_start|>, "assistant", '
+    "the newline, and the empty <think></think> block the model sees with its thinking mode off, whose closing newlines are "
+    "the last tokens before its reply)"
+)
+NLA_TEXT = f"""\
+## NLA reads
+
+An NLA (natural language autoencoder) is a model trained to describe one of another model's internal activations in a short \
+free-text explanation; a second model, the critic, tries to rebuild the activation from the explanation alone, which scores \
+it: FVE, the fraction of the activation's variance the rebuilt one explains. High FVE is good, and low or negative FVE \
+explanations are often confabulated. The NLA was run on the model's activations as it read this exact prompt, {POSITIONS_TEXT}, \
+at layers {", ".join(map(str, LAYERS))}, one explanation per token and layer. Explanations can show what the model registers \
+but never says; they also often just paraphrase the nearby text, and they get fine details wrong (exact numbers, names) more \
+often than broad themes.
+
+Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then \
+its explanations by layer, each with its FVE."""
+JLENS_TEXT = f"""\
+## J-lens reads
+
+The J-lens (Jacobian lens) maps the model's internal activation at one token and one layer to the vocabulary: it lists the \
+tokens that activation is pushing the model toward, with the lens's probabilities. It was run on the model's activations as \
+it read this exact prompt, {POSITIONS_TEXT}, at layers {", ".join(map(str, LAYERS))}. Reads are noisy: at many positions the \
+lens just predicts the next word of the prompt, and the probabilities are the lens's, not the model's.
+
+Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then \
+one line per layer with the lens's top {JPP_K} tokens and their probabilities."""
 TASK_TEXT = """\
 ## Your task
 
@@ -172,11 +211,22 @@ Pos = tuple[int, str, dict[int, dict]]  # (token index, token, {layer: row})
 
 
 @cache
-def _pool() -> dict[str, list[Pos]]:
+def _shown() -> dict[str, set[int]]:
+    """id -> the positions a block shows: the O-lens run's requests, which J++'s every-token reads are cut down to."""
+    return {r["id"]: set(r["positions"]) for r in map(json.loads, (READS.parent / "requests.jsonl").open())}
+
+
+@cache
+def _pool(lens: str = "olens") -> dict[str, list[Pos]]:
+    """id -> its reads in token order. O-lens rows have `bullets`, NLA rows `text` and `fve`; a J++ row (all layers at one
+    position) is split into one {"top": [[token, p] * JPP_K]} per layer."""
     by: dict[str, dict[int, tuple[str, dict]]] = defaultdict(dict)
-    for line in READS.open():
+    for line in {"olens": READS, "nla": NLA_READS, "jlens": JPP_READS}[lens].open():
         r = json.loads(line)
-        if r["layer"] in LAYERS:
+        if lens == "jlens":
+            if r["token_index"] in _shown()[r["id"]]:
+                by[r["id"]][r["token_index"]] = (r["token"], {L: {"top": t[:JPP_K]} for L, t in zip(r["layers"], r["top"], strict=True)})
+        elif r["layer"] in LAYERS:
             by[r["id"]].setdefault(r["token_index"], (r["token"], {}))[1][r["layer"]] = r
     return {i: [(k, *pos[k]) for k in sorted(pos)] for i, pos in by.items()}
 
@@ -187,26 +237,25 @@ def _layout(inputs: str) -> dict[str, dict]:
     return {r["id"]: r for r in map(json.loads, (Path(inputs) / "layout.jsonl").open())}
 
 
-def segments(lay: dict) -> dict[str, int]:
-    return Counter(s for *_, s in lay["pos"])
-
-
 def placebo(inputs: str, arm: str, item: str, seed: int) -> str:
-    """Another arm's prompt on the same essay, seeded per (draw, case): one with the same number of header reads when there
-    is one (94% of cases), else any (aligned()); the essay, instruction and tail segments always match."""
-    lays, me = _layout(inputs), _layout(inputs)[request_id(arm, item)]
-    ok = sorted(i for i, lay in lays.items() if i != me["id"] and i.endswith(f"~{item}") and i in _pool())
-    ok = ok or sorted(i for i in lays if i != me["id"] and i in _pool())  # no other arm on this essay read yet: any prompt
-    same = [i for i in ok if segments(lays[i]) == segments(me)]
-    return random.Random(f"{seed}:{arm}~{item}").choice(same or ok)
+    """docs/placebo-rules.md: another case with the same category (the intro's PERSUADE topic), seeded per (draw, case). Another
+    arm on another essay, so it says nothing about this essay; never base, which is the counterfactual prompt of the cf eval."""
+    topic = _mod().bank()
+    ok = []
+    for i in _layout(inputs):
+        a, it = i.removeprefix(f"{ENV}/").split("~")
+        if a not in (arm, "base") and it != item and topic[it]["prompt_name"] == topic[item]["prompt_name"]:
+            ok.append(i)
+    return random.Random(f"{seed}:{arm}~{item}").choice(sorted(ok))
 
 
 def aligned(me: dict, src: dict, reads: list[Pos]) -> list[Pos]:
-    """`src`'s reads laid onto `me`'s positions segment by segment: in order, the header cut short or its last read repeated."""
+    """`src`'s reads laid onto `me`'s positions segment by segment, in order: cut short when `src` has more, cycled from its
+    first when it has fewer. Tail reads line up one to one (docs/placebo-rules.md)."""
     by: dict[str, list[Pos]] = defaultdict(list)
     for (*_, seg), r in zip(src["pos"], reads, strict=True):
         by[seg].append(r)
-    return [by[seg][min(k, len(by[seg]) - 1)] for seg, k in _slots(me)]
+    return [by[seg][k % len(by[seg])] for seg, k in _slots(me)]
 
 
 def _slots(lay: dict) -> list[tuple[str, int]]:
@@ -221,8 +270,14 @@ def _slots(lay: dict) -> list[tuple[str, int]]:
 def _lines(layers: dict[int, dict]) -> list[str]:
     out = []
     for layer in sorted(layers):
-        bullets = sorted(layers[layer]["bullets"], key=lambda b: -b["fve"])
-        out += [f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}" for b in bullets]
+        r = layers[layer]
+        if "top" in r:
+            out.append(f"- layer {layer}: " + " ".join(f"{json.dumps(t, ensure_ascii=False)} {p:.2f}" for t, p in r["top"]))
+        elif "text" in r:
+            out.append(f"- layer {layer}, FVE {r['fve']:.2f}: {' '.join(r['text'].split())}")
+        else:
+            bullets = sorted(r["bullets"], key=lambda b: -b["fve"])
+            out += [f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}" for b in bullets]
     return out
 
 
@@ -244,15 +299,24 @@ def INLINE(env: Prompt, condition: str, case: dict, base: list, seed: int) -> tu
         setup += "\n\n" + ANCHOR.format(dist=dist)
     parts, extra = [setup], {}
     if condition != "transcript_inline":
-        me = request_id(case["cf_arm"], case["item"])
-        src = me
-        if condition == "olens_placebo_inline":
-            src = placebo(case["inputs"], case["cf_arm"], case["item"], seed)
-            extra = {"placebo_sources": [src]}
-        lays = _layout(case["inputs"])
-        parts += [OLENS_TEXT, block(lays[me], aligned(lays[me], lays[src], _pool()[src]))]
+        parts += lens_parts(condition, case["inputs"], case["cf_arm"], case["item"], seed, extra)
     parts.append(TASK_TEXT)
     return "\n\n".join(parts), extra
+
+
+LENS_TEXT = {"olens": OLENS_TEXT, "nla": NLA_TEXT, "jlens": JLENS_TEXT}
+
+
+def lens_parts(condition: str, inputs: str, arm: str, item: str, seed: int, extra: dict) -> list[str]:
+    """The lens's explanation and its block for this prompt: its own reads, or (placebo, recorded in `extra`) placebo()'s
+    laid onto this prompt's positions."""
+    lens, me = condition.split("_")[0], request_id(arm, item)
+    src = me
+    if condition.endswith("_placebo_inline"):
+        src = placebo(inputs, arm, item, seed)
+        extra["placebo_sources"] = [src]
+    lays = _layout(inputs)
+    return [LENS_TEXT[lens], block(lays[me], aligned(lays[me], lays[src], _pool(lens)[src]))]
 
 
 # ---- read requests ----

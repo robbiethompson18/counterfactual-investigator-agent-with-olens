@@ -220,7 +220,7 @@ async def main():
         "cfbench",
         args.slug,
         description=args.description or f"eval {args.name} ({', '.join(versions)}): {len(cases)} cases, {', '.join(conditions)}",
-        models=[{"name": p, "served_by": "openrouter"} for p in predictors],
+        models=[{"name": p, "served_by": "anthropic" if p.startswith(openrouter.CLAUDE) else "openrouter"} for p in predictors],
         params={
             "env": f"eval:{args.name}",
             "eval": args.name,
