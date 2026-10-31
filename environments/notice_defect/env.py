@@ -25,6 +25,7 @@ way (an error word on the same line, no negation). In `ask` this is the oracle; 
 import re
 
 from environments._lib.core import Ctx, Episode
+from environments._lib.defaults import QWEN_DEEPINFRA_DEFAULTS
 
 # One row per item: type, the kind phrase for the ask prompt, the template, the planted value and its correction, and any
 # extra anchors (lowercase regexes) a flag would name besides `bad` / `good`. Templates keep the defect to one `{x}` span.
@@ -2107,16 +2108,4 @@ REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
 # Matches hint_mcq / essay_grading: Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, evalcue's Qwen
 # model-card sampling per thinking mode. A bare `run notice_defect` sends that request body.
-DEFAULTS = {
-    "model": "qwen/qwen3.6-27b",
-    "backend": "openrouter",
-    "provider": "deepinfra/fp8",
-    "thinking": False,
-    "effort": "medium",
-    "body": "openrouter",
-    "sampling_all_models": True,
-    "sampling": {
-        "on": {"temperature": 1.0, "top_p": 0.95, "presence_penalty": 0.0},
-        "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
-    },
-}
+DEFAULTS = QWEN_DEEPINFRA_DEFAULTS

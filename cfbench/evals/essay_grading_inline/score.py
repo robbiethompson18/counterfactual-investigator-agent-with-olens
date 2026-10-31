@@ -7,7 +7,7 @@ so every modal score counts equally (Qwen's modal is 2 on 41% of cases; "always 
 = per draw, the share of Qwen's samples of that prompt whose score equals the submitted one, averaged over draws then
 cases; `modal` = % of draws naming Qwen's most common score (cfbench.answer's measure); `mae` = mean |submitted - Qwen's
 mean score|. 95% CIs bootstrap arms (an arm's 8 essays resampled together: cases on one arm are correlated). Then every
-paired difference in PAIRS (each lens vs its placebo, vs transcript-only and vs the O-lens) over the same cases, with its CI.
+paired difference in PAIRS over the same cases, with its CI.
 """
 
 import json

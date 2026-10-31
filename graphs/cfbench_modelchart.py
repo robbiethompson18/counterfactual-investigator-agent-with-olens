@@ -12,15 +12,13 @@ import re
 import urllib.request
 from collections import defaultdict
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.transforms import Affine2D
 
 from cfbench.core import canon_condition
-from cfbench.scoring import COLOR, LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.transforms import Affine2D
+from cfbench.scoring import LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
+from graphs.style import INK, MUTED, color
 
 RUNS = "data/runs/cfbench/*modelchart-*"
 DUMB_RUNS = "data/runs/cfbench/*dumbpred-*"  # 2026-10-26 thinking-off predictors (docs/cfbench-dumb-predictors.md)
@@ -42,16 +40,15 @@ DUMB_MODELS = {
     "openai/gpt-6.1-terra": "GPT-6.1 Terra",
     "z-ai/glm-5.3": "GLM 5.3",
 }
-# thinking level as one-hue ordinal steps (green: outside the four condition colours)
-THINKING = {"off": ("off", "#a8dbb5"), "minimal": ("minimal / low", "#3f9e5f"), "low": ("minimal / low", "#3f9e5f")}
-THINKING_ON = ("medium / high", "#0e4d27")
+# thinking level as ordinal warm grays (no condition's colour: it isn't a condition)
+THINKING = {"off": ("off", "#d4d0c6"), "minimal": ("minimal / low", "#8f8a7e"), "low": ("minimal / low", "#8f8a7e")}
+THINKING_ON = ("medium / high", "#3a3833")
 SWEEP_DRAWS = 2  # the Flash sweeps ran draws 0-1; their high-effort/20-call point (from the 3-draw model grid) uses the same two
 # model-chart x axis, in order of what the predictor gets: + transcripts, + O-lens text from another env, + this env's O-lens
 MODEL_AXIS = ["no_transcript", "transcript_agentic", "olens_placebo_agentic", "olens_agentic"]
 LOGOS = "https://cdn.jsdelivr.net/npm/simple-icons@13.21.0/icons/{}.svg"  # CC0 brand icons, one path each
 COMPANY = {"anthropic": "anthropic", "google": "googlegemini", "openai": "openai"}
 BADGE = {"anthropic": ("#f0eee6", "#d97757"), "google": ("white", "#4285f4"), "openai": ("#6e6e6e", "white")}  # (dot, logo)
-INK, MUTED = "#0b0b0b", "#52514e"
 
 
 def acc(rmse_value: float) -> float:
@@ -77,6 +74,14 @@ def load(pattern: str = RUNS) -> list[dict]:
                 seen.add(key)
                 rows.append(row)
     return rows
+
+
+def case_ci(per_case: dict, n_boot: int = 2000) -> tuple[float, float]:
+    """95% case-bootstrap interval of 100 − RMSE. With four cases it's mostly the spread between cases, which every line shares."""
+    mses = np.array(list(per_case.values())) ** 2
+    resamples = np.random.default_rng(0).integers(0, len(mses), (n_boot, len(mses)))
+    lo, hi = np.percentile(100 - 100 * np.sqrt(mses[resamples].mean(axis=1)), [2.5, 97.5])
+    return float(lo), float(hi)
 
 
 def score(rows: list[dict], key) -> dict:
@@ -122,16 +127,16 @@ def logo(predictor: str):
         return "o"
 
 
-def style(ax, s: dict, title: str, xlabel: str):
+def style(ax, s: dict, title: str, xlabel: str, ceiling: bool = True):
     ref = next(iter(s.values()))
     ax.axhline(ref["null"], color=INK, lw=0.8, ls="--", zorder=1)
-    ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
-    ax.text(ax.get_xlim()[0], ref["ceiling"], " ceiling (sampling noise)", va="bottom", fontsize=8, color=MUTED)
+    if ceiling:
+        ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
+        ax.text(ax.get_xlim()[0], ref["ceiling"], " ceiling (sampling noise)", va="bottom", fontsize=8, color=MUTED)
     ax.text(ax.get_xlim()[0], ref["null"], " edit does nothing", va="bottom", fontsize=8, color=INK)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
-    ax.set_title(title, loc="left", fontsize=10.5, color=INK)
-    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_title(title, pad=14)  # clears the ceiling label when the line sits at the top of the axes
 
 
 def model_lines(rows: list[dict], out: str) -> dict:
@@ -149,7 +154,7 @@ def model_lines(rows: list[dict], out: str) -> dict:
         ax.plot(xs, ys, color="#c8c8c8", lw=1.2, zorder=1)
         company, mark = m.split("/")[0], logo(m)
         for x, c, y in zip(xs, MODEL_AXIS, ys, strict=True):
-            ax.scatter(x, y, s=300, color=BADGE[company][0], edgecolor=COLOR[c], lw=2, zorder=2)
+            ax.scatter(x, y, s=300, color=BADGE[company][0], edgecolor=color(c), lw=2, zorder=2)
             ax.scatter(x, y, s=90, marker=mark, color=BADGE[company][1], lw=0, zorder=3)
         ends.append((ys[-1], name))
     label_y = -1e9
@@ -158,11 +163,11 @@ def model_lines(rows: list[dict], out: str) -> dict:
         ax.text(len(MODEL_AXIS) - 1 + 0.15, label_y, name, va="center", fontsize=9)
     ax.set_xticks(list(xs), [LABEL[c] for c in MODEL_AXIS])
     for tick, c in zip(ax.get_xticklabels(), MODEL_AXIS, strict=True):
-        tick.set_color(COLOR[c])
+        tick.set_color(color(c))
     ax.set_xlim(-0.4, len(MODEL_AXIS) - 0.2)
-    style(ax, s, "Predictor model by condition (high effort, 20 tool calls, 4 cases)", "")
+    style(ax, s, "Predictor model by condition (high effort, 20 tool calls, 4 cases)", "", ceiling=False)
     fig.tight_layout()
-    fig.savefig(f"{out}/models.png", dpi=150)
+    fig.savefig(f"{out}/models.png")
     plt.close(fig)
     return s
 
@@ -170,13 +175,15 @@ def model_lines(rows: list[dict], out: str) -> dict:
 def flash_lines(s: dict, xs: list, conditions: list[str], title: str, xlabel: str, path: str):
     fig, ax = plt.subplots(figsize=(6, 4.5))
     for c in conditions:
-        pts = [(i, s[x, c]["acc"]) for i, x in enumerate(xs) if (x, c) in s]
-        ax.plot(*zip(*pts, strict=True), color=COLOR[c], marker="o", lw=2, label=LABEL[c])
+        present = [(i, s[x, c]) for i, x in enumerate(xs) if (x, c) in s]
+        ax.plot([i for i, _ in present], [g["acc"] for _, g in present], color=color(c), marker="o", lw=2, label=LABEL[c])
+        cis = [case_ci(g["per_case"]) for _, g in present]
+        ax.fill_between([i for i, _ in present], [lo for lo, _ in cis], [hi for _, hi in cis], color=color(c), alpha=0.12, lw=0)
     ax.set_xticks(range(len(xs)), [str(x) for x in xs])
     ax.legend(frameon=False, fontsize=9, loc="center right")
     style(ax, s, title, xlabel)
     fig.tight_layout()
-    fig.savefig(path, dpi=150)
+    fig.savefig(path)
     plt.close(fig)
 
 
@@ -255,8 +262,8 @@ def ts_vs_olens(out: str) -> dict:
         ("anthropic/claude-opus-5.5", "high"): -0.4,
     }  # near-overlaps
     for x, y, m, e in pts:
-        level, color = THINKING.get(e, THINKING_ON)
-        ax.scatter(x, y, s=70, color=color, edgecolor=INK, lw=0.6, zorder=3)
+        level, shade = THINKING.get(e, THINKING_ON)
+        ax.scatter(x, y, s=70, color=shade, edgecolor=INK, lw=0.6, zorder=3)
         name = names[m] + (f" ({e})" if sum(p[2] == m for p in pts) > 1 else "")
         if (m, e) in column:
             ax.annotate(
@@ -270,20 +277,19 @@ def ts_vs_olens(out: str) -> dict:
             )
         else:
             ax.annotate(name, (x + 0.35, y + nudge.get((m, e), 0)), va="center", fontsize=8, color=INK)
-    for level, color in dict(THINKING.values()).items() | {THINKING_ON}:
-        ax.scatter([], [], s=70, color=color, edgecolor=INK, lw=0.6, label=f"thinking {level}")
+    for level, shade in dict(THINKING.values()).items() | {THINKING_ON}:
+        ax.scatter([], [], s=70, color=shade, edgecolor=INK, lw=0.6, label=f"thinking {level}")
     handles, labels = ax.get_legend_handles_labels()
     order = [labels.index(f"thinking {lv}") for lv in ("off", "minimal / low", "medium / high")]
-    ax.legend([handles[i] for i in order], [labels[i] for i in order], frameon=False, fontsize=9, loc="upper left")
+    ax.legend([handles[i] for i in order], [labels[i] for i in order], fontsize=9, loc="lower right")
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
     ax.set_aspect("equal")
     ax.set_xlabel("Transcript-only: 100 − RMSE (pp)")
     ax.set_ylabel("With O-lens: 100 − RMSE (pp)")
-    ax.set_title("Transcript-only vs O-lens by predictor (4 cases, 20 tool calls)", loc="left", fontsize=10.5, color=INK)
-    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_title("Transcript-only vs O-lens by predictor (4 cases, 20 tool calls)")
     fig.tight_layout()
-    fig.savefig(f"{out}/ts_vs_olens.png", dpi=150)
+    fig.savefig(f"{out}/ts_vs_olens.png")
     plt.close(fig)
     return s
 

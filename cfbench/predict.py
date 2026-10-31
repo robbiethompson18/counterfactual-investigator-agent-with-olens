@@ -9,12 +9,13 @@ right, for whoever reads the transcript (Robbie, 2026-10-29). Transcript-only, a
 bump, no backfill of older runs. An invalid submission's error never reveals the truth.
 """
 
+import hashlib
 import json
 import os
 from collections import Counter
 from collections.abc import Callable
 
-from openai.types.chat import ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
+from openai.types.chat import ChatCompletion, ChatCompletionFunctionToolParam, ChatCompletionMessageFunctionToolCall
 
 from cfbench import answer
 from cfbench.core import P_MAX, P_MIN
@@ -97,6 +98,23 @@ def grader(task: str, case: dict, env=None) -> Callable[[dict], str]:
     return claim if task == "claim" else rate
 
 
+def opening(prompt: str, tools: dict[str, Tool] | None, task: str, system: str | None) -> tuple[list, list]:
+    """The conversation's first messages and its tool schemas."""
+    default_system, submit, *_ = TASKS[task]
+    messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
+        {"role": "system", "content": system or default_system},
+        {"role": "user", "content": prompt},
+    ]
+    return messages, [submit, *(schema for schema, _ in (tools or {}).values())]
+
+
+def prompt_sha(prompt: str, tools: dict[str, Tool] | None, effort: str, task: str, system: str | None) -> str:
+    """A short hash of what `predict` sends first (messages, tool schemas, effort): cfbench.eval --reuse only copies a row
+    whose stored hash equals the one this run would send. Tool replies (transcripts, lens reads) aren't in it."""
+    messages, schemas = opening(prompt, tools, task, system)
+    return hashlib.sha256(json.dumps([messages, schemas, effort], sort_keys=True).encode()).hexdigest()[:16]
+
+
 async def predict(
     predictor: str,
     prompt: str,
@@ -106,21 +124,22 @@ async def predict(
     task: str = "rate",
     system: str | None = None,
     grade: Callable[[dict], str] | None = None,
+    first: ChatCompletion | None = None,
 ) -> dict:
-    """`system` replaces the task's system prompt (an eval's SYSTEM, cfbench/eval.py); None keeps it."""
-    default_system, submit, check_submission, nudge, empty = TASKS[task]
-    system = system or default_system
+    """`system` replaces the task's system prompt (an eval's SYSTEM, cfbench/eval.py); None keeps it. `first` is the reply to
+    the opening messages when it was already fetched (a Message Batches result, cfbench/eval.py --batch)."""
+    _, submit, check_submission, nudge, empty = TASKS[task]
     submit_name = submit["function"]["name"]
     tools = tools or {}
-    messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
-        {"role": "system", "content": system},
-        {"role": "user", "content": prompt},
-    ]
-    schemas = [submit, *(schema for schema, _ in tools.values())]
+    messages, schemas = opening(prompt, tools, task, system)
     cost, used, submission, tokens = 0.0, Counter(), None, Counter()
-    for _ in range(budget + MAX_TURNS):
+    for turn in range(budget + MAX_TURNS):
         # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
-        r = await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000, provider=PROVIDER)
+        r = (
+            first
+            if turn == 0 and first
+            else await openrouter.chat(predictor, messages, effort=effort, tools=schemas, max_tokens=16000, provider=PROVIDER)
+        )
         cost += getattr(r.usage, "cost", 0) or 0
         if u := r.usage:  # summed over the conversation's calls (harness 12)
             reasoning = u.completion_tokens_details.reasoning_tokens or 0 if u.completion_tokens_details else 0

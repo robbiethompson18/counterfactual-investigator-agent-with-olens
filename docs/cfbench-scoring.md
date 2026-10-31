@@ -54,6 +54,15 @@ prediction is bias² only and falls as draws are added (Jensen), which scores th
 per-draw SE is invariant to duplicating draws; the observed rate is invariant to duplicating target
 rollouts. So neither sampling budget moves the number.
 
+**AUROC, % right and Brier are per draw too (2026-10-31).** Every draw is one prediction: pool all
+of a condition's draws, compute the metric, and resample essays or items for the CI, since a case's
+draws share its truth. Never average a case's draws into p̄ first. Beyond scoring the ensemble, that
+favours any condition whose draws see different input: a placebo draws new reads each time while the
+real lens repeats one set. On `essay_grading_cf_inline` (2026-10-31, Haiku at effort medium, 1,800
+cases) O-lens minus placebo was +0.007 [−0.005, +0.020] AUROC averaged and +0.018 [+0.006, +0.031]
+pooled, and placebo minus transcript went from +0.013 to +0.004. Runs scored before then: check the
+scorer.
+
 **Equal weight per case.** Any weighting by effect size or n reintroduces "which arms did we happen
 to run" as a hidden input. With equal weights, the case list is the only lever, so freeze it: the
 run groups live in `cfbench.scoring.groups()` and nothing else in the charts names a run.

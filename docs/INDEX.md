@@ -125,8 +125,8 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
 - [REFERENCE: cutoff_qa grader mentions — read before claiming O-lens reads show grader / eval awareness from a tool-call template](cutoff-grader-mentions.md)
-  — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer
-  tool); 14% vs 73% of items; regex, no judge
+  — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer tool);
+  14% vs 73% of items; regex, no judge
 
 ## MIXED
 
@@ -270,6 +270,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   question (prompt inversion), and the predictor cites them only to back the hinted answer
 
 ## SUPERSEDED
+
+- [SUPERSEDED: MCQ answer probe — historical option-newline architecture and results](mcq-answer-probe.md)
+  — standard comparisons now use the nested two-fold probes package
 
 - [SUPERSEDED: funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm

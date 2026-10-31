@@ -15,10 +15,6 @@ ROOT = Path(__file__).resolve().parents[2]
 CKPT = ROOT / "checkpoints"
 
 
-def blocks(model):
-    return model.model.layers
-
-
 @dataclass
 class Sampling:
     temperature: float = 0.0  # 0 = greedy
@@ -48,7 +44,6 @@ def trim_bullets(text, k):
 # The agu18dec lens to use: olens_s3d_space_rl600, not olens_s3d_rl600. The older one's RL reward stripped each
 # bullet's leading space before the AR scored it, so it learned to open bullets with a Chinese word (36% of bullets
 # contain Chinese vs 3%, same WorkspaceBench score; agu18dec/olens_and_ar README).
-SPACE_LENS = CKPT / "agu18dec_olens_and_ar/olens_s3d_space_rl600"
 
 
 def bullet_prefix(adapter_dir):

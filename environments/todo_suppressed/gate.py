@@ -20,11 +20,8 @@ prompt is byte-identical to this run's, re-canonicalised with the current env.py
 import argparse
 import asyncio
 import json
-import os
 from collections import Counter
 from typing import Any
-
-import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -96,41 +93,11 @@ def item_table(runs: list[str], min_share: float) -> dict[str, dict]:
     return table
 
 
-GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-
-
-async def google_chat(model: str, prompt: str, client: httpx.AsyncClient, key_env: str, attempts: int = 4) -> tuple[str, str]:
-    """One Gemini call straight to Google (OpenRouter's BYOK route to Gemini was quota-exhausted on 2026-10-27): temperature
-    1.0, thinking level medium (the repo's reasoning-effort rule), no cost field. 429 / 5xx are retried with 15 s, 30 s, 60 s
-    between tries, and a 429 that outlasts that is an error row, not a hammer."""
-    body = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 1.0, "maxOutputTokens": 16000, "thinkingConfig": {"thinkingLevel": "medium"}},
-    }
-    headers = {"x-goog-api-key": os.environ[key_env]}
-    for attempt in range(attempts):
-        r = await client.post(GOOGLE_URL.format(model=model.removeprefix("google/")), json=body, headers=headers, timeout=600)
-        if r.status_code == 429 or r.status_code >= 500:
-            if attempt == attempts - 1:
-                r.raise_for_status()
-            await asyncio.sleep(15 * 2**attempt)
-            continue
-        r.raise_for_status()
-        cand = r.json()["candidates"][0]
-        text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []) if not p.get("thought"))
-        return text, cand.get("finishReason", "")
-    raise RuntimeError("unreachable")
-
-
-async def guess(model: str, prompt: str, sem: asyncio.Semaphore, backend: str, client: httpx.AsyncClient, key_env: str) -> dict:
+async def guess(model: str, prompt: str, sem: asyncio.Semaphore, key_env: str) -> dict:
     async with sem:
         try:
-            if backend == "google":
-                raw, finish = await google_chat(model, prompt, client, key_env)
-                cost = 0.0
-            else:
-                r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000)
-                raw, finish, cost = r.choices[0].message.content or "", r.choices[0].finish_reason, getattr(r.usage, "cost", None) or 0.0
+            r = await openrouter.chat(model, [{"role": "user", "content": prompt}], temperature=1.0, max_tokens=16000, key_env=key_env)
+            raw, finish, cost = r.choices[0].message.content or "", r.choices[0].finish_reason, getattr(r.usage, "cost", None) or 0.0
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, never a match
             return {"guess_raw": None, "guess": None, "minimal": None, "error": f"{type(e).__name__}: {e}"[:300], "cost": 0.0}
     form = canon_answer(raw)
@@ -148,7 +115,7 @@ async def main():
         "--backend",
         choices=["openrouter", "google"],
         default="openrouter",
-        help="openrouter (the brief's setup) or google = the generativelanguage API, the fallback when OpenRouter's BYOK route 429s",
+        help="openrouter (the brief's setup) or google = the gemini-direct/ route, the fallback when OpenRouter's BYOK route 429s",
     )
     ap.add_argument(
         "--google-key-env",
@@ -169,7 +136,7 @@ async def main():
         a.slug,
         description=f"text-inversion gate over {a.runs}: {a.model} writes the implement arm from the leave_todo transcript, pass@{a.n}",
         models=[
-            {"name": a.model, "served_by": f"google-direct, {a.google_key_env}, thinking medium" if a.backend == "google" else "openrouter"}
+            {"name": a.model, "served_by": f"google-direct, {a.google_key_env}, effort medium" if a.backend == "google" else "openrouter"}
         ],
         params={
             "runs": a.runs,
@@ -202,8 +169,8 @@ async def main():
                 kept[it].append({**s, "finish": row.get("finish"), "cost": row.get("cost", 0.0), "reused_from": prior})
     todo = [it for it in items for _ in range(a.n - len(kept[it]))]
     print(f"reusing {sum(map(len, kept.values()))} guesses, requesting {len(todo)}")
-    async with httpx.AsyncClient() as client:
-        fresh = iter(await asyncio.gather(*(guess(a.model, prompts[it], sem, a.backend, client, a.google_key_env) for it in todo)))
+    model = openrouter.DIRECT + a.model.removeprefix("google/") if a.backend == "google" else a.model
+    fresh = iter(await asyncio.gather(*(guess(model, prompts[it], sem, a.google_key_env) for it in todo)))
     results = [s for it in items for s in kept[it] + [next(fresh) for _ in range(a.n - len(kept[it]))]]
     (run / "raw_results.json").write_text(json.dumps({"items": items, "n": a.n, "results": results}))  # scoring can't lose paid calls
     verdicts: list[dict[str, Any]] = []

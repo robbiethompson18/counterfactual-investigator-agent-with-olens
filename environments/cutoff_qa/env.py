@@ -30,6 +30,7 @@ import json
 import os
 import re
 import unicodedata
+from collections import Counter
 from functools import cache
 
 from counterfactual_investigator_agent_with_olens.qwen import MODEL as SERVED_NAME
@@ -92,6 +93,22 @@ def norm(s: str) -> str:
     return " ".join(s.split())
 
 
+@cache
+def _gate_samples(gate_run: str) -> dict[str, dict]:
+    path = REPO_ROOT / "data/runs/cutoff_gate" / gate_run.removeprefix("cutoff_gate/") / "samples.jsonl"
+    return {r["id"]: r for r in map(json.loads, path.read_text().splitlines())}
+
+
+def gate_label(gate_run: str, item: str, modal: str) -> str:
+    """The predict-Qwen label: the gate's modal answer in `norm` form, taken from the raw samples. The gate clusters samples
+    with its own normalizer (scripts/cutoff_gate.py: "N'Djamena" -> "n djamena"), and norm() of that string keeps the space
+    where norm() of the answer itself drops the apostrophe ("ndjamena"), so a predictor saying exactly what Qwen says was
+    marked wrong on 17 of 1,849 tool-set labels (fixed 2026-10-31; favorites_qa stores a raw sample for the same reason)."""
+    r = _gate_samples(gate_run)[item]
+    forms = Counter(norm(t) for t, n in zip(r["samples"], r["samples_norm"], strict=True) if n == modal)
+    return forms.most_common(1)[0][0]
+
+
 def analog_key(analog: str | None) -> str | None:
     """A v1 analog's comparison form: the text before any parenthetical ("sonoma (macOS 14, 2023)" -> "sonoma")."""
     return norm(analog.split("(")[0]) or None if analog else None
@@ -112,9 +129,11 @@ def measure(ep) -> dict:
     answer = norm(reply)
     truths = {norm(t) for t in [meta["truth"], *meta.get("truth_aliases", [])]} - {""}
     stale = stale_key(meta)
+    correct = answer in truths
     return {
         "answer": answer,
-        "correct": answer in truths,
+        "positive": not correct,  # Qwen is wrong; ambiguous: also counts off-script wrong answers and alias misses, not only outdated facts
+        "correct": correct,
         "contains_truth": any(_contains(t, answer) for t in truths),
         "stale": None if stale is None else answer == stale,
         "contains_stale": None if stale is None else _contains(stale, answer),
@@ -123,7 +142,7 @@ def measure(ep) -> dict:
 
 BEHAVIOR = (
     "Positive (`correct`) if the reply, normalized, equals the item's truth or one of its aliases; "
-    "`stale` = it equals Qwen's gated modal answer."
+    "`stale` = it equals Qwen's gated modal answer; `positive` = not correct."
 )
 PRIMARY = "correct"
 PAIRS: dict = {}  # one arm, no counterfactual pair

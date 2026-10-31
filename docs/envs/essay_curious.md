@@ -145,7 +145,7 @@ Mean shift from the no-scenario arm: Duke −0.67 (up to −2.75 on `grandmother
 admissions bar the essay doesn't clear. It runs against the sycophancy prior ("I wrote this" makes
 Qwen harsher), the setting where hidden_goal's lens uplift came from.
 
-**Prediction: Duke → no scenario, 12 cases (2026-10-28).** `scripts/honest_score_predict.py` (fixed
+**Prediction: Duke → no scenario, 12 cases (2026-10-28).** `scripts/honest_score_predict.py` (deleted, at `d89747b4`; fixed
 here to register its own `score` task; since the answer task landed it had silently fallen back to
 the rate task): the investigator sees the Duke arm's rollouts and submits the expected no-scenario
 mean score, scored by squared error. Gemini 3.8 Flash, effort medium, 3 draws, pinned to

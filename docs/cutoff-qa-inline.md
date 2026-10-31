@@ -1,7 +1,13 @@
 # cutoff_qa_inline: predicting Qwen's stale answer from end-of-prompt O-lens, J++ and NLA reads
 
-**Status (2026-10-29):** REFERENCE. 999 items, one investigator (Haiku 5.5), O-lens / J++ / NLA each
-against its own placebo; the caveats below are open. The 200-item smoke further down is superseded
+**Status (2026-10-31):** REFERENCE. 999 items, one investigator (Haiku 5.5), O-lens / J++ / NLA each
+against its own placebo; the caveats below are open. **Labels re-scored 2026-10-31:** the label was
+`norm()` of the gate's already-normalized modal, so an answer with an apostrophe ("N'Djamena" → gate
+`n djamena`, predictor `ndjamena`) could never match; 9 of the 999 and 17 of the 1,849 tool-run
+labels. Fixed in `environments/cutoff_qa/env.py` `gate_label` (label from the gate's raw samples),
+saved runs re-scored with `scripts/regrade_cutoff_labels.py` (no new model calls; the Docent mirrors
+keep the old verdict text). Every condition gains 0.4–0.8pp; each lens − placebo gap moves by
+≤0.3pp. Numbers below are post-regrade. The 200-item smoke further down is superseded
 by the 1k run but kept for its mechanism notes.
 
 **Question.** Can an investigator that never sees Qwen3.6-27B's reply predict the answer it gives to
@@ -60,19 +66,19 @@ the second paired by item. This is the one cutoff chart: every lens goes on it.)
 
 | exact match (%)      | all     | stale   | not stale |
 | -------------------- | ------- | ------- | --------- |
-| transcript only      | 78      | 47      | 94        |
-| O-lens / its placebo | 85 / 77 | 72 / 55 | 92 / 89   |
-| J++ / its placebo    | 83 / 81 | 67 / 59 | 91 / 93   |
-| NLA / its placebo    | 86 / 83 | 73 / 60 | 92 / 95   |
+| transcript only      | 79      | 47      | 95        |
+| O-lens / its placebo | 86 / 78 | 73 / 56 | 92 / 89   |
+| J++ / its placebo    | 83 / 82 | 67 / 60 | 92 / 93   |
+| NLA / its placebo    | 86 / 83 | 74 / 61 | 93 / 95   |
 
-- **Only the O-lens clearly beats its own placebo by much:** +7.6pp [+5.7, +9.5]. NLA beats its
-  MMLU-Pro placebo by +2.8pp [+1.0, +4.6], J++ its placebo by +1.7pp [+0.1, +3.3].
-- **The J++ and NLA placebos aren't neutral:** +3.2pp [+1.7, +4.7] and +4.8pp [+3.5, +6.2] over
-  transcript-only (the O-lens placebo −0.7pp). Haiku reads off-topic reads as noise, then reasons
+- **Only the O-lens clearly beats its own placebo by much:** +7.6pp [+5.8, +9.5]. NLA beats its
+  MMLU-Pro placebo by +3.0pp [+1.2, +4.7], J++ its placebo by +1.6pp [+0.0, +3.2].
+- **The J++ and NLA placebos aren't neutral:** +3.2pp [+1.7, +4.8] and +4.8pp [+3.5, +6.2] over
+  transcript-only (the O-lens placebo −0.6pp). Haiku reads off-topic reads as noise, then reasons
   about the model's training cutoff and gives the stale answer more often; the gain is all on stale
-  items (NLA placebo 60 vs 47). Against transcript-only NLA looks as good as the O-lens (+7.6 vs
-  +6.9pp), but most of that is the placebo effect.
-- O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8]; J++ − NLA −2.7pp [−4.5, −1.0].
+  items (NLA placebo 61 vs 47). Against transcript-only NLA looks as good as the O-lens (+7.8 vs
+  +7.0pp), but most of that is the placebo effect.
+- O-lens − J++ +2.1pp [+0.4, +3.9]; O-lens − NLA −0.9pp [−2.4, +0.7]; J++ − NLA −3.0pp [−4.7, −1.2].
 
 **Read-position ablation** (2026-10-30, Kylie: does the gain need the assistant-turn tokens?). The
 1k run with only some reads shown: the first one or two of the six tail positions (`pos1` = the "."
@@ -87,15 +93,15 @@ positions shown. Runs `cfbench/2026-10-30_cutoff-qa-1k-olens-{pos1,pos2,qpunct,q
 
 | reads                                 | O-lens            | its placebo        | O-lens − transcript-only | O-lens − placebo    |
 | ------------------------------------- | ----------------- | ------------------ | ------------------------ | ------------------- |
-| none (transcript-only)                | 21.9 / 53.3 / 5.8 |                    |                          |                     |
-| "." only                              | 17.9 / 38.2 / 7.5 | 19.3 / 42.7 / 7.3  | −4.0pp [−5.7, −2.2]      | −1.4pp [−2.9, +0.2] |
-| "." + `<\|im_end\|>`                  | 18.4 / 40.9 / 6.8 | 19.3 / 45.1 / 6.0  | −3.6pp [−5.2, −2.0]      | −0.9pp [−2.4, +0.4] |
-| question punctuation                  | 15.2 / 28.5 / 8.3 | 20.6 / 44.4 / 8.4  | −6.7pp [−8.8, −4.7]      | −5.4pp [−7.3, −3.8] |
-| question punctuation + `<\|im_end\|>` | 15.8 / 29.0 / 9.0 | 19.0 / 43.9 / 6.3  | −6.1pp [−8.3, −4.1]      | −3.2pp [−5.0, −1.6] |
-| all six tail (through `assistant\n`)  | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
+| none (transcript-only)                | 21.5 / 52.9 / 5.4 |                    |                          |                     |
+| "." only                              | 17.5 / 38.0 / 7.0 | 18.9 / 42.4 / 6.8  | −4.0pp [−5.7, −2.3]      | −1.4pp [−2.9, +0.2] |
+| "." + `<\|im_end\|>`                  | 17.9 / 40.6 / 6.2 | 18.9 / 44.8 / 5.6  | −3.6pp [−5.2, −2.1]      | −1.0pp [−2.4, +0.4] |
+| question punctuation                  | 14.7 / 28.0 / 7.9 | 20.2 / 44.1 / 7.9  | −6.8pp [−8.8, −4.6]      | −5.5pp [−7.2, −3.7] |
+| question punctuation + `<\|im_end\|>` | 15.3 / 28.6 / 8.5 | 18.5 / 43.5 / 5.7  | −6.1pp [−8.3, −4.0]      | −3.2pp [−4.9, −1.5] |
+| all six tail (through `assistant\n`)  | 14.5 / 27.4 / 7.9 | 22.1 / 44.4 / 10.7 | −7.0pp [−9.2, −4.8]      | −7.6pp [−9.4, −5.7] |
 
-**On cutoff the question's own punctuation is as good as the six tail tokens** (15.2 vs 15.0, and
-28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The signal is at the "?" that ends the
+**On cutoff the question's own punctuation is as good as the six tail tokens** (14.7 vs 14.5, and
+28.0 vs 27.4 on stale items), and beats its placebo by 5.5pp. The signal is at the "?" that ends the
 question proper, before the boilerplate ("If you are not sure, give your best guess. Answer with
 just the person name."): some read there names Qwen's modal answer on 659 of 986 items (190 of 339
 stale), e.g. at "Who is the CEO of Intel?" L32: "The current CEO of Intel is **Pat Gelsinger**." The
@@ -113,24 +119,24 @@ the bank's 8-sample modal answer; reads are of the prompt alone, so no Qwen epis
 
 | condition            | all  | stale | − transcript-only, all | − its placebo, all  |
 | -------------------- | ---- | ----- | ---------------------- | ------------------- |
-| transcript-only      | 22.2 | 53.9  |                        |                     |
-| question punctuation | 17.4 | 33.6  | −4.8pp [−6.3, −3.3]    | −4.4pp [−5.8, −3.2] |
-| its placebo          | 21.8 | 47.0  |                        |                     |
-| six tail tokens      | 17.2 | 32.2  | −5.0pp [−6.6, −3.5]    | −6.5pp [−8.0, −5.2] |
+| transcript-only      | 21.7 | 53.7  |                        |                     |
+| question punctuation | 16.8 | 33.2  | −4.9pp [−6.3, −3.4]    | −4.5pp [−5.8, −3.2] |
+| its placebo          | 21.3 | 46.8  |                        |                     |
+| six tail tokens      | 16.7 | 31.9  | −5.0pp [−6.5, −3.5]    | −6.6pp [−8.0, −5.2] |
 | its placebo          | 23.7 | 46.7  |                        |                     |
 
-Question punctuation − six tail: +0.2pp [−0.9, +1.2] (stale +1.4 [−0.9, +3.5]); the same in each
-half. The new 1k shows a smaller gain overall (O-lens − transcript −2.9pp vs −6.7pp on the
-first 999) but the same on stale items (−15.7pp vs −24.8pp, CIs overlapping).
+Question punctuation − six tail: +0.2pp [−0.9, +1.1] (stale +1.3 [−0.9, +3.4]); the same in each
+half. The new 1k shows a smaller gain overall (O-lens − transcript −3.0pp vs −6.8pp on the
+first 999) but the same on stale items (−16.1pp vs −24.9pp, CIs overlapping).
 
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
 | condition            | exact | loose | stable_right | stable_wrong | vs transcript, win/loss | p      |
 | -------------------- | ----- | ----- | ------------ | ------------ | ----------------------- | ------ |
-| transcript_inline    | 66.7% | 69.0% | 96.2%        | 56.8%        |                         |        |
-| olens_inline         | 81.2% | 82.5% | 90.3%        | 79.0%        | 53 / 12                 | <0.001 |
-| olens_placebo_inline | 67.0% | 69.7% | 90.3%        | 60.4%        | 29 / 31                 | 0.90   |
+| transcript_inline    | 67.2% | 69.5% | 96.2%        | 57.5%        |                         |        |
+| olens_inline         | 81.8% | 83.2% | 90.3%        | 80.0%        | 54 / 12                 | <0.001 |
+| olens_placebo_inline | 67.8% | 70.5% | 90.3%        | 61.6%        | 30 / 31                 | 1.00   |
 
 The O-lens beats both transcript-only and the placebo by 14 pp, all of it on the stale items: on
 `stable_wrong`, Haiku answers the current truth (Lip-Bu Tan) 124 of 414 draws transcript-only and 55
@@ -250,28 +256,28 @@ item's text. Seven conditions × 3 draws, exact match, per-item means; paired 95
 
 | items                        | n     | transcript | O-lens | placebo | J++  | placebo | NLA  | placebo |
 | ---------------------------- | ----- | ---------- | ------ | ------- | ---- | ------- | ---- | ------- |
-| all                          | 1,849 | 83.3       | 87.1   | 81.5    | 86.5 | 84.6    | 87.9 | 86.8    |
-| stale                        | 456   | 49.4       | 72.5   | 55.5    | 68.5 | 59.4    | 72.0 | 64.0    |
-| not stale                    | 1,393 | 94.4       | 91.8   | 90.0    | 92.4 | 92.9    | 93.1 | 94.3    |
-| always calls the tool (8/8)  | 882   | 83.8       | 88.3   | 82.2    | 87.6 | 86.2    | 88.8 | 88.1    |
-| always calls the tool, stale | 232   | 49.9       | 73.0   | 56.9    | 71.6 | 62.2    | 73.7 | 67.0    |
-| never calls the tool (0/8)   | 222   | 83.8       | 86.9   | 83.3    | 87.1 | 84.7    | 86.6 | 85.9    |
+| all                          | 1,849 | 84.0       | 87.7   | 82.2    | 87.1 | 85.2    | 88.7 | 87.5    |
+| stale                        | 456   | 49.8       | 72.8   | 55.9    | 68.7 | 59.6    | 72.7 | 64.4    |
+| not stale                    | 1,393 | 95.2       | 92.5   | 90.7    | 93.2 | 93.6    | 93.9 | 95.0    |
+| always calls the tool (8/8)  | 882   | 84.3       | 88.8   | 82.7    | 88.1 | 86.7    | 89.5 | 88.7    |
+| always calls the tool, stale | 232   | 50.1       | 73.1   | 57.3    | 71.6 | 62.4    | 74.7 | 67.4    |
+| never calls the tool (0/8)   | 222   | 84.2       | 87.4   | 83.8    | 87.5 | 85.1    | 87.1 | 86.3    |
 
 | lens − its placebo, pp | O-lens               | J++                | NLA                |
 | ---------------------- | -------------------- | ------------------ | ------------------ |
-| all                    | +5.5 [+4.2, +6.9]    | +1.9 [+0.9, +3.0]  | +1.1 [+0.1, +2.1]  |
-| stale                  | +17.0 [+13.6, +20.4] | +9.1 [+6.2, +12.3] | +8.0 [+5.2, +11.0] |
-| always tool, stale     | +16.1 [+10.9, +21.1] | +9.3 [+5.5, +13.4] | +6.8 [+3.0, +10.6] |
+| all                    | +5.5 [+4.2, +6.9]    | +1.9 [+0.9, +3.0]  | +1.2 [+0.2, +2.2]  |
+| stale                  | +16.9 [+13.4, +20.2] | +9.1 [+6.2, +12.2] | +8.3 [+5.5, +11.3] |
+| always tool, stale     | +15.8 [+10.6, +21.0] | +9.2 [+5.3, +13.2] | +7.3 [+3.4, +11.4] |
 
 - **The O-lens result holds at 9x the items with the answer 16 tokens past the last read:** +17pp
   over its placebo on stale items, +16pp on the 232 stale items where Qwen always opens the tool
   call unforced. It isn't reading only the items where the answer is Qwen's intended next output.
 - **J++ and NLA also beat their placebos, by about half as much** (+9 and +8 on stale). Against
   transcript-only all three look alike (+19 to +23 on stale), because every placebo block alone
-  pushes Haiku toward the stale answer (O-lens placebo 55.5, J++ 59.4, NLA 64.0 vs transcript 49.4).
+  pushes Haiku toward the stale answer (O-lens placebo 55.9, J++ 59.6, NLA 64.4 vs transcript 49.8).
 - **On not-stale items the reads cost 1–3pp** against transcript-only, as before.
 - On the 863 items shared with the no-tool 1k run, each condition is within 1pp of its no-tool
-  number (O-lens 88.5 → 88.1). That run read only the six tail tokens and showed Haiku no system
+  number (O-lens 89.1 → 88.6). That run read only the six tail tokens and showed Haiku no system
   turn, so this compares the whole setup, not the tool alone.
 
 Cost: Haiku $65 (38,829 predictions, from token counts at $0.10/$0.50 per M; the rows' `cost` is 0
@@ -289,22 +295,22 @@ run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
 
 | items               | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
 | ------------------- | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
-| all                 | 1,849 | 16.7       | 12.8   | 16.2    | 12.6                    | 14.6    | 12.9             | 18.5    |
-| stale               | 456   | 50.6       | 31.6   | 44.4    | 31.2                    | 41.6    | 27.5             | 44.5    |
-| not stale           | 1,393 | 5.6        | 6.7    | 6.9     | 6.5                     | 5.8     | 8.2              | 10.0    |
-| always tool, stale  | 232   | 50.1       | 28.9   | 41.8    | 28.7                    | 38.8    | 27.0             | 43.1    |
+| all                 | 1,849 | 16.0       | 12.2   | 15.6    | 12.0                    | 14.0    | 12.3             | 17.8    |
+| stale               | 456   | 50.2       | 31.4   | 44.2    | 30.8                    | 41.2    | 27.2             | 44.1    |
+| not stale           | 1,393 | 4.8        | 5.9    | 6.2     | 5.8                     | 5.0     | 7.5              | 9.3     |
+| always tool, stale  | 232   | 49.9       | 28.9   | 41.7    | 28.3                    | 38.5    | 26.9             | 42.7    |
 
 | error, pp           | qpunct − placebo     | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full      |
 | ------------------- | -------------------- | -------------------------- | -------------------- | ------------------ |
-| all                 | −3.4 [−4.5, −2.2]    | −2.0 [−3.2, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
-| stale               | −12.8 [−15.9, −9.9]  | −10.4 [−13.7, −7.1]        | −17.0 [−20.4, −13.7] | +4.1 [+1.5, +6.8]  |
-| always tool, stale  | −12.9 [−17.8, −8.2]  | −10.1 [−14.9, −5.5]        | −16.1 [−21.1, −10.8] | +1.9 [−1.7, +5.6]  |
+| all                 | −3.4 [−4.5, −2.3]    | −2.0 [−3.1, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
+| stale               | −12.8 [−15.9, −9.6]  | −10.5 [−13.7, −7.1]        | −16.9 [−20.2, −13.4] | +4.2 [+1.6, +6.7]  |
+| always tool, stale  | −12.8 [−17.5, −8.2]  | −10.2 [−14.7, −5.6]        | −15.8 [−21.0, −10.6] | +2.0 [−1.7, +5.7]  |
 
 - **Most of the gain survives without the tail:** on stale items the question's punctuation alone is 12.8pp better than
-  its placebo, against 17.0pp with the last 10 tokens. The tail adds about 4pp on stale items (31.6 → 27.5) and costs
-  1.5pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
+  its placebo, against 16.9pp with the last 10 tokens. The tail adds about 4pp on stale items (31.4 → 27.2) and costs
+  1.6pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
   good as the six tail tokens.
-- `<|im_end|>` adds nothing on top (−0.4pp on stale, CI across 0); its placebo is a little better than the qpunct one.
+- `<|im_end|>` adds nothing on top (−0.6pp on stale, CI across 0); its placebo is a little better than the qpunct one.
 - Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct reads Haiku says Garland
   on all 3 draws ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
   with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).

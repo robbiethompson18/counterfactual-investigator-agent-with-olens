@@ -98,6 +98,9 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`. **Every `*_agentic` condition is stale (2026-10-30): run one only with
   Robbie's approval** (`CFBENCH_ALLOW_AGENTIC=1`); the single-turn `*_inline` conditions are
   current.
+- **Score every investigator draw as one prediction: pool draws for AUROC, % right and Brier, never
+  average a case's draws first.** Averaging scores an ensemble and flatters placebos, whose draws
+  see different reads ([docs/cfbench-scoring.md](docs/cfbench-scoring.md), 2026-10-31).
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 - **A tool call that ends a rollout by submitting an answer returns the verdict** (added
@@ -191,7 +194,9 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
-- `.githooks/pre-commit` runs ruff and ty on staged Python files. Enable it once per clone with
+- `.githooks/pre-commit` runs ruff and ty on staged Python files, and rebuilds and stages
+  `docs/final-writeup.html` whenever `docs/final-writeup.md` is staged; git-lfs's own pre-push hook
+  (gitignored there) uploads LFS objects. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
   Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
@@ -232,10 +237,12 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
   in orange, no tool calls in gray, J++ in purple, NLA in green. A placebo is its lens's color with
-  black stripes (Robbie, 2026-10-29; an open marker where stripes can't show); plain black placebos
-  are the old style. Paired-difference rows are labelled by the two conditions' swatches, A − B
-  (2026-10-30). In matplotlib take all of it from `graphs/style.py` (`bar_kw`, `marker_kw`,
-  `diff_rows`). Give any other condition a color outside these.
+  stripes in the background color (Robbie, 2026-10-31; an open marker where stripes can't show).
+  Hatching means placebo and nothing else: a second measure gets a lighter shade. Paired-difference
+  rows are labelled by the two conditions' swatches, A − B (2026-10-30). In matplotlib, import
+  `graphs/style.py`, which applies the look (Inter, warm ink, Evals-page background) and has
+  `bar_kw`, `marker_kw`, `ci_bar`, `diff_rows`; never hardcode a condition's color or `rcParams`.
+  Give any other condition a color outside these.
 
 ## Docs
 
@@ -266,11 +273,19 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 [docs/INDEX.md](docs/INDEX.md) by tag. When a doc's tag changes to or from ACTIVE, move its entry.
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
+The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
+built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 2026-10-31).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**
 
 Active docs:
+
+- [ACTIVE: probes package — read before running standard capture, fitting or reporting](probes/CLAUDE.md)
+  — replaces the legacy MCQ and essay probe entry points
+- [ACTIVE: Standard probe protocol — read before fitting or comparing any standard probe](docs/standard-probe-protocol.md)
+  — nested two-fold, two positions, six layers, capped matched training pools; legacy recipes remain
+  historical
 
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
   — env.py layout, `python -m environments run`
@@ -297,6 +312,8 @@ Active docs:
   names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
   linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
   90%
+- [REFERENCE: essay_grading_cf_inline — read before quoting the essay counterfactual eval, or comparing O-lens, NLA and J++ on it](docs/essay-grading-cf-inline.md)
+  — 1,800 cases, Haiku at medium, per-draw AUROC: O-lens 0.775 vs placebo 0.757 vs transcript 0.753; NLA and J++ about level; probes 0.86-0.89
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic
@@ -310,8 +327,6 @@ Active docs:
   — RMSE of the predicted rate
 - [ACTIVE: cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
 - [ACTIVE: notice_defect env (super experimental) — read before building, running or gating the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
-- [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
-  — picks Qwen's own answer 94% / 80%
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
 - [ACTIVE: style_transfer env (super experimental) — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
 - [ACTIVE: todo_suppressed (super experimental) — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
