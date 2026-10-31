@@ -93,15 +93,15 @@ positions shown. Runs `cfbench/2026-10-30_cutoff-qa-1k-olens-{pos1,pos2,qpunct,q
 
 | reads                                 | O-lens            | its placebo        | O-lens − transcript-only | O-lens − placebo    |
 | ------------------------------------- | ----------------- | ------------------ | ------------------------ | ------------------- |
-| none (transcript-only)                | 21.9 / 53.3 / 5.8 |                    |                          |                     |
-| "." only                              | 17.9 / 38.2 / 7.5 | 19.3 / 42.7 / 7.3  | −4.0pp [−5.7, −2.2]      | −1.4pp [−2.9, +0.2] |
-| "." + `<\|im_end\|>`                  | 18.4 / 40.9 / 6.8 | 19.3 / 45.1 / 6.0  | −3.6pp [−5.2, −2.0]      | −0.9pp [−2.4, +0.4] |
-| question punctuation                  | 15.2 / 28.5 / 8.3 | 20.6 / 44.4 / 8.4  | −6.7pp [−8.8, −4.7]      | −5.4pp [−7.3, −3.8] |
-| question punctuation + `<\|im_end\|>` | 15.8 / 29.0 / 9.0 | 19.0 / 43.9 / 6.3  | −6.1pp [−8.3, −4.1]      | −3.2pp [−5.0, −1.6] |
-| all six tail (through `assistant\n`)  | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
+| none (transcript-only)                | 21.5 / 52.9 / 5.4 |                    |                          |                     |
+| "." only                              | 17.5 / 38.0 / 7.0 | 18.9 / 42.4 / 6.8  | −4.0pp [−5.7, −2.3]      | −1.4pp [−2.9, +0.2] |
+| "." + `<\|im_end\|>`                  | 17.9 / 40.6 / 6.2 | 18.9 / 44.8 / 5.6  | −3.6pp [−5.2, −2.1]      | −1.0pp [−2.4, +0.4] |
+| question punctuation                  | 14.7 / 28.0 / 7.9 | 20.2 / 44.1 / 7.9  | −6.8pp [−8.8, −4.6]      | −5.5pp [−7.2, −3.7] |
+| question punctuation + `<\|im_end\|>` | 15.3 / 28.6 / 8.5 | 18.5 / 43.5 / 5.7  | −6.1pp [−8.3, −4.0]      | −3.2pp [−4.9, −1.5] |
+| all six tail (through `assistant\n`)  | 14.5 / 27.4 / 7.9 | 22.1 / 44.4 / 10.7 | −7.0pp [−9.2, −4.8]      | −7.6pp [−9.4, −5.7] |
 
-**On cutoff the question's own punctuation is as good as the six tail tokens** (15.2 vs 15.0, and
-28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The signal is at the "?" that ends the
+**On cutoff the question's own punctuation is as good as the six tail tokens** (14.7 vs 14.5, and
+28.0 vs 27.4 on stale items), and beats its placebo by 5.5pp. The signal is at the "?" that ends the
 question proper, before the boilerplate ("If you are not sure, give your best guess. Answer with
 just the person name."): some read there names Qwen's modal answer on 659 of 986 items (190 of 339
 stale), e.g. at "Who is the CEO of Intel?" L32: "The current CEO of Intel is **Pat Gelsinger**." The
@@ -119,15 +119,15 @@ the bank's 8-sample modal answer; reads are of the prompt alone, so no Qwen epis
 
 | condition            | all  | stale | − transcript-only, all | − its placebo, all  |
 | -------------------- | ---- | ----- | ---------------------- | ------------------- |
-| transcript-only      | 22.2 | 53.9  |                        |                     |
-| question punctuation | 17.4 | 33.6  | −4.8pp [−6.3, −3.3]    | −4.4pp [−5.8, −3.2] |
-| its placebo          | 21.8 | 47.0  |                        |                     |
-| six tail tokens      | 17.2 | 32.2  | −5.0pp [−6.6, −3.5]    | −6.5pp [−8.0, −5.2] |
+| transcript-only      | 21.7 | 53.7  |                        |                     |
+| question punctuation | 16.8 | 33.2  | −4.9pp [−6.3, −3.4]    | −4.5pp [−5.8, −3.2] |
+| its placebo          | 21.3 | 46.8  |                        |                     |
+| six tail tokens      | 16.7 | 31.9  | −5.0pp [−6.5, −3.5]    | −6.6pp [−8.0, −5.2] |
 | its placebo          | 23.7 | 46.7  |                        |                     |
 
-Question punctuation − six tail: +0.2pp [−0.9, +1.2] (stale +1.4 [−0.9, +3.5]); the same in each
-half. The new 1k shows a smaller gain overall (O-lens − transcript −2.9pp vs −6.7pp on the
-first 999) but the same on stale items (−15.7pp vs −24.8pp, CIs overlapping).
+Question punctuation − six tail: +0.2pp [−0.9, +1.1] (stale +1.3 [−0.9, +3.4]); the same in each
+half. The new 1k shows a smaller gain overall (O-lens − transcript −3.0pp vs −6.8pp on the
+first 999) but the same on stale items (−16.1pp vs −24.9pp, CIs overlapping).
 
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
@@ -295,22 +295,22 @@ run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
 
 | items               | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
 | ------------------- | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
-| all                 | 1,849 | 16.7       | 12.8   | 16.2    | 12.6                    | 14.6    | 12.9             | 18.5    |
-| stale               | 456   | 50.6       | 31.6   | 44.4    | 31.2                    | 41.6    | 27.5             | 44.5    |
-| not stale           | 1,393 | 5.6        | 6.7    | 6.9     | 6.5                     | 5.8     | 8.2              | 10.0    |
-| always tool, stale  | 232   | 50.1       | 28.9   | 41.8    | 28.7                    | 38.8    | 27.0             | 43.1    |
+| all                 | 1,849 | 16.0       | 12.2   | 15.6    | 12.0                    | 14.0    | 12.3             | 17.8    |
+| stale               | 456   | 50.2       | 31.4   | 44.2    | 30.8                    | 41.2    | 27.2             | 44.1    |
+| not stale           | 1,393 | 4.8        | 5.9    | 6.2     | 5.8                     | 5.0     | 7.5              | 9.3     |
+| always tool, stale  | 232   | 49.9       | 28.9   | 41.7    | 28.3                    | 38.5    | 26.9             | 42.7    |
 
 | error, pp           | qpunct − placebo     | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full      |
 | ------------------- | -------------------- | -------------------------- | -------------------- | ------------------ |
-| all                 | −3.4 [−4.5, −2.2]    | −2.0 [−3.2, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
-| stale               | −12.8 [−15.9, −9.9]  | −10.4 [−13.7, −7.1]        | −17.0 [−20.4, −13.7] | +4.1 [+1.5, +6.8]  |
-| always tool, stale  | −12.9 [−17.8, −8.2]  | −10.1 [−14.9, −5.5]        | −16.1 [−21.1, −10.8] | +1.9 [−1.7, +5.6]  |
+| all                 | −3.4 [−4.5, −2.3]    | −2.0 [−3.1, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
+| stale               | −12.8 [−15.9, −9.6]  | −10.5 [−13.7, −7.1]        | −16.9 [−20.2, −13.4] | +4.2 [+1.6, +6.7]  |
+| always tool, stale  | −12.8 [−17.5, −8.2]  | −10.2 [−14.7, −5.6]        | −15.8 [−21.0, −10.6] | +2.0 [−1.7, +5.7]  |
 
 - **Most of the gain survives without the tail:** on stale items the question's punctuation alone is 12.8pp better than
-  its placebo, against 17.0pp with the last 10 tokens. The tail adds about 4pp on stale items (31.6 → 27.5) and costs
-  1.5pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
+  its placebo, against 16.9pp with the last 10 tokens. The tail adds about 4pp on stale items (31.4 → 27.2) and costs
+  1.6pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
   good as the six tail tokens.
-- `<|im_end|>` adds nothing on top (−0.4pp on stale, CI across 0); its placebo is a little better than the qpunct one.
+- `<|im_end|>` adds nothing on top (−0.6pp on stale, CI across 0); its placebo is a little better than the qpunct one.
 - Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct reads Haiku says Garland
   on all 3 draws ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
   with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
