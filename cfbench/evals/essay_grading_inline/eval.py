@@ -240,11 +240,17 @@ def _layout(inputs: str) -> dict[str, dict]:
 def placebo(inputs: str, arm: str, item: str, seed: int) -> str:
     """docs/placebo-rules.md: another case with the same category (the intro's PERSUADE topic), seeded per (draw, case). Another
     arm on another essay, so it says nothing about this essay; never base, which is the counterfactual prompt of the cf eval."""
-    topic = _mod().bank()
+    topic, lays = _mod().bank(), _layout(inputs)
+    need = {s for *_, s in lays[request_id(arm, item)]["pos"]}  # a source needs a read in every segment this prompt has
     ok = []
-    for i in _layout(inputs):
+    for i, lay in lays.items():
         a, it = i.removeprefix(f"{ENV}/").split("~")
-        if a not in (arm, "base") and it != item and topic[it]["prompt_name"] == topic[item]["prompt_name"]:
+        if (
+            a not in (arm, "base")
+            and it != item
+            and topic[it]["prompt_name"] == topic[item]["prompt_name"]
+            and need <= {s for *_, s in lay["pos"]}
+        ):
             ok.append(i)
     return random.Random(f"{seed}:{arm}~{item}").choice(sorted(ok))
 
