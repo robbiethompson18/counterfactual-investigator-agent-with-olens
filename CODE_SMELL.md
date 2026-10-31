@@ -2,6 +2,18 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-30: two MCQ envs build the same prompt with copied code
+
+`environments/hint_mcq` (its `nohint` arm, the MMLU-Pro pool) and `environments/supergpqa` build the
+same prompt, each with its own copy of the code: stem, `\n`, the options as `A. …` from `LETTERS`, a
+blank line, then `INSTRUCTION = "Answer with the letter only."`. Each also has its own copy of the
+bare-letter reply parser (`hint_mcq.BARE_LETTER` vs `supergpqa.LETTER`). The bytes match today
+(checked 2026-10-30 on all 2,579 mcq_unselected and 3,000 supergpqa read prompts), and the
+mcq_unselected / supergpqa_inline results compare the two pools as if one prompt, so a one-sided
+edit would silently break that. Consolidate, details TBD (Robbie, 2026-10-30): probably one shared
+`mcq_prompt(stem, options)` + `bare_letter(reply)` that both envs import, keeping two envs since
+hint_mcq's ~20 hint arms are a different experiment, not one env with a dataset switch.
+
 ## 2026-10-29: `environments run --backend vllm` records the env's OpenRouter provider
 
 `DEFAULTS["provider"]` (e.g. `deepinfra/fp8`) stays in the target when the backend is `vllm`, so
@@ -403,11 +415,9 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
 
 - robbie-box `~/envs-results/` (agent-interp-envs screens): funding*email, sandbagging (screen and
   iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
-  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env,
-  skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs
-  in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their
-  `config.yaml`says`provider: fireworks`even when`scripts/envs_gateway.py` routed the calls
-  elsewhere, so don't trust it for which server answered.
+  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env, skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml`says`provider:
+  fireworks`even when`scripts/envs_gateway.py` routed the calls elsewhere, so don't trust it for
+  which server answered.
 - Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
   `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
   local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose

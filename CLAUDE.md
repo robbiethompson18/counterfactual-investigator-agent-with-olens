@@ -331,6 +331,9 @@ Active docs:
 - [ACTIVE: Default read positions — read before requesting any O-lens / NLA / J++ reads, or building an investigator block from reads](docs/read-positions.md)
   — every punctuation token + option newlines + the ten thinking-off tail tokens, layers 32–60,
   thinking off; the inline sets' fill runs and `cfbench.evals.inline_reads`
+- [ACTIVE: Placebo rules — read before building any O-lens / NLA / J++ placebo condition](docs/placebo-rules.md)
+  — another case of the same set, same option count, same subject category; positions aligned by
+  kind
 - [ACTIVE: Batch reads format — read before writing a reader, or showing batch O-lens/J++/NLA reads in expview](docs/olens-reads-format.md)
   — `X.jsonl` + `X.transcripts.jsonl`
 - [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)
