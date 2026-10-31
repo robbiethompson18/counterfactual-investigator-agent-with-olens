@@ -12,7 +12,7 @@ link); a PR touching them attaches its `talk.pdf` to the workflow run
 
 **Setup.** XeLaTeX with Metropolis, latexmk and the Inter font (Fira Sans is the fallback). On
 Debian/Ubuntu:
-`apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter`.
+`apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono`.
 
 **The deck.** `talk/talk.tex`, with its charts in `talk/figures.py` (run first by `make`, as
 `python -m slides.talk.figures`, from the real results), writing PDFs to `fig/`. Add new parts to it
