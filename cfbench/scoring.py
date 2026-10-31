@@ -621,6 +621,9 @@ def essay_flips() -> tuple[int, int]:
 AUTHOR_RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]
 AUTHOR_PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
 AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
+AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
+                 ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
 AUTHOR_VERSIONS = {"pooled": "all cases"}  # pooled (Kylie, 2026-10-31: not the Qwen-wrong / Qwen-right split)
 
 
