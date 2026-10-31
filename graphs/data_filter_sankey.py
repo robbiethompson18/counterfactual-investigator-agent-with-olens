@@ -1,12 +1,13 @@
-"""Sankeys of how each filtered single-turn dataset becomes eval cases (the write-up's "Data Filter" section). Dark green is
-evaluated, Qwen right and wrong alike; light green is usable but held out; gray is unusable. Essay grading has no filter, so no
-diagram.
+"""Sankeys of how each single-turn dataset becomes eval cases (the write-up's dataset descriptions). Dark green is evaluated, Qwen
+right and wrong alike; light green is usable but held out; gray is unusable. Essay grading has no filter, so its diagram is boring
+on purpose.
 
     uv run python -m graphs.data_filter_sankey [--out-dir docs/img]
 
 Counts are constants: docs/supergpqa-inline.md (Pool and Split), docs/mcq-unselected.md (the split, both batches),
 docs/envs/cutoff_qa.md and data/banks/cutoff_qa/v3.json (stable = 7 of 8 samples agree; the 1,197 not evaluated include the numeric
-items), docs/favorites-qa-inline.md.
+items), docs/favorites-qa-inline.md, and for essays cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
+data/runs/cfbench/2026-10-31_essay-cf-b-ts.
 """
 
 import argparse
@@ -75,6 +76,19 @@ DATASETS = {
             (STABLE, "not evaluated", 1_197, HELD),
             ("eval cases", "stale answer", 339, EVAL),
             ("eval cases", "current answer", 660, EVAL),
+        ],
+    ),
+    "essay": (
+        "Essay grading: no filter, every case is evaluated",
+        [
+            [("225 openers × 8 intros", 1_800)],
+            [("eval cases", 1_800)],
+            [("grade goes up", 973), ("grade doesn't go up", 827)],
+        ],
+        [
+            ("225 openers × 8 intros", "eval cases", 1_800, EVAL),
+            ("eval cases", "grade goes up", 973, EVAL),
+            ("eval cases", "grade doesn't go up", 827, EVAL),
         ],
     ),
     "favorites": (

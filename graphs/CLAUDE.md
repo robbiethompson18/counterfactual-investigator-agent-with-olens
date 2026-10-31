@@ -47,7 +47,7 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
-- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa and favorites_qa questions become eval cases (one PNG each; dark
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa and essay questions become eval cases (one PNG each; dark
   green evaluated, light green held out, gray unusable), counts sourced in the module; for the final write-up's Data Filter
   section
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
