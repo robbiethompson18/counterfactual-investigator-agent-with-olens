@@ -21,7 +21,11 @@ not "Haiku got more lens-shaped text".
   | mcq_unselected (MMLU-Pro) | `category`                      |
   | supergpqa                 | `field` (relax to `discipline`) |
   | cutoff_qa                 | `meta.domain`                   |
-  | favorites_qa              | `meta.category`                 |
+  | favorites_qa              | `meta.domain`                   |
+
+  favorites' own `meta.category` is unique per item (1,500 categories for 1,500 questions), so it
+  can't be matched; its 106 `domain`s can, and also keep out near-duplicate questions ("favorite
+  amphibian" vs "least favorite amphibian") that would share the answer.
 
 - **Don't exclude source cases whose answer matches this case's.** A same-letter source (about 1 in
   10 on a 10-option MCQ) is part of chance, and excluding it biases the placebo below chance.
@@ -30,8 +34,8 @@ not "Haiku got more lens-shaped text".
   NLA and J++ placebos did that).
 - **Position alignment, by kind**, because two cases' read positions differ in number:
 
-  - the tail tokens after the user turn (`<|im_end|>` … the final `\n\n` after `</think>`, the same
-    9 tokens on every prompt): one to one;
+  - the period ending the user turn and the 9 tail tokens after it (`<|im_end|>` … the final `\n\n`
+    after `</think>`, the same on every prompt): one to one;
   - each MCQ option's newline: one to one (same option count);
   - punctuation inside the prompt: the source's punctuation reads in order, assigned to this case's
     punctuation positions; truncate when the source has more, cycle from its first when it has
