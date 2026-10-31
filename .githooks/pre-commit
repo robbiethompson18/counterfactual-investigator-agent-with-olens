@@ -3,6 +3,7 @@
 # Enable once per clone: git config core.hooksPath .githooks
 # The HTML is built from the working tree's Markdown, not the staged copy.
 if git diff --cached --name-only -- docs/final-writeup.md scripts/build_writeup.sh | grep -q .; then
+  git lfs update >/dev/null 2>&1 # make sure git-lfs's pre-push hook is in .githooks, so the push uploads the HTML
   sh scripts/build_writeup.sh && git add docs/final-writeup.html || {
     echo "pre-commit: building docs/final-writeup.html failed; a missing chart PNG is the usual cause (regenerate it)." >&2
     exit 1
