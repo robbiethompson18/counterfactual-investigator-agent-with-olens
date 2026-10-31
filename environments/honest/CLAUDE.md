@@ -5,7 +5,8 @@ Honest grader: 11 scenarios × 5 framings; the shared prompt and score parser ar
 
 ## Score parsing
 
-**Fixed 2026-10-31:** honest and essay_grading share `parse_score` in `../_lib/honest.py`.
+**Fixed 2026-10-31 ([PR #474](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/pull/474)):**
+honest and essay_grading share `parse_score` in `../_lib/honest.py`.
 The final explicit `Score:` field wins, including ordinary Markdown around the label/value.
 Its decimal numerator must be finite and within 0–10, with denominator exactly 10. A missing or
 invalid final field gives `score=None` and `positive=None`; never fall back to an earlier score.
