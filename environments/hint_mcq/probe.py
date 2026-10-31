@@ -248,6 +248,8 @@ def table(res: dict, sites: list[str]) -> str:
 def plot(res: dict, sites: list[str], run: Path):
     import matplotlib.pyplot as plt
 
+    from graphs.style import MUTED, color
+
     fig, axes = plt.subplots(1, len(sites), figsize=(6 * len(sites), 4), sharey=True, squeeze=False)
     layers = res["layers"]
     for ax, site in zip(axes[0], sites, strict=True):
@@ -255,13 +257,13 @@ def plot(res: dict, sites: list[str], run: Path):
         ax.plot(layers, get("is_answer", "right", "top1_answer"), color="#2a9d8f", label="is_answer probe, right q: picks answer")
         ax.plot(layers, get("is_answer", "wrong", "top1_answer"), color="#e76f51", label="is_answer probe, wrong q: picks answer")
         ax.plot(layers, get("is_answer", "wrong", "top1_gold"), color="#e76f51", ls="--", label="is_answer probe, wrong q: picks gold")
-        ax.plot(layers, get("is_gold", "wrong", "top1_gold"), color="#8e44ad", ls=":", label="is_gold probe, wrong q: picks gold")
-        ax.axhline(res["letter_baseline"]["is_answer"]["all"]["top1_answer"], color="#999", lw=1, label="letter-only baseline")
+        ax.plot(layers, get("is_gold", "wrong", "top1_gold"), color=color("probe_tuned"), ls=":", label="is_gold probe, wrong q: gold")
+        ax.axhline(res["letter_baseline"]["is_answer"]["all"]["top1_answer"], color=MUTED, lw=1, label="letter-only baseline")
         ax.set(title=f"site: {site}", xlabel="layer", ylim=(0, 1))
     axes[0][0].set_ylabel("held-out questions, top-1 rate")
     axes[0][-1].legend(fontsize=7)
     fig.tight_layout()
-    fig.savefig(run / "probe_by_layer.png", dpi=130)
+    fig.savefig(run / "probe_by_layer.png")
 
 
 def _softmax_by_q(s: np.ndarray, starts: np.ndarray) -> np.ndarray:

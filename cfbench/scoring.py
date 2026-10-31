@@ -26,15 +26,6 @@ LABEL = {
     "jlens_agentic": "J-lens",
     "jlens_placebo_agentic": "J-lens placebo",
 }
-# CLAUDE.md chart colors: transcript-only blue, O-lens orange, placebo black, no tool calls gray; J-lens outside those four
-COLOR = {
-    "no_transcript": "#898781",
-    "transcript_agentic": "#2a78d6",
-    "olens_agentic": "#eb6834",
-    "olens_placebo_agentic": "#1a1a1a",
-    "jlens_agentic": "#8e44ad",
-    "jlens_placebo_agentic": "#c39bd3",
-}
 NULL_LABEL = "Edit does nothing"
 OLD_LENS = "olens_s3d_rl600"  # the pre-space lens; its reads are never reused (CLAUDE.md, docs/olens-space-migration.md)
 

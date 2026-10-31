@@ -3,9 +3,11 @@
 Every chart in the repo, one module each, run from the repo root as
 `uv run python -m graphs.<module>`; each writes PNGs under `docs/img/` (gitignored: the doc that
 shows a chart names the module that regenerates it). Scoring and run selection are not here: charts
-import them from `cfbench.scoring`. Colors, placebo hatching and the paired-difference rows (each
-labelled by its two conditions' swatches, A − B) come from `style.py` (`bar_kw`, `marker_kw`,
-`diff_rows`, `use`), which every module imports; CLAUDE.md has the rule.
+import them from `cfbench.scoring`. Every module imports `style.py`, and importing it applies the
+look (no `use()`, no `rcParams` here): colors, placebo stripes, bars with CI whiskers and the
+paired-difference rows (each labelled by its two conditions' swatches, A − B) are `bar_kw`,
+`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. The font is Inter
+(macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing.
 
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
@@ -15,9 +17,9 @@ labelled by its two conditions' swatches, A − B) come from `style.py` (`bar_kw
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
-- `cutoff_qa_notail`: the v3 tool run's O-lens cut to the question's punctuation (± `<|im_end|>`) vs the full
-  set, each with its placebo, error rate, stale / not stale / all, plus paired differences on stale items
-  (`docs/cutoff-qa-inline.md`)
+- `cutoff_qa_notail`: the v3 tool run's O-lens cut to the question's punctuation (± `<|im_end|>`) vs
+  the full set, each with its placebo, error rate, stale / not stale / all, plus paired differences
+  on stale items (`docs/cutoff-qa-inline.md`)
 - `favorites_qa_inline`: the same seven bars and paired-difference figure for the 1,500-item
   favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
 - `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right

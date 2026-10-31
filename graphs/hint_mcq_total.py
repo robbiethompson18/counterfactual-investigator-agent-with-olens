@@ -15,11 +15,10 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from graphs.style import INK, MUTED, bar_kw
 
 RUNS = Path("data/runs/cfbench")
 ORIG = {"d1": ["2026-10-27_answer-mcq-olens-header", "2026-10-27_answer-mcq-orig-killed-d1"],
@@ -29,13 +28,8 @@ TITLE = {"d1": "hint is the correct answer", "d2": "hint is the wrong answer"}
 CANON = {"agentic": "transcript_agentic", "olens": "olens_agentic", "olens_placebo": "olens_placebo_agentic"}
 CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
 LABEL = {"transcript_agentic": "Transcript-only", "olens_agentic": "O-lens", "olens_placebo_agentic": "O-lens placebo"}
-COLOR = {"transcript_agentic": "#2a78d6", "olens_agentic": "#eb6834", "olens_placebo_agentic": "#1a1a1a"}  # CLAUDE.md chart colors
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
 YLABEL = "% draws naming Qwen's no-hint answer"
 N_BOOT = 4000
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
 
 
 def runs(slot: str) -> list[Path]:
@@ -77,9 +71,9 @@ def summarize(by: dict, rng: np.random.Generator) -> dict:
 def panel(ax: plt.Axes, st: dict) -> None:
     for x, c in enumerate(CONDS):
         m, lo, hi = st[c]
-        ax.bar(x, 100 * m, width=0.55, color=COLOR[c], linewidth=0)
+        ax.bar(x, 100 * m, width=0.55, **bar_kw(c))
         ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1.2, capsize=4)
-        ax.text(x, 100 * hi + 1, f"{100 * m:.0f}%", ha="center", va="bottom", color=INK)
+        ax.text(x, 100 * hi + 1, f"{100 * m:.1f}%", ha="center", va="bottom", color=INK)
     ax.axhline(10, color=MUTED, linestyle=":", linewidth=1)
     ax.set_xticks(range(3))
     ax.set_xticklabels([LABEL[c] for c in CONDS], fontsize=9)
@@ -108,13 +102,13 @@ def main() -> None:
         n = len(by["olens_agentic"])
         report(TITLE[slot], n, st)
         panel(ax, st)
-        ax.set_title(f"{TITLE[slot]} (n={n})", loc="left", fontsize=10)
+        ax.set_title(f"{TITLE[slot]} (n={n})")
     axes[0].set_ylabel(YLABEL)
     axes[0].text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
-    fig.suptitle("Answer task on hint_mcq, by hint type (running total)", fontsize=11, x=0.01, ha="left")
+    fig.suptitle("Answer task on hint_mcq, by hint type (running total)", x=0.01, ha="left")
     fig.text(0.01, -0.03, note, color=MUTED, fontsize=8)
     fig.tight_layout()
-    fig.savefig(args.out / "by_hint.png", dpi=180, bbox_inches="tight")
+    fig.savefig(args.out / "by_hint.png", bbox_inches="tight")
 
     pooled = {c: {(slot, k): v for slot, by in slots.items() for k, v in by[c].items()} for c in CONDS}
     st = summarize(pooled, rng)
@@ -124,12 +118,12 @@ def main() -> None:
     panel(ax, st)
     ax.set_ylabel(YLABEL)
     ax.text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
-    ax.set_title(f"Answer task on hint_mcq: all {n} items, both hint types", loc="left", fontsize=10.5)
+    ax.set_title(f"Answer task on hint_mcq: all {n} items, both hint types")
     n_d1, n_d2 = (len(by["olens_agentic"]) for by in slots.values())
     caption = f"{n_d1} correct-hint + {n_d2} wrong-hint items ({n_q} distinct questions, bootstrapped as independent).\n"
     fig.text(0.01, -0.06, caption + note.replace(" Flash", "\nFlash"), color=MUTED, fontsize=8, va="top")
     fig.tight_layout()
-    fig.savefig(args.out / "combined.png", dpi=180, bbox_inches="tight")
+    fig.savefig(args.out / "combined.png", bbox_inches="tight")
     print("wrote", args.out)
 
 
