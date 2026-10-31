@@ -41,7 +41,7 @@ EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
 # envs with an `<env>-pairs` eval (every cfbench.run env_runs:<env>/... run): the viewer lists the evals defined here
 PAIRS_ENVS = ("alignment_faking", "hint_mcq", "hinted_truthfulqa")
 # evals set aside: off the viewer's eval lists (their own pages still open by URL); folders and HF files stay
-RETIRED_EVALS = {"af_which", "af_refusals"}
+RETIRED_EVALS = {"af_which", "af_refusals", "author_mcq_drop_inline", "author_mcq_inline"}  # author_*: SynthPAI, retired 2026-10-31
 # evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
 PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")
@@ -774,6 +774,17 @@ def defined() -> list[dict]:
     return [e | {"retired": True} if e["name"] in RETIRED_EVALS else e for e in out]
 
 
+def _finite(o):
+    """`o` with every NaN or infinite float replaced by None, so the page's JSON.parse accepts it."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: _finite(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_finite(v) for v in o]
+    return o
+
+
 def build(names: list[str] | None = None, export=True) -> list[Path]:
     """Write data/evals/<name>.json for `names` (default: every eval with a local run). There is no shared index (the
     page lists evals from spec/evals.json and reads each one's own file), so concurrent uploads can't clobber each other."""
@@ -807,7 +818,9 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc["page_html"] = page_html(name, [s for s in summaries if s.get("current", True)])
         doc["error_rate"] = getattr(_eval_module(name), "ERROR_RATE", False)  # answer task shown as error rate (lower is better)
         doc["position_chart"] = getattr(_eval_module(name), "POSITION_CHART", None)  # page.html positionChart
-        p.write_text(json.dumps(doc) + "\n")
+        tmp = p.with_suffix(".json.tmp")  # NaN (e.g. a Brier of p-bar over one-case groups) is not JSON: null, strictly
+        tmp.write_text(json.dumps(_finite(doc), allow_nan=False) + "\n")
+        tmp.replace(p)
         written.append(p)
     return written
 
