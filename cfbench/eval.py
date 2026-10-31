@@ -30,6 +30,7 @@ import inspect
 import json
 import random
 import re
+from collections import Counter
 from pathlib import Path
 
 import openai
@@ -46,7 +47,7 @@ from cfbench.core import (
     check_agentic,
     pick_examples,
 )
-from cfbench.predict import EFFORT, grader, predict
+from cfbench.predict import EFFORT, grader, predict, prompt_sha
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -100,7 +101,9 @@ async def main():
     ap.add_argument("--n-items", type=int, default=0, help="--prep: items per version (the eval's prep picks which)")
     ap.add_argument("--strict", action="store_true", help="--prep: only items the model refused in every base run (eval-specific)")
     ap.add_argument("--tag", default="", help="--prep: suffix for the inputs run's slug")
-    ap.add_argument("--reuse", default="", help="comma list of predictions.jsonl: copy rows for identical cases instead of re-predicting")
+    ap.add_argument(
+        "--reuse", default="", help="comma list of predictions.jsonl: copy rows with the same case and prompt_sha instead of re-predicting"
+    )
     ap.add_argument("--inputs", default="", help="the inputs run dir (default: the newest)")
     ap.add_argument("--versions", default="", help="comma list of the eval's versions (default: all it has)")
     ap.add_argument("--conditions", default="", help="comma list (default: the eval's CONDITIONS)")
@@ -140,7 +143,7 @@ async def main():
     task = getattr(ev, "TASK", "rate")
     ask_src = inspect.getsource(ev.ASK) if hasattr(ev, "ASK") else None
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
-    base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
+    base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None
     prompt_src = inspect.getsource(ev.PROMPT) if hasattr(ev, "PROMPT") else None
     assert not set(JLENS_CONDITIONS) & set(conditions), "cfbench.eval has no J-lens tools yet; use cfbench.run"
     inline = set(INLINE_CONDITIONS) & set(conditions)
@@ -200,20 +203,15 @@ async def main():
                 read = olens.tools(base, reads, placebo=placebo, seed=args.seed, sources=src, overrides=getattr(ev, "OLENS", None))[1]
             print(f"===== {condition} =====\n{prompt_of(env, case, base, shown, condition, read)}\n")
         return
-    # --reuse: earlier rows whose case saw the same prompt (same eval.md, same messages) count as done here; their truth
-    # fields are re-taken from this run's case, since the investigator never sees them
+    # --reuse: an earlier row of the same case whose prompt_sha equals this run's (the same system, prompt, tool schemas
+    # and effort sent) counts as done here; its truth fields are re-taken from this run's case, since the investigator never
+    # sees them. The hash doesn't see tool replies, so PLACEBO (which runs' reads the agentic lens tools serve) is still checked.
     inline_src = inspect.getsource(ev.INLINE) if hasattr(ev, "INLINE") else None
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
-    reuse = {}
+    reuse, reused = {}, Counter()
     for path in filter(None, args.reuse.split(",")):
         old = json.loads((Path(path).parent / "meta.json").read_text())["params"]
-        assert old["eval_md"] == notes, f"{path}: eval.md differs"
-        assert old.get("base_line") == base_src, f"{path}: BASE_LINE differs"
-        assert old.get("ask") == ask_src, f"{path}: ASK differs"
-        assert old.get("prompt_hook") == prompt_src, f"{path}: PROMPT differs"
         assert old.get("placebo_hook") == (inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None), f"{path}: PLACEBO differs"
-        # the INLINE prompt's O-lens blocks aren't in the key: a different hook (another eval's reads) must not reuse rows
-        assert old.get("inline_hook") == inline_src or not inline, f"{path}: INLINE differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
     run = new_run(
@@ -254,11 +252,6 @@ async def main():
 
     async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
         shown = pick_examples(base, random.Random(args.seed + draw), "answer" if task == "answer" else "rate")
-        if old := reuse.get(key(case | {"predictor": predictor, "draw": draw}, condition)):
-            assert old["shown"] == [r.source for r in shown], old["shown"]
-            with out.open("a") as f:
-                f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
-            return
         tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
         if condition in INLINE_CONDITIONS:
             prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
@@ -277,10 +270,18 @@ async def main():
             tools |= lens_tools
         if condition not in INLINE_CONDITIONS:
             prompt = prompt_of(env, case, base, shown, condition, read)
+        system = getattr(ev, "SYSTEM", None)
+        sha = prompt_sha(prompt, tools, effort, task, system)
+        if old := reuse.get(key(case | {"predictor": predictor, "draw": draw}, condition)):
+            old_sha = old.get("prompt_sha")
+            reused["reused" if old_sha == sha else "prompt_sha differs" if old_sha else "no prompt_sha"] += 1
+            if old_sha == sha:
+                with out.open("a") as f:
+                    f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
+                return
         async with slots:
             for attempt in range(3):
                 try:
-                    system = getattr(ev, "SYSTEM", None)
                     result = await predict(
                         predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
                     )
@@ -295,7 +296,7 @@ async def main():
         if task == "answer":  # graded as cfbench.run does: the submission's canonical form vs the cf arm's modal answer
             result |= answer.grade(env, case, result["answer"]) if result["valid"] else {"canon": None, "correct": None}
         row = {**case, "condition": condition, "harness_version": HARNESS_VERSION, "eval": args.name, "predictor": predictor}
-        row |= {"effort": effort} | extra
+        row |= {"effort": effort, "prompt_sha": sha} | extra
         row |= {"draw": draw, "shown": [r.source for r in shown], **result}
         with out.open("a") as f:
             f.write(json.dumps(row) + "\n")
@@ -307,6 +308,11 @@ async def main():
     jobs = [one(env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)]
     try:
         await asyncio.gather(*jobs)
+        if args.reuse:
+            print(
+                f"--reuse: {reused['reused']} rows reused; not reused: {reused['prompt_sha differs']} whose prompt_sha differs, "
+                f"{reused['no prompt_sha']} without one (older runs)"
+            )
     except BaseException:
         finish(run, status="abandoned")
         raise

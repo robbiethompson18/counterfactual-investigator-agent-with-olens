@@ -9,6 +9,7 @@ right, for whoever reads the transcript (Robbie, 2026-10-29). Transcript-only, a
 bump, no backfill of older runs. An invalid submission's error never reveals the truth.
 """
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -97,6 +98,20 @@ def grader(task: str, case: dict, env=None) -> Callable[[dict], str]:
     return claim if task == "claim" else rate
 
 
+def opening(prompt: str, tools: dict[str, Tool] | None, task: str, system: str | None) -> tuple[list, list]:
+    """The conversation's first request: (messages, tool schemas). `system` replaces the task's system prompt; None keeps it."""
+    default_system, submit = TASKS[task][:2]
+    messages = [{"role": "system", "content": system or default_system}, {"role": "user", "content": prompt}]
+    return messages, [submit, *(schema for schema, _ in (tools or {}).values())]
+
+
+def prompt_sha(prompt: str, tools: dict[str, Tool] | None, effort: str, task: str, system: str | None) -> str:
+    """A short hash of what `predict` sends first (messages, tool schemas, effort): cfbench.eval --reuse only copies a row
+    whose stored hash equals the one this run would send. Tool replies (transcripts, lens reads) aren't in it."""
+    messages, schemas = opening(prompt, tools, task, system)
+    return hashlib.sha256(json.dumps([messages, schemas, effort], sort_keys=True).encode()).hexdigest()[:16]
+
+
 async def predict(
     predictor: str,
     prompt: str,
@@ -108,15 +123,10 @@ async def predict(
     grade: Callable[[dict], str] | None = None,
 ) -> dict:
     """`system` replaces the task's system prompt (an eval's SYSTEM, cfbench/eval.py); None keeps it."""
-    default_system, submit, check_submission, nudge, empty = TASKS[task]
-    system = system or default_system
+    _, submit, check_submission, nudge, empty = TASKS[task]
     submit_name = submit["function"]["name"]
     tools = tools or {}
-    messages: list = [  # plain dicts in and out; the SDK's TypedDict unions add nothing here
-        {"role": "system", "content": system},
-        {"role": "user", "content": prompt},
-    ]
-    schemas = [submit, *(schema for schema, _ in tools.values())]
+    messages, schemas = opening(prompt, tools, task, system)  # plain dicts in and out; the SDK's TypedDict unions add nothing here
     cost, used, submission, tokens = 0.0, Counter(), None, Counter()
     for _ in range(budget + MAX_TURNS):
         # openrouter.chat's backoff outlasts OpenRouter's per-minute 429s (Gemini 3.8 Flash is capped at 300 rpm across all its users)
