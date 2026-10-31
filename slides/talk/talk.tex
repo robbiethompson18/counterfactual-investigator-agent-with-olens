@@ -1,6 +1,6 @@
 % The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
 % its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
-% sentence-end probe, scripts/author_probe/period_check.py); the appendix: the O-lens (nl) ablation of Part 1. `make -C slides`.
+% sentence-end probe, scripts/author_probe/period_check.py). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -289,9 +289,6 @@
 \end{frame}
 
 \section{Anecdata}
-\begin{frame}
-  \parthead
-\end{frame}
 
 \begin{frame}{“graded” in O-lens reads, chat vs agentic template}
   \begin{itemize}
@@ -335,17 +332,4 @@
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, space lens + AR, T 1.}
 \end{frame}
 
-\section{Appendix}
-\begin{frame}{Ablation: O-lens on the option newlines only, hinted multiple choice}
-  \begin{itemize}
-    \item \cond{olensnl}{O-lens (nl)}: the investigator gets only the O-lens reads at the option newlines (the \texttt{\nlg}
-      after each option), none at the end of the prompt; \olens{} gets every read token of Part 1's example prompt
-    \item Same cases and investigator as Part 1; O-lens (nl) is an earlier run, its placebo another question's reads at
-      the same option newlines
-  \end{itemize}
-  \slidefig{fig/grid_nl.pdf}
-  \source{As Part 1's results: top, AUROC of P(knew), 95\% case bootstrap, one-sided paired bootstrap vs transcript-only;
-    bottom, \% correct, 95\% item bootstrap, one-sided paired sign test vs transcript-only; dotted: always the hinted
-    letter. * p < .05, ** < .01, *** < .001.}
-\end{frame}
 \end{document}
