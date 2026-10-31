@@ -3,7 +3,10 @@
 **Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
 by hand.
 
-## Executive Summary
+Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
+review I will write (KTR). FOr Claude I will write (CTR).
+
+## Executive Summary (KTR)
 
 We originally set out to test whether metamodels are useful in counterfactual investigations. We
 replicated results from CHIVE ([Karvonen et al., 2026](https://arxiv.org/abs/2608.16747)), and
@@ -83,8 +86,7 @@ each, and the investigator must name the letter Qwen picks from the prompt alone
 consistency, the same letter on at least 7 of 8 samples: that leaves 2,523 cases from a random 4,000
 MMLU-Pro questions (Qwen right on 82%) and a random 3,000 of SuperGPQA's 6,328 consistent questions
 (Qwen right on 63%). We never filter on Qwen being wrong, so most labels are also the correct
-answer, and we report the Qwen-wrong slice separately ([mcq-unselected.md](mcq-unselected.md),
-[supergpqa-inline.md](supergpqa-inline.md)).
+answer, and we report the Qwen-wrong slice separately.
 
 <!-- @c three sentences on this dataset. Mention how we don't filter on qwen wrong.
 @robbie done. -->
@@ -130,14 +132,18 @@ just gets a small shift. The only selection is the balanced 34 intros per human 
 
 ### Data Filter
 
-TODO new graphs here. We should show some Sankey diagrams maybe?
+@c I like this sankey diagram! We should just align on colors!
+
+Dark green: evaluated in dataset. You can split to qwen right and wrong, but keep these same color
+so that it's obvious they are both valid and both users.
+
+light green: usable but held out (either for probes or simply untouched)
+
+gray: not usable (typically because qwen inconsistent).
+
+Also @c put every sankey diagram below its 3 sentence description.
 
 <img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 10,000 questions to 3,000 eval cases, consistency the only filter" width="500">
-
-<!-- @c make a sankey for one dataset to test it out
-@robbie done for SuperGPQA: `uv run python -m graphs.data_filter_sankey` (code PR #502, waiting
-on your review; the PNG is in docs/img locally). Counts are constants from
-docs/supergpqa-inline.md. If you like it I'll do the other datasets. -->
 
 ## Results and Ablations
 
@@ -219,7 +225,7 @@ Things that will not have receipts:
 
 # Appendix:
 
-## 🔮-lens Now Speak English
+## 🔮-lens Now Speak English (DONE)
 
 We investigated why so many o-lens bullets lead with a Mandarin character and then become English.
 The canonical o-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
@@ -230,10 +236,10 @@ Agam fixed this in RL, and the o-lens speaks English again.
 
 <img src="img/olens-mandarin.png" alt="O-lens Mandarin before vs after keeping the bullet's leading space" width="500">
 
-## Our issues with the CHIVE dataset
+## Our issues with the CHIVE dataset (DONE)
 
-- 40% of the data is off-policy in that it's one {Qwen,Gemma,etc} continuation at the end of a
-  WildChat ChatGPT transcript. This makes some 'weird behavior' not that surprising, eg
+- 40% of the data is off-policy in that it's one target model continuation at the end of a WildChat
+  ChatGPT transcript. This makes some 'weird behavior' not that surprising, e.g.
   [000054](https://chive-cases.pages.dev/?case=prompt_000054), where the model correctly points out
   its own prior mistake (some of the time).
 - We hardcode hypotheses to validate or not based on a raw move in % space (rather than say a
@@ -248,9 +254,9 @@ Agam fixed this in RL, and the o-lens speaks English again.
   that we throw away. These 10%+ → 0 experiments actually aren't statistically significant; feeling
   confident that a counterfactual is 'inert' is a hard problem that likely requires more than 30
   samples.
-  - the mirror case where CF bumps rate to 100% is much less common
+  - The mirror case where CF bumps rate to 100% is much less common
 
-## WorkspaceBench Shows Less Than We Thought
+## WorkspaceBench Shows Less Than We Thought (DONE)
 
 On 28 of 33 categories on WorkspaceBench, Sonnet 5.5 performing text inversion matches or exceeds
 the accuracy of every metamodel. On the remaining five categories, stock Qwen matches or exceeds the
@@ -266,202 +272,55 @@ grade(s) per token per layer and get credit if any of these pass.
 Our full review is the "WorkspaceBench Review" tab of the
 [sprint doc](https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit).
 
-## Counterfactual investigation graphs
+## Counterfactual investigation graphs (ALMOST DONE, Robbie reviewed, but I do want to add CHIVE here if possible)
 
 Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
-behavior rate, higher is better; hatching means placebo. The PNGs are gitignored, so regenerate them
-from the repo root, then rebuild `final-writeup.html`, which embeds them, with
-`sh scripts/build_writeup.sh`:
+behavior rate, higher is better; hatching means placebo.
 
-```bash
-uv run python -m graphs.cfbench_report        # the ten cfbench charts
-uv run python -m graphs.honest_binary
-uv run python -m graphs.honest_binary_olens --out docs/img/honest-grader/binary_rmse_olens.png
-uv run python -m graphs.essay_curious_answer data/runs/cfbench/2026-10-28_essay-curious
-uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-duke3*'
-uv run python -m graphs.hint_mcq_answer
-uv run python -m graphs.hint_mcq_total
-uv run --with transformers python -m graphs.olens_mandarin
-```
+### Null Results on Counterfactual Predictions
 
-### cfbench, pooled and by target
+We built ~30 environments, borrowing ideas from previous work (eg Aditya and Palisade, @c links here
+plz). We did not see metamodels help in evaluating counterfactuals in these environments. We did not
+even see transcripts helping, which led us to believe that these counterfactuals were too difficult
+to predict.
+
+Nothing helper an investigator make better counterfacutla predictions:
 
 <img src="img/cfbench-report/skill_pooled.png" alt="All targets pooled" width="404">
 
-All targets pooled. Env diff only, transcript-only, O-lens and its placebo land within about a point
-of each other, all well above "edit does nothing".
+This was true across target models:
 
 <img src="img/cfbench-report/skill_by_target.png" alt="By target model, with paired gains over transcript-only" width="500">
 
-By target model, with each condition's paired gain over transcript-only on the same cases.
+One task, essay grading, looked like it worked, but when we tried a different investigator model it
+did not replicate:
 
 <img src="img/cfbench-report/skill_hidden_goal.png" alt="hidden_goal.grade" width="404">
 
-hidden_goal.grade, the one env with a pre-registered O-lens win (Qwen without CoT, 38 cases). It did
-not replicate: on the same 38 cases, GPT-6.1 Sol under a later harness is null (RMSE:
-transcript-only 31.7pp, O-lens 32.0pp, placebo 32.0pp). We never reran Flash on all 38 under that
-harness. The task that failed when we sized it up is a different one, the
-[hinted MCQ answer task](#hinted-mcq-answer-task-legacy-before-hints-were-dropped).
+### Harness Sanity Chceks:
 
-<!-- @c When we sized up sample size here this one failed right? read
-https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit?tab=t.ikhkgkb68db4#heading=h.256u14widhfp
-and include the graph here showign the fail too?
-@robbie no: the linked report is about hint_mcq, not hidden_goal. Chart is in the hint section. -->
-
-<img src="img/cfbench-report/skill_other_envs.png" alt="Every other Qwen-without-CoT case" width="404">
-
-Every Qwen-without-CoT case outside hidden_goal.grade.
+Models searched for reasonable things when reading transcripts and lens outputs:
 
 <img src="img/cfbench-report/olens_search_topics.png" alt="What the O-lens agent searches for" width="489">
 
-What the O-lens agent searches the lens for.
+They read mostly transcripts instead of lookign at lenses:
 
 <img src="img/cfbench-report/tool_calls.png" alt="Which tools the predictor calls" width="500">
 
-Which tools the predictor calls, at a 20-call budget.
+### Harness Ablations
 
-### cfbench, predictor ablations
+We tested whether our results were sensitive to investigator model, effort, and tool budget. These
+sweeps use four hand-picked cases, so most differences between lines are noise. Stronger predictors
+gain more from transcripts (GPT-6 Astra +20pp [+3, +36] over no transcript; Haiku about 0), but no
+predictor reliably gains from the 🔮-lens: averaged over all seven, O-lens minus transcript-only is
++0.4pp [−0.9, +1.7] on these cases.
 
 <img src="img/cfbench-report/models.png" alt="Predictor model by condition" width="400">
 
-Seven predictor models by condition, on the model chart's four cases.
-
-<!-- @c remove the celing line from this graph plz ty
-@robbie done.
-@c possible to add error bars to this grpah somehow? don't chagne anything yet but this is mostly
-noise right?
-@robbie the lens gaps are noise; the GPT transcript gains are not. Paired case bootstrap on the 4
-cases: O-lens minus transcript-only is -2.7 to +3.0pp, and only Haiku's +3.0 excludes 0 (but its
-placebo matches it). Transcript-only minus no transcript is +16.5 [+5.9, +26.0] for Sol and
-+20.7 [+9.2, +28.5] for Astra. No error bars added, per your note. -->
-
 <img src="img/cfbench-report/flash_effort.png" alt="Gemini 3.8 Flash by reasoning effort" width="400">
-
-Gemini 3.8 Flash by reasoning effort. Shading is a 95% bootstrap over the four cases, so it mostly
-shows the spread between cases, which every line shares.
-
-<!-- @c likewise error shading here would be nice.
-@robbie done. -->
 
 <img src="img/cfbench-report/flash_calls.png" alt="Gemini 3.8 Flash by tool-call budget" width="400">
 
-Gemini 3.8 Flash by tool-call budget, shaded the same way.
-
-<!-- @c likewise would like to see error bars.
-@robbie done. -->
+No model seems to get more or less uplift from having access to 🔮-lens outputs:
 
 <img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript-only vs O-lens by predictor" width="321">
-
-Transcript-only vs O-lens, one dot per predictor and thinking level.
-
-### cfbench, binary regrade
-
-Graded as flip/no-flip instead of RMSE, O-lens, its placebo and transcript-only stay within a point
-or two of each other at every threshold from 5 to 30pp. At 10pp, balanced accuracy for
-transcript-only, O-lens and placebo is 73, 72 and 73 on GLM 5.3, and 78, 79 and 77 on Qwen without
-CoT. Method and tables are in [cfbench-binary-regrade.md](cfbench-binary-regrade.md).
-
-<!-- @c these ones aren't rendering? Do we even want them?
-@robbie they came from a scratch script that isn't in the repo, so they can't be regenerated. Cut;
-the numbers above say the same thing.
-@c all of these graphs fucking massive can we resize every graph in the appenix to be max maybe 300x500 pixels?
-@robbie done: every appendix image fits 500 wide by 300 tall. -->
-
-### Honest grader
-
-<img src="img/honest-grader/binary_rmse.png" alt="Honest grader, all 242 cases" width="500">
-
-All 242 cases, without the lens.
-
-<img src="img/honest-grader/binary_rmse_olens.png" alt="Honest grader, cases with lens reads" width="500">
-
-The cases the lens runs cover, with O-lens and its placebo.
-
-### Essay grading (essay_curious)
-
-<img src="img/essay-curious/accuracy.png" alt="Letter-grade answer task by condition" width="500">
-
-Share of draws naming the letter grade Qwen gives with no scenario.
-
-<img src="img/essay-curious/per_case.png" alt="Letter-grade answer task per case" width="318">
-
-The same, per case.
-
-<img src="img/essay-curious/score_rmse.png" alt="Out-of-10 score RMSE by condition" width="500">
-
-RMSE of the predicted no-scenario score out of 10.
-
-<img src="img/essay-curious/score_per_case.png" alt="Every out-of-10 prediction per case" width="487">
-
-Every out-of-10 prediction per case against the truth.
-
-### Hinted MCQ answer task (legacy, before hints were dropped)
-
-<img src="img/hint-mcq-answer/accuracy.png" alt="Hint answer task by hint type" width="500">
-
-<img src="img/hint-mcq-answer/per_item_gold_hint.png" alt="Correct draws per item, gold-letter hint" width="500">
-
-<img src="img/hint-mcq-answer/per_item_wrong_hint.png" alt="Correct draws per item, wrong-letter hint" width="500">
-
-Share of draws naming Qwen's no-hint letter, overall and per item.
-
-<img src="img/hint-mcq-total/by_hint.png" alt="Running total by hint type" width="500">
-
-<img src="img/hint-mcq-total/combined.png" alt="Running total, all items" width="405">
-
-The running total over the original items and the 2k scale-up. We thought this task was tremendously
-easy for the 🔮-lens: Qwen consistently picks one wrong answer, a hint hides it, and the
-investigator says what Qwen picks without the hint. It looked positive on 20 items. On all 241 items
-it is null: O-lens 27.2% [22.0, 32.6], placebo 27.1% [21.9, 32.6], transcript-only 24.7% [19.8,
-29.9].
-
-## Appendix: List of Bugs We Caught:
-
-Bugs in our own pipeline:
-
-1. **The O-lens wrote Chinese.** The lens we were given stripped each bullet's leading space before
-   the AR scored it during RL, so about half its bullets opened with a Chinese word. Agam retrained
-   it with the space kept, and we redid every read made with the old lens
-   ([olens-space-migration.md](olens-space-migration.md)).
-2. **Reads of the wrong render.** Batch reads of thinking-off conversations rendered the thinking-on
-   generation header, a prompt Qwen never saw (#477).
-3. **Reads attached to the wrong tokens.** The reader found each message field by plain text search,
-   so a short field like the answer "e" could match chat-template text and mislabel every token
-   after it (#487).
-4. **Labels nobody could match.** cutoff_qa labels were normalized twice, so answers with
-   apostrophes ("N'Djamena") could never be matched by any investigator (9 of 999 items).
-5. **A flipped sign.** cutoff_qa reported "positive" as Qwen correct instead of Qwen wrong, which
-   made downstream tools skip every episode (#486).
-6. **Stale predictions reused.** cfbench's `--reuse` matched rows by case, not by the prompt sent,
-   so a changed reads file could pass off another eval's predictions as new ones (#483).
-7. **The grader in the predictor's system prompt.** A merge put the grader function where the new
-   system-prompt argument went; caught by the type checker (24c98af5).
-8. **Two Qwens pooled.** OpenRouter's fp8 Qwen and our bf16 vLLM Qwen give different rates (14/20 vs
-   36/40 on one env), and we had pooled them as one target (1237cedb).
-9. **Truncated answers scored as complete.** Replies cut off by a token limit were labelled as
-   finished episodes until the runner raised on them (#473).
-10. **The gate and the env sampled differently.** cutoff_qa's env ran at different sampling settings
-    from the stability gate that made its labels (55f53874).
-11. **A placebo that was the answer.** The first essay placebo was another opener's reads on the
-    same essay, which was sometimes the counterfactual prompt itself.
-12. **Reads of the counterfactual.** One cfbench condition read the lens on the counterfactual
-    prompt, which is outside the zero-counterfactual setting; we dropped it.
-13. **Greedy reads were shared.** Before 2026-10-27 lens reads were greedy, so every rollout of one
-    prompt got the identical read, not independent draws.
-
-Bugs and biases in the setups we inherited:
-
-14. **CHIVE's thresholds discard clean kills.** The absolute 50pp rule marks 8,623 experiments where
-    a 10–50% behavior drops to 0% as inconclusive ([chive-critique.md](chive-critique.md)).
-15. **A filter that leaked the label.** Our first MCQ eval kept only questions where DeepSeek V4
-    Flash disagreed with Qwen, which imported DeepSeek's letter bias: the hinted letter alone
-    predicted "Qwen knew" at AUROC 0.70, vs 0.53 unfiltered
-    ([mcq-unselected.md](mcq-unselected.md)).
-16. **WorkspaceBench's text baseline was truncated.** Its prompt-only floor is one 256-token
-    generation, and 40–73% of them stop mid-sentence
-    ([wsb-flash-prompt-only.md](wsb-flash-prompt-only.md)).
-17. **WorkspaceBench compares pass@1 to pass@hundreds.** The lens passes if any readout over its
-    read grid passes; the text reader gets one answer.
-
-<!-- @c add 3-20 here and I will trim.
-@robbie done, 17. Sources: the fix commits on main and the docs linked. -->
