@@ -44,13 +44,6 @@ edit would silently break that. Consolidate, details TBD (Robbie, 2026-10-30): p
 `mcq_prompt(stem, options)` + `bare_letter(reply)` that both envs import, keeping two envs since
 hint_mcq's ~20 hint arms are a different experiment, not one env with a dataset switch.
 
-## 2026-10-29: `environments run --backend vllm` records the env's OpenRouter provider
-
-`DEFAULTS["provider"]` (e.g. `deepinfra/fp8`) stays in the target when the backend is `vllm`, so
-`data/envs/supergpqa/2026-10-29_n8/meta.json` says `provider: deepinfra/fp8` and id
-`Qwen/Qwen3.6-27B@vllm:deepinfra/fp8` for a run served by the shared bf16 vLLM pod. The runner
-(`environments/_lib/run.py`) should drop `provider` when the backend isn't openrouter.
-
 ## 2026-10-29: `links.json` is built from the local runs only
 
 `spec.build_links` writes `envs/<env>/links.json` (per episode: Docent run, primary value, O-lens
@@ -68,14 +61,6 @@ checkout would drop runs). Index uploads race too: hint_mcq's index had lost fou
 by scratch scripts (clean, dedup, gate-attach, truth recheck) that were not kept. Next batch: port
 the clean into `merge.py` so a bank version is reproducible from the agents' JSONL files plus the
 gate run.
-
-## 2026-10-29: `environments run` hangs forever on a request that never returns
-
-The env runner has no per-request timeout on Qwen calls, so one stuck request keeps the run alive
-after every other episode is done: all three hint_mcq runs of 2026-10-28 (`rest`, `rest-b`,
-`rest-late`) sat at the tail with an idle pod until they were killed and finished by hand (status
-abandoned, labels, index, Docent and HF upload by script). A timeout that drops the episode as an
-error, like cfbench's predictor timeout, would let the run finish on its own.
 
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
@@ -127,13 +112,6 @@ pulled over S3), but anything written outside `/workspace` is gone. First seen 2
 scale2k read (`jpp_reads/2026-10-27_hint-mcq-scale2k`) was saved by pulling over ssh by hand. Fix:
 install rsync in the pod boot (`olens_reads.sh setup`), or fetch with `ssh ... tar c | tar x` (or
 `scp`).
-
-## 2026-10-28: `environments run --no-upload` still uploads to Docent
-
-`--no-upload` skips only the HF step; the runner uploads the episodes to Docent whenever
-`DOCENT_API_KEY` is set (`environments/_lib/run.py`). An audit smoke on 2026-10-27 created the
-public, now empty, Docent collection `debug_pointer` that way. The flag should skip Docent too, or
-be renamed `--no-hf`.
 
 ## 2026-10-28: metamodel reader bugs from a Codex review of the serving code
 
