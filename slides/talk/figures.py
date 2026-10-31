@@ -205,8 +205,15 @@ def positions(bars: dict, groups: list = GROUPS) -> tuple[dict[str, float], list
     return xs, ticks
 
 
-def grid() -> None:
-    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
+def unit_mm(fig, ax) -> float:
+    """mm per x data unit of `ax` as laid out."""
+    fig.canvas.draw()
+    return ax.get_window_extent().width / fig.dpi * 25.4 / np.diff(ax.get_xlim())[0]
+
+
+def grid() -> float:
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns.
+    Returns the mm per bar unit, so other bar charts can match its bar widths and hatching."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
     widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0})[1][-1] + 1 for n in knew.values()]
@@ -215,7 +222,9 @@ def grid() -> None:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    mm = unit_mm(fig, axes[0][0])
     save(fig, OUT / "grid.pdf")
+    return mm
 
 
 # Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's per-case p from the two runs'
@@ -350,8 +359,10 @@ def essay_flips() -> tuple[int, int]:
     return int((ok["olens_inline"] & ~ok["olens_placebo_inline"]).sum()), int((~ok["olens_inline"] & ok["olens_placebo_inline"]).sum())
 
 
-def essay() -> None:
-    """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null."""
+def essay(mm: float) -> None:
+    """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null.
+    `mm`: grid()'s mm per bar unit; the figure is narrowed until its axes match it, so the bars (and their hatching) are
+    the same size as Part 1's (Kylie, 2026-10-31)."""
     bars, null, n, _ = essay_auroc_bars()
     fig, ax = figure(90, FULL_H)
     xs, ticks = positions(bars, ESSAY_GROUPS)
@@ -378,6 +389,9 @@ def essay() -> None:
     ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
     ax.tick_params(axis="y", labelcolor=MUTED)
     ax.set_ylabel("AUROC of P(score goes up)")
+    for _ in range(3):  # constrained layout moves the axes as the figure narrows
+        w = fig.get_figwidth() - (unit_mm(fig, ax) - mm) * np.diff(ax.get_xlim())[0] / 25.4
+        fig.set_figwidth(w)
     save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -406,5 +420,4 @@ def essay_tables() -> None:
 
 
 if __name__ == "__main__":
-    grid()
-    essay()
+    essay(grid())
