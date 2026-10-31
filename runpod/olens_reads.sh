@@ -46,8 +46,9 @@ ln -sfn $C /root/repo/olens/checkpoints
 hf download Qwen/Qwen3.6-27B >/dev/null
 # the space lens (CLAUDE.md) and the AR, keys renamed for vLLM's LoRA runtime (docs/metamodel-serving.md)
 cd /root/repo
-test -f /workspace/lora_vllm/olens_space_rl600/adapter_model.safetensors || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 /workspace/lora_vllm/olens_space_rl600
-test -f /workspace/lora_vllm/ar_ptag_pooled/adapter_model.safetensors || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/ar_ptag_pooled/lora /workspace/lora_vllm/ar_ptag_pooled
+# reconvert when the download is newer than the conversion (hf download rewrites a file only when its revision changed)
+[ /workspace/lora_vllm/olens_space_rl600/adapter_model.safetensors -nt $C/agu18dec_olens_and_ar/olens_s3d_space_rl600/adapter_model.safetensors ] || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/olens_s3d_space_rl600 /workspace/lora_vllm/olens_space_rl600
+[ /workspace/lora_vllm/ar_ptag_pooled/adapter_model.safetensors -nt $C/agu18dec_olens_and_ar/ar_ptag_pooled/lora/adapter_model.safetensors ] || python3 olens/scripts/lora_for_vllm.py $C/agu18dec_olens_and_ar/ar_ptag_pooled/lora /workspace/lora_vllm/ar_ptag_pooled
 echo SETUP_DONE
 EOF
     ;;
@@ -57,7 +58,7 @@ EOF
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
+cd /root/repo && PYTHONPATH=.:olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
   /workspace/reads/$tag.reads.jsonl $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;

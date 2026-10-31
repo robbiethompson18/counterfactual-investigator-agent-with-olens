@@ -16,7 +16,7 @@ scenario arm's reads, and those reads up to `</essay>` are also the `none` arm's
 | Code            | [`env.py`](env.py); essays in [`essays/`](essays/), written for this env by Claude Fable 5.1                                                              |
 | Arms            | `none`, `best_student`, `duke`, `chico` (factor `scenario`), the same four as `pm/<scenario>` (A+ to F) and `ten/<scenario>` (out of 10) (factor `scale`) |
 | Primary measure | `positive`: the letter is A or B, or the score is 7+. Also `grade`, `letter` (letter arms) and `score` (`ten` arms)                                       |
-| Pairs           | each scenario arm → its scale's `none` (the prediction cases; `ten` arms are scored by `scripts/honest_score_predict.py`)                                 |
+| Pairs           | each scenario arm → its scale's `none` (the prediction cases; `ten` arms are scored by `scripts/honest_score_predict.py`, deleted, at `d89747b4`)                                 |
 | Answer task     | `canon_answer` = the grade with any + or -, compared exactly (every reply in the A-F run is a bare letter)                                                |
 | Items           | 12 essays, one per file (the letter arms were run on piano, cross_country, wrist only)                                                                    |
 | Requires        | thinking off                                                                                                                                              |

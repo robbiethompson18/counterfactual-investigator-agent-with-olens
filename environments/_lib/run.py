@@ -17,7 +17,7 @@ no max_tokens unless --max-tokens is given (recorded), reasoning effort always s
 otherwise, episode caps in turns and prompt tokens, never dollars.
 
 A run finishes the way scripts/runs.py did: its transcripts go to Docent (scripts/docent_upload.py, when DOCENT_API_KEY is
-set; a failure only prints the retry command), then the run folder and its indexes go to HF unless --no-upload. Ctrl-C
+set; a failure only prints the retry command), then the run folder and its indexes go to HF; --no-upload skips both. Ctrl-C
 finishes the run as `abandoned` and still uploads it: failed runs are data.
 """
 
@@ -117,7 +117,8 @@ def make_target(env, a) -> tuple[Target, dict]:
         backend=cfg["backend"],
         url=cfg.get("url"),
         served_name=cfg.get("served_name"),
-        provider=cfg.get("provider"),
+        # an env's DEFAULTS provider is an OpenRouter slug: on vllm it's wrong in meta.json and the target id
+        provider=cfg.get("provider") if cfg["backend"].startswith("openrouter") else None,
         effort=cfg.get("effort"),
         thinking=bool(cfg.get("thinking")),
         max_tokens=cfg.get("max_tokens"),
@@ -144,7 +145,7 @@ def main(argv):
     ap.add_argument("--box-conc", type=int, default=16, help="of those, episodes with a podman box (podman degrades past a few dozen)")
     ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
     ap.add_argument("-d", "--description", default="")
-    ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF when done")
+    ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF or Docent when done")
     ap.add_argument("--no-docent", action="store_true", help="don't mirror the run to Docent (prints the backfill command instead)")
     add_target_args(ap)
     a = ap.parse_args(argv)
@@ -222,8 +223,8 @@ def main(argv):
     cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
     w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
     print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
-    docent_upload(w.dir, skip=a.no_docent)
-    written = build_index([a.env])
+    docent_upload(w.dir, skip=a.no_docent or a.no_upload)
+    written = build_index([a.env], evals=False)  # evals don't ship with an env run, and one broken eval used to block the upload
     if not a.no_upload:
         n, oid = upload([w.dir, *written], f"envrun {a.env} {run} ({status})")
         print(f"uploaded {n} files to envs/ ({oid[:10]})")
@@ -265,7 +266,9 @@ async def _run_all(env, jobs, target, today, caps, conc, box_conc, w, out: list)
 
     # no pool cap: httpx defaults to 100 connections, which silently capped --conc at 100
     limits = httpx.Limits(max_connections=None, max_keepalive_connections=None)
-    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60), limits=limits) as client:
+    # 20 min per request (the slowest call in any saved run, queueing included, was ~8 min), so a request that never
+    # returns is retried by _post and, after its tries, errors the episode instead of holding the run open for hours
+    async with httpx.AsyncClient(timeout=httpx.Timeout(20 * 60, connect=60), limits=limits) as client:
         await asyncio.gather(*(one(*j) for j in jobs))
 
 
@@ -334,7 +337,7 @@ def cli():
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})
-        written = build_index(envs)
+        written = build_index(envs, evals=False)
         n, oid = upload([*dirs, *written], "envs: upload " + ", ".join(rest))
         print(f"uploaded {n} files ({oid[:10]})")
     else:

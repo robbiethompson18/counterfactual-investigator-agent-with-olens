@@ -130,10 +130,15 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
 # think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
 # are byte-identical to 13.
-# 15: essay_grading_inline / essay_grading_cf_inline (Robbie, 2026-10-31): placebo from another arm on a different essay of the
+# 15: menus_inline input preparation uses intact prompt text and structured MCQ options, avoiding split Unicode
+# corruption and spurious options parsed from question stems. Existing saved inputs and predictions are not rewritten.
+# 16: MCQ options use the final lettered block and reads use complete-option ending newlines, including multiline options.
+# mcq_unselected / supergpqa_inline prompts and read selection can change; stored runs are not rewritten.
+# 17: honest / essay_grading behavior definitions mark missing or invalid final Score fields as unscorable.
+# 18: essay_grading_inline / essay_grading_cf_inline (Robbie, 2026-10-31): placebo from another arm on a different essay of the
 # same topic, never base (it was the same essay, base allowed), new NLA and J++ conditions, single-turn effort medium. Every
-# other eval's prompts are byte-identical to 14.
-HARNESS_VERSION = 15
+# other eval's prompts are byte-identical to 17. This eval's rows made on the branch before the merge say 15; same prompts.
+HARNESS_VERSION = 18
 
 
 @dataclass
@@ -200,7 +205,7 @@ highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` search
 bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text. Use the O-lens tools liberally."""
 
-# reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py)
+# reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py@d89747b4)
 OLENS_SAMPLED = """
 
 {n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \

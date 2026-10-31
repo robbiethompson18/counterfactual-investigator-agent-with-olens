@@ -13,7 +13,7 @@ from pathlib import Path
 from graphs.cutoff_qa_inline import bar_chart, diffs
 
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_favorites-haiku-v3-{s}") for s in ("olens", "jlens", "nla")]
-GROUPS = {"all items": None, "pick one": "pick_one", "recommend": "recommend", "choose for\na purpose": "choose_for",
+GROUPS = {"all items": None, "pick one": "pick_one", "recommend": "recommend", "choose for a purpose": "choose_for",
           "favorite": "favorite", "name one": "name_one"}  # fmt: skip
 
 
@@ -24,5 +24,5 @@ if __name__ == "__main__":
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/favorites-qa-inline-diff.png"))
     a = p.parse_args()
     title = "Predicting Qwen3.6-27B's own pick for a preference question from the prompt"
-    bar_chart(a.runs, a.out, "shape", GROUPS, title, figsize=(13, 3.9))
+    bar_chart(a.runs, a.out, "shape", GROUPS, title, panel_w=3.0)
     diffs(a.runs, a.out_diff, xlim=(-32, 38))

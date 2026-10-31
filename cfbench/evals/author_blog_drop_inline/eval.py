@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from cfbench.core import Rollout
+from cfbench.evals.author_mcq_drop_inline.eval import _with_offsets, block
 from cfbench.evals.hint_qwen_dsv4 import inline
 from scripts.author_probe.bank import LETTERS, MODEL
 from scripts.author_probe.blog import ATTRS as BLOG_ATTRS
@@ -75,28 +76,6 @@ def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dic
                         "answer": LETTERS[r["answer"]], "label": LETTERS[r["label"]], "p0": r["pmf"][r["answer"]],
                         "p1": d["pmf"][r["answer"]], "drop": -d["qwen_shift"], "tv": d["tv"], "flip": not d["argmax_kept"],
                         "prompt": qf_message(passages[r["passage"]]["text"], r["attr"], opts)})  # fmt: skip
-    return out
-
-
-def _with_offsets(reads_dir: Path, tok) -> list[dict]:
-    """The reader's rows for `prompt_ids` requests carry no message offsets: add msg_index 0, field "content" and the read
-    token's char offset in the user message, which inline.block() needs."""
-    reqs = {r["id"]: r for r in load(reads_dir / "requests.jsonl")}
-    spans: dict[str, list] = {}
-    out = []
-    for r in load(reads_dir / "reads.jsonl"):
-        if r["id"] not in spans:
-            user = reqs[r["id"]]["messages"][0]["content"]
-            text = tok.apply_chat_template(reqs[r["id"]]["messages"], tokenize=False, enable_thinking=False)
-            enc = tok(text, return_offsets_mapping=True, add_special_tokens=False)
-            assert enc["input_ids"] == reqs[r["id"]]["prompt_ids"], r["id"]
-            s0 = text.index(user)
-            spans[r["id"]] = [(a - s0, b - s0) for a, b in enc["offset_mapping"]]
-        a, b = spans[r["id"]][r["token_index"]]
-        out.append(
-            r
-            | {"msg_index": 0, "role": "user", "field": "content", "char_offset": a, "token": reqs[r["id"]]["messages"][0]["content"][a:b]}
-        )
     return out
 
 
@@ -164,24 +143,6 @@ def placebo(path: Path, own: str, seed: int) -> str:
     same = [s for s in sorted(rows) if s != own and s.split(":")[1] == attr and batch[s] == batch[own]]
     pool = [s for s in same if n(s) >= n(own)] or sorted(same, key=n)[-5:]
     return random.Random(f"{seed}:{own}").choice(pool)
-
-
-def block(path: Path, own: str, messages: list[dict], source: str) -> str:
-    """inline.block's format: `own`'s positions in the case's prompt, `source`'s bullets position by position (its first
-    ones; cycled if it has fewer positions)."""
-    rows, _ = inline._reads(path)
-    mine, theirs = inline._positions(rows[own]), inline._positions(rows[source])
-    out = []
-    for k, ((i, field, char, token), _) in enumerate(mine):
-        layers = theirs[k % len(theirs)][1]
-        text = messages[i][field]
-        assert text.startswith(token, char), (own, i, char, token)
-        out.append(f"{inline._label(text, char, token)}: {inline._context(text, char, token)}")
-        for layer in sorted(layers):
-            for b in sorted(layers[layer]["bullets"], key=lambda b: -b["fve"]):
-                out.append(f"- layer {layer}, FVE {b['fve']:.2f}: {' '.join(b['text'].split())}")
-        out.append("")
-    return "\n".join(out).strip()
 
 
 def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:

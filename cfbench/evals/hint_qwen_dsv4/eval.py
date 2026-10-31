@@ -71,7 +71,7 @@ CONDITIONS = ("transcript_agentic", "olens_agentic", "olens_placebo_agentic")  #
 CSV = REPO_ROOT / "environments/hint_mcq/twomodel_qwen_dsv4_follow.csv"
 # the eval's read jobs (stop tokens, layers 32/40/48, T 1, space lens), together covering every shown run
 READS = [REPO_ROOT / f"data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-stop{t}" for t in ("", "-b")]
-# the option newlines (each option's "\n", the last one's "\n\n"; environments/hint_mcq/probe.py's site), layers 32/40/48/52,
+# the option newlines (each option's "\n", the last one's "\n\n"; the legacy option-newline probe's site), layers 32/40/48/52,
 # read on one shown run per case: they precede the reply, so the case's shown runs share them and prep gives each the rows
 READS_NL = REPO_ROOT / "data/runs/olens_reads/2026-10-28_hint-qwen-dsv4-nl"
 # the 2026-10-28 scale-up (Kylie: "sample more q's"): the rest of MMLU-Pro (hint_mcq items 2200:, all categories) with the

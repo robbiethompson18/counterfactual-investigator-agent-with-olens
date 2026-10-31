@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from graphs.style import INK, MUTED, use
+from graphs.style import INK, MUTED
 
 # runs aren't conditions in the palette: two teals for the no-tool runs, magenta for the tool run
 RUNS = {"A": ("#147d7d", "no tool"), "A2": ("#7cc4c4", "no tool, second 1k"), "B": ("#b8336a", "submit_answer tool")}
@@ -97,11 +97,11 @@ def by_position(c: pd.DataFrame, out: Path) -> None:
     fig.suptitle(
         "With the submit_answer tool, the lens says 'graded' ~7x as often, almost all of it mid-instruction\n"
         "(\"…give your best guess. Your answer will be graded on accuracy.\"); the tool's system block never says it",
-        x=0.06, ha="left", fontsize=10.5, color=INK,
+        x=0.06, ha="left",
     )  # fmt: skip
     legend(ax, c)
     fig.tight_layout()
-    fig.savefig(out / "cutoff-grader-mentions.png", dpi=160)
+    fig.savefig(out / "cutoff-grader-mentions.png")
 
 
 def by_layer(c: pd.DataFrame, out: Path) -> None:
@@ -114,10 +114,10 @@ def by_layer(c: pd.DataFrame, out: Path) -> None:
     ax.set_xticks(LAYERS)
     ax.set_xlabel("layer read")
     ax.set_ylabel(YLAB + "\nat the mid-instruction , and .")
-    ax.set_title("The tool run says 'graded' more at every layer", loc="left", fontsize=10, color=INK)
+    ax.set_title("The tool run says 'graded' more at every layer")
     ax.legend(loc="upper right", frameon=False, fontsize=8.5)
     fig.tight_layout()
-    fig.savefig(out / "cutoff-grader-mentions-layers.png", dpi=160)
+    fig.savefig(out / "cutoff-grader-mentions-layers.png")
 
 
 def items(c: pd.DataFrame, out: Path) -> None:
@@ -135,13 +135,12 @@ def items(c: pd.DataFrame, out: Path) -> None:
     ax.set_ylim(0, 105)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel('% of items with ≥1 read saying "grader" / "graded"')
-    ax.set_title("Items where the lens ever says 'graded'", loc="left", fontsize=10, color=INK)
+    ax.set_title("Items where the lens ever says 'graded'")
     fig.tight_layout()
-    fig.savefig(out / "cutoff-grader-mentions-items.png", dpi=160)
+    fig.savefig(out / "cutoff-grader-mentions-items.png")
 
 
 def main(run: Path, out: Path) -> None:
-    use()
     c = pd.read_csv(run / "item_counts.csv")
     out.mkdir(parents=True, exist_ok=True)
     by_position(c, out)

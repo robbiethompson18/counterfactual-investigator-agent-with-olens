@@ -105,9 +105,9 @@ def env_index(env: str) -> dict:
     }
 
 
-def build(envs: list[str] | None = None) -> list[Path]:
+def build(envs: list[str] | None = None, evals: bool = True) -> list[Path]:
     """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
-    (spec.py; the spec only when the env's source changed). -> written paths."""
+    (spec.py; the spec only when the env's source changed), and data/evals/ unless `evals=False`. -> written paths."""
     from .evals import build as build_evals
     from .spec import build as build_spec
 
@@ -120,7 +120,7 @@ def build(envs: list[str] | None = None) -> list[Path]:
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
     written += build_spec(names)
-    written += build_evals(export=False)
+    written += build_evals(export=False) if evals else []
     top = {t["env"]: t for t in hf_index("index.json").get("envs", [])}  # keeps envs this checkout doesn't have (other branches)
     for e in env_names():
         p = LOCAL / e / "index.json"

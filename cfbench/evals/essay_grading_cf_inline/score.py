@@ -17,9 +17,9 @@ import numpy as np
 from scipy.stats import rankdata
 
 from cfbench.core import canon_condition
+from cfbench.scoring import essay_probe_scores, grouped_auc_ci
 
 BOOT = 1000
-PROBE = Path("data/runs/essay_probe/2026-10-31_essay-grading-acts/probe.json")  # probe.py's output
 PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"),
          ("nla_inline", "nla_placebo_inline"), ("nla_inline", "transcript_inline"), ("nla_inline", "olens_inline"),
          ("jlens_inline", "jlens_placebo_inline"), ("jlens_inline", "transcript_inline"), ("jlens_inline", "olens_inline"))  # fmt: skip
@@ -187,10 +187,14 @@ def PAGE(rows: list[dict]) -> str:
         nul = {k: -obs[k] for k in keys}
         null_auroc = metrics(nul, truth, keys)["auroc"]
         bs = [b["auroc"] for b in boot(lambda ks, nul=nul: metrics(nul, truth, ks), keys, rng)]
-        probe = json.loads(PROBE.read_text())["best"] if PROBE.exists() else None
-        chart = [(c, a, lo, hi) for c, a, lo, hi, *_ in res]
-        if probe:
-            chart.append(("probe", probe["zero_cf_auroc"], probe["zero_cf_auroc"], probe["zero_cf_auroc"]))
+        chart: list[tuple] = [(c, a, lo, hi) for c, a, lo, hi, *_ in res]
+        for site, title in (("user_end", "probe: user end"), ("response_start", "probe: final token")):
+            probe = essay_probe_scores(site)
+            if not set(keys) <= probe.keys():
+                continue  # New essays need their own held-out predictions before adding a probe bar.
+            assert all(probe[k]["truth"] == truth[k] for k in keys)
+            score, lo, hi = grouped_auc_ci([probe[k]["predicted_shift"] for k in keys], [truth[k] for k in keys], [k[1] for k in keys])
+            chart.append(("probe", score, lo, hi, title))
         out.append(bars(chart, 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)",
                         lines=[(null_auroc, f"bet at the mean {null_auroc:.3f}")]))  # fmt: skip
         comb = {c: combined(ps[c], obs, truth, keys) for c in order}
@@ -223,7 +227,7 @@ def PAGE(rows: list[dict]) -> str:
         )
         out.append(f"<p class=\"mute\">Bet at the mean: rank by minus the observed mean grade (low grades tend to come back up), "
                    f"AUROC {f3(null_auroc)} [{f3(np.nanpercentile(bs, 2.5))}, {f3(np.nanpercentile(bs, 97.5))}]. "
-                   "Linear probe: see the footnote; no CI.</p>")  # fmt: skip
+                   "Linear probes: essay-bootstrap CIs, conditional on the fitted models; see the footnote.</p>")  # fmt: skip
         out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
                          [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
                           for c, a, lo, hi, n, m in res]))  # fmt: skip
@@ -241,17 +245,12 @@ def PAGE(rows: list[dict]) -> str:
         lift = [f"{a[x] - a[x.replace('_inline', '_placebo_inline')]:+.3f}" for x in lenses]
         body.append([g, str(len(keys)), *(f3(a[c]) for c in order), *lift])
     out.append(table(["group", "cases", *(swatch(c) for c in order), *(f"{label(x)} − placebo" for x in lenses)], body))
-    if PROBE.exists():
-        b = json.loads(PROBE.read_text())["best"]
-        out.append(
-            '<h3>Footnote: the linear probe</h3><p class="lede"><b>Kylie thinks this is a bit cursed</b>: it is trained against Qwen\'s '
-            "own grades, on Qwen's own activations, so it is not an investigator the way Haiku is. How it was trained "
-            f"(<code>probe.py</code>): ridge regression from Qwen's activations at the {b['site']} token before its reply (layer "
-            f"{b['layer']}) on each arm prompt (the opener Qwen actually saw, not the plain one) to Qwen's mean grade on the "
-            "plain-opener prompt for the same essay. 5 folds grouped by essay, so every essay is scored by a probe that never "
-            "saw it with any opener; about 1,450 training prompts from ~160 essays per fold. The bar ranks cases by the probe's "
-            "guess minus the grade Qwen actually gave with the opener. Because the target is per essay, it mostly learns how good "
-            f"Qwen thinks the essay is underneath the opener. With a forward pass on the plain prompt instead (probe on both, "
-            f"plain − arm) it gets {f3(b['cf_auroc'])}; the probe's out-of-fold r with Qwen's grade is {b['r_score']:.2f}.</p>"
-        )
+    out.append(
+        '<h3>Standardized linear probes</h3><p class="lede">Ridge predicts the plain-opener mean grade from '
+        "biased-opener activations, then subtracts the observed grade. Both read positions are reported separately. "
+        "Nested two outer/two inner folds grouped by essay select among layers 32/40/48/52/56/60; "
+        "mean-loss ridge lambda = 1, training-only standardization, 899/901 training rows from 102 essays per fold. "
+        "Each plotted score uses only the cases displayed above. No counterfactual activations enter the probe. "
+        "The investigator + mean calibration above remains a separate five-fold baseline.</p>"
+    )
     return "\n".join(out)

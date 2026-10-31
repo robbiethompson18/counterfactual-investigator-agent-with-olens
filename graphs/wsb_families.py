@@ -8,18 +8,14 @@ update the table below when the doc changes. Wrong Bridge has no numbers yet and
 import argparse
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+from graphs.style import INK, MUTED, bar_kw, color
 
 SERIES = ["sonnet", "olens", "qwen"]
 LABEL = {"olens": "Qwen O-lens", "sonnet": "Sonnet, text only", "qwen": "Stock Qwen, asked directly"}
-COLOR = {"olens": "#eb6834", "sonnet": "#2a78d6", "qwen": "#3a9a5b"}  # O-lens orange, text-only blue, Qwen outside the four
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
+# the style's condition behind each series: stock Qwen is gray, no tools: it is not the NLA's green
+CONDITION = {"olens": "olens", "sonnet": "transcript", "qwen": "no_transcript"}
 
 # family -> (series -> score), caption under the family. A tuple (shown, faint) draws a hollow bar
 # behind the solid one for a second pass@ regime.
@@ -53,9 +49,9 @@ def main(out: Path) -> None:
             v = scores[s]
             if isinstance(v, tuple):
                 v, faint = v
-                ax.bar(x, faint, width, color="none", edgecolor=COLOR[s], lw=1.2, zorder=2)
+                ax.bar(x, faint, width, color="none", edgecolor=color(CONDITION[s]), lw=1.2, zorder=2)
                 ax.text(x, faint + 0.015, f"{faint:.2f}", ha="center", va="bottom", fontsize=7, color=MUTED)
-            ax.bar(x, v, width, color=COLOR[s], zorder=3)
+            ax.bar(x, v, width, zorder=3, **bar_kw(CONDITION[s]))
             ax.text(x, v + 0.015 if v > 0.03 else 0.015, f"{v:.2f}" if v < 1 else "1.0", ha="center", va="bottom", fontsize=8, color=INK)
         ax.text(i, -0.24, caption, ha="center", va="top", fontsize=7, color=MUTED, transform=ax.get_xaxis_transform())
     ax.set_xticks(range(len(FAMILIES)))
@@ -63,12 +59,12 @@ def main(out: Path) -> None:
     ax.set_ylim(0, 1.08)
     ax.set_ylabel("score (fraction correct)")
     ax.grid(axis="x", visible=False)
-    ax.set_title("WorkspaceBench families on Qwen3.6-27B: does the O-lens beat just asking?", loc="left", fontsize=11, color=INK, pad=22)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=COLOR[s]) for s in SERIES]
+    ax.set_title("WorkspaceBench families on Qwen3.6-27B: does the O-lens beat just asking?", pad=22)
+    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(CONDITION[s])) for s in SERIES]
     ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0, 1.0))
     fig.subplots_adjust(bottom=0.3)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 

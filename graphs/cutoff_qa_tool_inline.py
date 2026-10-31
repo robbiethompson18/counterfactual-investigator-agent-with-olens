@@ -12,7 +12,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.cutoff_qa_inline import COLOR, HATCH, INK, LABEL, MUTED, ci, per_item
+from graphs.cutoff_qa_inline import ci, per_item
+from graphs.style import MUTED, bar_kw, ci_bar, label
 
 GROUPS = {"all items": None, "stale\n(answer out of date)": "stable_wrong", "not stale\n(answer still true)": "stable_right"}
 
@@ -25,7 +26,7 @@ PANELS = {
 
 def main(out: Path) -> None:
     fig, axes = plt.subplots(1, len(PANELS), figsize=(11, 3.9), sharey=True)
-    width, gap = 0.24, 0.015
+    width, gap, top = 0.24, 0.015, 0.0
     for ax, (title, run) in zip(axes, PANELS.items(), strict=True):
         data = per_item([run])
         for i, gate in enumerate(GROUPS.values()):
@@ -33,28 +34,23 @@ def main(out: Path) -> None:
                 xs = [a for c, a in data[s].values() if gate is None or c == gate]
                 m, (lo, hi) = sum(xs) / len(xs), ci(xs)
                 x = i + (j - (len(SERIES) - 1) / 2) * (width + gap)
-                ax.bar(x, 100 * m, width, color=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
-                       lw=0, zorder=3)  # fmt: skip
-                ax.errorbar(
-                    x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4
-                )
-                ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
+                ci_bar(ax, x, s, 100 * m, 100 * lo, 100 * hi, width=width)
+                top = max(top, 100 * hi)
             n = sum(1 for c, _ in data[SERIES[0]].values() if gate is None or c == gate)
             ax.text(i, -0.15, f"n = {n}", ha="center", va="top", fontsize=8, color=MUTED, transform=ax.get_xaxis_transform())
         ax.set_xticks(range(len(GROUPS)))
         ax.set_xticklabels(GROUPS.keys(), fontsize=8.5)
         ax.set_xlim(-0.55, len(GROUPS) - 0.45)
-        ax.set_ylim(0, 108)
         ax.grid(axis="x", visible=False)
-        ax.set_title(title, loc="left", fontsize=9.5, color=INK)
+        ax.set_title(title)
+    axes[0].set_ylim(0, top + 7)
     axes[0].set_ylabel("% of items where Haiku names Qwen's answer")
     fig.suptitle("Predicting Qwen3.6-27B's answer from the prompt: does moving the answer away from the read hurt the O-lens?",
-                 x=0.07, ha="left", fontsize=10.5, color=INK, y=1.07)  # fmt: skip
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=COLOR[s], hatch=HATCH.get(s), edgecolor=INK if s in HATCH else None,
-                             lw=0) for s in SERIES]  # fmt: skip
-    fig.legend(handles, [LABEL[s] for s in SERIES], loc="upper left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0.065, 1.02))
+                 x=0.07, ha="left", y=1.07)  # fmt: skip
+    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(s)) for s in SERIES]
+    fig.legend(handles, [label(s) for s in SERIES], loc="upper left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0.065, 1.02))
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 

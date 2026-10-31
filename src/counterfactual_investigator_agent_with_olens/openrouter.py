@@ -47,12 +47,13 @@ VERTEX = "vertex/"
 CLAUDE = "anthropic-direct/"
 BATCH = "anthropic-batch/"
 BATCH_WAIT, BATCH_MAX, BATCH_POLL = 30, 1000, 30  # 1,000 inline prompts of ~25k tokens is ~100 MB, under the 256 MB batch cap
+BATCH_BYTES = 150_000_000
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: dict[str, AsyncOpenAI] = {}  # key_env -> client
 _VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud returns its cached hour-long token until it nears expiry
 _ANTHROPIC: anthropic.AsyncAnthropic | None = None
-_QUEUE: list[tuple[dict, asyncio.Future]] = []  # anthropic-batch/ requests waiting for the next batch
+_QUEUE: list[tuple[dict, asyncio.Future, int]] = []  # request, caller, serialized bytes, waiting for the next batch
 _BATCHER: asyncio.Task | None = None
 _BATCHES: set[asyncio.Task] = set()  # running batches, held so they aren't garbage-collected
 # 429, 529 overloaded, other 5xx, connection errors (timeouts are a subclass, re-raised below)
@@ -61,6 +62,11 @@ ANTHROPIC_TRANSIENT = (anthropic.RateLimitError, anthropic.OverloadedError, anth
 
 class NoChoices(Exception):
     """OpenRouter reports some provider errors as a 200 with no choices."""
+
+
+def same_model(predictor: str) -> str:
+    """The Gemini model behind a route: `google/X` (OpenRouter), `gemini-direct/X` and `vertex/X` are all X."""
+    return predictor.removeprefix(DIRECT).removeprefix(VERTEX).removeprefix("google/")
 
 
 def api_key() -> str:
@@ -87,7 +93,7 @@ def extra_body(*, thinking: bool = True, effort: str | None = EFFORT, provider: 
     return body
 
 
-def _claude_params(model: str, messages: list[Any], effort: str | None, **params: Any) -> dict:
+def claude_request(model: str, messages: list[Any], effort: str | None, **params: Any) -> dict:
     """A Messages API request from `chat`'s OpenAI shapes (module docstring). Consecutive user turns (tool results, then a
     nudge) are left for the API to merge."""
     turns: list[Any] = []  # plain dicts, as for the OpenAI SDK
@@ -117,7 +123,7 @@ def _claude_params(model: str, messages: list[Any], effort: str | None, **params
     return {"model": model, "messages": turns, "max_tokens": params.pop("max_tokens", 16000), **params}
 
 
-def _claude_reply(r: anthropic.types.Message) -> ChatCompletion:
+def claude_reply(r: anthropic.types.Message) -> ChatCompletion:
     """An Anthropic reply as a ChatCompletion (module docstring)."""
     uses = [b for b in r.content if b.type == "tool_use"]
     calls = [{"id": b.id, "type": "function", "function": {"name": b.name, "arguments": json.dumps(b.input)}} for b in uses]
@@ -148,14 +154,30 @@ def _claude_reply(r: anthropic.types.Message) -> ChatCompletion:
     )
 
 
+def anthropic_client(timeout: float = 600) -> anthropic.AsyncAnthropic:
+    """The shared Anthropic client ($ANTHROPIC_API_KEY), built on first use."""
+    global _ANTHROPIC
+    if _ANTHROPIC is None:
+        _ANTHROPIC = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=timeout, max_retries=2)
+    return _ANTHROPIC
+
+
 async def _batched(api: anthropic.AsyncAnthropic, request: dict) -> anthropic.types.Message:
     """`request` answered through the Message Batches API (module docstring)."""
     global _BATCHER
     future = asyncio.get_running_loop().create_future()
-    _QUEUE.append((request, future))
+    _QUEUE.append((request, future, batch_request_size(request)))
     if _BATCHER is None:
         _BATCHER = asyncio.create_task(_send_batches(api))
     return await future
+
+
+def batch_request_size(request: dict) -> int:
+    """UTF-8 payload bytes, including the per-request wrapper; JSON spacing makes this a conservative bound."""
+    size = len(json.dumps({"custom_id": str(BATCH_MAX), "params": request}, ensure_ascii=False).encode()) + 1
+    if size + 32 > BATCH_BYTES:  # reserve the outer {"requests": [...]} wrapper
+        raise ValueError(f"one batch request exceeds the {BATCH_BYTES}-byte payload budget")
+    return size
 
 
 async def _send_batches(api: anthropic.AsyncAnthropic) -> None:
@@ -163,8 +185,14 @@ async def _send_batches(api: anthropic.AsyncAnthropic) -> None:
     while _QUEUE:
         await asyncio.sleep(BATCH_WAIT)
         while _QUEUE:
-            chunk = _QUEUE[:BATCH_MAX]
-            del _QUEUE[:BATCH_MAX]
+            count, size = 0, 32
+            for _, _, request_size in _QUEUE[:BATCH_MAX]:
+                if size + request_size > BATCH_BYTES:
+                    break
+                count += 1
+                size += request_size
+            chunk = [(request, future) for request, future, _ in _QUEUE[:count]]
+            del _QUEUE[:count]
             task = asyncio.create_task(_run_batch(api, chunk))
             _BATCHES.add(task)
             task.add_done_callback(_BATCHES.discard)
@@ -181,6 +209,8 @@ async def _run_batch(api: anthropic.AsyncAnthropic, chunk: list[tuple[dict, asyn
             batch = await api.messages.batches.retrieve(batch.id)
         async for entry in await api.messages.batches.results(batch.id):
             future, result = chunk[int(entry.custom_id)][1], entry.result
+            if future.done():  # a cancelled caller must not prevent delivery of the other paid replies
+                continue
             if result.type == "succeeded":
                 future.set_result(result.message)
             else:
@@ -209,7 +239,7 @@ async def chat(
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
     `extra_body` there is merged over the OpenRouter fields. `key_env` names the env var holding the key for `gemini-direct/`."""
-    global _CLIENT, _VERTEX, _ANTHROPIC
+    global _CLIENT, _VERTEX
     if model.startswith(VERTEX):
         if _VERTEX is None or time.time() - _VERTEX[0] > 120:  # so re-read often, or the cached token runs out under us
             cmd = ["gcloud", "auth", "print-access-token"]
@@ -226,9 +256,7 @@ async def chat(
         extra = params.pop("extra_body", None) or {}
         params["reasoning_effort"] = "none" if effort == "off" else effort
     elif model.startswith((CLAUDE, BATCH)):
-        if _ANTHROPIC is None:
-            _ANTHROPIC = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=timeout, max_retries=2)
-        api, extra = _ANTHROPIC, {}
+        api, extra = anthropic_client(timeout), {}
     else:
         if _CLIENT is None:  # built on first use, not at import: modules get imported on machines without the key
             _CLIENT = client()
@@ -237,9 +265,9 @@ async def chat(
     for attempt in range(attempts):
         try:
             if isinstance(api, anthropic.AsyncAnthropic):
-                request = _claude_params(model.split("/", 1)[1], messages, effort, **params)
+                request = claude_request(model.split("/", 1)[1], messages, effort, **params)
                 reply = await _batched(api, request) if model.startswith(BATCH) else await api.messages.create(**request, timeout=timeout)
-                r = _claude_reply(reply)
+                r = claude_reply(reply)
             else:
                 r = await api.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)
             if not getattr(r, "choices", None):
