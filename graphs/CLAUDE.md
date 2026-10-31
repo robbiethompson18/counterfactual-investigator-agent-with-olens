@@ -56,7 +56,7 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
   chart with its probe; prints the paired differences the write-up quotes
 - `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as `headline_inline` and per set,
   for the final write-up's "Total Tokens Per"
-- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa and essay questions become
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay and blog questions become
   eval cases (one PNG each; dark green evaluated, light green held out, gray unusable), counts
   sourced in the module; for the final write-up's Data Filter section
 - `chive_inline`: AUROC on CHIVE's official yes/no claims, Haiku with vs without the model's reply,
