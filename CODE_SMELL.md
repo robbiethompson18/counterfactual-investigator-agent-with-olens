@@ -432,3 +432,8 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
   `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
   cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
   the episodes. Give it `positive` (= `stale`?) on PR #380's branch.
+- 2026-10-31: `environments evals NAME --upload` fails with HF's 10,000-files-per-directory limit
+  when a cfbench run's expview export writes more than 10k files to `expview/tokens/` (one per
+  prediction with reads: `2026-10-30_essay-cf-haiku-olens`, 10,800). Its tokens were left off HF;
+  shard `tokens/` into subdirectories (e.g. by id prefix) in `environments/_lib/evals.py`
+  `export_expview` / expview's `Run`.
