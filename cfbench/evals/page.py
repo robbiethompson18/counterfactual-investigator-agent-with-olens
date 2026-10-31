@@ -31,7 +31,7 @@ def bars(
     hatch: dict[str, str] | None = None,
 ) -> str:
     """A bar chart of (condition, value, ci_lo, ci_hi) with error bars (lo == hi: none), y from `lo` to `hi`, plus dashed
-    horizontal reference `lines` (value, label). `hatch`: {condition: CSS colour}, drawn as that colour with black stripes
+    horizontal reference `lines` (value, label). `hatch`: {condition: CSS colour}, drawn as that colour with stripes in the page background
     (a placebo in its lens's colour, CLAUDE.md chart colours)."""
     W, H, L, B, T, bw = 120 + 110 * len(rows) + (150 if lines else 0), 260, 44, 40, 24, 64  # lines' labels sit right of the bars
     y = lambda v: T + (H - T - B) * (1 - (min(max(v, lo), hi) - lo) / (hi - lo))
@@ -42,7 +42,7 @@ def bars(
         s.append(
             f'<defs><pattern id="{pat[cond]}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
             f'<rect width="7" height="7" fill="{colour}"/>'
-            '<line x1="0" y1="0" x2="0" y2="7" stroke="#111" stroke-width="3"/></pattern></defs>'
+            '<line x1="0" y1="0" x2="0" y2="7" stroke="var(--bg, #fff)" stroke-width="3"/></pattern></defs>'
         )
     for k in range(5):
         v = lo + (hi - lo) * k / 4
