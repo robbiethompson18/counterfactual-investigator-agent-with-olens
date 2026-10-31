@@ -24,14 +24,16 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
   favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
 - `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right
   cases (`docs/supergpqa-inline.md`)
-- `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
-  (`docs/envs/hint_cf.md`)
-- `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up
-  (every Flash run, 8/8 hint followers), pooled and by hint type
+- `standard_probes`: all five standard families, both positions, full-population MCQ transfer and
+  hinted MCQ, plus matched essay investigators (`docs/standard-probe-protocol.md`)
+- `hint_mcq_answer` (legacy selected cohort): the hint_mcq answer task, three bars per hint type and
+  per-item grids (`docs/envs/hint_cf.md`)
+- `hint_mcq_total` (legacy selected cohort): the answer task's running total over the original items
+  and the 2k scale-up (every Flash run, 8/8 hint followers), pooled and by hint type
 - `mcq_unselected`: Haiku predicting Qwen's MMLU-Pro letter from the bare prompt on the unselected
-  set, prompt only vs O-lens, J-lens and NLA with their placebos, beside the linear probe and Qwen's
-  own logits, for all / Qwen-right / Qwen-wrong cases, plus paired differences
-  (`docs/mcq-unselected.md`)
+  set, prompt only vs O-lens, J-lens and NLA with their placebos, beside both standardized probe
+  read positions on the same questions, for all / Qwen-right / Qwen-wrong cases, plus paired
+  differences (`docs/mcq-unselected.md`)
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
 - `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock

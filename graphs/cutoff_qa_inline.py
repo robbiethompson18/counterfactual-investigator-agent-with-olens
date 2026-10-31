@@ -18,6 +18,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.scoring import grouped_mean_ci
 from graphs.style import MUTED, ci_bar, diff_rows, positions
 
 # the bars, each lens beside its placebo under one label
@@ -36,7 +37,7 @@ def per_item(runs: list[Path], by: str | Callable[[dict], object] = "gate_class"
     """condition -> item -> (the row's `by` field, or by(row); mean accuracy over draws), pooled over the runs."""
     acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     cls = {}
-    for line in (ln for run in runs for ln in (run / "predictions.jsonl").read_text().splitlines()):
+    for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
         acc[r["condition"]][r["item"]].append(bool(r["correct"]))
         cls[r["item"]] = by(r) if callable(by) else r[by]
@@ -58,25 +59,29 @@ PAIRS = [
 ]
 
 
-def diff_panel(ax, data: dict, pairs: list = PAIRS, value=None) -> None:
+def diff_panel(ax, data: dict, pairs: list = PAIRS, value=None, clusters=None) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
     bootstrap CI over items, on the items whose `by` is `value` (None: every item)."""
     rows: list = []
     for q, group in pairs:
         rows.append(q)
         for a, b in group:
-            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a] if value is None or data[a][i][0] == value]
-            rows.append((a, b, sum(ds) / len(ds), *ci(ds)))
+            keys = [i for i in data[a] if value is None or data[a][i][0] == value]
+            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in keys]
+            interval = grouped_mean_ci(ds, [clusters[i] for i in keys])[1:] if clusters else ci(ds)
+            rows.append((a, b, sum(ds) / len(ds), *interval))
     diff_rows(ax, rows)
 
 
-def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16), pairs: list = PAIRS, noun: str = "items") -> None:
+def diffs(
+    runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16), pairs: list = PAIRS, noun: str = "items", data=None, clusters=None
+) -> None:
     """graphs.style.diff_rows over every item: filled when the CI excludes 0, labelled by the two conditions' swatches."""
-    data = per_item(runs, by=lambda _: None)  # every item
+    data = data if data is not None else per_item(runs, by=lambda _: None)  # every item
     n_rows = sum(1 + len(group) for _, group in pairs)
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * n_rows))
     ax.set_xlim(*xlim)
-    diff_panel(ax, data, pairs)
+    diff_panel(ax, data, pairs, clusters=clusters)
     ax.set_xlabel(f"difference in % of {noun} right, paired by {noun[:-1]} (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     ax.set_title(f"All {len(data['transcript_inline'])} {noun}")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -85,18 +90,19 @@ def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16), pai
 
 
 def bar_chart(runs: list[Path], out: Path, by, groups: dict, title: str, ylabel: str = "% of items where Haiku names Qwen's answer",
-              bars: list = BARS, panel_w: float = 3.7) -> None:  # fmt: skip
+              bars: list = BARS, panel_w: float = 3.7, data=None, clusters=None, note: str = "") -> None:  # fmt: skip
     """A panel per group of items, a bar per condition: the mean over items of per-item accuracy over draws, 95% bootstrap CIs over
     items. `groups` maps a group's label to a value of the rows' `by` (None: every item)."""
-    data = per_item(runs, by=by)
+    data = data if data is not None else per_item(runs, by=by)
     xs, ticks = positions(data, bars)
     fig, axes = plt.subplots(1, len(groups), figsize=(panel_w * len(groups), 3.6), sharey=True, layout="constrained")
     top = 0.0
     for ax, (group, value) in zip(axes, groups.items(), strict=True):
         n = 0
         for c, x in xs.items():
-            vals = [a for g, a in data[c].values() if value is None or g == value]
-            m, (lo, hi) = sum(vals) / len(vals), ci(vals)
+            keys = [i for i, (g, _) in data[c].items() if value is None or g == value]
+            vals = [data[c][i][1] for i in keys]
+            m, lo, hi = grouped_mean_ci(vals, [clusters[i] for i in keys]) if clusters else (sum(vals) / len(vals), *ci(vals))
             ci_bar(ax, x, c, 100 * m, 100 * lo, 100 * hi)
             top, n = max(top, 100 * hi), len(vals)
         ax.set_xticks(ticks, [name for name, cs in bars if any(c in data for c in cs)])
@@ -107,6 +113,8 @@ def bar_chart(runs: list[Path], out: Path, by, groups: dict, title: str, ylabel:
     axes[0].set_ylabel(ylabel)
     fig.suptitle(title, x=0.01, ha="left")
     fig.text(0.995, 0.97, "hatched = placebo", ha="right", fontsize=8, color=MUTED)
+    if note:
+        fig.supxlabel(note, fontsize=8, color=MUTED)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)

@@ -24,6 +24,7 @@ from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 
 from cfbench.evals.essay_grading_cf_inline.eval import mean
+from cfbench.scoring import essay_lens_rows, essay_probe_scores
 from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.style import BG, INK, MUTED, bar_kw, positions
 from slides.figure import FULL_H, FULL_W, figure, save
@@ -178,7 +179,7 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         ax.tick_params(axis="x", labelsize=7 * S)
         if head:
             ax.text(0, 1.2, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
-            ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
+            ax.text(0, 1.08, f"{n:,} cases · legacy selected cohort", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
         ax.grid(axis="x", visible=False)
     # the axis stops just above the tallest whisker's labels, not at the next round number (Kylie, 2026-10-30); gridlines
     # every 10% below it
@@ -217,40 +218,16 @@ def grid() -> float:
 # Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's per-case p from the two runs'
 # predictions (data/runs/cfbench/, or HF's runs/cfbench/), a case = (arm, intro), its p the mean of its draws, as score.py
 ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
-# the zero-counterfactual probe's out-of-fold per-case scores (ridge at the token before the reply, L52, from the arm
-# prompt to the base score, minus the observed arm mean): ridge_oof of cfbench/evals/essay_grading_cf_inline/probe.py (PR
-# #450) over the essay_probe run 2026-10-31_essay-grading-acts, dumped per case (its probe.json has the summary only);
-# from HF's runs/ when it isn't local; the probe bar is left out if neither has it
-ESSAY_PROBE = "runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
+# Standardized zero-counterfactual OOF probes, nested two-fold, with both positions shown.
 ESSAY_INVESTIGATORS = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
 ESSAY_GROUPS = [
     ("transcript", ["transcript_inline"]),
     ("O-lens", ["olens_inline", "olens_placebo_inline"]),
     ("transcript\n+ bet at mean", ["transcript_inline+mean"]),
     ("O-lens\n+ bet at mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
-    ("probe †", ["probe"]),
+    ("probe:\nuser end", ["probe_user_end"]),
+    ("probe:\nfinal", ["probe_response_start"]),
 ]  # † Kylie: probably cursed (the slide's footnote)
-
-
-def load_rows(run: str) -> list[dict]:
-    local = ROOT / "data/runs/cfbench" / run / "predictions.jsonl"
-    if local.exists():
-        return [json.loads(line) for line in local.open()]
-    with urllib.request.urlopen(HF.replace("/evals/", f"/runs/cfbench/{run}/predictions.jsonl")) as r:
-        return [json.loads(line) for line in r]
-
-
-def load_probe() -> list[dict]:
-    local = ROOT / "data" / ESSAY_PROBE
-    try:
-        lines = (
-            local.read_text().splitlines()
-            if local.exists()
-            else urllib.request.urlopen(HF.replace("evals/", ESSAY_PROBE)).read().decode().splitlines()
-        )
-    except urllib.error.HTTPError:
-        return []
-    return [json.loads(line) for line in lines]
 
 
 def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
@@ -267,17 +244,17 @@ def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.nd
     ps: dict[str, dict[tuple, list[float]]] = {}
     truth, arm_mean = {}, {}
     for run in ESSAY_RUNS:
-        for r in load_rows(run):
+        for r in essay_lens_rows(run):
             if r.get("valid", True) and r.get("p") is not None:
                 k = (r["base_arm"], r["item"])
                 ps.setdefault(r["condition"], {}).setdefault(k, []).append(r["p"])
                 truth[k], arm_mean[k] = r["k_cf"], mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
     keys = sorted(truth)
     xs = {c: np.array([np.mean(d[k]) for k in keys]) for c, d in ps.items()}
-    if probe := load_probe():
-        pr = {(r["base_arm"], r["item"]): r for r in probe}
-        assert all(pr[k]["k_cf"] == truth[k] for k in keys)
-        xs["probe"] = np.array([pr[k]["score"] for k in keys])
+    for site in ("user_end", "response_start"):
+        pr = essay_probe_scores(site)
+        assert all(pr[k]["truth"] == truth[k] for k in keys)
+        xs[f"probe_{site}"] = np.array([pr[k]["predicted_shift"] for k in keys])
     return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
 
 
@@ -321,7 +298,8 @@ def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
         bars[c] = (rank_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     pairs = {}
     for a, b in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"),
-                 ("olens_placebo_inline", "transcript_inline"), ("probe", "transcript_inline"),
+                 ("olens_placebo_inline", "transcript_inline"),
+                 ("probe_user_end", "transcript_inline"), ("probe_response_start", "transcript_inline"),
                  ("olens_inline+mean", "transcript_inline+mean"), ("olens_inline+mean", "olens_placebo_inline+mean"),
                  ("olens_placebo_inline+mean", "transcript_inline+mean")]:  # fmt: skip
         if a in boot:
@@ -356,8 +334,8 @@ def essay(mm: float) -> None:
     ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", labelsize=7 * S)
-    ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
-    ax.text(1.0, 1.08, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    ax.text(0, 1.08, f"{n:,} cases · probes: nested 2 × 2", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
+    ax.text(1.0, 1.08, "hatched = legacy placebo (contaminated)", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     ax.grid(axis="x", visible=False)
     top = max(hi for _, (_, hi), _ in bars.values()) + 0.07
     yt = np.arange(base, top, 0.1)
@@ -374,7 +352,7 @@ def essay(mm: float) -> None:
 def essay_diffs() -> None:
     """The paired differences as a forest plot in diff_rows' style (ink CI line and dot, filled when the CI excludes 0, a line
     at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
-    resamples as the table and the stars; the probe's (+0.127) is left out so it doesn't set the axis."""
+    resamples as the table and the stars; the probes are left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
     short = {"olens_inline": "O-lens", "olens_placebo_inline": "placebo", "transcript_inline": "transcript"}
     fig, ax = figure(57, 30)
@@ -412,7 +390,8 @@ def essay_tables() -> None:
     O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
-            "olens_placebo_inline": r"\swp{olens}\ placebo", "probe": r"\sw{probe}\ probe†"}  # fmt: skip
+            "olens_placebo_inline": r"\swp{olens}\ placebo",
+            "probe_user_end": r"\sw{probe}\ probe: user end", "probe_response_start": r"\sw{probe}\ probe: final"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
