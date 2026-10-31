@@ -4,7 +4,8 @@ on purpose.
 
     uv run python -m graphs.data_filter_sankey [--out-dir docs/img]
 
-Counts are constants: docs/supergpqa-inline.md (Pool and Split), docs/mcq-unselected.md (the split, both batches),
+Counts are constants: environments/supergpqa/ (26,529 questions, 15,300 non-calculation), docs/supergpqa-inline.md (Pool and Split),
+docs/mcq-unselected.md (the split, both batches),
 docs/envs/cutoff_qa.md and data/banks/cutoff_qa/v3.json (stable = 7 of 8 samples agree; the 1,197 not evaluated include the numeric
 items), docs/favorites-qa-inline.md, and for essays cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
 data/runs/cfbench/2026-10-31_essay-cf-b-ts.
@@ -19,22 +20,28 @@ import numpy as np
 from graphs.style import BG, INK, MUTED
 
 EVAL, HELD, UNUSABLE = "#1b5e3b", "#a9d6b8", "#cfcbc0"  # not the NLA's green or the no-tools gray: these aren't conditions
-STABLE, UNSTABLE = "consistent (≥ 7 of 8 samples agree)", "inconsistent, dropped"
+STABLE, UNSTABLE = "consistent (≥ 7 of 8)", "inconsistent, dropped"
 GAP, NODE_W = 0.06, 0.018
 # file slug -> title, columns of (node, count) top to bottom, flows of (source, target, count, colour)
 DATASETS = {
     "supergpqa": (
-        "SuperGPQA: the only filter is consistency, not Qwen being wrong",
+        "SuperGPQA: calculation questions dropped, then consistency the only filter",
         [
-            [("SuperGPQA questions", 10_000)],
+            [("SuperGPQA questions", 26_529)],
+            [("sampled, non-calculation", 10_000), ("not sampled", 5_300), ("calculation, dropped", 11_229)],
             [(STABLE, 6_328), (UNSTABLE, 3_672)],
             [("eval cases", 3_000), ("probe / validation pool", 3_328)],
             [("Qwen right", 1_878), ("Qwen wrong", 1_122)],
         ],
         [
-            ("SuperGPQA questions", STABLE, 3_000, EVAL),
-            ("SuperGPQA questions", STABLE, 3_328, HELD),
-            ("SuperGPQA questions", UNSTABLE, 3_672, UNUSABLE),
+            ("SuperGPQA questions", "sampled, non-calculation", 3_000, EVAL),
+            ("SuperGPQA questions", "sampled, non-calculation", 3_328, HELD),
+            ("SuperGPQA questions", "sampled, non-calculation", 3_672, UNUSABLE),
+            ("SuperGPQA questions", "not sampled", 5_300, HELD),
+            ("SuperGPQA questions", "calculation, dropped", 11_229, UNUSABLE),
+            ("sampled, non-calculation", STABLE, 3_000, EVAL),
+            ("sampled, non-calculation", STABLE, 3_328, HELD),
+            ("sampled, non-calculation", UNSTABLE, 3_672, UNUSABLE),
             (STABLE, "eval cases", 3_000, EVAL),
             (STABLE, "probe / validation pool", 3_328, HELD),
             ("eval cases", "Qwen right", 1_878, EVAL),
@@ -129,7 +136,7 @@ def sankey(title: str, columns: list, flows: list, out: Path) -> None:
     nodes = layout(columns, scale)
     out_used = {k: 0.0 for k in nodes}  # how much of each node's height its outgoing flows have used, from the top
     in_used = {k: 0.0 for k in nodes}
-    fig, ax = plt.subplots(figsize=(9, 4.2))
+    fig, ax = plt.subplots(figsize=(max(9, 2.2 * len(columns)), 4.2))
     for src, dst, n, color in flows:
         (xs, ys, _), (xd, yd, _), h = nodes[src], nodes[dst], n * scale
         a = (ys - out_used[src], ys - out_used[src] - h)
