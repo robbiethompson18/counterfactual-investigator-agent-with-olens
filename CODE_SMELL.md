@@ -2,6 +2,27 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-31: saved `menus_inline` inputs contain Unicode corruption and miscounted MCQ options
+
+`cfbench/evals/menus_inline/eval.py` reconstructed prompts by joining individually decoded tokens,
+which replaces characters split across UTF-8 token boundaries with U+FFFD. Future input preparation
+now extracts the user turn from the intact `text` in the fill run's `reads.transcripts.jsonl`, keeping
+the token arrays and read positions unchanged (harness 15).
+
+Existing `2026-10-30_menus-inline-inputs/cases.jsonl` inputs and their results remain unchanged:
+52/2,523 MMLU-Pro prompts and 51/3,000 SuperGPQA prompts are corrupted, 103/5,523 (1.9%) combined.
+The impact on measured lens uplift is unmeasured; the affected fraction does not establish that it
+is negligible. Robbie explicitly deferred reruns on 2026-10-31. No saved inputs or results were
+regenerated for this fix.
+
+Option parsing also matched lettered lines inside question stems: 7 MMLU-Pro and 33 SuperGPQA
+cases have wrong saved option counts, yielding 10 seed-0 placebo pairs with different true option
+counts. Two SuperGPQA cases were excluded as apparent 12/14-option singletons; they actually have
+8/10 options and can have same-count placebos. Future preparation uses the datasets' structured
+option lists, checked against the source evals' saved counts. The same-count placebo guard stays.
+The effect on uplift is unmeasured, and Robbie deferred these reruns too; historical inputs and
+results, including the two missing cases, remain unchanged.
+
 ## 2026-10-31: `honest_score_predict --provider` is a no-op
 
 `scripts/honest_score_predict.py` pins a provider by wrapping `openrouter.chat` in

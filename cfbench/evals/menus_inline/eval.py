@@ -4,7 +4,7 @@ the four inline sets (Robbie, 2026-10-30).
 One single-turn prompt for every set: the prompt Qwen3.6-27B (thinking off) was asked, never its reply, and one
 submit_answer call; truth is Qwen's modal answer (>= 7/8 samples agree, the sets' own gates). Versions are the sets:
 `cutoff` (999 present-tense factual questions), `favorites` (1,500 own-preference questions), `mcq_unselected` (2,523
-MMLU-Pro questions) and `supergpqa` (2,998 SuperGPQA questions); their cases are those evals' cases, nothing re-gated.
+MMLU-Pro questions) and `supergpqa` (3,000 SuperGPQA questions); their cases are those evals' cases, nothing re-gated.
 
 Reads are every default read position (docs/read-positions.md): the 2026-10-29 runs plus the 2026-10-30 fill
 (cfbench.evals.inline_reads), J++ from every-token runs (JPP). The menus pick positions from them:
@@ -34,7 +34,7 @@ from typing import Any
 
 from cfbench.core import Rollout
 from cfbench.evals import inline_reads
-from cfbench.evals.hint_qwen_dsv4_letter.eval import OPTION, canon
+from cfbench.evals.hint_qwen_dsv4_letter.eval import canon
 from cfbench.olens import show_token
 from environments._lib.core import load_env
 from environments._lib.runfolder import LOCAL, read_episodes
@@ -78,14 +78,20 @@ def labels() -> dict[str, dict]:
         out[f"favorites_qa/2026-10-29_v3-1500-nohint:{ep['id']}"] = {
             "set": "favorites", "item": ep["item"], "modal": fav.norm(m["qwen_modal"]), "k": m["qwen_modal_count"], "n": 8,
             "category": m["domain"], "category2": None, "gold": None}  # fmt: skip
+    mmlu = load_env("hint_mcq")._table()
     for line in (RUNS / "cfbench_evals/2026-10-29_mcq-unselected-inputs-b2/cases.jsonl").open():
         c = json.loads(line)
+        opts = list(mmlu.loc[c["item"]].options)
+        assert len(opts) == c["n_opts"], c["item"]
         out[f"mcq_unselected/nohint~{c['item']}"] = {"set": "mcq_unselected", "item": c["item"], "modal": c["modal"],
-            "k": c["k"], "n": c["n"], "category": c["category"], "category2": None, "gold": c["gold"]}  # fmt: skip
+            "k": c["k"], "n": c["n"], "category": c["category"], "category2": None, "gold": c["gold"], "opts": opts}  # fmt: skip
+    supergpqa = load_env("supergpqa")._table()
     for line in (RUNS / "cfbench_evals/2026-10-29_supergpqa-inline-inputs/cases.jsonl").open():
         c = json.loads(line)
+        opts = list(supergpqa.loc[c["item"]].options)
+        assert len(opts) == c["n_opts"], c["item"]
         out[f"supergpqa/base~{c['item']}"] = {"set": "supergpqa", "item": c["item"], "modal": c["modal"], "k": c["k"], "n": c["n"],
-                                              "category": c["field"], "category2": c["discipline"], "gold": c["gold"]}  # fmt: skip
+                             "category": c["field"], "category2": c["discipline"], "gold": c["gold"], "opts": opts}  # fmt: skip
     return out
 
 
@@ -97,10 +103,18 @@ def kinds(tokens: list[str], positions: list[int]) -> dict[int, str]:
     return {p: "dot" if p == dot else f"tail{p - dot - 1}" if p > dot else "nl" if tokens[p].strip() == "" else "punct" for p in positions}
 
 
+def user_prompt(transcript: dict) -> str:
+    # Individually decoded tokens can replace split UTF-8 characters with U+FFFD; slice the intact render instead.
+    text = transcript["text"]
+    prefix, suffix = "<|im_start|>user\n", "".join(TAIL)
+    assert text.startswith(prefix) and text.endswith(suffix), transcript["id"]
+    return text[len(prefix) : -len(suffix)]
+
+
 def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = None, strict: bool = False):
     """cases.jsonl: one row per case with its prompt, render tokens, read positions and their kinds, label and categories."""
     lab = labels()
-    tokens = {t["id"]: t["tokens"] for t in map(json.loads, FILL.open()) if t["id"] in lab}
+    transcripts = {t["id"]: t for t in map(json.loads, FILL.open()) if t["id"] in lab}
     rows = []
     for name in versions:
         pos = defaultdict(set)
@@ -110,10 +124,10 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
                 if r["layer"] == LAYERS[0] and r["id"] in lab:
                     pos[r["id"]].add(r["token_index"])
         for i in sorted(i for i, v in lab.items() if v["set"] == name):
-            toks = tokens[i]
-            user = "".join(toks[3 : len(toks) - len(TAIL)])  # <|im_start|>, "user", "\n", then the user turn
+            toks = transcripts[i]["tokens"]
+            user = user_prompt(transcripts[i])
             assert toks[:3] == ["<|im_start|>", "user", "\n"], toks[:3]
-            opts = [m.group(2) for m in OPTION.finditer(user)]
+            opts = lab[i].get("opts", [])
             rows.append(lab[i] | {"id": i, "prompt": user, "opts": opts, "n_opts": len(opts), "tokens": toks,
                                   "kinds": kinds(toks, sorted(pos[i]))})  # fmt: skip
         print(name, sum(r["set"] == name for r in rows), "cases")
@@ -159,8 +173,7 @@ def _cases(inputs: str) -> dict[str, dict]:
 
 
 def cases(inputs: Path, versions: list[str]):
-    """Every case of the versions, except the 2 supergpqa questions (12 and 14 options) no other case shares an option count
-    with: they can't have a placebo (docs/placebo-rules.md never relaxes it), so they're left out of every condition."""
+    """Every case with another same-set, same-option-count case available as its placebo."""
     peers = Counter((c["set"], c["n_opts"]) for c in _cases(str(inputs)).values())
     for c in _cases(str(inputs)).values():
         if c["set"] not in versions or peers[c["set"], c["n_opts"]] < 2:
