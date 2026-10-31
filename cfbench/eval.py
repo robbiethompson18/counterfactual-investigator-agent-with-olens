@@ -121,6 +121,7 @@ async def main():
     ap.add_argument("--models", default="", help="comma list of target model ids: only their cases")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--concurrency", type=int, default=32)
+    ap.add_argument("--attempts", type=int, default=3, help="tries per prediction before its draw is dropped")
     ap.add_argument("--slug", default="")
     ap.add_argument("--show", action="store_true", help="print the first case's prompt per condition (draw 0) and exit; no API calls")
     ap.add_argument("--description", default="")
@@ -307,8 +308,8 @@ async def main():
         return prompt, tools, extra | {"prompt_sha": prompt_sha(prompt, tools, effort, task, system)}, effort
 
     async def predicted(env, case: dict, condition: str, predictor: str, draw: int, prompt: str, tools: dict, effort: str, first=None):
-        """predict() with three attempts, then None; `first` is the predictor's first reply when it came from a batch."""
-        for attempt in range(3):
+        """predict() with --attempts tries, backing off, then None; `first` is the predictor's first reply when it came from a batch."""
+        for attempt in range(args.attempts):
             try:
                 budget = args.max_calls if tools else 0
                 return await predict(
@@ -317,6 +318,8 @@ async def main():
             except (openai.APIStatusError, anthropic.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
                 print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
                 first = None  # a retry starts the conversation over
+                if attempt + 1 < args.attempts:  # back off: an upstream rate limit fails immediate retries too
+                    await asyncio.sleep(min(60, 2**attempt))
 
     def record(env, case: dict, condition: str, predictor: str, draw: int, shown: list, effort: str, extra: dict, result: dict):
         if ev.MODEL_NAME:  # the predictor must never have seen the model id
