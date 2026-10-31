@@ -14,9 +14,10 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
-- `cutoff_qa_investigators`: the same task by investigator: Haiku 5.5 (later cutoff; transcript, told the model
-  and its cutoff, O-lens, placebo) beside Gemini 2.5 Flash-Lite (Qwen's cutoff; answering the question itself, transcript,
-  O-lens, placebo), stale / not stale / all; unfinished runs are left out
+- `cutoff_qa_investigators`: the same task by investigator: Haiku 5.5 (later cutoff; transcript,
+  told the model and its cutoff, O-lens, placebo) beside Gemini 2.5 Flash-Lite (Qwen's cutoff;
+  answering the question itself, transcript, O-lens, placebo), stale / not stale / all; unfinished
+  runs are left out
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
@@ -54,14 +55,19 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
-- `headline_inline`: the final write-up's Results headline, % of cases right on MCQ, knowledge cutoff and preferences: pooled
-  metamodels, each against its placebo, against the MCQ probe (and as error rate), and seven bars per task, plus essay grading's own
-  chart with its probe; prints the paired differences the write-up quotes
-- `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as `headline_inline` and per set,
-  for the final write-up's "Total Tokens Per"
-- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay and blog questions become
-  eval cases (one PNG each; dark green evaluated, light green held out, gray unusable), counts
-  sourced in the module; for the final write-up's Data Filter section
+- `headline_inline`: the final write-up's Results headline, % of cases right on MCQ, knowledge
+  cutoff and preferences: pooled metamodels, each against its placebo, against the MCQ probe (and as
+  error rate), and seven bars per task, plus essay grading's own chart with its probe; prints the
+  paired differences the write-up quotes
+- `headline_ablations`: the write-up's ablation charts on `headline_inline`'s runs: % right split by
+  Qwen right / wrong (MMLU-Pro, SuperGPQA, knowledge cutoff), each lens and each placebo minus
+  transcript only per task and pooled, and essay grading's and the blog deletions' AUROC split by
+  whether Qwen is right (essays: wrong side of its median grade vs the PERSUADE score)
+- `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as
+  `headline_inline` and per set, for the final write-up's "Total Tokens Per"
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay and blog questions
+  become eval cases (one PNG each; dark green evaluated, light green held out, gray unusable),
+  counts sourced in the module; for the final write-up's Data Filter section
 - `chive_inline`: AUROC on CHIVE's official yes/no claims, Haiku with vs without the model's reply,
   beside CHIVE's Opus 4.8 transcript and resampling arms, one panel per target, plus the paired
   difference (`docs/chive-inline.md`)
