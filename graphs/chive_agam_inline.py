@@ -52,7 +52,7 @@ def main(runs: list[Path], out: Path, out_diff: Path):
             rows.append((a, b, point[a] - point[b], *np.percentile(d, [2.5, 97.5])))
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
     diff_rows(ax, rows, value_fmt="{:+.3f}")
-    ax.set_xlim(-0.08, 0.12)
+    ax.set_xlim(-0.04, 0.06)
     ax.set_xlabel("AUROC difference, paired by claim (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     fig.savefig(out_diff, bbox_inches="tight")
     print(out_diff)
