@@ -69,7 +69,7 @@ text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=T
 ids = tok(text, add_special_tokens=False).input_ids
 toks = [tok.decode([i]) for i in ids]
 positions = {p for p, t in enumerate(toks) if PUNCT.match(t) or t == "<|im_end|>"}
-positions |= set(option_newline_positions)        # MCQs: the token holding each option's ending newline
+positions |= set(option_newline_positions)  # MCQs: the token holding each option's ending newline
 positions |= set(range(len(ids) - 10, len(ids)))  # the ten tail tokens, ending at </think>\n\n
 row = {"id": ..., "text": text, "positions": sorted(positions)}
 ```

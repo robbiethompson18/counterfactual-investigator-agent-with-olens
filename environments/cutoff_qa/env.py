@@ -30,6 +30,7 @@ import json
 import os
 import re
 import unicodedata
+from collections import Counter
 from functools import cache
 
 from counterfactual_investigator_agent_with_olens.qwen import MODEL as SERVED_NAME
@@ -90,6 +91,22 @@ def norm(s: str) -> str:
     s = NUMBER_UNITS.sub(r"\1", s)
     s = re.sub(r"^(?:the|a|an)\s+", "", s.strip())
     return " ".join(s.split())
+
+
+@cache
+def _gate_samples(gate_run: str) -> dict[str, dict]:
+    path = REPO_ROOT / "data/runs/cutoff_gate" / gate_run.removeprefix("cutoff_gate/") / "samples.jsonl"
+    return {r["id"]: r for r in map(json.loads, path.read_text().splitlines())}
+
+
+def gate_label(gate_run: str, item: str, modal: str) -> str:
+    """The predict-Qwen label: the gate's modal answer in `norm` form, taken from the raw samples. The gate clusters samples
+    with its own normalizer (scripts/cutoff_gate.py: "N'Djamena" -> "n djamena"), and norm() of that string keeps the space
+    where norm() of the answer itself drops the apostrophe ("ndjamena"), so a predictor saying exactly what Qwen says was
+    marked wrong on 17 of 1,849 tool-set labels (fixed 2026-10-31; favorites_qa stores a raw sample for the same reason)."""
+    r = _gate_samples(gate_run)[item]
+    forms = Counter(norm(t) for t, n in zip(r["samples"], r["samples_norm"], strict=True) if n == modal)
+    return forms.most_common(1)[0][0]
 
 
 def analog_key(analog: str | None) -> str | None:

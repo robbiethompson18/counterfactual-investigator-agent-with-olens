@@ -6,6 +6,12 @@ add a small, replicated gain over prompt-only; a linear probe on the same activa
 more; the NLA adds the least (results below). Cases rebuilt the same day with the strict bare-letter
 parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
 
+**Probe update (2026-10-31):** The regenerated figures use both standardized read positions on
+exactly the historical lens-evaluation questions; the old probe numbers in the text below are
+historical. Full-population results and regeneration commands are in the
+[standard protocol](standard-probe-protocol.md). The new classifier reads one shared prompt token;
+the old probe scored option-newline activations. These are different architectures.
+
 ## Why
 
 The hint evals ([envs/hint_cf.md](envs/hint_cf.md), `cfbench/evals/hint_qwen_dsv4*`) select
@@ -210,7 +216,8 @@ What it says:
 Kylie's question: is the probe row right, and does her original probe (the 718 balanced MMLU-Pro
 questions, [mcq-answer-probe.md](mcq-answer-probe.md)) do as well when applied unchanged? All on the
 same 2,523 cases. Fresh layer-52 forward pass for every prompt on one H200, then
-`environments/hint_mcq/probe_unselected.py` (now takes the eval: `prep mcq_unselected INPUTS`). Run
+[historical probe_unselected.py](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe_unselected.py)
+(now takes the eval: `prep mcq_unselected INPUTS`). Run
 `runs/mcq_answer_probe/2026-10-30_mcq-unselected-probe` (`scores.md`, `predictions.jsonl` in cfbench
 answer format, one row per case and condition).
 

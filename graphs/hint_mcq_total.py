@@ -105,7 +105,7 @@ def main() -> None:
         ax.set_title(f"{TITLE[slot]} (n={n})")
     axes[0].set_ylabel(YLABEL)
     axes[0].text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
-    fig.suptitle("Answer task on hint_mcq, by hint type (running total)", x=0.01, ha="left")
+    fig.suptitle("Legacy selected cohort · answer task on hint_mcq, by hint type (running total)", x=0.01, ha="left")
     fig.text(0.01, -0.03, note, color=MUTED, fontsize=8)
     fig.tight_layout()
     fig.savefig(args.out / "by_hint.png", bbox_inches="tight")
@@ -118,7 +118,7 @@ def main() -> None:
     panel(ax, st)
     ax.set_ylabel(YLABEL)
     ax.text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
-    ax.set_title(f"Answer task on hint_mcq: all {n} items, both hint types")
+    ax.set_title(f"Legacy selected cohort · answer task on hint_mcq: all {n} items, both hint types")
     n_d1, n_d2 = (len(by["olens_agentic"]) for by in slots.values())
     caption = f"{n_d1} correct-hint + {n_d2} wrong-hint items ({n_q} distinct questions, bootstrapped as independent).\n"
     fig.text(0.01, -0.06, caption + note.replace(" Flash", "\nFlash"), color=MUTED, fontsize=8, va="top")

@@ -39,32 +39,6 @@ these (its seed, thinking-render, resume and stale-LoRA bugs are fixed and remov
   early); per-token decoding mangles characters split across tokens in saved transcript text; J++
   provenance records a blob hash, not the commit, and J++ ignores per-request `layers`.
 
-## 2026-10-27: cfbench places every chat-template token at one character, labelled as the previous message
-
-The readers give template tokens (`<|im_end|>`, `\n`, `<|im_start|>`, `assistant`, `<think>`,
-`</think>`, the `\n\n` before the reply) `field: null` and the `msg_index`/`role` of the message
-before them, and `cfbench/olens.py` `positions()` puts all of them at that message's end. On
-hint_mcq the 9 tokens from the user's `<|im_end|>` to the `\n\n` right before the answer letter all
-sit at one char, labelled `user`, with nothing saying which token each read is; a `search_olens`
-over the transcript returns only the first of them (the "first read after the match"). The reads are
-all there (`olens_at` with the default window and `over="bullets"` reach them), so O-lens and
-placebo are handicapped equally, but the read right before the answer is the one that matters on the
-answer task.
-
-## 2026-10-27: a request row has one position mode, so header reads are a second `|header` request
-
-`scripts/olens_read_requests.py` reads a row either at stop tokens or at `turn_starts: N` (an
-`<|im_start|>` and the N tokens after it), not both. `olens_reads/2026-10-27_hint-mcq-header` and
-`-scale2k` got both by submitting each transcript twice, the second with `|header` appended to its
-id, and then needed a derived `cfbench/wrong_mcq/` dir that merges the header rows back under the
-plain id so they join rollout sources. Fix: let `turn_starts` add to the stop positions in one row
-(or have `olens.Reads` strip a `|suffix`).
-
-## 2026-10-25: RunPod tooling that cost ~$320 (see runpod/CLAUDE.md, "Cost guards")
-
-- `runpodctl pod get`'s `runtime` is `None` for running pods too (GraphQL showed 674 s uptime for a
-  pod runpodctl called runtime-less); the REST `publicIp` + `portMappings["22"]` are the truth.
-
 ## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
 
 Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
