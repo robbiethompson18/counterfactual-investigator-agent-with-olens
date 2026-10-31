@@ -272,6 +272,10 @@ or dead ends.**
 
 Active docs:
 
+- [ACTIVE: Standard probe protocol — read before fitting or comparing any standard probe](docs/standard-probe-protocol.md)
+  — nested two-fold, two positions, six layers, capped matched training pools; legacy recipes remain
+  historical
+
 - [ACTIVE: Environments — read before building, running, converting or browsing any behavioural env](environments/README.md)
   — env.py layout, `python -m environments run`
 - [ACTIVE: Viewers — read before building, changing or deploying any viewer or dashboard](docs/viewers.md)
