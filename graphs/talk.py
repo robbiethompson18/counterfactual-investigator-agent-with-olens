@@ -121,7 +121,7 @@ def essay() -> None:
     """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width: three
     lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table)."""
     fig, ax = slide_figure(FULL_W, 24)
-    essay_bars(ax, SLIDE_S)
+    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)")  # the frame title asks "does Qwen's grade go up"
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
