@@ -102,34 +102,44 @@ attributes (sex, age band, education, relationship, income). Retired (Kylie, 202
 ## Exploratory, post hoc: lexicons in the reads and sentence-end probes (2026-10-31)
 
 Kylie's follow-ups after the null. Post hoc and multiply tested; leads, not results. Code
-`scripts/author_probe/pronoun_probe.py` and `period_probe.py`; runs
-`runs/author_mcq_blog/2026-10-31_pronoun-probe` and `…_period-probe` (activations included).
+`scripts/author_probe/pronoun_probe.py`, `period_probe.py` and `period_check.py`; runs
+`runs/author_mcq_blog/2026-10-31_pronoun-probe` and `…_period-probe` (activations included). Each
+case's sentence is taken from its item id (8 cases delete a sentence whose text appears twice in its
+post).
 
 - **Answer words in the O-lens reads** along each post (FVE-weighted pronouns matching Qwen's answer
-  for sex, a short word list per bucket for age; level, step, before/after shifts, slope): AUROC
-  0.55-0.60 alone (sex 0.68 on qwen_wrong for the 3-sentence signed shift, one of 16 features),
-  placebo reads and the sentence text ~0.5. Added to Haiku's transcript p: sex +0.006 (n.s.), age
-  +0.020 — but the same counts on the sentence text add +0.017, so the age gain is lexical.
+  for sex, a short word list per bucket for age; level, step, before/after shifts, slope; 16
+  features): AUROC 0.55-0.60 alone (sex 0.68 on qwen_wrong for the 3-sentence signed shift, the best
+  of 16 on 160 cases), placebo reads and the sentence text ~0.5. Added to Haiku's transcript p
+  (5-fold CV): sex −0.004 (all lens features; level alone +0.001), age +0.021, but the same counts
+  on the sentence text add +0.017 for age, so the age gain is lexical.
 - **Sentence-end activations** (Qwen3.6-27B residual at the token holding the sentence's last
-  character, question-first prompt). An answer probe trained on 3,000 batch-3 pairs (no shared
-  bloggers) and read along each post: AUROC 0.57-0.64, +0.007 to +0.017 over Haiku. A probe fit to
-  the task (StandardScaler, PCA 128, logistic C 0.01, layer chosen by inner CV: L48; 5-fold CV
-  grouped by blogger):
+  character, question-first prompt, layer 48). An answer probe trained on 3,000 batch-3 pairs (no
+  shared bloggers) and read along each post: AUROC 0.53-0.64 over 8 variants (the best, the step in
+  P(answer), adds +0.017 over Haiku). The standard probe (`probes/fit.py`: training-only
+  standardisation, unpenalised intercept, no PCA, L2 with λ = 1) fit to the task, 5-fold CV grouped
+  by blogger, the combiner fully nested (`period_check.py`):
 
-| score                              | AUROC                | paired accuracy | + over Haiku transcript p |
-| ---------------------------------- | -------------------- | --------------- | ------------------------- |
-| Haiku transcript p                 | 0.797                | 0.758           |                           |
-| h at the sentence end              | 0.780 [0.755, 0.803] | 0.770           | +0.053 [+0.039, +0.068]   |
-| h(end k) − h(end k−1)              | 0.724                | 0.712           | +0.033                    |
-| TF-IDF of the sentence             | 0.645                | 0.652           | +0.011                    |
-| sentence length + position in post | 0.704                | 0.719           | +0.035                    |
-| h over Haiku + length/position     |                      |                 | +0.028 [+0.017, +0.038]   |
+| score                                 | AUROC                | paired accuracy | + over Haiku, nested    |
+| ------------------------------------- | -------------------- | --------------- | ----------------------- |
+| Haiku transcript p                    | 0.797                | 0.758           |                         |
+| L2 probe on h at the sentence end     | 0.784 [0.760, 0.808] | 0.782           | +0.058 [+0.043, +0.073] |
+| L2 probe on h(end k) − h(end k−1)     | 0.737                | 0.712           | +0.039                  |
+| PCA 128 + logistic on h (comparison)  | 0.780                | 0.766           |                         |
+| TF-IDF of the sentence                | 0.645                | 0.652           | +0.011                  |
+| sentence length + position in post    | 0.704                | 0.718           | +0.035                  |
+| L2 probe over Haiku + length/position |                      |                 | +0.032 [+0.023, +0.042] |
 
-Caveats: post hoc; the probe is fit to this task with ~650 positives (CV grouped by blogger, layer
-chosen inside each fold, but still the easiest thing here to overfit); the difference vector does
-worse than h, so it is not obviously reading a belief change at the sentence; TF-IDF is a weak text
-control. Next control: the same probe on the activation of the sentence alone (no question, no post
-around it), which separates "what this sentence says" from "what Qwen made of it in context".
+Over 5 fold splits the nested increments are +0.057 ± 0.003 (over Haiku) and +0.030 ± 0.003 (over
+Haiku + length/position); the mean rank of Haiku's p and the probe's out-of-fold score, with nothing
+fit, adds +0.055. Per attribute (pooled fit): sex +0.045, age +0.067 over Haiku, the age gain mostly
+on qwen_wrong (+0.087); age on qwen_right +0.033 (p 0.05).
+
+Caveats: post hoc; nested given the layer, but L48 (and L2 rather than PCA) were chosen on this same
+eval set; the probe is fit to this task with ~650 positives; the difference vector does worse than
+h, so it is not obviously reading a belief change at the sentence; an L2 probe at layer 16 already
+reaches 0.747 (the audit), so much of the signal is likely lexical, and TF-IDF is a weak text
+control. A control with the question removed (the post alone in the user turn) is running.
 
 ## Where things live
 
