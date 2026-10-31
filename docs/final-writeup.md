@@ -245,7 +245,7 @@ The difference is more noticeable when you measure by error rate (lower better):
 <img src="img/headline-cutoff.png" alt="Knowledge cutoff, transcript only, three metamodels and their placebos" width="500">
 
 This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. If you tell
-Haiku about Qwen's knowledge cutoff, or use a judge model with a similar knowlege cutoff, most or
+Haiku about Qwen's knowledge cutoff, or use a judge model with a similar knowledge cutoff, most or
 all of the effect disappears.
 
 <img src="img/cutoff-qa-investigators.png" alt="Knowledge cutoff by investigator: Haiku 5.5 (transcript only 47.1% on stale items, told the model and its cutoff 61.5%, O-lens 72.6%, placebo 55.6%) beside Gemini 2.5 Flash-Lite (answers the question itself 63.1%, transcript only 70.4%, O-lens 54.0%, placebo 8.3%), with not-stale and all-items panels" width="760">
@@ -257,7 +257,7 @@ investigator prompt at all and on 70% as a transcript-only investigator; given O
 to 54%, and given placebo reads to 8%, so it cannot use the reads at all. Regenerate with
 `uv run python -m graphs.cutoff_qa_investigators`.
 
-#### Idionsynratic Preferences
+#### Idiosyncratic Preferences
 
 <img src="img/headline-preferences.png" alt="Idiosyncratic preferences, transcript only, three metamodels and their placebos" width="500">
 
@@ -283,7 +283,7 @@ The chart shows the probe alone. Details and the separate ensemble analysis are 
 
 ### Filtering On Correctness
 
-#### No Uplift When Qwen is Right
+#### Little or No Uplift When Qwen is Right
 
 <img src="img/headline-qwen-right.png" alt="Cases where Qwen is right: transcript only vs O-lens, J++ and NLA on MMLU-Pro (94.4, 95.6, 95.1, 95.0), SuperGPQA (82.5, 88.8, 83.9, 84.6) and knowledge cutoff (94.6, 92.1, 91.8, 92.9)" width="760">
 
@@ -296,7 +296,7 @@ add 4 to 26pp over transcript only, while on Qwen-right cases they add 0 to 6pp 
 baseline and cost 2 to 3pp on knowledge cutoff. Regenerate with
 `uv run python -m graphs.headline_ablations`.
 
-#### Even Bad Results Look Good When You Filter On Qwen Being Wrong!
+#### Even Bad Results Can Look Good When You Filter On Qwen Being Wrong
 
 This is why we think it's so important to _not filter data based on subject model correctness_. If
 you do this, then way of pushing your investigator off of 'Qwen will say the right answer' looks
@@ -361,7 +361,9 @@ Regenerate with `uv run python -m graphs.headline_ablations`.
 
 <img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
 
-We see the most uplift from x, which uses less tokens than y. Thus we don't think that extra tokens alone drive placebo gains.
+We see the most uplift from the 🔮-lens, whose reads add the fewest tokens to Haiku's prompt (12.1k
+pooled, against 13.6k for NLA and 14.8k for J++, the weakest lens). Thus we don't think that extra
+tokens alone drive placebo gains.
 
 Reads also make Haiku think longer, so we checked whether more thinking explains the gains. It
 doesn't look like it. Pooled, Haiku spends 154 thinking tokens per prediction on transcript-only,
