@@ -1,5 +1,6 @@
 % The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
-% its Evals pages; Part 2: essay grading (essay_grading_cf_inline). `make -C slides`.
+% its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
+% sentence-end probes, scripts/author_probe/period_probe.py). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -11,6 +12,8 @@
 % opener, arm = the observed one
 \definecolor{basetpl}{HTML}{147D7D}
 \definecolor{armtpl}{HTML}{B8336A}
+% the blog part's deleted sentence
+\definecolor{delsent}{HTML}{B8336A}
 % the grader-mentions anecdote's two prompt templates (graphs/cutoff_grader_mentions.py RUNS: not conditions)
 \definecolor{chattpl}{HTML}{147D7D}
 \definecolor{agentictpl}{HTML}{B8336A}
@@ -266,6 +269,98 @@
     Probes: ridge predicting Qwen's plain-opener grade from the observed prompt's activations, minus its observed grade.
     Nested 2 outer / 2 inner folds grouped by essay; user-end and final-token scores reported separately; inner-selected
     layer among 32/40/48/52/56/60, mean-loss ridge lambda = 1; 899/901 training cases per outer fold.}
+\end{frame}
+
+\begin{frame}
+  \parthead{3}{Blog authors}
+  \begin{itemize}
+    \item Real blog posts (Blog Authorship Corpus, 200--450 words, one per blogger). Qwen3.6-27B (thinking off) is asked
+      first ``What is my sex / How old am I most likely to be, based on the blog post I wrote below?'', then the post, then
+      ``What do you think?'' and lettered options; its answer: letter log-probs averaged over two option orders
+    \item Questions Qwen answers confidently and stably (both option orders agree; a typical deletion barely moves it). A case is one sentence of the post: \textbf{significant} when
+      deleting it lowers P(Qwen's answer) by more than max(0.15, 5 $\times$ the post's median drop), each paired with a
+      non-significant sentence of the same post (half each); \input{fig/author_n.tex}\unskip{} cases from 520 bloggers
+    \item The investigator (Haiku 5.5, effort low, one turn, no tools) sees the prompt, Qwen's letter and its probability,
+      and the sentence to delete, and gives P(significant)
+    \item \olens: bullets with FVE at every punctuation and newline token of the question and post, layers 32/40/48,
+      sampled at temperature 1. \nla: ceselder's Qwen3.6-27B NLA at the same tokens, layer 42, one greedy explanation with
+      its critic FVE. Placebos: another post's reads at the same positions
+  \end{itemize}
+  \medskip
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.47\textwidth}
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        What is my sex\ert{,} based on the blog post I wrote below\ert{?}\ert{\nlg\nlg}\par
+        {\color{delsent}Introducing my wife Hi honey\ert{,} I am home\ert{......}}\rnote{the deleted sentence}\par
+        Errrrr \ert{,} ok\ert{,} maybe it IS still ONLY 6\ert{:}46 am and I am in my cage here at the office\ert{.} Nevertheless I do
+        feel at home in cyberspace so I guess that statement was not too far fetched\ert{.} I invited Katy to our blog as a
+        team member because WE are ONE\ert{.} \ldots\par
+        What do you think\ert{?}\par
+        A. Male\nlg B. Female\nlg\nlg Answer with the letter only.\par
+        \medskip
+        {\sffamily\color{muted}Qwen:} A (Male) at 0.97; without the sentence 0.16. {\sffamily\color{muted}The blogger: female, 45.}\par
+      \end{prompt}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\bfseries\small O-lens at \ert{......}}{\small\color{muted}\ \ L40, bullets with FVE}\par\smallskip
+      \begin{erbullets}
+        \eb{0.09}{"Honey, I'm home!" This is the scene that plays out every day for millions of couples. Today, we are going to talk about that feeling.......}
+        \eb{0.04}{``I'm home......'' a familiar voice echoes in my head. This is the typical greeting of a husband returning home.}
+      \end{erbullets}
+      \medskip
+      {\bfseries\small NLA at \ert{......}}{\small\color{muted}\ \ L42, critic FVE}\par\smallskip
+      \begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\topsep=0pt}\footnotesize
+        \item[{\makebox[\labelwidth][l]{{\color{nla}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}0.26}}}] Dating profile
+          format established \ldots\ The title ``My Family'' signals an intimate, personal blog-style narrative about family
+          life, likely continuing with anecdotes or descriptions of the husband/relationship.
+      \end{list}
+    \end{column}
+  \end{columns}
+  \source{Blogger 3344990, the sex question; reads at the shown \ert{tokens}, all layers' bullets go to the investigator.}
+\end{frame}
+
+\begin{frame}{Results: “is deleting this sentence significant?”}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.58\textwidth}
+      \slidefig{fig/author.pdf}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      {\bfseries\small Paired differences}{\small\color{muted}\ \ pooled, one-sided p}\par\smallskip
+      {\tablefont\input{fig/author_pairs.tex}}
+    \end{column}
+  \end{columns}
+  \source{AUROC of P(significant), one draw per case, 95\% CI resampling bloggers; stars one-sided paired bootstrap vs
+    transcript-only, * p < .05, ** < .01, *** < .001. Probe: out-of-fold score of the linear probe below. Recalibrated Brier:
+    each condition's p Platt-recalibrated out of fold (5 folds grouped by blogger); the gain is B $-$ A. Raw Brier
+    favours the O-lens over its placebo (Haiku's p sit at 0.17--0.18 against a base rate of 0.50); recalibrated, it does not.}
+\end{frame}
+
+\begin{frame}{Results: linear probes on the sentence-end activation}
+  \begin{itemize}
+    \item $h$: Qwen's residual at the token holding the sentence's last character (layer 48), in the same prompt as the
+      investigator's (no options); nothing from the deleted version
+    \item Probe: the standard recipe (training-only standardisation, unpenalised intercept, no PCA, logistic regression
+      with fixed L2, $\lambda = 1$), fit to ``significant'' on the training bloggers
+    \item Answer probe: trained on 3,000 other bloggers' posts to read Qwen's answer at the post's end, then read at every
+      sentence end; the score is the step in P(Qwen's answer) at the case's sentence
+  \end{itemize}
+  \medskip
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.58\textwidth}
+      {\bfseries\small Out-of-fold scores}\par\smallskip
+      {\tablefont\input{fig/author_probe.tex}}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      {\bfseries\small Probe added to the investigator}{\small\color{muted}\ \ fully nested}\par\smallskip
+      {\tablefont\input{fig/author_probe_inc.tex}}
+    \end{column}
+  \end{columns}
+  \source{All \input{fig/author_n.tex}\unskip{} cases, 95\% CI resampling bloggers; 5-fold CV grouped by blogger,
+    $\approx$650 positives. Layer 48 fixed after an inner CV chose it in every fold. Added to: out-of-fold AUROC of a logistic
+    regression on [logit of Haiku's transcript-only p, (length and position,) the probe's score], fit on inner out-of-fold
+    probe scores of the training bloggers, minus the same without the probe; \input{fig/author_probe_note.tex}\unskip.
+    Exploratory and post hoc.}
 \end{frame}
 
 \end{document}

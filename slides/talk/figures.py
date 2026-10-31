@@ -431,7 +431,182 @@ def grader() -> None:
     save(fig, OUT / "grader.pdf")
 
 
+# Part 3, blog authors (cfbench/evals/author_blog_drop_inline): does deleting this sentence make Qwen much less sure of its
+# answer about the blogger? Per case the investigator's p (one draw) from the eval's two runs, the task-fit standard L2
+# probe's out-of-fold score (scripts/author_probe/period_check.py, runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl);
+# CIs and stars resample bloggers.
+AUTHOR_RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]
+PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
+AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
+AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"])]  # fmt: skip
+VERSIONS = {"qwen_wrong": "Qwen's answer ≠ the blogger's", "qwen_right": "Qwen's answer = the blogger's"}
+
+
+def author_rows(run: str) -> list[dict]:
+    cache = ROOT / "data/plot_cache" / f"{run}.jsonl"
+    if cache.exists():
+        return [json.loads(line) for line in cache.open()]
+    local = ROOT / "data/runs/cfbench" / run / "predictions.jsonl"
+    url = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/runs/cfbench/{run}/predictions.jsonl"
+    fields = ("condition", "item", "pair", "version", "valid", "p", "k_cf")
+    with local.open() if local.exists() else urllib.request.urlopen(url) as stream:
+        rows = [{k: r[k] for k in fields if k in r} for r in map(json.loads, stream)]
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return rows
+
+
+def probe_file(name: str) -> Path:
+    f = ROOT / "data" / PROBE_RUN / name
+    if not f.exists():
+        hf_hub_download(HF_REPO, f"{PROBE_RUN}/{name}", repo_type="dataset", local_dir=ROOT / "data")
+    return f
+
+
+@cache
+def author_cases() -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+    """items, truth, version, blogger, condition -> score (the cases with every condition and a probe score)."""
+    ps: dict[str, dict[str, float]] = {}
+    meta = {}
+    for run in AUTHOR_RUNS:
+        for r in author_rows(run):
+            if r.get("valid", True) and r.get("p") is not None:
+                ps.setdefault(r["condition"], {})[r["item"]] = r["p"]
+                meta[r["item"]] = (r["k_cf"], r["version"], r["pair"].split(":")[0])
+    probe = {r["item"]: r["probe_l2_h"] for r in map(json.loads, probe_file("scores_l2.jsonl").open())}
+    items = sorted(i for i in meta if all(i in ps[c] for c in AUTHOR_CONDS) and i in probe)
+    xs = {c: np.array([ps[c][i] for i in items]) for c in AUTHOR_CONDS} | {"probe": np.array([probe[i] for i in items])}
+    y, v, b = (np.array([meta[i][k] for i in items]) for k in range(3))
+    return items, y, v, b, xs
+
+
+def platt(p: np.ndarray, y: np.ndarray, groups: np.ndarray) -> np.ndarray:
+    """Out-of-fold logistic recalibration of p (on logit p), 5 folds grouped by blogger."""
+    lp = np.log(np.clip(p, 0.01, 0.99) / (1 - np.clip(p, 0.01, 0.99)))
+    x = np.column_stack([np.ones(len(p)), lp])
+    us = sorted(set(groups))
+    fold = {g: i % 5 for i, g in enumerate(np.random.default_rng(0).permutation(us))}
+    f = np.array([fold[g] for g in groups])
+    out = np.zeros(len(p))
+    for i in range(5):
+        out[f == i] = 1 / (1 + np.exp(-x[f == i] @ _logistic(x[f != i], y[f != i].astype(float))))
+    return out
+
+
+@cache
+def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
+    """(version, condition) -> (AUROC, 95% CI, stars vs transcript-only, one-sided paired bootstrap over bloggers); paired
+    differences (a, b) -> (AUROC est, p, recalibrated-Brier gain est, p), pooled; n cases."""
+    items, y, v, b, xs = author_cases()
+    rng = np.random.default_rng(0)
+    bars = {}
+    for ver in VERSIONS:
+        m = v == ver
+        us = sorted(set(b[m]))
+        of = {u: np.flatnonzero(m & (b == u)) for u in us}
+        idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
+        boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+        for c, x in xs.items():
+            st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+            bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+    us = sorted(set(b))
+    of = {u: np.flatnonzero(b == u) for u in us}
+    idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
+    rec = {c: platt(xs[c], y, b) for c in AUTHOR_CONDS}
+    brier = lambda c, i: np.mean((rec[c][i] - y[i]) ** 2)
+    pairs = {}
+    for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
+                 ("nla_inline", "nla_placebo_inline"), ("nla_inline", "olens_inline")]:  # fmt: skip
+        da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
+        db = np.array([brier(c, i) - brier(a, i) for i in idx])
+        allc = np.arange(len(y))
+        pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), float((da <= 0).mean()), brier(c, allc) - brier(a, allc),
+                       float((db <= 0).mean()))  # fmt: skip
+    return bars, pairs, len(items)
+
+
+def author() -> None:
+    """AUROC of P(the deletion is significant) per condition, one panel per version; plus the paired differences table
+    (fig/author_pairs.tex)."""
+    bars, pairs, n = author_bars()
+    one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
+    width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
+    fig, axes = figure(86, FULL_H, ncols=2, sharey=True)
+    base = 0.5
+    top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
+    for ax, (ver, title) in zip(axes, VERSIONS.items(), strict=True):
+        xs, ticks = positions(one, AUTHOR_GROUPS)
+        for c, x in xs.items():
+            val, (lo, hi), st = bars[ver, c]
+            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
+            ax.errorbar(x, val, [[val - lo], [hi - val]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
+            for text, dy in ((f"{val:.3f}", 1.5), (st, 6.5)):
+                ax.annotate(
+                    text, (x, hi), xytext=(0, dy), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK
+                )
+        ax.set_xticks(ticks, [g for g, _ in AUTHOR_GROUPS])
+        ax.set_xlim(-0.6, width - 0.6)
+        ax.tick_params(axis="x", labelsize=7 * S)
+        ax.set_title(title, fontsize=7 * S, color=INK, loc="left")
+        ax.grid(axis="x", visible=False)
+    yt = np.arange(base, top, 0.1)
+    axes[0].set_ylim(base, top)
+    axes[0].set_yticks(yt, [f"{t:.1f}" for t in yt])
+    axes[0].set_ylabel("AUROC of P(significant)")
+    axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    save(fig, OUT / "author.pdf")
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
+            "olens_placebo_inline": r"\swp{olens}\ O-lens placebo", "nla_inline": r"\sw{nla}\ NLA",
+            "nla_placebo_inline": r"\swp{nla}\ NLA placebo"}  # fmt: skip
+    pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
+    rows = [
+        f"{name[a]} − {name[c].split(' ', 1)[1]} & {d:+.3f} & {pf(p)} & {g:+.3f} & {pf(q)}\\\\" for (a, c), (d, p, g, q) in pairs.items()
+    ]
+    head = [r" & \multicolumn{2}{c}{AUROC} & \multicolumn{2}{c}{recal.\ Brier gain}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
+    (OUT / "author_pairs.tex").write_text("\\begin{tabular}{@{}lrrrr@{}}\n" + "\n".join([*head, "\\hline", *rows]) + "\n\\end{tabular}\n")
+    (OUT / "author_n.tex").write_text(f"{n:,}")
+
+
+def author_probe_table() -> None:
+    """The sentence-end probe slide's table from the run's results.md (period_probe.py's sections, then period_check.py's):
+    pooled AUROC and paired accuracy, the fully nested increments over Haiku."""
+    lines = probe_file("results.md").read_text().splitlines()
+    cells = [[x.strip() for x in ln.strip().strip("|").split("|")] for ln in lines if ln.startswith("| ")]
+    row = {}
+    for c in cells:
+        if len(c) == 4 and c[1] == "pooled":
+            row[c[0]] = (c[2], c[3])  # period_probe: score | pooled | AUROC [CI] | paired [CI]
+        elif len(c) == 3 and c[0].startswith(("standard L2", "PCA 128")):
+            row[c[0]] = (c[1], c[2])  # period_check: probe | AUROC [CI] | paired [CI]
+    inc = {c[0]: c[3] for c in cells if len(c) == 5 and c[0].startswith("Haiku +")}
+    rows = [("Haiku transcript p", r"\sw{transcript}\ Haiku, transcript only"),
+            ("standard L2 on h", r"\sw{probe}\ probe on $h$ at the sentence end"),
+            ("standard L2 on h(k) - h(k-1)", r"probe on $h_k - h_{k-1}$"),
+            ("PCA 128 + logistic on h (period_probe, comparison)", r"probe on $h$, PCA 128 first"),
+            ("probe 1 (answer, last sentence end) P(answer) step", r"answer probe (trained apart), step in P(answer)"),
+            ("control: TF-IDF of the sentence", r"TF-IDF of the sentence"),
+            ("control: sentence length + position in post", r"sentence length + position")]  # fmt: skip
+    out = [r" & AUROC [95\% CI] & paired acc.\\", "\\hline"]
+    for key, lab in rows:
+        a, pa = row[key]
+        out.append(f"{lab} & {a} & {pa.split(' ')[0]}\\\\")
+    (OUT / "author_probe.tex").write_text("\\begin{tabular}{@{}lrr@{}}\n" + "\n".join(out) + "\n\\end{tabular}\n")
+    over = [(r"Haiku", "Haiku + probe vs Haiku"),
+            (r"Haiku + sentence length and position", "Haiku + length/position + probe vs Haiku + length/position")]  # fmt: skip
+    inc_rows = [r"probe added to & $\Delta$ AUROC [95\% CI]\\", "\\hline"] + [f"{lab} & {inc[key]}\\\\" for lab, key in over]
+    (OUT / "author_probe_inc.tex").write_text("\\begin{tabular}{@{}lr@{}}\n" + "\n".join(inc_rows) + "\n\\end{tabular}\n")
+    seeds = {ln.split(":")[0][2:]: ln.split(":")[1].split("(")[0].strip() for ln in lines if ln.startswith("- increment over")}
+    rank = next(c[3].split(" ")[0] for c in cells if c[0] == "mean rank(Haiku, probe)")
+    note = f"over 5 fold splits {seeds['increment over Haiku']} and {seeds['increment over Haiku + length/position']}; "
+    note += f"the mean rank of Haiku's p and the probe (nothing fit) {rank}"
+    (OUT / "author_probe_note.tex").write_text(note.replace("±", r"$\pm$"))
+
+
 if __name__ == "__main__":
-    essay(grid())
+    mm = grid()
+    essay(mm)
+    author()
+    author_probe_table()
     essay_diffs()
     grader()

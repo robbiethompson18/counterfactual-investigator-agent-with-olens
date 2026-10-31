@@ -258,6 +258,10 @@ def analyze(run: Path):
     increment("probe 2: h(sentence end), over Haiku + length/position", s_h, inc, extra=struct)
     s_hs = oof(np.column_stack([s_h, struct]), y, post)
     report("probe 2: h(sentence end) + length/position", s_hs, tab)
+    per_case = [{"item": c["item"], "version": c["version"], "attr": c["attr"], "post": c["post"], "y": int(y[i]),
+                 "probe_h": float(s_h[i]), "length_position": float(s_struct[i]), "tfidf": float(s_txt[i])}
+                for i, c in enumerate(cases)]  # fmt: skip
+    (run / "scores.jsonl").write_text("".join(json.dumps(r) + "\n" for r in per_case))  # out-of-fold scores (slides)
 
     out += ["\n## AUROC and within-post paired accuracy (95% CIs over bloggers)\n", *tab]
     out += ["\n## Increment over Haiku's transcript p (5-fold CV grouped by blogger; cases with Haiku p)\n", *inc]
