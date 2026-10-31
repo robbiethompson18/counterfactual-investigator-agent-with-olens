@@ -47,9 +47,9 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
-- `data_filter_sankey`: how SuperGPQA's 10,000 questions become 3,000 eval cases (consistency the
-  only filter, Qwen right/wrong at the end), counts sourced from `docs/supergpqa-inline.md`; for the
-  final write-up's Data Filter section
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa and favorites_qa questions become eval cases (one PNG each; dark
+  green evaluated, light green held out, gray unusable), counts sourced in the module; for the final write-up's Data Filter
+  section
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)
