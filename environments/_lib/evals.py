@@ -51,7 +51,7 @@ def eval_of(meta: dict) -> tuple[str, list[str], list[str]] | None:
     """A cfbench run's (eval name, envs, env runs it read), or None if it belongs to no eval."""
     p = meta.get("params", {})
     if p.get("eval"):
-        return p["eval"], p.get("envs") or [p["eval_env"]], []
+        return p["eval"], p.get("envs") or ([p["eval_env"]] if p.get("eval_env") else []), []
     m = re.match(r"(env|evalcue)_runs:([^/]+)/([^@]+)", p.get("env", ""))
     if not m:
         return None
@@ -134,7 +134,7 @@ def seen_tokens(reads, row: dict) -> dict | None:
 def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     """One expview item per prediction: the predictor's whole conversation as one call, and (where the eval's inputs have
     them) the base runs with the reads its tools could return as the item's tokens (seen_tokens)."""
-    from cfbench.core import canon_condition
+    from cfbench.core import OLENS_CONDITIONS, canon_condition
 
     sys.path.insert(0, str(REPO_ROOT / "expview"))
     from expview import Run, call
@@ -152,7 +152,13 @@ def export_expview(run_dir: Path, rows: list[dict], docent: dict) -> Path:
     run.reset()
     reads = None
     params, ev = meta["params"], _eval_module(meta["params"].get("eval"))
-    if ev is not None and hasattr(ev, "reads") and params.get("inputs"):
+    # as cfbench.eval: only the agentic O-lens conditions read `reads(inputs)` (single-turn evals' reads() differ)
+    if (
+        ev is not None
+        and hasattr(ev, "reads")
+        and params.get("inputs")
+        and {canon_condition(r["condition"]) for r in rows} & set(OLENS_CONDITIONS)
+    ):
         from cfbench import olens
 
         reads = olens.Reads(ev.reads(REPO_ROOT / "data" / "runs" / params["inputs"]))
@@ -455,6 +461,7 @@ def run_header(run_dir: Path, meta: dict, docent: dict) -> dict:
         "slug": meta.get("slug") or (m[2] if m else run_dir.name),
         "description": meta.get("description"),
         "status": meta.get("status"),
+        "inputs": Path(meta["params"]["inputs"]).name if meta["params"].get("inputs") else None,  # for the eval's INPUTS_RUNS
         "harness_version": meta["params"].get("harness_version", 1),
         "predictors": meta["params"].get("predictors", "").split(","),
         "effort": meta["params"].get("effort"),
@@ -781,6 +788,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
+        if skip := getattr(_eval_module(name), "SKIP_RUNS", None):  # superseded runs of a kept inputs run, left out too
+            summaries = [s for s in summaries if s["run"] not in skip]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
         if shown := getattr(_eval_module(name), "RUNS", None):  # the eval lists the runs it shows: each its own row, no pooling
@@ -796,6 +805,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
         doc["page_html"] = page_html(name, [s for s in summaries if s.get("current", True)])
+        doc["error_rate"] = getattr(_eval_module(name), "ERROR_RATE", False)  # answer task shown as error rate (lower is better)
+        doc["position_chart"] = getattr(_eval_module(name), "POSITION_CHART", None)  # page.html positionChart
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     return written

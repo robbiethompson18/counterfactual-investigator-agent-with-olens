@@ -4,7 +4,7 @@ Robbie, 2026-10-29. The investigator sees the question Qwen was asked (not the r
 submit_answer call (knowledge_cutoff's prompt, PR #378; inline.py here is a copy). The label is Qwen's modal answer from
 the bank's stability gate (`qwen_modal`, >= 7/8 samples agree), not the truth; stable_wrong items are the stale-belief ones. No
 counterfactual: base arm = cf arm = `nohint`, truth = the modal answer, so cfbench.answer's "edit does nothing" column is always
-yes. Cases: the episodes of the Qwen env runs RUNS, in bank order: the first 200 stable, non-numeric v2 items by bank order
+yes. Cases: the episodes of the Qwen env runs ENV_RUNS, in bank order: the first 200 stable, non-numeric v2 items by bank order
 (smoke200), plus 800 seeded-random stable non-numeric v3 items not among them (new800; the 1k scale-up, 2026-10-29).
 
 Conditions (single-turn, no tools): `transcript_inline` (the question), `olens_inline` (plus the item's own end-of-prompt reads:
@@ -54,10 +54,11 @@ from cfbench.evals.cutoff_qa_inline import inline
 from environments._lib.core import load_env
 from environments._lib.runfolder import LOCAL, read_episodes
 
+ERROR_RATE = True  # the env viewer shows this eval as error rate, lower is better (Kylie, 2026-10-30)
 ENV = "cutoff_qa"
 ENVS = [ENV]
-RUNS = ("2026-10-29_smoke200-nohint", "2026-10-29_new800-nohint")  # the Qwen env runs whose prompts (and reads) the cases are
-READS = [Path(f"data/runs/olens_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # end-of-prompt reads of RUNS
+ENV_RUNS = ("2026-10-29_smoke200-nohint", "2026-10-29_new800-nohint")  # the Qwen env runs whose prompts (and reads) the cases are
+READS = [Path(f"data/runs/olens_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # end-of-prompt reads of ENV_RUNS
 QWEN = "Qwen/Qwen3.6-27B"
 MODEL_NAME = "the model"
 TASK = "answer"
@@ -68,7 +69,7 @@ VERSIONS: dict[str, dict] = {"nohint": {"arm": "nohint"}}
 ARM_LABELS = {"nohint": "the question, verbatim"}
 PAIR_LABELS = {"nohint -> nohint": "no counterfactual"}
 NLA_READS = [Path(f"data/runs/nla_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # at READS's positions, layers
-JREADS = [Path(f"data/runs/jpp_reads/2026-10-29_cutoff{n}-all/reads.jsonl") for n in (200, 800)]  # J++ at every token of RUNS
+JREADS = [Path(f"data/runs/jpp_reads/2026-10-29_cutoff{n}-all/reads.jsonl") for n in (200, 800)]  # J++ at every token of ENV_RUNS
 JPOOL = Path("data/runs/jpp_reads/2026-10-27_hint-mcq-header/reads.jsonl")  # J++ placebo pool: hint_mcq, every token, L0-60/4
 JLENS_LAYERS = (32, 40, 48, 52, 56, 60)  # the O-lens reads' layers
 
@@ -78,11 +79,11 @@ def _mod():
 
 
 def collect() -> list[dict]:
-    """One case per episode of RUNS, in bank order: the prompt, Qwen's gated modal answer (the label) and the bank metadata."""
+    """One case per episode of ENV_RUNS, in bank order: the prompt, Qwen's gated modal answer (the label) and the bank metadata."""
     mod = _mod()
     order = {item: k for k, item in enumerate(mod.items())}
     out = []
-    for run, ep in ((r, ep) for r in RUNS for ep in read_episodes(LOCAL / ENV / r)):
+    for run, ep in ((r, ep) for r in ENV_RUNS for ep in read_episodes(LOCAL / ENV / r)):
         assert not ep.get("error") and ep["target"].split("@")[0].lower() == QWEN.lower(), ep["id"]
         meta = ep["meta"]
         assert not meta["numeric"] and meta["gate_class"].startswith("stable"), ep["id"]
@@ -152,6 +153,43 @@ def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str,
             extra = {"placebo_sources": [src]}
         rows = by_source[src]
     return inline.prompt(question, condition, False, MODEL_NAME, rows), extra
+
+
+# the env viewer's runs (environments/_lib/evals.py INPUTS_RUNS): the 1k and its second 1k with their read-position
+# ablations (Kylie, 2026-10-30); the 200-item smokes and the superseded NLA placebo pool are left off
+INPUTS_RUNS = {
+    "2026-10-29_cutoff-qa-inline-inputs-1k",
+    "2026-10-29_cutoff-qa-inline-inputs-1k-nla",
+    *(f"2026-10-30_cutoff-qa-inline-inputs-1k-{t}" for t in ("pos1", "pos2", "qpunct", "qpunct-imend")),
+    *(f"2026-10-30_cutoff-qa-inline-inputs-new1k-{t}" for t in ("tail6", "qpunct")),
+}
+SKIP_RUNS = {"2026-10-29_cutoff-qa-1k-nla-placebo"}  # superseded by ...-nla-placebo-mmlu (its pool mixed in cutoff reads)
+_PUNCT = ("question\npunctuation", "olens_qpunct_inline", "olens_qpunct_placebo_inline")
+_TAIL6 = ("six tail tokens\n(to assistant↵)", "olens_inline", "olens_placebo_inline")
+POSITION_CHART = {  # the env viewer's read-position bars (page.html positionChart; docs/cutoff-qa-inline.md)
+    "title": "O-lens read positions",
+    "caption": "Which read positions carry the signal. The question's punctuation is read before the assistant turn begins.",
+    "subsets": [["", "all"], ["stable_wrong", "stale only"]],
+    "panels": [
+        {
+            "title": "every read set (first 999)",
+            "groups": [
+                ['final "."', "olens_pos1_inline", "olens_pos1_placebo_inline"],
+                ['final "."\n+ <|im_end|>', "olens_pos2_inline", "olens_pos2_placebo_inline"],
+                list(_PUNCT),
+                ["question punct.\n+ <|im_end|>", "olens_qpunct_imend_inline", "olens_qpunct_imend_placebo_inline"],
+                list(_TAIL6),
+            ],
+        },
+        {"title": "question punctuation vs six tail (both 1ks)", "groups": [list(_PUNCT), list(_TAIL6)]},
+    ],
+}
+
+
+def ITEM_INFO(row: dict) -> dict:
+    """The env viewer's question table: the question, Qwen's modal answer and the class (stale = stable_wrong)."""
+    return {"question": _mod().build("nohint", row["item"]).messages[0]["content"] if row["item"] in _mod()._items() else "",
+            "own": row.get("modal_cf"), "class": row.get("gate_class")}  # fmt: skip
 
 
 def LINKS(row: dict) -> dict[str, dict]:

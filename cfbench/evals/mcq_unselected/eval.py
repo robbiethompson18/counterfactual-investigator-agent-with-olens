@@ -53,6 +53,7 @@ from environments._lib.runfolder import LOCAL, REPO_ROOT
 
 ENVS = ["hint_mcq"]
 TASK = "answer"
+ERROR_RATE = True  # the env viewer shows this eval as error rate, lower is better (Kylie, 2026-10-30)
 MODEL_NAME = "the model"  # the subject is never named to the investigator (Robbie, 2026-10-29); the runner asserts it
 VERSIONS: dict[str, dict] = {"mmlu_pro": {"half": "eval"}, "mmlu_pro_b2": {"half": "eval2"}}  # the two eval batches (split())
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")

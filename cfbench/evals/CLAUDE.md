@@ -59,6 +59,8 @@ in `RETIRED_EVALS` there is left off the lists.
   - `RUNS` (optional): the cfbench run dir names the env viewer shows for this eval, each with all
     its conditions current and no pooled row across them; without it the viewer picks runs itself
     (newest run per condition supersedes, current runs pooled).
+  - `ERROR_RATE` (optional): `True` shows an answer-task eval on the env viewer as error rate (1 − %
+    correct, lower is better) in its bars, tables and paired differences.
   - `VERSION_IN_IDS` (optional): `True` prefixes each prediction's expview item id with its version,
     for evals whose versions share arm pairs; off by default so other evals' links don't change.
 - `score.py` `PAGE(rows) -> str` (optional): the eval's own page section, HTML built from the current runs' prediction

@@ -51,6 +51,9 @@ Summary of the Final Pitch (2026-10-19):
   measured "successful changes" (their ≥50pp YES / ≤15pp NO rules). The absolute ≥50pp rule makes
   every removal edit a NO when the baseline rate is under 50%, so prefer a headroom-normalized
   effect plus a significance test when we label our own experiments.
+- **Our critique of CHIVE's data is in [docs/chive-critique.md](docs/chive-critique.md)**, every
+  number reproducible with `uv run python -m chive_critique`
+  ([chive_critique/CLAUDE.md](chive_critique/CLAUDE.md)).
 - **CHIVE's transcript-only baseline is strong (~81% AUROC), and in the paper no activation tool
   (AOs, NLAs, SAEs) beats it.** CHIVE didn't test the O-lens or J-lens, which is our opening.
 - **Selection bias in CHIVE.** The counterfactuals were proposed by a transcript-reading agent, so
@@ -291,7 +294,9 @@ Active docs:
   — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
   single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
   cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
-  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
+  linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
+  90%
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic

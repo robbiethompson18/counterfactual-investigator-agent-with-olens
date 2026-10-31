@@ -42,6 +42,7 @@ ENV, ARM = "supergpqa", "base"
 ENVS = [ENV]
 QWEN, MODEL_NAME = "Qwen/Qwen3.6-27B", "the model"
 TASK = "answer"
+ERROR_RATE = True  # the env viewer shows this eval as error rate, lower is better (Kylie, 2026-10-30)
 VERSION = "sg3k"
 VERSIONS = {VERSION: {"n": 3000}}
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline", "jlens_inline",

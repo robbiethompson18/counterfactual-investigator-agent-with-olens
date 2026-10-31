@@ -74,6 +74,55 @@ the second paired by item. This is the one cutoff chart: every lens goes on it.)
   +6.9pp), but most of that is the placebo effect.
 - O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8]; J++ − NLA −2.7pp [−4.5, −1.0].
 
+**Read-position ablation** (2026-10-30, Kylie: does the gain need the assistant-turn tokens?). The
+1k run with only some reads shown: the first one or two of the six tail positions (`pos1` = the "."
+ending the question, `pos2` = "." and `<|im_end|>`), or every punctuation token inside the question
+(`qpunct`, 4.1 per prompt: commas, "?", "."), alone or with `<|im_end|>` (`qpunct_imend`). The
+question's other punctuation was never read before: `olens_reads/2026-10-30_cutoff-fill-kylie` (the
+requests of `scripts/fill_read_requests.py`, PR #432, for this set). The preamble names only the
+positions shown. Runs `cfbench/2026-10-30_cutoff-qa-1k-olens-{pos1,pos2,qpunct,qpunct-imend}`
+(conditions renamed after the run, e.g. `olens_qpunct_inline`), inputs
+`cfbench_evals/2026-10-30_cutoff-qa-inline-inputs-1k-*`, 23,976 predictions, 0 invalid. Error rate
+(all / stale / not stale), paired by item, 95% bootstrap CIs:
+
+| reads                                 | O-lens            | its placebo        | O-lens − transcript-only | O-lens − placebo    |
+| ------------------------------------- | ----------------- | ------------------ | ------------------------ | ------------------- |
+| none (transcript-only)                | 21.9 / 53.3 / 5.8 |                    |                          |                     |
+| "." only                              | 17.9 / 38.2 / 7.5 | 19.3 / 42.7 / 7.3  | −4.0pp [−5.7, −2.2]      | −1.4pp [−2.9, +0.2] |
+| "." + `<\|im_end\|>`                  | 18.4 / 40.9 / 6.8 | 19.3 / 45.1 / 6.0  | −3.6pp [−5.2, −2.0]      | −0.9pp [−2.4, +0.4] |
+| question punctuation                  | 15.2 / 28.5 / 8.3 | 20.6 / 44.4 / 8.4  | −6.7pp [−8.8, −4.7]      | −5.4pp [−7.3, −3.8] |
+| question punctuation + `<\|im_end\|>` | 15.8 / 29.0 / 9.0 | 19.0 / 43.9 / 6.3  | −6.1pp [−8.3, −4.1]      | −3.2pp [−5.0, −1.6] |
+| all six tail (through `assistant\n`)  | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
+
+**On cutoff the question's own punctuation is as good as the six tail tokens** (15.2 vs 15.0, and
+28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The signal is at the "?" that ends the
+question proper, before the boilerplate ("If you are not sure, give your best guess. Answer with
+just the person name."): some read there names Qwen's modal answer on 659 of 986 items (190 of 339
+stale), e.g. at "Who is the CEO of Intel?" L32: "The current CEO of Intel is **Pat Gelsinger**." The
+commas (all in the boilerplate) name it on 40, the final "." on 316. The "." and `<|im_end|>` alone
+are at their placebo. Every placebo beats transcript-only by 1–3pp: any reads push Haiku towards the
+stale answer.
+
+**Second 1k** (2026-10-30, Kylie). 1,000 more seeded stable, non-numeric bank-v4 questions not among
+the 999 (326 stale), built from the bank by `cfbench/evals/cutoff_qa_inline/extend.py` (the label is
+the bank's 8-sample modal answer; reads are of the prompt alone, so no Qwen episode). Reads
+`olens_reads/2026-10-30_cutoff-new1k` (question punctuation + the six tail tokens), runs
+`cfbench/2026-10-30_cutoff-qa-new1k-tail6` (transcript-only, six-tail O-lens + placebo) and
+`..._cutoff-qa-new1k-olens-qpunct`, 15,000 predictions, $11, 0 invalid. Pooled with the first 999
+(1,999 questions, 665 stale), error rate:
+
+| condition            | all  | stale | − transcript-only, all | − its placebo, all  |
+| -------------------- | ---- | ----- | ---------------------- | ------------------- |
+| transcript-only      | 22.2 | 53.9  |                        |                     |
+| question punctuation | 17.4 | 33.6  | −4.8pp [−6.3, −3.3]    | −4.4pp [−5.8, −3.2] |
+| its placebo          | 21.8 | 47.0  |                        |                     |
+| six tail tokens      | 17.2 | 32.2  | −5.0pp [−6.6, −3.5]    | −6.5pp [−8.0, −5.2] |
+| its placebo          | 23.7 | 46.7  |                        |                     |
+
+Question punctuation − six tail: +0.2pp [−0.9, +1.2] (stale +1.4 [−0.9, +3.5]); the same in each
+half. The new 1k shows a smaller gain overall (O-lens − transcript −2.9pp vs −6.7pp on the
+first 999) but the same on stale items (−15.7pp vs −24.8pp, CIs overlapping).
+
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
