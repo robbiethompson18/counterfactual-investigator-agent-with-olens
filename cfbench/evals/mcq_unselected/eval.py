@@ -19,7 +19,7 @@ harness, so pool them by case. Run batch 1 with `--versions mmlu_pro`, batch 2 w
 
 **Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS),
 read from their labels file LABELS: a reply counts only when it is one bare letter (worked solutions are unscored; the
-first-capital parser before 2026-10-29 read them as "A" or "I", CODE_SMELL P1 #1). A question is a case when its modal
+first-capital parser before 2026-10-29 read them as "A" or "I", fixed in PR #404). A question is a case when its modal
 letter has >= MIN_SHARE of all its samples, an unscored reply counting against it (so >= 7 of 8 samples gave that bare
 letter, as the prompt says; a share of the scored replies alone admits questions on one or two bare letters). Truth =
 that modal letter.

@@ -68,7 +68,7 @@ So "guess the gold" scores 82% here; the interesting cases are the 220. Report o
 the headline and the wrong-subset accuracy as the diagnostic, without selecting on it.
 
 **The first build (1,285 cases: 1,044 right, 241 wrong) is superseded.** It read Qwen's replies with
-`hint_mcq`'s old parser, the first standalone capital A-J anywhere in the reply (CODE_SMELL P1 #1).
+`hint_mcq`'s old parser, the first standalone capital A-J anywhere in the reply (fixed in PR #404).
 4,785 of the 96,462 census replies (5%) are worked solutions instead of a letter, and in those the
 first capital is often the article "A", the pronoun "I" or a variable. Rebuilt from the same census
 with the strict parse:
