@@ -51,6 +51,9 @@ Summary of the Final Pitch (2026-10-19):
   measured "successful changes" (their ≥50pp YES / ≤15pp NO rules). The absolute ≥50pp rule makes
   every removal edit a NO when the baseline rate is under 50%, so prefer a headroom-normalized
   effect plus a significance test when we label our own experiments.
+- **Our critique of CHIVE's data is in [docs/chive-critique.md](docs/chive-critique.md)**, every
+  number reproducible with `uv run python -m chive_critique`
+  ([chive_critique/CLAUDE.md](chive_critique/CLAUDE.md)).
 - **CHIVE's transcript-only baseline is strong (~81% AUROC), and in the paper no activation tool
   (AOs, NLAs, SAEs) beats it.** CHIVE didn't test the O-lens or J-lens, which is our opening.
 - **Selection bias in CHIVE.** The counterfactuals were proposed by a transcript-reading agent, so
@@ -73,6 +76,13 @@ Summary of the Final Pitch (2026-10-19):
   record: T 1.0, top-p 0.95, top-k 64, one continuation of up to 4 bullets per site). Every read
   before that was greedy, the viewer's default; `--temperature 0` restores it. At T 1 each rollout
   is its own lens draw; at T 0 rollouts sharing a prompt share one read (docs/envs/hint_cf.md).
+- **Read everywhere, at all six layers (Robbie, 2026-10-30).** Default O-lens / NLA / J++ read
+  positions are every punctuation token and `<|im_end|>`, each MCQ option's newline, and the ten
+  tail tokens of the thinking-off render through `</think>\n\n`, at layers 32/40/48/52/56/60 for
+  every lens. Never hand-pick a few tail tokens; pick positions when building the investigator's
+  block instead. A `messages` row with `generation_prompt` renders the thinking-on `<think>\n`, so
+  think-block reads need a `text` row of the thinking-off render
+  ([docs/read-positions.md](docs/read-positions.md)).
 - **Metamodel hallucination.** O-lens and NLA readouts invent names, numbers, and plans that aren't
   in the activation. The O-lens gives a per-bullet FVE, which is a cheap hallucination signal to
   pass to the agent.
@@ -85,7 +95,9 @@ Summary of the Final Pitch (2026-10-19):
 - **cfbench conditions are `no_transcript`, `transcript_agentic`, `olens_agentic`,
   `olens_placebo_agentic`** (renamed 2026-10-27; old rows map through `canon_condition`). The inline
   two-transcript condition is retired: never compare a tool condition against anything but
-  `transcript_agentic`.
+  `transcript_agentic`. **Every `*_agentic` condition is stale (2026-10-30): run one only with
+  Robbie's approval** (`CFBENCH_ALLOW_AGENTIC=1`); the single-turn `*_inline` conditions are
+  current.
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 - **A tool call that ends a rollout by submitting an answer returns the verdict** (added
@@ -219,9 +231,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, no tool calls in gray, J++ in purple. A placebo is its lens's color with black stripes
-  (Robbie, 2026-10-29; in matplotlib: fill = the lens's color, `hatch="////"`, `edgecolor` black);
-  plain black placebos are the old style. Give any other condition a color outside these.
+  in orange, no tool calls in gray, J++ in purple, NLA in green. A placebo is its lens's color with
+  black stripes (Robbie, 2026-10-29; an open marker where stripes can't show); plain black placebos
+  are the old style. Paired-difference rows are labelled by the two conditions' swatches, A − B
+  (2026-10-30). In matplotlib take all of it from `graphs/style.py` (`bar_kw`, `marker_kw`,
+  `diff_rows`). Give any other condition a color outside these.
 
 ## Docs
 
@@ -272,9 +286,25 @@ Active docs:
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) —
   `python -m graphs.<module>` → `docs/img/`
+- [ACTIVE: slides — read before making a talk or slide deck, or a figure for one](slides/CLAUDE.md)
+  — Beamer + Metropolis theme in the Evals page's style, `make -C slides`
 - [ACTIVE: cfbench — read before predicting counterfactual arm outcomes or adding an env to the prediction harness](cfbench/CLAUDE.md)
   — our CHIVE replacement
-- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
+- [REFERENCE: supergpqa_inline — read before claiming the O-lens predicts Qwen's MCQ letter, giving an investigator lens reads of an MCQ prompt, or using the 3k / 3.3k eval-probe split](docs/supergpqa-inline.md)
+  — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
+  single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
+  cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
+  linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
+  90%
+- [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
+  — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
+  shared pod, and the arithmetic
+- [ACTIVE: mcq_unselected — read before predicting Qwen's MMLU-Pro letter from the bare prompt, comparing O-lens / J-lens / NLA / probe readers on it, or training a probe on MMLU-Pro (the 2k/2k split)](docs/mcq-unselected.md)
+  — unselected 4k sample of MMLU-Pro, two 2k eval batches + a 2k probe half (probe-trained questions
+  kept out of eval), strict consistency the only filter (2,523 cases, 82% right), no hint,
+  single-turn letter task; Haiku 5.5 results: O-lens +1.6pp and J-lens +2.3pp over prompt-only, NLA
+  +0.8pp, probe 92% (82% on Qwen-wrong vs 31-39% for the three lenses)
 - [ACTIVE: cfbench evals — read before building an eval that picks its own cases (one transcript per case, paired models, hidden model name) or showing one in the env viewer](cfbench/evals/CLAUDE.md)
 - [ACTIVE: cfbench scoring — read before scoring a predictor, quoting a cfbench number, or making the report's cfbench charts](docs/cfbench-scoring.md)
   — RMSE of the predicted rate
@@ -290,12 +320,22 @@ Active docs:
 - [ACTIVE: Donation Bet env — read before running donation_bet or comparing models' leakage gaps](docs/envs/donation_bet.md)
 - [ACTIVE: Hinted TruthfulQA (formerly vulnerable users) — read before running bio-conditioned factual MCQ (Poole-Dayan et al.) or "my friend / professor / Wikipedia says it's X" hints](docs/envs/hinted_truthfulqa.md)
 - [ACTIVE: cutoff_qa — read before asking Qwen factual questions whose answer changed around its knowledge cutoff, or extending the question bank](docs/envs/cutoff_qa.md)
+- [REFERENCE: favorites_qa_inline — read before claiming metamodel reads predict Qwen's own preferences, or rerunning the 1,500-item favourites investigator](docs/favorites-qa-inline.md)
+  — Haiku guesses Qwen's free-response pick: transcript-only 80%, O-lens 87.6%, NLA 87.4% (tie,
+  +7pp), J++ 79% (+0, though L60 top-3 holds the answer's first token on 61%); O-lens placebo −10pp,
+  NLA placebo neutral; the answer sits at the "\n" after `<|im_end|>`
 - [ACTIVE: favorites_qa — read before asking Qwen for its own favourites/picks (basic_readout implicit, scaled up), or extending that bank](docs/envs/favorites_qa.md)
 - [ACTIVE: Alignment faking — read before running the Greenblatt helpful-only setting (free/paid or preview/public tags) on any model](docs/envs/alignment_faking.md)
   — DSV4 Flash ~10pp gap, GLM and Qwen refuse all
 - [ACTIVE: GLM-5.3 O-lens reads — read before reading our transcripts with Celeste's GLM 5.3 O-lens or extending her readouts_dense tables](scripts/glm_olens_dense/CLAUDE.md)
 - [ACTIVE: runpod/ — read before Robbie's agents start any GPU, or before getting O-lens reads of transcripts](runpod/CLAUDE.md)
   — for Qwen completions use the shared server, not your own pod
+- [ACTIVE: Default read positions — read before requesting any O-lens / NLA / J++ reads, or building an investigator block from reads](docs/read-positions.md)
+  — every punctuation token + option newlines + the ten thinking-off tail tokens, layers 32–60,
+  thinking off; the inline sets' fill runs and `cfbench.evals.inline_reads`
+- [ACTIVE: Placebo rules — read before building any O-lens / NLA / J++ placebo condition](docs/placebo-rules.md)
+  — another case of the same set, same option count, same subject category; positions aligned by
+  kind
 - [ACTIVE: Batch reads format — read before writing a reader, or showing batch O-lens/J++/NLA reads in expview](docs/olens-reads-format.md)
   — `X.jsonl` + `X.transcripts.jsonl`
 - [ACTIVE: One-engine O-lens reader — read before running batch O-lens reads, or before changing how capture, lens decode or the AR are served](docs/olens-one-engine-reader.md)

@@ -43,6 +43,7 @@ from cfbench.core import (
     TOOL_BUDGET,
     TOOL_CONDITIONS,
     build_prompt,
+    check_agentic,
     pick_examples,
 )
 from cfbench.predict import EFFORT, grader, predict
@@ -133,13 +134,14 @@ async def main():
         finish(run)
         return
     assert args.slug or args.show, "--slug"
+    conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
+    check_agentic(conditions)
     inputs = Path(args.inputs) if args.inputs else latest_inputs(getattr(ev, "INPUTS_FROM", args.name), versions)
     task = getattr(ev, "TASK", "rate")
     ask_src = inspect.getsource(ev.ASK) if hasattr(ev, "ASK") else None
     notes = (EVALS / args.name / "eval.md").read_text() if (EVALS / args.name / "eval.md").exists() else ""
     base_src = inspect.getsource(ev.BASE_LINE) if hasattr(ev, "BASE_LINE") else None  # in meta, so --reuse can compare
     prompt_src = inspect.getsource(ev.PROMPT) if hasattr(ev, "PROMPT") else None
-    conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
     assert not set(JLENS_CONDITIONS) & set(conditions), "cfbench.eval has no J-lens tools yet; use cfbench.run"
     inline = set(INLINE_CONDITIONS) & set(conditions)
     assert not inline or hasattr(ev, "INLINE"), f"{args.name} has no INLINE prompt for {sorted(inline)}"

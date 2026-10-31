@@ -3,14 +3,25 @@
 Every chart in the repo, one module each, run from the repo root as
 `uv run python -m graphs.<module>`; each writes PNGs under `docs/img/` (gitignored: the doc that
 shows a chart names the module that regenerates it). Scoring and run selection are not here: charts
-import them from `cfbench.scoring`. Colors follow CLAUDE.md (transcript-only blue, O-lens orange,
-placebo black, no tools gray).
+import them from `cfbench.scoring`. Colors, placebo hatching and the paired-difference rows (each
+labelled by its two conditions' swatches, A − B) come from `style.py` (`bar_kw`, `marker_kw`,
+`diff_rows`, `use`), which every module imports; CLAUDE.md has the rule.
 
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
+- `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
+  required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
+  (`docs/cutoff-qa-inline.md`)
+- `cutoff_qa_notail`: the v3 tool run's O-lens cut to the question's punctuation (± `<|im_end|>`) vs the full
+  set, each with its placebo, error rate, stale / not stale / all, plus paired differences on stale items
+  (`docs/cutoff-qa-inline.md`)
+- `favorites_qa_inline`: the same seven bars and paired-difference figure for the 1,500-item
+  favourites eval, all items and by question shape (`docs/favorites-qa-inline.md`)
+- `supergpqa_inline`: the cutoff chart for supergpqa_inline, groups all / Qwen wrong / Qwen right
+  cases (`docs/supergpqa-inline.md`)
 - `hint_mcq_answer`: the hint_mcq answer task, three bars per hint type and per-item grids
   (`docs/envs/hint_cf.md`)
 - `hint_mcq_total`: the answer task's running total over the original items and the 2k scale-up
@@ -22,3 +33,6 @@ placebo black, no tools gray).
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
+- `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
+  no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
+  `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)

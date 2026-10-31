@@ -1,0 +1,188 @@
+% The sprint's slide theme: Metropolis restyled to look like the env viewer's Evals pages (environments/_lib/page.html:
+% warm off-white page, hairline rules, Inter, an indigo accent) with the charts' condition colours
+% (graphs/style.py). Load with \usetheme{olens} in a 16:9, 9pt deck (dense, for reading on a monitor, not a lecture hall) compiled with XeLaTeX; slides/CLAUDE.md has the macros.
+%
+% Colour on a slide is either the indigo accent (structure: progress bar, takeaway rule, links) or a condition's colour
+% (transcript-only blue, O-lens orange, J++ purple, NLA green, no tools gray, a placebo striped in its lens's colour), so
+% a coloured word always points at the same bars in a chart.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{beamerthemeolens}[2026/10/30 olens sprint theme]
+
+\usetheme[progressbar=frametitle, numbering=none, sectionpage=progressbar, block=fill, titleformat=regular]{metropolis}
+\RequirePackage{booktabs, colortbl, tikz, xcolor, graphicx}
+\RequirePackage[most]{tcolorbox}
+\usetikzlibrary{patterns}
+
+% ---------------------------------------------------------------------------------------------------------------- colours
+% The Evals page's light theme (page.html :root) for the chrome; graphs/style.py for the conditions. Keep them in sync.
+\definecolor{bg}{HTML}{F6F5F1}
+\definecolor{card}{HTML}{FFFFFF}
+\definecolor{ink}{HTML}{1C1B19}
+\definecolor{muted}{HTML}{6F6B62}
+\definecolor{faint}{HTML}{A29D92}
+\definecolor{rule}{HTML}{E4E0D6}
+\definecolor{track}{HTML}{EBE8E0}
+\definecolor{accent}{HTML}{4A4FC4}
+\definecolor{accentwash}{HTML}{ECEEFE}
+\definecolor{transcript}{HTML}{2A78D6}
+\definecolor{olens}{HTML}{EB6834}
+\definecolor{jlens}{HTML}{8E44AD}
+\definecolor{nla}{HTML}{2E9E5B}
+\definecolor{notool}{HTML}{898781}
+
+\setbeamercolor{normal text}{fg=ink, bg=bg}
+\setbeamercolor{alerted text}{fg=accent}
+\setbeamercolor{example text}{fg=muted}
+\setbeamercolor{frametitle}{fg=ink, bg=bg}
+\setbeamercolor{title}{fg=ink}
+\setbeamercolor{subtitle}{fg=muted}
+\setbeamercolor{author}{fg=ink}
+\setbeamercolor{institute}{fg=muted}
+\setbeamercolor{date}{fg=muted}
+\setbeamercolor{progress bar}{fg=accent, bg=track}
+\setbeamercolor{title separator}{fg=accent, bg=track}
+\setbeamercolor{section title}{fg=ink}
+\setbeamercolor{footline}{fg=faint}
+\setbeamercolor{itemize item}{fg=faint}
+\setbeamercolor{itemize subitem}{fg=faint}
+\setbeamercolor{enumerate item}{fg=muted}
+\setbeamercolor{background canvas}{bg=bg}
+\setbeamercolor{palette primary}{fg=card, bg=ink}
+
+% ------------------------------------------------------------------------------------------------------------------ fonts
+% Inter, the charts' font (slides.mplstyle), with semibold as bold; Fira Sans (Metropolis's own) where Inter isn't
+% installed. Lining figures in text, tabular ones in tables (\tablefont).
+\IfFontExistsTF{Inter}{%
+  \setsansfont{Inter}[BoldFont={Inter SemiBold}, ItalicFont={Inter Italic}, BoldItalicFont={Inter SemiBold Italic},
+    Numbers=Lining]
+  \newfontfamily\displayfont{Inter Display}[BoldFont={Inter Display SemiBold}, Numbers=Lining]
+}{%
+  \setsansfont{Fira Sans}[BoldFont={Fira Sans SemiBold}, ItalicFont={Fira Sans Light Italic}, Numbers=Lining]
+  \newfontfamily\displayfont{Fira Sans}[BoldFont={Fira Sans SemiBold}, Numbers=Lining]
+}
+\IfFontExistsTF{JetBrains Mono}{\setmonofont{JetBrains Mono}[Scale=MatchLowercase]}{\setmonofont{Fira Mono}[Scale=MatchLowercase]}
+\newcommand{\tablefont}{\small\addfontfeatures{Numbers={Tabular,Lining}}}
+
+\setbeamerfont{frametitle}{family=\displayfont, series=\bfseries, size=\large}
+\setbeamerfont{title}{family=\displayfont, series=\bfseries, size=\LARGE}
+\setbeamerfont{subtitle}{size=\normalsize}
+\setbeamerfont{author}{size=\small, series=\bfseries}
+\setbeamerfont{institute}{size=\small}
+\setbeamerfont{date}{size=\small}
+\setbeamerfont{section title}{family=\displayfont, series=\bfseries, size=\LARGE}
+\setbeamerfont{footline}{size=\tiny}
+\setbeamerfont{alerted text}{series=\bfseries}
+\setbeamerfont{block title}{series=\bfseries, size=\small}
+\setbeamerfont{standout}{family=\displayfont, series=\bfseries, size=\LARGE}
+\setbeamerfont{caption}{size=\footnotesize}
+
+% ----------------------------------------------------------------------------------------------------------------- layout
+\setbeamersize{text margin left=5mm, text margin right=5mm}
+\metroset{progressbar=frametitle}
+\setlength{\metropolis@progressinheadfoot@linewidth}{0.5pt}
+\setlength{\metropolis@titleseparator@linewidth}{0.5pt}
+\setlength{\metropolis@progressonsectionpage@linewidth}{0.5pt}
+
+% Frame title: ink on the page colour, left-aligned like the charts' titles, with Metropolis's progress bar as a hairline under it.
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth, leftskip=5mm, rightskip=5mm, ht=9mm, dp=2.6mm]{frametitle}%
+    \usebeamerfont{frametitle}\insertframetitle
+    \ifx\insertframesubtitle\@empty\else{\usebeamerfont{framesubtitle}\usebeamercolor[fg]{subtitle}\ \ \small\mdseries\insertframesubtitle}\fi
+  \end{beamercolorbox}%
+}
+
+% Footline: short title on the left, n / N on the right, both faint.
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth, ht=2.5mm, dp=3mm, leftskip=5mm, rightskip=5mm]{footline}%
+    \usebeamerfont{footline}\insertshorttitle\hfill\insertframenumber\,/\,\inserttotalframenumber
+  \end{beamercolorbox}%
+}
+
+\setbeamertemplate{title page}{%
+  \begin{minipage}[b][\paperheight]{\textwidth}
+    \vfill
+    {\usebeamercolor[fg]{title}\usebeamerfont{title}\raggedright\inserttitle\par}
+    \ifx\insertsubtitle\@empty\else\vspace{3mm}{\usebeamercolor[fg]{subtitle}\usebeamerfont{subtitle}\raggedright\insertsubtitle\par}\fi
+    \vspace{7mm}
+    {\color{accent}\rule{18mm}{1.2pt}}\par
+    \vspace{7mm}
+    {\usebeamercolor[fg]{author}\usebeamerfont{author}\insertauthor\par}
+    \vspace{1mm}
+    {\usebeamercolor[fg]{institute}\usebeamerfont{institute}\insertinstitute\par}
+    {\usebeamercolor[fg]{date}\usebeamerfont{date}\insertdate\par}
+    \vspace{14mm}
+  \end{minipage}%
+}
+
+\setbeamertemplate{section page}{%
+  \centering
+  \begin{minipage}{0.84\textwidth}
+    {\color{accent}\usebeamerfont{date}\bfseries\addfontfeatures{LetterSpace=8}PART \insertsectionnumber\par}
+    \vspace{2mm}
+    {\usebeamercolor[fg]{section title}\usebeamerfont{section title}\raggedright\insertsectionhead\par}
+    \vspace{4mm}
+    \usebeamertemplate*{progress bar in section page}
+  \end{minipage}
+  \par
+}
+
+% Lists: small gray squares and en dashes, tight.
+\setbeamertemplate{itemize item}{\raisebox{0.18em}{\rule{0.36em}{0.36em}}}
+\setbeamertemplate{itemize subitem}{\textendash}
+\setbeamertemplate{enumerate item}{\insertenumlabel.}
+\setlength{\leftmargini}{1.1em}
+\setlength{\leftmarginii}{1.1em}
+
+% ----------------------------------------------------------------------------------------------------------- slide macros
+% \cond{olens} "O-lens" in its colour. \sw{olens} a chart-legend swatch; \swp{olens} the placebo swatch, striped in the
+% background colour like the slide figures' placebo bars.
+\newcommand{\sw}[1]{\tikz[baseline=-0.1ex]\fill[#1] (0, 0) rectangle (0.85em, 0.65em);}
+\newcommand{\swp}[1]{\tikz[baseline=-0.1ex]{\fill[#1] (0, 0) rectangle (0.85em, 0.65em);
+  \fill[pattern=north east lines, pattern color=bg] (0, 0) rectangle (0.85em, 0.65em);}}
+\newcommand{\cond}[2]{{\color{#1}\bfseries #2}}
+\newcommand{\transcript}{\cond{transcript}{transcript only}}
+\newcommand{\olens}{\cond{olens}{O-lens}}
+\newcommand{\jlens}{\cond{jlens}{J++}}
+\newcommand{\nla}{\cond{nla}{NLA}}
+
+\newcommand{\muted}[1]{{\color{muted}#1}}
+% \struck{...}: a crossed-out earlier version of a line (e.g. superseded goals in a title), faint with the rule through it.
+% One line only (a TikZ node, so no extra package).
+\DeclareRobustCommand{\struck}[1]{\texorpdfstring{\tikz[baseline=(s.base)]{\node[inner sep=0, text=faint] (s) {#1};
+  \draw[faint, line width=0.06em] ([yshift=0.55ex]s.base west) -- ([yshift=0.55ex]s.base east);}}{#1}}
+
+% Panels: no box, just a bold title over a hairline, so text sits straight on the page. \begin{panel}[Title] ... \end{panel}.
+% Beamer's block and alertblock are panels too (alertblock with an indigo title).
+\tcbset{olenspanel/.style={blanker, borderline north={0.5pt}{0pt}{rule}, top=1.5mm, bottom=0mm, before upper=\raggedright,
+  fonttitle=\bfseries\small, coltitle=ink, attach title to upper={\par\smallskip}, before skip=1mm, after skip=2.5mm}}
+\newtcolorbox{panel}[1][]{olenspanel, title={#1}}
+\renewenvironment<>{block}[1]{\begin{tcolorbox}[olenspanel, title={#1}]}{\end{tcolorbox}}
+\renewenvironment<>{alertblock}[1]{\begin{tcolorbox}[olenspanel, title={#1}, coltitle=accent]}{\end{tcolorbox}}
+
+% \stat{value}{colour}{what it is}: a headline number for a summary slide, under a short rule in its colour.
+\newcommand{\stat}[3]{\begin{tcolorbox}[blanker, borderline north={1pt}{0pt}{#2}, top=1.5mm, before upper=\raggedright]
+  {\usebeamerfont{frametitle}\Large\color{#2}#1\par}\smallskip{\footnotesize\color{muted}#3\par}\end{tcolorbox}}
+\newcommand{\best}[1]{\textbf{#1}}
+
+% \slidefig{path}: a figure made at its slide size (slides/figure.py), included unscaled straight on the page (transparent
+% background) so its text matches the slide's.
+\newcommand{\slidefig}[1]{{\centering\includegraphics{#1}\par}}
+
+% \takeaway{...}: the one sentence a slide is for, indigo rule on the left. \source{...}: provenance in the bottom margin.
+\newcommand{\takeaway}[1]{%
+  \par\smallskip\noindent
+  \begin{tikzpicture}[baseline=(t.base)]
+    \node[inner sep=0, text width=\linewidth-3.5mm, anchor=north west, xshift=3.5mm, font=\normalsize] (t) {\bfseries #1};
+    \fill[accent] ([xshift=-3.5mm]t.north west) rectangle ([xshift=-2.6mm]t.south west);
+  \end{tikzpicture}\par}
+\newcommand{\source}[1]{\vfill{\scriptsize\color{faint}#1\par}}
+
+% Tables: booktabs rules in the page's hairline colour.
+\setlength{\heavyrulewidth}{0.6pt}
+\setlength{\lightrulewidth}{0.4pt}
+\setlength{\cmidrulewidth}{0.4pt}
+\AtBeginEnvironment{tabular}{\arrayrulecolor{rule}}
+\renewcommand{\arraystretch}{1.18}
+
+\mode<all>

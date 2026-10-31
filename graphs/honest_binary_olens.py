@@ -22,11 +22,9 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-INK, MUTED, GRID, NULL_FILL, BLUE, GRAY = "#0b0b0b", "#52514e", "#e1e0d9", "#ffffff", "#2a78d6", "#898781"
-ORANGE, BLACK = "#e8831a", "#0b0b0b"  # CLAUDE.md chart colors: O-lens orange, placebo black
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
+from graphs.style import INK, MUTED, bar_kw, diff_rows, use
+
+use()
 RUNS = ["2026-10-26_honest-ts-*", "2026-10-26_honest-ts2-*", "2026-10-26_honest-nt2-allpairs-*", "2026-10-26_honest-ol-*"]
 CONDS = {"mse": "agentic", "mse_nt": "no_transcript", "mse_ol": "olens", "mse_pl": "olens_placebo"}
 
@@ -86,11 +84,11 @@ def main():
 
     fig, (ax, bx) = plt.subplots(1, 2, figsize=(12, 5), gridspec_kw={"width_ratios": [1.25, 1]})
     series = [
-        ("Env diff only", pt["mse_nt"], ci(boots["mse_nt"]), {"color": GRAY}),
-        ("Transcript-only", pt["mse"], ci(boots["mse"]), {"color": BLUE}),
-        ("With O-lens", pt["mse_ol"], ci(boots["mse_ol"]), {"color": ORANGE}),
-        ("O-lens placebo", pt["mse_pl"], ci(boots["mse_pl"]), {"color": BLACK}),
-        ("Edit does nothing", pt["null"], ci(boots["null"]), {"color": NULL_FILL, "edgecolor": INK, "hatch": "////", "lw": 0.8}),
+        ("Env diff only", pt["mse_nt"], ci(boots["mse_nt"]), bar_kw("no_transcript")),
+        ("Transcript-only", pt["mse"], ci(boots["mse"]), bar_kw("transcript")),
+        ("With O-lens", pt["mse_ol"], ci(boots["mse_ol"]), bar_kw("olens")),
+        ("O-lens placebo", pt["mse_pl"], ci(boots["mse_pl"]), bar_kw("olens_placebo")),
+        ("Edit does nothing", pt["null"], ci(boots["null"]), bar_kw("null")),
     ]
     for j, (lab, v, c, kw) in enumerate(series):
         ax.bar(j, acc(v), 0.7, label=lab, zorder=2, **kw)
@@ -108,22 +106,14 @@ def main():
     ax.set_title(title, loc="left", fontsize=10)
     ax.legend(loc="upper left", ncol=3, fontsize=8, frameon=False)
     diffs = [
-        ("With O-lens − Transcript-only", (pt["mse"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_ts"]), ORANGE),
-        ("With O-lens − O-lens placebo", (pt["mse_pl"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_pl"]), ORANGE),
-        ("Transcript-only − Env diff only", (pt["mse_nt"] - pt["mse"]) * 100, ci(boots["ts_minus_nt"]), BLUE),
-        ("Env diff only − Edit does nothing", (pt["null"] - pt["mse_nt"]) * 100, ci(boots["nt_minus_null"]), GRAY),
+        ("olens", "transcript", "With O-lens − Transcript-only", (pt["mse"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_ts"])),
+        ("olens", "olens_placebo", "With O-lens − O-lens placebo", (pt["mse_pl"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_pl"])),
+        ("transcript", "no_transcript", "Transcript-only − Env diff only", (pt["mse_nt"] - pt["mse"]) * 100, ci(boots["ts_minus_nt"])),
+        ("no_transcript", "null", "Env diff only − Edit does nothing", (pt["null"] - pt["mse_nt"]) * 100, ci(boots["nt_minus_null"])),
     ]
-    for y, (lab, d, c, col) in enumerate(reversed(diffs)):
-        lo, hi = c[0] * 100, c[1] * 100
-        bx.plot([lo, hi], [y, y], color=col, lw=2, solid_capstyle="round", zorder=2)
-        bx.plot(d, y, "o", ms=7, color=col, mec="white", mew=1.5, zorder=3)
-        bx.text(hi + 0.6, y, f"{d:+.1f} [{lo:+.1f}, {hi:+.1f}]", va="center", fontsize=8, color=INK)
-        bx.text(lo - 0.6, y, lab, va="center", ha="right", fontsize=8, color=INK)
-    bx.axvline(0, color=MUTED, lw=1, zorder=1)
-    bx.set_yticks([])
-    bx.set_ylim(-0.8, 3.8)
-    lo_all, hi_all = min(c[0] for _, _, c, _ in diffs) * 100, max(c[1] for _, _, c, _ in diffs) * 100
-    bx.set_xlim(lo_all - 28, hi_all + 16)
+    lo_all, hi_all = min(c[0] for *_, c in diffs) * 100, max(c[1] for *_, c in diffs) * 100
+    bx.set_xlim(lo_all - 3, hi_all + 16)
+    diff_rows(bx, [(a, b, d, c[0] * 100, c[1] * 100, lab) for a, b, lab, d, c in diffs])
     bx.set_xlabel("RMSE reduction (pp, higher is better)")
     bx.set_title("Differences, 95% case bootstrap (paired, same cases)", loc="left", fontsize=10)
     fig.tight_layout()
@@ -132,7 +122,7 @@ def main():
     names = [("envdiff", "mse_nt"), ("TS", "mse"), ("OL", "mse_ol"), ("placebo", "mse_pl"), ("null", "null"), ("ceiling", "noise")]
     bars = " ".join(f"{lab} {acc(pt[fld]):.1f}" for lab, fld in names)
     print(f"wrote {args.out}: n={len(keys)} {bars}")
-    for lab, d, c, _ in diffs:
+    for _, _, lab, d, c in diffs:
         print(f"  {lab}: {d:+.1f} [{c[0] * 100:+.1f}, {c[1] * 100:+.1f}]")
 
     print("\nper scenario (weak item only; 100 − RMSE in pp, and the OL − TS difference with its 95% case bootstrap)")

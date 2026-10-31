@@ -1,16 +1,19 @@
 # HF transformers forward passes (scripts/hs_at_positions.py: residuals at given token positions + letter log-probs) on a
-# SkyPilot RunPod H200: Kylie's compute. Launch once (setup = venv + Qwen3.6-27B weights), then each job is a `sky exec`
-# (never nohup over ssh: `-i 15 --down` would kill it), outputs in ~/hs/<OUT>/; fetch them before the cluster idles out:
+# SkyPilot RunPod H200 (vast H200, RunPod B200 as fallbacks): Kylie's compute. Launch once (setup = venv + Qwen3.6-27B
+# weights), then each job is a `sky exec` (never nohup over ssh: `-i 15 --down` would kill it; exec needs --secret
+# HF_TOKEN again), outputs in ~/hs/<OUT>/; fetch them before the cluster idles out:
 #   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c qwen-hs -y -i 15 --down --secret HF_TOKEN scripts/sky/hs_positions.yaml
-#   sky exec qwen-hs -d --env IN=hs_inputs.jsonl --env OUT=name --env ARGS="--layers 32,40,48,52,56,60 --chunk 2000" \
+#   sky exec qwen-hs -d --secret HF_TOKEN --env IN=hs_inputs.jsonl --env OUT=name --env ARGS="--layers 52" \
 #     scripts/sky/hs_positions.yaml   # after rsyncing the inputs to qwen-hs:~/hs/
-name: author-probe
+name: qwen-hs
 
 resources:
-  disk_size: 300
+  disk_size: 150
   ordered:
     - {infra: runpod, accelerators: "H200-SXM:1"}
     - {infra: runpod, accelerators: "H200:1"}
+    - {infra: vast, accelerators: "H200:1"}
+    - {infra: runpod, accelerators: "B200:1"}
 
 secrets:
   HF_TOKEN: null
