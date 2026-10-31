@@ -138,7 +138,7 @@ def score(tok, lens, whiteners, texts, vecs, layers):
 
 
 def nnls_gram(G, b, zz):
-    """olens.fve.fve_nnls in Gram form: min ||z - sum c_i d_i||^2 over c >= 0, with G = D D^T, b = D z, zz = z.z. Exact
+    """Non-negative least squares in Gram form: min ||z - sum c_i d_i||^2 over c >= 0, with G = D D^T, b = D z, zz = z.z. Exact
     for a few directions: the optimum is the least-squares fit on some subset with every coefficient >= 0, where the
     squared residual is zz - b_S . c_S. Returns (FVE, c)."""
     k = len(b)
