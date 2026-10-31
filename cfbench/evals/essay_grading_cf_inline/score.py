@@ -18,6 +18,7 @@ from scipy.stats import rankdata
 from cfbench.core import canon_condition
 
 BOOT = 1000
+PROBE = Path("data/runs/essay_probe/2026-10-31_essay-grading-acts/probe.json")  # probe.py's output
 PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
 
 
@@ -102,11 +103,38 @@ def stats(rows: list[dict]) -> list[dict]:
     return out
 
 
+def _logit(p: np.ndarray) -> np.ndarray:
+    p = np.clip(p, 0.01, 0.99)
+    return np.log(p / (1 - p))
+
+
+def _logistic(x: np.ndarray, y: np.ndarray, l2: float = 1e-3) -> np.ndarray:
+    w = np.zeros(x.shape[1])
+    for _ in range(50):  # Newton
+        p = 1 / (1 + np.exp(-x @ w))
+        w -= np.linalg.solve(x.T @ (x * (p * (1 - p))[:, None]) + l2 * np.eye(len(w)), x.T @ (p - y) + l2 * w)
+    return w
+
+
+def combined(p: dict, obs: dict, truth: dict, keys: list) -> dict:
+    """Out-of-fold logistic regression on [1, logit(investigator p), observed arm grade], 5 folds grouped by essay: the
+    investigator plus "bet at the mean", with weights learned on other essays."""
+    x = np.array([[1.0, _logit(np.array(p[k])), obs[k]] for k in keys])
+    y = np.array([truth[k] for k in keys], dtype=float)
+    essays = sorted({k[1] for k in keys})
+    fold = {e: i % 5 for i, e in enumerate(np.random.default_rng(0).permutation(essays))}
+    f = np.array([fold[k[1]] for k in keys])
+    out = np.zeros(len(keys))
+    for i in range(5):
+        out[f == i] = x[f == i] @ _logistic(x[f != i], y[f != i])
+    return dict(zip(keys, out.tolist()))
+
+
 def PAGE(rows: list[dict]) -> str:
     """The eval's page section, AUROC first (Kylie): per condition AUROC with a 95% CI (essays resampled), on all cases and
     on the clear ones; paired AUROC differences with CI and one-sided p; % right and Brier for reference; AUROC by opener
     group (environments/essay_grading/wide.py)."""
-    from cfbench.evals.page import bars, swatch, table
+    from cfbench.evals.page import bars, label, swatch, table
     from environments.essay_grading.wide import GROUPS
 
     group = {f"w-{s}": g for g, d in GROUPS.items() for s in d}
@@ -133,7 +161,6 @@ def PAGE(rows: list[dict]) -> str:
             a = metrics(mp[c], truth, keys)["auroc"]
             bs = [b["auroc"] for b in boot(lambda ks, c=c: metrics(mp[c], truth, ks), keys, rng)]
             res.append((c, a, float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5)), len(keys), metrics(mp[c], truth, keys)))
-        out.append(bars([(c, a, lo, hi) for c, a, lo, hi, *_ in res], 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)"))
         for a, b in PAIRS:
             if a in mp and b in mp:
                 keys = [k for k in mp[a].keys() & mp[b].keys() if keep(k)]
@@ -146,6 +173,49 @@ def PAGE(rows: list[dict]) -> str:
                                           f"<span class=\"mute\">p {pfmt(np.mean([better(x[s]) for x in bs]))}</span>")  # fmt: skip
                 pair_rows.append([f"{swatch(a)} − {swatch(b)}", cell("auroc", lambda x: x <= 0), cell("right", lambda x: x <= 0),
                                   cell("brier", lambda x: x >= 0)])  # fmt: skip
+        # no investigator: bet at the mean (minus the observed arm mean: low grades come back up), and the linear probe
+        obs = {(r["base_arm"], r["item"]): sum(float(x) * n for x, n in r["answers_base"].items()) / sum(r["answers_base"].values())
+               for r in rows}  # fmt: skip
+        keys = [k for k in truth if keep(k)]
+        nul = {k: -obs[k] for k in keys}
+        null_auroc = metrics(nul, truth, keys)["auroc"]
+        bs = [b["auroc"] for b in boot(lambda ks, nul=nul: metrics(nul, truth, ks), keys, rng)]
+        probe = json.loads(PROBE.read_text())["best"] if PROBE.exists() else None
+        chart = [(c, a, lo, hi) for c, a, lo, hi, *_ in res]
+        if probe:
+            chart.append(("probe", probe["zero_cf_auroc"], probe["zero_cf_auroc"], probe["zero_cf_auroc"]))
+        out.append(bars(chart, 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)",
+                        lines=[(null_auroc, f"bet at the mean {null_auroc:.3f}")]))  # fmt: skip
+        comb = {c: combined(mp[c], obs, truth, keys) for c in order}
+        crow = []
+        for c in order:
+            cb = [b["auroc"] for b in boot(lambda ks, c=c, comb=comb: metrics(comb[c], truth, ks), keys, rng)]
+            crow.append((c, metrics(comb[c], truth, keys)["auroc"], float(np.nanpercentile(cb, 2.5)), float(np.nanpercentile(cb, 97.5)),
+                         f"{label(c)} + mean"))  # fmt: skip
+        out.append("<h3>Investigator + bet at the mean</h3>")
+        out.append(bars(crow, 0.5, 1.0, "AUROC of an out-of-fold logistic regression on [investigator's p, observed grade]",
+                        lines=[(null_auroc, f"bet at the mean {null_auroc:.3f}")]))  # fmt: skip
+        cpairs = []
+        for a, b in PAIRS:
+            if a in comb and b in comb:
+                dd = lambda ks, a=a, b=b, comb=comb: {"auroc": metrics(comb[a], truth, ks)["auroc"] - metrics(comb[b], truth, ks)["auroc"]}
+                mm, cbs = dd(keys)["auroc"], [x["auroc"] for x in boot(dd, keys, rng)]
+                ci_d = f"[{np.nanpercentile(cbs, 2.5):+.3f}, {np.nanpercentile(cbs, 97.5):+.3f}]"
+                p1 = pfmt(np.mean([x <= 0 for x in cbs]))
+                cpairs.append([f"{swatch(a)} − {swatch(b)}", f'<b>{mm:+.3f}</b> {ci_d} <span class="mute">p {p1}</span>'])
+        out.append(table(["difference, both + bet at the mean", "AUROC"], cpairs))
+        out.append(
+            '<p class="lede"><b>What this is.</b> Haiku sees Qwen\'s grades under the opener, but barely uses how low or high '
+            'they are, so the simplest rule, <i>bet at the mean</i> (say "up" when Qwen\'s observed grade is below the average '
+            "plain-opener grade, 2.79), already ties it (AUROC 0.776; 70.7% right). The two carry different information: a "
+            "logistic regression that adds Qwen's observed grade to the investigator's p, with its two weights fit on the other "
+            "four-fifths of the essays (5 folds grouped by essay, so no essay is scored by weights fit on it), lifts every "
+            "condition by about 0.07. The O-lens is still ahead of its placebo and of transcript-only after that, by about half "
+            "as much as before. The linear probe (above) is still higher.</p>"
+        )
+        out.append(f"<p class=\"mute\">Bet at the mean: rank by minus the observed mean grade (low grades tend to come back up), "
+                   f"AUROC {f3(null_auroc)} [{f3(np.nanpercentile(bs, 2.5))}, {f3(np.nanpercentile(bs, 97.5))}]. "
+                   "Linear probe: see the footnote; no CI.</p>")  # fmt: skip
         out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
                          [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
                           for c, a, lo, hi, n, m in res]))  # fmt: skip
@@ -163,4 +233,17 @@ def PAGE(rows: list[dict]) -> str:
             [g, str(len(keys)), *(f3(a[c]) for c in order), f"{a.get('olens_inline', np.nan) - a.get('olens_placebo_inline', np.nan):+.3f}"]
         )
     out.append(table(["group", "cases", *(swatch(c) for c in order), "O-lens − placebo"], body))
+    if PROBE.exists():
+        b = json.loads(PROBE.read_text())["best"]
+        out.append(
+            '<h3>Footnote: the linear probe</h3><p class="lede"><b>Kylie thinks this is a bit cursed</b>: it is trained against Qwen\'s '
+            "own grades, on Qwen's own activations, so it is not an investigator the way Haiku is. How it was trained "
+            f"(<code>probe.py</code>): ridge regression from Qwen's activations at the {b['site']} token before its reply (layer "
+            f"{b['layer']}) on each arm prompt (the opener Qwen actually saw, not the plain one) to Qwen's mean grade on the "
+            "plain-opener prompt for the same essay. 5 folds grouped by essay, so every essay is scored by a probe that never "
+            "saw it with any opener; about 1,450 training prompts from ~160 essays per fold. The bar ranks cases by the probe's "
+            "guess minus the grade Qwen actually gave with the opener. Because the target is per essay, it mostly learns how good "
+            f"Qwen thinks the essay is underneath the opener. With a forward pass on the plain prompt instead (probe on both, "
+            f"plain − arm) it gets {f3(b['cf_auroc'])}; the probe's out-of-fold r with Qwen's grade is {b['r_score']:.2f}.</p>"
+        )
     return "\n".join(out)
