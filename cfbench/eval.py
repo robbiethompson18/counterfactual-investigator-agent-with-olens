@@ -30,8 +30,10 @@ import inspect
 import json
 import random
 import re
+from hashlib import sha1
 from pathlib import Path
 
+import anthropic
 import openai
 
 from cfbench import answer, olens
@@ -46,7 +48,7 @@ from cfbench.core import (
     check_agentic,
     pick_examples,
 )
-from cfbench.predict import EFFORT, grader, predict
+from cfbench.predict import EFFORT, grader, opening, predict
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -119,6 +121,13 @@ async def main():
     ap.add_argument("--slug", default="")
     ap.add_argument("--show", action="store_true", help="print the first case's prompt per condition (draw 0) and exit; no API calls")
     ap.add_argument("--description", default="")
+    ap.add_argument(
+        "--batch",
+        choices=["submit", "collect"],
+        help="anthropic-batch/ predictors, inline conditions: `submit` sends every prediction to Anthropic's Message Batches API "
+        "at once and exits; `collect --run DIR` (same other args) waits for those batches and writes the rows",
+    )
+    ap.add_argument("--run", default="", help="--batch collect: the run dir --batch submit made")
     args = ap.parse_args()
     ev = importlib.import_module(f"cfbench.evals.{args.name}.eval")
     versions = args.versions.split(",") if args.versions else list(getattr(ev, "DEFAULT_VERSIONS", ev.VERSIONS))
@@ -133,7 +142,7 @@ async def main():
         ev.prep(run, versions, Path(args.placebo), args.n_items or None, args.strict)
         finish(run)
         return
-    assert args.slug or args.show, "--slug"
+    assert args.slug or args.show or args.run, "--slug"
     conditions = args.conditions.split(",") if args.conditions else list(ev.CONDITIONS)
     check_agentic(conditions)
     inputs = Path(args.inputs) if args.inputs else latest_inputs(getattr(ev, "INPUTS_FROM", args.name), versions)
@@ -216,79 +225,94 @@ async def main():
         assert old.get("inline_hook") == inline_src or not inline, f"{path}: INLINE differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
-    run = new_run(
-        "cfbench",
-        args.slug,
-        description=args.description or f"eval {args.name} ({', '.join(versions)}): {len(cases)} cases, {', '.join(conditions)}",
-        models=[{"name": p, "served_by": "openrouter"} for p in predictors],
-        params={
-            "env": f"eval:{args.name}",
-            "eval": args.name,
-            "envs": ev.ENVS,
-            "inputs": str(inputs.relative_to(ROOT)),
-            "versions": versions,
-            "conditions": ",".join(conditions),
-            "predictors": args.predictors,
-            "model_name": ev.MODEL_NAME,
-            "models": sorted({c["model"] for _, c, _ in cases}),
-            "task": task,
-            "effort": args.effort or EFFORT,
-            "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
-            "max_calls": args.max_calls,
-            "draws": args.draws,
-            "seed": args.seed,
-            "limit": args.limit,
-            "model_filter": args.models,
-            "harness_version": HARNESS_VERSION,
-            "eval_md": notes,
-            "base_line": base_src,
-            "ask": ask_src,
-            "prompt_hook": prompt_src,
-            "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
-            "inline_hook": inline_src,
-            "system": getattr(ev, "SYSTEM", None),
-            "reuse": args.reuse,
-        },
+    run = (
+        Path(args.run)
+        if args.batch == "collect"
+        else new_run(
+            "cfbench",
+            args.slug,
+            description=args.description or f"eval {args.name} ({', '.join(versions)}): {len(cases)} cases, {', '.join(conditions)}",
+            models=[{"name": p, "served_by": "openrouter"} for p in predictors],
+            params={
+                "env": f"eval:{args.name}",
+                "eval": args.name,
+                "envs": ev.ENVS,
+                "inputs": str(inputs.relative_to(ROOT)),
+                "versions": versions,
+                "conditions": ",".join(conditions),
+                "predictors": args.predictors,
+                "model_name": ev.MODEL_NAME,
+                "models": sorted({c["model"] for _, c, _ in cases}),
+                "task": task,
+                "effort": args.effort or EFFORT,
+                "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
+                "max_calls": args.max_calls,
+                "draws": args.draws,
+                "seed": args.seed,
+                "limit": args.limit,
+                "model_filter": args.models,
+                "harness_version": HARNESS_VERSION,
+                "eval_md": notes,
+                "base_line": base_src,
+                "ask": ask_src,
+                "prompt_hook": prompt_src,
+                "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
+                "inline_hook": inline_src,
+                "system": getattr(ev, "SYSTEM", None),
+                "reuse": args.reuse,
+                "batch": args.batch,
+            },
+        )
     )
     out, slots = run / "predictions.jsonl", asyncio.Semaphore(args.concurrency)
+    system = getattr(ev, "SYSTEM", None)
 
-    async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
-        shown = pick_examples(base, random.Random(args.seed + draw), "answer" if task == "answer" else "rate")
+    def shown_of(base: list, draw: int) -> list:
+        return pick_examples(base, random.Random(args.seed + draw), "answer" if task == "answer" else "rate")
+
+    def reused(case: dict, condition: str, predictor: str, draw: int, shown: list) -> bool:
+        """Writes the --reuse row for this prediction, if there is one."""
         if old := reuse.get(key(case | {"predictor": predictor, "draw": draw}, condition)):
             assert old["shown"] == [r.source for r in shown], old["shown"]
             with out.open("a") as f:
                 f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
-            return
-        async with slots:  # the prompt is built inside the slot, so --concurrency also bounds how many are in memory
-            tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
-            if condition in INLINE_CONDITIONS:
-                prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
-                effort = args.effort or ev.INLINE_EFFORT  # --effort, when given, applies to every condition (Robbie, 2026-10-29)
-            if condition in TOOL_CONDITIONS:
-                tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
-            if condition in OLENS_CONDITIONS:
-                assert reads is not None
-                src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
-                placebo = condition == "olens_placebo_agentic" and src is None
-                lens_tools, read = olens.tools(
-                    base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
+        return bool(old)
+
+    def job(env, case: dict, base: list, condition: str, draw: int, shown: list) -> tuple[str, dict, dict, str]:
+        """(prompt, tools, extra row fields, effort) of one prediction."""
+        tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
+        if condition in INLINE_CONDITIONS:
+            prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
+            effort = args.effort or ev.INLINE_EFFORT  # --effort, when given, applies to every condition (Robbie, 2026-10-29)
+        if condition in TOOL_CONDITIONS:
+            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
+        if condition in OLENS_CONDITIONS:
+            assert reads is not None
+            src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
+            placebo = condition == "olens_placebo_agentic" and src is None
+            lens_tools, read = olens.tools(
+                base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
+            )
+            if src is not None:
+                extra["placebo_sources"] = src
+            tools |= lens_tools
+        if condition not in INLINE_CONDITIONS:
+            prompt = prompt_of(env, case, base, shown, condition, read)
+        return prompt, tools, extra, effort
+
+    async def predicted(env, case: dict, condition: str, predictor: str, draw: int, prompt: str, tools: dict, effort: str, first=None):
+        """predict() with three attempts, then None; `first` is the predictor's first reply when it came from a batch."""
+        for attempt in range(3):
+            try:
+                budget = args.max_calls if tools else 0
+                return await predict(
+                    predictor, prompt, tools, budget, effort, task, system=system, grade=grader(task, case, env), first=first
                 )
-                if src is not None:
-                    extra["placebo_sources"] = src
-                tools |= lens_tools
-            if condition not in INLINE_CONDITIONS:
-                prompt = prompt_of(env, case, base, shown, condition, read)
-            for attempt in range(3):
-                try:
-                    system = getattr(ev, "SYSTEM", None)
-                    result = await predict(
-                        predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
-                    )
-                    break
-                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
-                    print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
-            else:
-                return
+            except (openai.APIStatusError, anthropic.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
+                print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
+                first = None  # a retry starts the conversation over
+
+    def record(env, case: dict, condition: str, predictor: str, draw: int, shown: list, effort: str, extra: dict, result: dict):
         if ev.MODEL_NAME:  # the predictor must never have seen the model id
             for m in getattr(ev, "MODEL_IDS", [case["model"]]):
                 assert not re.search(re.escape(m), json.dumps(result["messages"])), m
@@ -304,9 +328,96 @@ async def main():
             got = f"answer={result.get('canon')!r} ({'right' if result.get('correct') else 'wrong'})"
         print(f"{case['env']} {case['model']} {condition} draw {draw}: {got} ${result['cost']:.3f}")
 
-    jobs = [one(env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)]
+    everything = [
+        (env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)
+    ]
+
+    async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
+        shown = shown_of(base, draw)
+        if reused(case, condition, predictor, draw, shown):
+            return
+        async with slots:  # the prompt is built inside the slot, so --concurrency also bounds how many are in memory
+            prompt, tools, extra, effort = job(env, case, base, condition, draw, shown)
+            result = await predicted(env, case, condition, predictor, draw, prompt, tools, effort)
+        if result:
+            record(env, case, condition, predictor, draw, shown, effort, extra, result)
+
+    async def submit(run: Path, everything: list):
+        """Every prediction's first request, sent in batches of up to BATCH_MAX (or ~150 MB) as they're built, so memory
+        holds one batch; run/batches.jsonl maps each batch's requests back to their predictions for `collect`."""
+        api, chunk, keys = openrouter.anthropic_client(), [], []
+
+        async def send():
+            batch = await api.messages.batches.create(requests=[{"custom_id": str(i), "params": r} for i, r in enumerate(chunk)])
+            with (run / "batches.jsonl").open("a") as f:
+                f.write(json.dumps({"batch": batch.id, "keys": keys}) + "\n")
+            print(f"anthropic batch {batch.id}: {len(chunk)} requests", flush=True)
+            chunk.clear()
+            keys.clear()
+
+        size = 0
+        for env, case, base, condition, predictor, draw in everything:
+            shown = shown_of(base, draw)
+            if reused(case, condition, predictor, draw, shown):
+                continue
+            prompt, tools, _, effort = job(env, case, base, condition, draw, shown)
+            messages, schemas = opening(prompt, tools, task, system)
+            chunk.append(
+                openrouter.claude_request(predictor.removeprefix(openrouter.BATCH), messages, effort, tools=schemas, max_tokens=16000)
+            )
+            keys.append([*key(case | {"predictor": predictor, "draw": draw}, condition), sha1(prompt.encode()).hexdigest()])
+            size += len(prompt)
+            if len(chunk) == openrouter.BATCH_MAX or size > 150_000_000:
+                await send()
+                size = 0
+        if chunk:
+            await send()
+        print(f"submitted; collect with the same command plus --batch collect --run {run}")
+
+    async def collect(run: Path, everything: list):
+        """Waits for submit's batches; as each ends, finishes its predictions (a reply without a valid submission gets its
+        further turns, and an errored or expired request its whole conversation, from anthropic-direct/) and writes the rows,
+        then finishes the run. Rerunnable: predictions already in predictions.jsonl are skipped."""
+        api = openrouter.anthropic_client()
+        jobs = {key(case | {"predictor": p, "draw": d}, c): (env, case, base, c, p, d) for env, case, base, c, p, d in everything}
+        done = {key(r, r["condition"]) for r in map(json.loads, out.open())} if out.exists() else set()
+        pending = [json.loads(line) for line in (run / "batches.jsonl").open()]
+        while pending:
+            for b in list(pending):
+                if (await api.messages.batches.retrieve(b["batch"])).processing_status != "ended":
+                    continue
+                results = {e.custom_id: e.result async for e in await api.messages.batches.results(b["batch"])}
+
+                async def finish_one(i: int, k: list, results: dict):
+                    if tuple(k[:-1]) in done:
+                        return
+                    env, case, base, condition, predictor, draw = jobs[tuple(k[:-1])]
+                    shown = shown_of(base, draw)
+                    async with slots:
+                        prompt, tools, extra, effort = job(env, case, base, condition, draw, shown)
+                        assert sha1(prompt.encode()).hexdigest() == k[-1], f"{k}: prompt differs from the one submitted"
+                        r = results.get(str(i))
+                        first = openrouter.claude_reply(r.message) if r and r.type == "succeeded" else None
+                        direct = predictor.replace(openrouter.BATCH, openrouter.CLAUDE)
+                        result = await predicted(env, case, condition, direct, draw, prompt, tools, effort, first=first)
+                    if result:
+                        record(env, case, condition, predictor, draw, shown, effort, extra, result)
+
+                await asyncio.gather(*(finish_one(i, k, results) for i, k in enumerate(b["keys"])))
+                pending.remove(b)
+                print(f"collected {b['batch']}; {len(pending)} batches left", flush=True)
+            if pending:
+                await asyncio.sleep(60)
+        finish(run)
+
+    if args.batch:
+        assert set(conditions) <= set(INLINE_CONDITIONS), "--batch: single-turn (inline) conditions only"
+        assert all(p.startswith(openrouter.BATCH) for p in predictors), "--batch: anthropic-batch/ predictors only"
+        await (submit if args.batch == "submit" else collect)(run, everything)
+        return
+
     try:
-        await asyncio.gather(*jobs)
+        await asyncio.gather(*(one(*j) for j in everything))
     except BaseException:
         finish(run, status="abandoned")
         raise

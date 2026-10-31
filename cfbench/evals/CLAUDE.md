@@ -77,8 +77,18 @@ uv run python -m cfbench.eval NAME --prep [--versions a,b] [--placebo DIR]  # cf
 uv run python -m cfbench.eval NAME --show [--versions a,b]   # the first case's prompt per condition, no API calls
 uv run python -m cfbench.eval NAME --slug SLUG [--versions a,b] [--draws 1] [--limit N] [--conditions ...]
 uv run python -m cfbench.score data/runs/cfbench/<date>_<slug>
+# many inline predictions on Haiku: everything to Anthropic's Message Batches API at once (half price, no per-minute cap)
+uv run python -m cfbench.eval NAME --slug SLUG ... --predictors anthropic-batch/claude-haiku-5-5 --batch submit   # sends, exits
+uv run python -m cfbench.eval NAME ... --predictors anthropic-batch/claude-haiku-5-5 --batch collect --run DIR    # waits, writes rows
 uv run python -m environments evals NAME --upload   # the viewer's evals/NAME.json + expview of every conversation
 ```
+
+`--batch submit` builds and sends one batch (1,000 requests) at a time, so memory holds one batch whatever the run's
+size, and writes `batches.jsonl` (each batch id with its requests' predictions and prompt hashes). `--batch collect`, with
+the same other arguments (`--slug` not needed), can run any time after and be rerun: it waits for each batch, writes its
+rows (a reply without a valid submission gets its further turns, an errored request its whole conversation, from
+`anthropic-direct/`), and finishes the run once all have ended. Inline conditions only; `--reuse` works as usual at submit.
+Batches of 1,000 inline prompts took ~10 min on 2026-10-31; Anthropic's cap is 24 h, after which requests expire unbilled.
 
 Runs land in `data/runs/cfbench/<date>_<slug>/` like any cfbench run (meta params `eval`, `envs`),
 synced to HF at the end. Slugs ending `-smoke` are left out of the viewer. Gemini 3.8 Flash with 20
