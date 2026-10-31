@@ -235,6 +235,48 @@ much on items where Qwen always opens the tool call as on the rest, so it isn't 
 where the answer is Qwen's intended next output. The buckets aren't randomized (the never-tool items
 include the ones Qwen answers in hedged prose), and the shared-cutoff caveat below still applies.
 
+**Tool-call ablation at scale: bank v3, O-lens, J++ and NLA (2026-10-30).** Run
+`cfbench/2026-10-30_cutoff-qa-tool-v3` (harness 14; [Docent](https://docent.transluce.org)
+collection `cfbench`). Bank v3's 2,170 stable non-numeric items re-gated under the tool
+(`cutoff_gate/2026-10-30_v3-tool-required`: 1,849 stable, 1,842 with the no-tool answer, 85%;
+`..._v3-tool-auto`: unforced tool calls on 70.7% of replies, 1,047 items always). Cases: the 1,849
+stable items (456 stale). Haiku now sees the system turn (the tool definition) above the question.
+Reads on the tool render (`olens_reads/2026-10-30_cutoff-v3tool-punct`,
+`nla_reads/2026-10-30_cutoff-v3tool-punct`, `jpp_reads/2026-10-30_cutoff-v3tool-user`): O-lens and
+NLA at every punctuation token of the question plus the last 10 prompt tokens (the empty think block
+included; 13.1 positions per item), layers 32–60; J++ at every token from the user turn on. O-lens
+and NLA placebos are another item's reads mapped onto this item's positions and shown under this
+item's text. Seven conditions × 3 draws, exact match, per-item means; paired 95% bootstrap CIs.
+
+| items                        | n     | transcript | O-lens | placebo | J++  | placebo | NLA  | placebo |
+| ---------------------------- | ----- | ---------- | ------ | ------- | ---- | ------- | ---- | ------- |
+| all                          | 1,849 | 83.3       | 87.1   | 81.5    | 86.5 | 84.6    | 87.9 | 86.8    |
+| stale                        | 456   | 49.4       | 72.5   | 55.5    | 68.5 | 59.4    | 72.0 | 64.0    |
+| not stale                    | 1,393 | 94.4       | 91.8   | 90.0    | 92.4 | 92.9    | 93.1 | 94.3    |
+| always calls the tool (8/8)  | 882   | 83.8       | 88.3   | 82.2    | 87.6 | 86.2    | 88.8 | 88.1    |
+| always calls the tool, stale | 232   | 49.9       | 73.0   | 56.9    | 71.6 | 62.2    | 73.7 | 67.0    |
+| never calls the tool (0/8)   | 222   | 83.8       | 86.9   | 83.3    | 87.1 | 84.7    | 86.6 | 85.9    |
+
+| lens − its placebo, pp | O-lens               | J++                | NLA                |
+| ---------------------- | -------------------- | ------------------ | ------------------ |
+| all                    | +5.5 [+4.2, +6.9]    | +1.9 [+0.9, +3.0]  | +1.1 [+0.1, +2.1]  |
+| stale                  | +17.0 [+13.6, +20.4] | +9.1 [+6.2, +12.3] | +8.0 [+5.2, +11.0] |
+| always tool, stale     | +16.1 [+10.9, +21.1] | +9.3 [+5.5, +13.4] | +6.8 [+3.0, +10.6] |
+
+- **The O-lens result holds at 9x the items with the answer 16 tokens past the last read:** +17pp
+  over its placebo on stale items, +16pp on the 232 stale items where Qwen always opens the tool
+  call unforced. It isn't reading only the items where the answer is Qwen's intended next output.
+- **J++ and NLA also beat their placebos, by about half as much** (+9 and +8 on stale). Against
+  transcript-only all three look alike (+19 to +23 on stale), because every placebo block alone
+  pushes Haiku toward the stale answer (O-lens placebo 55.5, J++ 59.4, NLA 64.0 vs transcript 49.4).
+- **On not-stale items the reads cost 1–3pp** against transcript-only, as before.
+- On the 863 items shared with the no-tool 1k run, each condition is within 1pp of its no-tool
+  number (O-lens 88.5 → 88.1). That run read only the six tail tokens and showed Haiku no system
+  turn, so this compares the whole setup, not the tool alone.
+
+Cost: Haiku $65 (38,829 predictions, from token counts at $0.10/$0.50 per M; the rows' `cost` is 0
+under BYOK); GPU about $45 (two gates on one H200, then 2 O-lens and 3 NLA pods for ~1.3 h).
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens

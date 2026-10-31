@@ -119,7 +119,11 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # Submit verdicts (2026-10-29, no bump): a valid submit_prediction / submit_answer call's tool result now states the submission,
 # the truth and whether it was right (cfbench/predict.py `grader`). Transcript-only, written after the rollout ends (a valid
 # submission ends the predictor's loop), so nothing the predictor sees changes; older runs are not backfilled.
-HARNESS_VERSION = 13
+# 14: cutoff_qa_tool_inline (Robbie, 2026-10-30) shows Qwen's system turn (the submit_answer tool definition) above the
+# question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
+# think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
+# are byte-identical to 13.
+HARNESS_VERSION = 14
 
 
 @dataclass
