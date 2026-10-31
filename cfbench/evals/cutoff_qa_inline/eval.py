@@ -155,6 +155,43 @@ def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str,
     return inline.prompt(question, condition, False, MODEL_NAME, rows), extra
 
 
+# the env viewer's runs (environments/_lib/evals.py INPUTS_RUNS): the 1k and its second 1k with their read-position
+# ablations (Kylie, 2026-10-30); the 200-item smokes and the superseded NLA placebo pool are left off
+INPUTS_RUNS = {
+    "2026-10-29_cutoff-qa-inline-inputs-1k",
+    "2026-10-29_cutoff-qa-inline-inputs-1k-nla",
+    *(f"2026-10-30_cutoff-qa-inline-inputs-1k-{t}" for t in ("pos1", "pos2", "qpunct", "qpunct-imend")),
+    *(f"2026-10-30_cutoff-qa-inline-inputs-new1k-{t}" for t in ("tail6", "qpunct")),
+}
+SKIP_RUNS = {"2026-10-29_cutoff-qa-1k-nla-placebo"}  # superseded by ...-nla-placebo-mmlu (its pool mixed in cutoff reads)
+_PUNCT = ("question\npunctuation", "olens_qpunct_inline", "olens_qpunct_placebo_inline")
+_TAIL6 = ("six tail tokens\n(to assistant↵)", "olens_inline", "olens_placebo_inline")
+POSITION_CHART = {  # the env viewer's read-position bars (page.html positionChart; docs/cutoff-qa-inline.md)
+    "title": "O-lens read positions",
+    "caption": "Which read positions carry the signal. The question's punctuation is read before the assistant turn begins.",
+    "subsets": [["", "all"], ["stable_wrong", "stale only"]],
+    "panels": [
+        {
+            "title": "every read set (first 999)",
+            "groups": [
+                ['final "."', "olens_pos1_inline", "olens_pos1_placebo_inline"],
+                ['final "."\n+ <|im_end|>', "olens_pos2_inline", "olens_pos2_placebo_inline"],
+                list(_PUNCT),
+                ["question punct.\n+ <|im_end|>", "olens_qpunct_imend_inline", "olens_qpunct_imend_placebo_inline"],
+                list(_TAIL6),
+            ],
+        },
+        {"title": "question punctuation vs six tail (both 1ks)", "groups": [list(_PUNCT), list(_TAIL6)]},
+    ],
+}
+
+
+def ITEM_INFO(row: dict) -> dict:
+    """The env viewer's question table: the question, Qwen's modal answer and the class (stale = stable_wrong)."""
+    return {"question": _mod().build("nohint", row["item"]).messages[0]["content"] if row["item"] in _mod()._items() else "",
+            "own": row.get("modal_cf"), "class": row.get("gate_class")}  # fmt: skip
+
+
 def LINKS(row: dict) -> dict[str, dict]:
     env_run, _, ep = row["shown"][0].partition(":")
     env, run = env_run.split("/")

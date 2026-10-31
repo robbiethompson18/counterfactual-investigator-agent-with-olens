@@ -74,6 +74,55 @@ the second paired by item. This is the one cutoff chart: every lens goes on it.)
   +6.9pp), but most of that is the placebo effect.
 - O-lens − J++ +2.0pp [+0.3, +3.7]; O-lens − NLA −0.7pp [−2.3, +0.8]; J++ − NLA −2.7pp [−4.5, −1.0].
 
+**Read-position ablation** (2026-10-30, Kylie: does the gain need the assistant-turn tokens?). The
+1k run with only some reads shown: the first one or two of the six tail positions (`pos1` = the "."
+ending the question, `pos2` = "." and `<|im_end|>`), or every punctuation token inside the question
+(`qpunct`, 4.1 per prompt: commas, "?", "."), alone or with `<|im_end|>` (`qpunct_imend`). The
+question's other punctuation was never read before: `olens_reads/2026-10-30_cutoff-fill-kylie` (the
+requests of `scripts/fill_read_requests.py`, PR #432, for this set). The preamble names only the
+positions shown. Runs `cfbench/2026-10-30_cutoff-qa-1k-olens-{pos1,pos2,qpunct,qpunct-imend}`
+(conditions renamed after the run, e.g. `olens_qpunct_inline`), inputs
+`cfbench_evals/2026-10-30_cutoff-qa-inline-inputs-1k-*`, 23,976 predictions, 0 invalid. Error rate
+(all / stale / not stale), paired by item, 95% bootstrap CIs:
+
+| reads                                 | O-lens            | its placebo        | O-lens − transcript-only | O-lens − placebo    |
+| ------------------------------------- | ----------------- | ------------------ | ------------------------ | ------------------- |
+| none (transcript-only)                | 21.9 / 53.3 / 5.8 |                    |                          |                     |
+| "." only                              | 17.9 / 38.2 / 7.5 | 19.3 / 42.7 / 7.3  | −4.0pp [−5.7, −2.2]      | −1.4pp [−2.9, +0.2] |
+| "." + `<\|im_end\|>`                  | 18.4 / 40.9 / 6.8 | 19.3 / 45.1 / 6.0  | −3.6pp [−5.2, −2.0]      | −0.9pp [−2.4, +0.4] |
+| question punctuation                  | 15.2 / 28.5 / 8.3 | 20.6 / 44.4 / 8.4  | −6.7pp [−8.8, −4.7]      | −5.4pp [−7.3, −3.8] |
+| question punctuation + `<\|im_end\|>` | 15.8 / 29.0 / 9.0 | 19.0 / 43.9 / 6.3  | −6.1pp [−8.3, −4.1]      | −3.2pp [−5.0, −1.6] |
+| all six tail (through `assistant\n`)  | 15.0 / 27.8 / 8.4 | 22.6 / 44.7 / 11.2 | −6.9pp [−9.2, −4.8]      | −7.6pp [−9.5, −5.7] |
+
+**On cutoff the question's own punctuation is as good as the six tail tokens** (15.2 vs 15.0, and
+28.5 vs 27.8 on stale items), and beats its placebo by 5.4pp. The signal is at the "?" that ends the
+question proper, before the boilerplate ("If you are not sure, give your best guess. Answer with
+just the person name."): some read there names Qwen's modal answer on 659 of 986 items (190 of 339
+stale), e.g. at "Who is the CEO of Intel?" L32: "The current CEO of Intel is **Pat Gelsinger**." The
+commas (all in the boilerplate) name it on 40, the final "." on 316. The "." and `<|im_end|>` alone
+are at their placebo. Every placebo beats transcript-only by 1–3pp: any reads push Haiku towards the
+stale answer.
+
+**Second 1k** (2026-10-30, Kylie). 1,000 more seeded stable, non-numeric bank-v4 questions not among
+the 999 (326 stale), built from the bank by `cfbench/evals/cutoff_qa_inline/extend.py` (the label is
+the bank's 8-sample modal answer; reads are of the prompt alone, so no Qwen episode). Reads
+`olens_reads/2026-10-30_cutoff-new1k` (question punctuation + the six tail tokens), runs
+`cfbench/2026-10-30_cutoff-qa-new1k-tail6` (transcript-only, six-tail O-lens + placebo) and
+`..._cutoff-qa-new1k-olens-qpunct`, 15,000 predictions, $11, 0 invalid. Pooled with the first 999
+(1,999 questions, 665 stale), error rate:
+
+| condition            | all  | stale | − transcript-only, all | − its placebo, all  |
+| -------------------- | ---- | ----- | ---------------------- | ------------------- |
+| transcript-only      | 22.2 | 53.9  |                        |                     |
+| question punctuation | 17.4 | 33.6  | −4.8pp [−6.3, −3.3]    | −4.4pp [−5.8, −3.2] |
+| its placebo          | 21.8 | 47.0  |                        |                     |
+| six tail tokens      | 17.2 | 32.2  | −5.0pp [−6.6, −3.5]    | −6.5pp [−8.0, −5.2] |
+| its placebo          | 23.7 | 46.7  |                        |                     |
+
+Question punctuation − six tail: +0.2pp [−0.9, +1.2] (stale +1.4 [−0.9, +3.5]); the same in each
+half. The new 1k shows a smaller gain overall (O-lens − transcript −2.9pp vs −6.7pp on the
+first 999) but the same on stale items (−15.7pp vs −24.8pp, CIs overlapping).
+
 **200-item smoke** (`cfbench/2026-10-29_cutoff-qa-haiku-200`,
 [Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e)).
 
@@ -227,6 +276,46 @@ item's text. Seven conditions × 3 draws, exact match, per-item means; paired 95
 
 Cost: Haiku $65 (38,829 predictions, from token counts at $0.10/$0.50 per M; the rows' `cost` is 0
 under BYOK); GPU about $45 (two gates on one H200, then 2 O-lens and 3 NLA pods for ~1.3 h).
+
+**Tool run without the tail reads (2026-10-30, Kylie: are the last 10 tokens just reading the answer?).** The v3 tool
+run's O-lens block cut to the question's own punctuation (`qpunct`: every punctuation token of the user turn, its final
+"." included, 4.1 per item) or that plus `<|im_end|>` (`qpunct_imend`); the other 9 / 8 tail positions dropped, no new
+reads (`cut_reads`, inputs `cfbench_evals/2026-10-30_cutoff-qa-tool-inline-inputs-qpunct{,-imend}`). Placebo as above
+with the same seeds, so each draw's placebo comes from the same other item as in the full run, cut the same way. The block's
+preamble names only the positions shown. Runs `cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct{,-imend}-full`
+(conditions renamed `olens_qpunct(_imend)(_placebo)_inline` after the run; the runs without `-full` are the partial ones
+that stopped on OpenRouter credits, reused), 22,188 predictions, 0 invalid; transcript-only and the full set from the v3
+run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
+
+| items               | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
+| ------------------- | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
+| all                 | 1,849 | 16.7       | 12.8   | 16.2    | 12.6                    | 14.6    | 12.9             | 18.5    |
+| stale               | 456   | 50.6       | 31.6   | 44.4    | 31.2                    | 41.6    | 27.5             | 44.5    |
+| not stale           | 1,393 | 5.6        | 6.7    | 6.9     | 6.5                     | 5.8     | 8.2              | 10.0    |
+| always tool, stale  | 232   | 50.1       | 28.9   | 41.8    | 28.7                    | 38.8    | 27.0             | 43.1    |
+
+| error, pp           | qpunct − placebo     | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full      |
+| ------------------- | -------------------- | -------------------------- | -------------------- | ------------------ |
+| all                 | −3.4 [−4.5, −2.2]    | −2.0 [−3.2, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
+| stale               | −12.8 [−15.9, −9.9]  | −10.4 [−13.7, −7.1]        | −17.0 [−20.4, −13.7] | +4.1 [+1.5, +6.8]  |
+| always tool, stale  | −12.9 [−17.8, −8.2]  | −10.1 [−14.9, −5.5]        | −16.1 [−21.1, −10.8] | +1.9 [−1.7, +5.6]  |
+
+- **Most of the gain survives without the tail:** on stale items the question's punctuation alone is 12.8pp better than
+  its placebo, against 17.0pp with the last 10 tokens. The tail adds about 4pp on stale items (31.6 → 27.5) and costs
+  1.5pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
+  good as the six tail tokens.
+- `<|im_end|>` adds nothing on top (−0.4pp on stale, CI across 0); its placebo is a little better than the qpunct one.
+- Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct reads Haiku says Garland
+  on all 3 draws ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
+  with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
+  Every conversation is in expview: `#dataset=runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct-full` (and `-qpunct-imend-full`).
+
+![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
+![paired differences, stale items](img/cutoff-qa-notail-diff.png)
+
+Charts: `uv run python -m graphs.cutoff_qa_notail`.
+
+Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
 
 **Caveats.**
 
