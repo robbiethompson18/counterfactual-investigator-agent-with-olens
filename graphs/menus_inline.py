@@ -26,29 +26,41 @@ from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
 
 R = Path("data/runs/cfbench")
 # set -> (title, runs); a set's NLA run is left out until it exists
+# The canonical runs for the final write-up's MCQ / cutoff / preferences numbers (CLAUDE.local.md): draw 0 of every menu, then
+# `*-all-d12b`, draws 1-2 of prompt only and the `all` menu (graphs.headline_inline reads those as its lens conditions)
 SETS = {
-    "cutoff": ("cutoff_qa", ["2026-10-30_menus-cutoff-olens-jlens", "2026-10-31_menus-cutoff-nla-batch"]),
-    "favorites": ("favorites_qa", ["2026-10-30_menus-favorites-olens-jlens", "2026-10-31_menus-favorites-nla-batch"]),
+    "cutoff": ("cutoff_qa", ["2026-10-30_menus-cutoff-olens-jlens", "2026-10-31_menus-cutoff-nla-batch",
+                             "2026-10-31_menus-cutoff-all-d12b"]),
+    "favorites": ("favorites_qa", ["2026-10-30_menus-favorites-olens-jlens", "2026-10-31_menus-favorites-nla-batch",
+                                   "2026-10-31_menus-favorites-all-d12b"]),
     "mcq_unselected": ("MMLU-Pro (mcq_unselected)", ["2026-10-31_menus-mcq-unselected-olens-jlens-batch",
-                                                     "2026-10-31_menus-mcq-unselected-nla-or2"]),
-    "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3"]),
+                                                     "2026-10-31_menus-mcq-unselected-nla-or2",
+                                                     "2026-10-31_menus-mcq-unselected-all-d12b"]),
+    "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3",
+                                "2026-10-31_menus-supergpqa-all-d12b"]),
 }  # fmt: skip
 LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
 BOOT = 2000
 
 
+def runs(name: str) -> list[Path]:
+    """Set `name`'s finished runs."""
+    return [
+        R / run
+        for run in SETS[name][1]
+        if (R / run / "meta.json").exists() and json.loads((R / run / "meta.json").read_text()).get("status") == "done"
+    ]
+
+
 def load() -> dict[str, dict[str, dict[str, float]]]:
-    """set -> condition -> case -> 1.0 if Haiku named Qwen's answer, from every run of SETS that has finished."""
-    acc: dict = defaultdict(lambda: defaultdict(dict))
-    for name, (_, runs) in SETS.items():
-        for run in runs:
-            meta, rows = R / run / "meta.json", R / run / "predictions.jsonl"
-            if not meta.exists() or json.loads(meta.read_text()).get("status") != "done":
-                continue
-            for r in map(json.loads, rows.open()):
-                acc[name][r["condition"]][r["item"]] = float(bool(r.get("correct")))
-    return acc
+    """set -> condition -> case -> share of its draws where Haiku named Qwen's answer, from every run of SETS that has finished."""
+    draws: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))  # set -> condition -> case -> draw -> right
+    for name in SETS:
+        for run in runs(name):
+            for r in map(json.loads, (run / "predictions.jsonl").open()):
+                draws[name][r["condition"]][r["item"]][r.get("draw", 0)] = float(bool(r.get("correct")))
+    return {s: {c: {i: sum(v.values()) / len(v) for i, v in items.items()} for c, items in conds.items()} for s, conds in draws.items()}
 
 
 def pooled_ci(per_set: list[list[float]], seed: int = 0) -> tuple[float, float, float]:
