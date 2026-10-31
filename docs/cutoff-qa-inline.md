@@ -7,8 +7,11 @@ against its own placebo; the caveats below are open. **Labels re-scored 2026-10-
 labels. Fixed in `environments/cutoff_qa/env.py` `gate_label` (label from the gate's raw samples),
 saved runs re-scored with `scripts/regrade_cutoff_labels.py` (no new model calls; the Docent mirrors
 keep the old verdict text). Every condition gains 0.4–0.8pp; each lens − placebo gap moves by
-≤0.3pp. Numbers below are post-regrade. The 200-item smoke further down is superseded
-by the 1k run but kept for its mechanism notes.
+≤0.3pp. Numbers below are post-regrade. The 200-item smoke further down is superseded by the 1k run
+but kept for its mechanism notes. **2026-10-31:** most of the lenses' gain on stale items is Haiku's
+later knowledge cutoff: a same-cutoff investigator (Gemini 2.5 Flash-Lite) with no lens matches
+Haiku + lens, and every lens makes Flash-Lite worse (section "A same-cutoff investigator matches
+Haiku + lens").
 
 **Question.** Can an investigator that never sees Qwen3.6-27B's reply predict the answer it gives to
 a present-tense factual question ("Who is the CEO of Intel?"), and do O-lens reads of the prompt
@@ -283,38 +286,44 @@ item's text. Seven conditions × 3 draws, exact match, per-item means; paired 95
 Cost: Haiku $65 (38,829 predictions, from token counts at $0.10/$0.50 per M; the rows' `cost` is 0
 under BYOK); GPU about $45 (two gates on one H200, then 2 O-lens and 3 NLA pods for ~1.3 h).
 
-**Tool run without the tail reads (2026-10-30, Kylie: are the last 10 tokens just reading the answer?).** The v3 tool
-run's O-lens block cut to the question's own punctuation (`qpunct`: every punctuation token of the user turn, its final
-"." included, 4.1 per item) or that plus `<|im_end|>` (`qpunct_imend`); the other 9 / 8 tail positions dropped, no new
-reads (`cut_reads`, inputs `cfbench_evals/2026-10-30_cutoff-qa-tool-inline-inputs-qpunct{,-imend}`). Placebo as above
-with the same seeds, so each draw's placebo comes from the same other item as in the full run, cut the same way. The block's
-preamble names only the positions shown. Runs `cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct{,-imend}-full`
-(conditions renamed `olens_qpunct(_imend)(_placebo)_inline` after the run; the runs without `-full` are the partial ones
-that stopped on OpenRouter credits, reused), 22,188 predictions, 0 invalid; transcript-only and the full set from the v3
-run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
+**Tool run without the tail reads (2026-10-30, Kylie: are the last 10 tokens just reading the
+answer?).** The v3 tool run's O-lens block cut to the question's own punctuation (`qpunct`: every
+punctuation token of the user turn, its final "." included, 4.1 per item) or that plus `<|im_end|>`
+(`qpunct_imend`); the other 9 / 8 tail positions dropped, no new reads (`cut_reads`, inputs
+`cfbench_evals/2026-10-30_cutoff-qa-tool-inline-inputs-qpunct{,-imend}`). Placebo as above with the
+same seeds, so each draw's placebo comes from the same other item as in the full run, cut the same
+way. The block's preamble names only the positions shown. Runs
+`cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct{,-imend}-full` (conditions renamed
+`olens_qpunct(_imend)(_placebo)_inline` after the run; the runs without `-full` are the partial ones
+that stopped on OpenRouter credits, reused), 22,188 predictions, 0 invalid; transcript-only and the
+full set from the v3 run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
 
-| items               | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
-| ------------------- | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
-| all                 | 1,849 | 16.0       | 12.2   | 15.6    | 12.0                    | 14.0    | 12.3             | 17.8    |
-| stale               | 456   | 50.2       | 31.4   | 44.2    | 30.8                    | 41.2    | 27.2             | 44.1    |
-| not stale           | 1,393 | 4.8        | 5.9    | 6.2     | 5.8                     | 5.0     | 7.5              | 9.3     |
-| always tool, stale  | 232   | 49.9       | 28.9   | 41.7    | 28.3                    | 38.5    | 26.9             | 42.7    |
+| items              | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
+| ------------------ | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
+| all                | 1,849 | 16.0       | 12.2   | 15.6    | 12.0                    | 14.0    | 12.3             | 17.8    |
+| stale              | 456   | 50.2       | 31.4   | 44.2    | 30.8                    | 41.2    | 27.2             | 44.1    |
+| not stale          | 1,393 | 4.8        | 5.9    | 6.2     | 5.8                     | 5.0     | 7.5              | 9.3     |
+| always tool, stale | 232   | 49.9       | 28.9   | 41.7    | 28.3                    | 38.5    | 26.9             | 42.7    |
 
-| error, pp           | qpunct − placebo     | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full      |
-| ------------------- | -------------------- | -------------------------- | -------------------- | ------------------ |
-| all                 | −3.4 [−4.5, −2.3]    | −2.0 [−3.1, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
-| stale               | −12.8 [−15.9, −9.6]  | −10.5 [−13.7, −7.1]        | −16.9 [−20.2, −13.4] | +4.2 [+1.6, +6.7]  |
-| always tool, stale  | −12.8 [−17.5, −8.2]  | −10.2 [−14.7, −5.6]        | −15.8 [−21.0, −10.6] | +2.0 [−1.7, +5.7]  |
+| error, pp          | qpunct − placebo    | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full     |
+| ------------------ | ------------------- | -------------------------- | -------------------- | ----------------- |
+| all                | −3.4 [−4.5, −2.3]   | −2.0 [−3.1, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8] |
+| stale              | −12.8 [−15.9, −9.6] | −10.5 [−13.7, −7.1]        | −16.9 [−20.2, −13.4] | +4.2 [+1.6, +6.7] |
+| always tool, stale | −12.8 [−17.5, −8.2] | −10.2 [−14.7, −5.6]        | −15.8 [−21.0, −10.6] | +2.0 [−1.7, +5.7] |
 
-- **Most of the gain survives without the tail:** on stale items the question's punctuation alone is 12.8pp better than
-  its placebo, against 16.9pp with the last 10 tokens. The tail adds about 4pp on stale items (31.4 → 27.2) and costs
-  1.6pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
-  good as the six tail tokens.
-- `<|im_end|>` adds nothing on top (−0.6pp on stale, CI across 0); its placebo is a little better than the qpunct one.
-- Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct reads Haiku says Garland
-  on all 3 draws ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
-  with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
-  Every conversation is in expview: `#dataset=runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct-full` (and `-qpunct-imend-full`).
+- **Most of the gain survives without the tail:** on stale items the question's punctuation alone is
+  12.8pp better than its placebo, against 16.9pp with the last 10 tokens. The tail adds about 4pp on
+  stale items (31.4 → 27.2) and costs 1.6pp on not-stale ones, so overall the two are level. Same as
+  the 1k no-tool run, where the question's commas were as good as the six tail tokens.
+- `<|im_end|>` adds nothing on top (−0.6pp on stale, CI across 0); its placebo is a little better
+  than the qpunct one.
+- Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct
+  reads Haiku says Garland on all 3 draws
+  ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
+  with the placebo Pam Bondi on all 3
+  ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
+  Every conversation is in expview:
+  `#dataset=runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct-full` (and `-qpunct-imend-full`).
 
 ![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
 ![paired differences, stale items](img/cutoff-qa-notail-diff.png)
@@ -322,6 +331,90 @@ run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
 Charts: `uv run python -m graphs.cutoff_qa_notail`.
 
 Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
+
+## A same-cutoff investigator matches Haiku + lens (2026-10-31)
+
+**Question.** Haiku 5.5's knowledge cutoff is later than Qwen3.6-27B's, so with the model unnamed it
+answers the question itself and misses Qwen's stale answers. How much of the lens's gain on stale
+items is just that mismatch? Two controls, on the same 999 cases and prompt as the 1k result above
+(`cutoff_qa_inline`, end-of-prompt reads), 3 draws, effort medium:
+
+- **Told:** Haiku's prompt gains "The language model is Qwen3.6-27B, an open-weight model with a
+  knowledge cutoff around January 2025." (`inline.TOLD`, the `told` version, PR #515).
+- **Same-cutoff investigator:** Gemini 2.5 Flash-Lite (OpenRouter-listed cutoff 2025-01-31; Qwen
+  publishes none), unnamed model, every condition.
+- **Census:** each investigator asked each question itself, once, no investigator prompt
+  (`runs/cutoff_qa_census/2026-10-31_{flashlite,haiku}-1k`): how often its own knowledge is Qwen's.
+
+Exact match to Qwen's modal answer, % (stale 339 / not stale 660 / all 999):
+
+| investigator, condition               | stale       | not stale   | all         |
+| ------------------------------------- | ----------- | ----------- | ----------- |
+| Haiku answering itself (census)       | 25.4        | 86.1        | 65.5        |
+| Haiku, transcript only                | 47.1        | 94.6        | 78.5        |
+| Haiku, transcript only, told          | 61.5        | 93.3        | 82.5        |
+| Haiku, O-lens / placebo               | 72.6 / 55.6 | 92.1 / 89.3 | 85.5 / 77.9 |
+| Haiku, J++ / placebo                  | 67.1 / 59.6 | 91.8 / 93.1 | 83.4 / 81.7 |
+| Haiku, NLA / placebo (MMLU pool)      | 73.6 / 60.5 | 92.9 / 95.1 | 86.4 / 83.4 |
+| Flash-Lite answering itself (census)  | 63.1        | 82.1        | 75.7        |
+| Flash-Lite, transcript only           | 70.4        | 89.7        | 83.1        |
+| Flash-Lite, transcript only, told     | 70.0        | 92.2        | 84.7        |
+| Flash-Lite, O-lens / placebo          | 54.0 / 8.3  | 72.5 / 15.4 | 66.2 / 13.0 |
+| Flash-Lite, J++ / placebo             | 56.6 / 33.7 | 68.7 / 56.3 | 64.6 / 48.6 |
+| Flash-Lite, NLA / placebo (MMLU pool) | 59.7 / 17.6 | 78.7 / 28.2 | 72.2 / 24.6 |
+
+![Haiku vs Gemini 2.5 Flash-Lite, every condition, stale / not stale / all](img/cutoff-qa-investigators-old-prompt.png)
+
+(`uv run python -m graphs.cutoff_qa_investigators --set cutoff_qa_inline`; the default set is the
+canonical `menus_inline` chart below.)
+
+- **A same-cutoff model with no lens does as well as Haiku with one on stale items:** Flash-Lite
+  transcript-only 70.4% [66, 75] vs Haiku + O-lens 72.6% [68, 77], + NLA 73.6%, + J++ 67.1%. So most
+  of the lens's +25pp over Haiku transcript-only on stale items is Haiku not sharing Qwen's cutoff.
+- **Telling Haiku the cutoff closes about half of it:** +14.4pp [+10.4, +18.2] on stale items,
+  −1.4pp on not stale. Told Haiku still misses stale answers to facts that predate January 2025 but
+  Qwen gets wrong anyway (SSI's co-founder: Qwen says Sam Altman), which a cutoff can't recover.
+  Told Flash-Lite moves −0.4pp on stale items: it already has the cutoff.
+- **Every lens makes Flash-Lite worse:** O-lens −17.0pp [−19.7, −14.3], J++ −18.5pp, NLA −10.9pp vs
+  its transcript-only, all items. It takes the reads at face value: it submits the highest-FVE name,
+  hallucinated or not ("Nicolas Motegi" for Nissan's CEO), and on placebos it answers the placebo's
+  question (887 of 2,997 O-lens placebo draws give the placebo item's own answer, vs 108 for Haiku;
+  NLA placebo answers are mostly MMLU letters). Its large lens − placebo gaps (+46 to +53pp) measure
+  the placebo's damage, not lens signal.
+- **Haiku is the only investigator the lenses help, and only on stale items** (lens − placebo:
+  O-lens +17.0, NLA +13.2, J++ +7.5pp), which fits the shared-cutoff caveat below: the reads carry
+  the stale answer, which a same-cutoff text reader already has.
+
+Runs (`runs/cfbench/`, harness 18, OpenRouter): Haiku told `2026-10-31_cutoff-qa-1k-told-transcript`
+($0.66); Flash-Lite
+`2026-10-31_cutoff-qa-1k-flashlite-{transcript,told-transcript,olens,olens-placebo,jlens,jlens-placebo,nla,nla-placebo-mmlu}`
+($37.40, all OpenRouter credits: Flash-Lite thinks 2–4k tokens per draw once it has reads). Google
+no longer serves 2.5 Flash-Lite to new API keys (404), so it only runs on OpenRouter's own capacity,
+which rate-limits in streaks; cfbench `--attempts 10` with backoff (PR #521) got every draw through.
+These are the 2026-10-29 `cutoff_qa_inline` prompt and read positions, not the write-up's canonical
+`menus_inline` runs.
+
+**Under the canonical `menus_inline` prompt** (which tells the investigator the answer "may or may
+not be the correct one" and asks it to reason first; "all" read menu), Haiku's transcript-only is
+already 64.3% on stale items, not 47.1%: the prompt alone does what telling it the cutoff did. One
+Flash-Lite run there, `cfbench/2026-10-31_menus-cutoff-flashlite-transcript` (3 draws, $0.99),
+against the canonical Haiku runs (`2026-10-30_menus-cutoff-olens-jlens`,
+`2026-10-31_menus-cutoff-nla-batch`, 1 draw), stale items:
+
+| condition                   | stale       | all  | Flash-Lite transcript − this, stale [95% CI] |
+| --------------------------- | ----------- | ---- | -------------------------------------------- |
+| Haiku, transcript only      | 64.3        | 84.1 | +8.8 [+3.9, +14.1]                           |
+| Haiku, O-lens / placebo     | 77.0 / 67.0 | 85.2 | −3.9 [−8.4, +0.8]                            |
+| Haiku, NLA                  | 73.5        | 85.7 | −0.4 [−4.9, +4.3]                            |
+| Haiku, J++                  | 69.6        | 83.3 | +3.4 [−1.7, +8.8]                            |
+| Flash-Lite, transcript only | 73.1        | 83.8 |                                              |
+
+Paired by item. A same-cutoff investigator with no reads is within noise of Haiku with any of the
+three lenses, on stale items and overall.
+
+![canonical menus_inline runs: Haiku vs Gemini 2.5 Flash-Lite](img/cutoff-qa-investigators.png)
+
+(`uv run python -m graphs.cutoff_qa_investigators`.)
 
 **Caveats.**
 
@@ -332,7 +425,9 @@ Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GP
   control and hasn't been run here; the closest existing number is the census in
   docs/envs/knowledge_cutoff.md (Flash, same cutoff, holds the stale answer on 24% of WSB items
   unaided). A per-item check would be: does the lens name the modal answer on items where a
-  same-cutoff text reader does not.
+  same-cutoff text reader does not. **Partly answered 2026-10-31** (section above): a same-cutoff
+  text reader, Gemini 2.5 Flash-Lite, names Qwen's stale answer on 63% of stale items unaided and
+  70% as an investigator, about Haiku + lens.
 - One investigator (Haiku), one draw of the lens per item, 200 of 240 live items. The effect is
   large enough that the sign test is unambiguous, but the stable_right loss shows the reads can also
   mislead a model that already knows.

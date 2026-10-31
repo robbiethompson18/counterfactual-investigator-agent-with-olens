@@ -36,6 +36,7 @@ RULES FOR CLAUDE:
   this doc and to arxiv papers and to docent.
 - Never numbers in prose by default!! We do this so often. I want to audit all of these eventually.
   Numbers go in graphs.
+- No new diff charts, but can keep ones that are already here / that Robbie asks for specifically.
 
 ## Executive Summary (KTR)
 
@@ -65,8 +66,13 @@ investigations (eg CHIVE, WeirdChat) or on 'agentic' counterfactuals (eg
 [Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuation: 95%.
 
 SOTA metamodels do provide uplift on the simple prediction tasks we detail below (Multiple Choice
-Questions, Knowledge Cutoff Q&A, Idiosyncratic Preferences): 95%. They are worse than linear probes
-(where such probes are practicable): 95%.
+Questions, Knowledge Cutoff Q&A, Idiosyncratic Preferences): 95%.[^KCspecial] They are worse than
+linear probes (where such probes are practicable): 95%.
+
+[^KCspecial]:
+    This is somewhat ill-defined for the Knowledge Cutoff example, for reasons which are clear if
+    you read that section. For a model with the same knowledge cutoff or with a hint about the
+    subject's knowledge cutoff, my credence on this particular dataset is ~50%.
 
 SOTA metamodels would provide uplift on 'wild' counterfactuals if the investigator and subject model
 was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
@@ -77,7 +83,7 @@ model was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
 I think the last two questions are terribly interesting! If you are reading this and you work at a
 lab: this should be a straighforward experiment to run!
 
-## Part 0: 🔮-lens Does Not Provide Uplift on CHIVE
+## Part 0: 🔮-lens Does Not Provide Uplift on 'Wild' or Agentic Counterfactuals
 
 Bar chart on chives showing nulls Bar chart: score on all of our envs, showing nulls Bar chart:
 abaltions by model showing null
@@ -106,39 +112,37 @@ transcript-only or its own placebo:
 More details and charts is in the appendix,
 [Counterfactual investigation graphs](#counterfactual-investigation-graphs).
 
-### Chive Shows Little Uplift From The Transcript
+### CHIVE Shows Little Uplift From The Transcript
 
 A cheap test we ran: does giving the investigator the transcript of a chive rollout help in
 predicting counterfactuals? If the answer is no, then these scenarios very hard, and we don't expect
 metamodels to move the needle much either. For a sense of what we mean, see a docent transcript with
 a transcript, and one without. (@c make both of these links work!)
 
-The graphs below show that transcripts do move the needle, but only by a couple percentage points.
+The graphs below show that transcripts do improve investigator AUROC, bot only by about 1 point.
 
 <img src="img/chive-inline.png" alt="AUROC on CHIVE's yes/no claims: Haiku edit only vs transcript, beside CHIVE's Opus 4.8 transcript and resampling arms, per target and pooled" width="760">
 
 <img src="img/chive-inline-diff.png" alt="Haiku AUROC, transcript minus edit only, paired by claim: +0.012 pooled" width="500">
 
-### On A Subset of CHIVE, Metamodels Don't help.
+### On CHIVE-like Data, Metamodels Don't help.
 
-We did not recreate all of CHIVE using Qwen 3.6 27b rollouts, but we did test a 150 incidents (500
-counterfactuals) to check for signs of life. We see nothing promising, and move on to other
-datasets.[^datadetail]
+We did not recreate all of CHIVE using Qwen 3.6 27b rollouts, but we did test 150 incidents (500
+claims) on a slightly modified version of their setup to check for signs of life. We see nothing
+promising, and move on to other datasets.[^datadetail]
 
 [^datadetail]:
     Agam's 300 Qwen3.6-27B incidents from his run of the CHIVE pipeline
     ([agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics)), thinking
-    off, each with its edits stored exactly and their rates measured over 30 samples. We kept the 150
-    incidents with at most the median number of read positions (77), so the lens blocks stay small,
-    and labelled each experiment with CHIVE's rule: true if the edit moved the rate by at least 50pp,
-    false if by at most 15pp, otherwise dropped. That gives 515 claims, 316 true and 199 false. Haiku
-    5.5 sees CHIVE's prompt, with the edit shown as a diff of the conversation, and gives P(claim
-    true), 3 draws per claim. Lens reads are of the original conversation and reply only, at every
-    punctuation and end-of-turn token plus the ten tokens before the reply, layers 32 to 60; a placebo
-    is another incident's reads laid on the same positions. Details in `docs/chive-inline.md`.
-
-@c add your graphs here plz special claude.
-@robbie done: bar chart below and the dataset footnote above, no diff chart (`uv run python -m graphs.chive_agam_inline`).
+    off, each with its edits stored exactly and their rates measured over 30 samples. We kept the
+    150 incidents with at most the median number of read positions (77), so the lens blocks stay
+    small, and labelled each experiment with CHIVE's rule: true if the edit moved the rate by at
+    least 50pp, false if by at most 15pp, otherwise dropped. That gives 515 claims, 316 true and 199
+    false. Haiku 5.5 sees CHIVE's prompt, with the edit shown as a diff of the conversation, and
+    gives P(claim true), 3 draws per claim. Lens reads are of the original conversation and reply
+    only, at every punctuation and end-of-turn token plus the ten tokens before the reply, layers 32
+    to 60; a placebo is another incident's reads laid on the same positions. Details in
+    `docs/chive-inline.md`.
 
 <img src="img/chive-agam-inline.png" alt="AUROC on 515 CHIVE-style claims over Agam's Qwen3.6-27B incidents: edit only 0.775, transcript 0.780, O-lens 0.788 vs placebo 0.787, NLA 0.784 vs 0.780, J++ 0.791 vs 0.788" width="600">
 
