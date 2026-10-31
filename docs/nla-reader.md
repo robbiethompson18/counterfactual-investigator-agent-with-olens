@@ -40,6 +40,15 @@ changed too. It was fully fine-tuned after the LoRA stage. Every Qwen NLA critic
 51 GB model, so FVE means a second model somewhere; we put it in a separate job rather than a second
 engine.
 
+**Celeste's L42 NLA on the same reader (2026-10-31).** `ceselder/qwen3.6-27b-nla-rl` ships `av_base/`
+(base + the warmstart AV LoRA merged) and RL LoRAs on top. `av_base` is exactly base +
+`av_warmstart_lora/iter_0003864` (relative residual 0.02 / 0.015 on two weights, bf16 rounding), so
+`olens/scripts/ceselder_nla_lora.py` stacks warmstart + `av_rl_adapters/iter_000600` into one
+rank-192 LoRA on base Qwen and `NLAEngine` serves it (`--nla-meta` its `nla_meta.yaml`, `--nla-repo`,
+`--layers 42`). Step 600 because the shipped critic (`ar_reconstructor/`, 43 blocks) was saved
+there. No pooled whitener exists at L42, so `nla_score.py` leaves `fve` null and `fve_run` is the
+FVE to use. One-pod job: `scripts/sky/nla_jpp_reads.yaml` (J++ first, then this NLA and its critic).
+
 ## How it runs
 
 - `scripts/olens_read_requests.py --readout nla` builds `olens.nla.NLAEngine` instead of

@@ -137,6 +137,12 @@ the eval `<env>-pairs`.
   resample arms). Versions `bare` and `anchored` (plus the base arm's scores on that essay). Reads:
   every punctuation token + the ten thinking-off tail tokens, layers 32-60; placebo = another arm's
   reads on the same essay, segment for segment.
+  Also `nla_inline` / `nla_placebo_inline` (Celeste's L42 NLA, ceselder/qwen3.6-27b-nla-rl at RL
+  step 600, layer 42 only, FVE on the run's own ruler) and `jlens_inline` / `jlens_placebo_inline`
+  (J++ top 10 tokens per layer, layers 32-60 step 4), read at exactly the O-lens's positions from its
+  requests.jsonl (`scripts/sky/nla_jpp_reads.yaml`), same placebo source and seed (2026-10-31).
+  `essay_grading_cf_inline` (P(removing the opener raises Qwen's grade), AUROC) runs the same seven
+  conditions on the same reads.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the

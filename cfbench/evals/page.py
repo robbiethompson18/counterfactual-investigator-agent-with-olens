@@ -3,13 +3,26 @@
 An eval's score.py may define `PAGE(rows) -> str`: HTML built from the current runs' prediction rows, which
 `python -m environments evals NAME` stores as the eval's `page_html` and the env viewer puts at the top of the eval's page
 (the standard tables fold away below it). Anything with `data-cond="<condition>"` gets the page's colour for that
-condition as the CSS variable `--c` (use `fill="var(--c)"` in SVG, `style="background:var(--c)"` in HTML).
+condition as the CSS variable `--c` (use `fill="var(--c)"` in SVG, `style="background:var(--c)"` in HTML). A placebo is drawn
+in its lens's colour with black stripes (CLAUDE.md), so bars() and swatch() tag it with the lens's condition (`lens()`).
 """
 
 from html import escape
 
 LABELS = {"probe": "linear probe", "transcript_inline": "transcript", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
-          "transcript_agentic": "transcript", "olens_agentic": "O-lens", "olens_placebo_agentic": "O-lens placebo"}  # fmt: skip
+          "transcript_agentic": "transcript", "olens_agentic": "O-lens", "olens_placebo_agentic": "O-lens placebo",
+          "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo", "jlens_inline": "J++",
+          "jlens_placebo_inline": "J++ placebo"}  # fmt: skip
+HATCH = (
+    '<defs><pattern id="stripes" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+    '<rect width="2" height="6" fill="#000"/></pattern></defs>'
+)
+STRIPES = "repeating-linear-gradient(45deg, #000 0 2px, transparent 2px 6px)"
+
+
+def lens(cond: str) -> str:
+    """The condition whose colour a placebo takes: 'nla_placebo_inline' -> 'nla_inline'."""
+    return cond.replace("_placebo", "")
 
 
 def label(cond: str) -> str:
@@ -28,7 +41,10 @@ def bars(
     horizontal reference `lines` (value, label)."""
     W, H, L, B, T, bw = 120 + 110 * len(rows) + (150 if lines else 0), 260, 44, 40, 24, 64  # lines' labels sit right of the bars
     y = lambda v: T + (H - T - B) * (1 - (min(max(v, lo), hi) - lo) / (hi - lo))
-    s = [f'<text x="{L}" y="14" class="lab">{escape(title)}</text>']
+    s = [
+        HATCH,
+        f'<text x="{L}" y="14" class="lab">{escape(title)}</text>',
+    ]
     for k in range(5):
         v = lo + (hi - lo) * k / 4
         s.append(f'<line x1="{L}" x2="{W - 10}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="var(--line, #ddd)"/>')
@@ -41,7 +57,9 @@ def bars(
     for i, (cond, v, a, b, *lab) in enumerate(rows):
         cx = L + 40 + 110 * i + bw / 2
         box = f'x="{cx - bw / 2:.1f}" y="{y(v):.1f}" width="{bw}" height="{y(lo) - y(v):.1f}"'
-        s.append(f'<rect data-cond="{escape(cond)}" {box} fill="var(--c)" opacity="0.85"/>')
+        s.append(f'<rect data-cond="{escape(lens(cond))}" {box} fill="var(--c)" opacity="0.85"/>')
+        if "placebo" in cond:
+            s.append(f'<rect {box} fill="url(#stripes)" opacity="0.6"/>')
         if a != b:
             s.append(f'<line x1="{cx}" x2="{cx}" y1="{y(a):.1f}" y2="{y(b):.1f}" stroke="currentColor"/>')
             s += [f'<line x1="{cx - 6}" x2="{cx + 6}" y1="{y(t):.1f}" y2="{y(t):.1f}" stroke="currentColor"/>' for t in (a, b)]
@@ -61,4 +79,5 @@ def table(head: list[str], body: list[list[str]]) -> str:
 
 
 def swatch(cond: str) -> str:
-    return f'<i class="sw" data-cond="{escape(cond)}" style="background:var(--c)"></i>{escape(label(cond))}'
+    bg = f"{STRIPES}, var(--c)" if "placebo" in cond else "var(--c)"
+    return f'<i class="sw" data-cond="{escape(lens(cond))}" style="background:{bg}"></i>{escape(label(cond))}'
