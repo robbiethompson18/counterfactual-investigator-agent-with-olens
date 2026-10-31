@@ -100,3 +100,64 @@ def stats(rows: list[dict]) -> list[dict]:
                     "accuracy": right(keys), "accuracy_ci": [float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
                     "auroc": m["auroc"], "mean_brier": float(np.mean([(p - truth[k]) ** 2 for k in keys for p in d[k]]))})  # fmt: skip
     return out
+
+
+def PAGE(rows: list[dict]) -> str:
+    """The eval's page section, AUROC first (Kylie): per condition AUROC with a 95% CI (essays resampled), on all cases and
+    on the clear ones; paired AUROC differences with CI and one-sided p; % right and Brier for reference; AUROC by opener
+    group (environments/essay_grading/wide.py)."""
+    from cfbench.evals.page import bars, swatch, table
+    from environments.essay_grading.wide import GROUPS
+
+    group = {f"w-{s}": g for g, d in GROUPS.items() for s in d}
+    ps, truth, shift = defaultdict(lambda: defaultdict(list)), {}, {}
+    for r in rows:
+        if r.get("valid", True) and r.get("p") is not None:
+            k = (r["base_arm"], r["item"])
+            ps[canon_condition(r["condition"])][k].append(r["p"])
+            truth[k], shift[k] = r["k_cf"], r["shift"]
+    mp = {c: {k: float(np.mean(v)) for k, v in d.items()} for c, d in ps.items()}
+    order = [c for c in ("transcript_inline", "olens_inline", "olens_placebo_inline") if c in mp]
+    rng = np.random.default_rng(0)
+    f3 = lambda x: f"{x:.3f}"
+    pfmt = lambda p: "< 0.001" if p < 0.001 else f"= {p:.3f}"
+    out = ["<h2>AUROC: does the investigator rank the cases that go up above the ones that don't?</h2>",
+           ("<p class=\"lede\">Per case (an opener x an intro) the mean of its draws' p. Truth = Qwen's mean score with the plain "
+           "opener is higher than with this one. 95% CIs resample essays (an essay's truth is shared by its ~9 arms). "
+           "<b>Clear</b> = cases where the two means differ by at least 0.5 points (the rest are close to coin flips at ~8 "
+           "samples a side).</p>")]  # fmt: skip
+    for name, keep in (("all cases", lambda k: True), ("clear cases (|shift| ≥ 0.5)", lambda k: abs(shift[k]) >= 0.5)):
+        res, pair_rows = [], []
+        for c in order:
+            keys = [k for k in mp[c] if keep(k)]
+            a = metrics(mp[c], truth, keys)["auroc"]
+            bs = [b["auroc"] for b in boot(lambda ks, c=c: metrics(mp[c], truth, ks), keys, rng)]
+            res.append((c, a, float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5)), len(keys), metrics(mp[c], truth, keys)))
+        out.append(bars([(c, a, lo, hi) for c, a, lo, hi, *_ in res], 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)"))
+        for a, b in PAIRS:
+            if a in mp and b in mp:
+                keys = [k for k in mp[a].keys() & mp[b].keys() if keep(k)]
+                d = lambda ks, a=a, b=b: {
+                    s: metrics(mp[a], truth, ks)[s] - metrics(mp[b], truth, ks)[s] for s in ("auroc", "right", "brier")
+                }
+                m, bs = d(keys), boot(d, keys, rng)
+                cell = lambda s, better, m=m, bs=bs: (f"<b>{m[s]:+.3f}</b> [{np.nanpercentile([x[s] for x in bs], 2.5):+.3f}, "
+                                          f"{np.nanpercentile([x[s] for x in bs], 97.5):+.3f}] "
+                                          f"<span class=\"mute\">p {pfmt(np.mean([better(x[s]) for x in bs]))}</span>")  # fmt: skip
+                pair_rows.append([f"{swatch(a)} − {swatch(b)}", cell("auroc", lambda x: x <= 0), cell("right", lambda x: x <= 0),
+                                  cell("brier", lambda x: x >= 0)])  # fmt: skip
+        out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
+                         [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
+                          for c, a, lo, hi, n, m in res]))  # fmt: skip
+        out.append(f'<p class="lede">Paired differences, {name}, same resamples; p = one-sided bootstrap, first is better.</p>')
+        out.append(table(["difference", "AUROC", "% right", "Brier (lower is better)"], pair_rows))
+    out.append("<h3>AUROC by opener group</h3>")
+    body = []
+    for g in sorted({group.get(a, "old arms") for a, _ in truth}):
+        keys = [k for k in truth if group.get(k[0], "old arms") == g]
+        a = {c: metrics(mp[c], truth, [k for k in keys if k in mp[c]])["auroc"] for c in order}
+        body.append(
+            [g, str(len(keys)), *(f3(a[c]) for c in order), f"{a.get('olens_inline', np.nan) - a.get('olens_placebo_inline', np.nan):+.3f}"]
+        )
+    out.append(table(["group", "cases", *(swatch(c) for c in order), "O-lens − placebo"], body))
+    return "\n".join(out)

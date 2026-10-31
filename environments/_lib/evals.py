@@ -586,6 +586,20 @@ def item_info(meta: dict, rows: list[dict]) -> dict:
     return {r["item"]: hook(r) for r in {r["item"]: r for r in rows if r.get("item")}.values()} if hook else {}
 
 
+def page_html(name: str, summaries: list[dict]) -> str | None:
+    """The eval's own page section: its score.py's PAGE(rows) over the current runs' predictions (cfbench/evals/page.py)."""
+    import importlib
+    import importlib.util
+
+    if not importlib.util.find_spec(f"cfbench.evals.{name}.score"):
+        return None
+    page = getattr(importlib.import_module(f"cfbench.evals.{name}.score"), "PAGE", None)
+    if page is None:
+        return None
+    rows = [json.loads(line) for s in summaries for line in (CFBENCH / s["run"] / "predictions.jsonl").read_text().splitlines()]
+    return page(rows)
+
+
 def mark_current(name: str, summaries: list[dict]) -> dict:
     """Mark which conditions of each run are current (`current_conds`: the newest complete run per (version set,
     condition), so a later placebo-only rerun replaces just the placebo of an earlier run) and each run `current` if it
@@ -781,6 +795,7 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
+        doc["page_html"] = page_html(name, [s for s in summaries if s.get("current", True)])
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     return written

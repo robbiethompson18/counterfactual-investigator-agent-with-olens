@@ -61,6 +61,10 @@ in `RETIRED_EVALS` there is left off the lists.
     (newest run per condition supersedes, current runs pooled).
   - `VERSION_IN_IDS` (optional): `True` prefixes each prediction's expview item id with its version,
     for evals whose versions share arm pairs; off by default so other evals' links don't change.
+- `score.py` `PAGE(rows) -> str` (optional): the eval's own page section, HTML built from the current runs' prediction
+  rows. `environments evals` stores it as the eval's `page_html`; the env viewer shows it at the top of the eval's page,
+  with the standard claim tables folded below. Helpers (bar chart with CIs, tables, condition swatches; anything with
+  `data-cond` gets that condition's colour as `--c`): `cfbench/evals/page.py`. `essay_grading_cf_inline` is the example.
 - `eval.md`: anything else the investigator should know. The runner puts it in every prompt as
   `## About this evaluation`, just before the task, and records it in `meta.json`.
 
