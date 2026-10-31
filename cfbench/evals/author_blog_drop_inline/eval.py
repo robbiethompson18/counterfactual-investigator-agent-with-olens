@@ -297,6 +297,9 @@ def ITEM_INFO(row: dict) -> dict:
     the deleted sentence."""
     if not hasattr(ITEM_INFO, "comment"):
         ITEM_INFO.comment = {c["item"]: c["comment"] for c in load(INPUTS / "cases.jsonl")}  # ty: ignore[unresolved-attribute]
+        from cfbench.evals.author_blog_drop_inline.score import probe_scores
+
+        ITEM_INFO.probe = probe_scores()  # ty: ignore[unresolved-attribute]
     return {
         "source": row["version"],
         "class": "makes a difference" if row["k_cf"] else "no difference",
@@ -306,6 +309,7 @@ def ITEM_INFO(row: dict) -> dict:
         "drop": round(row["drop"], 3),
         "threshold": round(row["threshold"], 3),
         "deleted sentence": ITEM_INFO.comment.get(row["item"], ""),  # ty: ignore[unresolved-attribute]
+        "probe p": round(ITEM_INFO.probe.get(row["item"], float("nan")), 3),  # ty: ignore[unresolved-attribute]
     }
 
 

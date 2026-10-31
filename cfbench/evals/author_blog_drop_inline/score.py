@@ -27,6 +27,19 @@ EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-
 REPO = "https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens"
 HF = "https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/"
 INPUTS = "runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2"
+# the sentence-end probe (scripts/author_probe/period_check.py): the standard L2 probe at L48 on the sentence's last token, fit
+# to these labels, fully nested out-of-fold P(significant), seed 0 (Kylie, 2026-10-31: on the page as a reference point)
+PROBE = "runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl"
+
+
+def probe_scores() -> dict[str, float]:
+    """item -> the probe's out-of-fold P(significant), from data/ or the HF dataset."""
+    local = Path("data") / PROBE
+    if not local.exists():
+        from huggingface_hub import hf_hub_download
+
+        hf_hub_download("Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens", PROBE, repo_type="dataset", local_dir="data")
+    return {r["item"]: r["probe_l2_h"] for r in map(json.loads, local.read_text().splitlines())}
 
 
 def _auc(y: np.ndarray, p: np.ndarray) -> float:
@@ -82,6 +95,8 @@ def PAGE(rows: list[dict]) -> str:
     author = np.array([meta[k][2] for k in keys])
     version = np.array([k[0] for k in keys])
     P = {c: np.array([by[k][c] for k in keys]) for c in conds}
+    pr = probe_scores()
+    P["probe"] = np.array([pr.get(k[1], np.nan) for k in keys])
     R = {c: _platt(P[c], y, author) for c in conds}
     rng = np.random.default_rng(0)
     f3 = lambda x: f"{x:.3f}"
@@ -117,7 +132,7 @@ def PAGE(rows: list[dict]) -> str:
         m = version == v
         gs = _boot_groups(author[m])
         res = []
-        for c in conds:
+        for c in (*conds, "probe"):
             yy, pp = y[m], P[c][m]
             bs = [_auc(yy[i], pp[i]) for i in (_resample(gs, rng) for _ in range(BOOT))]
             res.append((c, _auc(yy, pp), float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5))))
@@ -139,11 +154,24 @@ def PAGE(rows: list[dict]) -> str:
             cells.append(f'<b>{obs:+.3f}</b> [{lo:+.3f}, {hi:+.3f}] <span class="mute">p {pf(np.nanmean(better(bs)))}</span>')
         return cells
 
+    out.append(
+        '<p class="mute">Linear probe (teal): not an investigator. A logistic regression (the standard recipe: training-only '
+        "standardisation, no PCA, L2 with λ = 1) on Qwen3.6-27B's layer-48 residual at the deleted sentence's last token, in "
+        "the same prompt, fit to these labels and scored out of fold (5 folds grouped by blogger). Layer 48 and the recipe were "
+        "chosen on this same eval set. A reference point, so no star or p-value against the investigator.</p>"
+    )
     body = []
     for a, b in (ab for ab in PAIRS if set(ab) <= set(conds)):
         for v in (None, *VERSIONS):
             m = np.ones(len(y), bool) if v is None else version == v
             body.append([f"{swatch(a)} − {swatch(b)}", v or "pooled", str(m.sum()), *paired(m, a, b)])
+    for v in (None, *VERSIONS):  # the probe as a reference: no test against the zero-shot investigator
+        m = np.ones(len(y), bool) if v is None else version == v
+        gs, ya = _boot_groups(author[m]), y[m]
+        f = lambda i, ya=ya, m=m: _auc(ya[i], P["probe"][m][i]) - _auc(ya[i], P["transcript_inline"][m][i])
+        lo, hi = np.nanpercentile([f(_resample(gs, rng)) for _ in range(BOOT)], [2.5, 97.5])
+        cell = f'<b>{f(np.arange(m.sum())):+.3f}</b> [{lo:+.3f}, {hi:+.3f}] <span class="mute">no test</span>'
+        body.append([f"{swatch('probe')} − {swatch('transcript_inline')}", v or "pooled", str(m.sum()), cell, "—", "—"])
     out.append("<h3>Paired differences A − B (positive = A better; one-sided p for H1: A better)</h3>")
     out.append(table(["comparison", "version", "cases", "AUROC [95% CI]", "raw Brier gain", "recalibrated Brier gain"], body))
 
