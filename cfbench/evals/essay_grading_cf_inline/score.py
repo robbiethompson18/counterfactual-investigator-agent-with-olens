@@ -121,12 +121,12 @@ def PAGE(rows: list[dict]) -> str:
     rng = np.random.default_rng(0)
     f3 = lambda x: f"{x:.3f}"
     pfmt = lambda p: "< 0.001" if p < 0.001 else f"= {p:.3f}"
-    out = ["<h2>AUROC: does the investigator rank the cases that go up above the ones that don't?</h2>",
-           ("<p class=\"lede\">Per case (an opener x an intro) the mean of its draws' p. Truth = Qwen's mean score with the plain "
-           "opener is higher than with this one. 95% CIs resample essays (an essay's truth is shared by its ~9 arms). "
-           "<b>Clear</b> = cases where the two means differ by at least 0.5 points (the rest are close to coin flips at ~8 "
-           "samples a side).</p>")]  # fmt: skip
-    for name, keep in (("all cases", lambda k: True), ("clear cases (|shift| ≥ 0.5)", lambda k: abs(shift[k]) >= 0.5)):
+    lede = (
+        "<p class=\"lede\">Per case (an opener x an intro) the mean of its draws' p. Truth = Qwen's mean score with the "
+        "plain opener is higher than with this one. 95% CIs resample essays (an essay's truth is shared by its ~9 arms).</p>"
+    )
+    out = ["<h2>AUROC: does the investigator rank the cases that go up above the ones that don't?</h2>", lede]
+    for name, keep in (("all cases", lambda k: True),):  # the clear-cases cut is in main() only (Kylie: drop it from the page)
         res, pair_rows = [], []
         for c in order:
             keys = [k for k in mp[c] if keep(k)]
@@ -149,7 +149,10 @@ def PAGE(rows: list[dict]) -> str:
         out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
                          [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
                           for c, a, lo, hi, n, m in res]))  # fmt: skip
-        out.append(f'<p class="lede">Paired differences, {name}, same resamples; p = one-sided bootstrap, first is better.</p>')
+        out.append(
+            '<p class="lede">Paired differences (the same essay resamples for both conditions); '
+            "p is one-sided: the first condition is better.</p>"
+        )
         out.append(table(["difference", "AUROC", "% right", "Brier (lower is better)"], pair_rows))
     out.append("<h3>AUROC by opener group</h3>")
     body = []
