@@ -153,7 +153,9 @@ the eval `<env>-pairs`.
   (single-turn). Headline: share of Qwen's samples matching the submitted score (`score.py`, CIs
   resample arms). Versions `bare` and `anchored` (plus the base arm's scores on that essay). Reads:
   every punctuation token + the ten thinking-off tail tokens, layers 32-60; placebo = another arm's
-  reads on the same essay, segment for segment.
+  reads on a different essay of the same PERSUADE topic, never base's (2026-10-31; it was the same
+  essay, which could pick the counterfactual prompt). All-layer NLA and J++ pairs on Robbie's
+  defaults, Haiku at effort medium; `essay_grading_cf_inline` runs the same conditions.
 - `hint_qwen_dsv4` (`knew` variant) and `hint_qwen_dsv4_letter`: questions Qwen3.6-27B and DSv4
   Flash answer consistently and differently, hinted to the correct letter (5 hint-following Qwen
   runs shown), half Qwen knew without the hint and half not, balanced within each gold letter (the

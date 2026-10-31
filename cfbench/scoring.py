@@ -349,7 +349,7 @@ def standard_mcq_comparison(runs, target: str) -> tuple[dict, dict]:
     return data, groups
 
 
-ESSAY_LENS_RUNS = ("2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens")
+ESSAY_LENS_RUNS = ("2026-10-31_essay-cf-b-ts", "2026-10-31_essay-cf-b-olens2", "2026-10-31_essay-cf-b-nla4", "2026-10-31_essay-cf-b-jlens")
 
 
 def essay_probe_scores(site: str) -> dict:
@@ -376,13 +376,13 @@ def essay_lens_rows(run: str) -> list[dict]:
 
 
 def standard_essay_comparison() -> tuple[dict, dict]:
-    """Same-case investigator and probe scores; omit the contaminated historical placebo."""
+    """Same-case investigator and probe scores: condition -> case -> its draws' scores, each draw one prediction."""
     probes = {f"probe_{site}": essay_probe_scores(site) for site in ("user_end", "response_start")}
     reference = probes["probe_response_start"]
     draws = {}
     for run in ESSAY_LENS_RUNS:
         for r in essay_lens_rows(run):
-            if r["condition"] not in ("transcript_inline", "olens_inline") or not r.get("valid", True) or r["p"] is None:
+            if not r.get("valid", True) or r["p"] is None:
                 continue
             key = r["base_arm"], r["item"]
             assert reference[key]["truth"] == r["k_cf"]
@@ -390,7 +390,16 @@ def standard_essay_comparison() -> tuple[dict, dict]:
     by = defaultdict(lambda: defaultdict(list))
     for (condition, key, _), value in draws.items():
         by[condition][key].append(value)
-    scores = {c: {k: float(np.mean(v)) for k, v in cases.items()} for c, cases in by.items()}
-    scores.update({c: {k: r["predicted_shift"] for k, r in rows.items()} for c, rows in probes.items()})
+    order = (
+        "transcript_inline",
+        "olens_inline",
+        "olens_placebo_inline",
+        "nla_inline",
+        "nla_placebo_inline",
+        "jlens_inline",
+        "jlens_placebo_inline",
+    )
+    scores = {c: dict(by[c]) for c in order}
+    scores.update({c: {k: [r["predicted_shift"]] for k, r in rows.items()} for c, rows in probes.items()})
     assert all(set(values) == set(reference) for values in scores.values())
     return scores, reference

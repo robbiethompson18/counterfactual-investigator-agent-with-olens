@@ -98,6 +98,9 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`. **Every `*_agentic` condition is stale (2026-10-30): run one only with
   Robbie's approval** (`CFBENCH_ALLOW_AGENTIC=1`); the single-turn `*_inline` conditions are
   current.
+- **Score every investigator draw as one prediction: pool draws for AUROC, % right and Brier, never
+  average a case's draws first.** Averaging scores an ensemble and flatters placebos, whose draws
+  see different reads ([docs/cfbench-scoring.md](docs/cfbench-scoring.md), 2026-10-31).
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 - **A tool call that ends a rollout by submitting an answer returns the verdict** (added
@@ -309,6 +312,8 @@ Active docs:
   names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
   linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
   90%
+- [REFERENCE: essay_grading_cf_inline — read before quoting the essay counterfactual eval, or comparing O-lens, NLA and J++ on it](docs/essay-grading-cf-inline.md)
+  — 1,800 cases, Haiku at medium, per-draw AUROC: O-lens 0.775 vs placebo 0.757 vs transcript 0.753; NLA and J++ about level; probes 0.86-0.89
 - [ACTIVE: Cost estimates — read before quoting what a read job, rollout batch or predictor run will cost](docs/cost-estimates.md)
   — measured rates: reads/s per reader on an H200, $ per Haiku draw per condition, rollouts/s on the
   shared pod, and the arithmetic

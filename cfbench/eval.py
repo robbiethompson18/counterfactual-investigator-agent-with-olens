@@ -259,7 +259,10 @@ async def main():
             "cfbench",
             args.slug,
             description=args.description or f"eval {args.name} ({', '.join(versions)}): {len(cases)} cases, {', '.join(conditions)}",
-            models=[{"name": p, "served_by": "openrouter"} for p in predictors],
+            models=[
+                {"name": p, "served_by": "anthropic" if p.startswith((openrouter.CLAUDE, openrouter.BATCH)) else "openrouter"}
+                for p in predictors
+            ],
             params=params,
         )
     )
@@ -352,7 +355,14 @@ async def main():
         (run / "batches.jsonl").touch()  # a fully reused run has no batches, but can still be collected
 
         async def send():
-            batch = await api.messages.batches.create(requests=[{"custom_id": str(i), "params": r} for i, r in enumerate(chunk)])
+            for attempt in range(5):
+                try:
+                    batch = await api.messages.batches.create(requests=[{"custom_id": str(i), "params": r} for i, r in enumerate(chunk)])
+                    break
+                except anthropic.APIConnectionError:
+                    if attempt == 4:
+                        raise
+                    await asyncio.sleep(10 * 2**attempt)
             with (run / "batches.jsonl").open("a") as f:
                 f.write(json.dumps({"batch": batch.id, "keys": keys, "request_hashes": [request_hash(r) for r in chunk]}) + "\n")
             print(f"anthropic batch {batch.id}: {len(chunk)} requests", flush=True)

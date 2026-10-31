@@ -136,7 +136,10 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # 16: MCQ options use the final lettered block and reads use complete-option ending newlines, including multiline options.
 # mcq_unselected / supergpqa_inline prompts and read selection can change; stored runs are not rewritten.
 # 17: honest / essay_grading behavior definitions mark missing or invalid final Score fields as unscorable.
-HARNESS_VERSION = 17
+# 18: essay_grading_inline / essay_grading_cf_inline (Robbie, 2026-10-31): placebo from another arm on a different essay of the
+# same topic, never base (it was the same essay, base allowed), new NLA and J++ conditions, single-turn effort medium. Every
+# other eval's prompts are byte-identical to 17. This eval's rows made on the branch before the merge say 15; same prompts.
+HARNESS_VERSION = 18
 
 
 @dataclass
