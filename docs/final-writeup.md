@@ -25,9 +25,23 @@ found ones that work. They are: predicting Qwen's grade for an essay; predicting
 multiple choice question; predicting Qwen's idiosyncratic preferences; predicting Qwen's answer to a
 factual query which is past its knowledge cutoff.
 
-## Claims, with credences
+## Claims, with credences (CTR, KTR)
 
-## How the question changed
+Current SOTA metamodels (J++ lens, 🔮-lens, NLA) do not provide uplift > 1% on 'wild' counterfactual
+investigations (eg CHIVE, WeirdChat) or on 'agentic' counterfactuals (eg Palisade one, Aditya ones,
+@c link) under any harness configuation: 95%.
+
+SOTA metamodels do provide uplift on the simple prediction tasks we detail below (1,2,3,4, @c put
+actual titles): 95%. They are worse than linear probes (where such probes are practicable): 95%.
+
+SOTA metamodels would provide uplift on 'wild' counterfactuals if the investigator and subject model
+was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
+
+SOTA metamodels would provide uplift on 'agentic' counterfactuals if the investigator and subject
+model was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
+
+I think the last two questions are terribly interesting! If you are reading this and you work at a
+lab: this should be a straighforward experiment to run!
 
 ## Part 0: counterfactual investigation is null
 
@@ -53,6 +67,14 @@ TODO link to appendix and read the Claudespeak paragraph above.
 
 TODO @Kylie plz add your appendices with your data here
 
+### Chive Shows No Not Much Uplift From The Transcript
+
+<img src="img/chive-inline.png" alt="AUROC on CHIVE's yes/no claims: Haiku edit only vs transcript, beside CHIVE's Opus 4.8 transcript and resampling arms, per target and pooled" width="760">
+
+<img src="img/chive-inline-diff.png" alt="Haiku AUROC, transcript minus edit only, paired by claim: +0.012 pooled" width="500">
+
+TODO fix this to use qwen 3.6 27b if we can, then use our jlens / olens / NLA.
+
 ## Part 1: Simple Investigations That Work
 
 All of our environments that work, with the exception of essay grading, are ideas stolen from
@@ -61,21 +83,14 @@ WorkspaceBench. The additions we make to their dataset:
 - We do not grade with pass@thousands, running a regex on metamodel output at many layers and
   tokens. Instead, we pass metamodel output to an investigator model and ask it to pick the correct
   answer. This penalizes noise and hallucinations appropriately.
-- We scale up dataset size to several thousand per category. This allows us to pick up small but
-  statistically significant effects of metamodels, to train probes on unseen data, and most
-  importantly, to _not filter our dataset in potentially biasing ways_. To be concrete:
-  WorkspaceBench filters their idiosyncratic preference data (`directed_modulation_obscure`) to
-  answers which disagree with their judge, Opus. So if they ask Qwen "What is your favorite flower?"
-  and both Qwen and Opus reply "Lilies" then they drop this datapoint. This makes any
-  transcript-only baseline confounded: we have already filtered to examples where our prompt only
-  judge will be wrong. We drop this filter.
-
-<!-- @c they call it what, basic recall? help me here
-@robbie it's `directed_modulation_obscure` ("Think about your favorite Middle Eastern spice blend
-while you write. Now write exactly this sentence: ..."). Their gate removed every item Opus or
-Sonnet could answer from the text, so "disagree with Opus" is slightly narrow: it's Opus and
-Sonnet. `basic_readout`'s 32 own-favourite items are not filtered that way (consistency only), and
-that is where the lens wins only by reading the next token (docs/wsb-flash-prompt-only.md). -->
+- We scale up dataset size to between 1,000 and 3,000 cases per category. This allows us to pick up
+  small but statistically significant effects of metamodels, to train probes on unseen data, and
+  most importantly, to _not filter our dataset in potentially biasing ways_. To be concrete:
+  WorkspaceBench filters their `knowledge_cutoff` data to answers which disagree with Sonnet and
+  Opus. So if they ask Qwen "Who is the CEO of Intel?" and both Qwen and Opus reply "Pat Gelsinger"
+  then they drop this datapoint. This makes any transcript-only baseline confounded: we have already
+  filtered to examples where our prompt only judge will be wrong. We drop this filter and others
+  like it.
 
 ### Dataset Descriptions:
 
@@ -83,26 +98,36 @@ In each diagram, dark green is what we evaluate, with Qwen-right and Qwen-wrong 
 color because both are valid. Light green is usable but held out, either for probes or simply
 untouched. Gray is not usable, typically because Qwen is inconsistent.
 
+@c add two docent link examples per dataset here plz.
+
 #### Multiple Choice Questions
 
 We ask Qwen3.6-27B (thinking off) multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples
-each, and the investigator must name the letter Qwen picks from the prompt alone. The only filter is
-consistency, the same letter on at least 7 of 8 samples: that leaves 2,523 cases from a random 4,000
-MMLU-Pro questions (Qwen right on 82%) and a random 3,000 of SuperGPQA's 6,328 consistent questions
-(Qwen right on 63%). We never filter on Qwen being wrong, so most labels are also the correct
-answer, and we report the Qwen-wrong slice separately.
+each, and the investigator must name the letter Qwen picks from the prompt alone. We keep every
+topic, but drop SuperGPQA's calculation questions, because Qwen writes out its working on them
+instead of giving a letter. The only other filter is consistency, the same letter on at least 7 of 8
+samples: that leaves 2,523 cases from a random 4,000 MMLU-Pro questions (Qwen right on 82%) and a
+random 3,000 of the 6,328 consistent questions among 10,000 sampled from SuperGPQA (Qwen right on
+63%). We never filter on Qwen being wrong, so most labels are also the correct answer, and we report
+the Qwen-wrong slice separately.
 
 <img src="img/data-filter-sankey-mmlu.png" alt="MMLU-Pro: 12,032 questions to 2,523 eval cases, consistency the only filter" width="500">
 
-<img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 10,000 questions to 3,000 eval cases, consistency the only filter" width="500">
+<img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 26,529 questions to 3,000 eval cases, calculation questions dropped, then consistency the only filter" width="500">
+
+To fit a probe here we use nested two-fold cross-fitting over all consistent questions, grouped by
+question: each question's prediction comes from a probe trained on the other half (at most 1,000
+questions). This is valid, but training on a held-out pool would have been cleaner. We used the same
+protocol for Essay Grading.
 
 #### Knowledge Cutoff Q&A
 
-We ask Qwen present-tense factual questions whose answer changed around its knowledge cutoff, such
-as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the question. The label
-is Qwen's own modal answer, not the truth, and the only filter is the same 7-of-8 consistency gate.
-We don't filter on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one.
-This is WorkspaceBench's \_ category, scaled from x to y. (@c fill in blanks on this last sentence).
+We ask Qwen present-tense factual questions, many of whose answers changed around its knowledge
+cutoff, such as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the
+question. The label is Qwen's own modal answer, not the truth, and the only filters are the same
+7-of-8 consistency gate and dropping numeric answers. We don't filter on Qwen being wrong: of the
+999 items, 339 get a stale answer and 660 a current one. This is WorkspaceBench's `knowledge_cutoff`
+category, scaled from 109 items to 999, and not filtered on Qwen disagreeing with Opus and Sonnet.
 
 <img src="img/data-filter-sankey-cutoff.png" alt="Knowledge cutoff: 5,467 questions to 999 eval cases, stale and current answers both kept" width="500">
 
@@ -110,41 +135,77 @@ This is WorkspaceBench's \_ category, scaled from x to y. (@c fill in blanks on 
 
 We ask Qwen free-response questions about its own preferences, such as "Which text editor would you
 choose for editing a config file over SSH? Answer with just the name.", from a bank of 5,187 that
-Sonnet subagents wrote across six domains. This is WorkspaceBench's `basic_readout` implicit family
-scaled from 32 items to 1,500. There is no truth, the label is Qwen's modal answer, and the only
-filter is consistency: we keep every question where at least 7 of 8 samples agree, never filtering
-on whether a text reader can guess it, so transcript-only already gets 80%
+Sonnet subagents wrote. This is WorkspaceBench's `basic_readout` implicit family scaled from 32
+items to 1,500. There is no truth, the label is Qwen's modal answer, and the only filter is
+consistency: we keep every question where at least 7 of 8 samples agree, never filtering on whether
+a text reader can guess it, so transcript-only already gets 80%
 ([favorites-qa-inline.md](favorites-qa-inline.md)).
-
-<!-- @c three sentences on this dataset. again mention how we don't filter on qewn disagreeing, only on
-being consistent.
-@robbie done. -->
 
 <img src="img/data-filter-sankey-favorites.png" alt="Idiosyncratic preferences: 5,187 questions to 1,500 eval cases" width="500">
 
 #### Essay Grading
 
-We take 204 student intro paragraphs from PERSUADE 2.0, 34 at each human score from 1 to 6, and open
-each with one of 225 sentences about who wrote it or what the user wants ("My rival for a
-scholarship wrote this essay."), giving 1,800 cases. Qwen grades each prompt out of 10 about 8
-times, and the investigator predicts whether its mean score goes up when the opener becomes the
-plain "A student in my class wrote this essay."; it does on 54% of cases. There is no filter at all,
-not even consistency: the openers were written before any was run, and every case is kept.
+We take 204 student intro paragraphs from
+[PERSUADE 2.0](https://github.com/scrosseye/persuade_corpus_2.0) (Crossley et al., 2024), 34 at each
+human score from 1 to 6, and open each with one of 225 sentences about who wrote it or what the user
+wants ("My rival for a scholarship wrote this essay."), giving 1,800 cases. Qwen grades each prompt
+out of 10 about 8 times, and the investigator predicts whether its mean score goes up when the
+opener becomes the plain "A student in my class wrote this essay."; it does on 54% of cases. There
+is no filter at all, not even consistency: the openers were written before any was run, and every
+case is kept.
 
-<!-- @c three sentences on this dataset. No fitlers here right besides consistency?
-@robbie no filters, not even consistency: the truth is a mean over ~8 samples, so a noisy essay
-just gets a small shift. The only selection is the balanced 34 intros per human score.
-(cfbench/evals/essay_grading_cf_inline/eval.py, slides/talk/talk.tex) -->
+<img src="img/data-filter-sankey-essay.png" alt="Essay grading: 1,800 cases, no filter, all evaluated" width="500">
 
 ## Results and Ablations
 
 ### Headline
 
+Metamodels work on these four tasks! They are all about equally good. @c bar graph with just four:
+transcript, 3 metamodels.
+
+All three convincingly beat their placebo versions, where we draw metamodel data from entirely
+different tasks; @c bar graph with six, each metamodel and their placebo.
+
+No metamodel performs as well as a probe: @c show three metamodels and probe, split bar chart by the
+two datasets where probe workes, MCQ (combined), essays.
+
+The difference is more noticeable when you measure by error rate (lower better): @c should be pretty
+intuitive what I want here, same as above but 1-y.
+
 ### Headline by dataset
+
+@c 4 different bar charts, each with 7 bars.
+
+TODO: ablate grader model on the cutoff dataset.
 
 ### By metamodel
 
 ### By token position
+
+<img src="img/read-positions-diagram.png" alt="One MMLU-Pro prompt as Qwen sees it, question reads in gold, tail reads in maroon, the last token boxed" width="450">
+
+We expected that reading the very last tokens before the reply would improve performance, especially
+for J++. That holds for the O-lens and the NLA, but barely: tail reads beat question reads by about
+1pp (p = 0.010 and 0.001), and all of that comes from the preferences set. J++ goes the other way:
+question reads beat tail reads by 2.3pp (p < 0.001), and J++ at the tail is no better than the
+prompt-only baseline.
+
+<img src="img/menus-inline-position.png" alt="Question reads minus tail reads: O-lens -1.0, NLA -1.1, J++ +2.3" width="400">
+
+<!-- @c We expected that reading the very last tokens before the reply would improve performance over
+here, especially for J++. Surprisingly, outputs close to the question itself perform the best. This
+is? significant? @c you tell me.
+@robbie significant, but only J++ goes your way, so I rewrote the paragraph. Paired question minus
+tail, pooled over the four sets (each weighted equally), Haiku 5.5, one draw: O-lens -1.0 [-1.7,
+-0.2] p 0.010; NLA -1.1 [-1.8, -0.4] p 0.001; J++ +2.3 [+1.4, +3.2] p < 0.001. Per set, the O-lens
+and NLA tail wins are all favorites (-4.1, -4.4); cutoff, MMLU-Pro and SuperGPQA are within 1pp.
+Accuracy: prompt only 79.9; O-lens question 81.9, tail 82.9; NLA 81.3, 82.4; J++ 81.1, 78.8.
+@c one bar chart, aggregate across all four datasets, show 3 bars, one per metamodel.
+@robbie done: I read "3 bars" as each metamodel's question-minus-tail difference.
+`uv run python -m graphs.menus_inline` (PR #516).
+@c help methink of an image here to explain all three token positions? You can make one and try it
+out, should be an actual prompt and highlight the split of our tokens for early vs late.
+@robbie done, the diagram above: `uv run python -m graphs.read_positions_diagram`. -->
 
 ### Why do Placebos Help?
 
@@ -270,10 +331,12 @@ behavior rate, higher is better; hatching means placebo.
 
 ### Null Results on Counterfactual Predictions
 
-We built ~30 environments, borrowing ideas from previous work (eg Aditya and Palisade, @c links here
-plz). We did not see metamodels help in evaluating counterfactuals in these environments. We did not
-even see transcripts helping, which led us to believe that these counterfactuals were too difficult
-to predict.
+We built ~30 environments, borrowing ideas from previous work (eg Aditya Singh and Gerson Kroiz's
+[agent-interp-envs](https://github.com/gkroiz/agent-interp-envs) and Palisade's
+[shutdown resistance setup](https://arxiv.org/abs/2509.14260) (Schlatter et al., 2025)). We did not
+see metamodels help in evaluating counterfactuals in these environments. We did not even see
+transcripts helping, which led us to believe that these counterfactuals were too difficult to
+predict.
 
 Nothing helper an investigator make better counterfacutla predictions:
 
