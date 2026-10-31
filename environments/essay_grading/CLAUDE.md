@@ -3,8 +3,8 @@
 Essay grading: who wrote the essay and what the user wants. What it tests, arms, measures and runs:
 [README.md](README.md).
 
-## Known issues (not fixed, revisit later)
+## Score parsing
 
-- **Bold scores are converted to negative grades:** `env.py`'s `SCORE` regex is a copy of
-  `../_lib/honest.py`'s and has the same bug; the finding is in
-  [../honest/CLAUDE.md](../honest/CLAUDE.md).
+Uses the shared `parse_score` in `../_lib/honest.py`; see
+[the parsing policy and local audit](../honest/CLAUDE.md#score-parsing). Missing or invalid final
+scores are unscorable (`positive=None`, `score=None`, `has_score=False`).
