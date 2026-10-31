@@ -7,8 +7,8 @@ are 95% bootstraps resampling questions (essays for essay grading) within each t
 
     uv run python -m graphs.headline_inline [--out-dir docs/img]
 
-Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error, headline-<task> and headline-essay-diff.png
-(paired differences in % right and AUROC, the latter from slides.talk.figures), and prints every
+Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error, headline-<task> (y axis from 50) and
+headline-essay-diff.png (paired differences in % right and AUROC, the latter from slides.talk.figures), and prints every
 paired difference the write-up quotes.
 """
 
@@ -111,13 +111,13 @@ def bars(ax, boot: Boot, tasks: list[str], groups: list, error: bool = False) ->
     ax.grid(axis="x", visible=False)
 
 
-def figure(path: Path, panels: list, ylabel: str = YLABEL, ylim: float = 100) -> None:
-    """panels: (title, draw(ax))."""
+def figure(path: Path, panels: list, ylabel: str = YLABEL, ylim: float = 100, floor: float = 0) -> None:
+    """panels: (title, draw(ax)). `floor`: where the y axis starts (the per-task charts start at 50)."""
     fig, axes = plt.subplots(1, len(panels), figsize=(4.8 * len(panels), 3.4), sharey=True, layout="constrained", squeeze=False)
     for ax, (title, draw) in zip(axes[0], panels, strict=True):
         draw(ax)
         ax.set_title(title)
-        ax.set_ylim(0, ylim)
+        ax.set_ylim(floor, ylim)
     axes[0][0].set_ylabel(ylabel)
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -180,7 +180,7 @@ def main(out: Path) -> None:
            ylabel="% of cases the investigator gets wrong", ylim=60)  # fmt: skip
     for task, title in TITLES.items():
         groups = [*seven, ("probe", [PROBE])] if task == "essay" else seven
-        figure(out / f"headline-{task}.png", [(title, lambda ax, t=task, g=groups: bars(ax, boot, [t], g))])
+        figure(out / f"headline-{task}.png", [(title, lambda ax, t=task, g=groups: bars(ax, boot, [t], g))], floor=50)
     essay_diffs(boot, out / "headline-essay-diff.png")
 
 
