@@ -3,7 +3,7 @@
 Source: ceselder/glm-5.3-olens-counterfactual-investigator (HF), config `evalcue`: episodes.parquet has each episode's render
 through GLM-5.3's own chat template (`rendered_text`), readouts.parquet the reads (layer 51, RL and SFT lenses, greedy + 4
 samples at T=1, no FVE) at ~12 chosen punctuation positions, indexed by GLM-5.3 token. Episodes join to our run dirs
-(data/runs/<env>/<run>/rows.jsonl) by run_dir + row_index; scripts/celeste_olens_reads.py and cfbench use the same reads.
+(data/runs/<env>/<run>/rows.jsonl) by run_dir + row_index; scripts/celeste_olens_reads.py@d89747b4 and cfbench use the same reads.
 
 Tokens are exact slices of the render (GLM-5.3's tokenizer offsets), so `pos` indexes them directly; a read whose token
 doesn't match is dropped. The RL lens's greedy readout is the greedy read and its 4 samples the T=1 read; the SFT lens is

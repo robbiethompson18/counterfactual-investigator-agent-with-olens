@@ -69,7 +69,7 @@ SAMPLES = ("rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4")
 OPEN = {"<|system|>", "<|user|>", "<|assistant|>", "<think>", "<|observation|>", "<tool_response>"}  # at their field's start
 CLOSE = {"</think>": "reasoning_content", "</tool_response>": "content"}  # at their field's end
 TEMPLATE = re.compile(r"<\|[^|>]*\|>|</?[a-z_]+>|\[gMASK\]|<sop>")
-TAILS = (80, 50, 30, 18, 10)  # as scripts/celeste_olens_reads.char_offset
+TAILS = (80, 50, 30, 18, 10)  # as scripts/celeste_olens_reads.char_offset@d89747b4
 NOT_ASKING = "instead of asking the user which one they meant"
 SKIP = {"4 Johns: base vs single edits"}  # email item 0, already one of email (junebug)'s items (Kylie, 2026-10-28)
 # the env has no BEHAVIOR; these are the realism pages' definitions (as cfbench/envs/overeager_rows.py on branch
@@ -181,7 +181,7 @@ def _pool(eps: list[tuple[str, str, dict, bool]], items: list[str], all_items: b
 
 
 def char_offset(text: str, ctx_left: str) -> int | None:
-    """Index in `text` of the read token's last character, from the tail of its left context (scripts/celeste_olens_reads)."""
+    """Index in `text` of the read token's last character, from the tail of its left context (scripts/celeste_olens_reads@d89747b4)."""
     tail_src = TEMPLATE.split(ctx_left)[-1]
     for k in TAILS:
         tail = tail_src[-k:]
