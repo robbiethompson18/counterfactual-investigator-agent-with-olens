@@ -20,7 +20,11 @@ a stale answer. Results so far are in [cutoff-qa-inline.md](../cutoff-qa-inline.
 ## Rules
 
 - **The label is Qwen's modal answer (`qwen_modal`), not the truth.** The task is to predict what
-  Qwen says. `truth`, `truth_now` and `pre_cutoff_analog` are metadata.
+  Qwen says. `truth`, `truth_now` and `pre_cutoff_analog` are metadata. `qwen_modal` is the gate's
+  normalized string (`scripts/cutoff_gate.py`, "N'Djamena" → `n djamena`), not an answer: build a
+  label with `gate_label(gate_run, item, qwen_modal)`, which takes `norm()` of the gate's raw
+  samples (`ndjamena`, what a predictor's answer canonicalizes to). Taking `norm(qwen_modal)` made
+  every apostrophe label unmatchable until 2026-10-31 (docs/cutoff-qa-inline.md).
 - **No date in the question.** "In March 2025, who became CEO of Intel?" makes Qwen hedge or refuse;
   "Who is the CEO of Intel?" gets its stale belief 7 of 8 times. Dated questions were 2%
   stable-wrong, the same questions present-tense 32% (table below).
