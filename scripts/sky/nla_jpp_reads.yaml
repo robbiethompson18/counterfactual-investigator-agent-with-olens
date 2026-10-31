@@ -1,0 +1,77 @@
+# J++ reads, then Celeste's L42 NLA (ceselder/qwen3.6-27b-nla-rl, AV at RL step 600 stacked on its warmstart LoRA,
+# olens/scripts/ceselder_nla_lora.py) and its critic's FVE, of one O-lens-format requests file, on one SkyPilot RunPod H200
+# (olens_reads.yaml's recipe). Outputs in ~/reads/: jpp.jsonl (+ .provenance.json, .transcripts.jsonl) and nla.jsonl
+# (+ .acts.bf16, .pred.bf16, .provenance.json, .transcripts.jsonl, scored in place by scripts/nla_score.py). Fetch before
+# the node goes down (-i 15 --down):
+#   REQ=path/to/requests.jsonl uvx --from 'skypilot[runpod]==0.13.0' sky launch -c nla-jpp -y -i 15 --down \
+#     --secret HF_TOKEN --env REQ [--env RUN_JPP=0] scripts/sky/nla_jpp_reads.yaml
+#   rsync -e 'ssh -F ~/.sky/generated/ssh/nla-jpp' -a nla-jpp:reads/ LOCAL_DIR/
+name: nla-jpp
+
+resources:
+  disk_size: 250
+  ordered:  # not H100: the one-engine reader OOMs at cudagraph capture on 80 GB
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+    - {infra: runpod, accelerators: "B200:1"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  RUN_JPP: 1  # 0: the NLA only
+  JPP_LAYERS: "32,36,40,44,48,52,56,60"
+  JPP_TOP_K: 10
+  NLA_STEP: iter_000600  # the AR (critic) was saved at step 600
+  MAX_HOURS: 3
+  REQ: requests.jsonl
+
+file_mounts:
+  ~/repo/olens: ./olens
+  ~/repo/scripts: ./scripts
+  ~/repo/src: ./src
+  ~/reads/requests.jsonl: ${REQ}
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf
+  ( cd /tmp && wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb >/dev/null && apt-get update -qq >/dev/null \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cuda-nvcc-12-9 cuda-cudart-dev-12-9 \
+       cuda-cccl-12-9 libcurand-dev-12-9 libcublas-dev-12-9 cuda-nvrtc-dev-12-9 cuda-profiler-api-12-9 \
+       libcusparse-dev-12-9 >/dev/null ) &
+  command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH=$HOME/.local/bin:$PATH
+  cd ~ && test -x olens-env/bin/python || uv venv -q --python 3.12 olens-env
+  export VIRTUAL_ENV=~/olens-env
+  uv pip install -q vllm==0.27.1 ninja scipy zstandard pyyaml \
+    --extra-index-url https://wheels.vllm.ai/0.27.1/cu129 --torch-backend=cu129 --index-strategy unsafe-best-match
+  uv pip install -q --no-deps "https://github.com/ceselder/vllm-metamodels/archive/refs/heads/main.zip"
+  H=~/olens-env/bin/hf
+  $H download Qwen/Qwen3.6-27B >/dev/null
+  [ "$RUN_JPP" = 0 ] || $H download neuronpedia/jacobian-lens qwen3.6-27b/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt >/dev/null
+  C=/data/olens_ckpt/ceselder_nla
+  $H download ceselder/qwen3.6-27b-nla-rl nla_meta.yaml run_config.yaml --local-dir $C >/dev/null
+  $H download ceselder/qwen3.6-27b-nla-rl --include 'ar_reconstructor/*' --local-dir $C >/dev/null
+  cd ~/repo
+  test -f /data/lora_vllm/ceselder_nla_$NLA_STEP/adapter_model.safetensors || \
+    ~/olens-env/bin/python olens/scripts/ceselder_nla_lora.py $NLA_STEP /data/lora_vllm/ceselder_nla_$NLA_STEP
+  wait  # CUDA packages
+  echo SETUP_DONE
+
+run: |
+  set -euo pipefail
+  [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
+  export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=olens/src:src
+  cd ~/repo
+  C=/data/olens_ckpt/ceselder_nla
+  if [ "$RUN_JPP" != 0 ]; then
+    timeout "${MAX_HOURS}h" python scripts/jpp_read_requests.py ~/reads/requests.jsonl ~/reads/jpp.jsonl --layers $JPP_LAYERS --top-k $JPP_TOP_K
+    echo JPP_DONE
+  fi
+  timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/nla.jsonl --readout nla --layers 42 \
+    --av-lora /data/lora_vllm/ceselder_nla_$NLA_STEP --nla-meta $C/nla_meta.yaml --nla-repo ceselder/qwen3.6-27b-nla-rl
+  echo NLA_DONE
+  python scripts/nla_score.py ~/reads/nla.jsonl --critic $C/ar_reconstructor --meta $C/nla_meta.yaml
+  echo READS_DONE
