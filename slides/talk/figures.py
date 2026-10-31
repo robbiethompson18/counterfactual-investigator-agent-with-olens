@@ -517,7 +517,7 @@ def author() -> None:
     bars, pairs, n = author_bars()
     one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
     width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
-    fig, ax0 = figure(70, FULL_H)
+    fig, ax0 = figure(70, 58)  # the deck's full figure height (slides/figure.py FULL_H)
     axes = [ax0]
     base = 0.5
     top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
@@ -556,8 +556,7 @@ def author() -> None:
 
 
 if __name__ == "__main__":
-    mm = grid()
-    essay(mm)
-    author()
+    essay(grid())
     essay_diffs()
     grader()
+    author()
