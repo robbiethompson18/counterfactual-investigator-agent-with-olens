@@ -117,6 +117,7 @@ async def main():
     )
     ap.add_argument("--max-calls", type=int, default=TOOL_BUDGET)
     ap.add_argument("--draws", type=int, default=3)
+    ap.add_argument("--draw-start", type=int, default=0, help="first draw index: tops up an earlier run's draws 0..N-1 (seed + draw)")
     ap.add_argument("--limit", type=int, default=0, help="first N cases only (smoke tests)")
     ap.add_argument("--models", default="", help="comma list of target model ids: only their cases")
     ap.add_argument("--seed", type=int, default=0)
@@ -239,6 +240,7 @@ async def main():
         "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
         "max_calls": args.max_calls,
         "draws": args.draws,
+        "draw_start": args.draw_start,
         "seed": args.seed,
         "limit": args.limit,
         "model_filter": args.models,
@@ -338,7 +340,11 @@ async def main():
         print(f"{case['env']} {case['model']} {condition} draw {draw}: {got} ${result['cost']:.3f}")
 
     everything = [
-        (env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)
+        (env, case, base, c, p, d)
+        for env, case, base in cases
+        for c in conditions
+        for p in predictors
+        for d in range(args.draw_start, args.draws)
     ]
 
     async def one(env, case: dict, base: list, condition: str, predictor: str, draw: int):
