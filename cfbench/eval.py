@@ -259,25 +259,25 @@ async def main():
             with out.open("a") as f:
                 f.write(json.dumps(old | case | {"reused_from": args.reuse}) + "\n")
             return
-        tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
-        if condition in INLINE_CONDITIONS:
-            prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
-            effort = args.effort or ev.INLINE_EFFORT  # --effort, when given, applies to every condition (Robbie, 2026-10-29)
-        if condition in TOOL_CONDITIONS:
-            tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
-        if condition in OLENS_CONDITIONS:
-            assert reads is not None
-            src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
-            placebo = condition == "olens_placebo_agentic" and src is None
-            lens_tools, read = olens.tools(
-                base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
-            )
-            if src is not None:
-                extra["placebo_sources"] = src
-            tools |= lens_tools
-        if condition not in INLINE_CONDITIONS:
-            prompt = prompt_of(env, case, base, shown, condition, read)
-        async with slots:
+        async with slots:  # the prompt is built inside the slot, so --concurrency also bounds how many are in memory
+            tools, read, extra, effort = {}, None, {}, args.effort or EFFORT
+            if condition in INLINE_CONDITIONS:
+                prompt, extra = inline_prompt(env, case, base, condition, args.seed + draw)
+                effort = args.effort or ev.INLINE_EFFORT  # --effort, when given, applies to every condition (Robbie, 2026-10-29)
+            if condition in TOOL_CONDITIONS:
+                tools = transcript_tools(base, chars=condition in OLENS_CONDITIONS)
+            if condition in OLENS_CONDITIONS:
+                assert reads is not None
+                src = placebo_sources(case, base, args.seed + draw) if condition == "olens_placebo_agentic" else None
+                placebo = condition == "olens_placebo_agentic" and src is None
+                lens_tools, read = olens.tools(
+                    base, reads, placebo=placebo, seed=args.seed + draw, sources=src, overrides=getattr(ev, "OLENS", None)
+                )
+                if src is not None:
+                    extra["placebo_sources"] = src
+                tools |= lens_tools
+            if condition not in INLINE_CONDITIONS:
+                prompt = prompt_of(env, case, base, shown, condition, read)
             for attempt in range(3):
                 try:
                     system = getattr(ev, "SYSTEM", None)
