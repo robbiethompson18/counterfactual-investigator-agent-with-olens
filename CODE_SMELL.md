@@ -2,26 +2,6 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-29: `links.json` is built from the local runs only
-
-`spec.build_links` writes `envs/<env>/links.json` (per episode: Docent run, primary value, O-lens
-reads; the env viewer's episode chips) from the run folders in this checkout, unlike `env_index`,
-which merges HF's index. `environments run` and `upload` ship it, so a checkout without every run of
-an env drops the others' chips: HF's hint_mcq `links.json` covers 17 of its 25 runs. It is also why
-the hint_mcq census runs' chips still show pre-strict ✓/✗ after PR #416 (a rebuild from a sparse
-checkout would drop runs). Index uploads race too: hint_mcq's index had lost four runs
-(`2026-10-28_rest*`, `_words`) until PR #416 rebuilt it. Fix: merge with HF's `links.json` the way
-`env_index` merges the index.
-
-## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
-
-The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md /
-BASE_LINE / ASK / PROMPT / PLACEBO source, so for the `*_inline` conditions it can't see the O-lens
-blocks (data, not code). A new eval with new reads reused another eval's `olens_inline` rows
-wholesale (2026-10-29, caught and deleted before scoring). It now also refuses a run with a
-different INLINE hook source, which still misses a change in the reads file behind the same hook;
-hashing each built prompt into the row would close it.
-
 ## 2026-10-28: metamodel reader bugs from a Codex review of the serving code
 
 A Codex read of `olens/src/olens/`, `scripts/olens_read_requests.py`,
