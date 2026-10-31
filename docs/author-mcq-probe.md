@@ -36,10 +36,10 @@ on the prompt?
   (`cfbench/evals/author_blog_drop_inline`, the hint evals' layout): Qwen's exact prompt and letter,
   Qwen's probability, the sentence to delete; claim = "the deletion is significant".
   - `transcript_inline`: that alone.
-  - `olens_inline`: plus agu18dec's Qwen3.6-27B O-lens, sampled at temperature 1 (top-p 0.95,
-    top-k 64, one continuation of up to 4 bullets per site), at every punctuation, symbol and
-    newline token of the question and post (`bank.is_read_token`), layers 32/40/48, every bullet
-    with its FVE.
+  - `olens_inline`: plus agu18dec's Qwen3.6-27B O-lens, sampled at temperature 1 (top-p 0.95, top-k
+    64, one continuation of up to 4 bullets per site), at every punctuation, symbol and newline
+    token of the question and post (`bank.is_read_token`), layers 32/40/48, every bullet with its
+    FVE.
   - `olens_placebo_inline`: another post's reads (same attribute, at least as many positions) in
     their place.
 
@@ -98,6 +98,38 @@ attributes (sex, age band, education, relationship, income). Retired (Kylie, 202
   0.005), AUROC +0.006 (p 0.28). The same null.
 - **Answer eval** (`author_mcq_inline`, 196 Qwen-wrong cases, predict Qwen's letter): transcript
   0.82, O-lens 0.79.
+
+## Exploratory, post hoc: lexicons in the reads and sentence-end probes (2026-10-31)
+
+Kylie's follow-ups after the null. Post hoc and multiply tested; leads, not results. Code
+`scripts/author_probe/pronoun_probe.py` and `period_probe.py`; runs
+`runs/author_mcq_blog/2026-10-31_pronoun-probe` and `…_period-probe` (activations included).
+
+- **Answer words in the O-lens reads** along each post (FVE-weighted pronouns matching Qwen's answer
+  for sex, a short word list per bucket for age; level, step, before/after shifts, slope): AUROC
+  0.55-0.60 alone (sex 0.68 on qwen_wrong for the 3-sentence signed shift, one of 16 features),
+  placebo reads and the sentence text ~0.5. Added to Haiku's transcript p: sex +0.006 (n.s.), age
+  +0.020 — but the same counts on the sentence text add +0.017, so the age gain is lexical.
+- **Sentence-end activations** (Qwen3.6-27B residual at the token holding the sentence's last
+  character, question-first prompt). An answer probe trained on 3,000 batch-3 pairs (no shared
+  bloggers) and read along each post: AUROC 0.57-0.64, +0.007 to +0.017 over Haiku. A probe fit to
+  the task (StandardScaler, PCA 128, logistic C 0.01, layer chosen by inner CV: L48; 5-fold CV
+  grouped by blogger):
+
+| score                              | AUROC                | paired accuracy | + over Haiku transcript p |
+| ---------------------------------- | -------------------- | --------------- | ------------------------- |
+| Haiku transcript p                 | 0.797                | 0.758           |                           |
+| h at the sentence end              | 0.780 [0.755, 0.803] | 0.770           | +0.053 [+0.039, +0.068]   |
+| h(end k) − h(end k−1)              | 0.724                | 0.712           | +0.033                    |
+| TF-IDF of the sentence             | 0.645                | 0.652           | +0.011                    |
+| sentence length + position in post | 0.704                | 0.719           | +0.035                    |
+| h over Haiku + length/position     |                      |                 | +0.028 [+0.017, +0.038]   |
+
+Caveats: post hoc; the probe is fit to this task with ~650 positives (CV grouped by blogger, layer
+chosen inside each fold, but still the easiest thing here to overfit); the difference vector does
+worse than h, so it is not obviously reading a belief change at the sentence; TF-IDF is a weak text
+control. Next control: the same probe on the activation of the sentence alone (no question, no post
+around it), which separates "what this sentence says" from "what Qwen made of it in context".
 
 ## Where things live
 

@@ -34,6 +34,7 @@ CONDITIONS = ("no_transcript", *TOOL_CONDITIONS)
 # into build_prompt's prompt; these are per-eval prompts (cfbench/evals/hint_qwen_dsv4/inline.py, 2026-10-28)
 INLINE_CONDITIONS = (
     "transcript_inline",
+    "no_transcript_inline",  # chive_inline's edit-only arm (2026-10-31)
     "olens_inline",
     "olens_placebo_inline",
     "nla_inline",
