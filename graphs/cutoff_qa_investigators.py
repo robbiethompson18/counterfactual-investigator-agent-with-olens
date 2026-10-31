@@ -6,8 +6,8 @@ stale, all. Exact match to Qwen's modal answer (post-2026-10-31 labels), per-ite
 bootstrap CIs over items; a run that isn't finished (meta.json status done) is left out.
 
 Two sets (Robbie, 2026-10-31):
-- `canonical` (default, the final write-up): the menus_inline cutoff runs, `all` menu (graphs/menus_inline.py SETS), Haiku at 1
-  draw; Flash-Lite has prompt-only only there.
+- `canonical` (default, the final write-up): the menus_inline cutoff runs, `all` menu (graphs/menus_inline.py SETS), Haiku at 3
+  draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw.
 - `cutoff_qa_inline`: the older eval's prompt and end-of-prompt reads, with every Flash-Lite condition and the told prompt (the
   model is Qwen3.6-27B, cutoff ~January 2025); docs/cutoff-qa-inline.md. Not for the write-up.
 
@@ -35,33 +35,36 @@ REF = CF / "2026-10-29_cutoff-qa-1k-transcript/predictions.jsonl"  # gold labels
 def old_lens_runs(prefix: str) -> list:
     """(bar, run, condition in the run) for the cutoff_qa_inline lens runs, one run per condition."""
     slugs = [("olens", "olens-placebo"), ("jlens", "jlens-placebo"), ("nla", "nla-placebo-mmlu")]
-    return [(f"{c}{p}_inline", CF / f"{prefix}-{s}", f"{c}{p}_inline") for c, ps in slugs for p, s in (("", c), ("_placebo", ps))]
+    return [(f"{c}{p}_inline", [CF / f"{prefix}-{s}"], f"{c}{p}_inline") for c, ps in slugs for p, s in (("", c), ("_placebo", ps))]
+
+
+TOPUP = CF / "2026-10-31_menus-cutoff-all-d12b"  # draws 1-2 of prompt only and every `all`-menu condition
 
 
 def menus_runs(run: str, lens: str) -> list:
-    return [(f"{lens}{p}_inline", CF / run, f"{lens}_all{p}_inline") for p in ("", "_placebo")]
+    return [(f"{lens}{p}_inline", [CF / run, TOPUP], f"{lens}_all{p}_inline") for p in ("", "_placebo")]
 
 
 # set -> investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load()
 SETS = {
     "canonical": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", CF / "2026-10-30_menus-cutoff-olens-jlens", "transcript_inline"),
+            ("transcript_inline", [CF / "2026-10-30_menus-cutoff-olens-jlens", TOPUP], "transcript_inline"),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "olens"),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "jlens"),
             *menus_runs("2026-10-31_menus-cutoff-nla-batch", "nla"),
         ],
-        "Gemini 2.5 Flash-Lite": [("transcript_inline", CF / "2026-10-31_menus-cutoff-flashlite-transcript", "transcript_inline")],
+        "Gemini 2.5 Flash-Lite": [("transcript_inline", [CF / "2026-10-31_menus-cutoff-flashlite-transcript"], "transcript_inline")],
     },
     "cutoff_qa_inline": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", CF / "2026-10-29_cutoff-qa-1k-transcript", "transcript_inline"),
-            ("transcript_told_inline", CF / "2026-10-31_cutoff-qa-1k-told-transcript", "transcript_inline"),
+            ("transcript_inline", [CF / "2026-10-29_cutoff-qa-1k-transcript"], "transcript_inline"),
+            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
             *old_lens_runs("2026-10-29_cutoff-qa-1k"),
         ],
         "Gemini 2.5 Flash-Lite": [
-            ("transcript_inline", CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript", "transcript_inline"),
-            ("transcript_told_inline", CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript", "transcript_inline"),
+            ("transcript_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"], "transcript_inline"),
+            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"], "transcript_inline"),
             *old_lens_runs("2026-10-31_cutoff-qa-1k-flashlite"),
         ],
     },
@@ -83,9 +86,9 @@ def load(which: str) -> dict[str, dict[str, dict]]:
     for who, bars in SETS[which].items():
         rows = [json.loads(line) for line in CENSUS[who].open()]
         out[who] = {"self_answer": {r["item"]: (cls[r["item"]], float(norm(r["reply"]) == gold[r["item"]])) for r in rows}}
-        for bar, run, cond in bars:
-            if done(run):
-                out[who][bar] = per_item([run], by=lambda r: cls[r["item"]])[cond]
+        for bar, runs, cond in bars:
+            if all(map(done, runs)):
+                out[who][bar] = per_item(runs, by=lambda r: cls[r["item"]])[cond]
     return out
 
 
