@@ -177,10 +177,15 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     with (out / "layout.jsonl").open("w") as f, (out / "requests.jsonl").open("w") as g:
         for p in keep:
             f.write(json.dumps(lays[p]) + "\n")
-            g.write(
-                json.dumps({"id": p, "env": "chive", "prompt_ids": data[p]["token_ids"], "positions": [k for k, *_ in lays[p]["pos"]]})
-                + "\n"
-            )
+            msgs = [*data[p]["messages"], {"role": "assistant", "content": data[p]["completion"]}]  # the reader renders these too
+            row = {
+                "id": p,
+                "env": "chive",
+                "messages": msgs,
+                "prompt_ids": data[p]["token_ids"],
+                "positions": [k for k, *_ in lays[p]["pos"]],
+            }
+            g.write(json.dumps(row) + "\n")
     print(f"kept {len(keep)} of {len(lays)} incidents (<= {cut} read positions); experiments: {dict(n)}")
 
 
