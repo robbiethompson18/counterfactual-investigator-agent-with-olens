@@ -49,7 +49,7 @@ from cfbench.core import (
     check_agentic,
     pick_examples,
 )
-from cfbench.predict import EFFORT, grader, opening, predict, prompt_sha
+from cfbench.predict import EFFORT, grader, opening, predict, prompt_sha, recorded_prompt_sha
 from cfbench.tools import transcript_tools
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import ROOT, finish, new_run
@@ -214,7 +214,8 @@ async def main():
         return
     # --reuse: an earlier row of the same case whose prompt_sha equals this run's (the same system, prompt, tool schemas
     # and effort sent) counts as done here; its truth fields are re-taken from this run's case, since the investigator never
-    # sees them. The hash doesn't see tool replies, so PLACEBO (which runs' reads the agentic lens tools serve) is still checked.
+    # sees them. Rows from before rows stored the hash get it from the opening request they record (recorded_prompt_sha).
+    # The hash doesn't see tool replies, so PLACEBO (which runs' reads the agentic lens tools serve) is still checked.
     inline_src = inspect.getsource(ev.INLINE) if hasattr(ev, "INLINE") else None
     key = lambda r, cond: (r.get("version"), r.get("item"), r["model"], r["base_arm"], r["cf_arm"], cond, r["predictor"], r["draw"])
     reuse, reuse_counts = {}, Counter()
@@ -222,7 +223,7 @@ async def main():
         old = json.loads((Path(path).parent / "meta.json").read_text())["params"]
         assert old.get("placebo_hook") == (inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None), f"{path}: PLACEBO differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
-            reuse[key(r, r["condition"])] = r
+            reuse[key(r, r["condition"])] = r | {"prompt_sha": recorded_prompt_sha(r)}
     params = {
         "env": f"eval:{args.name}",
         "eval": args.name,
