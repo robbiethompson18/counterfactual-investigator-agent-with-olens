@@ -4,7 +4,7 @@ the four inline sets (Robbie, 2026-10-30).
 One single-turn prompt for every set: the prompt Qwen3.6-27B (thinking off) was asked, never its reply, and one
 submit_answer call; truth is Qwen's modal answer (>= 7/8 samples agree, the sets' own gates). Versions are the sets:
 `cutoff` (999 present-tense factual questions), `favorites` (1,500 own-preference questions), `mcq_unselected` (2,523
-MMLU-Pro questions) and `supergpqa` (3,000 SuperGPQA questions); their cases are those evals' cases, nothing re-gated.
+MMLU-Pro questions) and `supergpqa` (2,998 SuperGPQA questions); their cases are those evals' cases, nothing re-gated.
 
 Reads are every default read position (docs/read-positions.md): the 2026-10-29 runs plus the 2026-10-30 fill
 (cfbench.evals.inline_reads), J++ from every-token runs (JPP). The menus pick positions from them:
@@ -27,7 +27,7 @@ own positions and context.
 
 import json
 import random
-from collections import defaultdict
+from collections import Counter, defaultdict
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -159,8 +159,11 @@ def _cases(inputs: str) -> dict[str, dict]:
 
 
 def cases(inputs: Path, versions: list[str]):
+    """Every case of the versions, except the 2 supergpqa questions (12 and 14 options) no other case shares an option count
+    with: they can't have a placebo (docs/placebo-rules.md never relaxes it), so they're left out of every condition."""
+    peers = Counter((c["set"], c["n_opts"]) for c in _cases(str(inputs)).values())
     for c in _cases(str(inputs)).values():
-        if c["set"] not in versions:
+        if c["set"] not in versions or peers[c["set"], c["n_opts"]] < 2:
             continue
         row = {"version": c["set"], "item": c["item"], "read_id": c["id"], "category": c["category"], "gold": c["gold"],
                "n_opts": c["n_opts"], "model": QWEN, "env_name": ENV_NAME[c["set"]], "task": TASK,
