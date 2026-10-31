@@ -7,7 +7,9 @@ on purpose.
 Counts are constants: environments/supergpqa/ (26,529 questions, 15,300 non-calculation), docs/supergpqa-inline.md (Pool and Split),
 docs/mcq-unselected.md (the split, both batches),
 docs/envs/cutoff_qa.md and data/banks/cutoff_qa/v3.json (stable = 7 of 8 samples agree; the 1,197 not evaluated include the numeric
-items), docs/favorites-qa-inline.md, and for essays cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
+items), docs/favorites-qa-inline.md, for blogs runs/author_mcq_blog/2026-10-30_{qwen36-qfirst,ablate-loo}{,-b}
+(docs/author-mcq-probe.md; a question is one blogger and attribute, and its 533 eval questions give 1,316 cases),
+and for essays cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
 data/runs/cfbench/2026-10-31_essay-cf-b-ts.
 """
 
@@ -96,6 +98,33 @@ DATASETS = {
             ("225 openers × 8 intros", "eval cases", 1_800, EVAL),
             ("eval cases", "grade goes up", 973, EVAL),
             ("eval cases", "grade doesn't go up", 827, EVAL),
+        ],
+    ),
+    "blog": (
+        "Blog authorship: every confident Qwen-wrong question is kept, Qwen-right ones are sampled",
+        [
+            [("questions about bloggers", 8_016)],
+            [("confident", 5_889), ("not confident, dropped", 2_127)],
+            [("sentences deleted", 2_077), ("Qwen right, not sampled", 3_812)],
+            [("stable", 1_850), ("unstable, dropped", 227)],
+            [("eval questions", 533), ("no significant sentence", 1_317)],
+            [("Qwen wrong", 272), ("Qwen right", 261)],
+        ],
+        [
+            ("questions about bloggers", "confident", 533, EVAL),
+            ("questions about bloggers", "confident", 1_544, UNUSABLE),
+            ("questions about bloggers", "confident", 3_812, HELD),
+            ("questions about bloggers", "not confident, dropped", 2_127, UNUSABLE),
+            ("confident", "sentences deleted", 533, EVAL),
+            ("confident", "sentences deleted", 1_544, UNUSABLE),
+            ("confident", "Qwen right, not sampled", 3_812, HELD),
+            ("sentences deleted", "stable", 533, EVAL),
+            ("sentences deleted", "stable", 1_317, UNUSABLE),
+            ("sentences deleted", "unstable, dropped", 227, UNUSABLE),
+            ("stable", "eval questions", 533, EVAL),
+            ("stable", "no significant sentence", 1_317, UNUSABLE),
+            ("eval questions", "Qwen wrong", 272, EVAL),
+            ("eval questions", "Qwen right", 261, EVAL),
         ],
     ),
     "favorites": (
