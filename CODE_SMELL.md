@@ -2,9 +2,10 @@
 
 Tech debt we know about, newest first.
 
-- **2026-10-31, graphs:** the deck and the write-up still draw the same results twice.
-  `graphs/talk.py` `essay()` and `author()` overlap `graphs/headline_inline.py`'s essay chart and
-  `graphs/author_blog_drop.py` (different bar sets, same statistics in `cfbench.scoring`). The next
-  step is drawing functions that take an `ax`, so one module renders a chart at write-up size (PNG)
-  and at slide size (`@slide`, PDF). Not done before the deadline because the two show different
-  bars.
+- **2026-10-31, graphs:** the deck (`graphs/talk.py` `essay()`) and the write-up
+  (`graphs/headline_inline.py`) draw essay grading from the same statistics
+  (`cfbench.scoring.essay_auroc_bars`) as different charts: AUROC with the "bet at the mean"
+  variants on the slide, % right plus paired differences in the write-up. Whether they should be one
+  chart drawn at two sizes (a draw function taking an `ax`, rendered as PNG and under `@slide` as
+  PDF) is an editorial call, open as of this date. The blog chart was unified the same day:
+  `author_blog_drop` and the ablation's blog panel compute from `author_bars` / `author_cases`.

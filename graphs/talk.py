@@ -13,6 +13,7 @@ from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 
 from cfbench.scoring import (
+    AUTHOR_GROUPS,
     AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
@@ -240,11 +241,6 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
-AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
-                 ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
-
-
 @slide
 def author() -> None:
     """AUROC of P(the deletion is significant) per condition, pooled over both versions; plus the paired differences table
@@ -260,7 +256,7 @@ def author() -> None:
         xs, ticks = positions(one, AUTHOR_GROUPS)
         for c, x in xs.items():
             val, (lo, hi), st = bars[ver, c]
-            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw("probe_user_end" if c == "transcript+probe" else c))  # a lighter teal
+            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
             ax.errorbar(x, val, [[val - lo], [hi - val]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             for text, dy in ((f"{val:.3f}", 1.5), (st, 6.5)):
                 ax.annotate(

@@ -45,6 +45,7 @@ STYLE = {
     "probe_user_end": ("#78b7aa", None, "probe: user end"),
     "probe_response_start": ("#11806a", None, "probe: final token"),
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
+    "transcript+probe": ("#78b7aa", None, "probe + transcript"),  # author_blog_drop's nested combiner, the lighter teal
     # chive_inline's reference bars: CHIVE's own Opus 4.8 arms on the same claims (a lighter shade = the same input, another measure)
     "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
