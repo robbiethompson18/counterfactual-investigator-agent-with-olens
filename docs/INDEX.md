@@ -124,6 +124,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   — their gate replayed with Sonnet 5.5 on all 200 items: 0.69 pass@1 / 0.83 pass@3 vs lens 0.76
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
+- [REFERENCE: cutoff_qa grader mentions — read before claiming O-lens reads show grader / eval awareness from a tool-call template](cutoff-grader-mentions.md)
+  — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer
+  tool); 14% vs 73% of items; regex, no judge
 
 ## MIXED
 
