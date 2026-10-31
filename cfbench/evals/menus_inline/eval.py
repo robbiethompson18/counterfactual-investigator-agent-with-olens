@@ -232,8 +232,10 @@ def align(c: dict, src: dict, positions: list[int]) -> dict[int, int]:
     out = {}
     for p in positions:
         k = c["kinds"][p]
-        i, pool = mine[k].index(p), theirs[k]
-        out[p] = pool[i % len(pool)] if k == "punct" else pool[i]
+        # in order, cycled when the source has fewer of the kind: punctuation always; option newlines on 40 of 8,022 cases,
+        # where an option's newline is fused into a punctuation token (".\n"), so it reads as punct
+        i, pool = mine[k].index(p), theirs.get(k) or theirs.get("punct") or theirs["nl"]
+        out[p] = pool[i % len(pool)]
     return out
 
 
