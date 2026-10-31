@@ -6,7 +6,8 @@ second call's prompt also holds the first): 4 retries and 1 failed call out of ~
 
     uv run python -m graphs.headline_tokens [--out-dir docs/img]
 
-Writes headline-tokens.png and prints added prompt and completion tokens and % right per set, placebos included.
+Writes headline-tokens.png and headline-thinking.png (mean thinking tokens per condition, pooled) and prints added prompt and completion
+tokens and % right per set, placebos included.
 """
 
 import argparse
@@ -19,7 +20,7 @@ import numpy as np
 
 from graphs import cutoff_qa_inline, favorites_qa_inline, mcq_unselected, supergpqa_inline
 from graphs.headline_inline import LENSES, PLACEBOS, TS
-from graphs.style import bar_kw, label
+from graphs.style import bar_kw, label, positions
 
 SETS = {
     "MMLU-Pro": mcq_unselected.RUNS,
@@ -28,7 +29,7 @@ SETS = {
     "preferences": favorites_qa_inline.RUNS,
 }
 MCQ = ["MMLU-Pro", "SuperGPQA"]
-METRICS = ("prompt", "completion", "correct")
+METRICS = ("prompt", "completion", "reasoning", "correct")
 
 
 def load(runs: list[Path]) -> dict:
@@ -40,6 +41,7 @@ def load(runs: list[Path]) -> dict:
             case = rows[r["condition"]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])
             case["completion"].append(r["tokens"]["completion"])
+            case["reasoning"].append(r["tokens"]["reasoning"])
             case["correct"].append(100 * r["correct"])
     return {c: {i: {m: float(np.mean(case[m])) for m in METRICS} for i, case in items.items()} for c, items in rows.items()}
 
@@ -77,6 +79,30 @@ def chart(tokens: dict[str, dict[str, float]], path: Path) -> None:
     print("wrote", path)
 
 
+def thinking(sets: dict[str, dict], path: Path) -> None:
+    """Mean thinking tokens per condition, with the three tasks weighted equally."""
+
+    def mean(c: str, names: list[str]) -> float:
+        return float(np.mean([case["reasoning"] for name in names for case in sets[name][c].values()]))
+
+    groups = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
+    conditions = [c for _, cs in groups for c in cs]
+    means = {c: float(np.mean([mean(c, MCQ), mean(c, ["knowledge cutoff"]), mean(c, ["preferences"])])) for c in conditions}
+    print("thinking tokens, pooled:", {c: round(v) for c, v in means.items()})
+    xs, ticks = positions(means, groups)
+    fig, ax = plt.subplots(figsize=(4.8, 3.2), layout="constrained")
+    for c, v in means.items():
+        ax.bar(xs[c], v, 0.8, zorder=3, **bar_kw(c))
+        ax.annotate(f"{v:.0f}", (xs[c], v), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5)
+    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5)
+    ax.grid(axis="x", visible=False)
+    ax.set_ylabel("Haiku's thinking tokens per prediction")
+    ax.set_title("Thinking tokens, pooled over the three tasks")
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print("wrote", path)
+
+
 def main(out: Path) -> None:
     sets = {name: load(runs) for name, runs in SETS.items()}
     print("transcript-only prompt:", {name: round(float(np.mean([v["prompt"] for v in d[TS].values()]))) for name, d in sets.items()})
@@ -85,6 +111,7 @@ def main(out: Path) -> None:
         for c in (x for lens in LENSES for x in (lens, PLACEBOS[lens])):
             print(f"{c:24}", {k: round(v, 1) for k, v in summary(sets, c, metric).items()})
     chart({c: summary(sets, c, "prompt") for c in LENSES}, out / "headline-tokens.png")
+    thinking(sets, out / "headline-thinking.png")
 
 
 if __name__ == "__main__":
