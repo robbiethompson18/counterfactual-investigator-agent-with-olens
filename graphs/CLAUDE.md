@@ -14,10 +14,10 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
-- `cutoff_qa_investigators`: the same task by investigator: Haiku 5.5 (later cutoff; transcript,
-  told the model and its cutoff, O-lens, placebo) beside Gemini 2.5 Flash-Lite (Qwen's cutoff;
-  answering the question itself, transcript, O-lens, placebo), stale / not stale / all; unfinished
-  runs are left out
+- `cutoff_qa_investigators`: knowledge cutoff by investigator, Haiku 5.5 (later cutoff) beside Gemini 2.5
+  Flash-Lite (Qwen's cutoff), each with its own-answer census, stale / not stale / all. `--set canonical`
+  (default, the final write-up: menus_inline `all` runs) or `--set cutoff_qa_inline` (the older eval, every
+  Flash-Lite condition and the told prompt, `docs/cutoff-qa-inline.md`)
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
