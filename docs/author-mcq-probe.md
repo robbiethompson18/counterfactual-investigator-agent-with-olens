@@ -4,7 +4,8 @@
 prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from (AUROC p =
 0.30, recalibrated Brier p = 0.36, 1,316 cases from 520 bloggers). An earlier pilot on SynthPAI
 (synthetic comments) gave the same null and is retired. A third batch of bloggers was stopped
-(Kylie: sample size won't change it).
+(Kylie: sample size won't change it). ceselder's layer-42 NLA in the O-lens's place is null too
+(AUROC vs transcript −0.003, p = 0.60; 2026-10-31).
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the
@@ -73,6 +74,28 @@ byte-identical). CIs and one-sided p (H1: O-lens better) from a 10k bootstrap ov
 
 Cost: about $110 of RunPod H200s (SynthPAI and blog, deletions and reads) and $40 of API (DeepSeek
 V4 Flash answers, Haiku investigator and judge) over 2026-10-29/31.
+
+## NLA in place of the O-lens (2026-10-31)
+
+[ceselder/qwen3.6-27b-nla-rl](https://huggingface.co/ceselder/qwen3.6-27b-nla-rl) (layer 42 only; AV
+= `av_base` + RL adapter `iter_000800`, 78% held-out FVE) at the same 26,706 tokens of the same
+prompts, greedy (the O-lens sampled at temperature 1), each explanation scored by its critic (median
+FVE 0.43 on this run's own ruler). Its AV is a merged full model, so it can't run on the one-engine
+reader: `scripts/author_probe/nla_l42.py` does capture, decode and critic in plain transformers on
+one GPU (`scripts/sky/nla_l42.yaml`, ~2.8 reads/s on an H200). Conditions `nla_inline` and
+`nla_placebo_inline` (the O-lens placebo's post), Haiku 5.5 at effort low, 1 draw; run
+`runs/cfbench/2026-10-31_author-blog-drop-haiku-nla`, reads
+`runs/nla_reads/2026-10-31_author-blog-nla-l42` (also on the per-question expview pages beside the
+O-lens).
+
+| pooled, A − B    | AUROC                           | raw Brier gain | recalibrated Brier gain |
+| ---------------- | ------------------------------- | -------------- | ----------------------- |
+| NLA − transcript | −0.003 [−0.023, +0.017], p 0.60 | −0.008         | −0.003, p 0.70          |
+| NLA − placebo    | +0.009, p 0.21                  | +0.006, p 0.02 | +0.002, p 0.36          |
+| NLA − O-lens     | −0.008, p 0.78                  | −0.012         | −0.004                  |
+
+Within-post paired accuracy: transcript 0.758, O-lens 0.771, NLA 0.772, NLA placebo 0.766 (CIs
+±0.035).
 
 ## Earlier pilot on SynthPAI (synthetic), retired
 
