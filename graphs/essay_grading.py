@@ -37,10 +37,11 @@ WRITEUP_S = 1.15  # text scale at write-up size: values at 7.5pt as graphs.style
 BASE = 0.5  # the axis starts at chance
 
 
-def essay_bars(ax, s: float, headroom: float = 0.1) -> None:
+def essay_bars(ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)") -> None:
     """The bars on ax, text sizes scaled by s. Bars from chance, the gray 95% CI whisker, the value in ink above it and the stars
     over that (offsets in points, so they clear the whisker at any height), the null dotted and labelled at the right. The axis
-    stops `headroom` above the tallest whisker: room for its two labels, so 0.1 on the deck's 24 mm figure, less when taller."""
+    stops `headroom` above the tallest whisker: room for its two labels, so 0.1 on the deck's 24 mm figure, less when taller.
+    `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u")."""
     bars, null, n, _ = essay_auroc_bars()
     xs, ticks = positions(bars, GROUPS)
     for c, x in xs.items():
@@ -61,7 +62,7 @@ def essay_bars(ax, s: float, headroom: float = 0.1) -> None:
     yt = np.arange(BASE, top, 0.1)
     ax.set_ylim(BASE, top)
     ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
-    ax.set_ylabel("AUROC of P(score goes up)")
+    ax.set_ylabel(ylabel)
 
 
 def essay_diffs(ax) -> None:
