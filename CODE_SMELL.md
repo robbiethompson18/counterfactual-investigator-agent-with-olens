@@ -18,28 +18,3 @@ these (its seed, thinking-render, resume and stale-LoRA bugs are fixed and remov
   harness v8); `char_offset` ignores a field's stripped leading whitespace (reads land a few chars
   early); per-token decoding mangles characters split across tokens in saved transcript text; J++
   provenance records a blob hash, not the commit, and J++ ignores per-request `layers`.
-
-## 2026-10-21: runs from before `scripts/runs.py` aren't in the layout or on HF
-
-Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.json`
-(`"backfilled": true`) once the agents producing them finish:
-
-- robbie-box `~/envs-results/` (agent-interp-envs screens): funding*email, sandbagging (screen and
-  iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
-  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env,
-  skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs
-  in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their
-  `config.yaml`says`provider: fireworks`even when`scripts/envs_gateway.py` routed the calls
-  elsewhere, so don't trust it for which server answered.
-- Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
-  `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
-  local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose
-  `*.log`/`*.txt` files at the root, 4 are local-only (`dev96_yesno_haiku55_retry{1,2}.log`,
-  `or_usage_before_*.txt`). `vardania_sneeze/` holds `.py` scripts that belong in git.
-- RunPod pods hold no results (they're bare vLLM servers), but nothing records which pod, vLLM
-  version or Qwen revision served a run.
-
-- 2026-10-29: `environments/cutoff_qa/env.py` `measure()` returns `correct`/`stale` but no
-  `positive`, so `cfbench.envs.env_runs` (and `scripts/olens_requests_from_runs.py`) skip every
-  cutoff_qa row. `cfbench/evals/cutoff_qa_inline` builds cases and the read requests straight from
-  the episodes. Give it `positive` (= `stale`?) on PR #380's branch.
