@@ -83,6 +83,7 @@ Checked and rejected the same day:
 | O-lens token viewer                   | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
 | expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html`, `.github/workflows/env-viewer-pages.yml`              | `envs/*/*/`, `runs/**/expview/`     |
 | env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html`, `.github/workflows/env-viewer-pages.yml`            | `envs/*/spec/`, `envs/*/links.json` |
+| talk deck (PDF)                       | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/talk.pdf        | `slides/talk/`, `.github/workflows/env-viewer-pages.yml`                           | `evals/`, `runs/` (figures)         |
 
 The old expview page, https://expview.pages.dev (Cloudflare), still works but is frozen at its
 2026-10-26 code; expview now deploys with the env viewer to GitHub Pages under `/expview/`.
