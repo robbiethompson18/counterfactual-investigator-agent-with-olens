@@ -261,11 +261,3 @@ def coverage(rows: dict[tuple, dict], cases: dict[tuple, Case]) -> dict:
         "predictions": sum(n_pred.values()),
         "by_cond": dict(n_pred),
     }
-
-
-def target_of_run(run_dir: str) -> str | None:
-    """Which target group a run belongs to, by its position in `groups()`."""
-    for name, dirs in groups().items():
-        if run_dir in dirs:
-            return name
-    return None
