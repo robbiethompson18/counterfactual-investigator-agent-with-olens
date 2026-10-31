@@ -14,13 +14,15 @@ evals/NAME.json (data/evals/, or HF's evals/ when it isn't local).
 import json
 import math
 import urllib.request
+from functools import cache
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.evals.essay_grading_cf_inline.eval import mean
 from graphs.style import INK, MUTED
-from slides.figure import FULL_W, bar_kw, figure, save
+from slides.figure import FULL_H, FULL_W, bar_kw, figure, save
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).with_name("fig")
@@ -188,10 +190,10 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
 
 
-def positions(bars: dict) -> tuple[dict[str, float], list[float]]:
+def positions(bars: dict, groups: list = GROUPS) -> tuple[dict[str, float], list[float]]:
     """x of every bar (a lens and its placebo touch, groups 0.6 apart) and the tick under each group's centre."""
     xs, ticks, x = {}, [], 0.0
-    for _, cs in GROUPS:
+    for _, cs in groups:
         cs = [c for c in cs if c in bars]
         if not cs:
             continue
@@ -215,5 +217,145 @@ def grid() -> None:
     save(fig, OUT / "grid.pdf")
 
 
+# Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's per-case p from the two runs'
+# predictions (data/runs/cfbench/, or HF's runs/cfbench/), a case = (arm, intro), its p the mean of its draws, as score.py
+ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
+# the zero-counterfactual probe's out-of-fold per-case scores (ridge at the token before the reply, L52, from the arm
+# prompt to the base score, minus the observed arm mean): ridge_oof of cfbench/evals/essay_grading_cf_inline/probe.py (PR
+# #450) over the essay_probe run 2026-10-31_essay-grading-acts, dumped per case (its probe.json has the summary only);
+# on bramble only, the probe bar is left out without it
+ESSAY_PROBE = ROOT / "data/runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
+ESSAY_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]), ("probe", ["probe"])]
+
+
+def load_rows(run: str) -> list[dict]:
+    local = ROOT / "data/runs/cfbench" / run / "predictions.jsonl"
+    if local.exists():
+        return [json.loads(line) for line in local.open()]
+    with urllib.request.urlopen(HF.replace("/evals/", f"/runs/cfbench/{run}/predictions.jsonl")) as r:
+        return [json.loads(line) for line in r]
+
+
+def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
+    """AUROC by ranks, ties half (score.py's)."""
+    from scipy.stats import rankdata
+
+    n1 = y.sum()
+    return float((rankdata(p)[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1)))
+
+
+@cache
+def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.ndarray]:
+    """keys (arm, intro), truth (base mean > arm mean), condition -> per-case score, the observed arm mean."""
+    ps: dict[str, dict[tuple, list[float]]] = {}
+    truth, arm_mean = {}, {}
+    for run in ESSAY_RUNS:
+        for r in load_rows(run):
+            if r.get("valid", True) and r.get("p") is not None:
+                k = (r["base_arm"], r["item"])
+                ps.setdefault(r["condition"], {}).setdefault(k, []).append(r["p"])
+                truth[k], arm_mean[k] = r["k_cf"], mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
+    keys = sorted(truth)
+    xs = {c: np.array([np.mean(d[k]) for k in keys]) for c, d in ps.items()}
+    if ESSAY_PROBE.exists():
+        pr = {(r["base_arm"], r["item"]): r for r in map(json.loads, ESSAY_PROBE.open())}
+        assert all(pr[k]["k_cf"] == truth[k] for k in keys)
+        xs["probe"] = np.array([pr[k]["score"] for k in keys])
+    return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
+
+
+@cache
+def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
+    """condition -> (AUROC, 95% CI resampling essays as score.py does, stars: one-sided paired bootstrap vs transcript-only);
+    the null (minus the observed arm mean: regression to the mean); n cases; paired differences -> (est, CI, one-sided p)."""
+    keys, y, xs, am = essay_cases()
+    items = sorted({k[1] for k in keys})
+    of = {i: np.array([n for n, k in enumerate(keys) if k[1] == i]) for i in items}
+    rng = np.random.default_rng(0)
+    idx = [np.concatenate([of[items[j]] for j in rng.integers(0, len(items), len(items))]) for _ in range(reps)]
+    boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+    bars = {}
+    for c, x in xs.items():
+        st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+        bars[c] = (rank_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+    pairs = {}
+    for a, b in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"),
+                 ("olens_placebo_inline", "transcript_inline"), ("probe", "transcript_inline")]:  # fmt: skip
+        if a in boot:
+            d = boot[a] - boot[b]
+            pairs[a, b] = (bars[a][0] - bars[b][0], np.quantile(d, [0.025, 0.975]).tolist(), float((d <= 0).mean()))
+    return bars, rank_auroc(-am, y), len(keys), pairs
+
+
+def essay_by_band() -> list[tuple[str, int, dict[str, float]]]:
+    """AUROC by the arm prompt's observed mean grade, in bands that cover every case."""
+    _, y, xs, am = essay_cases()
+    out = []
+    for name, m in (("< 2", am < 2), ("2 to < 4", (am >= 2) & (am < 4)), ("≥ 4", am >= 4)):
+        out.append((name, int(m.sum()), {c: rank_auroc(x[m], y[m]) for c, x in {**xs, "null": -am}.items()}))
+    return out
+
+
+def essay_flips() -> tuple[int, int]:
+    """Cases O-lens gets right (p >= 0.5 vs truth) and its placebo wrong, and the reverse."""
+    _, y, xs, _ = essay_cases()
+    ok = {c: (xs[c] >= 0.5) == y for c in ("olens_inline", "olens_placebo_inline")}
+    return int((ok["olens_inline"] & ~ok["olens_placebo_inline"]).sum()), int((~ok["olens_inline"] & ok["olens_placebo_inline"]).sum())
+
+
+def essay() -> None:
+    """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null."""
+    bars, null, n, _ = essay_auroc_bars()
+    fig, ax = figure(84, FULL_H)
+    xs, ticks = positions(bars, ESSAY_GROUPS)
+    base = 0.5
+    for c, x in xs.items():
+        v, (lo, hi), st = bars[c]
+        ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
+        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
+        ax.annotate(f"{v:.3f}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+        ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
+    ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
+    ax.text(1.0, null, " minus the\n arm's mean", transform=ax.get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
+    ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
+    ax.set_xlim(-0.6, ticks[-1] + 0.6)
+    ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
+    ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
+    ax.text(1.0, 1.08, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    for side in ("left", "bottom"):
+        ax.spines[side].set_visible(False)
+    ax.grid(axis="x", visible=False)
+    top = max(hi for _, (_, hi), _ in bars.values()) + 0.07
+    yt = np.arange(base, top, 0.1)
+    ax.set_ylim(base, top)
+    ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
+    ax.tick_params(axis="y", labelcolor=MUTED)
+    ax.set_ylabel("AUROC of P(score goes up)")
+    save(fig, OUT / "essay.pdf")
+    essay_tables()
+
+
+def essay_tables() -> None:
+    """The essay results slide's tables as LaTeX (fig/essay_pairs.tex, fig/essay_bands.tex) in the theme's macros, and the
+    O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
+    pairs = essay_auroc_bars()[3]
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
+            "olens_placebo_inline": r"\swp{olens}\ placebo", "probe": r"\sw{probe}\ probe"}  # fmt: skip
+    pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
+    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {d:+.3f} & [{lo:+.3f}, {hi:+.3f}] & {pf(p)}\\\\"
+            for (a, b), (d, (lo, hi), p) in pairs.items()]  # fmt: skip
+    tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
+    (OUT / "essay_pairs.tex").write_text(tab("lrrr", [" & $\\Delta$ & 95\\% CI & p\\\\", "\\hline", *rows]))
+    cols = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
+    head = " & ".join(["arm's mean", "cases", *(name[c] for c in cols)]) + "\\\\"
+    body = []
+    for g, n, a in essay_by_band():
+        best = max(a[c] for c in cols)
+        body.append(" & ".join([g, str(n), *(f"\\best{{{a[c]:.3f}}}" if a[c] == best else f"{a[c]:.3f}" for c in cols)]) + "\\\\")
+    (OUT / "essay_bands.tex").write_text(tab("lrrrr", [head, "\\hline", *body]))
+    (OUT / "essay_flips.tex").write_text("{} and {}".format(*essay_flips()))
+
+
 if __name__ == "__main__":
     grid()
+    essay()
