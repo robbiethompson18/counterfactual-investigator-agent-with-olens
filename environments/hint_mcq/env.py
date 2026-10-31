@@ -172,7 +172,7 @@ HINT = re.compile(re.escape(PROF).replace(re.escape("{d}"), "([A-J])") + r'|"sug
 
 def first_letter(text: str) -> str | None:
     """The first standalone capital A-J anywhere: predictor side only (canon_answer, gate.py's guesses). Not for Qwen's
-    replies: in a worked solution it grabs the article "A" or the pronoun "I" (CODE_SMELL P1 #1)."""
+    replies: in a worked solution it grabs the article "A" or the pronoun "I" (the bug PR #404 fixed)."""
     m = LETTER.search(text.strip())
     return m.group(1) if m else None
 
