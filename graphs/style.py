@@ -7,6 +7,7 @@ are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them.
 
 import shutil
 import subprocess
+from functools import wraps
 
 import matplotlib
 from matplotlib import font_manager
@@ -17,7 +18,13 @@ from matplotlib.offsetbox import AnnotationBbox, DrawingArea
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 
-INK, MUTED, GRID, BG = "#1c1b19", "#6f6b62", "#e4e0d6", "#f6f5f1"
+INK, MUTED, FAINT, GRID, BG = (
+    "#1c1b19",
+    "#6f6b62",
+    "#a29d92",
+    "#e4e0d6",
+    "#f6f5f1",
+)  # the Evals page's ink, --muted, --faint, grid, background
 BLUE, ORANGE, PURPLE, GREEN, GRAY = "#2a78d6", "#eb6834", "#8e44ad", "#2e9e5b", "#898781"
 PLACEBO_HATCH = "////"
 OUTLINE = "none"  # a bar with no fill, only an ink outline: a reference line's bar, not a tool
@@ -192,3 +199,49 @@ def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> Non
     ax.tick_params(axis="y", length=0, pad=SWATCH_PAD)
     ax.set_ylim(-0.6, len(rows) - 0.4)
     ax.grid(axis="y", visible=False)
+
+
+# Slide figures (slides/talk, made by graphs.talk): the look above at the deck's sizes. The 9pt theme's text is 2/3 of its size
+# outside the title slide (Kylie, 2026-10-30), so a figure's 8pt is too. A figure is made at the size it will sit on the slide
+# and included unscaled (\slidefig in slides/beamerthemeolens.sty), so its text matches the slide's: vector PDF, transparent
+# background. The 16:9 frame's text block is 150 mm wide. SLIDE_RC is applied around one figure by @slide, never process-wide:
+# a module that imports a slide figure's statistics must not inherit transparent PNGs and slide-sized text (that is what
+# turned the write-up's headline charts white and small on 2026-10-31).
+SLIDE_S = 2 / 3
+SLIDE_RC: dict = {
+    "font.size": 8 * SLIDE_S,
+    "axes.titlesize": 8.5 * SLIDE_S,
+    "axes.labelsize": 8 * SLIDE_S,
+    "xtick.labelsize": 7.5 * SLIDE_S,
+    "ytick.labelsize": 7.5 * SLIDE_S,
+    "legend.fontsize": 7.5 * SLIDE_S,
+    "pdf.fonttype": 42,
+    "savefig.transparent": True,
+    "savefig.format": "pdf",
+}
+MM = 1 / 25.4
+FULL_W, FULL_H = 150, 58  # a figure that fills the frame under its title
+HALF_W = 72  # one column of a two-column frame
+
+
+def slide(draw):
+    """Decorator: run a slide-figure function under SLIDE_RC (text sizes resolve when artists are made, transparency when the
+    PDF is saved, so the whole function runs inside it)."""
+
+    @wraps(draw)
+    def run(*args, **kwargs):
+        with plt.rc_context(SLIDE_RC):
+            return draw(*args, **kwargs)
+
+    return run
+
+
+def slide_figure(w_mm: float = FULL_W, h_mm: float = FULL_H, **kw):
+    return plt.subplots(figsize=(w_mm * MM, h_mm * MM), layout="constrained", **kw)
+
+
+def slide_save(fig, path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path)  # no bbox_inches="tight": that changes the size the deck relies on
+    plt.close(fig)
+    print(path)

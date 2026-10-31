@@ -1,4 +1,5 @@
-"""The write-up's ablation charts on graphs.headline_inline's runs: split by whether Qwen is right, lens and placebo differences.
+"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline `all` menu): split by whether Qwen
+is right, lens and placebo differences.
 
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, transcript only vs
   O-lens, J++ and NLA, one panel per set with a notion of right: MMLU-Pro, SuperGPQA (Qwen's modal letter is the gold one) and
@@ -22,9 +23,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from cfbench.scoring import grouped_auc_ci, grouped_mean_ci, standard_essay_comparison, standard_mcq_comparison
-from graphs import cutoff_qa_inline, mcq_unselected, supergpqa_inline
-from graphs.headline_inline import LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
+from cfbench.scoring import grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
+from graphs import cutoff_qa_inline, menus_inline
+from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
 from graphs.style import MUTED, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
@@ -35,14 +36,19 @@ ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
 
 
 def by_correctness() -> dict[str, dict[str, dict]]:
-    """set -> condition -> case -> (qwen_right, accuracy); the case is its own bootstrap group."""
-    out = {}
-    for name, runs, target in (("MMLU-Pro", mcq_unselected.RUNS, "mmlu"), ("SuperGPQA", supergpqa_inline.RUNS, "supergpqa")):
-        data, _ = standard_mcq_comparison(runs, target)
-        out[name] = {c: data[c] for c in (TS, *LENSES)}
-    cutoff = cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)
-    out["Knowledge cutoff"] = {c: {i: (g == "stable_right", a) for i, (g, a) in cutoff[c].items()} for c in (TS, *LENSES)}
-    return out
+    """set -> condition -> case -> (qwen_right, accuracy) on the canonical menus_inline runs (`all` menu); the case is its own
+    bootstrap group. MCQ: Qwen's modal letter is the gold one; cutoff: Qwen's answer is still true (gate_class stable_right,
+    from the cutoff eval's cases)."""
+    right: dict = defaultdict(dict)
+    for s in ("mcq_unselected", "supergpqa"):
+        for run in menus_inline.runs(s):
+            for r in map(json.loads, (run / "predictions.jsonl").open()):
+                right[s][r["item"]] = r["modal_cf"] == r["gold"]
+    right["cutoff"] = {i: g == "stable_right" for i, (g, _) in cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)[TS].items()}
+    menus = menus_inline.load()
+    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge cutoff": "cutoff"}
+    menu_name = {c: m for m, c in CANON.items()}
+    return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
 
 def accuracy_panels(sets: dict, right: bool, path: Path) -> None:

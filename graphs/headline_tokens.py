@@ -1,8 +1,8 @@
 """How many tokens each lens's reads add to the investigator's (Haiku 5.5) prompt, for the write-up: does one lens just give it more to
-think about? Same runs and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and pooled weights MCQ,
-knowledge cutoff and preferences equally. Added tokens = the condition's mean `tokens.prompt` (Anthropic's count of the whole opening
-call, tool schemas included) minus transcript_inline's on the same cases, averaged over draws. Rows with calls != 1 are dropped (a
-second call's prompt also holds the first): 4 retries and 1 failed call out of ~116k rows. No whiskers: this describes what was shown.
+think about? Same runs (menus_inline, `all` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
+pooled weights MCQ, knowledge cutoff and preferences equally. Added tokens = the condition's mean `tokens.prompt` (Anthropic's count
+of the whole opening call, tool schemas included) minus transcript_inline's on the same cases, averaged over draws. Rows with calls !=
+1 are dropped (a second call's prompt also holds the first): a handful of retries. No whiskers: this describes what was shown.
 
     uv run python -m graphs.headline_tokens [--out-dir docs/img]
 
@@ -18,15 +18,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs import cutoff_qa_inline, favorites_qa_inline, mcq_unselected, supergpqa_inline
-from graphs.headline_inline import LENSES, PLACEBOS, TS
+from graphs import menus_inline
+from graphs.headline_inline import CANON, LENSES, PLACEBOS, TS
 from graphs.style import bar_kw, label, positions
 
-SETS = {
-    "MMLU-Pro": mcq_unselected.RUNS,
-    "SuperGPQA": supergpqa_inline.RUNS,
-    "knowledge cutoff": cutoff_qa_inline.RUNS,
-    "preferences": favorites_qa_inline.RUNS,
+SETS = {  # the canonical menus_inline runs (CLAUDE.local.md), `all` menu
+    "MMLU-Pro": menus_inline.runs("mcq_unselected"),
+    "SuperGPQA": menus_inline.runs("supergpqa"),
+    "knowledge cutoff": menus_inline.runs("cutoff"),
+    "preferences": menus_inline.runs("favorites"),
 }
 MCQ = ["MMLU-Pro", "SuperGPQA"]
 METRICS = ("prompt", "completion", "reasoning", "correct")
@@ -37,8 +37,8 @@ def load(runs: list[Path]) -> dict:
     rows = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
-        if r["tokens"].get("calls") == 1:
-            case = rows[r["condition"]][r["item"]]
+        if r["condition"] in CANON and r["tokens"].get("calls") == 1:
+            case = rows[CANON[r["condition"]]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])
             case["completion"].append(r["tokens"]["completion"])
             case["reasoning"].append(r["tokens"]["reasoning"])
@@ -48,7 +48,7 @@ def load(runs: list[Path]) -> dict:
 
 def added(data: dict, c: str, metric: str) -> list[float]:
     """Condition c minus transcript-only, case by case."""
-    return [case[metric] - data[TS][i][metric] for i, case in data[c].items()]
+    return [case[metric] - data[TS][i][metric] for i, case in data[c].items() if i in data[TS]]
 
 
 def summary(sets: dict[str, dict], c: str, metric: str) -> dict[str, float]:

@@ -1,14 +1,15 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
 the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
-Essay grading, a counterfactual, gets its own charts with its probe and stays out of the pooled numbers. Reuses each eval's own runs
-and scoring: MCQ pools MMLU-Pro and SuperGPQA cases; an essay case is right when
+Essay grading, a counterfactual, gets its own charts with its probe and stays out of the pooled numbers. MCQ, cutoff and preferences
+come only from the canonical menus_inline runs, `all` menu (graphs.menus_inline SETS: one prompt, the same read positions and
+placebo rule on every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases; an essay case is right when
 p >= 0.5 matches whether the grade goes up, or the probe's predicted shift > 0 does. Pooled numbers weight the three tasks equally. CIs
 are 95% bootstraps resampling questions (essays for essay grading) within each task, paired across conditions.
 
     uv run python -m graphs.headline_inline [--out-dir docs/img]
 
 Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error, headline-<task> (y axis from 50) and
-headline-essay-diff.png (paired differences in % right and AUROC, the latter from slides.talk.figures), and prints every
+headline-essay-diff.png (paired differences in % right and AUROC, the latter from cfbench.scoring.essay_auroc_bars), and prints every
 paired difference the write-up quotes.
 """
 
@@ -18,10 +19,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from cfbench.scoring import standard_essay_comparison, standard_mcq_comparison
-from graphs import cutoff_qa_inline, favorites_qa_inline, mcq_unselected, supergpqa_inline
+from cfbench.scoring import essay_auroc_bars, standard_essay_comparison, standard_probe_rows
+from graphs import menus_inline
 from graphs.style import MUTED, ci_bar, diff_rows, label, positions
-from slides.talk.figures import essay_auroc_bars
 
 LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
@@ -29,24 +29,30 @@ TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
 TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences", "essay": "Essay grading"}
 POOLED = ["mcq", "cutoff", "preferences"]
+# task -> its menus_inline sets; the `all` menu's conditions under the names the charts use
+MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
+CANON = {TS: TS, **{c.replace("_", "_all_", 1): c for c in SEVEN[1:]}}  # olens_all_placebo_inline -> olens_placebo_inline
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
 
 def load() -> dict[str, tuple[dict, dict]]:
-    """task -> (condition -> case -> accuracy, case -> bootstrap group)."""
+    """task -> (condition -> case -> accuracy (share of its draws right), case -> bootstrap group). MCQ, cutoff and preferences
+    come only from the canonical menus_inline runs, `all` menu (CLAUDE.local.md); MCQ adds the standardized probe, and its
+    bootstrap resamples the probe's question groups."""
+    menus = menus_inline.load()
     out: dict[str, tuple[dict, dict]] = {}
-    acc: dict = {}
-    groups: dict = {}
-    for target, runs in (("mmlu", mcq_unselected.RUNS), ("supergpqa", supergpqa_inline.RUNS)):
-        data, clusters = standard_mcq_comparison(runs, target)
-        for c, items in data.items():
-            acc.setdefault(c, {}).update({(target, i): v for i, (_, v) in items.items()})
-        groups |= {(target, i): (target, g) for i, g in clusters.items()}
-    out["mcq"] = acc, groups
-    for task, runs in (("cutoff", cutoff_qa_inline.RUNS), ("preferences", favorites_qa_inline.RUNS)):
-        data = {c: {i: v for i, (_, v) in items.items()} for c, items in cutoff_qa_inline.per_item(runs).items()}
-        out[task] = data, {i: i for i in data[TS]}
+    for task, sets in MENU_SETS.items():
+        acc = {CANON[c]: {(s, i): v for s in sets for i, v in menus[s][c].items()} for c in CANON}
+        out[task] = acc, {k: k for k in acc[TS]}
+    acc, groups = out["mcq"]
+    acc[PROBE] = {}
+    for s, target in (("mcq_unselected", "mmlu"), ("supergpqa", "supergpqa")):
+        for row in standard_probe_rows(target, "response_start", target):
+            if (s, row["item"]) in acc[TS]:
+                acc[PROBE][s, row["item"]] = float(row["predicted_label"] == row["label"])
+                groups[s, row["item"]] = (s, row["group"])
+    assert acc[PROBE].keys() == acc[TS].keys(), "the probe must cover every MCQ case"
     scores, reference = standard_essay_comparison()
 
     def right(c: str, k: tuple, p: float) -> bool:
