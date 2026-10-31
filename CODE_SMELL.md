@@ -2,27 +2,6 @@
 
 Tech debt we know about, newest first.
 
-## 2026-10-31: saved `menus_inline` inputs contain Unicode corruption and miscounted MCQ options
-
-`cfbench/evals/menus_inline/eval.py` reconstructed prompts by joining individually decoded tokens,
-which replaces characters split across UTF-8 token boundaries with U+FFFD. Future input preparation
-now extracts the user turn from the intact `text` in the fill run's `reads.transcripts.jsonl`,
-keeping the token arrays and read positions unchanged (harness 15).
-
-Existing `2026-10-30_menus-inline-inputs/cases.jsonl` inputs and their results remain unchanged:
-52/2,523 MMLU-Pro prompts and 51/3,000 SuperGPQA prompts are corrupted, 103/5,523 (1.9%) combined.
-The impact on measured lens uplift is unmeasured; the affected fraction does not establish that it
-is negligible. Robbie explicitly deferred reruns on 2026-10-31. No saved inputs or results were
-regenerated for this fix.
-
-Option parsing also matched lettered lines inside question stems: 7 MMLU-Pro and 33 SuperGPQA cases
-have wrong saved option counts, yielding 10 seed-0 placebo pairs with different true option counts.
-Two SuperGPQA cases were excluded as apparent 12/14-option singletons; they actually have 8/10
-options and can have same-count placebos. Future preparation uses the datasets' structured option
-lists, checked against the source evals' saved counts. The same-count placebo guard stays. The
-effect on uplift is unmeasured, and Robbie deferred these reruns too; historical inputs and results,
-including the two missing cases, remain unchanged.
-
 ## 2026-10-29: `links.json` is built from the local runs only
 
 `spec.build_links` writes `envs/<env>/links.json` (per episode: Docent run, primary value, O-lens
@@ -34,13 +13,6 @@ checkout would drop runs). Index uploads race too: hint_mcq's index had lost fou
 (`2026-10-28_rest*`, `_words`) until PR #416 rebuilt it. Fix: merge with HF's `links.json` the way
 `env_index` merges the index.
 
-## 2026-10-29: `cutoff_qa` banks v2 and v3 are not reproducible from the repo
-
-`scripts/cutoff_facts/merge.py` only builds bank v1. v2 and v3 of `banks/cutoff_qa` were assembled
-by scratch scripts (clean, dedup, gate-attach, truth recheck) that were not kept. Next batch: port
-the clean into `merge.py` so a bank version is reproducible from the agents' JSONL files plus the
-gate run.
-
 ## 2026-10-29: cfbench.eval `--reuse` keys on the case, not the prompt
 
 The reuse key is (version, item, model, arms, condition, predictor, draw) plus asserts on eval.md /
@@ -49,48 +21,6 @@ blocks (data, not code). A new eval with new reads reused another eval's `olens_
 wholesale (2026-10-29, caught and deleted before scoring). It now also refuses a run with a
 different INLINE hook source, which still misses a change in the reads file behind the same hook;
 hashing each built prompt into the row would close it.
-
-## 2026-10-28: `environments run` crashes after a finished run in the evals index step
-
-`environments/_lib/run.py` calls `build_index` (`environments/_lib/index.py`), which builds `evals/`
-(`build_evals` → `evals.py` → `load_env`) after every env run, before the HF upload, so a failure
-there exits 1 after "done: N episodes" without uploading the episodes. An env run shouldn't depend
-on every eval's item metadata; catch per eval or skip the evals build there. Ways it has failed:
-
-- **An eval can't import a stored row:** if a cfbench run on disk has rows whose `source` names an
-  eval version the local checkout doesn't define (e.g. `mmlu_pro_pause` rows from another branch),
-  `ITEM_INFO` raises `KeyError` (three hint_mcq runs on 2026-10-28 had to be uploaded by hand with
-  `runfolder.upload`).
-- **A missing eval env module (partly fixed, essay_curious PR #306):** `load_env` imported
-  `environments.dumb_user_exploit_appraisal`, which does not exist, so every `environments run` on
-  main ended with a traceback (`envs/hint_mcq/2026-10-28_late` and `_words` were uploaded by hand
-  with `HfApi.upload_folder`). `evals.Envs` now skips envs that don't import.
-- **The upload still fails after that fix:** `build_index` also writes `data/evals/*.json`, and
-  `runfolder.upload` only accepts paths under `data/envs/`
-  (`ValueError: ... evals/... is not in the subpath of .../envs`), so essay_curious's runs were
-  uploaded with a direct `upload()` of the run dirs.
-
-HF's top-level `envs/index.json` was down to one env on 2026-10-27: an upload replaces it with
-whatever envs the local checkout has, so uploads from sparse checkouts drop the others (restored by
-hand for notice_defect).
-
-## 2026-10-28: `cfbench.run --skip` keys on the predictor string, so a route change redoes every draw
-
-`done` in `cfbench/run.py` is keyed on `(env, base_arm, cf_arm, condition, predictor, draw)`. The
-same model under another route (`google/gemini-3.8-flash` via OpenRouter, `gemini-direct/…`,
-`vertex/…`) counts as a different predictor, so a fill run on a new route repeats every draw the
-others already did (on 2026-10-28 arm B ran 228 draws to fill ~60). Workaround: pass skip files with
-`predictor` rewritten to the new route. Fix: key on the model name with the route prefix stripped.
-
-## 2026-10-28: `runpod/watch_pod.sh` can't fetch outputs from vLLM-image pods
-
-Its done-marker fetch is `rsync` over ssh, and the `vllm/vllm-openai` image (`v0.27.1`, the read
-pods' image) has no rsync, so the fetch fails ("rsync: command not found") and the watcher still
-deletes the pod without fetching. Outputs on the network volume survive (the NLA scale2k reads were
-pulled over S3), but anything written outside `/workspace` is gone. First seen 2026-10-27: the J++
-scale2k read (`jpp_reads/2026-10-27_hint-mcq-scale2k`) was saved by pulling over ssh by hand. Fix:
-install rsync in the pod boot (`olens_reads.sh setup`), or fetch with `ssh ... tar c | tar x` (or
-`scp`).
 
 ## 2026-10-28: metamodel reader bugs from a Codex review of the serving code
 

@@ -64,6 +64,11 @@ class NoChoices(Exception):
     """OpenRouter reports some provider errors as a 200 with no choices."""
 
 
+def same_model(predictor: str) -> str:
+    """The Gemini model behind a route: `google/X` (OpenRouter), `gemini-direct/X` and `vertex/X` are all X."""
+    return predictor.removeprefix(DIRECT).removeprefix(VERTEX).removeprefix("google/")
+
+
 def api_key() -> str:
     """$OPENROUTER_API_KEY, else /secrets/openrouter (bramble)."""
     return os.environ.get("OPENROUTER_API_KEY") or Path("/secrets/openrouter").read_text().strip()

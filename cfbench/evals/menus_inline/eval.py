@@ -20,6 +20,15 @@ there is none), one source per (draw, case) for every lens and menu, its reads a
 (the final ".", the tail tokens and option newlines one to one; punctuation in order, cycled) and shown at this case's
 own positions and context.
 
+Known defects in the saved inputs (2026-10-30_menus-inline-inputs; found 2026-10-31, reruns deferred by Robbie, so the inputs
+and results stay as they are; fixed for any future --prep, harness 15):
+- 103 of 5,523 MCQ prompts (52 MMLU-Pro, 51 SuperGPQA; 1.9%) carry U+FFFD where a character was split across tokens: the
+  prompt was rebuilt by joining per-token decodes. Prep now takes the user turn from the fill run's intact `text`.
+- 40 cases (7 MMLU-Pro, 33 SuperGPQA) have wrong option counts (lettered lines inside the stem were parsed as options), giving
+  10 seed-0 placebo pairs with different true option counts; 2 SuperGPQA cases were dropped as 12/14-option singletons that
+  really have 8/10 options. Prep now uses the datasets' structured option lists.
+The effect of either on the measured lens uplift is unmeasured.
+
     uv run python -m cfbench.eval menus_inline --prep
     uv run python -m cfbench.eval menus_inline --show --versions supergpqa --conditions olens_last_inline,olens_last_placebo_inline
     uv run python -m cfbench.eval menus_inline --slug menus-supergpqa --versions supergpqa --predictors anthropic/claude-haiku-5.5 --draws 1
