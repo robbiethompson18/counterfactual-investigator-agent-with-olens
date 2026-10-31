@@ -321,7 +321,7 @@ def essay() -> None:
     """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null.
     Full slide width: three lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table."""
     bars, null, n, _ = essay_auroc_bars()
-    fig, ax = figure(FULL_W, 36)
+    fig, ax = figure(FULL_W, 29)
     xs, ticks = positions(bars, ESSAY_GROUPS)
     base = 0.5
     for c, x in xs.items():

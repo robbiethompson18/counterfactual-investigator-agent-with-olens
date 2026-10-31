@@ -258,14 +258,9 @@
       \slidefig{fig/essay_diffs.pdf}
     \end{column}
   \end{columns}
-  \source{AUROC of P(up) over all 5,400 draws (each draw is one prediction), 95\% CI resampling the 204 essays, per condition; stars and the difference plot are paired (same resamples),
-    stars one-sided vs transcript-only, * p < .05, ** < .01, *** < .001.
-    Dotted, bet at the mean: rank by minus the arm's observed mean score. Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
-    + bet at mean: logistic regression on [logit of the investigator's p, Qwen's observed mean grade with the arm opener],
-    fit out-of-fold (5 folds grouped by essay); stars vs transcript + bet at mean.\\
-    Probes: ridge predicting Qwen's plain-opener grade from the observed prompt's activations, minus its observed grade.
-    Nested 2 outer / 2 inner folds grouped by essay; user-end and final-token scores reported separately; inner-selected
-    layer among 32/40/48/52/56/60, mean-loss ridge lambda = 1; 899/901 training cases per outer fold.}
+  \source{AUROC over all 5,400 draws (each one prediction), 95\% CI resampling the 204 essays; stars one-sided vs transcript (or transcript + mean), * p < .05, ** < .01, *** < .001.
+    Dotted: rank by minus the observed mean grade. Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
+    + mean: out-of-fold logistic regression adding Qwen's observed grade (5 folds by essay). Probes: ridge from the observed prompt's activations to the plain-opener grade, minus the observed grade; nested 2 x 2 folds by essay.}
 \end{frame}
 
 \end{document}
