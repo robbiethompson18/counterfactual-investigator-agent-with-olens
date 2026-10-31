@@ -9,7 +9,8 @@
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments evals [NAME ...] [--pull] [--upload]  # evals/<name>.json from cfbench runs + expview
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
-    uv run python -m environments rescore ENV/RUN [...] --tag T  # labels/measure@<sha12>-T.jsonl from today's measure()
+    uv run python -m environments rescore ENV/RUN [...] --tag T  # labels/measure@<sha12>-T.jsonl from today's measure(), made active
+    uv run python -m environments activate ENV/RUN LABELER@VER   # by hand: labels/LABELER@VER.jsonl is the run's current labels
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
 no max_tokens unless --max-tokens is given (recorded), reasoning effort always sent (medium) unless the env REQUIRES
@@ -36,9 +37,19 @@ import httpx
 from .backends import Target
 from .core import Ctx, episode_id, load_env, retired_arms, select_arms
 from .index import build as build_index
-from .index import latest_labels
 from .loop import run_episode
-from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, main_checkout_file, read_episodes, upload, write_labels
+from .runfolder import (
+    LOCAL,
+    REPO_ROOT,
+    RunWriter,
+    active_labels,
+    git_sha,
+    main_checkout_file,
+    read_episodes,
+    set_active_labels,
+    upload,
+    write_labels,
+)
 
 
 def parse_items(spec: str | None, all_items: list) -> list:
@@ -270,15 +281,17 @@ def measure_labels(env, episodes) -> list[tuple]:
 
 
 def rescore(runs: list[str], tag: str):
-    """A new labels/measure@<sha12>-<tag>.jsonl per ENV/RUN from the current measure() over the run's stored episodes. The
-    old labels files stay (a finished run is immutable); indexes and HF are left alone, so upload the new file yourself."""
+    """A new labels/measure@<sha12>-<tag>.jsonl per ENV/RUN from the current measure() over the run's stored episodes, made the
+    run's active labels (meta.json). The old labels files stay (a finished run is immutable); indexes and HF are left alone,
+    so upload the run yourself (`environments upload ENV/RUN`: the new file, meta.json and the indexes)."""
     sha = git_sha()
     assert sha and not sha.endswith("+dirty"), f"commit environments/ first: the labels file is named by its sha ({sha})"
     for spec in runs:
         run_dir = LOCAL / spec
-        old_name, old = latest_labels(run_dir)
+        old_name, old = active_labels(run_dir)
         labels = measure_labels(load_env(spec.split("/")[0]), read_episodes(run_dir))
         p = write_labels(run_dir, "measure", f"{sha[:12]}-{tag}", labels)
+        set_active_labels(run_dir, "measure", f"{sha[:12]}-{tag}")
         changed = sum(v != old.get(eid) for eid, v in labels)
         print(f"{spec}: {len(labels)} episodes, {changed} labels differ from {old_name} -> {p.relative_to(LOCAL)}")
 
@@ -314,6 +327,10 @@ def cli():
         ap.add_argument("--tag", required=True, help="the new file is labels/measure@<sha12>-<tag>.jsonl")
         a = ap.parse_args(rest)
         rescore(a.runs, a.tag)
+    elif cmd == "activate":  # then `environments upload ENV/RUN` ships meta.json and the indexes
+        run, name = rest
+        labeler, version = name.removesuffix(".jsonl").split("@", 1)
+        set_active_labels(LOCAL / run, labeler, version)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})

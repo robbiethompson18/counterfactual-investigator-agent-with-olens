@@ -1,13 +1,15 @@
 """Run folders, readable straight from HF (dataset path envs/<env>/<run>/, local data/envs/<env>/<run>/):
 
-    meta.json                      git sha, command, env ref, target, caps, overrides, arms, items, n, Docent ids, status
+    meta.json                      git sha, command, env ref, target, caps, overrides, arms, items, n, Docent ids, status;
+                                   active_labels {labeler: version}: which labels file is current, once there are several
     episodes/NNN.jsonl             size-sharded (~20 MB); one episode per line
     episodes/index.json            episode id -> [shard, byte offset, byte length], so a reader fetches one transcript
     blobs/<sha256>                 file contents, stored once; episodes hold {path: sha256} for files_before/files_after
     labels/<labeler>@<ver>.jsonl   {"episode": id, "values": {...}, "kind", "calls"?}; measure() is the labeler "measure"; never
                                    overwritten; "calls" = a judge's exact model calls (expview shows them on the episode)
 
-A finished run is immutable: new labels go in a new labels file. `index.py` builds envs/<env>/index.json from these.
+A finished run is immutable: new labels go in a new labels file, and every reader takes the current one from
+`active_labels()`. `index.py` builds envs/<env>/index.json from these.
 """
 
 import datetime as dt
@@ -100,6 +102,32 @@ def write_labels(run_dir: Path, labeler: str, version: str, rows: list[tuple], k
         lines.append(json.dumps(row, default=str) + "\n")
     p.write_text("".join(lines))
     return p
+
+
+def active_labels(run_dir: Path, labeler: str = "measure") -> tuple[str | None, dict]:
+    """The run's current labels/<labeler>@<version>.jsonl -> (file name, episode id -> values): the version meta.json's
+    `active_labels` names, else the only file; (None, {}) when there is none. Several files and no pointer is an error, since
+    neither file times (arbitrary after `hf download`) nor names (git shas) say which grading is current."""
+    files = sorted((run_dir / "labels").glob(f"{labeler}@*.jsonl"))
+    if version := json.loads((run_dir / "meta.json").read_text()).get("active_labels", {}).get(labeler):
+        files = [run_dir / "labels" / f"{labeler}@{version}.jsonl"]
+    elif len(files) > 1:
+        raise SystemExit(
+            f"{run_dir} has {len(files)} {labeler} label files ({', '.join(f.name for f in files)}) and meta.json names none: "
+            f"pull the run's meta.json from HF, or set one with `python -m environments activate ENV/RUN {labeler}@VERSION`"
+        )
+    if not files:
+        return None, {}
+    return files[0].name, {r["episode"]: r["values"] for r in map(json.loads, files[0].read_text().splitlines())}
+
+
+def set_active_labels(run_dir: Path, labeler: str, version: str):
+    """Make labels/<labeler>@<version>.jsonl the run's current labels (meta.json `active_labels`)."""
+    assert (run_dir / "labels" / f"{labeler}@{version}.jsonl").exists(), f"{run_dir} has no labels/{labeler}@{version}.jsonl"
+    p = run_dir / "meta.json"
+    meta = json.loads(p.read_text())
+    meta.setdefault("active_labels", {})[labeler] = version
+    p.write_text(json.dumps(meta, indent=1, default=str) + "\n")
 
 
 def read_episodes(run_dir: Path):
