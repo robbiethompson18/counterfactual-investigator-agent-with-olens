@@ -16,7 +16,7 @@ as a line `Score: N/10` (added 2026-10-28 with 9 more essays spread from terribl
 after the letter arms put nearly every essay at A).
 Measures: letter arms: `grade` (canon_answer: the grade with any + or -, e.g. "B+"), `letter` (without + or -), `positive` =
 the letter is A or B. `ten` arms: `score` (the last `Score: N/10`), `positive` = score >= 7. The answer task (letter arms) and
-scripts/honest_score_predict.py (ten arms, squared error against the counterfactual arm's mean score) are the headlines.
+scripts/honest_score_predict.py@d89747b4 (ten arms, squared error against the counterfactual arm's mean score) are the headlines.
 """
 
 import re

@@ -171,7 +171,7 @@ much lower.
 ## Transcript-only results (2026-10-26, Gemini 3.8 Flash, 3 draws, 44 cases)
 
 Runs `runs/cfbench/2026-10-26_honest-ts*` (binary, cfbench `agentic`) and
-`runs/cfbench/2026-10-26_honest-score-*` (continuous: `scripts/honest_score_predict.py`, same tools,
+`runs/cfbench/2026-10-26_honest-score-*` (continuous: `scripts/honest_score_predict.py`, deleted, at `d89747b4`; same tools,
 submits an expected 0–10 score, RMSE against the honest_peer mean). Cost about $35 of Flash.
 
 | cases                               | binary skill       | binary RMSE (p vs rate) | score RMSE | mean signed score error |

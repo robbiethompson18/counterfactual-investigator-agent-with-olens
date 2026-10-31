@@ -202,7 +202,7 @@ highest-FVE bullets (`max_bullets`). `search_olens` with `over="bullets"` search
 bullet, not just the best one) and returns only the bullets that match. Reads can show what the \
 model registers but never says; they also often just paraphrase the nearby text. Use the O-lens tools liberally."""
 
-# reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py)
+# reads from a lens with greedy + sampled readouts and no FVE, at a few chosen positions (scripts/celeste_olens_reads.py@d89747b4)
 OLENS_SAMPLED = """
 
 {n_read} of the runs (marked in the table) also have O-lens reads, which you can investigate with `search_olens` (a \
