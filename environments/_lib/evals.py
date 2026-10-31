@@ -41,7 +41,7 @@ EVAL_DIRS = REPO_ROOT / "cfbench" / "evals"
 # envs with an `<env>-pairs` eval (every cfbench.run env_runs:<env>/... run): the viewer lists the evals defined here
 PAIRS_ENVS = ("alignment_faking", "hint_mcq", "hinted_truthfulqa")
 # evals set aside: off the viewer's eval lists (their own pages still open by URL); folders and HF files stay
-RETIRED_EVALS = {"af_which", "af_refusals"}
+RETIRED_EVALS = {"af_which", "af_refusals", "author_mcq_drop_inline", "author_mcq_inline"}  # author_*: SynthPAI, retired 2026-10-31
 # evalcue runs of envs since ported to environments/ under another name (the deleted cfbench/envs/evalcue_runs.py PORTS)
 PORTS = {"hint_cf_wrong_mcq": "hint_mcq"}
 EXTRA = ("env", "model", "item", "base_arm", "cf_arm", "k_base", "n_base", "k_cf", "n_cf", "draw", "tool_calls", "turns", "shown")

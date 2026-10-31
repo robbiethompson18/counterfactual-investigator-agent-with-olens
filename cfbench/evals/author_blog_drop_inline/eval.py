@@ -1,7 +1,9 @@
-"""author_blog_drop_inline: author_mcq_drop_inline on the Blog Authorship Corpus (Kylie, 2026-10-30): if we delete this one
-sentence of a blogger's post, does Qwen3.6-27B become much less sure of its answer about the blogger's sex or age?
+"""Blog authors: does deleting this one sentence make Qwen3.6-27B much less sure of its answer about the blogger?
 
-Truth from runs/author_mcq_blog/2026-10-30_ablate-loo (scripts/author_probe/blog.py: question-first prompts, both option
+author_mcq_drop_inline's question on the Blog Authorship Corpus (Kylie, 2026-10-30), about the blogger's sex or age.
+
+Truth from runs/author_mcq_blog/2026-10-30_ablate-loo and -b (2 × 2,004 bloggers; scripts/author_probe/blog.py:
+question-first prompts, both option
 orders, one deleted sentence at a time, for every confident Qwen-wrong pair and 300 Qwen-right pairs per attribute). Same
 rule as the SynthPAI eval: positive when the drop in Qwen's probability on its answer is > max(0.15, 5 x the pair's median
 drop); stable pairs only (median single-sentence TV < 0.05); every positive plus as many negatives per pair; versions
@@ -246,16 +248,31 @@ def topup(out: Path):
     print("wrote", len(pairs), "requests to", out)
 
 
-PAIRS_DATASET = "runs/author_mcq_blog/2026-10-30_qwen36-qfirst/pairs"  # per-pair items: reads inline, deletions
+RUNS = ["2026-10-30_author-blog-drop-haiku-b2"]  # batches 1+2 pooled (batch 1's draws reused)
+EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
+
+
+def batch_of(pair: str) -> int:
+    """0 for the first 2,004 bloggers, 1 for the second (which reads run, which per-question dataset)."""
+    if not hasattr(batch_of, "first"):
+        batch_of.first = {r["id"] for r in load(READS[0] / "requests.jsonl")}  # ty: ignore[unresolved-attribute]
+    return 0 if pair in batch_of.first else 1  # ty: ignore[unresolved-attribute]
+
+
+def datasets(pair: str) -> dict[str, str]:
+    b = ("", "-b")[batch_of(pair)]
+    return {
+        "pair: O-lens reads + sentence deletions": f"runs/author_mcq_blog/2026-10-30_qwen36-qfirst{b}/pairs",
+        "O-lens reads (raw)": f"runs/olens_reads/2026-10-30_author-blog{b}",
+    }
 
 
 def _links(case: dict) -> dict[str, str]:
-    base = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
-    return {"pair: O-lens reads + sentence deletions": f"{base}#dataset={PAIRS_DATASET}&item={case['pair']}"}
+    return {k: f"{EXPVIEW}#dataset={d}&item={case['pair']}" for k, d in datasets(case["pair"]).items()}
 
 
 def LINKS(row: dict) -> dict[str, dict]:
-    return {"pair: O-lens reads + sentence deletions": {"dataset": PAIRS_DATASET, "item": row["pair"]}}
+    return {k: {"dataset": d, "item": row["pair"]} for k, d in datasets(row["pair"]).items()}
 
 
 def show_expview(inputs: Path, out: Path):

@@ -116,7 +116,7 @@ def pairs(a):
             "One item per (passage, attribute). Calls: Qwen3.6-27B's question-first prompt in both option orders with its letter "
             "probabilities (not a generation), and, for ablated pairs, every comment's deletion effect (TV, change in p(answer)); "
             "**bold** = evidence comment, drop in p(answer) > max(0.15, 5 x the pair's median). The token view shows the O-lens "
-            "reads (space lens, layers 32/40/48, every punctuation and newline token of the question and comments) when the pair "
+            "reads (agu18dec O-lens, layers 32/40/48, every punctuation and newline token of the question and comments) when the pair "
             "has them. Labels: confident (c >= 0.5, orders agree), stable (median deletion TV < 0.05; n/a = not ablated), "
             "qwen_correct, has_evidence, has_reads."
         ),
