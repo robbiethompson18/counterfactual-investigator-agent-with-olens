@@ -79,6 +79,10 @@ that is where the lens wins only by reading the next token (docs/wsb-flash-promp
 
 ### Dataset Descriptions:
 
+In each diagram, dark green is what we evaluate, with Qwen-right and Qwen-wrong cases in the same
+color because both are valid. Light green is usable but held out, either for probes or simply
+untouched. Gray is not usable, typically because Qwen is inconsistent.
+
 #### Multiple Choice Questions
 
 We ask Qwen3.6-27B (thinking off) multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples
@@ -88,12 +92,19 @@ MMLU-Pro questions (Qwen right on 82%) and a random 3,000 of SuperGPQA's 6,328 c
 (Qwen right on 63%). We never filter on Qwen being wrong, so most labels are also the correct
 answer, and we report the Qwen-wrong slice separately.
 
+<img src="img/data-filter-sankey-mmlu.png" alt="MMLU-Pro: 12,032 questions to 2,523 eval cases, consistency the only filter" width="500">
+
+<img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 10,000 questions to 3,000 eval cases, consistency the only filter" width="500">
+
 #### Knowledge Cutoff Q&A
 
 We ask Qwen present-tense factual questions whose answer changed around its knowledge cutoff, such
 as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the question. The label
 is Qwen's own modal answer, not the truth, and the only filter is the same 7-of-8 consistency gate.
 We don't filter on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one.
+This is WorkspaceBench's \_ category, scaled from x to y. (@c fill in blanks on this last sentence).
+
+<img src="img/data-filter-sankey-cutoff.png" alt="Knowledge cutoff: 5,467 questions to 999 eval cases, stale and current answers both kept" width="500">
 
 #### Idiosyncratic Preferences
 
@@ -109,6 +120,8 @@ on whether a text reader can guess it, so transcript-only already gets 80%
 being consistent.
 @robbie done. -->
 
+<img src="img/data-filter-sankey-favorites.png" alt="Idiosyncratic preferences: 5,187 questions to 1,500 eval cases" width="500">
+
 #### Essay Grading
 
 We take 204 student intro paragraphs from PERSUADE 2.0, 34 at each human score from 1 to 6, and open
@@ -122,21 +135,6 @@ not even consistency: the openers were written before any was run, and every cas
 @robbie no filters, not even consistency: the truth is a mean over ~8 samples, so a noisy essay
 just gets a small shift. The only selection is the balanced 34 intros per human score.
 (cfbench/evals/essay_grading_cf_inline/eval.py, slides/talk/talk.tex) -->
-
-### Data Filter
-
-@c I like this sankey diagram! We should just align on colors!
-
-Dark green: evaluated in dataset. You can split to qwen right and wrong, but keep these same color
-so that it's obvious they are both valid and both users.
-
-light green: usable but held out (either for probes or simply untouched)
-
-gray: not usable (typically because qwen inconsistent).
-
-Also @c put every sankey diagram below its 3 sentence description.
-
-<img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 10,000 questions to 3,000 eval cases, consistency the only filter" width="500">
 
 ## Results and Ablations
 
