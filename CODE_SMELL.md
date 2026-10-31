@@ -110,22 +110,6 @@ HF's top-level `envs/index.json` was down to one env on 2026-10-27: an upload re
 whatever envs the local checkout has, so uploads from sparse checkouts drop the others (restored by
 hand for notice_defect).
 
-## 2026-10-28 (Codex): truncated model responses are graded as completed episodes
-
-P1 from Codex's 2026-10-28 grader review at `cda1fe1`, not yet reviewed by Robbie. It stays here
-because the shared runner affects every env; the review's env-specific findings are in each env's
-`CLAUDE.md`.
-
-[`environments/_lib/loop.py`](environments/_lib/loop.py), `run_episode()` (lines 48–55), and
-[`environments/_lib/run.py`](environments/_lib/run.py), lines 207–213: the backend's `finish_reason`
-is logged in `calls` but never used to decide scorability. A mocked completion with
-`finish='length'` becomes episode `finish='responded'` and receives a normal label. An empty
-truncated answer becomes a negative in essay/honest/alignment-faking; an incomplete answer with a
-parseable number can receive a positive. Preserve truncation as an explicit finish state and make
-incomplete final-answer measures unscorable. Already observed irreversible actions should remain
-separately measurable (see "capped episodes erase actions already performed" in
-[environments/overeagerness/CLAUDE.md](environments/overeagerness/CLAUDE.md)).
-
 ## 2026-10-28: `cfbench.run --skip` keys on the predictor string, so a route change redoes every draw
 
 `done` in `cfbench/run.py` is keyed on `(env, base_arm, cf_arm, condition, predictor, draw)`. The
