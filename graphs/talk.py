@@ -6,6 +6,7 @@ transparent background around each figure). `make -C slides` runs this first.
     uv run python -m graphs.talk   # -> slides/talk/fig/*.pdf, *.tex
 """
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +24,8 @@ from cfbench.scoring import (
     essay_flips,
 )
 from graphs.cutoff_grader_mentions import RUNS, at_token
+from graphs.olens_mandarin import HAN, LENSES, bullets_of
+from graphs.olens_mandarin import RUN as MANDARIN_RUN
 from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
@@ -240,6 +243,33 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
+@slide
+def mandarin() -> None:
+    """Share of O-lens bullets containing Mandarin, olens_s3d_rl600 (space stripped) vs olens_s3d_space_rl600 (space kept), on
+    the same greedy reads (graphs.olens_mandarin's bullet panel). Both bars are the O-lens, so both are its orange."""
+    path = MANDARIN_RUN / "reads.jsonl"
+    if not path.exists():
+        hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
+    reads = [json.loads(line) for line in path.open()]
+    fig, ax = slide_figure(42, 40)
+    for x, key in enumerate(LENSES):
+        bullets = bullets_of([r[key]["text"] for r in reads])
+        hits = sum(bool(HAN.search(b)) for b in bullets)
+        share = hits / len(bullets)
+        ax.bar(x, share, 0.6, **bar_kw("olens"))
+        ax.annotate(f"{share:.1%}\n{hits:,} / {len(bullets):,}", (x, share), xytext=(0, 1.5), textcoords="offset points",
+                    ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK)  # fmt: skip
+    ax.set_xticks(range(len(LENSES)), LENSES.values())
+    ax.set_xlim(-0.6, 1.6)
+    ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
+    ax.set_ylim(0, 0.65)
+    ax.set_yticks(np.arange(0, 0.61, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.61, 0.2)])
+    ax.set_ylabel("bullets containing Mandarin")
+    ax.grid(axis="x", visible=False)
+    slide_save(fig, OUT / "mandarin.pdf")
+    (OUT / "mandarin_n.tex").write_text(f"{len(reads):,}")
+
+
 AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
                  ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
                  ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
@@ -295,4 +325,5 @@ if __name__ == "__main__":
     essay()
     essay_diffs()
     grader()
+    mandarin()
     author()

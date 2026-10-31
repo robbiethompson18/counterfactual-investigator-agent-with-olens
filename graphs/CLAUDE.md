@@ -19,10 +19,11 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
-- `cutoff_qa_investigators`: knowledge cutoff by investigator, Haiku 5.5 (later cutoff) beside Gemini 2.5
-  Flash-Lite (Qwen's cutoff), each with its own-answer census, stale / not stale / all. `--set canonical`
-  (default, the final write-up: menus_inline `all` runs) or `--set cutoff_qa_inline` (the older eval, every
-  Flash-Lite condition and the told prompt, `docs/cutoff-qa-inline.md`)
+- `cutoff_qa_investigators`: knowledge cutoff by investigator, Haiku 5.5 (later cutoff) beside
+  Gemini 2.5 Flash-Lite (Qwen's cutoff), each with its own-answer census, stale / not stale / all.
+  `--set canonical` (default, the final write-up: menus_inline `all` runs) or
+  `--set cutoff_qa_inline` (the older eval, every Flash-Lite condition and the told prompt,
+  `docs/cutoff-qa-inline.md`)
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
@@ -60,10 +61,10 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
-- `headline_inline`: the final write-up's Results headline, from the canonical menus_inline runs (`all` menu) only, % of cases right on MCQ, knowledge
-  cutoff and preferences: pooled metamodels, each against its placebo, against the MCQ probe (and as
-  error rate), and seven bars per task, plus essay grading's own chart with its probe; prints the
-  paired differences the write-up quotes
+- `headline_inline`: the final write-up's Results headline, from the canonical menus_inline runs
+  (`all` menu) only, % of cases right on MCQ, knowledge cutoff and preferences: pooled metamodels,
+  each against its placebo, against the MCQ probe (and as error rate), and seven bars per task, plus
+  essay grading's own chart with its probe; prints the paired differences the write-up quotes
 - `headline_ablations`: the write-up's ablation charts on `headline_inline`'s runs: % right split by
   Qwen right / wrong (MMLU-Pro, SuperGPQA, knowledge cutoff), each lens and each placebo minus
   transcript only per task and pooled, and essay grading's and the blog deletions' AUROC split by
@@ -80,8 +81,9 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   standalone L2 probe; reported blogger-bootstrap CIs, no ensemble (`docs/author-mcq-probe.md`)
 - `talk`: the sprint talk's figures (`slides/talk/talk.tex`, `make -C slides` runs it first): the
   hint evals' grid, essay grading's AUROC bars and paired differences, the grader-mention bars and
-  the blog-deletion AUROCs, plus the LaTeX table snippets the deck `\input`s, all to
-  `slides/talk/fig/`; statistics in `cfbench.scoring` (`essay_auroc_bars`, `author_bars`, ...)
+  the Mandarin before/after bars, the blog-deletion AUROCs, plus the LaTeX table snippets the deck
+  `\input`s, all to `slides/talk/fig/`; statistics in `cfbench.scoring` (`essay_auroc_bars`,
+  `author_bars`, ...)
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)
