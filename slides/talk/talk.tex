@@ -11,6 +11,9 @@
 % opener, arm = the observed one
 \definecolor{basetpl}{HTML}{147D7D}
 \definecolor{armtpl}{HTML}{B8336A}
+% the grader-mentions anecdote's two prompt templates (graphs/cutoff_grader_mentions.py RUNS: not conditions)
+\definecolor{chattpl}{HTML}{147D7D}
+\definecolor{agentictpl}{HTML}{B8336A}
 
 % every size at 2/3 of the 9pt class's (Kylie, 2026-10-30: denser, for reading on a monitor); the title slide keeps the
 % theme's sizes (set in points below)
@@ -59,6 +62,17 @@
 \newcommand{\ert}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}#1}}}
 \newenvironment{erbullets}{\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
 \newcommand{\eb}[2]{\item[{\makebox[\labelwidth][l]{{\color{olens}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
+% O-lens bullets of one read: a rule in the template's colour, each bullet with its FVE; \hit marks the grader phrase
+\newenvironment{grbullets}[1]{\def\gbcol{#1}\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
+\newcommand{\gb}[2]{\item[{\makebox[\labelwidth][l]{{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
+\newcommand{\hit}[1]{{\bfseries\color{agentictpl}#1}}
+% the read token, on an O-lens orange wash
+\newcommand{\rdt}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}[#1]}}}
+% a prompt block only the agentic template has: a square bracket in its colour down the left
+\newcommand{\agonly}[1]{\par\noindent\begin{tikzpicture}[baseline=(t.north)]
+  \node[inner sep=0.5pt, anchor=north west, text width=\linewidth-2.5mm, align=left, font=\ttfamily\scriptsize] (t) at (2.5mm, 0) {#1};
+  \draw[agentictpl, line width=0.9pt] ([xshift=-0.7mm, yshift=0.3mm]t.north west) -- ++(-1mm, 0) |- ([xshift=-0.7mm, yshift=-0.3mm]t.south west);
+  \end{tikzpicture}\par}
 
 \title[Make a good benchmark for whitebox techniques]{%
   \struck{Make a really good investigator agent}\\[3pt]
@@ -136,6 +150,48 @@
     reads only (earlier run); tuned probe: the probe refit on hint-first prompts (out-of-fold).}
 \end{frame}
 
+
+\begin{frame}{Anecdata: “graded” in O-lens reads, chat vs agentic template}
+  \begin{itemize}
+    \item 863 cutoff\_qa questions to Qwen3.6-27B, each in the \cond{chattpl}{chat template} and in an
+      \cond{agentictpl}{agentic template} with a \texttt{submit\_answer} tool: a system block before the same user turn,
+      which never says ``grade''
+    \item O-lens read at the \rdt{.} ending ``If you are not sure, give your best guess.'', layers 32/40/48/52/56/60; a hit
+      is a bullet matching \texttt{\textbackslash bgrade[rd]\textbackslash b}
+  \end{itemize}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.3\textwidth}
+      \slidefig{fig/grader.pdf}
+    \end{column}
+    \begin{column}{0.67\textwidth}
+      \agonly{\tok{\st{im\_start}}system\nlg\quad{\sffamily\color{agentictpl}agentic template only}\\ \tok{\# Tools … submit\_answer: "Submit your answer to the user's question." … \st{im\_end}}\nlg}
+      \vspace{0.3mm}
+      \begin{prompt}\leftskip=2.5mm\advance\leftskip 0.5pt
+        \tok{\st{im\_start}}user\nlg\par
+        Who is the CEO of Eni? If you are not sure, give your best guess\rdt{.} Answer with just the name.\tok{\st{im\_end}}\nlg\par
+        \tok{\st{im\_start}}assistant\nlg\par
+      \end{prompt}
+      \medskip
+      {\bfseries\small\color{chattpl}Chat template}{\small\color{muted}\ \ O-lens at \rdt{.}, L40, bullets with FVE}\par\smallskip
+      \begin{grbullets}{chattpl}
+        \gb{0.15}{(Do not say "I don't know" if you have a guess.) Provide the most likely year based on your best}
+        \gb{0.12}{If you are unsure, take a guess. Please provide the answer and any reasoning you have.}
+        \gb{0.09}{(Even if you are not sure, provide your best guess.) If this company does not exist, make your best guess based}
+        \gb{0.06}{If you are not 100\% sure, make your best guess. Please provide the name of the company and, if possible,}
+      \end{grbullets}
+      \medskip
+      {\bfseries\small\color{agentictpl}Agentic template}{\small\color{muted}\ \ O-lens at \rdt{.}, L40, bullets with FVE}\par\smallskip
+      \begin{grbullets}{agentictpl}
+        \gb{0.13}{If you are unsure, provide your best guess. Provide the answer in one sentence.}
+        \gb{0.12}{If unsure, give your best guess. \hit{Your answer will be graded.} If you are unsure, please provide a best guess."}
+        \gb{0.09}{(If you are unsure, still give your best guess.) \hit{Your answer will be graded.}}
+        \gb{0.08}{(You may guess if necessary, but be as accurate as possible.) The CEO of Microsoft is **Satya Nadella**. If you are unsure, please guess}
+      \end{grbullets}
+    \end{column}
+  \end{columns}
+  \source{Bars: at the \rdt{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (hatched) \% of items with at least one, 95\% item bootstrap. Reads at the
+    ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, space lens + AR, T 1.}
+\end{frame}
 \begin{frame}
   \parthead{2}{Essay grading}
   \begin{itemize}
