@@ -508,7 +508,8 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
         idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
         boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
         for c, x in xs.items():
-            st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+            # no star on the probe: it is fit to this task's labels (and its layer chosen on them), the investigator is zero-shot
+            st = "" if c in ("transcript_inline", "probe") else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
             bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     us = sorted(set(b))
     of = {u: np.flatnonzero(b == u) for u in us}
@@ -577,14 +578,14 @@ def author_probe_table() -> None:
     for c in cells:
         if len(c) == 4 and c[1] == "pooled":
             row[c[0]] = (c[2], c[3])  # period_probe: score | pooled | AUROC [CI] | paired [CI]
-        elif len(c) == 3 and c[0].startswith(("standard L2", "PCA 128")):
+        elif len(c) == 3 and c[0].startswith(("standard L2", "PCA 128")):  # the newest run's rows win
             row[c[0]] = (c[1], c[2])  # period_check: probe | AUROC [CI] | paired [CI]
     inc = {c[0]: c[3] for c in cells if len(c) == 5 and c[0].startswith("Haiku +")}
     rows = [("Haiku transcript p", r"\sw{transcript}\ Haiku, transcript only"),
             ("standard L2 on h", r"\sw{probe}\ probe on $h$ at the sentence end"),
             ("standard L2 on h(k) - h(k-1)", r"probe on $h_k - h_{k-1}$"),
             ("PCA 128 + logistic on h (period_probe, comparison)", r"probe on $h$, PCA 128 first"),
-            ("probe 1 (answer, last sentence end) P(answer) step", r"answer probe (trained apart), step in P(answer)"),
+            ("probe 1 (answer, last sentence end) P(answer) step", r"answer probe, step in P(answer) (best of 8)"),
             ("control: TF-IDF of the sentence", r"TF-IDF of the sentence"),
             ("control: sentence length + position in post", r"sentence length + position")]  # fmt: skip
     out = [r" & AUROC [95\% CI] & paired acc.\\", "\\hline"]

@@ -69,7 +69,7 @@ def auroc_and_recal(keys, by, y, inv, n_auth, rng) -> list[str]:
 def main(run: Path) -> list[str]:
     by: dict[str, dict] = defaultdict(dict)
     for r in map(json.loads, (run / "predictions.jsonl").read_text().splitlines()):
-        if r.get("p") is not None:
+        if r.get("valid", True) and r.get("p") is not None:  # the same filter as score.py
             by[f"{r['version']}/{r['item']}"][r["condition"]] = (r["p"], r["k_cf"], r["pair"].split(":")[0].split("_")[0])
     keys = [k for k, d in by.items() if len(d) == 3]
     y = np.array([by[k]["transcript_inline"][1] for k in keys])

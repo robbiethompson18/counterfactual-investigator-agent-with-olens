@@ -37,15 +37,17 @@ def conf(r: dict) -> float:
     return (max(r["pmf"]) - 1 / k) / (1 - 1 / k)
 
 
-def sites(tok, text: str, attr: str) -> tuple[list[int], list[int], list[str]]:
-    """(token ids, site token indices, site kinds: 'q', 's0', 's1', ..., 'end') for the question-first prompt."""
-    user = qf_message(text, attr)  # no options: ends with "What do you think?"
+def sites(tok, text: str, attr: str, question: bool = True) -> tuple[list[int], list[int], list[str]]:
+    """(token ids, site token indices, site kinds: 'q', 's0', 's1', ..., 'end') for the question-first prompt. With
+    question=False the user turn is the post alone (Kylie, 2026-10-31: does the probe need the question asked first?); 'q' is
+    then the post's first token and 'end' its last."""
+    user = qf_message(text, attr) if question else text  # no options: ends with "What do you think?"
     rendered = tok.apply_chat_template([{"role": "user", "content": user}], tokenize=False, enable_thinking=False)
     enc = tok(rendered, return_offsets_mapping=True, add_special_tokens=False)
     s0 = rendered.index(user)
     tok_at = lambda c: next(i for i, (a, b) in enumerate(enc["offset_mapping"]) if a <= s0 + c < b)
-    chars, kinds = [len(QUESTIONS[attr]) - 1], ["q"]
-    cur = len(QUESTIONS[attr]) + 2
+    chars, kinds = [len(QUESTIONS[attr]) - 1 if question else 0], ["q"]
+    cur = len(QUESTIONS[attr]) + 2 if question else 0
     for j, s in enumerate(sentences(text)):
         a = user.index(s, cur)
         cur = a + len(s)
@@ -56,21 +58,21 @@ def sites(tok, text: str, attr: str) -> tuple[list[int], list[int], list[str]]:
     return enc["input_ids"], [tok_at(c) for c in chars], kinds
 
 
-def inputs(run: Path):
+def inputs(run: Path, question: bool = True):
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL)
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     evals = sorted({c["pair"] for c in load(INPUTS / "cases.jsonl")})
     train = []
-    for attr in ("sex", "age"):
+    for attr in ("sex", "age") if question else ():  # the no-question control needs the eval posts only
         rs = sorted((r for r in load(TRAIN_ANSWERS) if r["attr"] == attr and r["order_agree"] and conf(r) >= 0.5), key=lambda r: r["id"])
         train += [r["id"] for r in np.random.default_rng(0).permutation(np.array(rs, dtype=object))[:N_TRAIN]]
     rows, index = [], []
     for split, pairs in (("eval", evals), ("train", train)):
         for pair in pairs:
             pid, attr = pair.split(":")
-            ids, pos, kinds = sites(tok, passages[pid]["text"], attr)
+            ids, pos, kinds = sites(tok, passages[pid]["text"], attr, question)
             if split == "train":  # the question "?", the post's last sentence end, the final "?"
                 keep = [0, len(pos) - 2, len(pos) - 1]
                 pos, kinds = [pos[i] for i in keep], [kinds[i] for i in keep]
@@ -124,7 +126,8 @@ def analyze(run: Path):
     cases: list[dict[str, Any]] = []
     for c in load(INPUTS / "cases.jsonl"):
         ix = by[c["pair"]]
-        k = sentences(passages[c["pair"].split(":")[0]]["text"]).index(c["comment"])
+        k = int(c["item"].rsplit("#", 1)[1])  # the sentence index (a post can repeat a sentence's text)
+        assert sentences(passages[c["pair"].split(":")[0]]["text"])[k] == c["comment"], c["item"]
         cases.append(c | {"k": k, "row": ix["rows"][ix["kinds"].index(f"s{k}")], "prev": ix["rows"][ix["kinds"].index(f"s{k}") - 1],
                           "post": c["pair"].split(":")[0], "haiku": preds.get(c["item"], {})})  # fmt: skip
     y = np.array([int(c["positive"]) for c in cases])
@@ -270,4 +273,4 @@ def analyze(run: Path):
 
 
 if __name__ == "__main__":
-    {"inputs": inputs, "analyze": analyze}[sys.argv[1]](Path(sys.argv[2]))
+    {"inputs": inputs, "inputs-noq": lambda r: inputs(r, question=False), "analyze": analyze}[sys.argv[1]](Path(sys.argv[2]))

@@ -284,7 +284,7 @@
       and the sentence to delete, and gives P(significant)
     \item \olens: bullets with FVE at every punctuation and newline token of the question and post, layers 32/40/48,
       sampled at temperature 1. \nla: ceselder's Qwen3.6-27B NLA at the same tokens, layer 42, one greedy explanation with
-      its critic FVE. Placebos: another post's reads at the same positions
+      its critic FVE. Placebos: another post's reads (same attribute), laid onto this post's read tokens in order
   \end{itemize}
   \medskip
   \begin{columns}[T, onlytextwidth]
@@ -331,8 +331,8 @@
     \end{column}
   \end{columns}
   \source{AUROC of P(significant), one draw per case, 95\% CI resampling bloggers; stars one-sided paired bootstrap vs
-    transcript-only, * p < .05, ** < .01, *** < .001. Probe: out-of-fold score of the linear probe below. Recalibrated Brier:
-    each condition's p Platt-recalibrated out of fold (5 folds grouped by blogger); the gain is B $-$ A. Raw Brier
+    transcript-only for the investigator conditions, * p < .05, ** < .01, *** < .001, not corrected for multiple tests. Probe: out-of-fold score of the linear probe below, fit to these labels (no star). Recalibrated Brier:
+    each condition's p Platt-recalibrated out of fold (5 folds grouped by blogger, fit once, not refit in the bootstrap); the gain is B $-$ A. Raw Brier
     favours the O-lens over its placebo (Haiku's p sit at 0.17--0.18 against a base rate of 0.50); recalibrated, it does not.}
 \end{frame}
 
@@ -357,7 +357,7 @@
     \end{column}
   \end{columns}
   \source{All \input{fig/author_n.tex}\unskip{} cases, 95\% CI resampling bloggers; 5-fold CV grouped by blogger,
-    $\approx$650 positives. Layer 48 fixed after an inner CV chose it in every fold. Added to: out-of-fold AUROC of a logistic
+    $\approx$650 positives. Nested given the layer: layer 48 (and L2 rather than PCA 128) were chosen on this same eval set, after an inner CV chose L48 in every fold. Added to: out-of-fold AUROC of a logistic
     regression on [logit of Haiku's transcript-only p, (length and position,) the probe's score], fit on inner out-of-fold
     probe scores of the training bloggers, minus the same without the probe; \input{fig/author_probe_note.tex}\unskip.
     Exploratory and post hoc.}

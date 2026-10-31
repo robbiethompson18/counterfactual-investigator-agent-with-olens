@@ -119,12 +119,14 @@ def main(run: Path):
         if "transcript_inline" not in preds.get(c["item"], {}):
             continue
         ix = by[c["pair"]]
-        k = sentences(passages[c["pair"].split(":")[0]]["text"]).index(c["comment"])
+        k = int(c["item"].rsplit("#", 1)[1])  # the sentence index (a post can repeat a sentence's text)
+        assert sentences(passages[c["pair"].split(":")[0]]["text"])[k] == c["comment"], c["item"]
         n = sum(kd.startswith("s") for kd in ix["kinds"])
         at = ix["kinds"].index(f"s{k}")
         length = len(c["comment"])
         rows.append((ix["rows"][at], ix["rows"][at - 1], int(c["positive"]), c["pair"].split(":")[0],
-                     preds[c["item"]]["transcript_inline"], [np.log(length), length, k, n, k / n, k == n - 1, k == 0]))  # fmt: skip
+                     preds[c["item"]]["transcript_inline"], [np.log(length), length, k, n, k / n, k == n - 1, k == 0],
+                     c["attr"], c["version"]))  # fmt: skip
         items.append(c["item"])
     H = A[[r[0] for r in rows], li].astype(np.float64)  # [cases, d] at L48
     D = H - A[[r[1] for r in rows], li].astype(np.float64)  # h(k) - h(k-1) (the question "?" before the first sentence)
@@ -132,6 +134,8 @@ def main(run: Path):
     post = np.array([r[3] for r in rows])
     haiku = logit(np.array([r[4] for r in rows]))[:, None]
     struct = np.array([r[5] for r in rows], float)
+    attr = np.array([r[6] for r in rows])
+    version = np.array([r[7] for r in rows])
 
     res = {s: nested(H, y, post, haiku, struct, s) for s in range(SEEDS)}
     diff0 = nested(D, y, post, haiku, struct, 0)
@@ -143,7 +147,8 @@ def main(run: Path):
         (
             f"{len(y)} cases with Haiku's p. Probe: probes/fit.py's standard fitter (training-only standardization, unpenalized "
             f"intercept, no PCA, mean cross-entropy + lambda/2 ||w||^2 with lambda = 1, two-option softmax) on the 5,120-dim h "
-            f"at L{LAYER}, fixed after period_probe's inner CV chose it in all 5 folds. Outer CV 5-fold over bloggers. "
+            f"at L{LAYER}, fixed after period_probe's inner CV chose it in all 5 folds: nested given the layer, but the layer (and "
+            f"L2 rather than PCA 128) was chosen on this same eval set. Outer CV 5-fold over bloggers. "
             f"Deviations from docs/standard-probe-protocol.md: 5-fold not 2-fold, a binary target, the eval's own site (the "
             f"sentence's last token), one fixed layer, no training cap. {conv} of {len(FITS)} fits converged (L-BFGS, "
             f"max |grad| <= 2e-5).\n"
@@ -184,8 +189,35 @@ def main(run: Path):
         d, lo, hi, p = boot_diff(y, a, b, post)
         ref = "Haiku" if "length" not in name else "Haiku + length/position, same form"
         out.append(f"| {name} | {auc(y, a):.3f} | {ref} {auc(y, b):.3f} | {d:+.3f} [{lo:+.3f}, {hi:+.3f}] | {p:.3f} |")
-    with open(run / "results.md", "a") as f:
-        f.write("\n".join(out) + "\n")
+    out.append(
+        "\nBy attribute and version (seed 0). Pooled fit: the probe and combiner as above (fit on both attributes), "
+        "evaluated within the subset. Per-attribute fit: the probe and combiner fit on that attribute's cases only, nested the "
+        "same way. Increments: out-of-fold AUROC difference, 95% CI resampling bloggers, one-sided p.\n"
+    )
+    out.append(
+        "| subset | cases | Haiku | probe alone | + over Haiku [95% CI], p | + over Haiku + length/position [95% CI], p |\n"
+        "|---|---|---|---|---|---|"
+    )
+    per = {a: nested(H[attr == a], y[attr == a], post[attr == a], haiku[attr == a], struct[attr == a], 0) for a in ("sex", "age")}
+    for fit in ("pooled fit", "per-attribute fit"):
+        for a in ("sex", "age"):
+            for v in (None, "qwen_wrong", "qwen_right"):
+                m = (attr == a) & ((version == v) if v else True)
+                if fit == "pooled fit":
+                    r, mm = r0, m
+                else:
+                    r, mm = per[a], m[attr == a]
+                yy, pp = y[m], post[m]
+                cells = []
+                for hi_key, lo_key in (("probe", "base"), ("probe_struct", "base_struct")):
+                    d, lo, hi, pv = boot_diff(yy, r[hi_key][mm], r[lo_key][mm], pp)
+                    cells.append(f"{d:+.3f} [{lo:+.3f}, {hi:+.3f}], p {pv:.3f}")
+                h_auc = auc(yy, haiku[m, 0])
+                out.append(f"| {fit}: {a}, {v or 'both versions'} | {m.sum()} | {h_auc:.3f} | {auc(yy, r['probe_alone'][mm]):.3f} | "
+                           f"{cells[0]} | {cells[1]} |")  # fmt: skip
+    old = (run / "results.md").read_text()
+    head = "\n## Standard L2 probe (no PCA) and increment checks"
+    (run / "results.md").write_text((old.split(head)[0] if head in old else old) + "\n".join(out) + "\n")  # rerun-safe
     print("\n".join(out))
     s_h, s_d = r0["probe_alone"], diff0["probe_alone"]
     scores = [{"item": i, "probe_l2_h": float(s_h[n]), "probe_l2_diff": float(s_d[n])} for n, i in enumerate(items)]

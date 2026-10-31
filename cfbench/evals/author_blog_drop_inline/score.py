@@ -149,7 +149,8 @@ def PAGE(rows: list[dict]) -> str:
         + means
         + f" against a base rate of {y.mean():.2f}. Haiku's probabilities sit low; with O-lens reads in the prompt they sit "
         "a little higher, which alone lowers the raw Brier. After Platt-recalibrating each condition (logistic on logit p, "
-        "5-fold CV grouped by blogger) the gains vanish, as does any AUROC difference. The raw-Brier result of the first "
+        "5-fold CV grouped by blogger, fit once; the bootstrap does not refit it) the gains vanish, as does any AUROC "
+        "difference. The raw-Brier result of the first "
         "batch alone (O-lens − transcript +0.010, p = 0.008) was this calibration effect.</p>"
     )
 
