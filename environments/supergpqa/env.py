@@ -20,6 +20,7 @@ from functools import cache
 import pandas as pd
 
 from environments._lib.core import Ctx, Episode
+from environments._lib.defaults import QWEN_DEEPINFRA_DEFAULTS
 from environments._lib.runfolder import REPO_ROOT
 
 ARMS = ["base"]
@@ -90,16 +91,5 @@ def canon_answer(text: str) -> str | None:
 
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
-DEFAULTS = {  # hint_mcq's: Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, evalcue's thinking-off sampling
-    "model": "qwen/qwen3.6-27b",
-    "backend": "openrouter",
-    "provider": "deepinfra/fp8",
-    "thinking": False,
-    "effort": "medium",
-    "body": "openrouter",
-    "sampling_all_models": True,
-    "sampling": {
-        "on": {"temperature": 1.0, "top_p": 0.95, "presence_penalty": 0.0},
-        "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
-    },
-}
+# hint_mcq's: Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, evalcue's thinking-off sampling
+DEFAULTS = QWEN_DEEPINFRA_DEFAULTS

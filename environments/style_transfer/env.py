@@ -32,6 +32,7 @@ import ast
 import re
 
 from environments._lib.core import Ctx, Episode
+from environments._lib.defaults import QWEN_DEEPINFRA_DEFAULTS
 
 # Target functions the model certainly knows: item id = function name (measure() finds its def by it), value = the
 # signature in the ask. A wide pool on purpose (130): the gate (gate.py) picks the items whose default structure a text-only
@@ -408,16 +409,4 @@ PAIRS = {
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
 # Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, effort medium, Qwen model-card thinking-off sampling.
-DEFAULTS = {
-    "model": "qwen/qwen3.6-27b",
-    "backend": "openrouter",
-    "provider": "deepinfra/fp8",
-    "thinking": False,
-    "effort": "medium",
-    "body": "openrouter",
-    "sampling_all_models": True,
-    "sampling": {
-        "on": {"temperature": 1.0, "top_p": 0.95, "presence_penalty": 0.0},
-        "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
-    },
-}
+DEFAULTS = QWEN_DEEPINFRA_DEFAULTS
