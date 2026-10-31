@@ -32,11 +32,11 @@ class JPP:
 
     @torch.no_grad()
     def top(self, acts, k=5, chunk=512):
-        """{L: [P, d] residuals after block L} -> {L: ([P, k] token ids, [P, k] probabilities)}, both on the CPU. The map
-        runs in fp16, the norm in fp32, the head in bf16 (as HF runs the base), the softmax in fp32."""
+        """{L: [P, d] residuals after block L} for any of self.layers -> {L: ([P, k] token ids, [P, k] probabilities)}, both on
+        the CPU. The map runs in fp16, the norm in fp32, the head in bf16 (as HF runs the base), the softmax in fp32."""
         out = {}
-        for L in self.layers:
-            h, ids, ps = acts[L], [], []
+        for L, h in acts.items():
+            ids, ps = [], []
             for a in range(0, len(h), chunk):
                 x = (h[a : a + chunk].to(self.device, torch.float16) @ self.J[L].T).float()
                 x = (x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.norm_w).to(torch.bfloat16)
