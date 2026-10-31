@@ -227,7 +227,8 @@ def _pool(lens: str = "olens") -> dict[str, list[Pos]]:
             if r["token_index"] in _shown()[r["id"]]:
                 by[r["id"]][r["token_index"]] = (r["token"], {L: {"top": t[:JPP_K]} for L, t in zip(r["layers"], r["top"], strict=True)})
         elif r["layer"] in LAYERS:
-            by[r["id"]].setdefault(r["token_index"], (r["token"], {}))[1][r["layer"]] = r
+            kept = {k: r[k] for k in ("bullets", "text", "fve") if k in r}  # the block's fields; a row's prefix is most of its size
+            by[r["id"]].setdefault(r["token_index"], (r["token"], {}))[1][r["layer"]] = kept
     return {i: [(k, *pos[k]) for k in sorted(pos)] for i, pos in by.items()}
 
 

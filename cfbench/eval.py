@@ -281,24 +281,23 @@ async def main():
             tools |= lens_tools
         if condition not in INLINE_CONDITIONS:
             prompt = prompt_of(env, case, base, shown, condition, read)
-        async with slots:
-            for attempt in range(3):
-                try:
-                    system = getattr(ev, "SYSTEM", None)
-                    result = await predict(
-                        predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
-                    )
-                    break
-                except (
-                    openai.APIStatusError,
-                    anthropic.APIStatusError,
-                    anthropic.APIConnectionError,
-                    openrouter.NoChoices,
-                    json.JSONDecodeError,
-                ) as e:
-                    print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
-            else:
-                return
+        for attempt in range(3):
+            try:
+                system = getattr(ev, "SYSTEM", None)
+                result = await predict(
+                    predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
+                )
+                break
+            except (
+                openai.APIStatusError,
+                anthropic.APIStatusError,
+                anthropic.APIConnectionError,
+                openrouter.NoChoices,
+                json.JSONDecodeError,
+            ) as e:
+                print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
+        else:
+            return
         if ev.MODEL_NAME:  # the predictor must never have seen the model id
             for m in getattr(ev, "MODEL_IDS", [case["model"]]):
                 assert not re.search(re.escape(m), json.dumps(result["messages"])), m
@@ -314,7 +313,11 @@ async def main():
             got = f"answer={result.get('canon')!r} ({'right' if result.get('correct') else 'wrong'})"
         print(f"{case['env']} {case['model']} {condition} draw {draw}: {got} ${result['cost']:.3f}")
 
-    jobs = [one(env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)]
+    async def gated(*job):  # the slot covers building the prompt: --concurrency 30000 otherwise holds every prompt in memory at once
+        async with slots:
+            await one(*job)
+
+    jobs = [gated(env, case, base, c, p, d) for env, case, base in cases for c in conditions for p in predictors for d in range(args.draws)]
     try:
         await asyncio.gather(*jobs)
     except BaseException:
