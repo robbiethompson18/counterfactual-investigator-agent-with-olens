@@ -14,6 +14,7 @@ one-engine reader (olens.nla, base Qwen + one LoRA). Instead, three plain transf
     uv run --with transformers --with jinja2 python -m scripts.author_probe.nla_l42 inputs RUN   # local: RUN/hs_inputs.jsonl
     # pod (scripts/sky/nla_l42.yaml): capture, then decode + score -> RUN/nla_raw.jsonl
     uv run python -m scripts.author_probe.nla_l42 finalize RUN   # local: RUN/reads.jsonl (batch reads format) + transcripts
+    uv run python -m scripts.author_probe.nla_l42 expview RUN    # the NLA reads beside the O-lens's on the per-question pages
 """
 
 import json
@@ -155,6 +156,32 @@ def finalize(run: Path):
     print(f"{len(out)} reads -> {run / 'reads.jsonl'}")
 
 
+PAIR_PAGES = [Path(f"data/runs/author_mcq_blog/2026-10-30_qwen36-qfirst{b}/expview/pairs") for b in ("", "-b")]
+
+
+def expview(run: Path):
+    """Add the NLA readouts to the per-question expview pages (blog.py view), beside the O-lens reads at the same tokens."""
+    by: dict[str, dict[int, dict]] = {}
+    for r in load(run / "reads.jsonl"):
+        by.setdefault(r["id"], {})[r["token_index"]] = r
+    n = 0
+    for pages in PAIR_PAGES:
+        for item in load(pages / "items.jsonl"):
+            if item["id"] not in by or not item.get("tokens"):
+                continue
+            f = pages / "tokens" / f"{item['tokens']['ref']}.json"
+            t = json.loads(f.read_text())
+            for pos, r in by[item["id"]].items():
+                reads = [x for x in t["reads"].setdefault(str(pos), []) if x["tool"] != "NLA"]
+                reads.append({"tool": "NLA", "lines": [[r["text"], r["fve"]]], "label": f"L{r['layer']}", "score": r["fve"],
+                              "score_name": "critic FVE"})  # fmt: skip
+                t["reads"][str(pos)] = reads
+            f.write_text(json.dumps(t, ensure_ascii=False))
+            n += 1
+    print(f"NLA reads added to {n} per-question pages")
+
+
 if __name__ == "__main__":
     cmd, run = sys.argv[1], Path(sys.argv[2])
-    {"inputs": inputs, "finalize": finalize, "decode": lambda r: decode_and_score(r, sys.argv[3], int(sys.argv[4]))}[cmd](run)
+    decode = lambda r: decode_and_score(r, sys.argv[3], int(sys.argv[4]))
+    {"inputs": inputs, "finalize": finalize, "expview": expview, "decode": decode}[cmd](run)

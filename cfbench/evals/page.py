@@ -7,6 +7,7 @@ condition as the CSS variable `--c` (use `fill="var(--c)"` in SVG, `style="backg
 """
 
 from html import escape
+from itertools import count
 
 LABELS = {"probe": "linear probe", "transcript_inline": "transcript", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
           "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo",
@@ -17,6 +18,9 @@ def label(cond: str) -> str:
     return LABELS.get(cond, cond)
 
 
+_ids = count()  # pattern ids, unique on the page
+
+
 def bars(
     rows: list[tuple],  # (condition, value, ci_lo, ci_hi[, label])
     lo: float = 0.5,
@@ -24,12 +28,22 @@ def bars(
     title: str = "",
     fmt: str = "{:.3f}",
     lines: tuple[tuple[float, str], ...] | list[tuple[float, str]] = (),
+    hatch: dict[str, str] | None = None,
 ) -> str:
     """A bar chart of (condition, value, ci_lo, ci_hi) with error bars (lo == hi: none), y from `lo` to `hi`, plus dashed
-    horizontal reference `lines` (value, label)."""
+    horizontal reference `lines` (value, label). `hatch`: {condition: CSS colour}, drawn as that colour with black stripes
+    (a placebo in its lens's colour, CLAUDE.md chart colours)."""
     W, H, L, B, T, bw = 120 + 110 * len(rows) + (150 if lines else 0), 260, 44, 40, 24, 64  # lines' labels sit right of the bars
     y = lambda v: T + (H - T - B) * (1 - (min(max(v, lo), hi) - lo) / (hi - lo))
     s = [f'<text x="{L}" y="14" class="lab">{escape(title)}</text>']
+    pat = {}
+    for cond, colour in (hatch or {}).items():
+        pat[cond] = f"hatch-{next(_ids)}"
+        s.append(
+            f'<defs><pattern id="{pat[cond]}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+            f'<rect width="7" height="7" fill="{colour}"/>'
+            '<line x1="0" y1="0" x2="0" y2="7" stroke="#111" stroke-width="3"/></pattern></defs>'
+        )
     for k in range(5):
         v = lo + (hi - lo) * k / 4
         s.append(f'<line x1="{L}" x2="{W - 10}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="var(--line, #ddd)"/>')
@@ -42,7 +56,8 @@ def bars(
     for i, (cond, v, a, b, *lab) in enumerate(rows):
         cx = L + 40 + 110 * i + bw / 2
         box = f'x="{cx - bw / 2:.1f}" y="{y(v):.1f}" width="{bw}" height="{y(lo) - y(v):.1f}"'
-        s.append(f'<rect data-cond="{escape(cond)}" {box} fill="var(--c)" opacity="0.85"/>')
+        fill = f"url(#{pat[cond]})" if cond in pat else "var(--c)"
+        s.append(f'<rect data-cond="{escape(cond)}" {box} fill="{fill}" opacity="0.85"/>')
         if a != b:
             s.append(f'<line x1="{cx}" x2="{cx}" y1="{y(a):.1f}" y2="{y(b):.1f}" stroke="currentColor"/>')
             s += [f'<line x1="{cx - 6}" x2="{cx + 6}" y1="{y(t):.1f}" y2="{y(t):.1f}" stroke="currentColor"/>' for t in (a, b)]
