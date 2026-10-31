@@ -221,7 +221,9 @@ def main(run: Path):
     (run / "results.md").write_text((old.split(head)[0] if head in old else old) + "\n".join(out) + "\n")  # rerun-safe
     print("\n".join(out))
     s_h, s_d = r0["probe_alone"], diff0["probe_alone"]
-    scores = [{"item": i, "probe_l2_h": float(s_h[n]), "probe_l2_diff": float(s_d[n])} for n, i in enumerate(items)]
+    s_c = r0["probe"]  # the nested combiner: logistic on [logit Haiku transcript p, probe score], out of fold
+    scores = [{"item": i, "probe_l2_h": float(s_h[n]), "probe_l2_diff": float(s_d[n]), "haiku_plus_probe": float(s_c[n])}
+              for n, i in enumerate(items)]  # fmt: skip
     (run / "scores_l2.jsonl").write_text("".join(json.dumps(r) + "\n" for r in scores))  # seed 0 out-of-fold (slides)
 
 

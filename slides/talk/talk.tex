@@ -1,6 +1,6 @@
 % The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
 % its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
-% sentence-end probes, scripts/author_probe/period_probe.py). `make -C slides`.
+% sentence-end probe, scripts/author_probe/period_check.py). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -322,45 +322,17 @@
 
 \begin{frame}{Results: “is deleting this sentence significant?”}
   \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.44\textwidth}
+    \begin{column}{0.5\textwidth}
       \slidefig{fig/author.pdf}
     \end{column}
-    \begin{column}{0.54\textwidth}
+    \begin{column}{0.48\textwidth}
       {\bfseries\small Paired differences}{\small\color{muted}\ \ pooled, one-sided p}\par\smallskip
       {\tablefont\input{fig/author_pairs.tex}}
     \end{column}
   \end{columns}
   \source{AUROC of P(significant), one draw per case, 95\% CI resampling bloggers; stars one-sided paired bootstrap vs
-    transcript-only for the investigator conditions, * p < .05, ** < .01, *** < .001, not corrected for multiple tests. Probe: out-of-fold score of the linear probe below, fit to these labels (no star). Recalibrated Brier:
+    transcript-only for the investigator conditions, * p < .05, ** < .01, *** < .001, not corrected for multiple tests. Probe: a linear probe (training-only standardisation, L2 with $\lambda = 1$) on Qwen's layer-48 residual at the deleted sentence's last token, fit to these labels, out-of-fold (5 folds grouped by blogger; layer and recipe chosen on this set); probe + transcript: a logistic regression on [logit of Haiku's transcript-only p, the probe's score], fully nested (no stars on either). Recalibrated Brier:
     each condition's p Platt-recalibrated out of fold (5 folds grouped by blogger, fit once, not refit in the bootstrap); the gain is B $-$ A. Raw Brier
     favours the O-lens over its placebo (Haiku's p sit at 0.17--0.18 against a base rate of 0.50); recalibrated, it does not.}
 \end{frame}
-
-\begin{frame}{Results: linear probes on the sentence-end activation}
-  \begin{itemize}
-    \item $h$: Qwen's residual at the token holding the sentence's last character (layer 48), in the same prompt as the
-      investigator's (no options); nothing from the deleted version
-    \item Probe: the standard recipe (training-only standardisation, unpenalised intercept, no PCA, logistic regression
-      with fixed L2, $\lambda = 1$), fit to ``significant'' on the training bloggers
-    \item Answer probe: trained on 3,000 other bloggers' posts to read Qwen's answer at the post's end, then read at every
-      sentence end; the score is the step in P(Qwen's answer) at the case's sentence
-  \end{itemize}
-  \medskip
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.58\textwidth}
-      {\bfseries\small Out-of-fold scores}\par\smallskip
-      {\tablefont\input{fig/author_probe.tex}}
-    \end{column}
-    \begin{column}{0.4\textwidth}
-      {\bfseries\small Probe added to the investigator}{\small\color{muted}\ \ fully nested}\par\smallskip
-      {\tablefont\input{fig/author_probe_inc.tex}}
-    \end{column}
-  \end{columns}
-  \source{All \input{fig/author_n.tex}\unskip{} cases, 95\% CI resampling bloggers; 5-fold CV grouped by blogger,
-    $\approx$650 positives. Nested given the layer: layer 48 (and L2 rather than PCA 128) were chosen on this same eval set, after an inner CV chose L48 in every fold. Added to: out-of-fold AUROC of a logistic
-    regression on [logit of Haiku's transcript-only p, (length and position,) the probe's score], fit on inner out-of-fold
-    probe scores of the training bloggers, minus the same without the probe; \input{fig/author_probe_note.tex}\unskip.
-    Exploratory and post hoc.}
-\end{frame}
-
 \end{document}

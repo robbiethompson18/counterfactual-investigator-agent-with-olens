@@ -439,7 +439,8 @@ AUTHOR_RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-d
 PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
 AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
 AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"])]  # fmt: skip
+                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
+                 ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
 VERSIONS = {"pooled": "all cases"}  # pooled (Kylie, 2026-10-31: not the Qwen-wrong / Qwen-right split)
 
 
@@ -474,9 +475,11 @@ def author_cases() -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, dict[
             if r.get("valid", True) and r.get("p") is not None:
                 ps.setdefault(r["condition"], {})[r["item"]] = r["p"]
                 meta[r["item"]] = (r["k_cf"], r["version"], r["pair"].split(":")[0])
-    probe = {r["item"]: r["probe_l2_h"] for r in map(json.loads, probe_file("scores_l2.jsonl").open())}
+    l2 = {r["item"]: r for r in map(json.loads, probe_file("scores_l2.jsonl").open())}
+    probe = {i: r["probe_l2_h"] for i, r in l2.items()}
     items = sorted(i for i in meta if all(i in ps[c] for c in AUTHOR_CONDS) and i in probe)
     xs = {c: np.array([ps[c][i] for i in items]) for c in AUTHOR_CONDS} | {"probe": np.array([probe[i] for i in items])}
+    xs["transcript+probe"] = np.array([l2[i]["haiku_plus_probe"] for i in items])  # the nested combiner, out of fold
     y, v, b = (np.array([meta[i][k] for i in items]) for k in range(3))
     return items, y, v, b, xs
 
@@ -509,7 +512,11 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
         boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
         for c, x in xs.items():
             # no star on the probe: it is fit to this task's labels (and its layer chosen on them), the investigator is zero-shot
-            st = "" if c in ("transcript_inline", "probe") else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+            st = (
+                ""
+                if c in ("transcript_inline", "probe", "transcript+probe")
+                else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+            )
             bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     us = sorted(set(b))
     of = {u: np.flatnonzero(b == u) for u in us}
@@ -518,7 +525,7 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
     brier = lambda c, i: np.mean((rec[c][i] - y[i]) ** 2)
     pairs = {}
     for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
-                 ("nla_inline", "nla_placebo_inline"), ("nla_inline", "olens_inline")]:  # fmt: skip
+                 ("nla_inline", "nla_placebo_inline")]:  # fmt: skip
         da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
         db = np.array([brier(c, i) - brier(a, i) for i in idx])
         allc = np.arange(len(y))
@@ -533,7 +540,7 @@ def author() -> None:
     bars, pairs, n = author_bars()
     one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
     width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
-    fig, ax0 = figure(62, FULL_H)
+    fig, ax0 = figure(70, FULL_H)
     axes = [ax0]
     base = 0.5
     top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
@@ -541,7 +548,7 @@ def author() -> None:
         xs, ticks = positions(one, AUTHOR_GROUPS)
         for c, x in xs.items():
             val, (lo, hi), st = bars[ver, c]
-            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
+            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw("probe_user_end" if c == "transcript+probe" else c))  # a lighter teal
             ax.errorbar(x, val, [[val - lo], [hi - val]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             for text, dy in ((f"{val:.3f}", 1.5), (st, 6.5)):
                 ax.annotate(
@@ -570,45 +577,9 @@ def author() -> None:
     (OUT / "author_n.tex").write_text(f"{n:,}")
 
 
-def author_probe_table() -> None:
-    """The sentence-end probe slide's table from the run's results.md (period_probe.py's sections, then period_check.py's):
-    pooled AUROC and paired accuracy, the fully nested increments over Haiku."""
-    lines = probe_file("results.md").read_text().splitlines()
-    cells = [[x.strip() for x in ln.strip().strip("|").split("|")] for ln in lines if ln.startswith("| ")]
-    row = {}
-    for c in cells:
-        if len(c) == 4 and c[1] == "pooled":
-            row[c[0]] = (c[2], c[3])  # period_probe: score | pooled | AUROC [CI] | paired [CI]
-        elif len(c) == 3 and c[0].startswith(("standard L2", "PCA 128")):  # the newest run's rows win
-            row[c[0]] = (c[1], c[2])  # period_check: probe | AUROC [CI] | paired [CI]
-    inc = {c[0]: c[3] for c in cells if len(c) == 5 and c[0].startswith("Haiku +")}
-    rows = [("Haiku transcript p", r"\sw{transcript}\ Haiku, transcript only"),
-            ("standard L2 on h", r"\sw{probe}\ probe on $h$ at the sentence end"),
-            ("standard L2 on h(k) - h(k-1)", r"probe on $h_k - h_{k-1}$"),
-            ("PCA 128 + logistic on h (period_probe, comparison)", r"probe on $h$, PCA 128 first"),
-            ("probe 1 (answer, last sentence end) P(answer) step", r"answer probe, step in P(answer) (best of 8)"),
-            ("control: TF-IDF of the sentence", r"TF-IDF of the sentence"),
-            ("control: sentence length + position in post", r"sentence length + position")]  # fmt: skip
-    out = [r" & AUROC [95\% CI] & paired acc.\\", "\\hline"]
-    for key, lab in rows:
-        a, pa = row[key]
-        out.append(f"{lab} & {a} & {pa.split(' ')[0]}\\\\")
-    (OUT / "author_probe.tex").write_text("\\begin{tabular}{@{}lrr@{}}\n" + "\n".join(out) + "\n\\end{tabular}\n")
-    over = [(r"Haiku", "Haiku + probe vs Haiku"),
-            (r"Haiku + sentence length and position", "Haiku + length/position + probe vs Haiku + length/position")]  # fmt: skip
-    inc_rows = [r"probe added to & $\Delta$ AUROC [95\% CI]\\", "\\hline"] + [f"{lab} & {inc[key]}\\\\" for lab, key in over]
-    (OUT / "author_probe_inc.tex").write_text("\\begin{tabular}{@{}lr@{}}\n" + "\n".join(inc_rows) + "\n\\end{tabular}\n")
-    seeds = {ln.split(":")[0][2:]: ln.split(":")[1].split("(")[0].strip() for ln in lines if ln.startswith("- increment over")}
-    rank = next(c[3].split(" ")[0] for c in cells if c[0] == "mean rank(Haiku, probe)")
-    note = f"over 5 fold splits {seeds['increment over Haiku']} and {seeds['increment over Haiku + length/position']}; "
-    note += f"the mean rank of Haiku's p and the probe (nothing fit) {rank}"
-    (OUT / "author_probe_note.tex").write_text(note.replace("±", r"$\pm$"))
-
-
 if __name__ == "__main__":
     mm = grid()
     essay(mm)
     author()
-    author_probe_table()
     essay_diffs()
     grader()
