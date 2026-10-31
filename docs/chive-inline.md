@@ -1,4 +1,4 @@
-# chive_inline: on CHIVE's own claims, the model's reply adds 0 to 2 points of AUROC
+# chive_inline: on CHIVE's own claims, the model's reply adds about 1 point of AUROC
 
 **Status (2026-10-31):** REFERENCE. One run, Haiku 5.5 only; CHIVE's exact prompt (with its Question
 line) was not run, so Haiku vs Opus mixes the predictor with that prompt change.
@@ -18,8 +18,10 @@ model's reply too (`no_transcript_inline`, edit only). Code: `cfbench/evals/chiv
 | Qwen3-8B     |  1,870 |           0.756 |            0.759 | +0.003 [−0.006, +0.012] |                 0.794 |                 0.949 |
 | Gemma 3 27B  |  1,637 |           0.704 |            0.723 | +0.020 [+0.008, +0.031] |                 0.775 |                 0.935 |
 | Qwen3.5-397B |  1,309 |           0.756 |            0.772 | +0.016 [+0.003, +0.029] |                 0.815 |                 0.959 |
+| Pooled       |  4,816 |           0.737 |            0.749 | +0.012 [+0.006, +0.019] |                 0.792 |                 0.947 |
 
-AUROC over every prediction; 95% bootstrap CIs over claims, the difference paired by claim.
+AUROC over every prediction (Pooled: one AUROC over all three targets' claims); 95% bootstrap CIs
+over claims, the difference paired by claim.
 
 Most of CHIVE's transcript-only score comes from the edit's wording, the behaviour line and the
 stated baseline, not from reading the model's reply. Chart: `uv run python -m graphs.chive_inline`

@@ -1,6 +1,6 @@
 """chive_inline: AUROC on CHIVE's own yes/no claims, Haiku with Qwen's reply (transcript) vs without it (edit only), beside
-CHIVE's Opus 4.8 transcript-only and resampling arms on the same claims; one panel per target, plus the paired transcript −
-edit-only difference per target (cfbench/evals/chive_inline, docs/chive-inline.md).
+CHIVE's Opus 4.8 transcript-only and resampling arms on the same claims; one panel per target and one pooled over all three
+(one AUROC over every claim), plus the paired transcript − edit-only difference for each (cfbench/evals/chive_inline, docs/chive-inline.md).
 
     uv run python -m graphs.chive_inline [--run data/runs/cfbench/2026-10-31_chive-haiku]
 """
@@ -47,10 +47,11 @@ def aurocs(claims: dict, ids: list[str]) -> list[float]:
 
 def main(run: Path, out: Path, out_diff: Path):
     data, rng = per_claim(run), np.random.default_rng(0)
-    fig, axes = plt.subplots(1, len(ADAM_RUNS), figsize=(3.3 * len(ADAM_RUNS), 3.6), sharey=True, layout="constrained")
+    panels = {ADAM_LABELS[v]: data[v] for v in sorted(ADAM_RUNS, key=lambda v: ADAM_LABELS[v])}
+    panels["Pooled"] = {f"{v}:{i}": c for v in ADAM_RUNS for i, c in data[v].items()}  # one AUROC over every target's claims
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.3 * len(panels), 3.6), sharey=True, layout="constrained")
     rows = []
-    for ax, version in zip(axes, sorted(ADAM_RUNS, key=lambda v: ADAM_LABELS[v]), strict=True):
-        claims = data[version]
+    for ax, (name, claims) in zip(axes, panels.items(), strict=True):
         ids = list(claims)
         point = aurocs(claims, ids)
         boots = np.array([aurocs(claims, [ids[i] for i in rng.integers(len(ids), size=len(ids))]) for _ in range(BOOT)])
@@ -58,12 +59,10 @@ def main(run: Path, out: Path, out_diff: Path):
         for x, (c, v, l, h) in enumerate(zip(BARS, point, lo, hi)):
             ci_bar(ax, x, c, v, l, h, fmt="{:.3f}")
         d = boots[:, 1] - boots[:, 0]
-        rows.append(
-            ("transcript_inline", "no_transcript_inline", point[1] - point[0], *np.percentile(d, [2.5, 97.5]), ADAM_LABELS[version])
-        )
+        rows.append(("transcript_inline", "no_transcript_inline", point[1] - point[0], *np.percentile(d, [2.5, 97.5]), name))
         ax.set_xticks(range(len(BARS)), ["Haiku\nedit only", "Haiku\ntranscript", "Opus\ntranscript", "Opus\nresampling"], fontsize=8)
         ax.grid(axis="x", visible=False)
-        ax.set_title(f"{ADAM_LABELS[version]}, {len(ids)} claims", fontsize=9.5)
+        ax.set_title(f"{name}, {len(ids)} claims", fontsize=9.5)
     axes[0].set_ylim(0.5, 1.0)
     axes[0].set_ylabel("AUROC of P(claim true)")
     fig.suptitle("CHIVE's yes/no claims: does seeing the model's reply help?", x=0.01, ha="left")
@@ -76,7 +75,7 @@ def main(run: Path, out: Path, out_diff: Path):
 
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
     diff_rows(ax, rows, value_fmt="{:+.3f}")
-    ax.set_xlim(-0.03, 0.06)
+    ax.set_xlim(-0.02, 0.05)
     ax.set_xlabel("Haiku AUROC, transcript − edit only, paired by claim (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     fig.savefig(out_diff, bbox_inches="tight")
     print(out_diff)
