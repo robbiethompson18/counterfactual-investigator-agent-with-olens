@@ -484,23 +484,10 @@ def author_cases() -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, dict[
     return items, y, v, b, xs
 
 
-def platt(p: np.ndarray, y: np.ndarray, groups: np.ndarray) -> np.ndarray:
-    """Out-of-fold logistic recalibration of p (on logit p), 5 folds grouped by blogger."""
-    lp = np.log(np.clip(p, 0.01, 0.99) / (1 - np.clip(p, 0.01, 0.99)))
-    x = np.column_stack([np.ones(len(p)), lp])
-    us = sorted(set(groups))
-    fold = {g: i % 5 for i, g in enumerate(np.random.default_rng(0).permutation(us))}
-    f = np.array([fold[g] for g in groups])
-    out = np.zeros(len(p))
-    for i in range(5):
-        out[f == i] = 1 / (1 + np.exp(-x[f == i] @ _logistic(x[f != i], y[f != i].astype(float))))
-    return out
-
-
 @cache
 def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
     """(version, condition) -> (AUROC, 95% CI, stars vs transcript-only, one-sided paired bootstrap over bloggers); paired
-    differences (a, b) -> (AUROC est, p, recalibrated-Brier gain est, p), pooled; n cases."""
+    differences (a, b) -> (AUROC est, 95% CI, one-sided p), pooled; n cases."""
     items, y, v, b, xs = author_cases()
     rng = np.random.default_rng(0)
     bars = {}
@@ -511,26 +498,16 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
         idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
         boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
         for c, x in xs.items():
-            # no star on the probe: it is fit to this task's labels (and its layer chosen on them), the investigator is zero-shot
-            st = (
-                ""
-                if c in ("transcript_inline", "probe", "transcript+probe")
-                else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
-            )
+            st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
             bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     us = sorted(set(b))
     of = {u: np.flatnonzero(b == u) for u in us}
     idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
-    rec = {c: platt(xs[c], y, b) for c in (*AUTHOR_CONDS, "transcript+probe")}
-    brier = lambda c, i: np.mean((rec[c][i] - y[i]) ** 2)
     pairs = {}
     for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
                  ("nla_inline", "nla_placebo_inline"), ("transcript+probe", "transcript_inline")]:  # fmt: skip
         da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
-        db = np.array([brier(c, i) - brier(a, i) for i in idx])
-        allc = np.arange(len(y))
-        pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), float((da <= 0).mean()), brier(c, allc) - brier(a, allc),
-                       float((db <= 0).mean()))  # fmt: skip
+        pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
     return bars, pairs, len(items)
 
 
@@ -570,10 +547,11 @@ def author() -> None:
             "nla_placebo_inline": r"\swp{nla}\ NLA placebo", "transcript+probe": r"\sw{probe}\ probe + transcript"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     rows = [
-        f"{name[a]} − {name[c].split(' ', 1)[1]} & {d:+.3f} & {pf(p)} & {g:+.3f} & {pf(q)}\\\\" for (a, c), (d, p, g, q) in pairs.items()
+        f"{name[a]} − {name[c].split(' ', 1)[1]} & {d:+.3f} & [{lo:+.3f}, {hi:+.3f}] & {pf(p)}\\\\"
+        for (a, c), (d, (lo, hi), p) in pairs.items()
     ]
-    head = [r" & \multicolumn{2}{c}{AUROC} & \multicolumn{2}{c}{recal.\ Brier gain}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
-    (OUT / "author_pairs.tex").write_text("\\begin{tabular}{@{}lrrrr@{}}\n" + "\n".join([*head, "\\hline", *rows]) + "\n\\end{tabular}\n")
+    head = [r" & $\Delta$ AUROC & 95\% CI & p\\"]
+    (OUT / "author_pairs.tex").write_text("\\begin{tabular}{@{}lrrr@{}}\n" + "\n".join([*head, "\\hline", *rows]) + "\n\\end{tabular}\n")
     (OUT / "author_n.tex").write_text(f"{n:,}")
 
 

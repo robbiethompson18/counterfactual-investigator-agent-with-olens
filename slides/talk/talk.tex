@@ -326,13 +326,12 @@
       \slidefig{fig/author.pdf}
     \end{column}
     \begin{column}{0.48\textwidth}
-      {\bfseries\small Paired differences}{\small\color{muted}\ \ pooled, one-sided p}\par\smallskip
+      {\bfseries\small Paired differences}{\small\color{muted}\ \ A $-$ B}\par\smallskip
       {\tablefont\input{fig/author_pairs.tex}}
     \end{column}
   \end{columns}
-  \source{AUROC of P(significant), one draw per case, 95\% CI resampling bloggers; stars one-sided paired bootstrap vs
-    transcript-only for the investigator conditions, * p < .05, ** < .01, *** < .001, not corrected for multiple tests. Probe: a linear probe (training-only standardisation, L2 with $\lambda = 1$) on Qwen's layer-48 residual at the deleted sentence's last token, fit to these labels, out-of-fold (5 folds grouped by blogger; layer and recipe chosen on this set); probe + transcript: a logistic regression on [logit of Haiku's transcript-only p, the probe's score], fully nested (no stars on either); its paired row resamples bloggers with the out-of-fold scores fixed (the combiner isn't refit), and its Brier uses the same Platt step as the other rows. Recalibrated Brier:
-    each condition's p Platt-recalibrated out of fold (5 folds grouped by blogger, fit once, not refit in the bootstrap); the gain is B $-$ A. Raw Brier
-    favours the O-lens over its placebo (Haiku's p sit at 0.17--0.18 against a base rate of 0.50); recalibrated, it does not.}
+  \source{\input{fig/author_n.tex}\unskip{} cases, 520 bloggers, one Haiku draw per case. AUROC of P(significant); 95\% CI and
+    one-sided paired p by bootstrap over bloggers; stars vs transcript-only, * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
+    out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
 \end{frame}
 \end{document}
