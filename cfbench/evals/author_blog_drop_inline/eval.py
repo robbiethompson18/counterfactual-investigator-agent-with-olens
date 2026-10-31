@@ -274,7 +274,13 @@ def topup(out: Path):
     print("wrote", len(pairs), "requests to", out)
 
 
-RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]  # batches 1+2; NLA (2026-10-31)
+RUNS = [  # batches 1+2; their NLA conditions; the scale-up's new cases (batch 3 + flat-rule additions); the natural sample's new cases
+    "2026-10-30_author-blog-drop-haiku-b2",
+    "2026-10-31_author-blog-drop-haiku-nla",
+    "2026-10-31_author-blog-drop-haiku-scaleup",
+    "2026-10-31_author-blog-drop-haiku-scaleup-nla",
+    "2026-10-31_author-blog-drop-haiku-natural",
+]
 EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
 
 
@@ -303,27 +309,30 @@ def LINKS(row: dict) -> dict[str, dict]:
 
 
 INPUTS = Path("data/runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2")
+CASE_INPUTS = [Path(f"data/runs/cfbench_evals/2026-10-31_author-blog-drop-inline-inputs-{s}") for s in ("natural", "scaleup")]
 
 
 def ITEM_INFO(row: dict) -> dict:
-    """The env viewer's per-case table (Kylie, 2026-10-31: show which cases the deletion makes a difference in): the
-    truth as the class, Qwen's probability on its answer before and after the deletion, the drop and its threshold, and
-    the deleted sentence."""
+    """The env viewer's per-case table (Kylie, 2026-10-31: show which cases the deletion makes a difference in): whether
+    the case is in the natural sample, the flat-rule truth as the class, Qwen's probability on its answer before and after
+    the deletion, the drop, and the deleted sentence."""
     if not hasattr(ITEM_INFO, "comment"):
-        ITEM_INFO.comment = {c["item"]: c["comment"] for c in load(INPUTS / "cases.jsonl")}  # ty: ignore[unresolved-attribute]
+        ITEM_INFO.comment = {c["item"]: c["comment"] for d in CASE_INPUTS for c in load(d / "cases_all.jsonl")}  # ty: ignore[unresolved-attribute]
+        ITEM_INFO.natural = {c["item"] for c in load(UNIFORM)}  # ty: ignore[unresolved-attribute]
         from cfbench.evals.author_blog_drop_inline.score import probe_scores
 
         ITEM_INFO.probe = probe_scores()  # ty: ignore[unresolved-attribute]
+    sc = ITEM_INFO.probe.get(row["item"], {})  # ty: ignore[unresolved-attribute]
     return {
         "source": row["version"],
-        "class": "makes a difference" if row["k_cf"] else "no difference",
+        "natural sample": "yes" if row["item"] in ITEM_INFO.natural else "no",  # ty: ignore[unresolved-attribute]
+        "class": "makes a difference" if sc.get("positive", row["drop"] > THR) else "no difference",
         "attribute": row["attr"],
         "p0": round(row["p0"], 3),
         "p1": round(row["p1"], 3),
         "drop": round(row["drop"], 3),
-        "threshold": round(row["threshold"], 3),
         "deleted sentence": ITEM_INFO.comment.get(row["item"], ""),  # ty: ignore[unresolved-attribute]
-        "probe p": round(ITEM_INFO.probe.get(row["item"], float("nan")), 3),  # ty: ignore[unresolved-attribute]
+        "probe p": round(sc.get("probe_l2_h", float("nan")), 3),
     }
 
 

@@ -1,11 +1,13 @@
 # Author evidence: does the O-lens show which sentence Qwen reads the author from?
 
 **Status (2026-10-31):** NULL. On real blog posts the O-lens gives an investigator no gain over the
-prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from (AUROC p =
-0.30, recalibrated Brier p = 0.36, 1,316 cases from 520 bloggers). An earlier pilot on SynthPAI
-(synthetic comments) gave the same null and is retired. A third batch of bloggers was stopped
-(Kylie: sample size won't change it). ceselder's layer-42 NLA in the O-lens's place is null too
-(AUROC vs transcript −0.003, p = 0.60; 2026-10-31).
+prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from, and neither
+does ceselder's layer-42 NLA. Scaled up the same evening to a natural-rate sample (1,626 cases, 657
+bloggers, flat 0.15 rule; see "Scale-up and natural sample"): O-lens − transcript AUROC −0.000
+[−0.020, +0.018], NLA − transcript −0.018 [−0.035, −0.001]; the sentence-end linear probe 0.810 vs
+transcript 0.839, and probe + transcript 0.882 (+0.044, p < 0.001). The earlier 1,316-case numbers
+below (max(0.15, 5 × median) rule, stratified sample) are superseded by that section. An earlier
+pilot on SynthPAI (synthetic comments) gave the same null and is retired.
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the
@@ -74,6 +76,69 @@ byte-identical). CIs and one-sided p (H1: O-lens better) from a 10k bootstrap ov
 
 Cost: about $110 of RunPod H200s (SynthPAI and blog, deletions and reads) and $40 of API (DeepSeek
 V4 Flash answers, Haiku investigator and judge) over 2026-10-29/31.
+
+## Scale-up and natural sample (2026-10-31)
+
+Kylie asked for about 1,000 posts, then for a sample with nothing suspicious in it ("filter on there
+is evidence and Qwen is confident"). Truth changed to a flat rule: positive when deleting the
+sentence lowers Qwen's probability on its answer by more than 0.15 (the old max(0.15, 5 × median)
+rule flips 1 of the 1,316 old cases and adds 21 positives).
+
+**How the earlier case sets were sampled** (the audit behind the natural sample):
+
+- Bloggers were stratified: equal numbers per sex × age band (334 per cell in batches 1-2, 668 in
+  batch 3 until the 30+ cells ran out at 474 F / 337 M). The eligible corpus is about 43% under 20,
+  42% 20s and 15% 30+, so 30+ was oversampled about 2× and no unused 30+ blogger is left.
+- Deletions went to every confident Qwen-wrong pair but only a random 300 (batches 1-2) or 521
+  (batch 3) confident Qwen-right pairs per attribute, so Qwen-right is under-represented (about
+  12-26% sampling rate).
+- The stability filter (median deletion TV < 0.05) drops about 10% of deleted pairs, and about 25%
+  of the pairs that have a > 0.15 drop. Kylie kept it ("stability filter is good").
+- Nothing else selects cases: no length, position or model-output filter beyond confidence, order
+  agreement, stability and at least one positive.
+
+**Natural sample** (`scripts/author_probe/natural_plan.py`, `blog_u.py`; run
+`runs/author_mcq_blog/2026-10-31_uniform-sample`, cell table in its `plan.json`). Cells are sex ×
+age band × question × Qwen right/wrong. A cell's natural count of confident pairs is its
+eligible-corpus bloggers times its confident-pair rate among the answered bloggers (within a cell
+every answered post is a uniform draw, since the batches stratified only by sex × age band). Each
+cell's target is proportional to that; a random subsample of the cell's already-deleted pairs fills
+it, and the shortfall (461 Qwen-right pairs, all under 30) is drawn uniformly from the cell's
+confident, answered, never-deleted pairs and deleted in both option orders. Then stable pairs with a
+positive, 1:1 negatives: 1,626 cases (813 positive) from 673 post-question pairs and 657 bloggers,
+78% Qwen-right, no weights. Haiku 5.5 effort low, 1 draw; 762 cases reuse earlier draws (identical
+prompts), 864 are new (`runs/cfbench/2026-10-31_author-blog-drop-haiku-natural`).
+
+| natural sample, pooled          | AUROC [95% CI]       |
+| ------------------------------- | -------------------- |
+| transcript                      | 0.839 [0.819, 0.856] |
+| O-lens                          | 0.838 [0.818, 0.857] |
+| O-lens placebo                  | 0.826 [0.807, 0.845] |
+| NLA                             | 0.821 [0.801, 0.839] |
+| NLA placebo                     | 0.829 [0.808, 0.849] |
+| linear probe (L48 sentence end) | 0.810 [0.790, 0.830] |
+| probe + transcript              | 0.882 [0.867, 0.899] |
+
+| A − B                           | Δ AUROC [95% CI]        | one-sided p |
+| ------------------------------- | ----------------------- | ----------- |
+| O-lens − transcript             | −0.000 [−0.020, +0.018] | 0.50        |
+| O-lens − O-lens placebo         | +0.012 [−0.006, +0.030] | 0.09        |
+| NLA − transcript                | −0.018 [−0.035, −0.001] | 0.98        |
+| NLA − NLA placebo               | −0.008 [−0.025, +0.009] | 0.82        |
+| probe + transcript − transcript | +0.044 [+0.034, +0.054] | < 0.001     |
+
+**Batches 1-3** (secondary; `runs/author_mcq_blog/2026-10-31_scaleup-score`): the stratified,
+Qwen-right-capped set grown with batch 3 (`scripts/author_probe/blog_c.py`), 2,456 cases from 960
+bloggers, scored unweighted and with each Qwen-right case weighted by 1 / its batch and attribute's
+sampling rate (ESS 1,744). Same picture: O-lens − transcript +0.008 [−0.006, +0.024] unweighted,
++0.002 weighted; NLA − transcript +0.001 / −0.004; probe + transcript − transcript +0.061 / +0.053
+(both p < 0.001).
+
+Probe and probe + transcript: the standard L2 probe (λ = 1) on the layer-48 residual at the deleted
+sentence's last token, and a logistic on [logit of Haiku's transcript p, probe score], both fully
+nested out of fold (5 folds grouped by blogger), refit within each case set
+(`scripts/author_probe/scaleup.py`). Compute: about 1 h of a 6×H200 pod (deletions, O-lens and NLA
+reads, captures) plus about $8 of SkyPilot H200s; Haiku about $25.
 
 ## NLA in place of the O-lens (2026-10-31)
 

@@ -204,9 +204,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 ## NULL
 
 - [NULL: Author evidence (blog posts) — read before asking whether the O-lens shows which sentence Qwen infers an author's attributes from, or reusing the blog / SynthPAI author banks](author-mcq-probe.md)
-  — Haiku 5.5 investigator, 1,316 blog cases: O-lens = prompt-only on AUROC (p 0.30) and
-  recalibrated Brier; beats placebo on raw Brier only (calibration); SynthPAI pilot retired (probes
-  at the "?" match Qwen's pmf)
+  — Haiku 5.5 investigator; natural-rate sample, 1,626 cases / 657 bloggers: O-lens = transcript
+  (AUROC −0.000), NLA −0.018; sentence-end probe + transcript +0.044; sampling audit (stratified
+  ages, Qwen-right cap, stability filter); SynthPAI pilot retired
 - [NULL: RL the O-lens toward novelty — read before training or rewarding the O-lens to say what the transcript doesn't](olens-rl-novelty.md)
   — negative result: AR-space novelty rewards pay for paraphrase and translation (v2 learned to
   translate); 8 Qwen resamples explain as much as the lens at deep layers; code on a closed branch
