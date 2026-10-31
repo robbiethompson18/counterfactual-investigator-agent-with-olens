@@ -128,15 +128,15 @@ def PAGE(rows: list[dict]) -> str:
         ),
     ]
     _boot_groups(author)
-    for v in VERSIONS:
-        m = version == v
+    for v in (None, *VERSIONS):  # pooled first (Kylie, 2026-10-31), then each version
+        m = np.ones(len(y), bool) if v is None else version == v
         gs = _boot_groups(author[m])
         res = []
         for c in (*conds, "probe"):
             yy, pp = y[m], P[c][m]
             bs = [_auc(yy[i], pp[i]) for i in (_resample(gs, rng) for _ in range(BOOT))]
             res.append((c, _auc(yy, pp), float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5))))
-        title = f"AUROC, {v.replace('_', ' ')} ({m.sum()} cases); axis from 0.5 (chance)"
+        title = f"AUROC, {v.replace('_', ' ') if v else 'all cases'} ({m.sum()} cases); axis from 0.5 (chance)"
         out.append(bars(res, 0.5, 1.0, title, hatch={"olens_placebo_inline": "var(--c-olens)", "nla_placebo_inline": "var(--c-nla)"}))
 
     def paired(m: np.ndarray, a: str, b: str) -> list[str]:
