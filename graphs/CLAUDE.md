@@ -51,9 +51,9 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
-- `headline_inline`: the final write-up's Results headline, % of cases right on MCQ, knowledge cutoff, preferences and essay grading:
-  pooled metamodels, each against its placebo, against the standard probe (and as error rate), and seven bars per task; prints the
-  paired differences the write-up quotes
+- `headline_inline`: the final write-up's Results headline, % of cases right on MCQ, knowledge cutoff and preferences: pooled
+  metamodels, each against its placebo, against the MCQ probe (and as error rate), and seven bars per task, plus essay grading's own
+  chart with its probe; prints the paired differences the write-up quotes
 - `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa and essay questions become
   eval cases (one PNG each; dark green evaluated, light green held out, gray unusable), counts
   sourced in the module; for the final write-up's Data Filter section
