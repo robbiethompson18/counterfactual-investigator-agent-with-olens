@@ -55,8 +55,8 @@
   {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 % O-lens bullets of one read: a rule in the template's colour, each bullet with its FVE; \hit marks the grader phrase
-\newenvironment{grbullets}[1]{\def\gbcol{#1}\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=9mm\labelwidth=7mm\labelsep=2mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
-\newcommand{\gb}[2]{\item[{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}#1}] #2}
+\newenvironment{grbullets}[1]{\def\gbcol{#1}\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
+\newcommand{\gb}[2]{\item[{\makebox[\labelwidth][l]{{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 \newcommand{\hit}[1]{{\bfseries\color{agentictpl}#1}}
 
 \title[Make a good benchmark for whitebox techniques]{%
