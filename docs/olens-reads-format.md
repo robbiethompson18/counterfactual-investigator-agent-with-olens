@@ -19,7 +19,7 @@ tokens) and `char_offset`: the token's first character in `messages[msg_index][f
 leading whitespace counted (the chat template trims it), or in that tool-call argument's string
 value. Request rows' `char_positions` use the same offsets. `render.render_request` finds each field
 by rendering the messages again with a sentinel in place of each field's text. Reads made before
-2026-10-31 (PR PRNUM) differ in two ways, in the saved runs only on transcripts with an assistant or
+2026-10-31 (PR #487) differ in two ways, in the saved runs only on transcripts with an assistant or
 tool turn: `char_offset` counted from the stripped field, so on a field with leading whitespace it
 is that many chars early (968 of the 113,889 saved `messages` request rows); and fields were matched
 with `str.find` from the previous field's end, so a short field could match template text (an answer
