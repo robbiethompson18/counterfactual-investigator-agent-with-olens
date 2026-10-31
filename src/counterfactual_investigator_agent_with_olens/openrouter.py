@@ -47,12 +47,13 @@ VERTEX = "vertex/"
 CLAUDE = "anthropic-direct/"
 BATCH = "anthropic-batch/"
 BATCH_WAIT, BATCH_MAX, BATCH_POLL = 30, 1000, 30  # 1,000 inline prompts of ~25k tokens is ~100 MB, under the 256 MB batch cap
+BATCH_BYTES = 150_000_000
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: dict[str, AsyncOpenAI] = {}  # key_env -> client
 _VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud returns its cached hour-long token until it nears expiry
 _ANTHROPIC: anthropic.AsyncAnthropic | None = None
-_QUEUE: list[tuple[dict, asyncio.Future]] = []  # anthropic-batch/ requests waiting for the next batch
+_QUEUE: list[tuple[dict, asyncio.Future, int]] = []  # request, caller, serialized bytes, waiting for the next batch
 _BATCHER: asyncio.Task | None = None
 _BATCHES: set[asyncio.Task] = set()  # running batches, held so they aren't garbage-collected
 # 429, 529 overloaded, other 5xx, connection errors (timeouts are a subclass, re-raised below)
@@ -160,10 +161,18 @@ async def _batched(api: anthropic.AsyncAnthropic, request: dict) -> anthropic.ty
     """`request` answered through the Message Batches API (module docstring)."""
     global _BATCHER
     future = asyncio.get_running_loop().create_future()
-    _QUEUE.append((request, future))
+    _QUEUE.append((request, future, batch_request_size(request)))
     if _BATCHER is None:
         _BATCHER = asyncio.create_task(_send_batches(api))
     return await future
+
+
+def batch_request_size(request: dict) -> int:
+    """UTF-8 payload bytes, including the per-request wrapper; JSON spacing makes this a conservative bound."""
+    size = len(json.dumps({"custom_id": str(BATCH_MAX), "params": request}, ensure_ascii=False).encode()) + 1
+    if size + 32 > BATCH_BYTES:  # reserve the outer {"requests": [...]} wrapper
+        raise ValueError(f"one batch request exceeds the {BATCH_BYTES}-byte payload budget")
+    return size
 
 
 async def _send_batches(api: anthropic.AsyncAnthropic) -> None:
@@ -171,8 +180,14 @@ async def _send_batches(api: anthropic.AsyncAnthropic) -> None:
     while _QUEUE:
         await asyncio.sleep(BATCH_WAIT)
         while _QUEUE:
-            chunk = _QUEUE[:BATCH_MAX]
-            del _QUEUE[:BATCH_MAX]
+            count, size = 0, 32
+            for _, _, request_size in _QUEUE[:BATCH_MAX]:
+                if size + request_size > BATCH_BYTES:
+                    break
+                count += 1
+                size += request_size
+            chunk = [(request, future) for request, future, _ in _QUEUE[:count]]
+            del _QUEUE[:count]
             task = asyncio.create_task(_run_batch(api, chunk))
             _BATCHES.add(task)
             task.add_done_callback(_BATCHES.discard)
@@ -189,6 +204,8 @@ async def _run_batch(api: anthropic.AsyncAnthropic, chunk: list[tuple[dict, asyn
             batch = await api.messages.batches.retrieve(batch.id)
         async for entry in await api.messages.batches.results(batch.id):
             future, result = chunk[int(entry.custom_id)][1], entry.result
+            if future.done():  # a cancelled caller must not prevent delivery of the other paid replies
+                continue
             if result.type == "succeeded":
                 future.set_result(result.message)
             else:

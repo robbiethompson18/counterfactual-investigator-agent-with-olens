@@ -90,6 +90,17 @@ rows (a reply without a valid submission gets its further turns, an errored requ
 `anthropic-direct/`), and finishes the run once all have ended. Inline conditions only; `--reuse` works as usual at submit.
 Batches of 1,000 inline prompts took ~10 min on 2026-10-31; Anthropic's cap is 24 h, after which requests expire unbilled.
 
+Collection checks the saved run configuration and each full request (including system prompt, tools
+and effort), and marks a run done only when every expected prediction has a row. Older manifests use
+their saved configuration and user-prompt hashes. Keep `--inputs` pinned to the submitted run if
+newer inputs have since appeared. If predictions are missing, collection saves the partial run as
+abandoned and raises: retry collection for failed replies, or, after an interrupted submission,
+submit a new run with `--reuse OLD_RUN/predictions.jsonl`. Fully reused runs need no API batches.
+API failures and interruptions save the partial run as abandoned through the usual run cleanup. Both
+batch paths count serialized UTF-8 payload bytes, including system prompts and tools, and split at a
+conservative 150 MB budget.
+
+
 Runs land in `data/runs/cfbench/<date>_<slug>/` like any cfbench run (meta params `eval`, `envs`),
 synced to HF at the end. Slugs ending `-smoke` are left out of the viewer. Gemini 3.8 Flash with 20
 tool calls costs ~$0.10 per draw on a 25k-character transcript, so budget draws × cases × conditions

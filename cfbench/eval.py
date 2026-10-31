@@ -30,7 +30,7 @@ import inspect
 import json
 import random
 import re
-from hashlib import sha1
+from hashlib import sha1, sha256
 from pathlib import Path
 
 import anthropic
@@ -225,6 +225,35 @@ async def main():
         assert old.get("inline_hook") == inline_src or not inline, f"{path}: INLINE differs"
         for r in map(json.loads, Path(path).read_text().splitlines()):
             reuse[key(r, r["condition"])] = r
+    params = {
+        "env": f"eval:{args.name}",
+        "eval": args.name,
+        "envs": ev.ENVS,
+        "inputs": str(inputs.relative_to(ROOT)),
+        "versions": versions,
+        "conditions": ",".join(conditions),
+        "predictors": args.predictors,
+        "model_name": ev.MODEL_NAME,
+        "models": sorted({c["model"] for _, c, _ in cases}),
+        "task": task,
+        "effort": args.effort or EFFORT,
+        "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
+        "max_calls": args.max_calls,
+        "draws": args.draws,
+        "seed": args.seed,
+        "limit": args.limit,
+        "model_filter": args.models,
+        "harness_version": HARNESS_VERSION,
+        "eval_md": notes,
+        "base_line": base_src,
+        "ask": ask_src,
+        "prompt_hook": prompt_src,
+        "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
+        "inline_hook": inline_src,
+        "system": getattr(ev, "SYSTEM", None),
+        "reuse": args.reuse,
+        "batch": args.batch,
+    }
     run = (
         Path(args.run)
         if args.batch == "collect"
@@ -233,35 +262,7 @@ async def main():
             args.slug,
             description=args.description or f"eval {args.name} ({', '.join(versions)}): {len(cases)} cases, {', '.join(conditions)}",
             models=[{"name": p, "served_by": "openrouter"} for p in predictors],
-            params={
-                "env": f"eval:{args.name}",
-                "eval": args.name,
-                "envs": ev.ENVS,
-                "inputs": str(inputs.relative_to(ROOT)),
-                "versions": versions,
-                "conditions": ",".join(conditions),
-                "predictors": args.predictors,
-                "model_name": ev.MODEL_NAME,
-                "models": sorted({c["model"] for _, c, _ in cases}),
-                "task": task,
-                "effort": args.effort or EFFORT,
-                "inline_effort": (args.effort or getattr(ev, "INLINE_EFFORT", None)) if inline else None,
-                "max_calls": args.max_calls,
-                "draws": args.draws,
-                "seed": args.seed,
-                "limit": args.limit,
-                "model_filter": args.models,
-                "harness_version": HARNESS_VERSION,
-                "eval_md": notes,
-                "base_line": base_src,
-                "ask": ask_src,
-                "prompt_hook": prompt_src,
-                "placebo_hook": inspect.getsource(ev.PLACEBO) if hasattr(ev, "PLACEBO") else None,
-                "inline_hook": inline_src,
-                "system": getattr(ev, "SYSTEM", None),
-                "reuse": args.reuse,
-                "batch": args.batch,
-            },
+            params=params,
         )
     )
     out, slots = run / "predictions.jsonl", asyncio.Semaphore(args.concurrency)
@@ -346,33 +347,40 @@ async def main():
         """Every prediction's first request, sent in batches of up to BATCH_MAX (or ~150 MB) as they're built, so memory
         holds one batch; run/batches.jsonl maps each batch's requests back to their predictions for `collect`."""
         api, chunk, keys = openrouter.anthropic_client(), [], []
+        (run / "batches.jsonl").touch()  # a fully reused run has no batches, but can still be collected
 
         async def send():
             batch = await api.messages.batches.create(requests=[{"custom_id": str(i), "params": r} for i, r in enumerate(chunk)])
             with (run / "batches.jsonl").open("a") as f:
-                f.write(json.dumps({"batch": batch.id, "keys": keys}) + "\n")
+                f.write(json.dumps({"batch": batch.id, "keys": keys, "request_hashes": [request_hash(r) for r in chunk]}) + "\n")
             print(f"anthropic batch {batch.id}: {len(chunk)} requests", flush=True)
             chunk.clear()
             keys.clear()
 
-        size = 0
+        size = 32  # outer {"requests": [...]} wrapper
         for env, case, base, condition, predictor, draw in everything:
             shown = shown_of(base, draw)
             if reused(case, condition, predictor, draw, shown):
                 continue
             prompt, tools, _, effort = job(env, case, base, condition, draw, shown)
-            messages, schemas = opening(prompt, tools, task, system)
-            chunk.append(
-                openrouter.claude_request(predictor.removeprefix(openrouter.BATCH), messages, effort, tools=schemas, max_tokens=16000)
-            )
-            keys.append([*key(case | {"predictor": predictor, "draw": draw}, condition), sha1(prompt.encode()).hexdigest()])
-            size += len(prompt)
-            if len(chunk) == openrouter.BATCH_MAX or size > 150_000_000:
+            request = batch_request(predictor, prompt, tools, effort)
+            request_size = openrouter.batch_request_size(request)
+            if chunk and (len(chunk) == openrouter.BATCH_MAX or size + request_size > openrouter.BATCH_BYTES):
                 await send()
-                size = 0
+                size = 32
+            chunk.append(request)
+            keys.append([*key(case | {"predictor": predictor, "draw": draw}, condition), sha1(prompt.encode()).hexdigest()])
+            size += request_size
         if chunk:
             await send()
         print(f"submitted; collect with the same command plus --batch collect --run {run}")
+
+    def batch_request(predictor: str, prompt: str, tools: dict, effort: str) -> dict:
+        messages, schemas = opening(prompt, tools, task, system)
+        return openrouter.claude_request(predictor.removeprefix(openrouter.BATCH), messages, effort, tools=schemas, max_tokens=16000)
+
+    def request_hash(request: dict) -> str:
+        return sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
 
     async def collect(run: Path, everything: list):
         """Waits for submit's batches; as each ends, finishes its predictions (a reply without a valid submission gets its
@@ -381,14 +389,15 @@ async def main():
         api = openrouter.anthropic_client()
         jobs = {key(case | {"predictor": p, "draw": d}, c): (env, case, base, c, p, d) for env, case, base, c, p, d in everything}
         done = {key(r, r["condition"]) for r in map(json.loads, out.open())} if out.exists() else set()
-        pending = [json.loads(line) for line in (run / "batches.jsonl").open()]
+        manifest = run / "batches.jsonl"
+        pending = [json.loads(line) for line in manifest.open()] if manifest.exists() else []
         while pending:
             for b in list(pending):
                 if (await api.messages.batches.retrieve(b["batch"])).processing_status != "ended":
                     continue
                 results = {e.custom_id: e.result async for e in await api.messages.batches.results(b["batch"])}
 
-                async def finish_one(i: int, k: list, results: dict):
+                async def finish_one(i: int, k: list, results: dict, hashes: list | None):
                     if tuple(k[:-1]) in done:
                         return
                     env, case, base, condition, predictor, draw = jobs[tuple(k[:-1])]
@@ -396,27 +405,44 @@ async def main():
                     async with slots:
                         prompt, tools, extra, effort = job(env, case, base, condition, draw, shown)
                         assert sha1(prompt.encode()).hexdigest() == k[-1], f"{k}: prompt differs from the one submitted"
+                        if hashes:  # older manifests rely on the prompt hash and saved params above
+                            assert request_hash(batch_request(predictor, prompt, tools, effort)) == hashes[i], (
+                                f"{k}: request differs from the one submitted (system, tools, model or effort)"
+                            )
                         r = results.get(str(i))
                         first = openrouter.claude_reply(r.message) if r and r.type == "succeeded" else None
                         direct = predictor.replace(openrouter.BATCH, openrouter.CLAUDE)
                         result = await predicted(env, case, condition, direct, draw, prompt, tools, effort, first=first)
                     if result:
                         record(env, case, condition, predictor, draw, shown, effort, extra, result)
+                        done.add(tuple(k[:-1]))
 
-                await asyncio.gather(*(finish_one(i, k, results) for i, k in enumerate(b["keys"])))
+                await asyncio.gather(*(finish_one(i, k, results, b.get("request_hashes")) for i, k in enumerate(b["keys"])))
                 pending.remove(b)
                 print(f"collected {b['batch']}; {len(pending)} batches left", flush=True)
             if pending:
                 await asyncio.sleep(60)
+        missing = jobs.keys() - done
+        if missing:
+            raise RuntimeError(
+                f"{len(missing)} predictions are missing; run marked abandoned. Retry collect for failed replies; "
+                "if submission was interrupted, submit a new run with --reuse pointing to this run's predictions.jsonl."
+            )
         finish(run)
 
     if args.batch:
         assert set(conditions) <= set(INLINE_CONDITIONS), "--batch: single-turn (inline) conditions only"
         assert all(p.startswith(openrouter.BATCH) for p in predictors), "--batch: anthropic-batch/ predictors only"
-        await (submit if args.batch == "submit" else collect)(run, everything)
-        return
+        if args.batch == "collect":  # a mistyped collection command must not change the original run's status
+            submitted = json.loads((run / "meta.json").read_text())["params"]
+            for name, value in params.items():
+                if name not in {"batch", "reuse"}:
+                    assert submitted.get(name) == value, f"{name} differs from submission; collect with the original configuration"
 
     try:
+        if args.batch:
+            await (submit if args.batch == "submit" else collect)(run, everything)
+            return
         await asyncio.gather(*(one(*j) for j in everything))
     except BaseException:
         finish(run, status="abandoned")
