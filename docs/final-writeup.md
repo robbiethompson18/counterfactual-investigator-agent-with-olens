@@ -3,6 +3,13 @@
 **Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
 by hand.
 
+<!-- AGENTS (Robbie, 2026-10-31): every lens number, chart and token count for MCQ (MMLU-Pro, SuperGPQA), knowledge
+cutoff and preferences comes ONLY from the canonical menus_inline runs, `all` menu (each prompt's punctuation and option
+newlines plus the 9 tail tokens, layers 32-60, same prompt and placebo rules on every set): `graphs/menus_inline.py` SETS,
+plus their 3-draw top-ups. Never the 2026-10-29 per-set runs (mcq-unselected-haiku-*, supergpqa-haiku-3k-*,
+cutoff-qa-1k-*, favorites-haiku-v3-*): each set there read different positions (J++ at every token on three sets, 16
+positions on MMLU-Pro) with a different prompt. Essay grading has no menus run and keeps its own. -->
+
 Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
 review I will write (KTR). FOr Claude I will write (CTR).
 
@@ -361,9 +368,11 @@ Regenerate with `uv run python -m graphs.headline_ablations`.
 
 <img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
 
-We see the most uplift from the 🔮-lens, whose reads add the fewest tokens to Haiku's prompt (12.1k
-pooled, against 13.6k for NLA and 14.8k for J++, the weakest lens). Thus we don't think that extra
-tokens alone drive placebo gains.
+We see the most uplift from the 🔮-lens, whose reads add the fewest tokens per prompt to Haiku's
+(12.1k per prediction, pooled, against 13.6k for NLA and 14.8k for J++, the weakest lens). Thus we
+don't think that extra tokens alone drive placebo gains. TODO: redo these counts once the charts use
+the menus_inline `all` runs, where every lens is read at the same positions; here J++ was read at
+every token on three of the four sets, which inflates its count.
 
 Reads also make Haiku think longer, so we checked whether more thinking explains the gains. It
 doesn't look like it. Pooled, Haiku spends 154 thinking tokens per prediction on transcript-only,
