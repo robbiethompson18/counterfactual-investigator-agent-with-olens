@@ -34,13 +34,22 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
   set, prompt only vs O-lens, J-lens and NLA with their placebos, beside both standardized probe
   read positions on the same questions, for all / Qwen-right / Qwen-wrong cases, plus paired
   differences (`docs/mcq-unselected.md`)
+- `menus_inline`: which read positions help (cfbench/evals/menus_inline): O-lens, NLA and J++ each
+  at four position menus (prompt punctuation, 9 tail tokens, all, last token) beside their placebos
+  and prompt only, pooled over cutoff_qa, favorites_qa, MMLU-Pro and SuperGPQA with each set
+  weighted equally
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
+- `olens_mandarin`: Mandarin in O-lens bullets and output tokens, before vs after the leading-space
+  fix (`docs/olens-chinese.md`, `docs/final-writeup.md`); needs `--with transformers`
 - `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock
   Qwen asked directly, numbers hand-copied from the sprint doc (Wrong Bridge is a TBD placeholder)
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa and essay questions become eval cases (one PNG each; dark
+  green evaluated, light green held out, gray unusable), counts sourced in the module; for the final write-up's Data Filter
+  section
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)

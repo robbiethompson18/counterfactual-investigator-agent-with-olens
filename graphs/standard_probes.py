@@ -100,20 +100,22 @@ def essays():
     scores, reference = standard_essay_comparison()
     rows = list(reference.values())
     for x, (condition, values) in enumerate(scores.items()):
-        m, lo, hi = grouped_auc_ci([values[k] for k in reference], [r["truth"] for r in rows], [r["group"] for r in rows])
+        draws = [(p, r) for k, r in reference.items() for p in values[k]]  # every draw one prediction
+        m, lo, hi = grouped_auc_ci([p for p, _ in draws], [r["truth"] for _, r in draws], [r["group"] for _, r in draws])
         ci_bar(ax, x, condition, m, lo, hi, width=0.65, fmt="{:.3f}")
     baseline, _, _ = grouped_auc_ci([-r["observed"] for r in rows], [r["truth"] for r in rows], [r["group"] for r in rows])
     ax.axhline(baseline, color=MUTED, ls=":", lw=1)
-    ax.set_xticks(range(4), ["Transcript", "O-lens", "Probe: user end", "Probe: final token"])
-    ax.set_xlim(-0.65, 3.65)
+    names = ["Transcript", "O-lens", "placebo", "NLA", "placebo", "J++", "placebo", "Probe:\nuser end", "Probe:\nfinal token"]
+    ax.set_xticks(range(len(names)), names)
+    ax.set_xlim(-0.65, len(names) - 0.35)
     ax.set_ylim(0.5, 0.95)
     ax.set_ylabel("AUROC: plain-opener grade > observed grade")
     ax.grid(axis="x", visible=False)
     ax.set_title("Essays: investigators and standardized probes\n1,800 matched cases · 204 essays", color=INK)
     fig.supxlabel(
         "Probes: nested two-fold; 899/901 training cases per fold; 95% essay-bootstrap CIs\n"
-        f"Dotted: mean-reversion baseline ({baseline:.3f}). Historical Haiku: low effort.\n"
-        "Legacy placebo excluded: counterfactual contamination.",
+        f"Dotted: mean-reversion baseline ({baseline:.3f}). Haiku 5.5 at effort medium, AUROC over every draw.\n"
+        "Placebo: another opener's reads on a different essay of the same topic.",
         fontsize=8.5,
         color=MUTED,
     )

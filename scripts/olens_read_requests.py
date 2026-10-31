@@ -21,11 +21,11 @@ says `thinking: true`), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `"last"` only the final one, `positions: [token indices]` exactly those, and `char_positions:
-[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its stripped content,
-as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row with `text` instead of
-`messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render); `option_newlines: true` (or --option-newlines)
-adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
-option's "\\n\\n" included: the legacy option-newline probe's `nl` site). A row's
+[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its content as given,
+leading whitespace counted, as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row
+with `text` instead of `messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render);
+`option_newlines: true` (or --option-newlines) adds, to whichever positions the row reads, the newline token after each MCQ
+option ("\\nA. ..." or "\\n(A) ...", the last option's "\\n\\n" included: the legacy option-newline probe's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -39,7 +39,8 @@ already in OUT are skipped, so a rerun resumes (re-reading the last one, which a
 
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
-     field's text, or null), layer, bullets: [{text, fve, coef}] (sorted by fve), joint_fve}
+     field's text as given, leading whitespace counted; null for template tokens), layer, bullets: [{text, fve, coef}]
+     (sorted by fve), joint_fve}
 
 plus OUT's provenance (olens.provenance: lens adapter, bullet prefix, AR, whitener, revisions, sampling) as
 reads.provenance.json next to it, and each transcript's tokens and chat sections as OUT.transcripts.jsonl
@@ -49,10 +50,7 @@ reads.provenance.json next to it, and each transcript's tokens and chat sections
 import argparse
 import hashlib
 import json
-import os
-import re
 import time
-import zlib
 from pathlib import Path
 
 import numpy as np
@@ -63,16 +61,13 @@ from olens.nla import NLA_SAMPLING, NLAEngine
 from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
-from counterfactual_investigator_agent_with_olens.render import render_request, transcript_line  # PYTHONPATH=olens/src:src
-from environments._lib.mcq import option_newlines as mcq_option_newlines
+from counterfactual_investigator_agent_with_olens.reads import (  # PYTHONPATH=.:olens/src:src; untested on a pod since the move
+    prepare,
+    queue,
+    resume,
+    write_transcript,
+)
 from olens import provenance
-
-PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
-
-
-def option_newlines(text: str) -> list[int]:
-    """Character-offset adapter for the shared complete-option newline contract."""
-    return [char for char, _ in mcq_option_newlines(text)]
 
 
 # WorkspaceBench's sampling of record for prose lenses (T 1.0, top-p 0.95, top-k 64; the RL that made the lens sampled at T 1.0 too),
@@ -196,37 +191,6 @@ def main():
     run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
 
 
-def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
-    """Render one request row: messages, token ids, per-token provenance, token strings, read positions, layers, prefix keys.
-    `opt_nl` (or the row's `option_newlines`) adds the newline after each MCQ option in every message's content."""
-    msgs, ids, where = render_request(tok, row)
-    if row.get("prompt_ids"):  # token ids given as-is (e.g. edited after rendering); no per-token message provenance
-        ids, where = row["prompt_ids"], [(-1, None, None)] * len(row["prompt_ids"])
-    toks = [tok.decode([i]) for i in ids]
-    positions = [i for i, x in enumerate(ids) if x == im_end or PUNCT.match(toks[i])]
-    if row.get("turn_starts") is not None:  # only each <|im_start|> and the N tokens after it (the role, "\n", ...)
-        starts = [i for i, x in enumerate(ids) if x == im_start]
-        starts = starts[-1:] if row.get("last_turn_only") else starts
-        if row.get("turn_role"):  # e.g. "assistant": only that role's headers
-            starts = [i for i in starts if i + 1 < len(ids) and toks[i + 1] == row["turn_role"]]
-        positions = sorted({j for i in starts for j in range(i, min(len(ids), i + 1 + row["turn_starts"]))})
-    elif row.get("positions") == "all":
-        positions = list(range(len(ids)))
-    elif row.get("positions") == "last":  # the final token only (WorkspaceBench's final_token read site)
-        positions = [len(ids) - 1]
-    elif isinstance(row.get("positions"), list):  # explicit token indices into the rendered request
-        positions = row["positions"]
-    elif row.get("char_positions"):  # [[msg_index, char offset into its content], ...]: the token holding each char
-        positions = [max(i for i, w in enumerate(where) if w[:2] == (m, "content") and w[2] <= c) for m, c in row["char_positions"]]
-    if opt_nl or row.get("option_newlines"):
-        for mi, m in enumerate(msgs):
-            for c in option_newlines((m.get("content") or "").strip()):
-                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= c))
-        positions = sorted(set(positions))
-    row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
-    return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
-
-
 def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start):
     """The loop: many transcripts per step, every engine call one big batch (module docstring)."""
     t0, n_done, n_reads, secs = time.time(), 0, 0, dict.fromkeys(("capture", "decode", "score"), 0.0)
@@ -310,55 +274,10 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
               flush=True)  # fmt: skip
 
 
-def resume(out: Path) -> set[str]:
-    """Transcript ids already in OUT, for a rerun to skip. A transcript's lines are appended in one block after the one before,
-    so only the last transcript on disk can be partial (a crash mid-write, maybe a torn last line): truncate OUT to before it,
-    and it is read again. Costs one transcript per restart."""
-    if not out.exists():
-        return set()
-    ids, last, last_start, pos = set(), None, 0, 0
-    with out.open("rb") as f:
-        for line in f:
-            try:
-                i = json.loads(line)["id"]
-            except json.JSONDecodeError:
-                break
-            if i != last:
-                last, last_start = i, pos
-            ids.add(i)
-            pos += len(line)
-    os.truncate(out, last_start)
-    return ids - {last}
-
-
 def item_seed(seed, key, layer):
     """A decode's own sampling seed, from --seed, its cache key (prefix hash, transcript id at T > 0) and layer: one seed for the
     whole batch made equal vectors (one position read for many transcripts) decode to the same sample (2026-10-29)."""
     return int.from_bytes(hashlib.blake2b(repr((seed, key, layer)).encode(), digest_size=4).digest(), "little")
-
-
-def prefix_keys(ids, positions):
-    """position -> a hash of the token ids up to and including it (equal keys = equal prefixes, hence equal reads)."""
-    h, keys, want = hashlib.blake2b(digest_size=16), {}, set(positions)
-    for i, x in enumerate(ids):
-        h.update(int(x).to_bytes(4, "little"))
-        if i in want:
-            keys[i] = h.copy().digest()
-    return keys
-
-
-def queue(path, shard, done):
-    """REQUESTS minus `done`, this shard only: priority order, round-robin over (env, arm) within a priority so early
-    results cover every case. Re-read on every call, so appending to REQUESTS adds work to a running reader."""
-    rows = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
-    i, n = map(int, shard.split("/"))
-    rank, seen = {}, {}
-    for r in rows:
-        g = (r.get("priority", 0), r.get("env"), r.get("arm"))
-        rank[r["id"]] = (g[0], seen.get(g, 0))
-        seen[g] = seen.get(g, 0) + 1
-    rows = [r for r in rows if r["id"] not in done and zlib.crc32(r.get("shard_key", r["id"]).encode()) % n == i]
-    return sorted(rows, key=lambda r: rank[r["id"]])
 
 
 def acts_path(out):
@@ -378,13 +297,6 @@ def write(tok, out, job, fields):
                 "layer": L, **fl,
             }  # fmt: skip
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-
-def write_transcript(out, job):
-    """The transcript's line in OUT.transcripts.jsonl (tokens as text, chat sections, request metadata): with OUT it is all
-    a viewer needs (docs/olens-reads-format.md). Written before the reads, so a reread after a crash may repeat it."""
-    with out.with_suffix(".transcripts.jsonl").open("a") as f:
-        f.write(json.dumps(transcript_line(job["row"], job["msgs"], job["toks"], job["where"]), ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":

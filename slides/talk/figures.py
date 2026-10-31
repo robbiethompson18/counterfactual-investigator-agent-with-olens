@@ -24,10 +24,10 @@ from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 
 from cfbench.evals.essay_grading_cf_inline.eval import mean
-from cfbench.scoring import essay_lens_rows, essay_probe_scores
+from cfbench.scoring import ESSAY_LENS_RUNS, essay_lens_rows, essay_probe_scores
 from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.style import BG, INK, MUTED, bar_kw, positions
-from slides.figure import FULL_H, FULL_W, figure, save
+from slides.figure import FULL_W, figure, save
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).with_name("fig")
@@ -193,15 +193,8 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
 
 
-def unit_mm(fig, ax) -> float:
-    """mm per x data unit of `ax` as laid out."""
-    fig.canvas.draw()
-    return ax.get_window_extent().width / fig.dpi * 25.4 / np.diff(ax.get_xlim())[0]
-
-
-def grid() -> float:
-    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns.
-    Returns the mm per bar unit, so other bar charts can match its bar widths and hatching."""
+def grid() -> None:
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
     widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0}, GROUPS)[1][-1] + 1 for n in knew.values()]
@@ -210,21 +203,23 @@ def grid() -> float:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
-    mm = unit_mm(fig, axes[0][0])
     save(fig, OUT / "grid.pdf")
-    return mm
 
 
-# Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's per-case p from the two runs'
-# predictions (data/runs/cfbench/, or HF's runs/cfbench/), a case = (arm, intro), its p the mean of its draws, as score.py
-ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
+# Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's draws from the runs' predictions
+# (data/runs/cfbench/, or HF's runs/cfbench/), a case = (arm, intro), every draw one prediction, as score.py
 # Standardized zero-counterfactual OOF probes, nested two-fold, with both positions shown.
-ESSAY_INVESTIGATORS = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
+ESSAY_LENSES = ["olens_inline", "nla_inline", "jlens_inline"]
+ESSAY_INVESTIGATORS = ["transcript_inline", *(c for x in ESSAY_LENSES for c in (x, x.replace("_inline", "_placebo_inline")))]
 ESSAY_GROUPS = [
     ("transcript", ["transcript_inline"]),
     ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-    ("transcript\n+ bet at mean", ["transcript_inline+mean"]),
-    ("O-lens\n+ bet at mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
+    ("NLA", ["nla_inline", "nla_placebo_inline"]),
+    ("J++", ["jlens_inline", "jlens_placebo_inline"]),
+    ("transcript\n+ mean", ["transcript_inline+mean"]),
+    ("O-lens\n+ mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
+    ("NLA\n+ mean", ["nla_inline+mean", "nla_placebo_inline+mean"]),
+    ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
     ("probe:\nuser end", ["probe_user_end"]),
     ("probe:\nfinal", ["probe_response_start"]),
 ]  # † Kylie: probably cursed (the slide's footnote)
@@ -240,21 +235,22 @@ def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
 
 @cache
 def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.ndarray]:
-    """keys (arm, intro), truth (base mean > arm mean), condition -> per-case score, the observed arm mean."""
-    ps: dict[str, dict[tuple, list[float]]] = {}
+    """keys (arm, intro), truth (base mean > arm mean), condition -> scores (cases x draws; a probe has one per case), the
+    observed arm mean."""
+    ps: dict[str, dict[tuple, dict[int, float]]] = {}
     truth, arm_mean = {}, {}
-    for run in ESSAY_RUNS:
+    for run in ESSAY_LENS_RUNS:
         for r in essay_lens_rows(run):
             if r.get("valid", True) and r.get("p") is not None:
                 k = (r["base_arm"], r["item"])
-                ps.setdefault(r["condition"], {}).setdefault(k, []).append(r["p"])
+                ps.setdefault(r["condition"], {}).setdefault(k, {})[r["draw"]] = r["p"]  # rows are in completion order
                 truth[k], arm_mean[k] = r["k_cf"], mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
     keys = sorted(truth)
-    xs = {c: np.array([np.mean(d[k]) for k in keys]) for c, d in ps.items()}
+    xs = {c: np.array([[d[k][i] for i in sorted(d[k])] for k in keys]) for c, d in ps.items()}
     for site in ("user_end", "response_start"):
         pr = essay_probe_scores(site)
         assert all(pr[k]["truth"] == truth[k] for k in keys)
-        xs[f"probe_{site}"] = np.array([pr[k]["predicted_shift"] for k in keys])
+        xs[f"probe_{site}"] = np.array([[pr[k]["predicted_shift"]] for k in keys])
     return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
 
 
@@ -268,16 +264,24 @@ def _logistic(x: np.ndarray, y: np.ndarray, l2: float = 1e-3) -> np.ndarray:
 
 def recalibrated(keys: list[tuple], y: np.ndarray, p: np.ndarray, am: np.ndarray) -> np.ndarray:
     """The investigator plus bet at the mean, as the essay eval page's combined() (branch claude/essay-grading-probe,
-    score.py): out-of-fold logistic regression on [1, logit(p), the observed arm mean grade], 5 folds grouped by essay."""
-    lp = np.log(np.clip(p, 0.01, 0.99) / (1 - np.clip(p, 0.01, 0.99)))
-    x = np.column_stack([np.ones(len(p)), lp, am])
+    score.py): out-of-fold logistic regression on [1, logit(p), the observed arm mean grade], 5 folds grouped by essay. `p`:
+    cases x draws, one row per draw; returns the same shape."""
+    d = p.shape[1]
+    q = np.clip(p.ravel(), 0.01, 0.99)
+    x = np.column_stack([np.ones(len(q)), np.log(q / (1 - q)), np.repeat(am, d)])
+    yy = np.repeat(y, d).astype(float)
     essays = sorted({k[1] for k in keys})
     fold = {e: i % 5 for i, e in enumerate(np.random.default_rng(0).permutation(essays))}
-    f = np.array([fold[k[1]] for k in keys])
-    out = np.zeros(len(p))
+    f = np.repeat([fold[k[1]] for k in keys], d)
+    out = np.zeros(len(q))
     for i in range(5):
-        out[f == i] = x[f == i] @ _logistic(x[f != i], y[f != i].astype(float))
-    return out
+        out[f == i] = x[f == i] @ _logistic(x[f != i], yy[f != i])
+    return out.reshape(p.shape)
+
+
+def pooled_auroc(x: np.ndarray, y: np.ndarray) -> float:
+    """AUROC over every draw (cases x draws): each draw is one prediction (docs/cfbench-scoring.md)."""
+    return rank_auroc(x.ravel(), np.repeat(y, x.shape[1]))
 
 
 @cache
@@ -290,18 +294,16 @@ def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
     of = {i: np.array([n for n, k in enumerate(keys) if k[1] == i]) for i in items}
     rng = np.random.default_rng(0)
     idx = [np.concatenate([of[items[j]] for j in rng.integers(0, len(items), len(items))]) for _ in range(reps)]
-    boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+    boot = {c: np.array([pooled_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
     bars = {}
     for c, x in xs.items():
         ref = "transcript_inline+mean" if c.endswith("+mean") else "transcript_inline"
         st = "" if c == ref else stars(float((boot[c] - boot[ref] <= 0).mean()))
-        bars[c] = (rank_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+        bars[c] = (pooled_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     pairs = {}
-    for a, b in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"),
-                 ("olens_placebo_inline", "transcript_inline"),
-                 ("probe_user_end", "transcript_inline"), ("probe_response_start", "transcript_inline"),
-                 ("olens_inline+mean", "transcript_inline+mean"), ("olens_inline+mean", "olens_placebo_inline+mean"),
-                 ("olens_placebo_inline+mean", "transcript_inline+mean")]:  # fmt: skip
+    lens_pairs = [p for x in ESSAY_LENSES for p in ((x, x.replace("_inline", "_placebo_inline")), (x, "transcript_inline"))]
+    for a, b in [*lens_pairs, ("olens_placebo_inline", "transcript_inline"), ("probe_user_end", "transcript_inline"),
+                 ("probe_response_start", "transcript_inline"), *((f"{a}+mean", f"{b}+mean") for a, b in lens_pairs)]:  # fmt: skip
         if a in boot:
             d = boot[a] - boot[b]
             pairs[a, b] = (bars[a][0] - bars[b][0], np.quantile(d, [0.025, 0.975]).tolist(), float((d <= 0).mean()))
@@ -309,18 +311,17 @@ def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
 
 
 def essay_flips() -> tuple[int, int]:
-    """Cases O-lens gets right (p >= 0.5 vs truth) and its placebo wrong, and the reverse."""
+    """Draws O-lens gets right (p >= 0.5 vs truth) and the same-numbered placebo draw wrong, and the reverse."""
     _, y, xs, _ = essay_cases()
-    ok = {c: (xs[c] >= 0.5) == y for c in ("olens_inline", "olens_placebo_inline")}
+    ok = {c: (xs[c] >= 0.5) == y[:, None] for c in ("olens_inline", "olens_placebo_inline")}
     return int((ok["olens_inline"] & ~ok["olens_placebo_inline"]).sum()), int((~ok["olens_inline"] & ok["olens_placebo_inline"]).sum())
 
 
-def essay(mm: float) -> None:
+def essay() -> None:
     """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null.
-    `mm`: grid()'s mm per bar unit; the figure is narrowed until its axes match it, so the bars (and their hatching) are
-    the same size as Part 1's (Kylie, 2026-10-31)."""
+    Full slide width: three lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table."""
     bars, null, n, _ = essay_auroc_bars()
-    fig, ax = figure(90, FULL_H)
+    fig, ax = figure(FULL_W, 29)
     xs, ticks = positions(bars, ESSAY_GROUPS)
     base = 0.5
     for c, x in xs.items():
@@ -335,16 +336,13 @@ def essay(mm: float) -> None:
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", labelsize=7 * S)
     ax.text(0, 1.08, f"{n:,} cases · probes: nested 2 × 2", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
-    ax.text(1.0, 1.08, "hatched = legacy placebo (contaminated)", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
+    ax.text(1.0, 1.08, "AUROC over every draw · hatched = placebo", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
     ax.grid(axis="x", visible=False)
     top = max(hi for _, (_, hi), _ in bars.values()) + 0.07
     yt = np.arange(base, top, 0.1)
     ax.set_ylim(base, top)
     ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
     ax.set_ylabel("AUROC of P(score goes up)")
-    for _ in range(3):  # constrained layout moves the axes as the figure narrows
-        w = fig.get_figwidth() - (unit_mm(fig, ax) - mm) * np.diff(ax.get_xlim())[0] / 25.4
-        fig.set_figwidth(w)
     save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -354,28 +352,17 @@ def essay_diffs() -> None:
     at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
     resamples as the table and the stars; the probes are left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
-    short = {"olens_inline": "O-lens", "olens_placebo_inline": "placebo", "transcript_inline": "transcript"}
-    fig, ax = figure(57, 30)
+    short = {"olens_inline": "O-lens", "nla_inline": "NLA", "jlens_inline": "J++"}
+    fig, ax = figure(72, 25)
     ticks, labels, y = [], [], 0.0
-    for head, sfx in (("investigator", ""), ("+ bet at mean", "+mean")):
+    for a, b in [(x, other) for x in ESSAY_LENSES for other in (x.replace("_inline", "_placebo_inline"), "transcript_inline")]:
+        d, (lo, hi), _ = pairs[a, b]
+        ax.plot([lo, hi], [y, y], color=INK, lw=1.2, solid_capstyle="butt", zorder=3)
+        ax.plot(d, y, "o", ms=3.5, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
         ticks.append(y)
-        labels.append(head)
+        labels.append(f"{short[a]} − {'transcript' if b == 'transcript_inline' else 'placebo'}")
         y -= 1
-        for a, b in [
-            ("olens_inline", "transcript_inline"),
-            ("olens_inline", "olens_placebo_inline"),
-            ("olens_placebo_inline", "transcript_inline"),
-        ]:
-            d, (lo, hi), _ = pairs[a + sfx, b + sfx]
-            ax.plot([lo, hi], [y, y], color=INK, lw=1.2, solid_capstyle="butt", zorder=3)
-            ax.plot(d, y, "o", ms=3.5, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
-            ticks.append(y)
-            labels.append(f"{short[a]} − {short[b]}")
-            y -= 1
     ax.set_yticks(ticks, labels)
-    for tick, lab in zip(ax.get_yticklabels(), labels, strict=True):
-        if lab in ("investigator", "+ bet at mean"):  # group headers, as diff_rows
-            tick.set_fontweight("bold")
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_ylim(y + 0.4, 0.6)
     ax.set_xlim(-0.012, 0.035)
@@ -390,12 +377,13 @@ def essay_tables() -> None:
     O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
-            "olens_placebo_inline": r"\swp{olens}\ placebo",
+            "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
+            "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
             "probe_user_end": r"\sw{probe}\ probe: user end", "probe_response_start": r"\sw{probe}\ probe: final"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
-            for a, b in pairs if not a.endswith("+mean")]  # fmt: skip
+            for a, b in pairs if not a.endswith("+mean") and not a.startswith("probe")]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
     head = [r" & \multicolumn{2}{c}{investigator} & \multicolumn{2}{c}{+ bet at mean}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
     (OUT / "essay_pairs.tex").write_text(tab("lrrrr", [*head, "\\hline", *rows]))
@@ -432,6 +420,7 @@ def grader() -> None:
 
 
 if __name__ == "__main__":
-    essay(grid())
+    grid()
+    essay()
     essay_diffs()
     grader()

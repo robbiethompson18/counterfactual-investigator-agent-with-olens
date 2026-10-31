@@ -34,7 +34,7 @@ N_BOOT = 4000
 
 def runs(slot: str) -> list[Path]:
     scale = [p for p in sorted(RUNS.glob(f"*_answer-mcq-scale2k-{slot}*")) if not p.name.endswith(OTHER_PREDICTORS)]
-    return [RUNS / name for name in ORIG[slot]] + scale
+    return [RUNS / name for name in ORIG[slot]] + [p for p in scale if p.joinpath("predictions.jsonl").exists()]  # abandoned runs have none
 
 
 def load(slot: str) -> dict:

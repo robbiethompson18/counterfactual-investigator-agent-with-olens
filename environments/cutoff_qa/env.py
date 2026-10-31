@@ -129,9 +129,11 @@ def measure(ep) -> dict:
     answer = norm(reply)
     truths = {norm(t) for t in [meta["truth"], *meta.get("truth_aliases", [])]} - {""}
     stale = stale_key(meta)
+    correct = answer in truths
     return {
         "answer": answer,
-        "correct": answer in truths,
+        "positive": not correct,  # Qwen is wrong; ambiguous: also counts off-script wrong answers and alias misses, not only outdated facts
+        "correct": correct,
         "contains_truth": any(_contains(t, answer) for t in truths),
         "stale": None if stale is None else answer == stale,
         "contains_stale": None if stale is None else _contains(stale, answer),
@@ -140,7 +142,7 @@ def measure(ep) -> dict:
 
 BEHAVIOR = (
     "Positive (`correct`) if the reply, normalized, equals the item's truth or one of its aliases; "
-    "`stale` = it equals Qwen's gated modal answer."
+    "`stale` = it equals Qwen's gated modal answer; `positive` = not correct."
 )
 PRIMARY = "correct"
 PAIRS: dict = {}  # one arm, no counterfactual pair

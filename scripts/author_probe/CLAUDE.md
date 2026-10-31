@@ -17,6 +17,7 @@ behind `cfbench/evals/author_blog_drop_inline`.
 | `blog.py`                          | bramble + GPU | Blog Authorship Corpus version (the result): `build [--append]`, `prompts [--skip]`, `answers`, `del-prep`, `del-analyze`, `view` (per-question expview with reads)                                                                                                                                      |
 | `merge_reads.py`                   | bramble       | merge a reader's output into a batch reads run (dedup, positions unioned)                                                                                                                                                                                                                                |
 | `score_drop.py`, `pvalues_drop.py` | bramble       | drop-eval scores; pooled paired AUROC / raw / Platt-recalibrated Brier with author-clustered CIs and one-sided p                                                                                                                                                                                         |
+| `pronoun_probe.py`                 | bramble       | exploratory, post hoc: FVE-weighted gendered pronouns in the O-lens reads along each sex post (level, step, shift before/after, slope) vs whether deleting a sentence makes a difference; placebo and text baselines, CV over Haiku transcript p (`runs/author_mcq_blog/2026-10-31_pronoun-probe`) |
 
 ```bash
 uv run python -m scripts.author_probe.bank build --upload

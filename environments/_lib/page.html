@@ -1214,7 +1214,7 @@ async function evalPage(h) {
       ${allConds.map(k => `<td>${ev.pooled.rmse[k] == null ? '<span class="mute">–</span>' : rmseBadge(ev.pooled.rmse[k], ev.pooled.rmse_null)}</td>`).join("")}<td class="num">${(100 * ev.pooled.rmse_null).toFixed(1)}pp</td></tr>` : ""}</table></div>`;
   const paired = runs.flatMap(R => R.paired.filter(keep).map(p => [R, p]));
   const pairedHtml = paired.length ? `<h3>Paired models (same cases, different model)${ev.pooled && !h.run && !h.env ? ", pooled over versions at the bottom" : ""}</h3>
-    <p class="lede">Mean predicted p per model, next to each model's true rate, and the AUROC of the per-case mean p for telling the first model's cases from the second's
+    <p class="lede">Mean predicted p per model, next to each model's true rate, and the AUROC of every draw's p for telling the first model's cases from the second's
       (0.5 = can't tell them apart; 1 = always higher for the first).</p>
     <div class="scroll"><table><tr><th>run</th><th>case</th><th>investigator</th><th>model A (truth)</th><th>mean p A</th><th>model B (truth)</th><th>mean p B</th><th>AUROC A > B</th></tr>
     ${paired.map(([R, p]) => `<tr><td class="mono">${esc(R.slug)}</td><td class="mono">${esc(p.env)}${p.version ? ` · ${esc(p.version)}` : ""}<br>${esc(p.base)} → ${esc(p.cf)}</td><td>${swatch(p.condition)}${esc(condShort(p.condition))}</td>

@@ -1,6 +1,6 @@
 """Charts for the essay_curious out-of-10 prediction (docs/envs/essay_curious.md): RMSE of the predicted no-scenario mean
 score per condition, with 95% case-bootstrap CIs and the "edit does nothing" null (predict the scenario arm's own mean),
-paired differences, and a per-case plot of every draw against the truth. Rows come from scripts/honest_score_predict.py.
+paired differences, and a per-case plot of every draw against the truth. Rows come from scripts/honest_score_predict.py@d89747b4.
 
     uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-*' [--out docs/img/essay-curious]
 """

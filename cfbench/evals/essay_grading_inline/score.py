@@ -7,7 +7,7 @@ so every modal score counts equally (Qwen's modal is 2 on 41% of cases; "always 
 = per draw, the share of Qwen's samples of that prompt whose score equals the submitted one, averaged over draws then
 cases; `modal` = % of draws naming Qwen's most common score (cfbench.answer's measure); `mae` = mean |submitted - Qwen's
 mean score|. 95% CIs bootstrap arms (an arm's 8 essays resampled together: cases on one arm are correlated). Then every
-paired difference against olens_inline over the same cases, with its CI.
+paired difference in PAIRS over the same cases, with its CI.
 """
 
 import json
@@ -21,7 +21,9 @@ from cfbench.core import canon_condition
 from cfbench.evals.essay_grading_inline.eval import canon
 
 BOOT = 2000
-PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
+PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"),
+         ("nla_inline", "nla_placebo_inline"), ("nla_inline", "transcript_inline"), ("nla_inline", "olens_inline"),
+         ("jlens_inline", "jlens_placebo_inline"), ("jlens_inline", "transcript_inline"), ("jlens_inline", "olens_inline"))  # fmt: skip
 
 
 def per_case(rows: list[dict]) -> dict[str, dict[str, dict[str, dict[tuple, float]]]]:

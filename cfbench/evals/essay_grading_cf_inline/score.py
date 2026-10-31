@@ -2,9 +2,10 @@
 
     uv run python -m cfbench.evals.essay_grading_cf_inline.score data/runs/cfbench/<date>_<slug> [...]
 
-Per condition: % right (guess = p >= 0.5, per case the mean over draws), AUROC of the mean p (up vs not), Brier, each with
+Per condition, every draw one prediction (docs/cfbench-scoring.md: the user gets one call, and averaging draws first rewards a
+placebo for showing different reads on each draw): % right (guess = p >= 0.5), pooled AUROC (up vs not), Brier, each with
 a 95% CI resampling essays (truths are per essay); the same on the clear cases (|shift| >= 0.5 points); then every paired
-difference against olens_inline over the same cases.
+difference in PAIRS (each lens vs its placebo, vs transcript-only and vs the O-lens) over the same cases.
 """
 
 import json
@@ -19,7 +20,9 @@ from cfbench.core import canon_condition
 from cfbench.scoring import essay_probe_scores, grouped_auc_ci
 
 BOOT = 1000
-PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
+PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"),
+         ("nla_inline", "nla_placebo_inline"), ("nla_inline", "transcript_inline"), ("nla_inline", "olens_inline"),
+         ("jlens_inline", "jlens_placebo_inline"), ("jlens_inline", "transcript_inline"), ("jlens_inline", "olens_inline"))  # fmt: skip
 
 
 def auroc(p: np.ndarray, y: np.ndarray) -> float:
@@ -28,7 +31,11 @@ def auroc(p: np.ndarray, y: np.ndarray) -> float:
 
 
 def metrics(ps: dict, truth: dict, keys: list) -> dict[str, float]:
-    p, y = np.array([ps[k] for k in keys]), np.array([truth[k] for k in keys])
+    """`ps`: case -> its draws' scores (or one score, for a rule with no draws), each draw one prediction."""
+    if not keys:  # a small run may have no clear cases, or two conditions no shared ones
+        return {"right": float("nan"), "brier": float("nan"), "auroc": float("nan")}
+    draws = [np.atleast_1d(ps[k]) for k in keys]
+    p, y = np.concatenate(draws), np.repeat([truth[k] for k in keys], [len(d) for d in draws])
     return {"right": float(((p >= 0.5) == y).mean()), "brier": float(((p - y) ** 2).mean()),
             "auroc": auroc(p, y)}  # fmt: skip
 
@@ -50,11 +57,10 @@ def main(paths: list[str]):
             k = (r["base_arm"], r["item"])
             ps[canon_condition(r["condition"])][k].append(r["p"])
             truth[k], shift[k] = r["k_cf"], r["shift"]
-    mp = {c: {k: float(np.mean(v)) for k, v in d.items()} for c, d in ps.items()}
     rng = np.random.default_rng(0)
     for name, keep in (("all", lambda k: True), ("clear |shift|>=0.5", lambda k: abs(shift[k]) >= 0.5)):
         print(f"== {name}")
-        for c, d in sorted(mp.items()):
+        for c, d in sorted(ps.items()):
             keys = [k for k in d if keep(k)]
             m = metrics(d, truth, keys)
             bs = boot(lambda ks, d=d: metrics(d, truth, ks), keys, rng)
@@ -62,10 +68,10 @@ def main(paths: list[str]):
             up = np.mean([truth[k] for k in keys])
             print(f"  {c:22} n={len(keys)} up={up:.2f}  " + "  ".join(f"{s} {m[s]:.3f} [{ci[s][0]:.3f}, {ci[s][1]:.3f}]" for s in m))
         for a, b in PAIRS:
-            if a in mp and b in mp:
-                keys = [k for k in mp[a].keys() & mp[b].keys() if keep(k)]
+            if a in ps and b in ps:
+                keys = [k for k in ps[a].keys() & ps[b].keys() if keep(k)]
                 diff = lambda ks, a=a, b=b: {
-                    s: metrics(mp[a], truth, ks)[s] - metrics(mp[b], truth, ks)[s] for s in ("right", "auroc", "brier")
+                    s: metrics(ps[a], truth, ks)[s] - metrics(ps[b], truth, ks)[s] for s in ("right", "auroc", "brier")
                 }
                 m, bs = diff(keys), boot(diff, keys, rng)
                 print(f"  {a} - {b}: " + "  ".join(f"{s} {m[s]:+.3f} [{np.nanpercentile([x[s] for x in bs], 2.5):+.3f}, "
@@ -78,7 +84,7 @@ if __name__ == "__main__":
 
 def stats(rows: list[dict]) -> list[dict]:
     """The env viewer's claim table (environments/_lib/evals.py), hint_qwen_dsv4's % right schema: one row per condition,
-    a case = (arm, intro), its score the mean of its draws; CI resampling essays."""
+    a case = (arm, intro), every draw one prediction; CI resampling essays."""
     invalid: dict[str, int] = defaultdict(int)
     by: dict = defaultdict(lambda: defaultdict(list))
     truth = {}
@@ -95,8 +101,7 @@ def stats(rows: list[dict]) -> list[dict]:
         keys = list(d)
         right = lambda ks, d=d: float(np.mean([np.mean([(p >= 0.5) == truth[k] for p in d[k]]) for k in ks]))
         bs = np.array(boot(right, keys, rng), dtype=float)
-        mp = {k: float(np.mean(v)) for k, v in d.items()}
-        m = metrics(mp, truth, keys)
+        m = metrics(d, truth, keys)
         out.append({"condition": cond, "version": "cf", "invalid": invalid[cond], "n": sum(map(len, d.values())), "n_items": len(keys),
                     "accuracy": right(keys), "accuracy_ci": [float(np.percentile(bs, 2.5)), float(np.percentile(bs, 97.5))],
                     "auroc": m["auroc"], "mean_brier": float(np.mean([(p - truth[k]) ** 2 for k in keys for p in d[k]]))})  # fmt: skip
@@ -118,16 +123,20 @@ def _logistic(x: np.ndarray, y: np.ndarray, l2: float = 1e-3) -> np.ndarray:
 
 def combined(p: dict, obs: dict, truth: dict, keys: list) -> dict:
     """Out-of-fold logistic regression on [1, logit(investigator p), observed arm grade], 5 folds grouped by essay: the
-    investigator plus "bet at the mean", with weights learned on other essays."""
-    x = np.array([[1.0, _logit(np.array(p[k])), obs[k]] for k in keys])
-    y = np.array([truth[k] for k in keys], dtype=float)
+    investigator plus "bet at the mean", with weights learned on other essays. One row per draw; returns case -> its draws' scores."""
+    owner = [k for k in keys for _ in p[k]]
+    x = np.array([[1.0, _logit(np.array(v)), obs[k]] for k in keys for v in p[k]])
+    y = np.array([truth[k] for k in owner], dtype=float)
     essays = sorted({k[1] for k in keys})
     fold = {e: i % 5 for i, e in enumerate(np.random.default_rng(0).permutation(essays))}
-    f = np.array([fold[k[1]] for k in keys])
-    out = np.zeros(len(keys))
+    f = np.array([fold[k[1]] for k in owner])
+    scores = np.zeros(len(owner))
     for i in range(5):
-        out[f == i] = x[f == i] @ _logistic(x[f != i], y[f != i])
-    return dict(zip(keys, out.tolist()))
+        scores[f == i] = x[f == i] @ _logistic(x[f != i], y[f != i])
+    out = defaultdict(list)
+    for k, s in zip(owner, scores.tolist(), strict=True):
+        out[k].append(s)
+    return dict(out)
 
 
 def PAGE(rows: list[dict]) -> str:
@@ -144,28 +153,28 @@ def PAGE(rows: list[dict]) -> str:
             k = (r["base_arm"], r["item"])
             ps[canon_condition(r["condition"])][k].append(r["p"])
             truth[k], shift[k] = r["k_cf"], r["shift"]
-    mp = {c: {k: float(np.mean(v)) for k, v in d.items()} for c, d in ps.items()}
-    order = [c for c in ("transcript_inline", "olens_inline", "olens_placebo_inline") if c in mp]
+    order = [c for c in ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline", "jlens_inline",
+                         "jlens_placebo_inline") if c in ps]  # fmt: skip
     rng = np.random.default_rng(0)
     f3 = lambda x: f"{x:.3f}"
     pfmt = lambda p: "< 0.001" if p < 0.001 else f"= {p:.3f}"
     lede = (
-        "<p class=\"lede\">Per case (an opener x an intro) the mean of its draws' p. Truth = Qwen's mean score with the "
+        '<p class="lede">Every draw of a case (an opener x an intro) is one prediction, pooled. Truth = Qwen\'s mean score with the '
         "plain opener is higher than with this one. 95% CIs resample essays (an essay's truth is shared by its ~9 arms).</p>"
     )
     out = ["<h2>AUROC: does the investigator rank the cases that go up above the ones that don't?</h2>", lede]
     for name, keep in (("all cases", lambda k: True),):  # the clear-cases cut is in main() only (Kylie: drop it from the page)
         res, pair_rows = [], []
         for c in order:
-            keys = [k for k in mp[c] if keep(k)]
-            a = metrics(mp[c], truth, keys)["auroc"]
-            bs = [b["auroc"] for b in boot(lambda ks, c=c: metrics(mp[c], truth, ks), keys, rng)]
-            res.append((c, a, float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5)), len(keys), metrics(mp[c], truth, keys)))
+            keys = [k for k in ps[c] if keep(k)]
+            a = metrics(ps[c], truth, keys)["auroc"]
+            bs = [b["auroc"] for b in boot(lambda ks, c=c: metrics(ps[c], truth, ks), keys, rng)]
+            res.append((c, a, float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5)), len(keys), metrics(ps[c], truth, keys)))
         for a, b in PAIRS:
-            if a in mp and b in mp:
-                keys = [k for k in mp[a].keys() & mp[b].keys() if keep(k)]
+            if a in ps and b in ps:
+                keys = [k for k in ps[a].keys() & ps[b].keys() if keep(k)]
                 d = lambda ks, a=a, b=b: {
-                    s: metrics(mp[a], truth, ks)[s] - metrics(mp[b], truth, ks)[s] for s in ("auroc", "right", "brier")
+                    s: metrics(ps[a], truth, ks)[s] - metrics(ps[b], truth, ks)[s] for s in ("auroc", "right", "brier")
                 }
                 m, bs = d(keys), boot(d, keys, rng)
                 cell = lambda s, better, m=m, bs=bs: (f"<b>{m[s]:+.3f}</b> [{np.nanpercentile([x[s] for x in bs], 2.5):+.3f}, "
@@ -190,7 +199,7 @@ def PAGE(rows: list[dict]) -> str:
             chart.append(("probe", score, lo, hi, title))
         out.append(bars(chart, 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)",
                         lines=[(null_auroc, f"bet at the mean {null_auroc:.3f}")]))  # fmt: skip
-        comb = {c: combined(mp[c], obs, truth, keys) for c in order}
+        comb = {c: combined(ps[c], obs, truth, keys) for c in order}
         crow = []
         for c in order:
             cb = [b["auroc"] for b in boot(lambda ks, c=c, comb=comb: metrics(comb[c], truth, ks), keys, rng)]
@@ -211,7 +220,8 @@ def PAGE(rows: list[dict]) -> str:
         out.append(
             '<p class="lede"><b>What this is.</b> Haiku sees Qwen\'s grades under the opener, but barely uses how low or high '
             'they are, so the simplest rule, <i>bet at the mean</i> (say "up" when Qwen\'s observed grade is below the average '
-            "plain-opener grade, 2.79), already ties it (AUROC 0.776; 70.7% right). The two carry different information: a "
+            "plain-opener grade, 2.79), already matches or beats a single draw of it (AUROC 0.776; 70.7% right). "
+            "The two carry different information: a "
             "logistic regression that adds Qwen's observed grade to the investigator's p, with its two weights fit on the other "
             "four-fifths of the essays (5 folds grouped by essay, so no essay is scored by weights fit on it), lifts every "
             "condition by about 0.07. The O-lens is still ahead of its placebo and of transcript-only after that, by about half "
@@ -229,14 +239,14 @@ def PAGE(rows: list[dict]) -> str:
         )
         out.append(table(["difference", "AUROC", "% right", "Brier (lower is better)"], pair_rows))
     out.append("<h3>AUROC by opener group</h3>")
+    lenses = [x for x in ("olens_inline", "nla_inline", "jlens_inline") if x in ps and x.replace("_inline", "_placebo_inline") in ps]
     body = []
     for g in sorted({group.get(a, "old arms") for a, _ in truth}):
         keys = [k for k in truth if group.get(k[0], "old arms") == g]
-        a = {c: metrics(mp[c], truth, [k for k in keys if k in mp[c]])["auroc"] for c in order}
-        body.append(
-            [g, str(len(keys)), *(f3(a[c]) for c in order), f"{a.get('olens_inline', np.nan) - a.get('olens_placebo_inline', np.nan):+.3f}"]
-        )
-    out.append(table(["group", "cases", *(swatch(c) for c in order), "O-lens − placebo"], body))
+        a = {c: metrics(ps[c], truth, [k for k in keys if k in ps[c]])["auroc"] for c in order}
+        lift = [f"{a[x] - a[x.replace('_inline', '_placebo_inline')]:+.3f}" for x in lenses]
+        body.append([g, str(len(keys)), *(f3(a[c]) for c in order), *lift])
+    out.append(table(["group", "cases", *(swatch(c) for c in order), *(f"{label(x)} − placebo" for x in lenses)], body))
     out.append(
         '<h3>Standardized linear probes</h3><p class="lede">Ridge predicts the plain-opener mean grade from '
         "biased-opener activations, then subtracts the observed grade. Both read positions are reported separately. "
