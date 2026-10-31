@@ -8,7 +8,7 @@
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{beamerthemeolens}[2026/10/30 olens sprint theme]
 
-\usetheme[progressbar=frametitle, numbering=none, sectionpage=progressbar, block=fill, titleformat=regular]{metropolis}
+\usetheme[progressbar=frametitle, numbering=none, sectionpage=none, block=fill, titleformat=regular]{metropolis}
 \RequirePackage{booktabs, colortbl, tikz, xcolor, graphicx}
 \RequirePackage[most]{tcolorbox}
 \usetikzlibrary{patterns}
@@ -83,12 +83,15 @@
 \setlength{\metropolis@titleseparator@linewidth}{0.5pt}
 \setlength{\metropolis@progressonsectionpage@linewidth}{0.5pt}
 
+% "PART n  Title" of the current section, right of every frame title (none before the first \section)
+\newcommand{\olens@partlabel}{\ifnum\value{section}>0{\color{accent}\usebeamerfont{date}\scriptsize\mdseries {\bfseries\addfontfeatures{LetterSpace=8}PART \insertsectionnumber}\ \ \insertsectionhead}\fi}
 % Frame title: ink on the page colour, left-aligned like the charts' titles, with Metropolis's progress bar as a hairline under it.
 \setbeamertemplate{frametitle}{%
   \nointerlineskip
   \begin{beamercolorbox}[wd=\paperwidth, leftskip=5mm, rightskip=5mm, ht=9mm, dp=2.6mm]{frametitle}%
     \usebeamerfont{frametitle}\insertframetitle
     \ifx\insertframesubtitle\@empty\else{\usebeamerfont{framesubtitle}\usebeamercolor[fg]{subtitle}\ \ \small\mdseries\insertframesubtitle}\fi
+    \hfill\olens@partlabel
   \end{beamercolorbox}%
 }
 
