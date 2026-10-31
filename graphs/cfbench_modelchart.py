@@ -76,6 +76,14 @@ def load(pattern: str = RUNS) -> list[dict]:
     return rows
 
 
+def case_ci(per_case: dict, n_boot: int = 2000) -> tuple[float, float]:
+    """95% case-bootstrap interval of 100 − RMSE. With four cases it's mostly the spread between cases, which every line shares."""
+    mses = np.array(list(per_case.values())) ** 2
+    resamples = np.random.default_rng(0).integers(0, len(mses), (n_boot, len(mses)))
+    lo, hi = np.percentile(100 - 100 * np.sqrt(mses[resamples].mean(axis=1)), [2.5, 97.5])
+    return float(lo), float(hi)
+
+
 def score(rows: list[dict], key) -> dict:
     """key(row) -> group; returns group -> {acc, rmse, per_case (env/rollout run -> rmse), null, ceiling, cost, n}.
 
@@ -119,15 +127,16 @@ def logo(predictor: str):
         return "o"
 
 
-def style(ax, s: dict, title: str, xlabel: str):
+def style(ax, s: dict, title: str, xlabel: str, ceiling: bool = True):
     ref = next(iter(s.values()))
     ax.axhline(ref["null"], color=INK, lw=0.8, ls="--", zorder=1)
-    ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
-    ax.text(ax.get_xlim()[0], ref["ceiling"], " ceiling (sampling noise)", va="bottom", fontsize=8, color=MUTED)
+    if ceiling:
+        ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
+        ax.text(ax.get_xlim()[0], ref["ceiling"], " ceiling (sampling noise)", va="bottom", fontsize=8, color=MUTED)
     ax.text(ax.get_xlim()[0], ref["null"], " edit does nothing", va="bottom", fontsize=8, color=INK)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
-    ax.set_title(title)
+    ax.set_title(title, pad=14)  # clears the ceiling label when the line sits at the top of the axes
 
 
 def model_lines(rows: list[dict], out: str) -> dict:
@@ -156,7 +165,7 @@ def model_lines(rows: list[dict], out: str) -> dict:
     for tick, c in zip(ax.get_xticklabels(), MODEL_AXIS, strict=True):
         tick.set_color(color(c))
     ax.set_xlim(-0.4, len(MODEL_AXIS) - 0.2)
-    style(ax, s, "Predictor model by condition (high effort, 20 tool calls, 4 cases)", "")
+    style(ax, s, "Predictor model by condition (high effort, 20 tool calls, 4 cases)", "", ceiling=False)
     fig.tight_layout()
     fig.savefig(f"{out}/models.png")
     plt.close(fig)
@@ -166,8 +175,10 @@ def model_lines(rows: list[dict], out: str) -> dict:
 def flash_lines(s: dict, xs: list, conditions: list[str], title: str, xlabel: str, path: str):
     fig, ax = plt.subplots(figsize=(6, 4.5))
     for c in conditions:
-        pts = [(i, s[x, c]["acc"]) for i, x in enumerate(xs) if (x, c) in s]
-        ax.plot(*zip(*pts, strict=True), color=color(c), marker="o", lw=2, label=LABEL[c])
+        present = [(i, s[x, c]) for i, x in enumerate(xs) if (x, c) in s]
+        ax.plot([i for i, _ in present], [g["acc"] for _, g in present], color=color(c), marker="o", lw=2, label=LABEL[c])
+        cis = [case_ci(g["per_case"]) for _, g in present]
+        ax.fill_between([i for i, _ in present], [lo for lo, _ in cis], [hi for _, hi in cis], color=color(c), alpha=0.12, lw=0)
     ax.set_xticks(range(len(xs)), [str(x) for x in xs])
     ax.legend(frameon=False, fontsize=9, loc="center right")
     style(ax, s, title, xlabel)
