@@ -27,7 +27,8 @@ from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
 R = Path("data/runs/cfbench")
 # set -> (title, runs); a set's NLA run is left out until it exists
 # The canonical runs for the final write-up's MCQ / cutoff / preferences numbers (CLAUDE.local.md): draw 0 of every menu, then
-# `*-all-d12b`, draws 1-2 of prompt only and the `all` menu (graphs.headline_inline reads those as its lens conditions)
+# `*-all-d12b` / `-d12c`, draws 1-2 of prompt only and the `all` menu (graphs.headline_inline reads those as its lens conditions;
+# the MCQ sets' d12b ran out of credits mid-upload, so their d12c holds d12b's rows plus the rest)
 SETS = {
     "cutoff": ("cutoff_qa", ["2026-10-30_menus-cutoff-olens-jlens", "2026-10-31_menus-cutoff-nla-batch",
                              "2026-10-31_menus-cutoff-all-d12b"]),
@@ -35,9 +36,9 @@ SETS = {
                                    "2026-10-31_menus-favorites-all-d12b"]),
     "mcq_unselected": ("MMLU-Pro (mcq_unselected)", ["2026-10-31_menus-mcq-unselected-olens-jlens-batch",
                                                      "2026-10-31_menus-mcq-unselected-nla-or2",
-                                                     "2026-10-31_menus-mcq-unselected-all-d12b"]),
+                                                     "2026-10-31_menus-mcq-unselected-all-d12c"]),
     "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3",
-                                "2026-10-31_menus-supergpqa-all-d12b"]),
+                                "2026-10-31_menus-supergpqa-all-d12c"]),
 }  # fmt: skip
 LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
