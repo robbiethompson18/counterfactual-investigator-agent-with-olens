@@ -123,8 +123,7 @@ ESSAY_GROUPS = [
     ("O-lens\n+ mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
     ("NLA\n+ mean", ["nla_inline+mean", "nla_placebo_inline+mean"]),
     ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
-    ("probe:\nuser end", ["probe_user_end"]),
-    ("probe:\nfinal", ["probe_response_start"]),
+    ("probe", ["probe_user_end"]),  # the user-end probe only (Kylie: one probe is easier to explain)
 ]  # † Kylie: probably cursed (the slide's footnote)
 
 
@@ -133,7 +132,7 @@ def essay() -> None:
     """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null.
     Full slide width: three lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table."""
     bars, null, n, _ = essay_auroc_bars()
-    fig, ax = slide_figure(FULL_W, 29)
+    fig, ax = slide_figure(FULL_W, 24)
     xs, ticks = positions(bars, ESSAY_GROUPS)
     base = 0.5
     for c, x in xs.items():
@@ -149,10 +148,10 @@ def essay() -> None:
     ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
-    ax.text(0, 1.08, f"{n:,} cases · probes: nested 2 × 2", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED)
-    ax.text(1.0, 1.08, "AUROC over every draw · hatched = placebo", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    head = f"{n:,} cases · probe: nested 2 × 2 · AUROC over every draw · hatched = placebo"  # one line, clear of the probe's stars
+    ax.text(0, 1.08, head, transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED)
     ax.grid(axis="x", visible=False)
-    top = max(hi for _, (_, hi), _ in bars.values()) + 0.07
+    top = max(bars[c][1][1] for c in xs) + 0.1
     yt = np.arange(base, top, 0.1)
     ax.set_ylim(base, top)
     ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
@@ -165,7 +164,7 @@ def essay() -> None:
 def essay_diffs() -> None:
     """The paired differences as a forest plot in diff_rows' style (ink CI line and dot, filled when the CI excludes 0, a line
     at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
-    resamples as the table and the stars; the probes are left out so it doesn't set the axis."""
+    resamples as the table and the stars; the probe is left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
     short = {"olens_inline": "O-lens", "nla_inline": "NLA", "jlens_inline": "J++"}
     fig, ax = slide_figure(72, 25)
@@ -194,7 +193,7 @@ def essay_tables() -> None:
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
             "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
             "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
-            "probe_user_end": r"\sw{probe}\ probe: user end", "probe_response_start": r"\sw{probe}\ probe: final"}  # fmt: skip
+            "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
