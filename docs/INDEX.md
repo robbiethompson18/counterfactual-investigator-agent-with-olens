@@ -13,6 +13,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
+- [REFERENCE: chive_inline — read before claiming CHIVE's transcript-only baseline depends on the transcript, or comparing a predictor with CHIVE's published arms](chive-inline.md)
+  — Haiku on CHIVE's 4,816 official yes/no claims: the model's reply adds +0.003 to +0.020 AUROC
+  over the edit alone
 - [REFERENCE: CHIVE critique — read before quoting what is wrong with CHIVE's data, thresholds or ground truth, or before replicating those numbers](chive-critique.md)
   — on Adam's release and Agam's run: 40% off-policy prefixes, 8,623 clean kills (12% of
   experiments, 32% of investigations) the 50pp rule discards, 12% of incidents with
