@@ -15,29 +15,7 @@ environments to make the task easier and on-policy, but this did not just result
 
 We suspect that counterfactuals are a harder task than the literature appreciates: on both our
 environments and on CHIVE, adding a transcript does not help a counterfactual investigator when
-compared to simply giving the investigator both system prompts. @c plz dig on this, I know we did
-env only on our envs, did we ever do this on CHIVE? if not we should.
-
-@robbie: we never ran it on CHIVE, and the CHIVE paper has no such arm either: every CHIVE predictor
-sees the transcript plus the claim. On CHIVE the equivalent arm is the original prompt plus the edit
-description, with no Qwen response. I didn't run it, because it needs a new harness condition, not a
-docs change. On our own envs the evidence is mixed, so the sentence overclaims as written:
-
-- cfbench, GLM 5.3, 280 cases: no transcript 30pp RMSE vs transcript-only 31pp
-  ([cfbench-scoring.md](cfbench-scoring.md)). The binary regrade agrees: no transcript wins by 5
-  points of balanced accuracy ([cfbench-binary-regrade.md](cfbench-binary-regrade.md)).
-- cfbench, Qwen without CoT, 144 cases: 28pp vs 24pp. The transcript helps by 4pp, CI [−6.6, −1.8].
-- Alignment faking: the prompt alone is the best condition, 7.4pp vs transcript 13.1pp
-  ([alignment-faking-cfbench.md](alignment-faking-cfbench.md)).
-- Honest grader, 242 cases: 75 vs 78 (100 − RMSE). The transcript helps by 3.5pp, CI [+1.6, +5.6]
-  ([honest-grader-envs.md](honest-grader-envs.md)).
-- Over-eagerness: 18.3pp vs 18.6pp, a tie ([overeager-main-cfbench.md](overeager-main-cfbench.md)).
-- Model chart, 4 cases: the transcript helps every strong predictor, e.g. GPT-6 Astra 39 → 60 (100 −
-  RMSE), and does nothing for Haiku ([cfbench-model-chart.md](cfbench-model-chart.md)).
-
-A defensible version: "on several of our environments, adding the transcript helps a counterfactual
-investigator little or not at all compared with giving it both prompts". Drop "and on CHIVE" unless
-we run it.
+compared to simply giving the investigator both system prompts. TODO waiting on CHIVE results here
 
 We successively simplified the counterfactual prediction tasks we asked metamodels to do until we
 found ones that work. They are: predicting Qwen's grade for an essay; predicting Qwen's answer to a
@@ -51,42 +29,22 @@ factual query which is past its knowledge cutoff.
 ## Part 0: counterfactual investigation is null
 
 Bar chart on chives showing nulls Bar chart: score on all of our envs, showing nulls Bar chart:
-abaltions by model showing null @c what other ablatoins did I d ohere?
+abaltions by model showing null
 
-@robbie: every ablation on the counterfactual task. In none does the O-lens reliably beat
-transcript-only or its placebo:
-
-- **Predictor model:** seven predictors from Haiku 5.5 to GPT-6 Astra, plus thinking-off and weak
-  predictors ([cfbench-model-chart.md](cfbench-model-chart.md),
-  [cfbench-dumb-predictors.md](cfbench-dumb-predictors.md)). The lens beats placebo only for Gemini
-  4 Argon and Flash, both through hidden_goal.
-- **Predictor effort and tool-call budget:** effort low, medium and high; 5 to 40 tool calls (same
-  doc).
-- **Target thinking on vs off:** pre-registered; the O-lens is below transcript-only in both
-  ([nocot-cfbench.md](nocot-cfbench.md), [cot-cfbench.md](cot-cfbench.md)).
-- **How reads reach the predictor:** agentic tool vs reads pasted into the prompt (closed PR #116,
-  [olens-cfbench-spike.md](olens-cfbench-spike.md)), and reads on the counterfactual prompt (dropped
-  as outside the zero-counterfactual setting).
-- **Lens settings:** old vs space lens, greedy vs temperature 1, stop-token vs every-token reads,
-  reads from before the hint only ([olens-space-migration.md](olens-space-migration.md),
-  [envs/hint_cf.md](envs/hint_cf.md)). We never ablated layers on this task.
-- **Other tools, each with its placebo:** J-lens, NLA, Thought Anchors
-  ([jlens-cfbench.md](jlens-cfbench.md), [nla-cfbench-hint-mcq.md](nla-cfbench-hint-mcq.md),
-  [thought-anchors.md](thought-anchors.md)).
-- **Other models' lenses:** Camila's DeepSeek V4 Flash lens on alignment faking, Celeste's GLM 5.3
-  lens on over-eagerness.
-- **Harness:** versions 1 to 6, and one shown run instead of 30
-  ([cfbench-harness-smoke.md](cfbench-harness-smoke.md)).
-- **Scoring:** log skill vs RMSE vs binary at 5 to 30pp thresholds
-  ([cfbench-scoring.md](cfbench-scoring.md),
-  [cfbench-binary-regrade.md](cfbench-binary-regrade.md)).
-- **CHIVE itself:** Flash vs Sonnet 5.5, free-form vs yes/no
-  ([smoke25-results.md](smoke25-results.md)), and the off-policy split of Agam's run
-  ([chive-critique.md](chive-critique.md)).
-
-Existing charts: `python -m graphs.cfbench_report` (pooled, by target model) and
-`python -m graphs.cfbench_modelchart` (by predictor, effort, call budget). Nothing in `graphs/`
-charts CHIVE yet.
+We ablated everything we could think of, and in none of it did the O-lens reliably beat
+transcript-only or its own placebo. We swapped the predictor across seven models, from Haiku 5.5 to
+GPT-6 Astra, plus thinking-off and deliberately weak predictors. We varied the predictor's reasoning
+effort from low to high, and its tool-call budget from 5 to 40 calls. We ran the target with and
+without chain of thought, both pre-registered. We changed how reads reach the predictor: as an
+agentic tool, or pasted straight into its prompt. We changed the lens itself: the old lens vs the
+space-fixed one, greedy vs temperature-1 decoding, and reads at stop tokens vs at every token. We
+tried other metamodels, J-lens, NLAs and Thought Anchors, each against its own placebo. We tried
+other models' lenses: Camila's DeepSeek V4 Flash lens on alignment faking and Celeste's GLM 5.3 lens
+on over-eagerness. We iterated the predictor's harness through six versions. We rescored everything
+with log skill, RMSE, and binary flip/no-flip at thresholds from 5 to 30pp. And on CHIVE itself we
+tried Flash vs Sonnet 5.5 as the predictor, and free-form vs yes/no answers. The one thing we never
+ablated is which layers the lens reads. Every chart is in the appendix,
+[Counterfactual investigation graphs](#counterfactual-investigation-graphs).
 
 ### The WorkspaceBench review
 
@@ -117,31 +75,34 @@ your metamodels degrade exactly when CoT degrades and might never be useful.
 
 ## Pre-sprint work
 
-Approximately none. I spent a lot of time trying to understand how 🔮-lenses work!
+Robbie spent a lot of time trying to understand how 🔮-lenses work and should've spent more time
+deeply understanding CHIVE and WorkspaceBench. He did not run code or experiments related to this
+project idea.
 
 ## Cost
 
-@c can you fill this in for me, I will download something from Chase later.
+STILL TODO LEAVE UNTIL 4pm.
 
-@robbie: filled in what the provider APIs report on 2026-10-31. The TODO rows need the Chase
-statement.
+@kylie you should add your stuff here too.
 
-| item                                          | spend  | source                                                 |
-| --------------------------------------------- | ------ | ------------------------------------------------------ |
-| RunPod GPUs, 2026-10-19 to 2026-10-31         | $2,051 | `runpodctl billing pods`; $1,997 of it H200s           |
-| RunPod GPUs before the work log, Oct 2 to 18  | $1,192 | same; not counted as sprint spend                      |
-| OpenRouter, personal account (from Oct 27)    | $331   | `GET /api/v1/credits`, `total_usage`                   |
-| OpenRouter, old usebits account (to Oct 27)   | TODO   | key retired; it was burning ~$2,100/month on Oct 26    |
-| Anthropic API (BYOK Haiku, Sonnet, Opus 5.5)  | TODO   | Chase                                                  |
-| Google AI Studio (Gemini 3.8 Flash, BYOK)     | TODO   | Chase; part of it came out of a $300 free-trial credit |
-| Docent, Hugging Face, Cloudflare/GitHub Pages | $0     | free tiers                                             |
+| item                                          | spend  | source                                                                                        |
+| --------------------------------------------- | ------ | --------------------------------------------------------------------------------------------- |
+| RunPod GPUs, 2026-10-19 to 2026-10-31         | $2,051 | `runpodctl billing pods`; $1,997 of it H200s                                                  |
+| RunPod GPUs before the work log, Oct 2 to 18  | $1,192 | same; not counted as sprint spend. This is an overestimate... some of this is NDRL. TODO fix. |
+| OpenRouter, personal account (from Oct 27)    | $331   | `GET /api/v1/credits`, `total_usage`                                                          |
+| OpenRouter, old usebits account (to Oct 27)   | TODO   | key retired; it was burning ~$2,100/month on Oct 26                                           |
+| Anthropic API (BYOK Haiku, Sonnet, Opus 5.5)  | TODO   | Chase                                                                                         |
+| Google AI Studio (Gemini 3.8 Flash, BYOK)     | TODO   | Chase; part of it came out of a $300 free-trial credit                                        |
+| Docent, Hugging Face, Cloudflare/GitHub Pages | $0     | free tiers                                                                                    |
+
+Things that will not have receipts:
+
+- $2.5k of OpenRouter credits that Robbie had lying around from his startup
+- Robbie's two claude max plans, which provided coding agent tokens + $600 in free API credits ($200
+  a month, we hit a boundary on one).
+- Robbie's Codex max plan.
 
 ## Where everything is
-
-@c what is this section supposed to bve?
-
-@robbie: it's the map for a reader who wants to check our work: where the code, data, transcripts
-and viewers live. Draft:
 
 - **Code:** this repo,
   [robbiethompson18/counterfactual-investigator-agent-with-olens](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens).
@@ -161,11 +122,6 @@ and viewers live. Draft:
 
 ## 🔮-lens Now Speak English
 
-@c paste in from progress report doc.
-
-@robbie done, pasted verbatim from the Oct 25 progress report's appendix ("Mandarin in O-lens
-Bullets: 50% → 0.5%"). The repo's version with numbers is [olens-chinese.md](olens-chinese.md).
-
 We investigated why so many o-lens bullets lead with a Mandarin character and then become English.
 The canonical o-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
 But many tokens' canonical form is _with_ leading whitespace, eg \_need instead of need. The AR
@@ -173,92 +129,158 @@ especially hates having the space stripped when when the next character will be 
 
 Agam fixed this in RL, and the o-lens speaks English again.
 
+@c plz use add the graph from the doc! We should probably remake it using the new style, and
+possibly not use the blue orange theme to not overload it.
+
 ## Our issues with the CHIVE dataset
-
-@c plz paste in verbatim all of my messages from my Slack with Adam yesterday verbatim and I will
-trim.
-
-@robbie done: your three messages in the 2026-10-30 group DM with Adam and Kylie, verbatim, with
-Slack markup turned into Markdown. This repo is public and `CLAUDE.md` bans private Slack content,
-so where your third message quotes Adam I replaced his words with a bracketed paraphrase. The
-numbers are reproducible in [chive-critique.md](chive-critique.md).
-
-**10:38 PDT**
-
-Hey Adam, should've sent this much sooner, but Kylie and I tested if the o-lens works on CHIVE data
-for our sprint project, and found that not only does this not work, but it's not even close. We had
-to dumb the task down to "predict what Qwen will say about this fact past its knowledge cutoff" to
-start getting any results. Nothing more agentic or less contrived worked despite much tinkering.
-
-1. Is this surprising to you?
-2. What would convince you that our null results show 'metamodels are not up for this task' and not
-   'harness issue'?
-3. We spent a long time dissecting CHIVE to figure out why nothing worked and have opinions about
-   the dataset, happy to share more thoughts if that is interesting. (eg due to cutoff quirks some
-   scenarios have almost identical counterfactuals marked as a `supported cause` and a
-   `refuted hypothesis`)
-
-**11:48 PDT**
-
-Ok well none of our complaints truly affect a majority of datapoints but here they are nonetheless:
 
 - 40% of the data is off-policy in that it's one {Qwen,Gemma,etc} continuation at the end of a
   WildChat ChatGPT transcript. This makes some 'weird behavior' not that surprising, eg
   [000054](https://chive-cases.pages.dev/?case=prompt_000054), where the model correctly points out
-  its own prior mistake (some of the time)
+  its own prior mistake (some of the time).
 - We hardcode hypotheses to validate or not based on a raw move in % space (rather than say a
   likelihood ratio) so 20%->71% is a validated finding but 30% -> 0% is null and 10% --> 0% is
-  'validated doesn't matter, moves < 15%.' It's not obvious what a better solution is (Fisher's
-  exact test?), but this setup causes issues:
+  'validated doesn't matter, moves < 15%.' It's not obvious what a better solution is. At least for
+  positive examples Fisher's Exact Test seems better. If you p=0.01 (w/ Benjamini-Hochberg
+  Correction) you get 1.5x experiments marked positive and usable in the dataset.
 - On 8.6k experiments (12%, affecting 32% of investigations) we have a base behavior rate between
   10% and 50%, and a counterfactual which moves that rate to 0%, but because of our cutoffs this is
   marked inconclusive and not shown to the predictor. In 18% of investigations we have no positive
   experiments (and thus only negative claims to show the predictor) but we do have a 10%+ → 0 claim
-  that we throw away.
+  that we throw away. These 10%+ → 0 experiments actually aren't statistically significant; feeling
+  confident that a counterfactual is 'inert' is a hard problem that likely requires more than 30
+  samples.
   - the mirror case where CF bumps rate to 100% is much less common
-
-**17:29 PDT**
-
-> [Adam asked what we thought of CHIVE's data quality overall, and what we would do to improve or
-> filter it.]
-
-I think the weakest is deciding what counts as 'weird,' which IIUC is just Opus asked to rate
-WildChat. (This skews very heavily toward 'mistakes' which I think you cover in the paper).
-Weirdchat does something potentially more interesting with their search approach, but their
-datapoints fall into a couple similar scenarios and have the sad property of being
-'unrealistic/adversarial.' This is a hard question, I suspect there is more to be done here and that
-someone with access to lots of real user data will be able to do the best research.
-
-> [Adam: off-policy data is acceptable, if not ideal.]
-
-Hot take! I agree simulating the user turn is also bad. Multi-turn agentic settings with no user
-turn but the model is required to interact with a sandbox are on my (interesting, possible to create
-at scale) Pareto frontier, which we did in the first week of our project before changing course
-because metamodel uplift was 0.
-
-> [Adam guessed the qualitative takeaways would not change if we filtered out the problem cases.]
-
-agree
-
-> [Adam: the likelihood cutoff should only cost usable data points, not add problematic ones.]
-
-Not sure this is true, the 14% --> 0% 'inert' case is potentially problematic. Having thought about
-it only briefly, it seems very hard to feel statistically confident that your rate of weird behavior
-_hasn't_ changed. Claude wants to use Cohens's _h,_ which I agree trades simplicity for 'Platonic
-Statistical Goodness.'
-
-> [Adam: the more complex metrics he tried did not much raise the yield of experiments that are
-> unlikely to be sampling noise.]
-
-If you use Fisher's exact test you are selecting based on this exactly! If you p=0.05 (w/ BH
-correction) you get **1.7x experiments marked positive**, +23% investigations with a positive result
-(1.5x and 22% if you use p=0.01).
 
 ## WorkspaceBench Shows Less Than We Thought
 
-@c plz just link that doc
+On 28 of 33 categories on WorkspaceBench, Sonnet 5.5 performing text inversion matches or exceeds
+the accuracy of every metamodel. On the remaining five categories, stock Qwen matches or exceeds the
+performance of any metamodel.
 
-@robbie done. Our review is the "WorkspaceBench Review" tab of the
-[sprint doc](https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit)
-(access-restricted). Its public counterpart in the repo is
-[wsb-flash-prompt-only.md](wsb-flash-prompt-only.md).
+The five exceptions are: two filters on Qwen being factually inaccurate, two requests for Qwen’s
+favorite of something, and a steering task which cannot be run on other models.
+
+On four other tasks, the benchmark shows metamodels beating a prompt-only baseline by comparing
+Sonnet’s pass@1 to metamodels’ pass@hundreds-to-thousands. Metamodels get one (sometimes four)
+grade(s) per token per layer and get credit if any of these pass.
+
+Our full review is the "WorkspaceBench Review" tab of the
+[sprint doc](https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit).
+
+## Counterfactual investigation graphs
+
+Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
+behavior rate, higher is better; hatching means placebo. The PNGs are gitignored, so regenerate them
+from the repo root:
+
+```bash
+uv run python -m graphs.cfbench_report        # the ten cfbench charts
+uv run python -m graphs.honest_binary
+uv run python -m graphs.honest_binary_olens --out docs/img/honest-grader/binary_rmse_olens.png
+uv run python -m graphs.essay_curious_answer data/runs/cfbench/2026-10-28_essay-curious
+uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-duke3*'
+uv run python -m graphs.hint_mcq_answer
+uv run python -m graphs.hint_mcq_total
+```
+
+### cfbench, pooled and by target
+
+![All targets pooled](img/cfbench-report/skill_pooled.png)
+
+All targets pooled. Env diff only, transcript-only, O-lens and its placebo land within about a point
+of each other, all well above "edit does nothing".
+
+![By target model, with paired gains over transcript-only](img/cfbench-report/skill_by_target.png)
+
+By target model, with each condition's paired gain over transcript-only on the same cases.
+
+![hidden_goal.grade](img/cfbench-report/skill_hidden_goal.png)
+
+hidden_goal.grade, the one env with a pre-registered O-lens win (Qwen without CoT, 38 cases).
+
+![Every other Qwen-without-CoT case](img/cfbench-report/skill_other_envs.png)
+
+Every Qwen-without-CoT case outside hidden_goal.grade.
+
+![What the O-lens agent searches for](img/cfbench-report/olens_search_topics.png)
+
+What the O-lens agent searches the lens for.
+
+![Which tools the predictor calls](img/cfbench-report/tool_calls.png)
+
+Which tools the predictor calls, at a 20-call budget.
+
+### cfbench, predictor ablations
+
+![Predictor model by condition](img/cfbench-report/models.png)
+
+Seven predictor models by condition, on the model chart's four cases.
+
+![Gemini 3.8 Flash by reasoning effort](img/cfbench-report/flash_effort.png)
+
+Gemini 3.8 Flash by reasoning effort.
+
+![Gemini 3.8 Flash by tool-call budget](img/cfbench-report/flash_calls.png)
+
+Gemini 3.8 Flash by tool-call budget.
+
+![Transcript-only vs O-lens by predictor](img/cfbench-report/ts_vs_olens.png)
+
+Transcript-only vs O-lens, one dot per predictor and thinking level.
+
+### cfbench, binary regrade
+
+![RMSE vs binary grading per target](img/cfbench-binary-regrade/binary_vs_rmse.png)
+
+![Balanced accuracy vs flip threshold](img/cfbench-binary-regrade/binary_threshold_sweep.png)
+
+The same predictions graded as flip/no-flip. These two came from a scratch script that isn't in the
+repo, so they can't be regenerated; the method is in
+[cfbench-binary-regrade.md](cfbench-binary-regrade.md).
+
+### Honest grader
+
+![Honest grader, all 242 cases](img/honest-grader/binary_rmse.png)
+
+All 242 cases, without the lens.
+
+![Honest grader, cases with lens reads](img/honest-grader/binary_rmse_olens.png)
+
+The cases the lens runs cover, with O-lens and its placebo.
+
+### Essay grading (essay_curious)
+
+![Letter-grade answer task by condition](img/essay-curious/accuracy.png)
+
+Share of draws naming the letter grade Qwen gives with no scenario.
+
+![Letter-grade answer task per case](img/essay-curious/per_case.png)
+
+The same, per case.
+
+![Out-of-10 score RMSE by condition](img/essay-curious/score_rmse.png)
+
+RMSE of the predicted no-scenario score out of 10.
+
+![Every out-of-10 prediction per case](img/essay-curious/score_per_case.png)
+
+Every out-of-10 prediction per case against the truth.
+
+### Hinted MCQ answer task (legacy, before hints were dropped)
+
+![Hint answer task by hint type](img/hint-mcq-answer/accuracy.png)
+
+![Correct draws per item, gold-letter hint](img/hint-mcq-answer/per_item_gold_hint.png)
+
+![Correct draws per item, wrong-letter hint](img/hint-mcq-answer/per_item_wrong_hint.png)
+
+Share of draws naming Qwen's no-hint letter, overall and per item.
+
+![Running total by hint type](img/hint-mcq-total/by_hint.png)
+
+![Running total, all items](img/hint-mcq-total/combined.png)
+
+The running total over the original items and the 2k scale-up. `graphs.hint_mcq_total` currently
+crashes, because the abandoned run `2026-10-28_answer-mcq-scale2k-d1-jlens50-c` has no predictions
+file, so these two don't render yet.
