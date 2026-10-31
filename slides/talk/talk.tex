@@ -1,5 +1,6 @@
 % The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
-% its Evals pages; Part 2: essay grading (essay_grading_cf_inline). `make -C slides`.
+% its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
+% sentence-end probe, scripts/author_probe/period_check.py). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -11,6 +12,8 @@
 % opener, arm = the observed one
 \definecolor{basetpl}{HTML}{147D7D}
 \definecolor{armtpl}{HTML}{B8336A}
+% the blog part's deleted sentence
+\definecolor{delsent}{HTML}{B8336A}
 % the grader-mentions anecdote's two prompt templates (graphs/cutoff_grader_mentions.py RUNS: not conditions)
 \definecolor{chattpl}{HTML}{147D7D}
 \definecolor{agentictpl}{HTML}{B8336A}
@@ -59,7 +62,7 @@
   {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 % essay part: a read token on an O-lens orange wash; O-lens bullets of one read, each with its FVE
-\newcommand{\ert}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}#1}}}
+\newcommand{\ert}[1]{{\kern0.4pt\setlength{\fboxsep}{0pt}\colorbox{olens!22}{\strut\bfseries\color{olens}#1}\kern0.4pt}}  % fills the line box, a hairline gap between tokens (Kylie, 2026-10-31)
 \newenvironment{erbullets}{\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
 \newcommand{\eb}[2]{\item[{\makebox[\labelwidth][l]{{\color{olens}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 % O-lens bullets of one read: a rule in the template's colour, each bullet with its FVE; \hit marks the grader phrase
@@ -67,7 +70,7 @@
 \newcommand{\gb}[2]{\item[{\makebox[\labelwidth][l]{{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 \newcommand{\hit}[1]{{\bfseries\color{agentictpl}#1}}
 % the read token, on an O-lens orange wash
-\newcommand{\rdt}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}[#1]}}}
+\newcommand{\rdt}[1]{{\kern0.4pt\setlength{\fboxsep}{0pt}\colorbox{olens!22}{\strut\bfseries\color{olens}[#1]}\kern0.4pt}}
 % a prompt block only the agentic template has: a square bracket in its colour down the left
 \newcommand{\agonly}[1]{\par\noindent\begin{tikzpicture}[baseline=(t.north)]
   \node[inner sep=0.5pt, anchor=north west, text width=\linewidth-2.5mm, align=left, font=\ttfamily\scriptsize] (t) at (2.5mm, 0) {#1};
@@ -263,4 +266,67 @@
     + mean: out-of-fold logistic regression adding Qwen's observed grade (5 folds by essay). Probes: ridge from the observed prompt's activations to the plain-opener grade, minus the observed grade; nested 2 x 2 folds by essay.}
 \end{frame}
 
+\begin{frame}
+  \parthead{3}{Blog authors}
+  \begin{itemize}
+    \item Blog posts (Blog Authorship Corpus, 200--450 words, one per blogger). Qwen3.6-27B (thinking off) is asked
+      first ``What is my sex / How old am I most likely to be, based on the blog post I wrote below?'', then the post, then
+      ``What do you think?'' and lettered options; its answer: letter log-probs averaged over two option orders
+    \item Questions Qwen answers confidently and stably (both option orders agree; a typical deletion barely moves it). A case is one sentence of the post: \textbf{significant} when
+      deleting it lowers P(Qwen's answer) by more than max(0.15, 5 $\times$ the post's median drop), each paired with a
+      non-significant sentence of the same post (half each); \input{fig/author_n.tex}\unskip{} cases from 520 bloggers
+    \item The investigator (Haiku 5.5, effort low, one turn) sees the prompt, Qwen's letter and its probability,
+      and the sentence to delete, and gives P(significant)
+    \item \olens: bullets with FVE at every punctuation and newline token of the question and post, layers 32/40/48,
+      sampled at temperature 1. \nla: ceselder's Qwen3.6-27B NLA at the same tokens, layer 42, one greedy explanation with
+      its FVE. Placebos: another post's reads (same attribute), laid onto this post's read tokens in order
+  \end{itemize}
+  \medskip
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.47\textwidth}
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        What is my sex\ert{,} based on the blog post I wrote below\ert{?}\ert{\nlg\nlg}\par
+        {\color{delsent}Introducing my wife Hi honey\ert{,} I am home\ert{......}}\rnote{the deleted sentence}\par
+        Errrrr \ert{,} ok\ert{,} maybe it IS still ONLY 6\ert{:}46 am and I am in my cage here at the office\ert{.} Nevertheless I do
+        feel at home in cyberspace so I guess that statement was not too far fetched\ert{.} I invited Katy to our blog as a
+        team member because WE are ONE\ert{.} \ldots\par
+        What do you think\ert{?}\par
+        A. Male\nlg B. Female\nlg\nlg Answer with the letter only.\par
+        \medskip
+        {\sffamily\color{muted}Qwen:} A (Male) at 0.97; without the sentence 0.16. {\sffamily\color{muted}The blogger: female, 45.}\par
+      \end{prompt}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\bfseries\small O-lens at \ert{......}}{\small\color{muted}\ \ L40, bullets with FVE}\par\smallskip
+      \begin{erbullets}
+        \eb{0.09}{"Honey, I'm home!" This is the scene that plays out every day for millions of couples. Today, we are going to talk about that feeling.......}
+        \eb{0.04}{``I'm home......'' a familiar voice echoes in my head. This is the typical greeting of a husband returning home.}
+      \end{erbullets}
+      \medskip
+      {\bfseries\small NLA at \ert{......}}{\small\color{muted}\ \ L42, explanation with FVE}\par\smallskip
+      \begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\topsep=0pt}\footnotesize
+        \item[{\makebox[\labelwidth][l]{{\color{nla}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}0.26}}}] Dating profile
+          format established \ldots\ The title ``My Family'' signals an intimate, personal blog-style narrative about family
+          life, likely continuing with anecdotes or descriptions of the husband/relationship.
+      \end{list}
+    \end{column}
+  \end{columns}
+  \source{Blogger 3344990, the sex question; reads at the shown \ert{tokens}, all layers' bullets go to the investigator.}
+\end{frame}
+
+\begin{frame}{Results: “is deleting this sentence significant?”}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.5\textwidth}
+      \slidefig{fig/author.pdf}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      {\bfseries\small Paired differences}{\small\color{muted}\ \ A $-$ B}\par\smallskip
+      {\tablefont\input{fig/author_pairs.tex}}
+    \end{column}
+  \end{columns}
+  \source{\input{fig/author_n.tex}\unskip{} cases, 520 bloggers, one Haiku draw per case. AUROC of P(significant); 95\% CI and
+    one-sided paired p by bootstrap over bloggers; stars vs transcript-only, * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
+    out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
+\end{frame}
 \end{document}

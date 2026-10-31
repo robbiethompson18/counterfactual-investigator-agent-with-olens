@@ -209,8 +209,9 @@ def analyze(attr: str, ex) -> tuple[list[str], list[dict]]:
     for item, c in cases.items():
         msg, P = text[c["pair"]], pos[c["pair"]]
         sp = spans(msg, attr)
-        ks = [i for i, (_, _, s) in enumerate(sp) if s == c["comment"]]
-        if not ks or not all(k in preds[item] for k in CONDS):
+        ks = [int(item.rsplit("#", 1)[1])]  # the sentence index (a post can repeat a sentence's text)
+        assert sp[ks[0]][2] == c["comment"], item
+        if not all(k in preds[item] for k in CONDS):
             skipped += 1
             continue
         k = ks[0]

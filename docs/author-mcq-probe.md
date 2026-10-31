@@ -4,7 +4,8 @@
 prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from (AUROC p =
 0.30, recalibrated Brier p = 0.36, 1,316 cases from 520 bloggers). An earlier pilot on SynthPAI
 (synthetic comments) gave the same null and is retired. A third batch of bloggers was stopped
-(Kylie: sample size won't change it).
+(Kylie: sample size won't change it). ceselder's layer-42 NLA in the O-lens's place is null too
+(AUROC vs transcript −0.003, p = 0.60; 2026-10-31).
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the
@@ -74,6 +75,28 @@ byte-identical). CIs and one-sided p (H1: O-lens better) from a 10k bootstrap ov
 Cost: about $110 of RunPod H200s (SynthPAI and blog, deletions and reads) and $40 of API (DeepSeek
 V4 Flash answers, Haiku investigator and judge) over 2026-10-29/31.
 
+## NLA in place of the O-lens (2026-10-31)
+
+[ceselder/qwen3.6-27b-nla-rl](https://huggingface.co/ceselder/qwen3.6-27b-nla-rl) (layer 42 only; AV
+= `av_base` + RL adapter `iter_000800`, 78% held-out FVE) at the same 26,706 tokens of the same
+prompts, greedy (the O-lens sampled at temperature 1), each explanation scored by its critic (median
+FVE 0.43 on this run's own ruler). Its AV is a merged full model, so it can't run on the one-engine
+reader: `scripts/author_probe/nla_l42.py` does capture, decode and critic in plain transformers on
+one GPU (`scripts/sky/nla_l42.yaml`, ~2.8 reads/s on an H200). Conditions `nla_inline` and
+`nla_placebo_inline` (the O-lens placebo's post), Haiku 5.5 at effort low, 1 draw; run
+`runs/cfbench/2026-10-31_author-blog-drop-haiku-nla`, reads
+`runs/nla_reads/2026-10-31_author-blog-nla-l42` (also on the per-question expview pages beside the
+O-lens).
+
+| pooled, A − B    | AUROC                           | raw Brier gain | recalibrated Brier gain |
+| ---------------- | ------------------------------- | -------------- | ----------------------- |
+| NLA − transcript | −0.003 [−0.023, +0.017], p 0.60 | −0.008         | −0.003, p 0.70          |
+| NLA − placebo    | +0.009, p 0.21                  | +0.006, p 0.02 | +0.002, p 0.36          |
+| NLA − O-lens     | −0.008, p 0.78                  | −0.012         | −0.004                  |
+
+Within-post paired accuracy: transcript 0.758, O-lens 0.771, NLA 0.772, NLA placebo 0.766 (CIs
+±0.035).
+
 ## Earlier pilot on SynthPAI (synthetic), retired
 
 [SynthPAI](https://huggingface.co/datasets/RobinSta/SynthPAI): synthetic Reddit comments by ~300
@@ -102,34 +125,44 @@ attributes (sex, age band, education, relationship, income). Retired (Kylie, 202
 ## Exploratory, post hoc: lexicons in the reads and sentence-end probes (2026-10-31)
 
 Kylie's follow-ups after the null. Post hoc and multiply tested; leads, not results. Code
-`scripts/author_probe/pronoun_probe.py` and `period_probe.py`; runs
-`runs/author_mcq_blog/2026-10-31_pronoun-probe` and `…_period-probe` (activations included).
+`scripts/author_probe/pronoun_probe.py`, `period_probe.py` and `period_check.py`; runs
+`runs/author_mcq_blog/2026-10-31_pronoun-probe` and `…_period-probe` (activations included). Each
+case's sentence is taken from its item id (8 cases delete a sentence whose text appears twice in its
+post).
 
 - **Answer words in the O-lens reads** along each post (FVE-weighted pronouns matching Qwen's answer
-  for sex, a short word list per bucket for age; level, step, before/after shifts, slope): AUROC
-  0.55-0.60 alone (sex 0.68 on qwen_wrong for the 3-sentence signed shift, one of 16 features),
-  placebo reads and the sentence text ~0.5. Added to Haiku's transcript p: sex +0.006 (n.s.), age
-  +0.020 — but the same counts on the sentence text add +0.017, so the age gain is lexical.
+  for sex, a short word list per bucket for age; level, step, before/after shifts, slope; 16
+  features): AUROC 0.55-0.60 alone (sex 0.68 on qwen_wrong for the 3-sentence signed shift, the best
+  of 16 on 160 cases), placebo reads and the sentence text ~0.5. Added to Haiku's transcript p
+  (5-fold CV): sex −0.004 (all lens features; level alone +0.001), age +0.021, but the same counts
+  on the sentence text add +0.017 for age, so the age gain is lexical.
 - **Sentence-end activations** (Qwen3.6-27B residual at the token holding the sentence's last
-  character, question-first prompt). An answer probe trained on 3,000 batch-3 pairs (no shared
-  bloggers) and read along each post: AUROC 0.57-0.64, +0.007 to +0.017 over Haiku. A probe fit to
-  the task (StandardScaler, PCA 128, logistic C 0.01, layer chosen by inner CV: L48; 5-fold CV
-  grouped by blogger):
+  character, question-first prompt, layer 48). An answer probe trained on 3,000 batch-3 pairs (no
+  shared bloggers) and read along each post: AUROC 0.53-0.64 over 8 variants (the best, the step in
+  P(answer), adds +0.017 over Haiku). The standard probe (`probes/fit.py`: training-only
+  standardisation, unpenalised intercept, no PCA, L2 with λ = 1) fit to the task, 5-fold CV grouped
+  by blogger, the combiner fully nested (`period_check.py`):
 
-| score                              | AUROC                | paired accuracy | + over Haiku transcript p |
-| ---------------------------------- | -------------------- | --------------- | ------------------------- |
-| Haiku transcript p                 | 0.797                | 0.758           |                           |
-| h at the sentence end              | 0.780 [0.755, 0.803] | 0.770           | +0.053 [+0.039, +0.068]   |
-| h(end k) − h(end k−1)              | 0.724                | 0.712           | +0.033                    |
-| TF-IDF of the sentence             | 0.645                | 0.652           | +0.011                    |
-| sentence length + position in post | 0.704                | 0.719           | +0.035                    |
-| h over Haiku + length/position     |                      |                 | +0.028 [+0.017, +0.038]   |
+| score                                 | AUROC                | paired accuracy | + over Haiku, nested    |
+| ------------------------------------- | -------------------- | --------------- | ----------------------- |
+| Haiku transcript p                    | 0.797                | 0.758           |                         |
+| L2 probe on h at the sentence end     | 0.784 [0.760, 0.808] | 0.782           | +0.058 [+0.043, +0.073] |
+| L2 probe on h(end k) − h(end k−1)     | 0.737                | 0.712           | +0.039                  |
+| PCA 128 + logistic on h (comparison)  | 0.780                | 0.766           |                         |
+| TF-IDF of the sentence                | 0.645                | 0.652           | +0.011                  |
+| sentence length + position in post    | 0.704                | 0.718           | +0.035                  |
+| L2 probe over Haiku + length/position |                      |                 | +0.032 [+0.023, +0.042] |
 
-Caveats: post hoc; the probe is fit to this task with ~650 positives (CV grouped by blogger, layer
-chosen inside each fold, but still the easiest thing here to overfit); the difference vector does
-worse than h, so it is not obviously reading a belief change at the sentence; TF-IDF is a weak text
-control. Next control: the same probe on the activation of the sentence alone (no question, no post
-around it), which separates "what this sentence says" from "what Qwen made of it in context".
+Over 5 fold splits the nested increments are +0.057 ± 0.003 (over Haiku) and +0.030 ± 0.003 (over
+Haiku + length/position); the mean rank of Haiku's p and the probe's out-of-fold score, with nothing
+fit, adds +0.055. Per attribute (pooled fit): sex +0.045, age +0.067 over Haiku, the age gain mostly
+on qwen_wrong (+0.087); age on qwen_right +0.033 (p 0.05).
+
+Caveats: post hoc; nested given the layer, but L48 (and L2 rather than PCA) were chosen on this same
+eval set; the probe is fit to this task with ~650 positives; the difference vector does worse than
+h, so it is not obviously reading a belief change at the sentence; an L2 probe at layer 16 already
+reaches 0.747 (the audit), so much of the signal is likely lexical, and TF-IDF is a weak text
+control. A control with the question removed (the post alone in the user turn) is running.
 
 ## Where things live
 
