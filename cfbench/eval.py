@@ -32,6 +32,7 @@ import random
 import re
 from pathlib import Path
 
+import anthropic
 import openai
 
 from cfbench import answer, olens
@@ -285,7 +286,13 @@ async def main():
                         predictor, prompt, tools, args.max_calls if tools else 0, effort, task, system=system, grade=grader(task, case, env)
                     )
                     break
-                except (openai.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
+                except (
+                    openai.APIStatusError,
+                    anthropic.APIStatusError,
+                    anthropic.APIConnectionError,
+                    openrouter.NoChoices,
+                    json.JSONDecodeError,
+                ) as e:
                     print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
             else:
                 return
