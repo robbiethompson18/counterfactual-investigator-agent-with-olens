@@ -65,4 +65,4 @@ The single-draw and pooled comparisons agree; the mean of 3 draws gave O-lens âˆ
 - Reads: `olens_reads/2026-10-30_essay-grading-inline`,
   `nla_reads/2026-10-31_essay-grading-inline-all-layer`,
   `jpp_reads/2026-10-31_essay-grading-inline-every-token`.
-- Charts: `make -C slides` (`slides/talk/figures.py`), `python -m graphs.standard_probes`.
+- Charts: `make -C slides` (`graphs/talk.py`), `python -m graphs.standard_probes`.

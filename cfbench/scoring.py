@@ -7,9 +7,13 @@ have equal weight; the headline is RMSE next to the RMSE of "the edit does nothi
 
 import glob
 import json
+import math
 import os
+import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import binom
@@ -30,6 +34,8 @@ NULL_LABEL = "Edit does nothing"
 OLD_LENS = "olens_s3d_rl600"  # the pre-space lens; its reads are never reused (CLAUDE.md, docs/olens-space-migration.md)
 
 R = "data/runs/cfbench/"
+HF_REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
+HF_URL = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/"
 
 
 def _nt(pat: str) -> list[str]:
@@ -266,7 +272,7 @@ def standard_probe_file(relative: str):
     path = Path("data") / STANDARD_PROBE_RUN / relative
     if not path.exists():
         hf_hub_download(
-            "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens",
+            HF_REPO,
             f"{STANDARD_PROBE_RUN}/{relative}",
             repo_type="dataset",
             local_dir="data",
@@ -366,7 +372,7 @@ def essay_lens_rows(run: str) -> list[dict]:
     if cache.exists():
         return [json.loads(line) for line in cache.open()]
     local = Path("data/runs/cfbench") / run / "predictions.jsonl"
-    url = f"https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/resolve/main/runs/cfbench/{run}/predictions.jsonl"
+    url = HF_URL + f"runs/cfbench/{run}/predictions.jsonl"
     fields = ("condition", "base_arm", "item", "draw", "valid", "p", "k_cf", "shift", "answers_base", "effort")
     with local.open() if local.exists() else urlopen(url) as stream:
         rows = [{k: r[k] for k in fields if k in r} for r in map(json.loads, stream)]
@@ -403,3 +409,285 @@ def standard_essay_comparison() -> tuple[dict, dict]:
     scores.update({c: {k: [r["predicted_shift"]] for k, r in rows.items()} for c, rows in probes.items()})
     assert all(set(values) == set(reference) for values in scores.values())
     return scores, reference
+
+
+# ---- The deck's and headline charts' statistics (graphs.talk, graphs.headline_inline). Moved from slides/talk/figures.py on
+# 2026-10-31 so that slides/ holds TeX only and graphs/ imports nothing from it.
+
+
+def eval_json(name: str) -> dict:
+    """The viewer's evals/NAME.json (data/evals/, or HF's evals/ when it isn't local)."""
+    local = Path("data/evals") / f"{name}.json"
+    if local.exists():
+        return json.loads(local.read_text())
+    with urllib.request.urlopen(HF_URL + f"evals/{name}.json") as r:
+        return json.load(r)
+
+
+def stars(p: float | None) -> str:
+    return "" if p is None else "***" if p < 1e-3 else "**" if p < 1e-2 else "*" if p < 0.05 else ""
+
+
+def sign_p(b: int, w: int) -> float:
+    """Exact one-sided sign test: P(at least b better of b + w)."""
+    n = b + w
+    return 1.0 if not n else min(1.0, sum(math.comb(n, i) for i in range(b, n + 1)) / 2**n)
+
+
+# The hint evals (hint_qwen_dsv4{,_before}{,_letter}_tail_inline), one panel per eval as on its Evals page (#eval=NAME):
+# claim evals as % right (guess = p >= 0.5, CI from claim_tables, stars from its paired one-sided sign test against
+# transcript-only) or as AUROC; answer evals as the page's headline answer panel recomputed as page.html's answerChartBlock
+# does: every item's draws merged across runs, a bar is the mean over items of the item's fraction right, a 95% item bootstrap
+# (2000 resamples; the page's own RNG differs, so a CI end can move by a point), the exact one-sided sign test against
+# transcript-only over the items that differ, chance = 1 / the most options.
+def claim_bars(name: str) -> tuple[dict, float, int]:
+    """condition -> (% right, CI, stars) from the eval's claim table (pooled), chance 50%."""
+    t = eval_json(name)["claim_tables"][0]
+    rows = {r["condition"]: r for r in t["rows"] if r["version"] == "pooled"}
+    paired = {p["condition"]: p for p in t["paired"]["pooled"] if p["ref"].startswith("transcript_")}
+    bars = {c: (r["accuracy"], r["accuracy_ci"], stars(paired.get(c, {}).get("p_one"))) for c, r in rows.items()}
+    return bars, 0.5, max(r["n_items"] for r in rows.values())
+
+
+def auroc(pos: np.ndarray, neg: np.ndarray) -> float:
+    """P(a knew case's p > a didn't case's), ties half."""
+    d = pos[:, None] - neg[None, :]
+    return float((d > 0).mean() + 0.5 * (d == 0).mean())
+
+
+def auroc_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
+    """condition -> (AUROC of P(knew), 95% bootstrap CI over cases, stars), chance 0.5 (Kylie, 2026-10-30: in place of % right,
+    which rewards a shift in the investigator's bias at the 0.5 threshold). An item's p is the mean over its draws, as
+    score.py; stars: one-sided paired bootstrap that the condition's AUROC beats transcript-only's on the same cases."""
+    p: dict[str, dict[tuple, list[float]]] = {}
+    truth: dict[tuple, int] = {}
+    for R in eval_json(name)["runs"]:
+        for g in R["groups"]:
+            for c, ds in g.get("draws", {}).items():
+                for d in ds:
+                    k = (g["env"], d["item"])
+                    p.setdefault(c, {}).setdefault(k, []).append(d["p"])
+                    truth[k] = g["k_cf"]
+    keys = sorted(truth)
+    y = np.array([truth[k] for k in keys])
+    rng = np.random.default_rng(0)
+    idx = rng.integers(0, len(keys), (reps, len(keys)))
+    score = lambda x, i: auroc(x[i][y[i] == 1], x[i][y[i] == 0])
+    xs = {c: np.array([np.mean(v[k]) for k in keys]) for c, v in p.items()}
+    ref = np.array([score(xs["transcript_inline"], i) for i in idx])
+    bars = {}
+    for c, x in xs.items():
+        boot = np.array([score(x, i) for i in idx])
+        st = "" if c == "transcript_inline" else stars(float((boot - ref <= 0).mean()))
+        bars[c] = (auroc(x[y == 1], x[y == 0]), np.quantile(boot, [0.025, 0.975]).tolist(), st)
+    return bars, 0.5, len(keys)
+
+
+def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
+    """condition -> (% correct, CI, stars) over every item of every run, as the page's headline answer panel."""
+    items: dict[tuple, dict[str, list[float]]] = {}
+    letters = set()
+    for R in eval_json(name)["runs"]:
+        if R.get("task") != "answer":
+            continue
+        for g in R["groups"]:
+            for it in g["items"]:
+                I = items.setdefault((g["env"], g.get("version") or "", g["base"], g["cf"], it.get("item") or ""), {})
+                for c, ds in it["draws"].items():
+                    I.setdefault(c, []).extend(float(d["correct"]) for d in ds)
+                letters |= {a for a in [it["truth"], *it.get("answers_base", {}), *it.get("answers_cf", {})] if a != "null"}
+    per = {c: {k: sum(I[c]) / len(I[c]) for k, I in items.items() if I.get(c)} for c in {c for I in items.values() for c in I}}
+    rng = np.random.default_rng(0)
+    bars = {}
+    for c, xs in per.items():
+        x = np.array(list(xs.values()))
+        boot = x[rng.integers(0, len(x), (reps, len(x)))].mean(1)
+        ref = {k: v - per["transcript_inline"][k] for k, v in xs.items() if k in per["transcript_inline"]}  # this - transcript
+        b, w = sum(d > 0 for d in ref.values()), sum(d < 0 for d in ref.values())
+        p = None if c == "transcript_inline" else sign_p(b, w)
+        bars[c] = (x.mean(), np.quantile(boot, [0.025, 0.975]).tolist(), stars(p))
+    chance = 1 / (max(ord(a) for a in letters) - 64)
+    return bars, chance, len(items)
+
+
+# Essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's draws from the runs' predictions (data/runs/cfbench/,
+# or HF's runs/cfbench/), a case = (arm, intro), every draw one prediction, as score.py; standardized zero-counterfactual OOF
+# probes, nested two-fold, both positions.
+ESSAY_LENSES = ["olens_inline", "nla_inline", "jlens_inline"]
+ESSAY_INVESTIGATORS = ["transcript_inline", *(c for x in ESSAY_LENSES for c in (x, x.replace("_inline", "_placebo_inline")))]
+
+
+def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
+    """AUROC by ranks, ties half (score.py's)."""
+    from scipy.stats import rankdata
+
+    n1 = y.sum()
+    return float((rankdata(p)[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1)))
+
+
+def _grade_mean(dist: dict) -> float:
+    """Mean grade of a {score: count} distribution (cfbench.evals.essay_grading_cf_inline.eval.mean, without its imports)."""
+    return sum(float(s) * k for s, k in dist.items()) / sum(dist.values())
+
+
+@cache
+def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.ndarray]:
+    """keys (arm, intro), truth (base mean > arm mean), condition -> scores (cases x draws; a probe has one per case), the
+    observed arm mean."""
+    ps: dict[str, dict[tuple, dict[int, float]]] = {}
+    truth, arm_mean = {}, {}
+    for run in ESSAY_LENS_RUNS:
+        for r in essay_lens_rows(run):
+            if r.get("valid", True) and r.get("p") is not None:
+                k = (r["base_arm"], r["item"])
+                ps.setdefault(r["condition"], {}).setdefault(k, {})[r["draw"]] = r["p"]  # rows are in completion order
+                truth[k], arm_mean[k] = r["k_cf"], _grade_mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
+    keys = sorted(truth)
+    xs = {c: np.array([[d[k][i] for i in sorted(d[k])] for k in keys]) for c, d in ps.items()}
+    for site in ("user_end", "response_start"):
+        pr = essay_probe_scores(site)
+        assert all(pr[k]["truth"] == truth[k] for k in keys)
+        xs[f"probe_{site}"] = np.array([[pr[k]["predicted_shift"]] for k in keys])
+    return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
+
+
+def _logistic(x: np.ndarray, y: np.ndarray, l2: float = 1e-3) -> np.ndarray:
+    w = np.zeros(x.shape[1])
+    for _ in range(50):  # Newton
+        p = 1 / (1 + np.exp(-x @ w))
+        w -= np.linalg.solve(x.T @ (x * (p * (1 - p))[:, None]) + l2 * np.eye(len(w)), x.T @ (p - y) + l2 * w)
+    return w
+
+
+def recalibrated(keys: list[tuple], y: np.ndarray, p: np.ndarray, am: np.ndarray) -> np.ndarray:
+    """The investigator plus bet at the mean, as the essay eval page's combined() (branch claude/essay-grading-probe,
+    score.py): out-of-fold logistic regression on [1, logit(p), the observed arm mean grade], 5 folds grouped by essay. `p`:
+    cases x draws, one row per draw; returns the same shape."""
+    d = p.shape[1]
+    q = np.clip(p.ravel(), 0.01, 0.99)
+    x = np.column_stack([np.ones(len(q)), np.log(q / (1 - q)), np.repeat(am, d)])
+    yy = np.repeat(y, d).astype(float)
+    essays = sorted({k[1] for k in keys})
+    fold = {e: i % 5 for i, e in enumerate(np.random.default_rng(0).permutation(essays))}
+    f = np.repeat([fold[k[1]] for k in keys], d)
+    out = np.zeros(len(q))
+    for i in range(5):
+        out[f == i] = x[f == i] @ _logistic(x[f != i], yy[f != i])
+    return out.reshape(p.shape)
+
+
+def pooled_auroc(x: np.ndarray, y: np.ndarray) -> float:
+    """AUROC over every draw (cases x draws): each draw is one prediction (docs/cfbench-scoring.md)."""
+    return rank_auroc(x.ravel(), np.repeat(y, x.shape[1]))
+
+
+@cache
+def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
+    """condition -> (AUROC, 95% CI resampling essays as score.py does, stars: one-sided paired bootstrap vs transcript-only);
+    the null (minus the observed arm mean: regression to the mean); n cases; paired differences -> (est, CI, one-sided p)."""
+    keys, y, xs, am = essay_cases()
+    xs = xs | {f"{c}+mean": recalibrated(keys, y, xs[c], am) for c in ESSAY_INVESTIGATORS}
+    items = sorted({k[1] for k in keys})
+    of = {i: np.array([n for n, k in enumerate(keys) if k[1] == i]) for i in items}
+    rng = np.random.default_rng(0)
+    idx = [np.concatenate([of[items[j]] for j in rng.integers(0, len(items), len(items))]) for _ in range(reps)]
+    boot = {c: np.array([pooled_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+    bars = {}
+    for c, x in xs.items():
+        ref = "transcript_inline+mean" if c.endswith("+mean") else "transcript_inline"
+        st = "" if c == ref else stars(float((boot[c] - boot[ref] <= 0).mean()))
+        bars[c] = (pooled_auroc(x, y), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+    pairs = {}
+    lens_pairs = [p for x in ESSAY_LENSES for p in ((x, x.replace("_inline", "_placebo_inline")), (x, "transcript_inline"))]
+    for a, b in [*lens_pairs, ("olens_placebo_inline", "transcript_inline"), ("probe_user_end", "transcript_inline"),
+                 ("probe_response_start", "transcript_inline"), *((f"{a}+mean", f"{b}+mean") for a, b in lens_pairs)]:  # fmt: skip
+        if a in boot:
+            d = boot[a] - boot[b]
+            pairs[a, b] = (bars[a][0] - bars[b][0], np.quantile(d, [0.025, 0.975]).tolist(), float((d <= 0).mean()))
+    return bars, rank_auroc(-am, y), len(keys), pairs
+
+
+def essay_flips() -> tuple[int, int]:
+    """Draws O-lens gets right (p >= 0.5 vs truth) and the same-numbered placebo draw wrong, and the reverse."""
+    _, y, xs, _ = essay_cases()
+    ok = {c: (xs[c] >= 0.5) == y[:, None] for c in ("olens_inline", "olens_placebo_inline")}
+    return int((ok["olens_inline"] & ~ok["olens_placebo_inline"]).sum()), int((~ok["olens_inline"] & ok["olens_placebo_inline"]).sum())
+
+
+# Part 3, blog authors (cfbench/evals/author_blog_drop_inline): does deleting this sentence make Qwen much less sure of its
+# answer about the blogger? Per case the investigator's p (one draw) from the eval's two runs, the task-fit standard L2
+# probe's out-of-fold score (scripts/author_probe/period_check.py, runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl);
+# CIs and stars resample bloggers.
+AUTHOR_RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]
+AUTHOR_PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
+AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
+AUTHOR_VERSIONS = {"pooled": "all cases"}  # pooled (Kylie, 2026-10-31: not the Qwen-wrong / Qwen-right split)
+
+
+def author_rows(run: str) -> list[dict]:
+    cache = Path("data/plot_cache") / f"{run}.jsonl"
+    if cache.exists():
+        return [json.loads(line) for line in cache.open()]
+    local = Path("data/runs/cfbench") / run / "predictions.jsonl"
+    url = HF_URL + f"runs/cfbench/{run}/predictions.jsonl"
+    fields = ("condition", "item", "pair", "version", "valid", "p", "k_cf")
+    with local.open() if local.exists() else urllib.request.urlopen(url) as stream:
+        rows = [{k: r[k] for k in fields if k in r} for r in map(json.loads, stream)]
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return rows
+
+
+def author_probe_file(name: str) -> Path:
+    from huggingface_hub import hf_hub_download
+
+    f = Path("data") / AUTHOR_PROBE_RUN / name
+    if not f.exists():
+        hf_hub_download(HF_REPO, f"{AUTHOR_PROBE_RUN}/{name}", repo_type="dataset", local_dir="data")
+    return f
+
+
+@cache
+def author_cases() -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+    """items, truth, version, blogger, condition -> score (the cases with every condition and a probe score)."""
+    ps: dict[str, dict[str, float]] = {}
+    meta = {}
+    for run in AUTHOR_RUNS:
+        for r in author_rows(run):
+            if r.get("valid", True) and r.get("p") is not None:
+                ps.setdefault(r["condition"], {})[r["item"]] = r["p"]
+                meta[r["item"]] = (r["k_cf"], r["version"], r["pair"].split(":")[0])
+    l2 = {r["item"]: r for r in map(json.loads, author_probe_file("scores_l2.jsonl").open())}
+    probe = {i: r["probe_l2_h"] for i, r in l2.items()}
+    items = sorted(i for i in meta if all(i in ps[c] for c in AUTHOR_CONDS) and i in probe)
+    xs = {c: np.array([ps[c][i] for i in items]) for c in AUTHOR_CONDS} | {"probe": np.array([probe[i] for i in items])}
+    xs["transcript+probe"] = np.array([l2[i]["haiku_plus_probe"] for i in items])  # the nested combiner, out of fold
+    y, v, b = (np.array([meta[i][k] for i in items]) for k in range(3))
+    return items, y, v, b, xs
+
+
+@cache
+def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
+    """(version, condition) -> (AUROC, 95% CI, stars vs transcript-only, one-sided paired bootstrap over bloggers); paired
+    differences (a, b) -> (AUROC est, 95% CI, one-sided p), pooled; n cases."""
+    items, y, v, b, xs = author_cases()
+    rng = np.random.default_rng(0)
+    bars = {}
+    for ver in AUTHOR_VERSIONS:
+        m = np.ones(len(y), bool) if ver == "pooled" else v == ver
+        us = sorted(set(b[m]))
+        of = {u: np.flatnonzero(m & (b == u)) for u in us}
+        idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
+        boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+        for c, x in xs.items():
+            st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
+            bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+    us = sorted(set(b))
+    of = {u: np.flatnonzero(b == u) for u in us}
+    idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
+    pairs = {}
+    for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
+                 ("nla_inline", "nla_placebo_inline"), ("transcript+probe", "transcript_inline")]:  # fmt: skip
+        da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
+        pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
+    return bars, pairs, len(items)

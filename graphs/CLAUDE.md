@@ -1,23 +1,28 @@
 # graphs
 
-Every chart in the repo, one module each, run from the repo root as
-`uv run python -m graphs.<module>`; each writes PNGs under `docs/img/` (gitignored: the doc that
-shows a chart names the module that regenerates it). Scoring and run selection are not here: charts
-import them from `cfbench.scoring`. Every module imports `style.py`, and importing it applies the
-look (no `use()`, no `rcParams` here): colors, placebo stripes, bars with CI whiskers and the
+Every chart in the repo, for the docs and for the slide deck, one module each, run from the repo
+root as `uv run python -m graphs.<module>`; each writes PNGs under `docs/img/` (gitignored: the doc
+that shows a chart names the module that regenerates it), except `talk`, which writes the deck's
+PDFs to `slides/talk/fig/`. `docs/` and `slides/` are leaves: nothing here imports from them, and no
+Python lives there. Scoring and run selection are not here: charts import them from
+`cfbench.scoring`. Every module imports `style.py`, and importing it applies the look (no `use()`,
+no `rcParams` anywhere else): colors, placebo stripes, bars with CI whiskers and the
 paired-difference rows (each labelled by its two conditions' swatches, A − B) are `bar_kw`,
-`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. The font is Inter
-(macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing.
+`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. A slide figure is a
+function decorated with `@slide`, which applies the deck's sizes and transparent background
+(`SLIDE_RC`) around that one figure, with `slide_figure(w_mm, h_mm)` and `slide_save`; never apply
+them process-wide (that is what turned the headline PNGs white and small on 2026-10-31). The font is
+Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing.
 
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
 - `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
   J++ and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
-- `cutoff_qa_investigators`: the same task by investigator: Haiku 5.5 (later cutoff; transcript,
-  told the model and its cutoff, O-lens, placebo) beside Gemini 2.5 Flash-Lite (Qwen's cutoff;
-  answering the question itself, transcript, O-lens, placebo), stale / not stale / all; unfinished
-  runs are left out
+- `cutoff_qa_investigators`: knowledge cutoff by investigator, Haiku 5.5 (later cutoff) beside Gemini 2.5
+  Flash-Lite (Qwen's cutoff), each with its own-answer census, stale / not stale / all. `--set canonical`
+  (default, the final write-up: menus_inline `all` runs) or `--set cutoff_qa_inline` (the older eval, every
+  Flash-Lite condition and the told prompt, `docs/cutoff-qa-inline.md`)
 - `cutoff_qa_tool_inline`: the same three conditions with Qwen answering in plain text vs through a
   required submit_answer tool call (answer 5 vs 20 tokens past the last read), one panel each
   (`docs/cutoff-qa-inline.md`)
@@ -73,6 +78,10 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
   difference (`docs/chive-inline.md`)
 - `author_blog_drop`: blog sentence-deletion AUROC, text-only Haiku, Haiku with O-lens and the
   standalone L2 probe; reported blogger-bootstrap CIs, no ensemble (`docs/author-mcq-probe.md`)
+- `talk`: the sprint talk's figures (`slides/talk/talk.tex`, `make -C slides` runs it first): the
+  hint evals' grid, essay grading's AUROC bars and paired differences, the grader-mention bars and
+  the blog-deletion AUROCs, plus the LaTeX table snippets the deck `\input`s, all to
+  `slides/talk/fig/`; statistics in `cfbench.scoring` (`essay_auroc_bars`, `author_bars`, ...)
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)

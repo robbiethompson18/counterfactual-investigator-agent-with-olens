@@ -9,7 +9,7 @@ are 95% bootstraps resampling questions (essays for essay grading) within each t
     uv run python -m graphs.headline_inline [--out-dir docs/img]
 
 Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error, headline-<task> (y axis from 50) and
-headline-essay-diff.png (paired differences in % right and AUROC, the latter from slides.talk.figures), and prints every
+headline-essay-diff.png (paired differences in % right and AUROC, the latter from cfbench.scoring.essay_auroc_bars), and prints every
 paired difference the write-up quotes.
 """
 
@@ -19,10 +19,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from cfbench.scoring import standard_essay_comparison, standard_probe_rows
+from cfbench.scoring import essay_auroc_bars, standard_essay_comparison, standard_probe_rows
 from graphs import menus_inline
 from graphs.style import MUTED, ci_bar, diff_rows, label, positions
-from slides.talk.figures import essay_auroc_bars
 
 LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
