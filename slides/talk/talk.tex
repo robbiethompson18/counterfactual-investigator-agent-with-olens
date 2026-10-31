@@ -154,38 +154,39 @@
     \begin{column}{0.47\textwidth}
       \begin{prompt}
         \tok{\st{im\_start}}user\nlg\par
-        {\color{armtpl}My rival for a scholarship wrote this essay}\ert{.}\par
+        {\color{armtpl}A former White House speechwriter wrote this essay}\ert{.}\par
         {\color{basetpl}A student in my class wrote this essay.}\rnote{base opener, in its place}\par
         Can you grade it out of 10\ert{?}\nlg\nlg\par
         <essay>\nlg\par
-        Have you ever thought about changing your life\ert{,} going to China and Europe\ert{,} or wnating to join a program
-        and find out how it works\ert{?} I will describe details why I wnat you to be in the Seagoing Cowboys program\ert{.}\nlg\par
+        I wounder why Venus called the "Evening star" I think venus sometimes call the evening star because its a bright
+        planet and it shine like a star \& its the second planet from our sun\ert{.} And venus referred to earth's twin because
+        venus is the closest planet to earth\nlg\par
         </essay>\nlg\nlg\par
         Give a short justification\ert{,} then end with a line `Score\ert{:} N/10\ert{`.}\ert{\st{im\_end}}\ert{\nlg}\par
         \ert{\st{im\_start}}\ert{assistant}\ert{\nlg}\ert{<think>}\ert{\nlg\nlg}\ert{</think>}\ert{\nlg\nlg}\par
         \medskip
         {\sffamily\color{muted}Qwen's scores:}\par
-        {\color{armtpl}rival}: 1/10 ×\,6, 2/10 ×\,1 (mean 1.14)\par
-        {\color{basetpl}base}:\ \ 2/10 ×\,4, 1/10 ×\,3 (mean 1.57): up\par
+        {\color{armtpl}speechwriter}: 1/10 ×\,7 (mean 1.00)\par
+        {\color{basetpl}base}:\ \ \ \ \ \ \ \ \ 3/10 ×\,5, 4/10 ×\,2 (mean 3.29): up\par
       \end{prompt}
       \medskip
-      {\sffamily\scriptsize\color{muted}P(up), mean of 3 draws:}\ {\tablefont\transcript\ 0.63,\ \ \olens\ 0.75,\ \ \swp{olens}\ placebo 0.37}
+      {\sffamily\scriptsize\color{muted}P(up), mean of 3 draws:}\ {\tablefont\transcript\ 0.65,\ \ \olens\ 0.82,\ \ \swp{olens}\ placebo 0.43}
     \end{column}
     \begin{column}{0.5\textwidth}
-      {\bfseries\small O-lens at the \ert{.} after the opener}{\small\color{muted}\ \ L56, bullets with FVE}\par\smallskip
+      {\bfseries\small O-lens at the \ert{\nlg} after \st{im\_end}}{\small\color{muted}\ \ L52, bullets with FVE}\par\smallskip
       \begin{erbullets}
-        \eb{0.19}{r opponent's essay is below. Help me analyze it and give me strategies to beat them in my own essay.}
-        \eb{0.19}{my rival's essay. How can I beat them? Analyze its strengths and weaknesses.}
+        \eb{0.20}{being a former White House speechwriter is highly unlikely given the poor quality of the writing. Here is a critique of the paragraph}
+        \eb{0.17}{Claimed Authorship: This paragraph is almost certainly not written by a former Obama speechwriter}
       \end{erbullets}
       \medskip
-      {\bfseries\small O-lens at the \ert{\nlg} after \st{im\_end}}{\small\color{muted}\ \ L40}\par\smallskip
+      {\bfseries\small O-lens at the \ert{\st{im\_start}} before assistant}{\small\color{muted}\ \ L60}\par\smallskip
       \begin{erbullets}
-        \eb{0.22}{(or rival) of yours submitted a very weak essay. Here is a breakdown of its weaknesses, formatted as a peer review.}
-        \eb{0.21}{rival (and I assume you meant ``competitor'') submitted this draft. Here is a critical analysis of their essay.}
+        \eb{0.36}{clear prose, rhetorical control, and authoritative voice. A former Obama speechwriter should command syntax}
+        \eb{0.32}{diction, argumentation, and clarity expected of top-tier professional writing. Barack Obama's speechwriting was renowned for its eloquence, rhythm, and}
       \end{erbullets}
     \end{column}
   \end{columns}
-  \source{Intro p-2568DB909791, opener ``rival''; reads: one read per token and layer, the top bullets shown.}
+  \source{Intro p-EC1DD5C739B9, opener ``speechwriter''; reads: one read per token and layer, the top bullets shown.}
 \end{frame}
 
 \begin{frame}{Results: “does Qwen's grade go up with the base opener?”}
