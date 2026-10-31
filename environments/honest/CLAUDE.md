@@ -3,18 +3,15 @@
 Honest grader: 11 scenarios × 5 framings; the shared prompt and score parser are in
 `../_lib/honest.py`. What it tests, arms, measures and runs: [README.md](README.md).
 
-## Known issues (not fixed, revisit later)
+## Score parsing
 
-Codex found these in a 2026-10-28 grader review at `cda1fe1` (moved here from `CODE_SMELL.md`);
-Robbie hasn't reviewed them, so treat them as findings to verify. P1 = prioritize before trusting
-affected results; P2 = narrower correctness or reporting issue.
+**Fixed 2026-10-31:** honest and essay_grading share `parse_score` in `../_lib/honest.py`.
+The final explicit `Score:` field wins, including ordinary Markdown around the label/value.
+Its decimal numerator must be finite and within 0–10, with denominator exactly 10. A missing or
+invalid final field gives `score=None` and `positive=None`; never fall back to an earlier score.
 
-### P2: bold scores are converted to negative grades
-
-[`environments/_lib/honest.py`](../_lib/honest.py), `SCORE` (line 45), and its copy in
-[`environments/essay_grading/env.py`](../essay_grading/env.py), line 94, reject `Score: **2/10**`
-and `**Score:** **2/10**`. A harsh grade therefore becomes `positive=False` with no score.
-Conversely, the regex accepts `Score: 4/100` as 4/10 because the denominator has no boundary.
-Normalize Markdown around the score and require the complete denominator; share the parser. All 550
-locally available honest replies had parseable scores, so this check demonstrates a parser bug
-without establishing an error rate in that run.
+This fixes the 2026-10-28 review finding: bold scores were missed, `/100` was accepted as `/10`,
+and an earlier score could override a final bold score. An offline audit of the two locally saved
+canonical runs (550 honest + 19,783 essay_grading responses) found zero score corrections and one
+missing essay score changing from negative to unscorable (1/20,333, 0.0049%). This is local coverage,
+not a census of HF. Historical labels were not rewritten.

@@ -134,7 +134,8 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # corruption and spurious options parsed from question stems. Existing saved inputs and predictions are not rewritten.
 # 16: MCQ options use the final lettered block and reads use complete-option ending newlines, including multiline options.
 # mcq_unselected / supergpqa_inline prompts and read selection can change; stored runs are not rewritten.
-HARNESS_VERSION = 16
+# 17: honest / essay_grading behavior definitions mark missing or invalid final Score fields as unscorable.
+HARNESS_VERSION = 17
 
 
 @dataclass
