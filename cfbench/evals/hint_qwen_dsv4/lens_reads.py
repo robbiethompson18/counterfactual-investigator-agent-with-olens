@@ -79,7 +79,8 @@ def split(reads: Path, run: Path):
         else:
             by[tag].append(r)
     for tag, d in SOURCES.items():
-        want = _sites(r for r in _rows(d / "reads.jsonl") if r["id"] in {q["id"] for q in _rows(d / "requests.jsonl") if _keep(tag, q)})
+        ids = {q["id"] for q in _rows(d / "requests.jsonl") if _keep(tag, q)}
+        want = _sites(r for r in _rows(d / "reads.jsonl") if r["id"] in ids)
         got = _sites(by[tag])
         assert got == want, f"{tag}: {len(got - want)} extra, {len(want - got)} missing sites vs {d.name}"
         (run / tag).mkdir(parents=True, exist_ok=True)
