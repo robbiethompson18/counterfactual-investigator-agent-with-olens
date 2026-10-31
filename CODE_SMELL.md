@@ -120,10 +120,6 @@ A Codex read of `olens/src/olens/`, `scripts/olens_read_requests.py`,
 found no layer-index, norm or position-alignment bug in the J++ or O-lens paths. It did find these,
 none fixed yet:
 
-- **One seed for every lens request** (`one_engine.py` ~203-211, `olens_read_requests.py` ~248):
-  vLLM seeds each request's sampler from the same `seed` (default 0), so transcripts that share a
-  prompt (e.g. the 8 samples of one item) get identical sampled lens draws on that prompt, not
-  independent ones. Fix: seed from (run seed, id, position, layer, replicate).
 - **Field matching can run into a later message** (`render.py` ~78-88): `text.find(s, cur)` searches
   the whole rest of the transcript, so a short field (an assistant's `"A"`) can match inside a later
   message and shift every field after it; an answer `"think"` matches inside `<think>`. Single-turn
