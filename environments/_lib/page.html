@@ -1239,13 +1239,16 @@ async function evalPage(h) {
     ${runs.length ? `<p class="lede">Each chart has the observed rate before (base arm) and after (counterfactual arm), bands = 95% credible intervals (Beta(1,1)), and every investigator
       draw as a point, coloured by condition; the dashed line is the null "the edit does nothing" (predict the base rate the investigator was shown). Click a point for
       everything that investigator saw and said (prompt, tool calls and results, submit) in expview.</p>` : ""}
-    ${claim.length ? claimSection(ev, claim, keep, h) : ""}
+    ${ev.page_html && !h.run && !h.env ? `<div class="evpage">${ev.page_html}</div>` : ""}
+    ${claim.length && ev.page_html ? `<details class="sec"><summary>Standard claim tables</summary><div class="body">${claimSection(ev, claim, keep, h)}</div></details>` : claim.length ? claimSection(ev, claim, keep, h) : ""}
     ${claim.length ? questionTable([...claim], h) : ""}
     ${runs.length ? `${runs.map(R => rmseCiBlock(R.rmse, R.rmse_null, R.boot, `${esc(R.slug)} · harness v${R.harness_version}`)).join("")}
       ${ev.pooled && !h.run && !h.env ? rmseCiBlock(ev.pooled.rmse, ev.pooled.rmse_null, ev.pooled.boot, `pooled over ${ev.pooled.runs.length} runs`) : ""}
       ${pairedHtml}<details class="sec"><summary>RMSE over all cases (vs "the edit does nothing")</summary><div class="body">${summary}</div></details>${body}` : ""}${ansSummary}${ans.length ? questionTable([...ans], h) : ""}${ansBody ? `<details class="sec"><summary>Per dataset and run: every item's draws</summary><div class="body">${ansBody}</div></details>` : ""}
     ${older.length ? `<details class="sec"><summary>Older runs (${older.length}): superseded by the runs above</summary><div class="body"><ul>${older.map(R =>
       `<li><a class="mono" href="#${hashOf({eval: h.eval, run: R.run})}">${esc(R.slug)}</a> <span class="mute">${esc(R.date)} · ${R.n_cases} cases · ${R.versions ? esc(R.versions.join(", ")) : ""}${R.inputs ? ` · inputs ${esc(R.inputs)}` : ""}</span></li>`).join("")}</ul></div></details>` : ""}`;
+  // an eval's own section (its score.py PAGE, cfbench/evals/page.py): data-cond elements get that condition's colour as --c
+  for (const e of $("view").querySelectorAll("[data-cond]")) e.style.setProperty("--c", condColor(e.dataset.cond));
 }
 
 // claim evals (cfbench/evals CLAUDE.md, TASK = "claim"): the investigator gives P(a claim is true), truth 0 or 1 per case,
