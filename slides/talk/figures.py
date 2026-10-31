@@ -440,7 +440,7 @@ PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
 AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
 AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
                  ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"])]  # fmt: skip
-VERSIONS = {"qwen_wrong": "Qwen's answer ≠ the blogger's", "qwen_right": "Qwen's answer = the blogger's"}
+VERSIONS = {"pooled": "all cases"}  # pooled (Kylie, 2026-10-31: not the Qwen-wrong / Qwen-right split)
 
 
 def author_rows(run: str) -> list[dict]:
@@ -502,7 +502,7 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
     rng = np.random.default_rng(0)
     bars = {}
     for ver in VERSIONS:
-        m = v == ver
+        m = np.ones(len(y), bool) if ver == "pooled" else v == ver
         us = sorted(set(b[m]))
         of = {u: np.flatnonzero(m & (b == u)) for u in us}
         idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
@@ -528,12 +528,13 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
 
 
 def author() -> None:
-    """AUROC of P(the deletion is significant) per condition, one panel per version; plus the paired differences table
+    """AUROC of P(the deletion is significant) per condition, pooled over both versions; plus the paired differences table
     (fig/author_pairs.tex)."""
     bars, pairs, n = author_bars()
     one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
     width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
-    fig, axes = figure(86, FULL_H, ncols=2, sharey=True)
+    fig, ax0 = figure(62, FULL_H)
+    axes = [ax0]
     base = 0.5
     top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
     for ax, (ver, title) in zip(axes, VERSIONS.items(), strict=True):
