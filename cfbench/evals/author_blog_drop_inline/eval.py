@@ -14,6 +14,7 @@ and the post up to "What do you think?", layers 32/40/48).
     uv run --with transformers --with jinja2 python -m cfbench.evals.author_blog_drop_inline.eval topup OUT.jsonl   # read requests
     uv run --with transformers --with jinja2 python -m cfbench.eval author_blog_drop_inline --prep
     uv run python -m cfbench.evals.author_blog_drop_inline.eval show-expview INPUTS INPUTS/expview
+    uv run python -m cfbench.evals.author_blog_drop_inline.eval add-nla INPUTS   # reads/nla.jsonl from NLA_READS
 """
 
 import json
@@ -35,11 +36,13 @@ ABLATES = [
 ABLATES_X2 = ABLATES
 ATTRS = {k: ("", v) for k, v in BLOG_ATTRS.items()}  # bank.ATTRS shape: (question, options)
 READS = [Path(f"data/runs/olens_reads/2026-10-30_author-blog{s}") for s in ("", "-b")]
+# ceselder/qwen3.6-27b-nla-rl (layer 42) at the O-lens positions (scripts/author_probe/nla_l42.py; Kylie, 2026-10-31)
+NLA_READS = Path("data/runs/nla_reads/2026-10-31_author-blog-nla-l42")
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
 MODEL_NAME = "the model"
 TASK = "claim"
-CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
+CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline")
 INLINE_EFFORT = "low"  # Kylie, 2026-10-30
 VERSIONS: dict[str, dict] = {"qwen_wrong": {"wrong": True}, "qwen_right": {"wrong": False}}  # Qwen vs the SynthPAI label
 SEED = 0
@@ -121,7 +124,17 @@ def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | No
     rows_req = [{"id": p, "item": p, "messages": msgs[p], "batch": batch[p]} for p in sorted(have)]  # batch: the placebo stays within it
     (out / "reads/requests.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows_req))
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
+    if (NLA_READS / "reads.jsonl").exists():
+        add_nla(out)
     print(f"{len(cs)} cases ({sum(c['positive'] for c in cs)} positive) from {len(need)} pairs; reads for {len(have & need)} pairs")
+
+
+def add_nla(inputs: Path):
+    """The NLA conditions' readouts for the inputs run's pairs, as reads/nla.jsonl (also run on an existing inputs run)."""
+    need = {r["id"] for r in load(inputs / "reads/requests.jsonl")}
+    rows = [r for r in load(NLA_READS / "reads.jsonl") if r["id"] in need]
+    (inputs / "reads/nla.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+    print(f"{len(rows)} NLA readouts for {len({r['id'] for r in rows})} of {len(need)} pairs -> {inputs / 'reads/nla.jsonl'}")
 
 
 def reads(inputs: Path) -> list[str]:
@@ -184,6 +197,36 @@ def block(path: Path, own: str, messages: list[dict], source: str) -> str:
     return "\n".join(out).strip()
 
 
+NLA_TEXT = """\
+An NLA (natural language autoencoder) is a model trained to describe one of another model's internal activations in a short \
+free-text explanation; a second model, the critic, tries to rebuild the activation from the explanation alone, which scores \
+it: FVE, the fraction of the activation's variance the rebuilt one explains (here relative to the mean activation over these \
+blog prompts, so 0 means no better than the average prompt). High FVE is good; explanations with low or negative FVE are \
+often confabulated. The NLA was run on {model}'s activations {where}, at layer {layer}, one explanation per token. \
+Explanations can show what the model registers but never says; they also often just paraphrase the nearby text, and they \
+get fine details wrong (exact numbers, names) more often than broad themes. {timing}
+
+Each position below shows the text around the token read, wrapped in <read></read> (↵ is a newline), then its explanation \
+with its FVE."""
+
+
+def nla_block(path: Path, own: str, messages: list[dict], source: str) -> str:
+    """block()'s format over NLA readouts (reads/nla.jsonl): `own`'s positions, `source`'s explanation position by position."""
+    by: dict[str, list[dict]] = {}
+    for r in load(path / "nla.jsonl"):
+        by.setdefault(r["id"], []).append(r)
+    mine, theirs = (sorted(by[x], key=lambda r: r["char_offset"]) for x in (own, source))
+    out = []
+    for k, r in enumerate(mine):
+        text, char, token = messages[r["msg_index"]][r["field"]], r["char_offset"], r["token"]
+        assert text.startswith(token, char), (own, char, token)
+        t = theirs[k % len(theirs)]
+        out.append(f"{inline._label(text, char, token)}: {inline._context(text, char, token)}")
+        out.append(f"- layer {t['layer']}, FVE {t['fve']:.2f}: {' '.join(t['text'].split())}")
+        out.append("")
+    return "\n".join(out).strip()
+
+
 def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:
     """inline.prompt's layout with this eval's setup text (no hint): the shared O-lens pieces, our task."""
     run = base[0]
@@ -212,7 +255,15 @@ follows. Everything else is identical.
 {edit}"""
     ]
     extra = {}
-    if condition != "transcript_inline":
+    if condition.startswith("nla"):
+        path = Path(case["inputs"]) / "reads"
+        own = run.source.split("/", 1)[1]
+        source = placebo(path, own, seed) if condition == "nla_placebo_inline" else own  # the O-lens placebo's pick
+        if source != own:
+            extra["placebo_sources"] = [source]
+        text = NLA_TEXT.format(model=model, where=WHERE, layer=42, timing=TIMING)
+        parts.append(f"## NLA reads\n\n{text}\n\n<nla_reads>\n{nla_block(path, own, run.messages, source)}\n</nla_reads>")
+    elif condition != "transcript_inline":
         path = Path(case["inputs"]) / "reads"
         own = run.source.split("/", 1)[1]
         source = placebo(path, own, seed) if condition == "olens_placebo_inline" else own
@@ -248,7 +299,7 @@ def topup(out: Path):
     print("wrote", len(pairs), "requests to", out)
 
 
-RUNS = ["2026-10-30_author-blog-drop-haiku-b2"]  # batches 1+2 pooled (batch 1's draws reused)
+RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]  # batches 1+2; NLA (2026-10-31)
 EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
 
 
@@ -264,6 +315,7 @@ def datasets(pair: str) -> dict[str, str]:
     return {
         "pair: O-lens reads + sentence deletions": f"runs/author_mcq_blog/2026-10-30_qwen36-qfirst{b}/pairs",
         "O-lens reads (raw)": f"runs/olens_reads/2026-10-30_author-blog{b}",
+        "NLA reads (raw)": "runs/nla_reads/2026-10-31_author-blog-nla-l42",
     }
 
 
@@ -340,3 +392,5 @@ if __name__ == "__main__" and sys.argv[1] == "topup":
     topup(Path(sys.argv[2]))
 if __name__ == "__main__" and sys.argv[1] == "show-expview":
     show_expview(Path(sys.argv[2]), Path(sys.argv[3]))
+if __name__ == "__main__" and sys.argv[1] == "add-nla":
+    add_nla(Path(sys.argv[2]))

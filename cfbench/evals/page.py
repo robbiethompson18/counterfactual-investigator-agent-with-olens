@@ -9,6 +9,7 @@ condition as the CSS variable `--c` (use `fill="var(--c)"` in SVG, `style="backg
 from html import escape
 
 LABELS = {"probe": "linear probe", "transcript_inline": "transcript", "olens_inline": "O-lens", "olens_placebo_inline": "O-lens placebo",
+          "nla_inline": "NLA", "nla_placebo_inline": "NLA placebo",
           "transcript_agentic": "transcript", "olens_agentic": "O-lens", "olens_placebo_agentic": "O-lens placebo"}  # fmt: skip
 
 
