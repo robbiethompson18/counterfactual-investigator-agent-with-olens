@@ -10,12 +10,32 @@ plus their 3-draw top-ups. Never the 2026-10-29 per-set runs (mcq-unselected-hai
 cutoff-qa-1k-*, favorites-haiku-v3-*): each set there read different positions (J++ at every token on three sets, 16
 positions on MMLU-Pro) with a different prompt. Essay grading has no menus run and keeps its own. -->
 
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31): canonical means the `menus_inline` runs, `all`
+> menu: every lens read at the same positions (each prompt's punctuation and option newlines plus
+> the 9 tail tokens at the start of the assistant turn), all six layers 32/40/48/52/56/60, one
+> prompt and one placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes
+> from something else and must be redone on those runs before this ships. Status at 15:50 PDT: draw
+> 0 of every canonical set is done; the draws 1-2 top-ups (`*-all-d12b`, Anthropic batch API) are
+> 70-90% through on cutoff and preferences and still being submitted for MMLU-Pro and SuperGPQA, so
+> about an hour out. PR #539 switches `graphs.headline_inline` and `graphs.headline_tokens` to them;
+> the branch `graphs/cutoff-investigators-canonical` does the same for
+> `graphs.cutoff_qa_investigators`; nothing yet fixes `graphs.headline_ablations`' Qwen-right /
+> Qwen-wrong charts.**
+
 Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
 review I will write (KTR). FOr Claude I will write (CTR).
 
 TODO BROAD:
 
 - put essay grading and blog posts into some null tasks.
+
+RULES FOR CLAUDE:
+
+- Never give bash to reprodue something, people can just point their agent at our repo.
+- Never link to github (except once to the overall repo); you are allowed to link to other parts of
+  this doc and to arxiv papers and to docent.
+- Never numbers in prose by default!! We do this so often. I want to audit all of these eventually.
+  Numbers go in graphs.
 
 ## Executive Summary (KTR)
 
@@ -86,13 +106,41 @@ transcript-only or its own placebo:
 More details and charts is in the appendix,
 [Counterfactual investigation graphs](#counterfactual-investigation-graphs).
 
-### Chive Shows Not Much Uplift From The Transcript
+### Chive Shows Little Uplift From The Transcript
+
+A cheap test we ran: does giving the investigator the transcript of a chive rollout help in
+predicting counterfactuals? If the answer is no, then these scenarios very hard, and we don't expect
+metamodels to move the needle much either. For a sense of what we mean, see a docent transcript with
+a transcript, and one without. (@c make both of these links work!)
+
+The graphs below show that transcripts do move the needle, but only by a couple percentage points.
 
 <img src="img/chive-inline.png" alt="AUROC on CHIVE's yes/no claims: Haiku edit only vs transcript, beside CHIVE's Opus 4.8 transcript and resampling arms, per target and pooled" width="760">
 
 <img src="img/chive-inline-diff.png" alt="Haiku AUROC, transcript minus edit only, paired by claim: +0.012 pooled" width="500">
 
-TODO fix this to use qwen 3.6 27b if we can, then use our jlens / olens / NLA.
+### On A Subset of CHIVE, Metamodels Don't help.
+
+We did not recreate all of CHIVE using Qwen 3.6 27b rollouts, but we did test a 150 incidents (500
+counterfactuals) to check for signs of life. We see nothing promising, and move on to other
+datasets.[^datadetail]
+
+[^datadetail]:
+    Agam's 300 Qwen3.6-27B incidents from his run of the CHIVE pipeline
+    ([agu18dec/chive-forensics](https://huggingface.co/datasets/agu18dec/chive-forensics)), thinking
+    off, each with its edits stored exactly and their rates measured over 30 samples. We kept the 150
+    incidents with at most the median number of read positions (77), so the lens blocks stay small,
+    and labelled each experiment with CHIVE's rule: true if the edit moved the rate by at least 50pp,
+    false if by at most 15pp, otherwise dropped. That gives 515 claims, 316 true and 199 false. Haiku
+    5.5 sees CHIVE's prompt, with the edit shown as a diff of the conversation, and gives P(claim
+    true), 3 draws per claim. Lens reads are of the original conversation and reply only, at every
+    punctuation and end-of-turn token plus the ten tokens before the reply, layers 32 to 60; a placebo
+    is another incident's reads laid on the same positions. Details in `docs/chive-inline.md`.
+
+@c add your graphs here plz special claude.
+@robbie done: bar chart below and the dataset footnote above, no diff chart (`uv run python -m graphs.chive_agam_inline`).
+
+<img src="img/chive-agam-inline.png" alt="AUROC on 515 CHIVE-style claims over Agam's Qwen3.6-27B incidents: edit only 0.775, transcript 0.780, O-lens 0.788 vs placebo 0.787, NLA 0.784 vs 0.780, J++ 0.791 vs 0.788" width="600">
 
 ## Part 1: Our New Simple Evals
 
@@ -180,21 +228,22 @@ and
 
 #### Essay Grading
 
-We take 204 student intro paragraphs from
-[PERSUADE 2.0](https://github.com/scrosseye/persuade_corpus_2.0) (Crossley et al., 2024), 34 at each
-human score from 1 to 6, and open each with one of 225 sentences about who wrote it or what the user
-wants ("My rival for a scholarship wrote this essay."), giving 1,800 cases. Qwen grades each prompt
-out of 10 about 8 times, and the investigator predicts whether its mean score goes up when the
-opener becomes the plain "A student in my class wrote this essay."; it does on 54% of cases. There
-is no filter at all, not even consistency: the openers were written before any was run on these
-essays, and every case is kept.
+We take 204 micro-essays from [PERSUADE 2.0](https://github.com/scrosseye/persuade_corpus_2.0)
+(Crossley et al., 2024): each is the opening paragraph of a real student essay, 40 to 100 words, 34
+at each human score from 1 to 6. We also write 225 opener sentences about who wrote it or what the
+user wants ("My rival for a scholarship wrote this essay."). We do not run every opener on every
+micro-essay: each opener goes on 8 of the micro-essays, so each micro-essay gets about 9 openers,
+and that gives 1,800 cases. Qwen grades each prompt out of 10 about 8 times, and the investigator
+predicts whether its mean score goes up when the opener becomes the plain "A student in my class
+wrote this essay."; it does on 54% of cases. There is no filter at all, not even consistency: the
+openers were written before any was run on these micro-essays, and every case is kept.
 
-<img src="img/data-filter-sankey-essay.png" alt="Essay grading: 1,800 cases, no filter, all evaluated" width="500">
+<img src="img/data-filter-sankey-essay.png" alt="Essay grading: 1,800 cases (225 openers, each on 8 of the 204 micro-essays), no filter, all evaluated" width="500">
 
 Example Qwen transcripts on Docent:
 [rival opener](https://docent.transluce.org/dashboard/d0ca26f8-3fcb-46ae-934a-43ee4e9dc3f6/agent_run/88f65572-a720-48ac-b03a-af7615811af2)
 and
-[plain opener on the same intro](https://docent.transluce.org/dashboard/d0ca26f8-3fcb-46ae-934a-43ee4e9dc3f6/agent_run/0de617fd-dcd2-4717-bdc9-72676025408b).
+[plain opener on the same micro-essay](https://docent.transluce.org/dashboard/d0ca26f8-3fcb-46ae-934a-43ee4e9dc3f6/agent_run/0de617fd-dcd2-4717-bdc9-72676025408b).
 
 #### Blog Authorship
 
@@ -224,6 +273,14 @@ Metamodels work on these three tasks! The 🔮-lens and NLA are about equally go
 The next few charts show pooled correctness over all three tasks. Our investigator is always Haiku
 5.5 on medium effort.
 
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** The four headline charts (metamodels,
+> placebos, probes, probes as error rate) and every number in this section (78.0 / 84.5 / 80.0 /
+> 83.6%, the −9.7pp and +2.0pp) come from the 2026-10-29 per-set runs, where the read positions
+> differed by set (J++ at every token on SuperGPQA, cutoff and favorites, 16 positions on MMLU-Pro)
+> and so did the prompt. Redo from the `menus_inline` `all` runs once PR #539 is merged and the
+> top-ups are in; on draw 0 the pooled gains are smaller (O-lens +3.1, NLA +2.6, J++ −1.4pp vs
+> transcript-only), so the prose here changes too.
+
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: transcript only 78.0%, O-lens 84.5%, J++ 80.0%, NLA 83.6%" width="500">
 
 All three beat their placebo versions (where we swap in metamodel data from a different question) by
@@ -245,24 +302,38 @@ The difference is more noticeable when you measure by error rate (lower better):
 
 #### On Multiple Choice Questions
 
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** The three per-task charts in this section
+> (multiple choice, knowledge cutoff, preferences) are the same 2026-10-29 per-set runs. Fixed by PR
+> #539 + the top-ups; regenerate with `graphs.headline_inline`.
+
 <img src="img/headline-mcq.png" alt="Multiple choice, transcript only, three metamodels and their placebos" width="500">
 
 #### Knowledge Cutoff Q&A
 
 <img src="img/headline-cutoff.png" alt="Knowledge cutoff, transcript only, three metamodels and their placebos" width="500">
 
-This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. If you tell
-Haiku about Qwen's knowledge cutoff, or use a judge model with a similar knowledge cutoff, most or
-all of the effect disappears.
+This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. Asked the
+questions itself, Haiku gives Qwen's stale answer on 25% of the 339 stale items; Gemini 2.5
+Flash-Lite, whose cutoff (January 2025) is about Qwen's, gives it on 63%. Use an investigator with a
+similar knowledge cutoff and the metamodels' uplift disappears. Concretely, the far right blue bar
+is is a strong and arguably fairer baseline, and we show no uplift to it.
 
-<img src="img/cutoff-qa-investigators.png" alt="Knowledge cutoff by investigator: Haiku 5.5 (transcript only 47.1% on stale items, told the model and its cutoff 61.5%, O-lens 72.6%, placebo 55.6%) beside Gemini 2.5 Flash-Lite (answers the question itself 63.1%, transcript only 70.4%, O-lens 54.0%, placebo 8.3%), with not-stale and all-items panels" width="760">
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** `graphs.cutoff_qa_investigators` on `main`
+> still reads the 2026-10-29 `cutoff_qa_inline` runs for Haiku (transcript-only 47% on stale items,
+> not the 64% in the chart's alt text). The 64 / 77 / 74 / 70% numbers come from the canonical
+> `menus_inline` runs via the unmerged branch `graphs/cutoff-investigators-canonical`: merge it,
+> regenerate the chart from it, and check the chart on the page matches. The Flash-Lite lens and
+> placebo rows (54%, 8%) are from the old prompt and positions and have no canonical counterpart;
+> either rerun Flash-Lite on the `menus_inline` inputs or keep them clearly labelled as the old set.
 
-Telling Haiku that the model is Qwen3.6-27B with a January 2025 cutoff closes about half of the gap
-on stale items (transcript only goes from 47% to 62%, against 73% with the O-lens). Gemini 2.5
-Flash-Lite, whose cutoff is about Qwen's, names Qwen's stale answer on 63% of stale items with no
-investigator prompt at all and on 70% as a transcript-only investigator; given O-lens reads it falls
-to 54%, and given placebo reads to 8%, so it cannot use the reads at all. Regenerate with
-`uv run python -m graphs.cutoff_qa_investigators`.
+<img src="img/cutoff-qa-investigators.png" alt="Knowledge cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, transcript only 64.3%, O-lens 77.0% (placebo 67.0%), J++ 69.6% (placebo 43.1%), NLA 73.5% (placebo 67.0%); Gemini 2.5 Flash-Lite answers itself 63.1%, transcript only 73.1%; with not-stale and all-items panels" width="600">
+
+Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to
+8–34%, because it takes the bullets at face value ([docs/cutoff-qa-inline.md](cutoff-qa-inline.md)).
+[^oldprompt] This is not so surprising: Gemini 2.5 Flash-Lite is dumb.
+
+[^oldprompt]:
+    This is on a slightly stale prompt (`cutoff_qa_line`), which we believe is unimportant.
 
 #### Idiosyncratic Preferences
 
@@ -279,6 +350,12 @@ gain over text-only is not statistically significant; the standalone probe is al
 on this metric. The probe is supervised on this deletion task with bloggers held out, and its
 configuration was chosen during exploration of this dataset.
 
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog authorship is not on canonical reads:
+> O-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
+> and post's punctuation and newlines with no start-of-assistant-turn tail tokens. There is no
+> `menus_inline` run for this set. Decide: rerun the reads at the canonical positions and six
+> layers, or keep the chart with that caveat in the text.
+
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with O-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
 
 The chart shows the probe alone. Details and the separate ensemble analysis are in
@@ -291,6 +368,13 @@ The chart shows the probe alone. Details and the separate ensemble analysis are 
 ### Filtering On Correctness
 
 #### Little or No Uplift When Qwen is Right
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Both correctness-split charts (Qwen right /
+> Qwen wrong) and the numbers in the paragraph below are from the 2026-10-29 per-set runs. **PR #539
+> does not fix these:** `graphs.headline_ablations.by_correctness` reads `mcq_unselected.RUNS`,
+> `supergpqa_inline.RUNS` and `cutoff_qa_inline.RUNS` directly, so it needs its own switch to
+> `graphs.menus_inline.load` (the `menus_inline` rows carry `modal_cf` / `gold` and `gate_class`, so
+> the split is available).
 
 <img src="img/headline-qwen-right.png" alt="Cases where Qwen is right: transcript only vs O-lens, J++ and NLA on MMLU-Pro (94.4, 95.6, 95.1, 95.0), SuperGPQA (82.5, 88.8, 83.9, 84.6) and knowledge cutoff (94.6, 92.1, 91.8, 92.9)" width="760">
 
@@ -309,11 +393,16 @@ This is why we think it's so important to _not filter data based on subject mode
 you do this, then way of pushing your investigator off of 'Qwen will say the right answer' looks
 like a significant effect.
 
-<img src="img/headline-essay-correctness.png" alt="Essay grading AUROC on the 76 essays Qwen grades wrong (transcript only 0.743, O-lens 0.764, placebo 0.752, J++ 0.747 / 0.740, NLA 0.749 / 0.744) and the 128 it grades right (0.758, 0.781, 0.760, 0.766 / 0.755, 0.766 / 0.764)" width="760">
+<img src="img/headline-essay-correctness.png" alt="Essay grading AUROC on the 76 of 204 micro-essays Qwen grades wrong (transcript only 0.743, O-lens 0.764, placebo 0.752, J++ 0.747 / 0.740, NLA 0.749 / 0.744) and the 128 it grades right (0.758, 0.781, 0.760, 0.766 / 0.755, 0.766 / 0.764)" width="760">
 
-Qwen is "wrong" on an essay when it grades a top-half essay (PERSUADE holistic score 4 to 6) below
-its own median grade, or a bottom-half essay above it, which is 76 of the 204 essays; the split
-changes little here, the O-lens leading transcript only by about 0.02 AUROC on both halves.
+Qwen is "wrong" on a micro-essay when it grades a top-half one (PERSUADE holistic score 4 to 6)
+below its own median grade, or a bottom-half one above it, which is 76 of the 204 micro-essays; the
+split changes little here, the O-lens leading transcript only by about 0.02 AUROC on both halves.
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog chart: same non-canonical reads as the
+> blog chart above (layers 32/40/48, no tail tokens). Essay chart above it is on canonical-style
+> reads (every punctuation token + the 10 tail tokens, layers 32-60) from its own runs, which is
+> fine: essay has no `menus_inline` run by design.
 
 <img src="img/headline-blog-correctness.png" alt="Blog sentence deletion AUROC on the 722 cases where Qwen is wrong about the author (transcript only 0.749, O-lens 0.766, placebo 0.746) and the 594 where it is right (0.849, 0.841, 0.831)" width="760">
 
@@ -323,6 +412,12 @@ cases it trails transcript only by 0.008. Both charts regenerate with
 `uv run python -m graphs.headline_ablations`.
 
 ### Which Metamodel is Best?
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** This chart and the paired differences quoted
+> below (+6.5 / +2.0 / +5.5pp pooled) are from the 2026-10-29 per-set runs. Fixed by PR #539
+> (`graphs.headline_ablations` gets these rows through `graphs.headline_inline.load`), then rewrite
+> the paragraph; on canonical draw 0 J++ is below transcript-only, so "J++ is the weakest" may
+> become "J++ hurts".
 
 <img src="img/headline-lens-diffs.png" alt="Each lens minus transcript only, paired by case: multiple choice O-lens +5.1, J++ +2.2, NLA +1.8; knowledge cutoff +7.0, +4.9, +7.8; idiosyncratic preferences +7.3, -0.9, +7.0; pooled +6.5, +2.0, +5.5" width="620">
 
@@ -355,14 +450,17 @@ can be accused of being next-token predictors.
 
 #### Which tasks
 
-Yes: paired by case, a placebo only helps on knowledge cutoff (J++ placebo +3.2pp, NLA placebo
-+4.8pp, O-lens placebo −0.6pp over transcript only), where any stale read tells Haiku the model
-thinks it is an earlier year; on multiple choice and preferences every placebo is neutral or hurts,
-the J++ placebo badly (−5.5pp and −27.0pp).
+Split by case, a placebo only helps on knowledge cutoff (J++ placebo +3.2pp, NLA placebo +4.8pp,
+O-lens placebo −0.6pp over transcript only). Stale reads tell Haiku the model thinks it is an
+earlier year. On multiple choice and preferences every placebo is neutral or hurts, the J++ placebo
+badly.
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Same: the placebo-minus-transcript rows and
+> the numbers in the paragraph above are from the 2026-10-29 per-set runs, where the J++ placebo was
+> J++ at every token on three sets, which is probably why it is so damaging (−27pp on preferences).
+> Redo after PR #539.
 
 <img src="img/headline-placebo-diffs.png" alt="Each lens's placebo minus transcript only, paired by case: multiple choice O-lens -1.2, J++ -5.5, NLA -0.5; knowledge cutoff -0.6, +3.2, +4.8; idiosyncratic preferences -9.8, -27.0, +0.8; pooled -3.9, -9.7, +1.7" width="620">
-
-Regenerate with `uv run python -m graphs.headline_ablations`.
 
 #### Total Tokens Per
 
@@ -370,9 +468,13 @@ Regenerate with `uv run python -m graphs.headline_ablations`.
 
 We see the most uplift from the 🔮-lens, whose reads add the fewest tokens per prompt to Haiku's
 (12.1k per prediction, pooled, against 13.6k for NLA and 14.8k for J++, the weakest lens). Thus we
-don't think that extra tokens alone drive placebo gains. TODO: redo these counts once the charts use
-the menus_inline `all` runs, where every lens is read at the same positions; here J++ was read at
-every token on three of the four sets, which inflates its count.
+don't think that extra tokens alone drive placebo gains.
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Both token charts (prompt tokens added,
+> thinking tokens) and every count in this section (12.1k / 13.6k / 14.8k; 154 / 224 / 214 / 288 and
+> the placebos' 297 / 226 / 377; the −0.07 to −0.44 correlations) are from the 2026-10-29 per-set
+> runs, where J++ was read at every token on three of the four sets, which inflates its count. Fixed
+> by PR #539 (`graphs.headline_tokens`); redo the numbers.
 
 Reads also make Haiku think longer, so we checked whether more thinking explains the gains. It
 doesn't look like it. Pooled, Haiku spends 154 thinking tokens per prediction on transcript-only,
@@ -529,6 +631,14 @@ Our full review is the "WorkspaceBench Review" tab of the
 
 Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
 behavior rate, higher is better; hatching means placebo.
+
+> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** None of the counterfactual charts in this
+> appendix is on canonical reads, and none can be: they are the `olens_agentic` tool runs, where the
+> predictor's `olens_at` tool shows layers 32/40/48 by default (`cfbench/olens.py`) at the reads'
+> stop-token positions, and the J-lens tool reads every token at layers 36-60. There is no
+> six-layer, same-positions rerun of these, and the `*_agentic` conditions are frozen (CLAUDE.md,
+> 2026-10-30). Decide: say so in the text here (and in "The one thing we never ablated" above, which
+> is about layers), or drop the O-lens bars from these charts.
 
 ### Null Results on Counterfactual Predictions
 
