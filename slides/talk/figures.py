@@ -23,7 +23,7 @@ import numpy as np
 
 from cfbench.evals.essay_grading_cf_inline.eval import mean
 from graphs.style import INK, MUTED
-from slides.figure import FULL_H, FULL_W, bar_kw, figure, save
+from slides.figure import BG, FULL_H, FULL_W, bar_kw, figure, save
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).with_name("fig")
@@ -387,6 +387,45 @@ def essay(mm: float) -> None:
     essay_tables()
 
 
+def essay_diffs() -> None:
+    """The paired differences as a forest plot in diff_rows' style (ink CI line and dot, filled when the CI excludes 0, a line
+    at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
+    resamples as the table and the stars; the probe's (+0.127) is left out so it doesn't set the axis."""
+    pairs = essay_auroc_bars()[3]
+    short = {"olens_inline": "O-lens", "olens_placebo_inline": "placebo", "transcript_inline": "transcript"}
+    fig, ax = figure(57, 30)
+    ticks, labels, y = [], [], 0.0
+    for head, sfx in (("investigator", ""), ("+ bet at mean", "+mean")):
+        ticks.append(y)
+        labels.append(head)
+        y -= 1
+        for a, b in [
+            ("olens_inline", "transcript_inline"),
+            ("olens_inline", "olens_placebo_inline"),
+            ("olens_placebo_inline", "transcript_inline"),
+        ]:
+            d, (lo, hi), _ = pairs[a + sfx, b + sfx]
+            ax.plot([lo, hi], [y, y], color=INK, lw=1.2, solid_capstyle="butt", zorder=3)
+            ax.plot(d, y, "o", ms=3.5, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
+            ticks.append(y)
+            labels.append(f"{short[a]} − {short[b]}")
+            y -= 1
+    ax.set_yticks(ticks, labels)
+    for tick, lab in zip(ax.get_yticklabels(), labels, strict=True):
+        if lab in ("investigator", "+ bet at mean"):  # group headers, as diff_rows
+            tick.set_fontweight("bold")
+    ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
+    ax.set_ylim(y + 0.4, 0.6)
+    ax.set_xlim(-0.012, 0.035)
+    ax.set_xticks([0, 0.01, 0.02, 0.03], ["0", "+0.01", "+0.02", "+0.03"])
+    ax.tick_params(axis="both", length=0, labelcolor=MUTED)
+    ax.set_xlabel("Δ AUROC, paired 95% CI", color=MUTED)
+    ax.grid(axis="y", visible=False)
+    for side in ("left", "top", "right", "bottom"):
+        ax.spines[side].set_visible(False)
+    save(fig, OUT / "essay_diffs.pdf")
+
+
 def essay_tables() -> None:
     """The essay results slide's tables as LaTeX (fig/essay_pairs.tex) in the theme's macros, and the
     O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
@@ -405,3 +444,4 @@ def essay_tables() -> None:
 
 if __name__ == "__main__":
     essay(grid())
+    essay_diffs()
