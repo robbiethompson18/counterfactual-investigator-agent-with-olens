@@ -415,9 +415,11 @@ Backfill them into `runs/<experiment>/<date>_<slug>/` with a best-effort `meta.j
 
 - robbie-box `~/envs-results/` (agent-interp-envs screens): funding*email, sandbagging (screen and
   iteration), grade_your_own and eval_tampering are backfilled (2026-10-22) as
-  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env, skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their `config.yaml`says`provider:
-  fireworks`even when`scripts/envs_gateway.py` routed the calls elsewhere, so don't trust it for
-  which server answered.
+  `runs/<env>/<date>*{screen,iter}/`. Still only on the box: `optimize*cache_c`(2.2 GB, retired env,
+  skipped on purpose), the`plumbing\*`and`fe_smoke*\*`smoke tests, and the gateway logs
+  in`~/envs-logs/`. Step dirs are root-owned (Docker), so copy with `sudo`. Their
+  `config.yaml`says`provider: fireworks`even when`scripts/envs_gateway.py` routed the calls
+  elsewhere, so don't trust it for which server answered.
 - Robbie's Mac `data/runs/` (as of 2026-10-22): `identity` and `evalcue` (pre-`runs.py`
   `<env>/TAG.jsonl` files, no `meta.json`) are fully on HF and `cfbench` nearly (7 files
   local-only); `stoptokens` and `vardania_sneeze` are not on HF at all. Of the 13 loose
