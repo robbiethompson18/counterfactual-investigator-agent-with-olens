@@ -33,3 +33,6 @@ labelled by its two conditions' swatches, A − B) come from `style.py` (`bar_kw
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
   Sonnet 5.5 text inversion, at WSB's any-of-grid scoring and at pass@1
   (`docs/wsb-flash-prompt-only.md`); numbers are sourced constants in the module
+- `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
+  no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
+  `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)
