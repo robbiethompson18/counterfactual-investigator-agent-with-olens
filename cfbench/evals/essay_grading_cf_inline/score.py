@@ -214,7 +214,8 @@ def PAGE(rows: list[dict]) -> str:
         out.append(
             '<p class="lede"><b>What this is.</b> Haiku sees Qwen\'s grades under the opener, but barely uses how low or high '
             'they are, so the simplest rule, <i>bet at the mean</i> (say "up" when Qwen\'s observed grade is below the average '
-            "plain-opener grade, 2.79), already ties it (AUROC 0.776; 70.7% right). The two carry different information: a "
+            "plain-opener grade, 2.79), already matches or beats a single draw of it (AUROC 0.776; 70.7% right). "
+            "The two carry different information: a "
             "logistic regression that adds Qwen's observed grade to the investigator's p, with its two weights fit on the other "
             "four-fifths of the essays (5 folds grouped by essay, so no essay is scored by weights fit on it), lifts every "
             "condition by about 0.07. The O-lens is still ahead of its placebo and of transcript-only after that, by about half "
