@@ -54,7 +54,9 @@ def main():
     )
 
     tok = AutoTokenizer.from_pretrained(args.base)
-    eng = OneEngine(tok, args.base, gpu_memory_utilization=args.vllm_mem, max_num_seqs=64, max_model_len=args.max_model_len)
+    eng = OneEngine(
+        tok, args.base, ar_lora=None, ar_root=None, gpu_memory_utilization=args.vllm_mem, max_num_seqs=64, max_model_len=args.max_model_len
+    )
     jpp = JPP(eng.base_dir, eng.norm_w, eng.eps, layers)
     out.with_suffix(".provenance.json").write_text(
         json.dumps(
