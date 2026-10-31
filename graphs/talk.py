@@ -14,6 +14,7 @@ from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 
 from cfbench.scoring import (
+    AUTHOR_GROUPS,
     AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
@@ -24,7 +25,7 @@ from cfbench.scoring import (
     essay_flips,
 )
 from graphs.cutoff_grader_mentions import RUNS, at_token
-from graphs.olens_mandarin import HAN, LENSES, bullets_of
+from graphs.olens_mandarin import HAN, bullets_of
 from graphs.olens_mandarin import RUN as MANDARIN_RUN
 from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
 
@@ -243,23 +244,26 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
+MANDARIN_LENSES = {"old": "Old Qwen O-lens\n(spaces stripped)", "new": "Qwen O-lens\n(fixed)"}
+
+
 @slide
 def mandarin() -> None:
-    """Share of O-lens bullets containing Mandarin, olens_s3d_rl600 (space stripped) vs olens_s3d_space_rl600 (space kept), on
-    the same greedy reads (graphs.olens_mandarin's bullet panel). Both bars are the O-lens, so both are its orange."""
+    """Share of Qwen O-lens bullets containing Mandarin, the old lens (bullet's leading space stripped in its RL reward) vs the
+    fixed one, on the same greedy reads (graphs.olens_mandarin's bullet panel). Both bars are the O-lens, so both are its orange."""
     path = MANDARIN_RUN / "reads.jsonl"
     if not path.exists():
         hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
     reads = [json.loads(line) for line in path.open()]
     fig, ax = slide_figure(42, 40)
-    for x, key in enumerate(LENSES):
+    for x, key in enumerate(MANDARIN_LENSES):
         bullets = bullets_of([r[key]["text"] for r in reads])
         hits = sum(bool(HAN.search(b)) for b in bullets)
         share = hits / len(bullets)
         ax.bar(x, share, 0.6, **bar_kw("olens"))
         ax.annotate(f"{share:.1%}\n{hits:,} / {len(bullets):,}", (x, share), xytext=(0, 1.5), textcoords="offset points",
                     ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK)  # fmt: skip
-    ax.set_xticks(range(len(LENSES)), LENSES.values())
+    ax.set_xticks(range(len(MANDARIN_LENSES)), MANDARIN_LENSES.values())
     ax.set_xlim(-0.6, 1.6)
     ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
     ax.set_ylim(0, 0.65)
@@ -268,11 +272,6 @@ def mandarin() -> None:
     ax.grid(axis="x", visible=False)
     slide_save(fig, OUT / "mandarin.pdf")
     (OUT / "mandarin_n.tex").write_text(f"{len(reads):,}")
-
-
-AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-                 ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
-                 ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
 
 
 @slide
@@ -290,7 +289,7 @@ def author() -> None:
         xs, ticks = positions(one, AUTHOR_GROUPS)
         for c, x in xs.items():
             val, (lo, hi), st = bars[ver, c]
-            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw("probe_user_end" if c == "transcript+probe" else c))  # a lighter teal
+            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
             ax.errorbar(x, val, [[val - lo], [hi - val]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             for text, dy in ((f"{val:.3f}", 1.5), (st, 6.5)):
                 ax.annotate(

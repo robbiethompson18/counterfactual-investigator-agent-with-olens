@@ -23,14 +23,13 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from cfbench.scoring import grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
+from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from graphs import cutoff_qa_inline, menus_inline
 from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
 from graphs.style import MUTED, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
-BLOG_RUN = Path("data/runs/cfbench/2026-10-30_author-blog-drop-haiku-b2")
 ESSAY_INPUTS = Path("data/runs/cfbench_evals/2026-10-30_essay-grading-inline-inputs/cases.jsonl")
 ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
 
@@ -142,15 +141,15 @@ def essay_groups() -> dict[str, dict]:
 
 
 def blog_groups() -> dict[str, dict]:
-    rows = defaultdict(lambda: defaultdict(list))
-    for r in map(json.loads, (BLOG_RUN / "predictions.jsonl").open()):
-        if r["valid"] and r["p"] is not None:
-            rows[r["version"]][r["condition"]].append((r["p"], int(r["k_cf"]), r["pair"].split(":")[0]))
+    """The deck's blog cases (cfbench.scoring.author_cases) split by Qwen's answer about the author: version ->
+    condition -> (scores, truth, blogger)."""
+    _, y, version, blogger, xs = author_cases()
     groups = {}
-    for version, name in (("qwen_wrong", "Qwen is wrong about the author"), ("qwen_right", "Qwen is right about the author")):
-        conds = rows[version]
-        n = len({g for _, _, g in conds[TS]})
-        groups[f"{name}, {len(conds[TS])} cases, {n} bloggers"] = {c: tuple(map(list, zip(*v, strict=True))) for c, v in conds.items()}
+    for v, name in (("qwen_wrong", "Qwen is wrong about the author"), ("qwen_right", "Qwen is right about the author")):
+        m = version == v
+        groups[f"{name}, {int(m.sum())} cases, {len(set(blogger[m]))} bloggers"] = {
+            c: (x[m].tolist(), y[m].astype(int).tolist(), blogger[m].tolist()) for c, x in xs.items()
+        }
     return groups
 
 

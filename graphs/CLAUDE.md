@@ -77,8 +77,9 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
 - `chive_inline`: AUROC on CHIVE's official yes/no claims, Haiku with vs without the model's reply,
   beside CHIVE's Opus 4.8 transcript and resampling arms, one panel per target, plus the paired
   difference (`docs/chive-inline.md`)
-- `author_blog_drop`: blog sentence-deletion AUROC, text-only Haiku, Haiku with O-lens and the
-  standalone L2 probe; reported blogger-bootstrap CIs, no ensemble (`docs/author-mcq-probe.md`)
+- `author_blog_drop`: blog sentence-deletion AUROC, the deck's bars at write-up size (transcript
+  only, O-lens and NLA with placebos, the L2 probe, probe + transcript), computed by
+  `cfbench.scoring.author_bars` with blogger-bootstrap CIs (`docs/author-mcq-probe.md`)
 - `talk`: the sprint talk's figures (`slides/talk/talk.tex`, `make -C slides` runs it first): the
   hint evals' grid, essay grading's AUROC bars and paired differences, the grader-mention bars and
   the Mandarin before/after bars, the blog-deletion AUROCs, plus the LaTeX table snippets the deck
