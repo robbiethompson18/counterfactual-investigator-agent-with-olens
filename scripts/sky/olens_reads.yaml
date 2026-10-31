@@ -27,6 +27,7 @@ file_mounts:
   ~/repo/olens: ./olens
   ~/repo/scripts: ./scripts
   ~/repo/src: ./src
+  ~/repo/environments: ./environments
   ~/reads/requests.jsonl: ${REQ}
 
 setup: |
@@ -64,6 +65,6 @@ run: |
   [ -z "${CUDA_VISIBLE_DEVICES-x}" ] || [ -n "$CUDA_VISIBLE_DEVICES" ] || unset CUDA_VISIBLE_DEVICES
   export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
   cd ~/repo
-  PYTHONPATH=olens/src:src timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/reads.jsonl \
+  PYTHONPATH=.:olens/src:src timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/reads.jsonl \
     --layers $LAYERS --lens-lora /data/lora_vllm/olens_space_rl600 --ar-lora /data/lora_vllm/ar_ptag_pooled
   echo READS_DONE
