@@ -9,6 +9,7 @@ right, for whoever reads the transcript (Robbie, 2026-10-29). Transcript-only, a
 bump, no backfill of older runs. An invalid submission's error never reveals the truth.
 """
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -105,6 +106,13 @@ def opening(prompt: str, tools: dict[str, Tool] | None, task: str, system: str |
         {"role": "user", "content": prompt},
     ]
     return messages, [submit, *(schema for schema, _ in (tools or {}).values())]
+
+
+def prompt_sha(prompt: str, tools: dict[str, Tool] | None, effort: str, task: str, system: str | None) -> str:
+    """A short hash of what `predict` sends first (messages, tool schemas, effort): cfbench.eval --reuse only copies a row
+    whose stored hash equals the one this run would send. Tool replies (transcripts, lens reads) aren't in it."""
+    messages, schemas = opening(prompt, tools, task, system)
+    return hashlib.sha256(json.dumps([messages, schemas, effort], sort_keys=True).encode()).hexdigest()[:16]
 
 
 async def predict(
