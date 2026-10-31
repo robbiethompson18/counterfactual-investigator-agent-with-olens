@@ -2,6 +2,15 @@
 
 Tech debt we know about, newest first.
 
+## 2026-10-31: `honest_score_predict --provider` is a no-op
+
+`scripts/honest_score_predict.py` pins a provider by wrapping `openrouter.chat` in
+`functools.partial(..., provider=...)`, but `cfbench.predict.predict` passes `provider=PROVIDER`
+(None unless `$CFBENCH_PROVIDER`) explicitly, and a call's keyword beats the partial's, so the pin
+never reaches OpenRouter. Use `CFBENCH_PROVIDER='{"order": [...], "allow_fallbacks": false}'`
+instead, or drop the flag. (`--google-key` wraps `chat` the same way with `key_env`, which `predict`
+doesn't pass, so that one works.)
+
 ## 2026-10-30: two MCQ envs build the same prompt with copied code
 
 `environments/hint_mcq` (its `nohint` arm, the MMLU-Pro pool) and `environments/supergpqa` build the

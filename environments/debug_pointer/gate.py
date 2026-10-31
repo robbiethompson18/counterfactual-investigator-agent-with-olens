@@ -17,20 +17,17 @@ never a survivor; `--resume PREV` copies the error-free samples of an earlier ga
 records its `via`), for when the Flash quota dies mid-run. Output is a run under data/runs/debug_pointer_gate/:
 guesses.jsonl (one row per item, arm, sample: the prompt, raw and canonical guess, Qwen's modal answer, match) and
 verdicts.jsonl (one row per item/arm), plus the tables this prints. Flash runs through the shared OpenRouter client at
-effort medium; `--via google [--google-key VAR]` calls Google's API directly instead (generateContent with thinkingLevel
-medium, the key from that .envrc.local variable, default THIRD_GEMINI_KEY), the fallback for when the OpenRouter BYOK key is
+effort medium; `--via google [--google-key VAR]` sends it to the client's `gemini-direct/` route instead (Google's API
+with the key from that .envrc.local variable, default THIRD_GEMINI_KEY), the fallback for when the OpenRouter BYOK key is
 out of daily quota (CLAUDE.local.md: probe the three keys, use one that answers, record the route and key name in meta).
 """
 
 import argparse
 import asyncio
 import json
-import os
 import sys
 from collections import Counter
 from pathlib import Path
-
-import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -57,32 +54,6 @@ Now consider a COUNTERFACTUAL PROMPT: identical to the base prompt except that t
 
 Qwen3.6-27B (thinking disabled, default sampling) answers the counterfactual prompt with a filename and answers almost the same \
 thing every time. What is its most likely answer? Output that filename only."""
-
-
-GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-
-
-async def google_chat(
-    client: httpx.AsyncClient, model: str, content: str, max_tokens: int, key: str, attempts: int = 6
-) -> tuple[str, dict]:
-    """One generateContent call at temperature 1.0 with thinking level medium: (reply text, usageMetadata). 429/5xx are
-    retried with 10 s, 20 s, 40 s, ... like openrouter.chat; anything else raises."""
-    body = {
-        "contents": [{"parts": [{"text": content}]}],
-        "generationConfig": {"temperature": 1.0, "maxOutputTokens": max_tokens, "thinkingConfig": {"thinkingLevel": "medium"}},
-    }
-    url = GOOGLE_URL.format(model=model.removeprefix("google/"))
-    for attempt in range(attempts):
-        r = await client.post(url, json=body, headers={"x-goog-api-key": key}, timeout=600)
-        if (r.status_code == 429 or r.status_code >= 500) and attempt < attempts - 1:
-            await asyncio.sleep(10 * 2**attempt)
-            continue
-        r.raise_for_status()
-        j = r.json()
-        parts = j["candidates"][0].get("content", {}).get("parts", [])
-        text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
-        return text, j.get("usageMetadata", {}) | {"finish": j["candidates"][0].get("finishReason")}
-    raise AssertionError("unreachable")
 
 
 def cells(run: Path) -> dict[tuple[str, str], list[dict]]:
@@ -136,22 +107,17 @@ def item_table(by_cell: dict, min_mode: float, min_follow: float) -> list[dict]:
     return rows
 
 
-async def guess(
-    model: str, via: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int, client: httpx.AsyncClient, key: str
-) -> dict:
+async def guess(model: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int, key_env: str) -> dict:
     ep = row["base"]
     content = GUESSER_PROMPT.format(
         prompt=ep["messages"][0]["content"], reply=ep["messages"][-1]["content"], removed=env.POINTER.format(file=row["hint_file"])
     )
     async with sem:
         try:
-            if via == "google":
-                raw, meta = await google_chat(client, model, content, max_tokens, key)
-                cost, finish = 0.0, meta.get("finish")  # Google's API reports tokens, not dollars
-            else:
-                r = await openrouter.chat(model, [{"role": "user", "content": content}], temperature=1.0, max_tokens=max_tokens)
-                raw = r.choices[0].message.content or ""
-                cost, finish = getattr(r.usage, "cost", None) or 0.0, r.choices[0].finish_reason
+            messages = [{"role": "user", "content": content}]
+            r = await openrouter.chat(model, messages, temperature=1.0, max_tokens=max_tokens, key_env=key_env)
+            raw = r.choices[0].message.content or ""
+            cost, finish = getattr(r.usage, "cost", None) or 0.0, r.choices[0].finish_reason  # gemini-direct reports no cost
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, not a dead run
             err = f"{type(e).__name__}: {e}"[:300]
             return {"sample": sample, "prompt": content, "guess_raw": None, "guess": None, "error": err, "cost": 0.0}
@@ -241,15 +207,14 @@ async def main():
                 }
         print(f"resuming {a.resume}: {len(kept)} error-free samples kept", file=sys.stderr)
     sem = asyncio.Semaphore(a.conc)
-    key = os.environ[a.google_key] if a.via == "google" else ""
+    model = openrouter.DIRECT + a.model.removeprefix("google/") if a.via == "google" else a.model
 
-    async def one(r: dict, s: int, client: httpx.AsyncClient) -> dict:
+    async def one(r: dict, s: int) -> dict:
         if (r["item"], r["arm"], s) in kept:
             return kept[r["item"], r["arm"], s]
-        return await guess(a.model, a.via, r, s, sem, a.max_tokens, client, key) | {"via": a.via}
+        return await guess(model, r, s, sem, a.max_tokens, a.google_key) | {"via": a.via}
 
-    async with httpx.AsyncClient() as client:
-        results = await asyncio.gather(*(one(r, s, client) for r in todo for s in range(a.n)))
+    results = await asyncio.gather(*(one(r, s) for r in todo for s in range(a.n)))
     guesses, verdicts = [], []
     by_pair = {(r["item"], r["arm"]): results[i * a.n : (i + 1) * a.n] for i, r in enumerate(todo)}
     for r in rows:
