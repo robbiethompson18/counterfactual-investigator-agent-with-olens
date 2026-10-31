@@ -1,4 +1,4 @@
-"""Nested two-fold probes: python -m scripts.standard_probes.fit RUN --family essay|mmlu|supergpqa|combined|hinted.
+"""Nested two-fold probes: python -m probes.fit RUN --family essay|mmlu|supergpqa|combined|hinted.
 
 Outputs are separate per family/site under RUN/fits. Input rows and capture chunks remain on disk;
 only a single layer's selected training matrix is materialized. --smoke checks the numerical objective.

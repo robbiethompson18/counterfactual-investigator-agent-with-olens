@@ -252,3 +252,145 @@ def coverage(rows: dict[tuple, dict], cases: dict[tuple, Case]) -> dict:
         "predictions": sum(n_pred.values()),
         "by_cond": dict(n_pred),
     }
+
+
+# Standardized probe results. Charts share this loader instead of retaining the old selected-layer summaries.
+STANDARD_PROBE_RUN = "runs/standard_probes/2026-10-31_nested2-v1"
+
+
+def standard_probe_file(relative: str):
+    from pathlib import Path
+
+    from huggingface_hub import hf_hub_download
+
+    path = Path("data") / STANDARD_PROBE_RUN / relative
+    if not path.exists():
+        hf_hub_download(
+            "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens",
+            f"{STANDARD_PROBE_RUN}/{relative}",
+            repo_type="dataset",
+            local_dir="data",
+        )
+    return path
+
+
+def standard_probe_rows(family: str, site: str, target: str | None = None) -> list[dict]:
+    path = standard_probe_file(f"fits/{family}/{site}/predictions.jsonl")
+    with path.open() as stream:
+        rows = [r for r in map(json.loads, stream) if target is None or r["family"] == target]
+    assert len({r["id"] for r in rows}) == len(rows)
+    return rows
+
+
+def grouped_mean_ci(values, groups, reps: int = 2000) -> tuple[float, float, float]:
+    """Mean over cases; percentile CI resampling question/essay groups, conditional on the fitted models."""
+    values = np.asarray(values, dtype=float)
+    _, inverse = np.unique(groups, return_inverse=True)
+    counts = np.bincount(inverse)
+    totals = np.bincount(inverse, weights=values)
+    rng = np.random.default_rng(0)
+    boot = []
+    for start in range(0, reps, 100):
+        indices = rng.integers(len(counts), size=(min(100, reps - start), len(counts)))
+        boot.extend((totals[indices].sum(1) / counts[indices].sum(1)).tolist())
+    lo, hi = np.quantile(boot, [0.025, 0.975])
+    return float(values.mean()), float(lo), float(hi)
+
+
+def grouped_auc_ci(scores, truth, groups, reps: int = 2000) -> tuple[float, float, float]:
+    from scipy.stats import rankdata
+
+    scores, truth = np.asarray(scores), np.asarray(truth, dtype=bool)
+    unique = np.unique(groups)
+    rows = [np.flatnonzero(np.asarray(groups) == group) for group in unique]
+
+    def auc(indices):
+        y = truth[indices]
+        n1 = y.sum()
+        return float((rankdata(scores[indices])[y].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1)))
+
+    rng = np.random.default_rng(0)
+    boot = [auc(np.concatenate([rows[i] for i in rng.integers(len(rows), size=len(rows))])) for _ in range(reps)]
+    lo, hi = np.quantile(boot, [0.025, 0.975])
+    return auc(np.arange(len(scores))), float(lo), float(hi)
+
+
+def standard_mcq_comparison(runs, target: str) -> tuple[dict, dict]:
+    """Historical lens draws and new within-benchmark OOF probes on exactly the same questions."""
+    draws, truth = {}, {}
+    for run in runs:
+        with (run / "predictions.jsonl").open() as stream:
+            for row in map(json.loads, stream):
+                if row["condition"].startswith("probe") or row["condition"] == "qwen_logits":
+                    continue
+                item = row["item"]
+                draws[row["condition"], item, row.get("draw", 0)] = float(bool(row["correct"]))
+                labels = row["modal_cf"], row["gold"]
+                if item in truth:
+                    assert truth[item] == labels
+                truth[item] = labels
+    by = defaultdict(lambda: defaultdict(list))
+    for (condition, item, _), value in draws.items():
+        by[condition][item].append(value)
+    data = {c: {i: (truth[i][0] == truth[i][1], float(np.mean(v))) for i, v in items.items()} for c, items in by.items()}
+    groups = {}
+    for site in ("user_end", "response_start"):
+        probes = {}
+        for row in standard_probe_rows(target, site, target):
+            item = row["item"]
+            if item not in truth:
+                continue
+            assert truth[item] == (chr(65 + row["label"]), chr(65 + row["gold"]))
+            probes[item] = (row["label"] == row["gold"], float(row["predicted_label"] == row["label"]))
+            groups[item] = row["group"]
+        data[f"probe_{site}"] = probes
+    common = set.intersection(*(set(items) for items in data.values()))
+    assert common and all(set(items) == common for items in data.values()), "Conditions must cover identical comparison questions"
+    return data, groups
+
+
+ESSAY_LENS_RUNS = ("2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens")
+
+
+def essay_probe_scores(site: str) -> dict:
+    """Key standardized predictions by (opener arm, essay), as the investigator does."""
+    return {(r["id"].split("/", 1)[1].split("~", 1)[0], r["item"]): r for r in standard_probe_rows("essay", site)}
+
+
+def essay_lens_rows(run: str) -> list[dict]:
+    """Read just scoring fields; stream the public run if it is not cached locally."""
+    from pathlib import Path
+    from urllib.request import urlopen
+
+    cache = Path("data/plot_cache") / f"{run}.jsonl"
+    if cache.exists():
+        return [json.loads(line) for line in cache.open()]
+    local = Path("data/runs/cfbench") / run / "predictions.jsonl"
+    url = f"https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/resolve/main/runs/cfbench/{run}/predictions.jsonl"
+    fields = ("condition", "base_arm", "item", "draw", "valid", "p", "k_cf", "shift", "answers_base", "effort")
+    with local.open() if local.exists() else urlopen(url) as stream:
+        rows = [{k: r[k] for k in fields if k in r} for r in map(json.loads, stream)]
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    return rows
+
+
+def standard_essay_comparison() -> tuple[dict, dict]:
+    """Same-case investigator and probe scores; omit the contaminated historical placebo."""
+    probes = {f"probe_{site}": essay_probe_scores(site) for site in ("user_end", "response_start")}
+    reference = probes["probe_response_start"]
+    draws = {}
+    for run in ESSAY_LENS_RUNS:
+        for r in essay_lens_rows(run):
+            if r["condition"] not in ("transcript_inline", "olens_inline") or not r.get("valid", True) or r["p"] is None:
+                continue
+            key = r["base_arm"], r["item"]
+            assert reference[key]["truth"] == r["k_cf"]
+            draws[r["condition"], key, r["draw"]] = r["p"]
+    by = defaultdict(lambda: defaultdict(list))
+    for (condition, key, _), value in draws.items():
+        by[condition][key].append(value)
+    scores = {c: {k: float(np.mean(v)) for k, v in cases.items()} for c, cases in by.items()}
+    scores.update({c: {k: r["predicted_shift"] for k, r in rows.items()} for c, rows in probes.items()})
+    assert all(set(values) == set(reference) for values in scores.values())
+    return scores, reference

@@ -1,6 +1,6 @@
 """Build the fixed populations, grouped folds and capture shards for docs/standard-probe-protocol.md.
 
-    uv run --with transformers --with jinja2 python -m scripts.standard_probes.prepare
+    uv run --with transformers --with jinja2 python -m probes.prepare
 
 No generations or fitting: labels reuse the existing census. Data and cached essay activations live in the tracked run.
 """

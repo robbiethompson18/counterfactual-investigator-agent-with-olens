@@ -96,7 +96,7 @@ def bars(panels: dict, out: Path, filtered: bool) -> None:
     axes[0].text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
     which = "items where Qwen followed the hint 8/8" if filtered else "all survivors"
     title = f"Answer task on hint_mcq: name Qwen's letter with the hint removed ({which}; Flash, 5 draws per pair)"
-    fig.suptitle(title, x=0.01, ha="left")
+    fig.suptitle("Legacy selected cohort · " + title, x=0.01, ha="left")
     note = "95% item-level bootstrap. The wrong-hint items are a subset of the correct-hint items, so the pooled panel counts them twice."
     fig.text(0.01, -0.03, note, color=MUTED, fontsize=8)
     fig.tight_layout()
@@ -124,7 +124,7 @@ def per_item(by: dict, meta: dict, title: str, out: Path) -> None:
     ax.set_ylim(-0.7, 2.7)
     ax.invert_yaxis()
     ax.grid(axis="y", visible=False)
-    ax.set_title(f"{title}: correct draws per item (own letter / hint letter)")
+    ax.set_title(f"Legacy · {title}: correct draws per item (own letter / hint letter)")
     fig.tight_layout()
     fig.savefig(out, bbox_inches="tight")
 

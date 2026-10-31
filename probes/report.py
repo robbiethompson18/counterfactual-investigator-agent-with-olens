@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.standard_probes.fit import mcq_inner_assignment, read_jsonl
+from probes.fit import mcq_inner_assignment, read_jsonl
 
 FAMILIES = ("essay", "hinted", "mmlu", "supergpqa", "combined")
 SITES = ("user_end", "response_start")

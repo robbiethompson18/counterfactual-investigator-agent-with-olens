@@ -35,6 +35,8 @@ STYLE = {
     "olens_nl": ("#c9a227", None, "O-lens (nl)"),
     "olens_nl_placebo": ("#c9a227", PLACEBO_HATCH, "O-lens (nl) placebo"),
     "probe": ("#11806a", None, "probe"),
+    "probe_user_end": ("#78b7aa", None, "probe: user end"),
+    "probe_response_start": ("#11806a", None, "probe: final token"),
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),

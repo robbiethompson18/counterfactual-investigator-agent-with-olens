@@ -143,3 +143,39 @@ reruns, not an untouched confirmation experiment.
 
 [Full report, subgroup scores, predictions, fitted weights, input/fold manifests and provenance](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/runs/standard_probes/2026-10-31_nested2-v1).
 `report.md` holds all sixteen cells; `paired_comparisons.json` holds group-bootstrap comparisons.
+
+## Code and figures
+
+The maintained implementation is the [`probes` package](../probes/CLAUDE.md): run
+`python -m probes.prepare`, `python -m probes.fit`, and `python -m probes.report`. The superseded
+MCQ
+[fit](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe.py),
+[eval](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe_eval.py),
+[unselected](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe_unselected.py),
+and
+[essay](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/cfbench/evals/essay_grading_cf_inline/probe.py)
+entry points are preserved in git history, not as competing current recipes. Their saved HF
+artifacts remain unchanged.
+
+Regenerate locally, without model calls:
+
+```bash
+uv run python -m graphs.standard_probes
+uv run python -m graphs.mcq_unselected
+uv run python -m graphs.supergpqa_inline
+```
+
+- `docs/img/standard-probes-mcq.png`: all six source-to-target comparisons, both positions, full
+  populations and Qwen-right/wrong subgroups.
+- `docs/img/standard-probes-hinted.png`: canonical gold-letter hint after options, full 7,943 cases.
+- `docs/img/standard-probes-essays.png`: both essay positions, historical transcript/O-lens
+  investigators on the same 1,800 cases, and the mean-reversion baseline. Historical Haiku used low
+  effort. The old placebo is excluded because some reads came from the same essay's counterfactual.
+- `docs/img/mcq-unselected{,-diff}.png` and `docs/img/supergpqa-inline{,-diff}.png`: historical lens
+  cohorts (2,523 and 3,000 questions), with new within-benchmark probes joined by question ID. These
+  are paired comparison subsets, not the full-population scores above.
+
+All confidence intervals resample question stems or essays, conditional on the fitted models. They
+exclude training/selection variability. The figures use `graphs.style` (merged style PR #476).
+Historical hint-selected figures remain legacy: their prompts, labels and cohorts differ, so their
+probe bars cannot be replaced by the full-population canonical hint result.

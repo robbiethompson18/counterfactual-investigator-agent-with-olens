@@ -274,6 +274,8 @@ or dead ends.**
 
 Active docs:
 
+- [ACTIVE: probes package — read before running standard capture, fitting or reporting](probes/CLAUDE.md)
+  — replaces the legacy MCQ and essay probe entry points
 - [ACTIVE: Standard probe protocol — read before fitting or comparing any standard probe](docs/standard-probe-protocol.md)
   — nested two-fold, two positions, six layers, capped matched training pools; legacy recipes remain
   historical
@@ -316,8 +318,6 @@ Active docs:
   — RMSE of the predicted rate
 - [ACTIVE: cfbench harness smoke test — read before changing the predictor's prompt or tools, or bumping HARNESS_VERSION](docs/cfbench-harness-smoke.md)
 - [ACTIVE: notice_defect env (super experimental) — read before building, running or gating the latent-noticing env (does the O-lens read a planted defect Qwen never mentioned?)](docs/envs/notice_defect.md)
-- [ACTIVE: MCQ answer probe — read before probing Qwen's MCQ answer from option-token activations, or using a probe pmf as a stand-in for Qwen's answer](docs/mcq-answer-probe.md)
-  — picks Qwen's own answer 94% / 80%
 - [ACTIVE: debug_pointer env (super experimental) — read before running or extending the code-pointer bug-localization env or its Flash gate](docs/envs/debug_pointer.md)
 - [ACTIVE: style_transfer env (super experimental) — read before building context-vs-no-context code-form counterfactuals, or reading the lens for a latent default form](docs/envs/style_transfer.md)
 - [ACTIVE: todo_suppressed (super experimental) — read before building or running the "leave a function as a TODO" suppressed-plan env, reading the lens at a suppressed function, or gating an env's items with Flash](docs/envs/todo_suppressed.md)
