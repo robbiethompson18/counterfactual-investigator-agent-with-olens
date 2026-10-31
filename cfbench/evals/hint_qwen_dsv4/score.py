@@ -30,6 +30,8 @@ BOOT = 2000
 PAIRS = (
     ("olens_agentic", ("olens_placebo_agentic", "transcript_agentic", "no_transcript")),
     ("olens_inline", ("olens_placebo_inline", "transcript_inline")),
+    ("nla_inline", ("nla_placebo_inline", "transcript_inline", "olens_inline")),
+    ("jlens_inline", ("jlens_placebo_inline", "transcript_inline", "olens_inline")),
 )
 
 
@@ -46,7 +48,7 @@ def sign_test(diffs: list[float]) -> tuple[int, int, float]:
 
 
 def paired(right: dict[tuple[str, str], dict[str, list[bool]]], rng: np.random.Generator) -> list[dict]:
-    """O-lens vs each other condition per version: mean over shared items of (O-lens − other) per-item % right."""
+    """Each lens vs its comparisons (PAIRS) per version: mean over shared items of (lens − other) per-item % right."""
     out = []
     for version, (olens, versus) in ((v, p) for v in sorted({v for _, v in right}) for p in PAIRS):
         a = right.get((olens, version), {})
