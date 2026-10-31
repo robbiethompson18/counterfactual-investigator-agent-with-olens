@@ -41,6 +41,8 @@ STYLE = {
     # chive_inline's reference bars: CHIVE's own Opus 4.8 arms on the same claims (a lighter shade = the same input, another measure)
     "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
+    "transcript_told": ("#1f4e79", None, "transcript only, told the model and its cutoff"),  # cutoff_qa_investigators
+    "self_answer": (OUTLINE, None, "answers the question itself"),  # cutoff_qa_investigators: the same-cutoff census
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
 }
