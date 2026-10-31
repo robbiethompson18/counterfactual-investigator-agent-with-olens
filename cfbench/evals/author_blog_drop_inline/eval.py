@@ -32,7 +32,7 @@ ABLATES = [
 ]  # 2 x 2,004 bloggers
 ABLATES_X2 = ABLATES
 ATTRS = {k: ("", v) for k, v in BLOG_ATTRS.items()}  # bank.ATTRS shape: (question, options)
-READS = [Path("data/runs/olens_reads/2026-10-30_author-blog"), Path("data/runs/olens_reads/2026-10-30_author-blog-b")]
+READS = [Path(f"data/runs/olens_reads/2026-10-30_author-blog{s}") for s in ("", "-b")]
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
 MODEL_NAME = "the model"
