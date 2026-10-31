@@ -25,9 +25,14 @@ from pathlib import Path
 import torch
 from olens.jpp import JPP, JPP_FILE, JPP_REPO
 from olens.one_engine import OneEngine
-from olens_read_requests import prepare, queue, resume, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
 from transformers import AutoTokenizer
 
+from counterfactual_investigator_agent_with_olens.reads import (  # untested on a pod since the move (2026-10-31)
+    prepare,
+    queue,
+    resume,
+    write_transcript,
+)
 from olens import provenance
 
 DEFAULT_LAYERS = ",".join(str(L) for L in range(0, 61, 4))

@@ -14,8 +14,9 @@ from pathlib import Path
 
 import numpy as np
 from olens.one_engine import OneEngine
-from olens_read_requests import prepare  # scripts/ is on sys.path when run as a script
 from transformers import AutoTokenizer
+
+from counterfactual_investigator_agent_with_olens.reads import prepare  # untested on a pod since the move (2026-10-31)
 
 
 def main():
