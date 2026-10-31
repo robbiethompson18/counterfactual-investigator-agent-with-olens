@@ -41,6 +41,13 @@ INLINE_CONDITIONS = (
     "jlens_inline",
     "jlens_placebo_inline",
     "jlens_inline_no60",
+    # menus_inline (2026-10-30): each lens at four read menus, each with its placebo (cfbench/evals/menus_inline)
+    *(
+        f"{lens}_{menu}{p}_inline"
+        for lens in ("olens", "nla", "jlens")
+        for menu in ("prompt", "tail", "all", "last")
+        for p in ("", "_placebo")
+    ),
 )
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
