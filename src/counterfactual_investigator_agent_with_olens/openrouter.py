@@ -15,6 +15,12 @@ OpenAI-compatible API with $GEMINI_API_KEY, at `reasoning_effort` = effort, so a
 the one OpenRouter's BYOK route is spending (set GEMINI_API_KEY to the key you want for that run). No `usage.cost`.
 `vertex/<model>` does the same on Vertex AI's OpenAI-compatible endpoint in $VERTEX_PROJECT, authenticated as the active
 gcloud account (token re-read every 2 min); for when AI Studio 503s "high demand" but Vertex has capacity.
+`anthropic-direct/<model>` (e.g. `anthropic-direct/claude-haiku-5-5`, Anthropic's id, not OpenRouter's) never touches
+OpenRouter, whose BYOK route falls back to OpenRouter's own paid capacity when our key is rate-limited: it calls Anthropic's
+Messages API with $ANTHROPIC_API_KEY at `output_config.effort` = effort (`off` sends `thinking: disabled`), translating
+OpenAI-format messages and tools in and the reply back into a ChatCompletion (`completion_tokens_details.reasoning_tokens`
+= thinking tokens; `max_tokens` defaults to 16000). The reply's message keeps Anthropic's raw content blocks in
+`anthropic_content` (thinking signatures included), so appending `message.model_dump()` replays them next turn. No `usage.cost`.
 """
 
 import asyncio
@@ -25,6 +31,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+import anthropic
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, InternalServerError, RateLimitError
 from openai.types.chat import ChatCompletion
 
@@ -32,10 +39,14 @@ BASE_URL = "https://openrouter.ai/api/v1"
 GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 DIRECT = "gemini-direct/"
 VERTEX = "vertex/"
+CLAUDE = "anthropic-direct/"
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: AsyncOpenAI | None = None
 _VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud returns its cached hour-long token until it nears expiry
+_ANTHROPIC: anthropic.AsyncAnthropic | None = None
+# 429, 529 overloaded, other 5xx, connection errors (timeouts are a subclass, re-raised below)
+ANTHROPIC_TRANSIENT = (anthropic.RateLimitError, anthropic.OverloadedError, anthropic.InternalServerError, anthropic.APIConnectionError)
 
 
 class NoChoices(Exception):
@@ -66,6 +77,65 @@ def extra_body(*, thinking: bool = True, effort: str | None = EFFORT, provider: 
     return body
 
 
+async def _claude(
+    api: anthropic.AsyncAnthropic, model: str, messages: list[Any], effort: str | None, timeout: float, **params: Any
+) -> ChatCompletion:
+    """One Messages API call behind `chat`'s OpenAI shapes (module docstring). Consecutive user turns (tool results, then a
+    nudge) are left for the API to merge."""
+    turns: list[Any] = []  # plain dicts, as for the OpenAI SDK
+    for m in messages:
+        if m["role"] == "assistant":
+            calls = [
+                {"type": "tool_use", "id": c["id"], "name": c["function"]["name"], "input": json.loads(c["function"]["arguments"])}
+                for c in m.get("tool_calls") or []
+            ]
+            text = [{"type": "text", "text": m["content"]}] if m.get("content") else []
+            turns.append({"role": "assistant", "content": m.get("anthropic_content") or text + calls})
+        elif m["role"] == "tool":
+            turns.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": m["tool_call_id"], "content": m["content"]}]})
+        elif m["role"] == "user":
+            turns.append({"role": "user", "content": m["content"]})
+    if system := "\n\n".join(m["content"] for m in messages if m["role"] == "system"):
+        params["system"] = system
+    if tools := params.pop("tools", None):
+        params["tools"] = [
+            {"name": f["name"], "description": f.get("description", ""), "input_schema": f.get("parameters") or {"type": "object"}}
+            for f in (t["function"] for t in tools)
+        ]
+    if effort == "off":
+        params["thinking"] = {"type": "disabled"}
+    elif effort:
+        params["output_config"] = {"effort": effort}
+    r = await api.messages.create(model=model, messages=turns, max_tokens=params.pop("max_tokens", 16000), timeout=timeout, **params)
+    uses = [b for b in r.content if b.type == "tool_use"]
+    calls = [{"id": b.id, "type": "function", "function": {"name": b.name, "arguments": json.dumps(b.input)}} for b in uses]
+    message = {
+        "role": "assistant",
+        "content": "".join(b.text for b in r.content if b.type == "text") or None,
+        "tool_calls": calls or None,
+        "anthropic_content": [b.model_dump(exclude_none=True) for b in r.content],
+    }
+    u = r.usage
+    thinking = u.output_tokens_details.thinking_tokens if u.output_tokens_details else 0
+    prompt = u.input_tokens + (u.cache_read_input_tokens or 0) + (u.cache_creation_input_tokens or 0)
+    finish = {"max_tokens": "length", "tool_use": "tool_calls", "refusal": "content_filter"}.get(r.stop_reason or "", "stop")
+    return ChatCompletion.model_validate(
+        {
+            "id": r.id,
+            "object": "chat.completion",
+            "created": int(time.time()),
+            "model": r.model,
+            "choices": [{"index": 0, "finish_reason": finish, "message": message}],
+            "usage": {
+                "prompt_tokens": prompt,
+                "completion_tokens": u.output_tokens,
+                "total_tokens": prompt + u.output_tokens,
+                "completion_tokens_details": {"reasoning_tokens": thinking},
+            },
+        }
+    )
+
+
 async def chat(
     model: str,
     messages: list[Any],  # plain dicts, as the SDK accepts them
@@ -80,7 +150,7 @@ async def chat(
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
     `extra_body` there is merged over the OpenRouter fields."""
-    global _CLIENT, _GOOGLE, _VERTEX
+    global _CLIENT, _GOOGLE, _VERTEX, _ANTHROPIC
     if model.startswith(VERTEX):
         if _VERTEX is None or time.time() - _VERTEX[0] > 120:  # so re-read often, or the cached token runs out under us
             cmd = ["gcloud", "auth", "print-access-token"]
@@ -96,6 +166,10 @@ async def chat(
         api, model = _GOOGLE, model.removeprefix(DIRECT)
         extra = params.pop("extra_body", None) or {}
         params["reasoning_effort"] = "none" if effort == "off" else effort
+    elif model.startswith(CLAUDE):
+        if _ANTHROPIC is None:
+            _ANTHROPIC = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"], timeout=timeout, max_retries=2)
+        api, model, extra = _ANTHROPIC, model.removeprefix(CLAUDE), {}
     else:
         if _CLIENT is None:  # built on first use, not at import: modules get imported on machines without the key
             _CLIENT = client()
@@ -103,12 +177,15 @@ async def chat(
         extra = extra_body(thinking=effort != "off", effort=effort, provider=provider) | (params.pop("extra_body", None) or {})
     for attempt in range(attempts):
         try:
-            r = await api.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)
+            if isinstance(api, anthropic.AsyncAnthropic):
+                r = await _claude(api, model, messages, effort, timeout, **params)
+            else:
+                r = await api.chat.completions.create(model=model, messages=messages, timeout=timeout, extra_body=extra, **params)
             if not getattr(r, "choices", None):
                 raise NoChoices(str(r.model_extra)[:500])
             return r
-        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices, json.JSONDecodeError) as e:
-            if attempt == attempts - 1 or isinstance(e, APITimeoutError):
+        except (APIConnectionError, InternalServerError, RateLimitError, NoChoices, json.JSONDecodeError, *ANTHROPIC_TRANSIENT) as e:
+            if attempt == attempts - 1 or isinstance(e, (APITimeoutError, anthropic.APITimeoutError)):
                 raise
             await asyncio.sleep(10 * 2**attempt)
     raise AssertionError("unreachable")  # the loop returns or raises
