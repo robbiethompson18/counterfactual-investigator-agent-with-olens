@@ -16,16 +16,9 @@ wsb/ runs on data/runs/wsb_*/ (Opus 5.5 judges, their prompts).
 import argparse
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-LENS, TEXT = "#eb6834", "#2a78d6"  # CLAUDE.md chart colors: O-lens orange, transcript-only blue
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
+from graphs.style import INK, MUTED, bar_kw
 
 FAMILIES = ["user_modeling", "basic_readout", "moral_rationale", "jailbreak_recognition"]
 LABEL = {
@@ -56,10 +49,10 @@ def chart(lens: dict, title: str, lens_label: str, out: Path):
         if v is None:
             ax.text(i - w / 2, 0.03, "no public\nper-readout\nrows", ha="center", va="bottom", fontsize=8, color=MUTED)
         else:
-            ax.bar(i - w / 2, v, w, color=LENS, label=lens_label if i == 0 else None)
+            ax.bar(i - w / 2, v, w, label=lens_label if i == 0 else None, **bar_kw("olens"))
             ax.text(i - w / 2, v + 0.015, f"{v:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
         t = TEXT_PASS1[fam]
-        ax.bar(i + w / 2, t, w, color=TEXT, label="Sonnet 5.5 text inversion, pass@1" if i == 0 else None)
+        ax.bar(i + w / 2, t, w, label="Sonnet 5.5 text inversion, pass@1" if i == 0 else None, **bar_kw("transcript"))
         ax.text(i + w / 2, t + 0.015, f"{t:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
         if fam in TEXT_NOTE:
             ax.text(i + w / 2, t + 0.07, TEXT_NOTE[fam], ha="center", va="bottom", fontsize=7.5, color=MUTED)
@@ -67,10 +60,10 @@ def chart(lens: dict, title: str, lens_label: str, out: Path):
     ax.set_ylim(0, 1.08)
     ax.set_ylabel("pass rate")
     ax.grid(axis="x", visible=False)
-    ax.set_title(title, loc="left", fontsize=10, color=INK)
+    ax.set_title(title)
     ax.legend(loc="upper right", frameon=False, bbox_to_anchor=(1.0, -0.14), ncol=2, fontsize=9)
     fig.tight_layout()
-    fig.savefig(out, dpi=160)
+    fig.savefig(out)
     print(out)
 
 

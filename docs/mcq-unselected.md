@@ -6,6 +6,12 @@ add a small, replicated gain over prompt-only; a linear probe on the same activa
 more; the NLA adds the least (results below). Cases rebuilt the same day with the strict bare-letter
 parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
 
+**Probe update (2026-10-31):** The regenerated figures use both standardized read positions on
+exactly the historical lens-evaluation questions; the old probe numbers in the text below are
+historical. Full-population results and regeneration commands are in the
+[standard protocol](standard-probe-protocol.md). The new classifier reads one shared prompt token;
+the old probe scored option-newline activations. These are different architectures.
+
 ## Why
 
 The hint evals ([envs/hint_cf.md](envs/hint_cf.md), `cfbench/evals/hint_qwen_dsv4*`) select
@@ -68,7 +74,7 @@ So "guess the gold" scores 82% here; the interesting cases are the 220. Report o
 the headline and the wrong-subset accuracy as the diagnostic, without selecting on it.
 
 **The first build (1,285 cases: 1,044 right, 241 wrong) is superseded.** It read Qwen's replies with
-`hint_mcq`'s old parser, the first standalone capital A-J anywhere in the reply (CODE_SMELL P1 #1).
+`hint_mcq`'s old parser, the first standalone capital A-J anywhere in the reply (fixed in PR #404).
 4,785 of the 96,462 census replies (5%) are worked solutions instead of a letter, and in those the
 first capital is often the article "A", the pronoun "I" or a variable. Rebuilt from the same census
 with the strict parse:
@@ -146,6 +152,12 @@ draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45
 | linear probe, hidden_states[52]    | **91.9** | 94.1       | **82.1**   |
 | Qwen's own letter logits (ceiling) | 99.8     | 99.9       | 99.3       |
 
+![prompt only vs O-lens, J-lens, NLA and their placebos, the linear probe and Qwen's logits; all / Qwen right / Qwen wrong](img/mcq-unselected.png)
+
+![paired differences between conditions with 95% CIs, all cases and Qwen-wrong cases](img/mcq-unselected-diff.png)
+
+(`uv run python -m graphs.mcq_unselected` makes both; 95% bootstrap CIs over cases.)
+
 Paired by case, 95% bootstrap over cases (3,000 resamples):
 
 | comparison                   | all                 | Qwen wrong         |
@@ -204,7 +216,8 @@ What it says:
 Kylie's question: is the probe row right, and does her original probe (the 718 balanced MMLU-Pro
 questions, [mcq-answer-probe.md](mcq-answer-probe.md)) do as well when applied unchanged? All on the
 same 2,523 cases. Fresh layer-52 forward pass for every prompt on one H200, then
-`environments/hint_mcq/probe_unselected.py` (now takes the eval: `prep mcq_unselected INPUTS`). Run
+[historical probe_unselected.py](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe_unselected.py)
+(now takes the eval: `prep mcq_unselected INPUTS`). Run
 `runs/mcq_answer_probe/2026-10-30_mcq-unselected-probe` (`scores.md`, `predictions.jsonl` in cfbench
 answer format, one row per case and condition).
 

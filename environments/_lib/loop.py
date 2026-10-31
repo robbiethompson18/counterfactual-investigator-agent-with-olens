@@ -4,6 +4,8 @@
 Stop rules: a reply without tool calls ends the episode ("responded"); a `done` handler ends it ("done"); `max_turns`
 model calls ("max_turns"); a prompt over `max_prompt_tokens`, or (ported envs only) the episode's cost over `max_cost_usd`
 ("cut_long").
+A reply cut off by a token limit (finish_reason "length") raises, so the runner records the episode as an error instead of
+labelling a truncated answer.
 Every model call is logged with its provider and usage, including calls whose turn a custom step later drops.
 """
 
@@ -28,6 +30,8 @@ async def run_episode(env, ep: Episode, ctx: Ctx, target: Target, client: httpx.
     async def call():
         r = await chat(client, target, messages, ep.tools or None)
         calls.append({"provider": r["provider"], "finish": r["finish"], "usage": r["usage"]})
+        if r["finish"] == "length":
+            raise RuntimeError(f"reply truncated (finish_reason=length) on call {len(calls)}, provider {r['provider']}")
         return r
 
     try:

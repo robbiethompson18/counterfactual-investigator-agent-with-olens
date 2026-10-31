@@ -22,7 +22,7 @@ from pathlib import Path
 
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
 from wsb import banks
-from wsb.jailbreak import ANSWER_MAX_TOKENS, ANSWERER, OPEN_MODEL_NOTE, TEMPLATE
+from wsb.jailbreak import ANSWERER, answer
 from wsb.judge import client, seed_int
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "expview"))
@@ -199,21 +199,6 @@ def check_golden(items: list[dict], path: Path):
 
 
 # ---- the run
-
-
-async def answer(item: dict, draw: int) -> dict:
-    content = OPEN_MODEL_NOTE + TEMPLATE.format(prefix=item["prefix"], token=item["token"])
-    r = await client.messages.create(model=ANSWERER, max_tokens=ANSWER_MAX_TOKENS, messages=[{"role": "user", "content": content}])
-    return {
-        "id": item["id"],
-        "draw": draw,
-        "response": "".join(b.text for b in r.content if b.type == "text").strip(),
-        "reasoning": "".join(b.thinking for b in r.content if b.type == "thinking") or None,
-        "stop_reason": r.stop_reason,
-        "refusal_category": getattr(getattr(r, "stop_details", None), "category", None),
-        "sent": [{"role": "user", "content": content}],
-        "usage": {"input": r.usage.input_tokens, "output": r.usage.output_tokens},
-    }
 
 
 async def judge(readout: str, mc: dict) -> dict:

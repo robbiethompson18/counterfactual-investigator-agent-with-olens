@@ -41,6 +41,13 @@ INLINE_CONDITIONS = (
     "jlens_inline",
     "jlens_placebo_inline",
     "jlens_inline_no60",
+    # menus_inline (2026-10-30): each lens at four read menus, each with its placebo (cfbench/evals/menus_inline)
+    *(
+        f"{lens}_{menu}{p}_inline"
+        for lens in ("olens", "nla", "jlens")
+        for menu in ("prompt", "tail", "all", "last")
+        for p in ("", "_placebo")
+    ),
 )
 # Condition names as stored in predictions.jsonl rows before 2026-10-27 (every reader maps them with canon_condition).
 # `transcript` pasted two labelled base-arm transcripts into the prompt: retired 2026-10-27, since a predictor that reads
@@ -123,7 +130,12 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
 # think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
 # are byte-identical to 13.
-HARNESS_VERSION = 14
+# 15: menus_inline input preparation uses intact prompt text and structured MCQ options, avoiding split Unicode
+# corruption and spurious options parsed from question stems. Existing saved inputs and predictions are not rewritten.
+# 16: MCQ options use the final lettered block and reads use complete-option ending newlines, including multiline options.
+# mcq_unselected / supergpqa_inline prompts and read selection can change; stored runs are not rewritten.
+# 17: honest / essay_grading behavior definitions mark missing or invalid final Score fields as unscorable.
+HARNESS_VERSION = 17
 
 
 @dataclass

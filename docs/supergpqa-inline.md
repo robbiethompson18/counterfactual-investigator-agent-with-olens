@@ -4,6 +4,12 @@
 Qwen-wrong). One investigator (Haiku 5.5), one draw, 3,000 cases, all seven conditions run; the
 caveats at the end are open.
 
+**Probe update (2026-10-31):** The regenerated figures use both standardized read positions on
+exactly the historical lens-evaluation questions; the old probe numbers in the text below are
+historical. Full-population results and regeneration commands are in the
+[standard protocol](standard-probe-protocol.md). The new classifier reads one shared prompt token;
+the old probe scored option-newline activations. These are different architectures.
+
 **Question.** [mcq_unselected](mcq-unselected.md)'s question on a harder pool: given only the
 prompt, can an investigator predict the letter Qwen3.6-27B (thinking off) answers, and do O-lens,
 NLA or J++ reads of the prompt help beyond a placebo? No hint, no counterfactual, no LLM judge:

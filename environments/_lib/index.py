@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .backends import canonical_id
 from .core import ROOT, env_names, load_env, retired_arms, retired_run_arms, run_dirs
-from .runfolder import LOCAL, REPO, hf_token, read_episodes
+from .runfolder import LOCAL, REPO, active_labels, hf_token, read_episodes
 
 
 def hf_index(path: str, root="envs/") -> dict:
@@ -30,13 +30,6 @@ def hf_index(path: str, root="envs/") -> dict:
         return json.loads(Path(hf_hub_download(REPO, root + path, repo_type="dataset", token=hf_token())).read_text())
     except EntryNotFoundError:
         return {}
-
-
-def latest_labels(run_dir: Path, labeler="measure") -> tuple[str | None, dict]:
-    files = sorted((run_dir / "labels").glob(f"{labeler}@*.jsonl"), key=lambda p: p.stat().st_mtime)
-    if not files:
-        return None, {}
-    return files[-1].name, {r["episode"]: r["values"] for r in map(json.loads, files[-1].read_text().splitlines())}
 
 
 def summarize(vals: list, items: list) -> dict:
@@ -58,7 +51,7 @@ def env_index(env: str) -> dict:
     runs: list[dict] = []
     for run_dir in run_dirs(env, mod, LOCAL):
         meta = json.loads((run_dir / "meta.json").read_text())
-        label_file, labels = latest_labels(run_dir)
+        label_file, labels = active_labels(run_dir)
         by_arm, skip = defaultdict(list), retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
             if ep["arm"] not in skip:
@@ -112,9 +105,9 @@ def env_index(env: str) -> dict:
     }
 
 
-def build(envs: list[str] | None = None) -> list[Path]:
+def build(envs: list[str] | None = None, evals: bool = True) -> list[Path]:
     """Rebuild envs/<env>/index.json for `envs` (default every env) and envs/index.json, plus each env's spec/ and links.json
-    (spec.py; the spec only when the env's source changed). -> written paths."""
+    (spec.py; the spec only when the env's source changed), and data/evals/ unless `evals=False`. -> written paths."""
     from .evals import build as build_evals
     from .spec import build as build_spec
 
@@ -127,7 +120,7 @@ def build(envs: list[str] | None = None) -> list[Path]:
         p.write_text(json.dumps(idx, indent=1) + "\n")
         written.append(p)
     written += build_spec(names)
-    written += build_evals(export=False)
+    written += build_evals(export=False) if evals else []
     top = {t["env"]: t for t in hf_index("index.json").get("envs", [])}  # keeps envs this checkout doesn't have (other branches)
     for e in env_names():
         p = LOCAL / e / "index.json"

@@ -24,7 +24,7 @@ from pathlib import Path
 import torch
 from olens.jpp import JPP, JPP_FILE, JPP_REPO
 from olens.one_engine import OneEngine
-from olens_read_requests import prepare, queue, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
+from olens_read_requests import prepare, queue, resume, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
 from transformers import AutoTokenizer
 
 from olens import provenance
@@ -48,7 +48,7 @@ def main():
     args = ap.parse_args()
     layers = list(range(63)) if args.layers == "all" else [int(x) for x in args.layers.split(",")]
     out = Path(args.out)
-    done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
+    done = resume(out)
     print(
         f"{len(queue(args.requests, args.shard, done))} transcripts to read at {len(layers)} layers, positions={args.positions}", flush=True
     )

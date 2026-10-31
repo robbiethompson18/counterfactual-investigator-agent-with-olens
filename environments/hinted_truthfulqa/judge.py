@@ -22,7 +22,7 @@ from pathlib import Path
 import httpx
 
 from environments._lib.backends import OPENROUTER, _post, openrouter_key
-from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
+from environments._lib.runfolder import LOCAL, REPO_ROOT, active_labels, read_episodes
 
 from . import env as E
 
@@ -122,9 +122,7 @@ def main(argv):
     for run in a.runs:
         rd = LOCAL / "hinted_truthfulqa" / run
         meta = json.loads((rd / "meta.json").read_text())
-        measure = {}
-        for f in sorted((rd / "labels").glob("measure@*.jsonl")):
-            measure = {r["episode"]: r["values"] for r in map(json.loads, f.read_text().splitlines())}
+        _, measure = active_labels(rd)
         eps = [ep for ep in read_episodes(rd) if not ep.get("error")]
         # raw judge calls are kept beside the expview run, so a re-export never pays for the judge twice
         raw = out_dir.parent / "judge_calls" / f"{run}.jsonl"

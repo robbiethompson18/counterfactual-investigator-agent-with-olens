@@ -14,8 +14,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from environments._lib.index import latest_labels
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 from environments.donation_bet import env as E
 
 
@@ -38,7 +37,7 @@ def newcombe(k1, n1, k2, n2):
 
 def counts(run) -> dict[str, dict[str, list]]:
     """arm -> item -> list of 0/1 (at or below the line)."""
-    _, labels = latest_labels(run)
+    _, labels = active_labels(run)
     c: dict = defaultdict(lambda: defaultdict(list))
     for ep in read_episodes(run):
         v = (labels.get(ep["id"]) or {}).get("positive")
