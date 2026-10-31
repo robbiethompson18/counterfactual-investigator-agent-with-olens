@@ -18,12 +18,9 @@ match), verdicts.jsonl (one row per item) and the tables this prints.
 import argparse
 import asyncio
 import json
-import os
 import re
 from collections import Counter
 from pathlib import Path
-
-import httpx
 
 from counterfactual_investigator_agent_with_olens import openrouter
 from counterfactual_investigator_agent_with_olens.runs import finish, new_run
@@ -55,7 +52,6 @@ would find. You may reason briefly, then end with a line `ANSWER: FLAGGED` or `A
 {cf_prompt}
 </counterfactual_prompt>"""
 
-GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 CLEAR = 0.75  # modal share for a usable oracle (6/8); --clear overrides
 MAX_CLEAN = 0.25  # a usable item's clean twin is flagged at most this often
 
@@ -131,37 +127,14 @@ def canon_answer(text: str) -> str | None:
     return None if not found else ("NOT_FLAGGED" if found[-1].startswith("NOT") else "FLAGGED")
 
 
-async def google_chat(model: str, key: str, content: str, max_tokens: int) -> tuple[str, dict]:
-    """Gemini called directly (when OpenRouter's BYOK route is out of quota): T 1.0, thinking level medium, same as the
-    OpenRouter call. 429/5xx retried with backoff like openrouter.chat."""
-    body = {
-        "contents": [{"parts": [{"text": content}]}],
-        "generationConfig": {"temperature": 1.0, "maxOutputTokens": max_tokens, "thinkingConfig": {"thinkingLevel": "medium"}},
-    }
-    async with httpx.AsyncClient(timeout=600) as client:
-        for attempt in range(6):
-            r = await client.post(GOOGLE_URL.format(model=model.split("/")[-1]), params={"key": key}, json=body)
-            if r.status_code in (429, 500, 503) and attempt < 5:
-                await asyncio.sleep(10 * 2**attempt)
-                continue
-            r.raise_for_status()
-            j = r.json()
-            parts = j["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts if not p.get("thought")), j.get("usageMetadata", {})
-    raise AssertionError("unreachable")
-
-
-async def guess(model: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int, google_key: str | None) -> dict:
+async def guess(model: str, row: dict, sample: int, sem: asyncio.Semaphore, max_tokens: int, key_env: str) -> dict:
     content = GUESSER_PROMPT.format(base_prompt=row["base_prompt"], base_reply=row["base_reply"], cf_prompt=row["cf_prompt"])
     async with sem:
         try:
-            if google_key:
-                raw, usage = await google_chat(model, google_key, content, max_tokens)
-                out = {"cost": 0.0, "usage": usage}
-            else:
-                r = await openrouter.chat(model, [{"role": "user", "content": content}], temperature=1.0, max_tokens=max_tokens)
-                raw = r.choices[0].message.content or ""
-                out = {"cost": getattr(r.usage, "cost", None) or 0.0, "finish": r.choices[0].finish_reason}
+            messages = [{"role": "user", "content": content}]
+            r = await openrouter.chat(model, messages, temperature=1.0, max_tokens=max_tokens, key_env=key_env)
+            raw = r.choices[0].message.content or ""
+            out = {"cost": getattr(r.usage, "cost", None) or 0.0, "finish": r.choices[0].finish_reason}
         except Exception as e:  # noqa: BLE001 - one failed sample is a row with an error, not a dead run
             err = f"{type(e).__name__}: {e}"[:300]
             return {"sample": sample, "prompt": content, "guess_raw": None, "guess": None, "error": err, "cost": 0.0}
@@ -207,10 +180,10 @@ async def main():
     ap.add_argument(
         "--reuse", metavar="GATE_RUN", help="reuse Flash guesses from this gate run (same prompt) and only call for missing ones"
     )
-    ap.add_argument("--google-key", metavar="ENVVAR", help="call Gemini directly with this key (when OpenRouter is out of quota)")
+    ap.add_argument("--google-key", metavar="ENVVAR", help="call Gemini via gemini-direct/ with this key (when OpenRouter is out of quota)")
     a = ap.parse_args()
-    google_key = os.environ[a.google_key] if a.google_key else None
-    served_by = f"google-direct ({a.google_key}), thinking level medium" if a.google_key else "openrouter"
+    model = openrouter.DIRECT + a.model.removeprefix("google/") if a.google_key else a.model
+    served_by = f"google-direct ({a.google_key}), effort medium" if a.google_key else "openrouter"
     run_dirs = [Path(LOCAL) / "notice_defect" / r for r in a.run.split("+")]
     if missing := [str(r) for r in run_dirs if not (r / "episodes").is_dir()]:
         raise SystemExit(f"no such run: {missing}")
@@ -246,7 +219,7 @@ async def main():
         content = GUESSER_PROMPT.format(base_prompt=row["base_prompt"], base_reply=row["base_reply"], cf_prompt=row["cf_prompt"])
         if (content, s) in reused:
             return reused[(content, s)] | {"reused_from": a.reuse}
-        return await guess(a.model, row, s, sem, a.max_tokens, google_key)
+        return await guess(model, row, s, sem, a.max_tokens, a.google_key or "GEMINI_API_KEY")
 
     results = await asyncio.gather(*(one(row, s) for row in table for s in range(a.n)))
     print(f"{sum('reused_from' in r for r in results)} guesses reused from {a.reuse}")
