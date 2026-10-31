@@ -8,7 +8,7 @@ import argparse
 import hashlib
 import json
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -119,7 +119,7 @@ def fit_model(x, rows, essay):
         args=(z, y, n_options),
         method="L-BFGS-B",
         jac=True,
-        options={"maxiter": 300, "gtol": 1e-6, "ftol": 1e-10, "maxls": 40},
+        options={"maxiter": 1000, "gtol": 1e-6, "ftol": 1e-10, "maxls": 40},
     )
     gradient_max = float(np.abs(result.jac).max())
     if not result.success and gradient_max > 2e-5:
@@ -154,7 +154,7 @@ class Activations:
         self.run = run
         self.root = root or run / "activations"
         self.by_id = {}
-        self.arrays = {}
+        self.arrays = OrderedDict()
         self.essay = {}
         self.rows = rows
 
@@ -197,6 +197,9 @@ class Activations:
                 if layers_path.exists() and json.loads(layers_path.read_text()) != LAYERS:
                     raise ValueError(f"Unexpected layer order in {directory}")
                 self.arrays[key] = np.load(directory / f"{site}.npy", mmap_mode="r")
+                if len(self.arrays) > 32:
+                    self.arrays.popitem(last=False)
+            self.arrays.move_to_end(key)
             array = self.arrays[key]
             if output is None:
                 output = np.empty((len(rows), array.shape[2]), dtype=np.float64)
