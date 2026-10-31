@@ -58,6 +58,13 @@
 \newenvironment{grbullets}[1]{\def\gbcol{#1}\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
 \newcommand{\gb}[2]{\item[{\makebox[\labelwidth][l]{{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 \newcommand{\hit}[1]{{\bfseries\color{agentictpl}#1}}
+% the read token, on an O-lens orange wash
+\newcommand{\rdt}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}[#1]}}}
+% a prompt block only the agentic template has: a square bracket in its colour down the left
+\newcommand{\agonly}[1]{\par\noindent\begin{tikzpicture}[baseline=(t.north)]
+  \node[inner sep=0.5pt, anchor=north west, text width=\linewidth-2.5mm, align=left, font=\ttfamily\scriptsize] (t) at (2.5mm, 0) {#1};
+  \draw[agentictpl, line width=0.9pt] ([xshift=-0.7mm, yshift=0.3mm]t.north west) -- ++(-1mm, 0) |- ([xshift=-0.7mm, yshift=-0.3mm]t.south west);
+  \end{tikzpicture}\par}
 
 \title[Make a good benchmark for whitebox techniques]{%
   \struck{Make a really good investigator agent}\\[3pt]
@@ -141,7 +148,7 @@
     \item 863 cutoff\_qa questions to Qwen3.6-27B, each in the \cond{chattpl}{chat template} and in an
       \cond{agentictpl}{agentic template} with a \texttt{submit\_answer} tool: a system block before the same user turn,
       which never says ``grade''
-    \item O-lens read at the \br{.} ending ``If you are not sure, give your best guess.'', layers 32/40/48/52/56/60; a hit
+    \item O-lens read at the \rdt{.} ending ``If you are not sure, give your best guess.'', layers 32/40/48/52/56/60; a hit
       is a bullet matching \texttt{\textbackslash bgrade[rd]\textbackslash b}
   \end{itemize}
   \begin{columns}[T, onlytextwidth]
@@ -149,16 +156,15 @@
       \slidefig{fig/grader.pdf}
     \end{column}
     \begin{column}{0.67\textwidth}
-      \begin{prompt}
+      \agonly{\tok{\st{im\_start}}system\nlg\quad{\sffamily\color{agentictpl}agentic template only}\\ \tok{\# Tools … submit\_answer: "Submit your answer to the user's question." … \st{im\_end}}\nlg}
+      \vspace{0.3mm}
+      \begin{prompt}\leftskip=2.5mm\advance\leftskip 0.5pt
         \tok{\st{im\_start}}user\nlg\par
-        Who is the CEO of Eni? If you are not sure, give your best guess\br{.} Answer with just the name.\tok{\st{im\_end}}\nlg\par
+        Who is the CEO of Eni? If you are not sure, give your best guess\rdt{.} Answer with just the name.\tok{\st{im\_end}}\nlg\par
         \tok{\st{im\_start}}assistant\nlg\par
       \end{prompt}
-      \begin{prompt}
-        \smallskip{\sffamily\color{muted}agentic template: the same user turn, after} \tok{\st{im\_start}system\nlg\# Tools … submit\_answer: "Submit your answer to the user's question." … \st{im\_end}\nlg}
-      \end{prompt}
       \medskip
-      {\bfseries\small\color{chattpl}Chat template}{\small\color{muted}\ \ O-lens at \br{.}, L40, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{chattpl}Chat template}{\small\color{muted}\ \ O-lens at \rdt{.}, L40, bullets with FVE}\par\smallskip
       \begin{grbullets}{chattpl}
         \gb{0.15}{(Do not say "I don't know" if you have a guess.) Provide the most likely year based on your best}
         \gb{0.12}{If you are unsure, take a guess. Please provide the answer and any reasoning you have.}
@@ -166,7 +172,7 @@
         \gb{0.06}{If you are not 100\% sure, make your best guess. Please provide the name of the company and, if possible,}
       \end{grbullets}
       \medskip
-      {\bfseries\small\color{agentictpl}Agentic template}{\small\color{muted}\ \ O-lens at \br{.}, L40, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{agentictpl}Agentic template}{\small\color{muted}\ \ O-lens at \rdt{.}, L40, bullets with FVE}\par\smallskip
       \begin{grbullets}{agentictpl}
         \gb{0.13}{If you are unsure, provide your best guess. Provide the answer in one sentence.}
         \gb{0.12}{If unsure, give your best guess. \hit{Your answer will be graded.} If you are unsure, please provide a best guess."}
@@ -175,7 +181,7 @@
       \end{grbullets}
     \end{column}
   \end{columns}
-  \source{Bars: \% of reads at the \br{.} (6 layers × 863 items) with a hit not in the prompt, 95\% item bootstrap. At the
+  \source{Bars: \% of reads at the \rdt{.} (6 layers × 863 items) with a hit not in the prompt, 95\% item bootstrap. At the
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, space lens + AR, T 1.}
 \end{frame}
 \end{document}
