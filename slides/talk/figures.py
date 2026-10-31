@@ -37,11 +37,13 @@ FAINT = "#a29d92"  # the Evals page's --faint
 S = 2 / 3  # this deck's text is 2/3 of the theme's (Kylie, 2026-10-30), so the figures' is too
 plt.rcParams.update({k: plt.rcParams[k] * S for k in ["font.size", "axes.titlesize", "axes.labelsize", "xtick.labelsize",
                                                       "ytick.labelsize", "legend.fontsize"]})  # fmt: skip
-# the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30). The
-# O-lens (nl) placebo isn't on the tail pages: it is the placebo of the option-newlines-only eval the O-lens (nl) bar
-# comes from (NAME without "_tail", same cases).
+# the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30). O-lens
+# (nl) is an ablation in the appendix (Kylie, 2026-10-31); its placebo isn't on the tail pages: it is the placebo of the
+# option-newlines-only eval the O-lens (nl) bar comes from (NAME without "_tail", same cases).
 GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-          ("O-lens (nl)", ["olens_inline_nl", "olens_nl_placebo"]), ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
+          ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
+NL_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+             ("O-lens (nl)", ["olens_inline_nl", "olens_nl_placebo"])]  # fmt: skip
 PANELS = {"after": "hint after the options", "before": "hint first"}
 
 
@@ -154,7 +156,9 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
     return bars, chance, len(items)
 
 
-def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pct: bool, head: bool, base: float = 0) -> None:
+def row(
+    axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pct: bool, head: bool, base: float = 0, groups=GROUPS
+) -> None:
     """One row of the grid, a panel per hint position, in the template's (and the Evals page's answer chart's) style:
     solid bars (placebo hatched, beside its lens), gray 95% CI whisker, the value in ink above it with the stars over
     that, muted group names under the bars, a dotted baseline labelled at the right. `head`: the column titles and case
@@ -162,9 +166,11 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
     line is then the axis itself, and 0.4 for % correct)."""
     data = {k: bars_of(name) for k, name in evals.items()}
     for k, name in evals.items():
-        data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
+        if groups is NL_GROUPS:
+            data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
+        data[k] = ({c: b for c, b in data[k][0].items() if any(c in cs for _, cs in groups)}, *data[k][1:])
     for ax, (k, (bars, chance, n)) in zip(axes, data.items(), strict=True):
-        xs, ticks = positions(bars, GROUPS)
+        xs, ticks = positions(bars, groups)
         for c, x in xs.items():
             v, (lo, hi), st = bars[c]
             ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
@@ -174,7 +180,7 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
             ax.annotate(label, (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
             ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
-        ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
+        ax.set_xticks(ticks, [g for g, cs in groups if any(c in bars for c in cs)])
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
         ax.tick_params(axis="x", labelsize=7 * S)
         if head:
@@ -193,17 +199,17 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
 
 
-def grid() -> None:
+def grid(groups=GROUPS, out: str = "grid.pdf", h: float = 60) -> None:
     """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0}, GROUPS)[1][-1] + 1 for n in knew.values()]
-    fig, axes = figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
-    row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
+    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0}, groups)[1][-1] + 1 for n in knew.values()]
+    fig, axes = figure(FULL_W, h, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
+    row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5, groups=groups)
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
-        pct=True, head=False, base=0.4)  # fmt: skip
+        pct=True, head=False, base=0.4, groups=groups)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
-    save(fig, OUT / "grid.pdf")
+    save(fig, OUT / out)
 
 
 # Part 2, essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's draws from the runs' predictions
@@ -545,6 +551,7 @@ def author() -> None:
 
 if __name__ == "__main__":
     grid()
+    grid(NL_GROUPS, "grid_nl.pdf", h=48)
     essay()
     essay_diffs()
     grader()

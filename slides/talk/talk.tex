@@ -1,6 +1,6 @@
 % The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
 % its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
-% sentence-end probe, scripts/author_probe/period_check.py). `make -C slides`.
+% sentence-end probe, scripts/author_probe/period_check.py); the appendix: the O-lens (nl) ablation of Part 1. `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -42,14 +42,13 @@
 % the example prompt: a read token on O-lens orange; newlines as ↵ (Inter has the glyph); special tokens spelled with {}
 % boxed one by one so the mono font's ligatures don't turn <| and |> into arrows
 \newcommand{\nlg}{{\sffamily ↵}}
-% a read token in brackets, then a column of dots, top down, one per condition that gets it: O-lens orange, O-lens (nl)
-% gold, probe teal
+% a read token in brackets, then a column of dots, top down, one per condition that gets it: O-lens orange, probe teal
 \newcommand{\dt}[1]{\tikz[baseline=-0.1ex]\fill[#1] (0, 0.45ex) circle (0.85pt);}
 \newcommand{\dts}[1]{\tikz[baseline=0pt]{\path (0, 0) -- (0, 2.9pt);
   \foreach \c [count=\i] in {#1} \fill[\c] (0, 3.05pt - 1.3pt * \i + 1.3pt) circle (0.55pt);}}
 \newcommand{\br}[1]{{\bfseries\color{ink}[}#1{\bfseries\color{ink}]}}
 \newcommand{\rd}[1]{\br{#1}\kern0.4pt\dts{olens}\kern1.2pt}
-\newcommand{\ro}[1]{\br{#1}\kern0.4pt\dts{olens, olensnl, probe}\kern1.2pt}
+\newcommand{\ro}[1]{\br{#1}\kern0.4pt\dts{olens, probe}\kern1.2pt}
 \newcommand{\st}[1]{\mbox{<}\mbox{|}#1\mbox{|}\mbox{>}}
 \newcommand{\tok}[1]{{\color{muted}#1}}
 \newcommand{\hint}[1]{{\bfseries #1}}
@@ -140,8 +139,8 @@
   \end{columns}
   \medskip
   \footnotesize
-  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens,
-  \dt{olensnl}\,\cond{olensnl}{O-lens (nl)} and \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
+  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens{} and
+  \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
   Qwen answers B in 7 of 8 samples.
   \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
@@ -150,8 +149,7 @@
   \slidefig{fig/grid.pdf}
   \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
     95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; O-lens (nl): the option-newline
-    reads only (earlier run); tuned probe: the probe refit on hint-first prompts (out-of-fold).}
+    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
 \end{frame}
 \section{Essay grading}
 \begin{frame}
@@ -335,5 +333,19 @@
   \end{columns}
   \source{Bars: at the \rdt{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (lighter) \% of items with at least one, 95\% item bootstrap. Reads at the
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, space lens + AR, T 1.}
+\end{frame}
+
+\section{Appendix}
+\begin{frame}{Ablation: O-lens on the option newlines only, hinted multiple choice}
+  \begin{itemize}
+    \item \cond{olensnl}{O-lens (nl)}: the investigator gets only the O-lens reads at the option newlines (the \texttt{\nlg}
+      after each option), none at the end of the prompt; \olens{} gets every read token of Part 1's example prompt
+    \item Same cases and investigator as Part 1; O-lens (nl) is an earlier run, its placebo another question's reads at
+      the same option newlines
+  \end{itemize}
+  \slidefig{fig/grid_nl.pdf}
+  \source{As Part 1's results: top, AUROC of P(knew), 95\% case bootstrap, one-sided paired bootstrap vs transcript-only;
+    bottom, \% correct, 95\% item bootstrap, one-sided paired sign test vs transcript-only; dotted: always the hinted
+    letter. * p < .05, ** < .01, *** < .001.}
 \end{frame}
 \end{document}
