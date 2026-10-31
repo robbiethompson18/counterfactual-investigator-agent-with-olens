@@ -1102,8 +1102,10 @@ async function evalsTab(D) {
 // one row per question over the shown runs (claim or answer task): the eval's ITEM_INFO (question, gold, own answer, class,
 // hint), and per condition every draw as a chip, green = right; a chip opens the draw's card (expview conversation with
 // every tool call and its output, incl. the O-lens bullets with layer, token and FVE; Docent), ↗ goes straight to expview.
-// Filters: class, source, one condition right and another wrong, and a regex over the question; #...&q=ITEM shows one row.
+// Filters: class, source, one condition right and another wrong, and a regex over the question and the text columns;
+// ITEM_INFO keys beyond the standard ones (QCOLS) show as extra sortable columns, standard ones no row fills are hidden; #...&q=ITEM shows one row.
 let Q = null;
+const QCOLS = [["source", "source"], ["class", "class"], ["gold", "gold"], ["own", "own answer"], ["hint", "hint"], ["question", "question"]];
 function questionTable(rs, h) {
   const rows = {};
   const add = (R, g, k, item, d, right, label) => {
@@ -1123,7 +1125,8 @@ function questionTable(rs, h) {
   }
   const conds = condOrder([...new Set(Object.values(rows).flatMap(r => Object.keys(r.cells)))]);
   const pairs = conds.flatMap(a => conds.filter(b => b !== a).map(b => [a, b]));
-  Q = {rows: Object.values(rows), conds, sort: "item", dir: 1, q: h.q || ""};
+  const extra = [...new Set(Object.values(rows).flatMap(r => Object.keys(r.info)))].filter(k => !QCOLS.some(([c]) => c === k));
+  Q = {rows: Object.values(rows), conds, extra, sort: "item", dir: 1, q: h.q || ""};
   setTimeout(qRender, 0);
   const sel = (id, opts) => `<select id="${id}" onchange="qRender()">${opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select>`;
   const classes = [...new Set(Q.rows.map(r => r.info.class).filter(Boolean))], sources = [...new Set(Q.rows.map(r => r.info.source).filter(Boolean))];
@@ -1134,7 +1137,7 @@ function questionTable(rs, h) {
       ${classes.length ? sel("qclass", [["", "every class"], ...classes.map(c => [c, c])]) : ""}
       ${sources.length > 1 ? sel("qsource", [["", "every source"], ...sources.map(c => [c, c])]) : ""}
       ${sel("qpair", [["", "any outcome"], ...pairs.map(([a, b]) => [a + "|" + b, `${condShort(a)} right, ${condShort(b)} wrong`])])}
-      <input id="qre" placeholder="regex over the question (or an item id)" value="${esc(Q.q)}" oninput="qRender()" style="min-width:260px">
+      <input id="qre" placeholder="regex over the question or text columns (or an item id)" value="${esc(Q.q)}" oninput="qRender()" style="min-width:260px">
       <span id="qcount" class="mute"></span></div>
     <div class="scroll"><table class="evt" id="qtab"></table></div>`;
 }
@@ -1147,16 +1150,19 @@ function qRender() {
   const [pa, pb] = v("qpair") ? v("qpair").split("|") : [];
   const ok = (r, k) => { const c = r.cells[k] || []; return c.length ? c.filter(x => x.right).length / c.length : null; };
   let rows = Q.rows.filter(r => (!v("qclass") || r.info.class === v("qclass")) && (!v("qsource") || r.info.source === v("qsource"))
-    && (!re || re.test(r.info.question || "") || re.test(r.item)) && (!pa || (ok(r, pa) > 0.5 && ok(r, pb) != null && ok(r, pb) < 0.5)));
+    && (!re || re.test(r.item) || ["question", ...Q.extra].some(k => typeof r.info[k] === "string" && re.test(r.info[k]))) && (!pa || (ok(r, pa) > 0.5 && ok(r, pb) != null && ok(r, pb) < 0.5)));
   const key = r => Q.sort === "item" ? (isNaN(+r.item) ? r.item : +r.item) : Q.sort in r.info ? r.info[Q.sort] ?? "" : ok(r, Q.sort) ?? -1;
   rows.sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * Q.dir);
   $("qcount").textContent = `${rows.length} shown`;
   const th = (k, l) => `<th style="cursor:pointer" onclick="qSort('${k}')" title="sort">${l}${Q.sort === k ? (Q.dir > 0 ? " ▲" : " ▼") : ""}</th>`;
   const chip = x => `<span style="white-space:nowrap"><a href="#" onclick="drawCard(${x.i}, event)" class="chip" style="background:${x.right == null ? "transparent" : x.right ? "var(--good,#d6f5d6)" : "var(--bad,#f8d0d0)"};color:inherit">${esc(x.label)}</a>${x.href ? `<a href="${esc(x.href)}" target="_blank" rel="noopener" title="the conversation in expview">↗</a>` : ""}</span>`;
-  $("qtab").innerHTML = `<tr>${th("item", "item")}${th("source", "source")}${th("class", "class")}${th("gold", "gold")}${th("own", "own answer")}${th("hint", "hint")}<th>question</th>
-    ${Q.conds.map(k => th(k, swatch(k) + esc(condShort(k)))).join("")}</tr>` + rows.map(r => `<tr><td class="mono">${esc(r.item)}</td><td>${esc(r.info.source || "")}</td><td>${esc(r.info.class || "")}</td>
-      <td class="num">${esc(r.info.gold || "")}</td><td class="num">${esc(r.info.own || "")}</td><td class="num">${esc(r.info.hint || "")}</td>
-      <td style="min-width:260px;max-width:460px">${r.info.question ? `<details><summary>${esc(r.info.question.slice(0, 110))}${r.info.question.length > 110 ? "…" : ""}</summary><pre class="code" style="white-space:pre-wrap">${esc(r.info.question)}</pre></details>` : ""}</td>
+  // the standard ITEM_INFO columns that any row fills, then any other ITEM_INFO keys as their own sortable columns
+  const cols = [...QCOLS.filter(([k]) => Q.rows.some(r => r.info[k] != null && r.info[k] !== "")), ...Q.extra.map(k => [k, k])];
+  const long = t => `<details><summary>${esc(t.slice(0, 110))}${t.length > 110 ? "…" : ""}</summary><pre class="code" style="white-space:pre-wrap">${esc(t)}</pre></details>`;
+  const cell = (k, x) => x == null || x === "" ? "<td></td>" : typeof x === "number" ? `<td class="num">${Number.isInteger(x) ? x : x.toFixed(3)}</td>`
+    : k === "question" || String(x).length > 60 ? `<td style="min-width:260px;max-width:460px">${long(String(x))}</td>` : `<td>${esc(String(x))}</td>`;
+  $("qtab").innerHTML = `<tr>${th("item", "item")}${cols.map(([k, l]) => k === "question" ? `<th>${l}</th>` : th(k, esc(l))).join("")}
+    ${Q.conds.map(k => th(k, swatch(k) + esc(condShort(k)))).join("")}</tr>` + rows.map(r => `<tr><td class="mono">${esc(r.item)}</td>${cols.map(([k]) => cell(k, r.info[k])).join("")}
       ${Q.conds.map(k => `<td>${(r.cells[k] || []).map(chip).join(" ")}</td>`).join("")}</tr>`).join("");
 }
 let ARMLAB = {}, PAIRLAB = {};  // the eval's ARM_LABELS and PAIR_LABELS (evals/NAME.json arm_labels, pair_labels)

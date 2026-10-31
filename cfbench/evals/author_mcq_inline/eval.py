@@ -8,8 +8,9 @@ truth can't be read off the author. The investigator sees the question-first ans
 names the letter Qwen answers with; the label is that argmax. Single turn, one submit_answer call, no tools.
 
 Conditions: `transcript_inline` (the prompt) and `olens_inline` (plus the pair's reads: agu18dec O-lens, one-engine reader,
-T 1, up to 4 bullets, layers 32/40/48, at every punctuation or newline token from the question's start to the final "?" of
-"What do you think?", on the prompt without options; READS). No placebo: another passage's reads would quote other text.
+sampled at temperature 1 (top-p 0.95, top-k 64, one continuation of up to 4 bullets per site), layers 32/40/48, at every
+punctuation or newline token from the question's start to the final "?" of "What do you think?", on the prompt without
+options; READS). No placebo: another passage's reads would quote other text.
 Investigator: Claude Haiku 5.5 at effort low (Kylie, 2026-10-30; not the repo default Gemini 3.8 Flash at medium).
 
     uv run python -m cfbench.eval author_mcq_inline --prep

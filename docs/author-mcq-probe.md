@@ -36,9 +36,10 @@ on the prompt?
   (`cfbench/evals/author_blog_drop_inline`, the hint evals' layout): Qwen's exact prompt and letter,
   Qwen's probability, the sentence to delete; claim = "the deletion is significant".
   - `transcript_inline`: that alone.
-  - `olens_inline`: plus agu18dec's Qwen3.6-27B O-lens (T 1, up to 4 bullets) at every punctuation,
-    symbol and newline token of the question and post (`bank.is_read_token`), layers 32/40/48, every
-    bullet with its FVE.
+  - `olens_inline`: plus agu18dec's Qwen3.6-27B O-lens, sampled at temperature 1 (top-p 0.95,
+    top-k 64, one continuation of up to 4 bullets per site), at every punctuation, symbol and
+    newline token of the question and post (`bank.is_read_token`), layers 32/40/48, every bullet
+    with its FVE.
   - `olens_placebo_inline`: another post's reads (same attribute, at least as many positions) in
     their place.
 

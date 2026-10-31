@@ -275,6 +275,27 @@ def LINKS(row: dict) -> dict[str, dict]:
     return {k: {"dataset": d, "item": row["pair"]} for k, d in datasets(row["pair"]).items()}
 
 
+INPUTS = Path("data/runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2")
+
+
+def ITEM_INFO(row: dict) -> dict:
+    """The env viewer's per-case table (Kylie, 2026-10-31: show which cases the deletion makes a difference in): the
+    truth as the class, Qwen's probability on its answer before and after the deletion, the drop and its threshold, and
+    the deleted sentence."""
+    if not hasattr(ITEM_INFO, "comment"):
+        ITEM_INFO.comment = {c["item"]: c["comment"] for c in load(INPUTS / "cases.jsonl")}  # ty: ignore[unresolved-attribute]
+    return {
+        "source": row["version"],
+        "class": "makes a difference" if row["k_cf"] else "no difference",
+        "attribute": row["attr"],
+        "p0": round(row["p0"], 3),
+        "p1": round(row["p1"], 3),
+        "drop": round(row["drop"], 3),
+        "threshold": round(row["threshold"], 3),
+        "deleted sentence": ITEM_INFO.comment.get(row["item"], ""),  # ty: ignore[unresolved-attribute]
+    }
+
+
 def show_expview(inputs: Path, out: Path):
     """The exact prompts --show prints, for every case and condition, as an expview run (no API calls): the predictor's
     system prompt and the user prompt with eval.md, nothing sent."""
