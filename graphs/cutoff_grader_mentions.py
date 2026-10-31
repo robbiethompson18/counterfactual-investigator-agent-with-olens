@@ -40,6 +40,25 @@ def boot(d: pd.DataFrame, n: int = 2000, seed: int = 0) -> tuple[float, float, f
     return (g[:, 0].sum() / g[:, 1].sum(), *np.percentile(s[:, 0] / s[:, 1], [2.5, 97.5]))
 
 
+def at_token(run: Path, token: str, reps: int = 2000, seed: int = 0) -> dict[str, tuple[float, float, float]]:
+    """Novel "grader"/"graded" rate at one mid-instruction token ("," after "not sure" or "." after "best guess") for A and B on
+    the items both read, all six layers: run -> (rate, 95% item-bootstrap CI). The instruction is the same in every item, so each
+    item has exactly one such token, read at six layers (item_counts' instr_punct holds the two tokens)."""
+    c = pd.read_csv(run / "item_counts.csv")
+    ip = c[c.cls == "instr_punct"]
+    assert (ip[f"{COL}_count"] == 2).all()
+    items_ = sorted(set(ip[ip.run == "A"].item) & set(ip[ip.run == "B"].item))
+    h = pd.read_json(run / "novel_hits.jsonl", lines=True)
+    h = h[h.families.map(lambda f: "graded" in f) & (h.cls == "instr_punct") & (h.token == token)].drop_duplicates(["run", "item", "layer"])
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(items_), (reps, len(items_)))
+    out = {}
+    for r in ("A", "B"):
+        k = h[h.run == r].groupby("item").size().reindex(items_, fill_value=0).values / 6
+        out[r] = (k.mean(), *np.percentile(k[idx].mean(1), [2.5, 97.5]))
+    return out
+
+
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     p, d = k / n, 1 + z * z / n
     c, h = (p + z * z / (2 * n)) / d, z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
