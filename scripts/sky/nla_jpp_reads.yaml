@@ -4,7 +4,7 @@
 # (+ .acts.bf16, .pred.bf16, .provenance.json, .transcripts.jsonl, scored in place by scripts/nla_score.py). Fetch before
 # the node goes down (-i 15 --down):
 #   REQ=path/to/requests.jsonl uvx --from 'skypilot[runpod]==0.13.0' sky launch -c nla-jpp -y -i 15 --down \
-#     --secret HF_TOKEN --env REQ scripts/sky/nla_jpp_reads.yaml
+#     --secret HF_TOKEN --env REQ [--env RUN_JPP=0] scripts/sky/nla_jpp_reads.yaml
 #   rsync -e 'ssh -F ~/.sky/generated/ssh/nla-jpp' -a nla-jpp:reads/ LOCAL_DIR/
 name: nla-jpp
 
@@ -20,6 +20,7 @@ secrets:
 envs:
   HF_HOME: /data/hf
   HF_XET_HIGH_PERFORMANCE: 1
+  RUN_JPP: 1  # 0: the NLA only
   JPP_LAYERS: "32,36,40,44,48,52,56,60"
   JPP_TOP_K: 10
   NLA_STEP: iter_000600  # the AR (critic) was saved at step 600
@@ -49,7 +50,7 @@ setup: |
   uv pip install -q --no-deps "https://github.com/ceselder/vllm-metamodels/archive/refs/heads/main.zip"
   H=~/olens-env/bin/hf
   $H download Qwen/Qwen3.6-27B >/dev/null
-  $H download neuronpedia/jacobian-lens qwen3.6-27b/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt >/dev/null
+  [ "$RUN_JPP" = 0 ] || $H download neuronpedia/jacobian-lens qwen3.6-27b/jpp/Salesforce-wikitext/Qwen3.6-27B_jpp_lens.pt >/dev/null
   C=/data/olens_ckpt/ceselder_nla
   $H download ceselder/qwen3.6-27b-nla-rl nla_meta.yaml run_config.yaml --local-dir $C >/dev/null
   $H download ceselder/qwen3.6-27b-nla-rl --include 'ar_reconstructor/*' --local-dir $C >/dev/null
@@ -65,8 +66,10 @@ run: |
   export PATH=$HOME/olens-env/bin:/usr/local/cuda-12.9/bin:$PATH OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=olens/src:src
   cd ~/repo
   C=/data/olens_ckpt/ceselder_nla
-  timeout "${MAX_HOURS}h" python scripts/jpp_read_requests.py ~/reads/requests.jsonl ~/reads/jpp.jsonl --layers $JPP_LAYERS --top-k $JPP_TOP_K
-  echo JPP_DONE
+  if [ "$RUN_JPP" != 0 ]; then
+    timeout "${MAX_HOURS}h" python scripts/jpp_read_requests.py ~/reads/requests.jsonl ~/reads/jpp.jsonl --layers $JPP_LAYERS --top-k $JPP_TOP_K
+    echo JPP_DONE
+  fi
   timeout "${MAX_HOURS}h" python scripts/olens_read_requests.py ~/reads/requests.jsonl ~/reads/nla.jsonl --readout nla --layers 42 \
     --av-lora /data/lora_vllm/ceselder_nla_$NLA_STEP --nla-meta $C/nla_meta.yaml --nla-repo ceselder/qwen3.6-27b-nla-rl
   echo NLA_DONE
