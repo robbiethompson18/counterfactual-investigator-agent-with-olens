@@ -134,7 +134,6 @@ def PAGE(rows: list[dict]) -> str:
             a = metrics(mp[c], truth, keys)["auroc"]
             bs = [b["auroc"] for b in boot(lambda ks, c=c: metrics(mp[c], truth, ks), keys, rng)]
             res.append((c, a, float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5)), len(keys), metrics(mp[c], truth, keys)))
-        out.append(bars([(c, a, lo, hi) for c, a, lo, hi, *_ in res], 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)"))
         for a, b in PAIRS:
             if a in mp and b in mp:
                 keys = [k for k in mp[a].keys() & mp[b].keys() if keep(k)]
@@ -147,26 +146,25 @@ def PAGE(rows: list[dict]) -> str:
                                           f"<span class=\"mute\">p {pfmt(np.mean([better(x[s]) for x in bs]))}</span>")  # fmt: skip
                 pair_rows.append([f"{swatch(a)} − {swatch(b)}", cell("auroc", lambda x: x <= 0), cell("right", lambda x: x <= 0),
                                   cell("brier", lambda x: x >= 0)])  # fmt: skip
-        out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
-                         [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
-                          for c, a, lo, hi, n, m in res]))  # fmt: skip
-        # baselines that need no investigator: mean reversion (minus the observed arm mean), and the linear probe if it was run
+        # no investigator: bet at the mean (minus the observed arm mean: low grades come back up), and the linear probe
         obs = {(r["base_arm"], r["item"]): sum(float(x) * n for x, n in r["answers_base"].items()) / sum(r["answers_base"].values())
                for r in rows}  # fmt: skip
         keys = [k for k in truth if keep(k)]
         nul = {k: -obs[k] for k in keys}
+        null_auroc = metrics(nul, truth, keys)["auroc"]
         bs = [b["auroc"] for b in boot(lambda ks, nul=nul: metrics(nul, truth, ks), keys, rng)]
-        ci = f"[{f3(np.nanpercentile(bs, 2.5))}, {f3(np.nanpercentile(bs, 97.5))}]"
-        base_rows = [["null: minus the observed arm mean (mean reversion)", f"<b>{f3(metrics(nul, truth, keys)['auroc'])}</b> {ci}"]]
-        if PROBE.exists():
-            b = json.loads(PROBE.read_text())["best"]
-            base_rows.append(
-                [f"linear probe, zero-counterfactual ({b['site']} token, L{b['layer']}; probe.py)", f"<b>{f3(b['zero_cf_auroc'])}</b>"]
-            )
-            base_rows.append(
-                [f"linear probe with a forward pass on the edited prompt ({b['site']} token, L{b['layer']})", f3(b["cf_auroc"])]
-            )
-        out.append(table(["baseline (no investigator)", "AUROC"], base_rows))
+        probe = json.loads(PROBE.read_text())["best"] if PROBE.exists() else None
+        chart = [(c, a, lo, hi) for c, a, lo, hi, *_ in res]
+        if probe:
+            chart.append(("probe", probe["zero_cf_auroc"], probe["zero_cf_auroc"], probe["zero_cf_auroc"]))
+        out.append(bars(chart, 0.5, 1.0, f"AUROC, {name} (n = {res[0][4]}); axis from 0.5 (chance)",
+                        lines=[(null_auroc, f"bet at the mean {null_auroc:.3f}")]))  # fmt: skip
+        out.append(f"<p class=\"mute\">Bet at the mean: rank by minus the observed mean grade (low grades tend to come back up), "
+                   f"AUROC {f3(null_auroc)} [{f3(np.nanpercentile(bs, 2.5))}, {f3(np.nanpercentile(bs, 97.5))}]. "
+                   "Linear probe: see the footnote; no CI.</p>")  # fmt: skip
+        out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
+                         [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
+                          for c, a, lo, hi, n, m in res]))  # fmt: skip
         out.append(
             '<p class="lede">Paired differences (the same essay resamples for both conditions); '
             "p is one-sided: the first condition is better.</p>"
@@ -181,4 +179,17 @@ def PAGE(rows: list[dict]) -> str:
             [g, str(len(keys)), *(f3(a[c]) for c in order), f"{a.get('olens_inline', np.nan) - a.get('olens_placebo_inline', np.nan):+.3f}"]
         )
     out.append(table(["group", "cases", *(swatch(c) for c in order), "O-lens − placebo"], body))
+    if PROBE.exists():
+        b = json.loads(PROBE.read_text())["best"]
+        out.append(
+            '<h3>Footnote: the linear probe</h3><p class="lede"><b>Kylie thinks this is a bit cursed</b>: it is trained against Qwen\'s '
+            "own grades, on Qwen's own activations, so it is not an investigator the way Haiku is. How it was trained "
+            f"(<code>probe.py</code>): ridge regression from Qwen's activations at the {b['site']} token before its reply (layer "
+            f"{b['layer']}) on each arm prompt (the opener Qwen actually saw, not the plain one) to Qwen's mean grade on the "
+            "plain-opener prompt for the same essay. 5 folds grouped by essay, so every essay is scored by a probe that never "
+            "saw it with any opener; about 1,450 training prompts from ~160 essays per fold. The bar ranks cases by the probe's "
+            "guess minus the grade Qwen actually gave with the opener. Because the target is per essay, it mostly learns how good "
+            f"Qwen thinks the essay is underneath the opener. With a forward pass on the plain prompt instead (probe on both, "
+            f"plain − arm) it gets {f3(b['cf_auroc'])}; the probe's out-of-fold r with Qwen's grade is {b['r_score']:.2f}.</p>"
+        )
     return "\n".join(out)
