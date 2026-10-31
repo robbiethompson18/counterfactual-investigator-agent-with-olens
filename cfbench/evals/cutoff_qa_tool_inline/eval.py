@@ -166,6 +166,7 @@ QPUNCT_WHERE = "at every punctuation mark in the user's question above, includin
 QPUNCT_IMEND_WHERE = QPUNCT_WHERE + " and at the end-of-turn token after it,"
 TEXTS, NTAIL = {}, {"tail10": 10, "qpunct": 1, "qpunct_imend": 2}  # positions at the end mapped one to one by the placebo
 for _kind, _text in (("olens", inline.OLENS_TEXT), ("nla", inline.NLA_TEXT)):
+    _text = _text.replace("{where},", OLD_WHERE)  # cutoff_qa_inline's O-lens text names its positions as {where} since PR #439
     assert OLD_WHERE in _text and OLD_SHOWN in _text, _kind
     _text = _text.replace(OLD_SHOWN, NEW_SHOWN)
     for _cut, _where in (("tail10", NEW_WHERE), ("qpunct", QPUNCT_WHERE), ("qpunct_imend", QPUNCT_IMEND_WHERE)):
@@ -260,6 +261,30 @@ def INLINE(env, condition: str, case: dict, base_runs: list, seed: int) -> tuple
         assert old in prompt
         prompt = prompt.replace(old, "every token of the user's turn above (not the system turn) as")
     return prompt.replace(head, f'```\nSystem: "{system}"\n\nUser: "'), extra
+
+
+_FULL = ("question punct.\n+ last 10 tokens", "olens_inline", "olens_placebo_inline")
+POSITION_CHART = {  # the env viewer's read-position bars (page.html positionChart; docs/cutoff-qa-inline.md, Kylie 2026-10-30)
+    "title": "O-lens read positions",
+    "caption": "Does the gain need the last 10 tokens? The question's punctuation is read before the assistant turn begins.",
+    "subsets": [["", "all"], ["stable_wrong", "stale only"]],
+    "panels": [
+        {
+            "title": "question punctuation vs the full set",
+            "groups": [
+                ["question\npunctuation", "olens_qpunct_inline", "olens_qpunct_placebo_inline"],
+                ["question punct.\n+ <|im_end|>", "olens_qpunct_imend_inline", "olens_qpunct_imend_placebo_inline"],
+                list(_FULL),
+            ],
+        },
+    ],
+}
+
+
+def ITEM_INFO(row: dict) -> dict:
+    """The env viewer's question table: the question, Qwen's modal answer and the class (stale = stable_wrong)."""
+    return {"question": row["messages"][1]["content"].split('User: "', 1)[-1].split('"\n', 1)[0] if row.get("messages") else "",
+            "own": row.get("modal_cf"), "class": row.get("gate_class")}  # fmt: skip
 
 
 def cases(inputs: Path, versions: list[str]):
