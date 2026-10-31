@@ -18,6 +18,7 @@ from scipy.stats import rankdata
 from cfbench.core import canon_condition
 
 BOOT = 1000
+PROBE = Path("data/runs/essay_probe/2026-10-31_essay-grading-acts/probe.json")  # probe.py's output
 PAIRS = (("olens_inline", "olens_placebo_inline"), ("olens_inline", "transcript_inline"), ("olens_placebo_inline", "transcript_inline"))
 
 
@@ -149,6 +150,23 @@ def PAGE(rows: list[dict]) -> str:
         out.append(table(["condition", "cases", "<b>AUROC</b> [95% CI]", "% right (p ≥ 0.5)", "Brier"],
                          [[swatch(c), str(n), f"<b>{f3(a)}</b> [{f3(lo)}, {f3(hi)}]", f"{100 * m['right']:.1f}", f3(m["brier"])]
                           for c, a, lo, hi, n, m in res]))  # fmt: skip
+        # baselines that need no investigator: mean reversion (minus the observed arm mean), and the linear probe if it was run
+        obs = {(r["base_arm"], r["item"]): sum(float(x) * n for x, n in r["answers_base"].items()) / sum(r["answers_base"].values())
+               for r in rows}  # fmt: skip
+        keys = [k for k in truth if keep(k)]
+        nul = {k: -obs[k] for k in keys}
+        bs = [b["auroc"] for b in boot(lambda ks, nul=nul: metrics(nul, truth, ks), keys, rng)]
+        ci = f"[{f3(np.nanpercentile(bs, 2.5))}, {f3(np.nanpercentile(bs, 97.5))}]"
+        base_rows = [["null: minus the observed arm mean (mean reversion)", f"<b>{f3(metrics(nul, truth, keys)['auroc'])}</b> {ci}"]]
+        if PROBE.exists():
+            b = json.loads(PROBE.read_text())["best"]
+            base_rows.append(
+                [f"linear probe, zero-counterfactual ({b['site']} token, L{b['layer']}; probe.py)", f"<b>{f3(b['zero_cf_auroc'])}</b>"]
+            )
+            base_rows.append(
+                [f"linear probe with a forward pass on the edited prompt ({b['site']} token, L{b['layer']})", f3(b["cf_auroc"])]
+            )
+        out.append(table(["baseline (no investigator)", "AUROC"], base_rows))
         out.append(
             '<p class="lede">Paired differences (the same essay resamples for both conditions); '
             "p is one-sided: the first condition is better.</p>"
