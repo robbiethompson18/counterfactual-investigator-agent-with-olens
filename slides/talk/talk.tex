@@ -62,7 +62,7 @@
   {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 % essay part: a read token on an O-lens orange wash; O-lens bullets of one read, each with its FVE
-\newcommand{\ert}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}#1}}}
+\newcommand{\ert}[1]{{\setlength{\fboxsep}{0pt}\colorbox{olens!22}{\strut\bfseries\color{olens}#1}}}  % fills the whole line box (Kylie, 2026-10-31)
 \newenvironment{erbullets}{\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
 \newcommand{\eb}[2]{\item[{\makebox[\labelwidth][l]{{\color{olens}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 % O-lens bullets of one read: a rule in the template's colour, each bullet with its FVE; \hit marks the grader phrase
@@ -70,7 +70,7 @@
 \newcommand{\gb}[2]{\item[{\makebox[\labelwidth][l]{{\color{\gbcol}\rule[-0.2ex]{0.6pt}{1.6ex}}\,{\scriptsize\color{muted}\addfontfeatures{Numbers=Monospaced}#1}}}] #2}
 \newcommand{\hit}[1]{{\bfseries\color{agentictpl}#1}}
 % the read token, on an O-lens orange wash
-\newcommand{\rdt}[1]{{\setlength{\fboxsep}{0.6pt}\colorbox{olens!22}{\bfseries\color{olens}[#1]}}}
+\newcommand{\rdt}[1]{{\setlength{\fboxsep}{0pt}\colorbox{olens!22}{\strut\bfseries\color{olens}[#1]}}}
 % a prompt block only the agentic template has: a square bracket in its colour down the left
 \newcommand{\agonly}[1]{\par\noindent\begin{tikzpicture}[baseline=(t.north)]
   \node[inner sep=0.5pt, anchor=north west, text width=\linewidth-2.5mm, align=left, font=\ttfamily\scriptsize] (t) at (2.5mm, 0) {#1};
