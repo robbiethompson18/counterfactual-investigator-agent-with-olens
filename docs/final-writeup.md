@@ -61,35 +61,83 @@ WorkspaceBench. The additions we make to their dataset:
 - We scale up dataset size to several thousand per category. This allows us to pick up small but
   statistically significant effects of metamodels, to train probes on unseen data, and most
   importantly, to _not filter our dataset in potentially biasing ways_. To be concrete:
-  WorkspaceBench filters their idiosyncratic preference data (they call it what, basic recall? @c
-  help me here) to answers which disagree with their judge, Opus. So if they ask Qwen "What is your
-  favorite flower?" and both Qwen and Opus reply "Lilies" then they drop this datapoint. This makes
-  any transcript-only baseline confounded: we have already filtered to examples where our prompt
-  only judge will be wrong. We drop this filter.
+  WorkspaceBench filters their idiosyncratic preference data (`directed_modulation_obscure`) to
+  answers which disagree with their judge, Opus. So if they ask Qwen "What is your favorite flower?"
+  and both Qwen and Opus reply "Lilies" then they drop this datapoint. This makes any
+  transcript-only baseline confounded: we have already filtered to examples where our prompt only
+  judge will be wrong. We drop this filter.
+
+<!-- @c they call it what, basic recall? help me here
+@robbie it's `directed_modulation_obscure` ("Think about your favorite Middle Eastern spice blend
+while you write. Now write exactly this sentence: ..."). Their gate removed every item Opus or
+Sonnet could answer from the text, so "disagree with Opus" is slightly narrow: it's Opus and
+Sonnet. `basic_readout`'s 32 own-favourite items are not filtered that way (consistency only), and
+that is where the lens wins only by reading the next token (docs/wsb-flash-prompt-only.md). -->
 
 ### Dataset Descriptions:
 
 #### Multiple Choice Questions
 
-@c three sentences on this dataset. Mention how we don't filter on qwen wrong.
+We ask Qwen3.6-27B (thinking off) multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples
+each, and the investigator must name the letter Qwen picks from the prompt alone. The only filter is
+consistency, the same letter on at least 7 of 8 samples: that leaves 2,523 cases from a random 4,000
+MMLU-Pro questions (Qwen right on 82%) and a random 3,000 of SuperGPQA's 6,328 consistent questions
+(Qwen right on 63%). We never filter on Qwen being wrong, so most labels are also the correct
+answer, and we report the Qwen-wrong slice separately ([mcq-unselected.md](mcq-unselected.md),
+[supergpqa-inline.md](supergpqa-inline.md)).
+
+<!-- @c three sentences on this dataset. Mention how we don't filter on qwen wrong.
+@robbie done. -->
 
 #### Knowledge Cutoff Q&A
 
-@c three sentences on this dataset. We don't filter on qwen wrong here either
+We ask Qwen present-tense factual questions whose answer changed around its knowledge cutoff, such
+as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the question. The label
+is Qwen's own modal answer, not the truth, and the only filter is the same 7-of-8 consistency gate.
+We don't filter on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one
+([cutoff-qa-inline.md](cutoff-qa-inline.md), [envs/cutoff_qa.md](envs/cutoff_qa.md)).
+
+<!-- @c three sentences on this dataset. We don't filter on qwen wrong here either
+@robbie done. Correct: no wrong filter, stale and current are both in. -->
 
 #### Idiosyncratic Preferences
 
-@c three sentences on this dataset. again mention how we don't filter on qewn disagreeing, only on
+We ask Qwen free-response questions about its own preferences, such as "Which text editor would you
+choose for editing a config file over SSH? Answer with just the name.", from a bank of 5,187 that
+Sonnet subagents wrote across six domains. This is WorkspaceBench's `basic_readout` implicit family
+scaled from 32 items to 1,500. There is no truth, the label is Qwen's modal answer, and the only
+filter is consistency: we keep every question where at least 7 of 8 samples agree, never filtering
+on whether a text reader can guess it, so transcript-only already gets 80%
+([favorites-qa-inline.md](favorites-qa-inline.md)).
+
+<!-- @c three sentences on this dataset. again mention how we don't filter on qewn disagreeing, only on
 being consistent.
+@robbie done. -->
 
 #### Essay Grading
 
-@c three sentences on this dataset. No fitlers here right besides consistency?
+We take 204 student intro paragraphs from PERSUADE 2.0, 34 at each human score from 1 to 6, and open
+each with one of 225 sentences about who wrote it or what the user wants ("My rival for a
+scholarship wrote this essay."), giving 1,800 cases. Qwen grades each prompt out of 10 about 8
+times, and the investigator predicts whether its mean score goes up when the opener becomes the
+plain "A student in my class wrote this essay."; it does on 54% of cases. There is no filter at all,
+not even consistency: the openers were written before any was run, and every case is kept.
+
+<!-- @c three sentences on this dataset. No fitlers here right besides consistency?
+@robbie no filters, not even consistency: the truth is a mean over ~8 samples, so a noisy essay
+just gets a small shift. The only selection is the balanced 34 intros per human score.
+(cfbench/evals/essay_grading_cf_inline/eval.py, slides/talk/talk.tex) -->
 
 ### Data Filter
 
-TODO new graphs here. We should show some Sankey diagrams maybe? @c make a sankey for one dataset to
-test it out
+TODO new graphs here. We should show some Sankey diagrams maybe?
+
+<img src="img/data-filter-sankey-supergpqa.png" alt="SuperGPQA: 10,000 questions to 3,000 eval cases, consistency the only filter" width="500">
+
+<!-- @c make a sankey for one dataset to test it out
+@robbie done for SuperGPQA: `uv run python -m graphs.data_filter_sankey` (code PR #502, waiting
+on your review; the PNG is in docs/img locally). Counts are constants from
+docs/supergpqa-inline.md. If you like it I'll do the other datasets. -->
 
 ## Results and Ablations
 
@@ -369,4 +417,51 @@ it is null: O-lens 27.2% [22.0, 32.6], placebo 27.1% [21.9, 32.6], transcript-on
 
 ## Appendix: List of Bugs We Caught:
 
-@c add 3-20 here and I will trim.
+Bugs in our own pipeline:
+
+1. **The O-lens wrote Chinese.** The lens we were given stripped each bullet's leading space before
+   the AR scored it during RL, so about half its bullets opened with a Chinese word. Agam retrained
+   it with the space kept, and we redid every read made with the old lens
+   ([olens-space-migration.md](olens-space-migration.md)).
+2. **Reads of the wrong render.** Batch reads of thinking-off conversations rendered the thinking-on
+   generation header, a prompt Qwen never saw (#477).
+3. **Reads attached to the wrong tokens.** The reader found each message field by plain text search,
+   so a short field like the answer "e" could match chat-template text and mislabel every token
+   after it (#487).
+4. **Labels nobody could match.** cutoff_qa labels were normalized twice, so answers with
+   apostrophes ("N'Djamena") could never be matched by any investigator (9 of 999 items).
+5. **A flipped sign.** cutoff_qa reported "positive" as Qwen correct instead of Qwen wrong, which
+   made downstream tools skip every episode (#486).
+6. **Stale predictions reused.** cfbench's `--reuse` matched rows by case, not by the prompt sent,
+   so a changed reads file could pass off another eval's predictions as new ones (#483).
+7. **The grader in the predictor's system prompt.** A merge put the grader function where the new
+   system-prompt argument went; caught by the type checker (24c98af5).
+8. **Two Qwens pooled.** OpenRouter's fp8 Qwen and our bf16 vLLM Qwen give different rates (14/20 vs
+   36/40 on one env), and we had pooled them as one target (1237cedb).
+9. **Truncated answers scored as complete.** Replies cut off by a token limit were labelled as
+   finished episodes until the runner raised on them (#473).
+10. **The gate and the env sampled differently.** cutoff_qa's env ran at different sampling settings
+    from the stability gate that made its labels (55f53874).
+11. **A placebo that was the answer.** The first essay placebo was another opener's reads on the
+    same essay, which was sometimes the counterfactual prompt itself.
+12. **Reads of the counterfactual.** One cfbench condition read the lens on the counterfactual
+    prompt, which is outside the zero-counterfactual setting; we dropped it.
+13. **Greedy reads were shared.** Before 2026-10-27 lens reads were greedy, so every rollout of one
+    prompt got the identical read, not independent draws.
+
+Bugs and biases in the setups we inherited:
+
+14. **CHIVE's thresholds discard clean kills.** The absolute 50pp rule marks 8,623 experiments where
+    a 10–50% behavior drops to 0% as inconclusive ([chive-critique.md](chive-critique.md)).
+15. **A filter that leaked the label.** Our first MCQ eval kept only questions where DeepSeek V4
+    Flash disagreed with Qwen, which imported DeepSeek's letter bias: the hinted letter alone
+    predicted "Qwen knew" at AUROC 0.70, vs 0.53 unfiltered
+    ([mcq-unselected.md](mcq-unselected.md)).
+16. **WorkspaceBench's text baseline was truncated.** Its prompt-only floor is one 256-token
+    generation, and 40–73% of them stop mid-sentence
+    ([wsb-flash-prompt-only.md](wsb-flash-prompt-only.md)).
+17. **WorkspaceBench compares pass@1 to pass@hundreds.** The lens passes if any readout over its
+    read grid passes; the text reader gets one answer.
+
+<!-- @c add 3-20 here and I will trim.
+@robbie done, 17. Sources: the fix commits on main and the docs linked. -->
