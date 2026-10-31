@@ -26,7 +26,8 @@ case ${1:?command} in
       if [ "$used" -gt 2000 ]; then echo "GPU still holds ${used} MiB after killing vLLM:"; nvidia-smi; exit 1; fi
       mkdir -p /root/repo /workspace/reads'
     COPYFILE_DISABLE=1 tar czf - --exclude .git --exclude .venv --exclude data --exclude vendor --exclude checkpoints \
-      --exclude node_modules --exclude __pycache__ --exclude .envrc.local --exclude transcript-viewer olens scripts runpod src |
+      --exclude node_modules --exclude __pycache__ --exclude .envrc.local --exclude transcript-viewer olens scripts runpod src \
+      environments/__init__.py environments/_lib/__init__.py environments/_lib/mcq.py |  # reads.py imports environments._lib.mcq
       ssh_pod 'tar xzf - -C /root/repo 2>/dev/null'
     ssh_pod 'bash -s' <<'EOF'
 set -e
