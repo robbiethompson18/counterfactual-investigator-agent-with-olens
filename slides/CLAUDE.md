@@ -31,9 +31,9 @@ nothing from either; statistics come from `cfbench.scoring`.
   does it). Change a colour in `page.html` / `graphs/style.py` and the theme's `\definecolor`s
   together.
 - No boxes or cards anywhere: figures, tables and panels sit straight on the page. A part is a
-  `\section{Title}` (no section page) whose first frame opens with `\parthead`; every other frame
-  shows the part's title on the right of its frame title. Single striking examples go in the last
-  part, Anecdata.
+  `\section{Title}` (no section page) whose first frame opens with `\parthead` (a part may skip
+  that frame, as Anecdata does); every other frame shows the part's title on the right of its frame
+  title. Single striking examples go in the last part, Anecdata.
 - Figures: a function in `graphs/talk.py` decorated with `graphs.style`'s `@slide`, made with
   `slide_figure(w_mm, h_mm)` and written with `slide_save`. `@slide` applies the deck's sizes
   (`SLIDE_RC`: 8pt × the deck's 2/3, transparent PDF) around that one figure only, never

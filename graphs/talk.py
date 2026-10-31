@@ -26,11 +26,10 @@ from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
-# the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30). The
-# O-lens (nl) placebo isn't on the tail pages: it is the placebo of the option-newlines-only eval the O-lens (nl) bar
-# comes from (NAME without "_tail", same cases).
+# the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
+# (nl) is left out (Kylie, 2026-10-31).
 GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-          ("O-lens (nl)", ["olens_inline_nl", "olens_nl_placebo"]), ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
+          ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
 PANELS = {"after": "hint after the options", "before": "hint first"}
 
 
@@ -62,8 +61,8 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
     counts above the panels. `base`: where the bars and the axis start (Kylie 2026-10-30: 0.5 for AUROC, whose chance
     line is then the axis itself, and 0.4 for % correct)."""
     data = {k: bars_of(name) for k, name in evals.items()}
-    for k, name in evals.items():
-        data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
+    for k in evals:
+        data[k] = ({c: b for c, b in data[k][0].items() if any(c in cs for _, cs in GROUPS)}, *data[k][1:])
     for ax, (k, (bars, chance, n)) in zip(axes, data.items(), strict=True):
         xs, ticks = positions(bars, GROUPS)
         for c, x in xs.items():
@@ -105,7 +104,7 @@ def grid() -> None:
     """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0}, GROUPS)[1][-1] + 1 for n in knew.values()]
+    widths = [positions(auroc_bars(n)[0], GROUPS)[1][-1] + 1 for n in knew.values()]
     fig, axes = slide_figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
     row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
