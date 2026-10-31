@@ -20,10 +20,9 @@ Hinted MCQ predicts the no-hint modal answer from a hinted prompt; do not mix hi
 variants or silently reuse a wrong-only/disagreement-selected cohort as the standard population.
 
 Essay grading uses only biased-prompt activations to predict the same essay's plain-opener mean
-grade. Subtract the observed biased-opener mean to obtain the predicted change. Truth is plain mean
-
-> biased mean; ties belong to not-up. The older second recipe used a counterfactual forward pass; it
-> is not a second standard essay probe.
+grade. Subtract the observed biased-opener mean to obtain the predicted change. Truth is
+`plain mean > biased mean`; ties belong to not-up. The older second recipe used a counterfactual
+forward pass; it is not a second standard essay probe.
 
 ## Known data inventory before rebuilding
 
