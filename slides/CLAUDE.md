@@ -30,7 +30,7 @@ rather than starting another deck.
   together.
 - No boxes or cards anywhere: figures, tables and panels sit straight on the page. A part is a
   `\section{Title}` (no section page) whose first frame opens with `\parthead`; every other frame
-  shows "PART n Title" on the right of its frame title. Single striking examples go in the last
+  shows the part's title on the right of its frame title. Single striking examples go in the last
   part, Anecdata.
 - Figures: make them with `slides/figure.py` (`figure(w_mm, h_mm)`, `save`), which applies
   `graphs/style.py`'s look with `slides.mplstyle`'s sizes (8pt) and takes the colours from
