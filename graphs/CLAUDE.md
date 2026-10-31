@@ -54,6 +54,8 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 - `headline_inline`: the final write-up's Results headline, % of cases right on MCQ, knowledge cutoff and preferences: pooled
   metamodels, each against its placebo, against the MCQ probe (and as error rate), and seven bars per task, plus essay grading's own
   chart with its probe; prints the paired differences the write-up quotes
+- `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as `headline_inline` and per set,
+  for the final write-up's "Total Tokens Per"
 - `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa and essay questions become
   eval cases (one PNG each; dark green evaluated, light green held out, gray unusable), counts
   sourced in the module; for the final write-up's Data Filter section
