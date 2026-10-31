@@ -17,7 +17,7 @@ def label(cond: str) -> str:
 
 
 def bars(
-    rows: list[tuple[str, float, float, float]],
+    rows: list[tuple],  # (condition, value, ci_lo, ci_hi[, label])
     lo: float = 0.5,
     hi: float = 1.0,
     title: str = "",
@@ -38,7 +38,7 @@ def bars(
             f'<line x1="{L}" x2="{W - 10}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="currentColor" stroke-dasharray="5 4" opacity="0.7"/>'
         )
         s.append(f'<text x="{W - 12}" y="{y(v) - 5:.1f}" class="ax" text-anchor="end">{escape(text)}</text>')
-    for i, (cond, v, a, b) in enumerate(rows):
+    for i, (cond, v, a, b, *lab) in enumerate(rows):
         cx = L + 40 + 110 * i + bw / 2
         box = f'x="{cx - bw / 2:.1f}" y="{y(v):.1f}" width="{bw}" height="{y(lo) - y(v):.1f}"'
         s.append(f'<rect data-cond="{escape(cond)}" {box} fill="var(--c)" opacity="0.85"/>')
@@ -46,7 +46,7 @@ def bars(
             s.append(f'<line x1="{cx}" x2="{cx}" y1="{y(a):.1f}" y2="{y(b):.1f}" stroke="currentColor"/>')
             s += [f'<line x1="{cx - 6}" x2="{cx + 6}" y1="{y(t):.1f}" y2="{y(t):.1f}" stroke="currentColor"/>' for t in (a, b)]
         s.append(f'<text x="{cx}" y="{y(b) - 6:.1f}" class="ax" text-anchor="middle">{fmt.format(v)}</text>')
-        s.append(f'<text x="{cx}" y="{H - B + 18}" class="lab" text-anchor="middle">{escape(label(cond))}</text>')
+        s.append(f'<text x="{cx}" y="{H - B + 18}" class="lab" text-anchor="middle">{escape(lab[0] if lab else label(cond))}</text>')
     return f'<div class="scroll"><svg class="evchart" viewBox="0 0 {W} {H}" width="{W}" height="{H}">{"".join(s)}</svg></div>'
 
 
