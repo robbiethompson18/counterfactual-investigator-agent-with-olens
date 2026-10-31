@@ -48,23 +48,60 @@ ablated is which layers the lens reads. Every chart is in the appendix,
 
 TODO link to appendix and read the Claudespeak paragraph above.
 
+TODO @Kylie plz add your appendices with your data here
+
 ## Part 1: Simple Investigations That Work
 
 All of our environments that work, with the exception of essay grading, are ideas stolen from
 WorkspaceBench. The additions we make to their dataset:
 
 - We do not grade with pass@thousands, running a regex on metamodel output at many layers and
-  tokens. Instead, we pass metamodel output to an investigator model and ask it to pick 
+  tokens. Instead, we pass metamodel output to an investigator model and ask it to pick the correct
+  answer. This penalizes noise and hallucinations appropriately.
+- We scale up dataset size to several thousand per category. This allows us to pick up small but
+  statistically significant effects of metamodels, to train probes on unseen data, and most
+  importantly, to _not filter our dataset in potentially biasing ways_. To be concrete:
+  WorkspaceBench filters their idiosyncratic preference data (they call it what, basic recall? @c
+  help me here) to answers which disagree with their judge, Opus. So if they ask Qwen "What is your
+  favorite flower?" and both Qwen and Opus reply "Lilies" then they drop this datapoint. This makes
+  any transcript-only baseline confounded: we have already filtered to examples where our prompt
+  only judge will be wrong. We drop this filter.
 
-### Multiple Choice Questions
+### Dataset Descriptions:
 
-### Knowledge Cutoff Q&A
+#### Multiple Choice Questions
 
-### Idiosyncratic Preferences
+@c three sentences on this dataset. Mention how we don't filter on qwen wrong.
 
-### Essay Grading
+#### Knowledge Cutoff Q&A
 
-## Part 2: essay grading counterfactual
+@c three sentences on this dataset. We don't filter on qwen wrong here either
+
+#### Idiosyncratic Preferences
+
+@c three sentences on this dataset. again mention how we don't filter on qewn disagreeing, only on
+being consistent.
+
+#### Essay Grading
+
+@c three sentences on this dataset. No fitlers here right besides consistency?
+
+### Data Filter
+
+TODO new graphs here. We should show some Sankey diagrams maybe? @c make a sankey for one dataset to
+test it out
+
+## Results and Ablations
+
+### Headline
+
+### Headline by dataset
+
+### By metamodel
+
+### By token position
+
+### Why do Placebos Help?
 
 ## How we kept LLM agents from producing BS
 
@@ -329,3 +366,7 @@ easy for the 🔮-lens: Qwen consistently picks one wrong answer, a hint hides i
 investigator says what Qwen picks without the hint. It looked positive on 20 items. On all 241 items
 it is null: O-lens 27.2% [22.0, 32.6], placebo 27.1% [21.9, 32.6], transcript-only 24.7% [19.8,
 29.9].
+
+## Appendix: List of Bugs We Caught:
+
+@c add 3-20 here and I will trim.
