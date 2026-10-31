@@ -117,24 +117,14 @@ install rsync in the pod boot (`olens_reads.sh setup`), or fetch with `ssh ... t
 
 A Codex read of `olens/src/olens/`, `scripts/olens_read_requests.py`,
 `scripts/jpp_read_requests.py`, `src/.../render.py` and `runpod/olens_reads.sh` (no GPU run). It
-found no layer-index, norm or position-alignment bug in the J++ or O-lens paths. It did find these,
-none fixed yet:
+found no layer-index, norm or position-alignment bug in the J++ or O-lens paths. It also found
+these (its seed, thinking-render, resume and stale-LoRA bugs are fixed and removed):
 
 - **Field matching can run into a later message** (`render.py` ~78-88): `text.find(s, cur)` searches
   the whole rest of the transcript, so a short field (an assistant's `"A"`) can match inside a later
   message and shift every field after it; an answer `"think"` matches inside `<think>`. Single-turn
   envs are safe; multi-turn ones aren't. Fix: get field spans from the renderer, or match within
   message boundaries.
-- **Thinking-off generation prompts render with thinking on** (`render.py` ~72): `render_request()`
-  doesn't pass `thinking` to `chat_text()`, so an open generation header ends `<think>\n` instead of
-  `<think>\n\n</think>\n\n`. Reads at that header see a prompt the model never saw. Transcripts that
-  include the reply are unaffected.
-- **Resume trusts partial transcripts** (`olens_read_requests.py` ~163, `jpp_read_requests.py` ~51):
-  any id with a row in the output counts as done, so a crash mid-transcript leaves it partial
-  forever. Fix: a separate done marker, or check the expected position count.
-- **Stale converted LoRAs on a reused volume** (`olens_reads.sh` ~42-50): converted adapters are
-  rebuilt only when missing, so an updated checkpoint keeps serving the old conversion while
-  provenance reports the new revision.
 - Smaller: template tokens carry the previous message's id/role (cfbench places them itself since
   harness v8); `char_offset` ignores a field's stripped leading whitespace (reads land a few chars
   early); per-token decoding mangles characters split across tokens in saved transcript text; J++

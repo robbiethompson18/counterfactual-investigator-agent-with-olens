@@ -16,7 +16,8 @@ REQUESTS.jsonl: one transcript per line, {id, messages (OpenAI chat format; assi
 and tool_calls), tools ("evalcue.harness.BASH_TOOL" or a list of tool schemas), priority?, env?, arm?}. Rows are read in
 priority order, round-robin over (env, arm) within a priority. A row's optional `layers` overrides --layers for it
 (whiteners are loaded for --layers only, so keep it a subset). Optional `generation_prompt: true` renders the open
-assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
+assistant header after the last message (as at generation time; thinking off, i.e. the empty think block, unless the row
+says `thinking: true`), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `"last"` only the final one, `positions: [token indices]` exactly those, and `char_positions:
@@ -34,7 +35,7 @@ read before 2026-10-27 used), one continuation of up to 4 bullets per (position,
 is its own draw, so an arm's 8 samples of one prompt give 8 lens draws of each prompt position; at 0 they share one read.
 Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/build.py) and every <|im_end|>,
 prompt included. OUT.jsonl gets one line per (transcript, position, layer), appended per transcript; transcripts
-already in OUT are skipped, so a rerun resumes:
+already in OUT are skipped, so a rerun resumes (re-reading the last one, which a crash may have left partial):
 
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
@@ -48,6 +49,7 @@ reads.provenance.json next to it, and each transcript's tokens and chat sections
 import argparse
 import hashlib
 import json
+import os
 import re
 import time
 import zlib
@@ -172,7 +174,7 @@ def main():
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
     out = Path(args.out)
-    done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
+    done = resume(out)
     done |= set(Path(args.skip_ids).read_text().split()) if args.skip_ids else set()
     print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
@@ -306,6 +308,27 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         print(f"[{n_done}, {len(todo) - len(jobs)} queued] batch of {len(jobs)} transcripts, {n_tok} tokens, {len(items)} reads "
               f"({n_all - len(items)} cached) | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
               flush=True)  # fmt: skip
+
+
+def resume(out: Path) -> set[str]:
+    """Transcript ids already in OUT, for a rerun to skip. A transcript's lines are appended in one block after the one before,
+    so only the last transcript on disk can be partial (a crash mid-write, maybe a torn last line): truncate OUT to before it,
+    and it is read again. Costs one transcript per restart."""
+    if not out.exists():
+        return set()
+    ids, last, last_start, pos = set(), None, 0, 0
+    with out.open("rb") as f:
+        for line in f:
+            try:
+                i = json.loads(line)["id"]
+            except json.JSONDecodeError:
+                break
+            if i != last:
+                last, last_start = i, pos
+            ids.add(i)
+            pos += len(line)
+    os.truncate(out, last_start)
+    return ids - {last}
 
 
 def item_seed(seed, key, layer):
