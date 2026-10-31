@@ -105,6 +105,10 @@ Gate runs, Qwen3.6-27B, 8 samples plus greedy:
 
 ## Known weaknesses
 
+- **Banks v2 and v3 can't be rebuilt from the repo**: `scripts/cutoff_facts/merge.py` builds only v1,
+  and the scratch scripts that cleaned, deduplicated and gate-attached v2 and v3 weren't kept; the
+  banks themselves are on HF.
+
 - **Truth drifts.** `truth` is the writer's value at authoring; present-tense answers keep changing.
   Re-check before quoting accuracy against truth. The label (`qwen_modal`) does not drift.
 - **Stale analogs are guesses.** `pre_cutoff_analog` is the writer's prediction; the gate's

@@ -25,7 +25,7 @@ and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "as
 leading whitespace counted, as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row
 with `text` instead of `messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render);
 `option_newlines: true` (or --option-newlines) adds, to whichever positions the row reads, the newline token after each MCQ
-option ("\\nA. ..." or "\\n(A) ...", the last option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
+option ("\\nA. ..." or "\\n(A) ...", the last option's "\\n\\n" included: the legacy option-newline probe's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.

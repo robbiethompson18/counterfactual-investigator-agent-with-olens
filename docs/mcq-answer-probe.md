@@ -1,8 +1,10 @@
 # MCQ answer probe: Qwen's own answer from the option tokens
 
-**Status (2026-10-30):** ACTIVE. MMLU-Pro in-sample, TruthfulQA out-of-sample done; O-lens reads at
-the same tokens on both. 2026-10-30: per-dimension scaling ablated (no effect), and the frozen probe
-scored on mcq_unselected and supergpqa_inline (~90%).
+**Status (2026-10-31):** SUPERSEDED for standard comparisons by the
+[standard probe protocol](standard-probe-protocol.md) and [`probes/`](../probes/CLAUDE.md).
+Historical option-newline results below remain valid descriptions of that different architecture.
+The old fit/eval entry points have been retired; use the pinned source links below to reproduce
+them.
 
 Kylie's question: on multiple-choice questions Qwen3.6-27B answers consistently, does a linear probe
 on the activations at each option's tokens say which option Qwen will pick, and does it track Qwen's
@@ -191,14 +193,15 @@ Run with Kylie's go-ahead after the design above was frozen; nothing was tuned o
 - **Probe.** The chosen listwise probe and the binary is_answer probe, each fit once on all 718
   MMLU-Pro questions (`oos`), applied unchanged.
 
-| prompt / site                        | top-1 ans: all / right / wrong | top-1 gold (wrong q) | NLL                   | KL    | ECE   | binary AUROC |
-| ------------------------------------ | ------------------------------ | -------------------- | --------------------- | ----- | ----- | ------------ | ----- | ----- |
-| uniform                              | 0.247                          | 0.240                | 1.547                 | 1.395 | 0.022 |              |
-| edited, `nl` (main)                  | 0.885 / 0.920 / 0.660          | 0.140                | 0.306                 | 0.225 | 0.030 | 0.953        |
-| original, `nl` (last option at `<    | im_end                         | >`)                  | 0.893 / 0.930 / 0.660 | 0.110 | 0.307 | 0.221        | 0.040 | 0.955 |
-| last option at its text's last token | 0.908 / 0.938 / 0.720          | 0.100                | 0.254                 | 0.182 | 0.028 | 0.953        |
-| binary probe softmaxed, edited `nl`  | 0.858 / 0.894 / 0.630          | 0.130                | 0.420                 | 0.359 | 0.057 |              |
-| Qwen's own letter pmf                | 0.997                          | 0.000                | 0.060                 | 0     | 0.046 |              |
+| prompt / site | top-1 ans: all / right / wrong | top-1 gold (wrong q) | NLL | KL | ECE | binary
+AUROC | | ------------------------------------ | ------------------------------ |
+-------------------- | --------------------- | ----- | ----- | ------------ | ----- | ----- | |
+uniform | 0.247 | 0.240 | 1.547 | 1.395 | 0.022 | | | edited, `nl` (main) | 0.885 / 0.920 / 0.660 |
+0.140 | 0.306 | 0.225 | 0.030 | 0.953 | | original, `nl` (last option at
+`<    | im_end                         | >`) | 0.893 / 0.930 / 0.660 | 0.110 | 0.307 | 0.221 | 0.040
+| 0.955 | | last option at its text's last token | 0.908 / 0.938 / 0.720 | 0.100 | 0.254 | 0.182 |
+0.028 | 0.953 | | binary probe softmaxed, edited `nl` | 0.858 / 0.894 / 0.630 | 0.130 | 0.420 |
+0.359 | 0.057 | | | Qwen's own letter pmf | 0.997 | 0.000 | 0.060 | 0 | 0.046 | |
 
 - Overall the frozen probe matches its MMLU-Pro held-out level (top-1 0.885 vs 0.897, NLL 0.306 vs
   0.303) on a different dataset, prompt format and option count; the drop is on wrong questions
@@ -211,8 +214,9 @@ Run with Kylie's go-ahead after the design above was frozen; nothing was tuned o
 
 ## Where things live
 
-- Code: [`environments/hint_mcq/probe.py`](../environments/hint_mcq/probe.py) (`collect`, `fit`,
-  `pmf`, `whiten`, `dump`, `lens-requests`, `lens-stats`, `tqa-prep`, `oos`);
+- Code:
+  [historical probe.py](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/blob/638c3c56552dbc4368639245af5480a36702bf08/environments/hint_mcq/probe.py)
+  (`collect`, `fit`, `pmf`, `whiten`, `dump`, `lens-requests`, `lens-stats`, `tqa-prep`, `oos`);
   [`scripts/hs_at_positions.py`](../scripts/hs_at_positions.py) (HF forward pass over pre-tokenized
   prompts, any GPU venv); [`scripts/olens_capture_check.py`](../scripts/olens_capture_check.py) (the
   reader's capture vs saved activations); the reader's `char_positions`, explicit `positions` and

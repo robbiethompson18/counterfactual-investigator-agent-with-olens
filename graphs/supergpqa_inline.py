@@ -12,10 +12,12 @@ Reads the runs' predictions.jsonl, pooled (docs/supergpqa-inline.md).
 import argparse
 from pathlib import Path
 
+from cfbench.scoring import standard_mcq_comparison
 from graphs.cutoff_qa_inline import PAIRS, bar_chart, diffs
+from graphs.mcq_unselected import BARS_MCQ
 
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_supergpqa-haiku-3k-{s}") for s in ("ts", "olens", "jlens", "nla")]
-GROUPS = {"all cases": None, "Qwen wrong (its letter is not the gold one)": "wrong", "Qwen right": "right"}
+GROUPS = {"all cases": None, "Qwen wrong (its letter is not the gold one)": False, "Qwen right": True}
 # cutoff_qa_inline's rows, the last one as NLA − J++
 SUPERGPQA_PAIRS = [
     *PAIRS[:-1],
@@ -23,9 +25,9 @@ SUPERGPQA_PAIRS = [
 ]
 
 
-def qwen_right(row: dict) -> str:
-    """right | wrong: Qwen's modal letter vs gold."""
-    return "right" if row["modal_cf"] == row["gold"] else "wrong"
+def qwen_right(row: dict) -> bool:
+    """Qwen's modal letter vs gold."""
+    return row["modal_cf"] == row["gold"]
 
 
 if __name__ == "__main__":
@@ -34,6 +36,30 @@ if __name__ == "__main__":
     p.add_argument("--out", type=Path, default=Path("docs/img/supergpqa-inline.png"))
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/supergpqa-inline-diff.png"))
     a = p.parse_args()
-    title = "Predicting Qwen3.6-27B's letter on a SuperGPQA question from the prompt"
-    bar_chart(a.runs, a.out, qwen_right, GROUPS, title, ylabel="% of cases where Haiku names Qwen's letter")
-    diffs(a.runs, a.out_diff, xlim=(-12, 30), pairs=SUPERGPQA_PAIRS, noun="cases")
+    data, clusters = standard_mcq_comparison(a.runs, "supergpqa")
+    title = "SuperGPQA: historical lens runs and standardized probes on the same questions"
+    bar_chart(
+        a.runs,
+        a.out,
+        qwen_right,
+        GROUPS,
+        title,
+        ylabel="% naming Qwen's letter",
+        bars=BARS_MCQ,
+        panel_w=4.7,
+        data=data,
+        clusters=clusters,
+        note="Probe: nested two-fold, up to 1,000 training questions; 95% question-group CIs. Historical lens draws: 3.",
+    )
+    diffs(
+        a.runs,
+        a.out_diff,
+        xlim=(-12, 55),
+        pairs=[
+            *SUPERGPQA_PAIRS,
+            ("Standardized probe", [("probe_response_start", "probe_user_end"), ("probe_response_start", "transcript_inline")]),
+        ],
+        noun="cases",
+        data=data,
+        clusters=clusters,
+    )
