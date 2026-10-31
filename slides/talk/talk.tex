@@ -247,15 +247,14 @@
 \end{frame}
 
 \begin{frame}{Results: “does Qwen's grade go up with the base opener?”}
+  \slidefig{fig/essay.pdf}
+  \smallskip
   \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.6\textwidth}
-      \slidefig{fig/essay.pdf}
-    \end{column}
-    \begin{column}{0.38\textwidth}
+    \begin{column}{0.5\textwidth}
       {\bfseries\small Paired differences}{\small\color{muted}\ \ AUROC, one-sided p (essay bootstrap)}\par\smallskip
       {\tablefont\input{fig/essay_pairs.tex}}
-      \medskip
-
+    \end{column}
+    \begin{column}{0.5\textwidth}
       \slidefig{fig/essay_diffs.pdf}
     \end{column}
   \end{columns}
