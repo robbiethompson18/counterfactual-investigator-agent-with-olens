@@ -17,7 +17,6 @@ import collections
 import functools
 import glob
 import json
-import os
 import statistics
 import sys
 from pathlib import Path
@@ -129,24 +128,12 @@ the squared error against the observed mean, so give your best point estimate. R
 `submit_prediction` once."""
 
 
-def google_direct(key_var: str) -> None:
-    """Send the predictor's calls to Google's OpenAI-compatible endpoint with the key in $key_var instead of OpenRouter (for
-    when OpenRouter's BYOK Google key is out of credit or over its daily cap, CLAUDE.local.md). OpenRouter's own body fields
-    (usage accounting, its reasoning switch) become Google's `reasoning_effort`."""
-    from openai import AsyncOpenAI
-
-    openrouter._CLIENT = AsyncOpenAI(
-        base_url="https://generativelanguage.googleapis.com/v1beta/openai/", api_key=os.environ[key_var], timeout=600, max_retries=2
-    )
-    openrouter.extra_body = lambda thinking=True, effort=None, provider=None: {"reasoning_effort": effort} if thinking and effort else {}  # ty: ignore[invalid-assignment]
-
-
 async def main(args):
     if args.provider:  # pin one OpenRouter provider, no fallbacks (google-vertex = OpenRouter's credit; google-ai-studio = the BYOK key)
         openrouter.chat = functools.partial(openrouter.chat, provider={"order": [args.provider], "allow_fallbacks": False})
-    if args.google_key:
-        google_direct(args.google_key)
-        args.predictor = args.predictor.removeprefix("google/")
+    if args.google_key:  # openrouter.chat's gemini-direct/ route with the key in $google_key
+        openrouter.chat = functools.partial(openrouter.chat, key_env=args.google_key)
+        args.predictor = openrouter.DIRECT + args.predictor.removeprefix("google/")
     env = env_runs.load(args.spec)
     pairs = [tuple(p.split(":")) for p in args.pairs.split(",")]
     reads = olens.Reads(args.olens_reads.split(",")) if args.olens_reads else None

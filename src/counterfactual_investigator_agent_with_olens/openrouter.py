@@ -11,8 +11,9 @@ defaults differ; `effort="off"` disables thinking, which some models refuse with
 `client` and `extra_body` are the pieces, for a caller that runs its own loop (evalcue/harness.py, which also serves Qwen).
 
 `gemini-direct/<model>` (e.g. `gemini-direct/gemini-3.8-flash`) skips OpenRouter: the same call goes to Google's
-OpenAI-compatible API with $GEMINI_API_KEY, at `reasoning_effort` = effort, so a run can use a key whose daily quota isn't
-the one OpenRouter's BYOK route is spending (set GEMINI_API_KEY to the key you want for that run). No `usage.cost`.
+OpenAI-compatible API with the key in $`key_env` (default GEMINI_API_KEY; OLD_GEMINI_API_KEY, THIRD_GEMINI_KEY, ...), at
+`reasoning_effort` = effort, so a run can use a key whose daily quota isn't the one OpenRouter's BYOK route is spending. The
+only direct-to-Google client: don't hand-roll generateContent. No `usage.cost`.
 `vertex/<model>` does the same on Vertex AI's OpenAI-compatible endpoint in $VERTEX_PROJECT, authenticated as the active
 gcloud account (token re-read every 2 min); for when AI Studio 503s "high demand" but Vertex has capacity.
 """
@@ -34,7 +35,7 @@ DIRECT = "gemini-direct/"
 VERTEX = "vertex/"
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
-_GOOGLE: AsyncOpenAI | None = None
+_GOOGLE: dict[str, AsyncOpenAI] = {}  # key_env -> client
 _VERTEX: tuple[float, AsyncOpenAI] | None = None  # (built at, client): gcloud returns its cached hour-long token until it nears expiry
 
 
@@ -72,6 +73,7 @@ async def chat(
     *,
     effort: str | None = EFFORT,
     provider: dict | None = None,
+    key_env: str = "GEMINI_API_KEY",
     timeout: float = 600,
     attempts: int = 6,
     **params: Any,
@@ -79,8 +81,8 @@ async def chat(
     """One chat completion with thinking on at `effort`. Connection errors, 5xx, 429, empty-choices and non-JSON responses are retried
     `attempts` times with 10 s, 20 s, 40 s, ... between tries (~5 min in all for 6, which outlasts OpenRouter's per-minute
     429s); a timeout is not retried, it already waited `timeout` seconds. Other request fields go in `params`; an
-    `extra_body` there is merged over the OpenRouter fields."""
-    global _CLIENT, _GOOGLE, _VERTEX
+    `extra_body` there is merged over the OpenRouter fields. `key_env` names the env var holding the key for `gemini-direct/`."""
+    global _CLIENT, _VERTEX
     if model.startswith(VERTEX):
         if _VERTEX is None or time.time() - _VERTEX[0] > 120:  # so re-read often, or the cached token runs out under us
             cmd = ["gcloud", "auth", "print-access-token"]
@@ -91,9 +93,9 @@ async def chat(
         extra = params.pop("extra_body", None) or {}
         params["reasoning_effort"] = "none" if effort == "off" else effort
     elif model.startswith(DIRECT):
-        if _GOOGLE is None:
-            _GOOGLE = AsyncOpenAI(base_url=GOOGLE_URL, api_key=os.environ["GEMINI_API_KEY"], timeout=timeout, max_retries=2)
-        api, model = _GOOGLE, model.removeprefix(DIRECT)
+        if key_env not in _GOOGLE:
+            _GOOGLE[key_env] = AsyncOpenAI(base_url=GOOGLE_URL, api_key=os.environ[key_env], timeout=timeout, max_retries=2)
+        api, model = _GOOGLE[key_env], model.removeprefix(DIRECT)
         extra = params.pop("extra_body", None) or {}
         params["reasoning_effort"] = "none" if effort == "off" else effort
     else:
