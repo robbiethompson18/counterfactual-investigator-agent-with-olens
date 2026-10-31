@@ -54,7 +54,7 @@ exclude = [
 allowed-unresolved-imports = [
   "torch", "torch.**", "vllm", "vllm.**", "vllm_lens", "vllm_lens.**", "transformers", "transformers.**",
   "safetensors", "safetensors.**", "tokenizers", "sklearn", "sklearn.**", "statsmodels.**", "duckdb",
-  "olens_glm53_usage", "realvariants", "email_env",
+  "olens_glm53_usage", "realvariants", "email_env", "peft",
 ]
 
 [dependency-groups]

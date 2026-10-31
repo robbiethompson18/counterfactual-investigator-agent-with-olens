@@ -1,10 +1,12 @@
-"""Exploratory, post hoc (Kylie, 2026-10-31): do gendered pronouns in the O-lens reads say whether deleting a sentence
-makes Qwen3.6-27B much less sure of the blogger's sex? CPU only, existing reads. Sex only (age words are harder).
+"""Exploratory, post hoc (Kylie, 2026-10-31): do answer words in the O-lens reads say whether deleting a sentence makes
+Qwen3.6-27B much less sure of its answer about the blogger? CPU only, existing reads. Sex first; age added after (its
+words are a weaker proxy for the answer).
 
-author_blog_drop_inline's sex cases (batches 1+2; each post has as many positives as negatives). Per post, the trajectory
-S over every read position of the blog post in order (bullets at layers 32/40/48, FVE clipped at 0):
-  S = FVE-weighted count of pronouns matching Qwen's answer (he/him/his/himself or she/her/hers/herself), and
-  S± = matching - opposite.
+author_blog_drop_inline's cases (batches 1+2; each post has as many positives as negatives), per attribute. Per post, the
+trajectory S over every read position of the blog post in order (bullets at layers 32/40/48, FVE clipped at 0):
+  S = FVE-weighted count of the words of Qwen's answer: sex, its pronouns (he/him/his/himself or she/her/hers/herself);
+      age, a short list per bucket (LEX), and
+  S± = matching - the mean of the other answers' counts.
 Sentences are blog.py's split of the post; a sentence's end is its final punctuation token (else its last read position).
 Features of the case sentence k, for S and S±:
   level      S at the end of k
@@ -28,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.author_probe.blog import END, QUESTIONS, sentences
+from scripts.author_probe.blog import ATTRS, END, QUESTIONS, sentences
 
 sys.path.insert(0, "expview")
 from expview import Run, call
@@ -36,7 +38,15 @@ from expview import Run, call
 INPUTS = Path("data/runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2")
 PRED = Path("data/runs/cfbench/2026-10-30_author-blog-drop-haiku-b2/predictions.jsonl")
 CONDS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
-RX = {"A": re.compile(r"\b(he|him|his|himself)\b", re.IGNORECASE), "B": re.compile(r"\b(she|her|hers|herself)\b", re.IGNORECASE)}
+LEX = {  # by Qwen's answer letter in the canonical order (blog.py ATTRS); age lists fixed before the age trajectory run
+    "sex": {"A": r"he|him|his|himself", "B": r"she|her|hers|herself"},
+    "age": {
+        "A": r"school|teens?|teenagers?|parents|class|classes|homework|high school|grade",
+        "B": r"college|university|job|boyfriend|girlfriend|roommates?|campus|dating",
+        "C": r"kids|children|wife|husband|career|mortgage|married|son|daughter",
+    },
+}
+RX = {a: {k: re.compile(rf"\b({v})\b", re.IGNORECASE) for k, v in d.items()} for a, d in LEX.items()}
 BOOT = 2000
 FEATS = ["level", "step", "shift", "shift_w1", "shift_w2", "shift_w3", "shift_t", "slope"]
 
@@ -45,11 +55,10 @@ def load(p: Path) -> list[dict]:
     return [json.loads(line) for line in p.read_text().splitlines()]
 
 
-def counts(bullets: list, answer: str) -> tuple[float, float]:
-    """(matching, matching - opposite), FVE-weighted."""
-    w = {k: sum(f * len(rx.findall(t)) for t, f in bullets) for k, rx in RX.items()}
-    other = "B" if answer == "A" else "A"
-    return w[answer], w[answer] - w[other]
+def counts(bullets: list, attr: str, answer: str) -> tuple[float, float]:
+    """(matching, matching - mean of the other answers), FVE-weighted."""
+    w = {k: sum(f * len(rx.findall(t)) for t, f in bullets) for k, rx in RX[attr].items()}
+    return w[answer], w[answer] - float(np.mean([v for k, v in w.items() if k != answer]))
 
 
 def positions(rows: list[dict]) -> list[tuple[int, str, list]]:
@@ -61,9 +70,9 @@ def positions(rows: list[dict]) -> list[tuple[int, str, list]]:
     return [(o, t, bs) for (o, t), bs in sorted(by.items())]
 
 
-def spans(msg: str) -> list[tuple[int, int, str]]:
+def spans(msg: str, attr: str) -> list[tuple[int, int, str]]:
     """(start, end, text) of each sentence of the post inside the user message."""
-    head = QUESTIONS["sex"] + "\n\n"
+    head = QUESTIONS[attr] + "\n\n"
     post = msg[len(head) : len(msg) - len(END) - 2]
     out, cur = [], len(head)
     for s in sentences(post):
@@ -92,9 +101,9 @@ def features(seg: list[list[float]], ends: list[float], k: int) -> dict[str, flo
     return out
 
 
-def series(P: list, sp: list, answer: str, values=None) -> tuple[list, list, list, list]:
+def series(P: list, sp: list, attr: str, answer: str, values=None) -> tuple[list, list, list, list]:
     """Per sentence: S and S± at its read positions, and at its end. `values`: per-position (S, S±) to use instead of P's."""
-    v = values or [counts(bs, answer) for _, _, bs in P]
+    v = values or [counts(bs, attr, answer) for _, _, bs in P]
     seg, seg2, end, end2 = [], [], [], []
     for a, b, _ in sp:
         idx = [i for i, (o, _, _) in enumerate(P) if a <= o < b]
@@ -153,7 +162,36 @@ def bar(x: float, top: float) -> str:
 
 
 def main(run: Path):
-    cases = {k: c for k, c in ((c["item"], c) for c in load(INPUTS / "cases.jsonl")) if c["attr"] == "sex"}
+    ex = Run(
+        run / "expview",
+        title="Answer words in O-lens reads along each post (exploratory)",
+        description="Per case: S (FVE-weighted count of the words of Qwen's answer in the O-lens bullets: pronouns for sex, a "
+        "short list per age bucket) along the post, per sentence: its end and the mean over its read positions, the case "
+        "sentence marked ▶; then the bullets at its end. Per attribute, the top 5 positives and negatives by `lens shift_t`, "
+        "plus 5 random of each.",
+        label_order=["attr", "truth", "shift_t", "drop"],
+    )
+    out = [
+        "# Answer words in the O-lens reads vs 'deleting this sentence makes a difference' (exploratory, post hoc)\n",
+        (
+            "AUROC (1:1, calibration-free) and within-post paired accuracy (each positive vs each negative of its post, ties ½), "
+            "95% CIs over bloggers. ± = matching minus the mean of the other answers' words. Sex: pronouns; age: "
+            + "; ".join(f"{k} {v}" for k, v in LEX["age"].items())
+            + ".\n"
+        ),
+    ]
+    scores = []
+    for attr in ("sex", "age"):
+        o, rows = analyze(attr, ex)
+        out += o
+        scores += [{"attr": attr} | {k: v for k, v in r.items() if not k.startswith("_")} for r in rows]
+    (run / "results.md").write_text("\n".join(out) + "\n")
+    (run / "scores.jsonl").write_text("".join(json.dumps(r) + "\n" for r in scores))
+    print("\n".join(x for x in out if "Sanity" not in x))
+
+
+def analyze(attr: str, ex) -> tuple[list[str], list[dict]]:
+    cases = {k: c for k, c in ((c["item"], c) for c in load(INPUTS / "cases.jsonl")) if c["attr"] == attr}
     text = {r["id"]: r["messages"][0]["content"] for r in load(INPUTS / "reads/requests.jsonl")}
     raw: dict[str, list] = defaultdict(list)
     for r in load(INPUTS / "reads/reads.jsonl"):
@@ -170,7 +208,7 @@ def main(run: Path):
     rows, fallback, skipped = [], 0, 0
     for item, c in cases.items():
         msg, P = text[c["pair"]], pos[c["pair"]]
-        sp = spans(msg)
+        sp = spans(msg, attr)
         ks = [i for i, (_, _, s) in enumerate(sp) if s == c["comment"]]
         if not ks or not all(k in preds[item] for k in CONDS):
             skipped += 1
@@ -179,11 +217,11 @@ def main(run: Path):
         a, b, _ = sp[k]
         if not any(P[i][0] <= b - 1 < P[i][0] + len(P[i][1]) for i in range(len(P))):
             fallback += 1
-        seg, seg2, end, end2 = series(P, sp, c["answer"])
+        seg, seg2, end, end2 = series(P, sp, attr, c["answer"])
         Q = pos[placebo_src[item]]
-        qv = [counts(Q[i % len(Q)][2], c["answer"]) for i in range(len(P))]  # the placebo's i-th position at our i-th
-        pseg, pseg2, pend, pend2 = series(P, sp, c["answer"], qv)
-        tv = [counts([(s, 1.0)], c["answer"]) for _, _, s in sp]  # text: each sentence one position
+        qv = [counts(Q[i % len(Q)][2], attr, c["answer"]) for i in range(len(P))]  # the placebo's i-th position at our i-th
+        pseg, pseg2, pend, pend2 = series(P, sp, attr, c["answer"], qv)
+        tv = [counts([(s, 1.0)], attr, c["answer"]) for _, _, s in sp]  # text: each sentence one position
         tseg, tseg2 = [[x[0]] for x in tv], [[x[1]] for x in tv]
         r = {"item": item, "post": c["pair"].split(":")[0], "version": c["version"], "y": int(c["positive"])}
         for name, (sg, en) in {
@@ -196,29 +234,25 @@ def main(run: Path):
         rows.append(r)
 
     out = [
-        "# Gendered pronouns in the O-lens reads vs 'deleting this sentence makes a difference' (sex; exploratory, post hoc)\n",
+        f"\n# {attr}\n",
         (
-            f"{len(rows)} of {len(cases)} sex cases ({skipped} skipped: no valid Haiku p in some condition, or the sentence "
+            f"{len(rows)} of {len(cases)} {attr} cases ({skipped} skipped: no valid Haiku p in some condition, or the sentence "
             f"not found in blog.py's split), {len({r['post'] for r in rows})} bloggers. The sentence-final token is not a read "
             f"position in {fallback} cases ({fallback / len(rows):.0%}): the sentence's last read position stands in.\n"
-        ),
-        (
-            "AUROC (1:1, calibration-free) and within-post paired accuracy (each positive vs each negative of its post, ties ½), "
-            "95% CIs over bloggers. ± = matching minus opposite-gender pronouns.\n"
         ),
     ]
     names = [k for k in rows[0] if not k.startswith("_") and k not in ("item", "post", "version", "y")]
     for ver in ("pooled", "qwen_wrong", "qwen_right"):
         R = [r for r in rows if ver == "pooled" or r["version"] == ver]
         y, post = np.array([r["y"] for r in R]), np.array([r["post"] for r in R])
-        out.append(f"\n## {ver}: {len(R)} cases ({y.sum()} positive), {len(set(post))} bloggers\n")
+        out.append(f"\n## {attr}, {ver}: {len(R)} cases ({y.sum()} positive), {len(set(post))} bloggers\n")
         out.append("| score | AUROC [95% CI] | paired accuracy [95% CI] |\n|---|---|---|")
         for n in names:
             s = np.array([r[n] for r in R], float)
             (al, ah), (pl, ph) = boot(auc, y, s, post), boot(paired, y, s, post)
             out.append(f"| {n} | {auc(y, s):.3f} [{al:.3f}, {ah:.3f}] | {paired(y, s, post):.3f} [{pl:.3f}, {ph:.3f}] |")
 
-    out.append("\n## Incremental value over Haiku's transcript p (5-fold CV grouped by blogger, out-of-fold)\n")
+    out.append(f"\n## {attr}: incremental value over Haiku's transcript p (5-fold CV grouped by blogger, out-of-fold)\n")
     out.append("| model | AUROC | − transcript p [95% CI] | one-sided p | paired accuracy |\n|---|---|---|---|---|")
     y, post = np.array([r["y"] for r in rows]), np.array([r["post"] for r in rows])
     lp = np.array([r["haiku transcript"] for r in rows]).clip(0.01, 0.99)
@@ -226,6 +260,7 @@ def main(run: Path):
     base = oof(X0, y, post)
     for label, fs in {
         "transcript p": [],
+        "+ lens level only (the one feature the first pass used)": ["lens level"],
         "+ lens S and S± features": [f"lens {f}" for f in FEATS] + [f"lens± {f}" for f in FEATS],
         "+ placebo S and S± features": [f"placebo {f}" for f in FEATS] + [f"placebo± {f}" for f in FEATS],
         "+ text S and S± features": [f"text {f}" for f in FEATS] + [f"text± {f}" for f in FEATS],
@@ -243,15 +278,7 @@ def main(run: Path):
             f"| {label} | {auc(y, p):.3f} | {d:+.3f} [{lo:+.3f}, {hi:+.3f}] | {np.mean(np.array(bs) <= 0):.3f} | {paired(y, p, post):.3f} |"
         )
 
-    ex = Run(
-        run / "expview",
-        title="Pronouns in O-lens reads along each post (sex; exploratory)",
-        description="Per case: S (FVE-weighted count of pronouns matching Qwen's answer in the O-lens bullets) along the post, "
-        "per sentence: its end and the mean over its read positions, the case sentence marked ▶; then the bullets at its end. "
-        "Top 5 positives and negatives by `lens shift_t`, plus 5 random of each.",
-        label_order=["truth", "shift_t", "drop"],
-    )
-    out.append("\n## Sanity check: top 5 positives and negatives by lens shift_t\n")
+    out.append(f"\n## {attr}: sanity check, top 5 positives and negatives by lens shift_t\n")
     rng = np.random.default_rng(0)
     for y_ in (1, 0):
         R = [r for r in rows if r["y"] == y_]
@@ -270,14 +297,14 @@ def main(run: Path):
             a, b, _ = r["_sp"][k]
             idx = [i for i, (o, _, _) in enumerate(P) if a <= o < b]
             bl = sorted(P[idx[-1]][2], key=lambda x: -x[1]) if idx else []
-            body = f"Qwen answers {'Male' if c['answer'] == 'A' else 'Female'}: p {c['p0']:.3f} → {c['p1']:.3f} without ▶ "
+            body = f"Qwen answers {ATTRS[attr]['ABC'.index(c['answer'])]}: p {c['p0']:.3f} → {c['p1']:.3f} without ▶ "
             body += f"(drop {c['drop']:+.3f}, threshold {c['threshold']:.2f}). lens shift_t {r['lens shift_t']:+.2f}, step "
             body += f"{r['lens step']:+.2f}, shift {r['lens shift']:+.2f}.\n\n" + "\n".join(lines)
             body += "\n\nBullets at ▶'s last read position:\n\n" + "\n".join(f"- FVE {f:.3f}: {' '.join(t.split())}" for t, f in bl)
             ex.add(
                 id=f"{pick}/{r['item']}",
-                group=f"{'positive' if y_ else 'negative'} ({pick})",
-                labels={"truth": y_, "shift_t": round(r["lens shift_t"], 2), "drop": round(c["drop"], 3)},
+                group=f"{attr}: {'positive' if y_ else 'negative'} ({pick})",
+                labels={"attr": attr, "truth": y_, "shift_t": round(r["lens shift_t"], 2), "drop": round(c["drop"], 3)},
                 calls=[
                     call(
                         "S along the post",
@@ -289,9 +316,7 @@ def main(run: Path):
             )
             if pick == "top":
                 out.append(f"- `{r['item']}` shift_t {r['lens shift_t']:+.2f}, drop {c['drop']:+.2f}: _{c['comment'][:160]}_")
-    (run / "results.md").write_text("\n".join(out) + "\n")
-    (run / "scores.jsonl").write_text("".join(json.dumps({k: v for k, v in r.items() if not k.startswith("_")}) + "\n" for r in rows))
-    print("\n".join(out))
+    return out, rows
 
 
 if __name__ == "__main__":
