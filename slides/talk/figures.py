@@ -226,7 +226,11 @@ ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
 # #450) over the essay_probe run 2026-10-31_essay-grading-acts, dumped per case (its probe.json has the summary only);
 # from HF's runs/ when it isn't local; the probe bar is left out if neither has it
 ESSAY_PROBE = "runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
-ESSAY_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]), ("probe", ["probe"])]
+ESSAY_GROUPS = [
+    ("transcript", ["transcript_inline"]),
+    ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+    ("probe †", ["probe"]),
+]  # † Kylie: probably cursed (the slide's footnote)
 
 
 def load_rows(run: str) -> list[dict]:
@@ -330,7 +334,7 @@ def essay() -> None:
         ax.annotate(f"{v:.3f}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
         ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
     ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
-    ax.text(1.0, null, " minus the\n arm's mean", transform=ax.get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
+    ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
     ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
@@ -354,7 +358,7 @@ def essay_tables() -> None:
     O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
-            "olens_placebo_inline": r"\swp{olens}\ placebo", "probe": r"\sw{probe}\ probe"}  # fmt: skip
+            "olens_placebo_inline": r"\swp{olens}\ placebo", "probe": r"\sw{probe}\ probe†"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {d:+.3f} & [{lo:+.3f}, {hi:+.3f}] & {pf(p)}\\\\"
             for (a, b), (d, (lo, hi), p) in pairs.items()]  # fmt: skip

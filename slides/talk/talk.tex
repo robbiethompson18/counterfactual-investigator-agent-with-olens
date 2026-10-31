@@ -204,10 +204,10 @@
   \end{columns}
   \source{AUROC of P(up), 1,800 cases (a case's p is the mean of its 3 draws), 95\% CI resampling the 204 essays (a case's
     truth is shared within its essay), stars: one-sided paired bootstrap vs transcript-only, * p < .05, ** < .01, *** < .001.
-    Dotted: rank by minus the arm's observed mean score (regression to the mean). Placebo: another opener's reads on the same
-    intro, aligned by position. Probe: ridge on the residual stream at the token before the reply, L52 (picked by
-    out-of-fold r = 0.88 on the grade), from the arm prompt to the base score, minus the arm's mean; 5 folds grouped by
-    essay. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.}
+    Dotted, bet at the mean: rank by minus the arm's observed mean score. Placebo: another opener's reads on the same intro,
+    aligned by position. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.\\
+    † Kylie: probably cursed — a ridge regression trained on Qwen's own grades (5-fold out-of-fold, grouped by essay), fed the
+    observed prompt's activations at the last token before the reply, L52.}
 \end{frame}
 
 \end{document}
