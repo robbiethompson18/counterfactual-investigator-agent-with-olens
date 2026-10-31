@@ -12,6 +12,7 @@ PYTHONPATH=olens/src:src (runpod/olens_reads.sh) and the transcript-viewer venv 
 import copy
 import itertools
 import json
+import re
 
 
 def tool_args_as_dicts(messages: list[dict]) -> list[dict]:
@@ -64,39 +65,83 @@ BASH_TOOL = {  # evalcue/harness.py; copied so this runs on a pod without evalcu
 }
 
 
+TOOL_RESPONSE = ("<tool_response>", "</tool_response>")  # Qwen3.6's template checks a user turn's text for this wrapper
+
+
+def field_spans(tok, msgs: list[dict], text: str, **kw) -> list[tuple]:
+    """(start, end, msg_index, field, lead) of each non-blank string field of `msgs` (reasoning_content, content, each tool
+    call's string arguments) in `text`, their chat_text(**kw) render; a span is the field's stripped text, and `lead` the
+    length of the leading whitespace before it (which the template trims, except in tool-call arguments). Renders `msgs`
+    again with each field's stripped text swapped for a unique sentinel (the whitespace around it kept, so the template
+    trims the same), finds the sentinels, then puts the texts back and asserts that this gives `text` again: a template
+    branch on a field's text would break it (e.g. an assistant `content` holding `</think>` with no string
+    `reasoning_content`, which the template splits). A user turn's <tool_response> wrapper stays outside its sentinel, so
+    the template's last-user-query check sees it. A field the template drops (reasoning before the last user query) has no
+    span."""
+    mark = next(chr(c) for c in range(0xE000, 0xF900) if chr(c) not in text)  # a private-use char not in the transcript
+    subs = []  # per sentinel: (msg_index, field, stripped text, lead, wrapper prefix length, text the sentinel stands for)
+
+    def sub(i: int, name: str, s: str, keep: tuple[str, str] = ("", "")) -> str:
+        core = s.strip()
+        if not core:
+            return s
+        lead = len(s) - len(s.lstrip())
+        subs.append((i, name, core, lead, len(keep[0]), core[len(keep[0]) : len(core) - len(keep[1])]))
+        return s[:lead] + keep[0] + f"{mark}{len(subs) - 1}{mark}" + keep[1] + s[lead + len(core) :]
+
+    marked = copy.deepcopy(msgs)
+    for i, m in enumerate(marked):
+        for name in ("reasoning_content", "content"):
+            if isinstance(m.get(name), str):
+                core = m[name].strip()
+                wrapped = m["role"] == "user" and core.startswith(TOOL_RESPONSE[0]) and core.endswith(TOOL_RESPONSE[1])
+                m[name] = sub(i, name, m[name], TOOL_RESPONSE if wrapped else ("", ""))
+        for tc in m.get("tool_calls") or []:
+            args = tc["function"]["arguments"]
+            for k, v in args.items():
+                if isinstance(v, str):
+                    args[k] = sub(i, "tool_call", v)
+    marked_text = chat_text(tok, marked, **kw)
+    hits = list(re.finditer(f"{mark}(\\d+){mark}", marked_text))
+    assert len({h.group(1) for h in hits}) == len(hits), "a field rendered twice"
+    spans, real, at, n = [], [], 0, 0  # n: length of the real text rebuilt so far
+    for hit in hits:
+        real.append(marked_text[at : hit.start()])
+        n += hit.start() - at
+        i, name, core, lead, pre, inner = subs[int(hit.group(1))]
+        spans.append((n - pre, n - pre + len(core), i, name, lead))
+        real.append(inner)
+        n += len(inner)
+        at = hit.end()
+    real.append(marked_text[at:])
+    assert "".join(real) == text, "a field's text changed how the chat template rendered it; its span can't be found by sentinel"
+    return spans
+
+
 def render_request(tok, row: dict) -> tuple[list[dict], list[int], list[tuple]]:
     """One olens_read_requests.py request row (messages, tools, generation_prompt, thinking; or `text`, a raw prompt) rendered as
-    Qwen saw it -> (messages, token ids, per-token (msg_index, field, char_offset)). A `generation_prompt` header renders with
-    thinking off (the empty think block, the repo's default) unless the row says `thinking: true`."""
+    Qwen saw it -> (messages, token ids, per-token (msg_index, field, char_offset)). `char_offset` is the token's first
+    character in messages[msg_index][field] as given (its leading whitespace counted, though the template trims it); for a
+    "tool_call" field, in that argument's string value. A `generation_prompt` header renders with thinking off (the empty
+    think block, the repo's default) unless the row says `thinking: true`."""
     if "text" in row:  # a plain prompt, no chat template (WorkspaceBench's `plain` render): one user "message", every token in it
         enc = tok(row["text"], add_special_tokens=False, return_offsets_mapping=True)
         return [{"role": "user", "content": row["text"]}], enc.input_ids, [(0, "content", a) for a, _ in enc.offset_mapping]
     msgs = tool_args_as_dicts(row["messages"])
     tools = [BASH_TOOL] if row.get("tools") == "evalcue.harness.BASH_TOOL" else row.get("tools")
-    text = chat_text(tok, msgs, tools=tools, generation_prompt=bool(row.get("generation_prompt")), thinking=bool(row.get("thinking")))
+    kw = {"tools": tools, "generation_prompt": bool(row.get("generation_prompt")), "thinking": bool(row.get("thinking"))}
+    text = chat_text(tok, msgs, **kw)
     enc = tok(text, add_special_tokens=False, return_offsets_mapping=True)
-    # Find each message's fields in the rendered text, in order; a token belongs to the last message whose first
-    # field starts at or before it (so template tokens around a message go with it), -1 before the first.
-    fields, cur = [], 0  # (start, end, msg_index, field)
-    for i, m in enumerate(msgs):
-        parts = [("reasoning_content", m.get("reasoning_content")), ("content", m.get("content"))]
-        parts += [("tool_call", v) for tc in m.get("tool_calls") or [] for v in tc["function"]["arguments"].values()]
-        for name, s in parts:
-            s = s.strip() if isinstance(s, str) else None
-            if not s:
-                continue
-            j = text.find(s, cur)
-            if j < 0:
-                continue
-            fields.append((j, j + len(s), i, name))
-            cur = j + len(s)
+    # A token belongs to the last message whose first field starts at or before it (so template tokens around a message go
+    # with it), -1 before the first.
+    fields = field_spans(tok, msgs, text, **kw)
     starts = {}
-    for a, _, i, _ in fields:
+    for a, _, i, _, _ in fields:
         starts.setdefault(i, a)
     where = []
     for a, _ in enc.offset_mapping:
         msg = max((i for i, s in starts.items() if s <= a), default=-1)
-        f = next(((name, a - s) for s, e, i, name in fields if s <= a < e), (None, None))
+        f = next(((name, lead + a - s) for s, e, i, name, lead in fields if s <= a < e), (None, None))
         where.append((msg, *f))
     return msgs, enc.input_ids, where
 

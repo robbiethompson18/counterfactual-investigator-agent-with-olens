@@ -21,11 +21,11 @@ says `thinking: true`), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `"last"` only the final one, `positions: [token indices]` exactly those, and `char_positions:
-[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its stripped content,
-as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row with `text` instead of
-`messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render); `option_newlines: true` (or --option-newlines)
-adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
-option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
+[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its content as given,
+leading whitespace counted, as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row
+with `text` instead of `messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render);
+`option_newlines: true` (or --option-newlines) adds, to whichever positions the row reads, the newline token after each MCQ
+option ("\\nA. ..." or "\\n(A) ...", the last option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -39,7 +39,8 @@ already in OUT are skipped, so a rerun resumes (re-reading the last one, which a
 
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
-     field's text, or null), layer, bullets: [{text, fve, coef}] (sorted by fve), joint_fve}
+     field's text as given, leading whitespace counted; null for template tokens), layer, bullets: [{text, fve, coef}]
+     (sorted by fve), joint_fve}
 
 plus OUT's provenance (olens.provenance: lens adapter, bullet prefix, AR, whitener, revisions, sampling) as
 reads.provenance.json next to it, and each transcript's tokens and chat sections as OUT.transcripts.jsonl
@@ -220,8 +221,10 @@ def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
         positions = [max(i for i, w in enumerate(where) if w[:2] == (m, "content") and w[2] <= c) for m, c in row["char_positions"]]
     if opt_nl or row.get("option_newlines"):
         for mi, m in enumerate(msgs):
-            for c in option_newlines((m.get("content") or "").strip()):
-                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= c))
+            content = m.get("content") or ""
+            lead = len(content) - len(content.lstrip())  # options are found in the stripped text, char_offset counts from the raw
+            for c in option_newlines(content.strip()):
+                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= lead + c))
         positions = sorted(set(positions))
     row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
     return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
