@@ -27,7 +27,7 @@ SETS = {
     "cutoff": ("cutoff_qa", ["2026-10-30_menus-cutoff-olens-jlens", "2026-10-31_menus-cutoff-nla-batch"]),
     "favorites": ("favorites_qa", ["2026-10-30_menus-favorites-olens-jlens", "2026-10-31_menus-favorites-nla-batch"]),
     "mcq_unselected": ("MMLU-Pro (mcq_unselected)", ["2026-10-31_menus-mcq-unselected-olens-jlens-batch",
-                                                     "2026-10-31_menus-mcq-unselected-nla-batch2"]),
+                                                     "2026-10-31_menus-mcq-unselected-nla-or2"]),
     "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3"]),
 }  # fmt: skip
 LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}

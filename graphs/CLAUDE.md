@@ -39,6 +39,8 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
   favorites_qa, MMLU-Pro and SuperGPQA with each set weighted equally
 - `honest_binary`, `honest_binary_olens`: the honest-grader binary prediction runs
   (`docs/honest-grader-envs.md`)
+- `olens_mandarin`: Mandarin in O-lens bullets and output tokens, before vs after the leading-space fix
+  (`docs/olens-chinese.md`, `docs/final-writeup.md`); needs `--with transformers`
 - `wsb_families`: WorkspaceBench families on Qwen3.6-27B, O-lens vs Sonnet-as-text-reader vs stock
   Qwen asked directly, numbers hand-copied from the sprint doc (Wrong Bridge is a TBD placeholder)
 - `wsb_text_inversion`: the four contested WorkspaceBench families, best published metamodel vs
