@@ -277,6 +277,46 @@ item's text. Seven conditions × 3 draws, exact match, per-item means; paired 95
 Cost: Haiku $65 (38,829 predictions, from token counts at $0.10/$0.50 per M; the rows' `cost` is 0
 under BYOK); GPU about $45 (two gates on one H200, then 2 O-lens and 3 NLA pods for ~1.3 h).
 
+**Tool run without the tail reads (2026-10-30, Kylie: are the last 10 tokens just reading the answer?).** The v3 tool
+run's O-lens block cut to the question's own punctuation (`qpunct`: every punctuation token of the user turn, its final
+"." included, 4.1 per item) or that plus `<|im_end|>` (`qpunct_imend`); the other 9 / 8 tail positions dropped, no new
+reads (`cut_reads`, inputs `cfbench_evals/2026-10-30_cutoff-qa-tool-inline-inputs-qpunct{,-imend}`). Placebo as above
+with the same seeds, so each draw's placebo comes from the same other item as in the full run, cut the same way. The block's
+preamble names only the positions shown. Runs `cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct{,-imend}-full`
+(conditions renamed `olens_qpunct(_imend)(_placebo)_inline` after the run; the runs without `-full` are the partial ones
+that stopped on OpenRouter credits, reused), 22,188 predictions, 0 invalid; transcript-only and the full set from the v3
+run. Error rate, per-item means over 3 draws, paired 95% bootstrap CIs by item:
+
+| items               | n     | transcript | qpunct | placebo | qpunct + `<\|im_end\|>` | placebo | full (+ last 10) | placebo |
+| ------------------- | ----- | ---------- | ------ | ------- | ----------------------- | ------- | ---------------- | ------- |
+| all                 | 1,849 | 16.7       | 12.8   | 16.2    | 12.6                    | 14.6    | 12.9             | 18.5    |
+| stale               | 456   | 50.6       | 31.6   | 44.4    | 31.2                    | 41.6    | 27.5             | 44.5    |
+| not stale           | 1,393 | 5.6        | 6.7    | 6.9     | 6.5                     | 5.8     | 8.2              | 10.0    |
+| always tool, stale  | 232   | 50.1       | 28.9   | 41.8    | 28.7                    | 38.8    | 27.0             | 43.1    |
+
+| error, pp           | qpunct − placebo     | + `<\|im_end\|>` − placebo | full − placebo       | qpunct − full      |
+| ------------------- | -------------------- | -------------------------- | -------------------- | ------------------ |
+| all                 | −3.4 [−4.5, −2.2]    | −2.0 [−3.2, −0.9]          | −5.5 [−6.9, −4.2]    | −0.1 [−1.0, +0.8]  |
+| stale               | −12.8 [−15.9, −9.9]  | −10.4 [−13.7, −7.1]        | −17.0 [−20.4, −13.7] | +4.1 [+1.5, +6.8]  |
+| always tool, stale  | −12.9 [−17.8, −8.2]  | −10.1 [−14.9, −5.5]        | −16.1 [−21.1, −10.8] | +1.9 [−1.7, +5.6]  |
+
+- **Most of the gain survives without the tail:** on stale items the question's punctuation alone is 12.8pp better than
+  its placebo, against 17.0pp with the last 10 tokens. The tail adds about 4pp on stale items (31.6 → 27.5) and costs
+  1.5pp on not-stale ones, so overall the two are level. Same as the 1k no-tool run, where the question's commas were as
+  good as the six tail tokens.
+- `<|im_end|>` adds nothing on top (−0.4pp on stale, CI across 0); its placebo is a little better than the qpunct one.
+- Example (`e001-06`, the US Attorney General; Qwen's stale answer Merrick Garland): with qpunct reads Haiku says Garland
+  on all 3 draws ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/ba3a80c0-f6cf-4a79-8ee3-1dc0e8b49871)),
+  with the placebo Pam Bondi on all 3 ([Docent](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4be0fc4e-3592-4321-9694-ab9c1f925ba7)).
+  Every conversation is in expview: `#dataset=runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-qpunct-full` (and `-qpunct-imend-full`).
+
+![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
+![paired differences, stale items](img/cutoff-qa-notail-diff.png)
+
+Charts: `uv run python -m graphs.cutoff_qa_notail`.
+
+Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
+
 **Caveats.**
 
 - **The lens is a Qwen3.6-27B LoRA, so it has Qwen's cutoff.** This design can't tell "the lens
