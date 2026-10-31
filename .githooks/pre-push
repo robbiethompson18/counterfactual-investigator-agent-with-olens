@@ -1,4 +1,0 @@
-#!/bin/sh
-# core.hooksPath replaces .git/hooks, where git-lfs installs its own pre-push hook, so call it here: uploads LFS objects
-# (docs/final-writeup.html) on every push.
-git lfs pre-push "$@"
