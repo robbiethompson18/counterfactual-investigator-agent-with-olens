@@ -4,9 +4,12 @@ question's final "."), `tail` (the 9 tokens after it, `<|im_end|>` ... the `\\n\
 (that final `\\n\\n` only), for O-lens, NLA and J++, each beside a same-category placebo (docs/placebo-rules.md), on four
 sets: cutoff_qa, favorites_qa, mcq_unselected (MMLU-Pro), SuperGPQA. One draw per case.
 
-One figure, docs/img/menus-inline.png: % of cases where Haiku names Qwen's answer, a panel per lens, a group per menu (lens and
-its hatched placebo), prompt only as the blue bar and dashed line; each bar is the mean of the four sets' accuracies (each set
-weighted equally), 95% CIs from resampling cases within every set.
+docs/img/menus-inline.png: % of cases where Haiku names Qwen's answer, a panel per lens, a group per menu (lens and its hatched
+placebo), prompt only as the blue bar and dashed line; each bar is the mean of the four sets' accuracies (each set weighted
+equally), 95% CIs from resampling cases within every set.
+
+docs/img/menus-inline-position.png (the write-up's "By token position"): one bar per lens, its `prompt` menu minus its `tail`
+menu on the same cases, pooled the same way, with a paired 95% CI and two-sided bootstrap p.
 
     uv run python -m graphs.menus_inline [--out docs/img/menus-inline.png]
 """
@@ -19,7 +22,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.style import BLUE, MUTED, ci_bar
+from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
 
 R = Path("data/runs/cfbench")
 # set -> (title, runs); a set's NLA run is left out until it exists
@@ -63,6 +66,38 @@ def pooled(acc: dict, c: str) -> tuple[float, float, float] | None:
     return pooled_ci([[100 * v for v in acc[s][c].values()] for s in SETS])
 
 
+def paired(acc: dict, a: str, b: str, seed: int = 0) -> tuple[float, float, float, float]:
+    """Condition a minus b in pp on the cases both have: mean over sets (each weighted equally), 95% CI and two-sided p from
+    resampling cases within every set."""
+    per_set = [[100 * (acc[s][a][k] - acc[s][b][k]) for k in sorted(acc[s][a].keys() & acc[s][b].keys())] for s in SETS]
+    rng = random.Random(seed)
+    boots = sorted(sum(sum(rng.choices(d, k=len(d))) / len(d) for d in per_set) / len(per_set) for _ in range(BOOT))
+    p = min(1.0, 2 * min(sum(x <= 0 for x in boots), sum(x >= 0 for x in boots)) / BOOT)
+    return sum(sum(d) / len(d) for d in per_set) / len(per_set), boots[int(0.025 * BOOT)], boots[int(0.975 * BOOT)], p
+
+
+def position_diff(acc: dict, out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(4.4, 3.4), layout="constrained")
+    ticks = []
+    for x, (lens, lens_label) in enumerate(LENSES.items()):
+        v, lo, hi, p = paired(acc, f"{lens}_prompt_inline", f"{lens}_tail_inline")
+        ax.bar(x, v, 0.7, zorder=3, **bar_kw(lens))
+        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9, zorder=4)
+        ax.annotate(f"{v:+.1f}", (x, hi if v > 0 else lo), xytext=(0, 2 if v > 0 else -2), textcoords="offset points",
+                    ha="center", va="bottom" if v > 0 else "top", fontsize=8, color=INK)  # fmt: skip
+        ticks.append(f"{lens_label}\np {'< 0.001' if p < 0.001 else f'= {p:.3f}'}")
+    ax.axhline(0, color=MUTED, lw=0.8)
+    ax.set_xticks(range(len(LENSES)), ticks)
+    ax.grid(axis="x", visible=False)
+    ax.set_ylim(-3, 4)
+    ax.set_ylabel("question reads − tail reads (pp)")
+    ax.set_title("Reads at the question vs at the 9 tail tokens", loc="left")
+    fig.supxlabel("Paired, mean of the four sets (each weighted equally); 95% CIs resample cases within each set.", fontsize=7.5,
+                  color=MUTED)  # fmt: skip
+    fig.savefig(out, bbox_inches="tight")
+    print(out)
+
+
 def bars(acc: dict, out: Path) -> None:
     fig, axes = plt.subplots(1, len(LENSES), figsize=(4.6 * len(LENSES), 4.0), sharey=True, layout="constrained")
     base = pooled(acc, "transcript_inline")
@@ -97,4 +132,6 @@ if __name__ == "__main__":
     p.add_argument("--out", type=Path, default=Path("docs/img/menus-inline.png"))
     a = p.parse_args()
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    bars(load(), a.out)
+    acc = load()
+    bars(acc, a.out)
+    position_diff(acc, a.out.with_name(a.out.stem + "-position.png"))
