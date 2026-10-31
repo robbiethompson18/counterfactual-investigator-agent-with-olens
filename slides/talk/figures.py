@@ -343,15 +343,6 @@ def essay_auroc_bars(reps: int = 2000) -> tuple[dict, float, int, dict]:
     return bars, rank_auroc(-am, y), len(keys), pairs
 
 
-def essay_by_band() -> list[tuple[str, int, dict[str, float]]]:
-    """AUROC by the arm prompt's observed mean grade, in bands that cover every case."""
-    _, y, xs, am = essay_cases()
-    out = []
-    for name, m in (("< 2", am < 2), ("2 to < 4", (am >= 2) & (am < 4)), ("≥ 4", am >= 4)):
-        out.append((name, int(m.sum()), {c: rank_auroc(x[m], y[m]) for c, x in {**xs, "null": -am}.items()}))
-    return out
-
-
 def essay_flips() -> tuple[int, int]:
     """Cases O-lens gets right (p >= 0.5 vs truth) and its placebo wrong, and the reverse."""
     _, y, xs, _ = essay_cases()
@@ -397,7 +388,7 @@ def essay(mm: float) -> None:
 
 
 def essay_tables() -> None:
-    """The essay results slide's tables as LaTeX (fig/essay_pairs.tex, fig/essay_bands.tex) in the theme's macros, and the
+    """The essay results slide's tables as LaTeX (fig/essay_pairs.tex) in the theme's macros, and the
     O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
@@ -409,13 +400,6 @@ def essay_tables() -> None:
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
     head = [r" & \multicolumn{2}{c}{investigator} & \multicolumn{2}{c}{+ bet at mean}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
     (OUT / "essay_pairs.tex").write_text(tab("lrrrr", [*head, "\\hline", *rows]))
-    cols = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
-    head = " & ".join(["arm's mean", "cases", *(name[c] for c in cols)]) + "\\\\"
-    body = []
-    for g, n, a in essay_by_band():
-        best = max(a[c] for c in cols)
-        body.append(" & ".join([g, str(n), *(f"\\best{{{a[c]:.3f}}}" if a[c] == best else f"{a[c]:.3f}" for c in cols)]) + "\\\\")
-    (OUT / "essay_bands.tex").write_text(tab("lrrrr", [head, "\\hline", *body]))
     (OUT / "essay_flips.tex").write_text("{} and {}".format(*essay_flips()))
 
 
