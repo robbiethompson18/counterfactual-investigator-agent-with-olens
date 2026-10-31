@@ -12,15 +12,11 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from graphs.cutoff_qa_inline import ci
-from graphs.style import INK, MUTED, bar_kw, diff_rows, use
+from graphs.style import bar_kw, ci_bar, diff_rows
 
-use()
 RUN = Path("data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3")  # transcript-only and the full set
 CUTS = {c: Path(f"data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-{c.replace('_', '-')}-full") for c in ("qpunct", "qpunct_imend")}
 READS = {"qpunct": "question\npunctuation", "qpunct_imend": "punctuation\n+ <|im_end|>", "full": "full set\n(+ last 10)"}
@@ -53,9 +49,7 @@ def bars(data, cls, out: Path) -> None:
         def bar(x, key, cond, ax=ax, items=items):
             xs = [data[key][i] for i in items]
             m, (lo, hi) = sum(xs) / len(xs), ci(xs)
-            ax.bar(x, 100 * m, width, zorder=3, **bar_kw(cond))
-            ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4)
-            ax.text(x, 100 * hi + 1, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8, color=INK)
+            ci_bar(ax, x, cond, 100 * m, 100 * lo, 100 * hi, width=width)
 
         bar(0, "transcript", "transcript_inline")
         for k, reads in enumerate(READS, start=1):
@@ -63,7 +57,7 @@ def bars(data, cls, out: Path) -> None:
             bar(k + width / 2, f"{reads}_placebo", "olens_placebo_inline")
         ax.set_xticks(range(len(READS) + 1))
         ax.set_xticklabels(["no reads", *READS.values()], fontsize=8)
-        ax.set_title(f"{title}, n = {len(items)}", loc="left", fontsize=9.5, color=INK)
+        ax.set_title(f"{title}, n = {len(items)}")
         ax.grid(axis="x", visible=False)
     axes[0].set_ylabel("% of items where Haiku misses Qwen's answer")
     axes[0].set_ylim(0, 60)
@@ -71,9 +65,9 @@ def bars(data, cls, out: Path) -> None:
     fig.legend(handles, ["transcript only", "O-lens", "O-lens placebo (another item's reads)"], loc="upper left", frameon=False,
                fontsize=8.5, ncol=3, bbox_to_anchor=(0.06, 1.04))  # fmt: skip
     fig.suptitle("Predicting Qwen3.6-27B's (tool-call) answer: O-lens reads at the question's punctuation vs the full set, error rate",
-                 x=0.06, y=1.1, ha="left", fontsize=10.5, color=INK)  # fmt: skip
+                 x=0.06, y=1.1, ha="left")  # fmt: skip
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 
@@ -96,9 +90,9 @@ def diffs(data, cls, out: Path) -> None:
     ax.set_xlim(-30, 10)
     diff_rows(ax, rows)
     ax.set_xlabel("difference in error rate, pp, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_title(f"Stale items, n = {len(items)} (negative = the first condition misses less)", loc="left", fontsize=10, color=INK)
+    ax.set_title(f"Stale items, n = {len(items)} (negative = the first condition misses less)")
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 

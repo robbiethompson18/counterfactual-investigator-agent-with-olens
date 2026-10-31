@@ -16,13 +16,10 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-from graphs.style import INK, MUTED, bar_kw, color, use
+from graphs.style import BG, INK, MUTED, bar_kw, color
 
 ROLLOUTS = Path("data/runs/hint_cf_wrong_mcq/2026-10-26_or_nothink2/rows.jsonl")
 RUNS = {
@@ -32,7 +29,6 @@ RUNS = {
 CONDS = ["agentic", "olens", "olens_placebo"]
 LABEL = {"agentic": "Transcript-only", "olens": "O-lens", "olens_placebo": "O-lens placebo"}
 COLOR = {c: color(c) for c in LABEL}  # graphs.style: a placebo is its tool's colour, hatched
-use()
 N_BOOT = 4000
 
 
@@ -89,22 +85,22 @@ def bars(panels: dict, out: Path, filtered: bool) -> None:
             m, lo, hi, _ = st[c]
             ax.bar(x, 100 * m, width=0.55, **bar_kw(c))
             ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1.2, capsize=4)
-            ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}%", ha="center", va="bottom", color=INK)
+            ax.text(x, 100 * hi + 1.5, f"{100 * m:.1f}%", ha="center", va="bottom", color=INK)
         ax.axhline(10, color=MUTED, linestyle=":", linewidth=1)
         ax.set_xticks(range(3))
         ax.set_xticklabels([LABEL[c] for c in CONDS], fontsize=9)
         ax.grid(axis="x", visible=False)
-        ax.set_title(f"{name}: {len(keys)} pairs", loc="left", fontsize=10)
+        ax.set_title(f"{name}: {len(keys)} pairs")
     axes[0].set_ylabel("% draws naming Qwen's no-hint answer")
     axes[0].set_ylim(0, 60)
     axes[0].text(-0.45, 10.8, "chance", fontsize=8, color=MUTED)
     which = "items where Qwen followed the hint 8/8" if filtered else "all survivors"
     title = f"Answer task on hint_mcq: name Qwen's letter with the hint removed ({which}; Flash, 5 draws per pair)"
-    fig.suptitle(title, fontsize=11, x=0.01, ha="left")
+    fig.suptitle(title, x=0.01, ha="left")
     note = "95% item-level bootstrap. The wrong-hint items are a subset of the correct-hint items, so the pooled panel counts them twice."
     fig.text(0.01, -0.03, note, color=MUTED, fontsize=8)
     fig.tight_layout()
-    fig.savefig(out / "accuracy.png", dpi=180, bbox_inches="tight")
+    fig.savefig(out / "accuracy.png", bbox_inches="tight")
 
 
 def per_item(by: dict, meta: dict, title: str, out: Path) -> None:
@@ -114,8 +110,10 @@ def per_item(by: dict, meta: dict, title: str, out: Path) -> None:
         for xi, k in enumerate(keys):
             hits, n = sum(by[c][k]), len(by[c][k])
             size = 70 + 220 * hits / max(n, 1)
-            hatch = bar_kw(c)["hatch"] if hits else None  # hatching takes the edge colour, so a hatched marker gets an ink edge
-            ax.scatter(xi, yi, s=size, facecolor=COLOR[c] if hits else "none", edgecolors=INK if hatch else COLOR[c], linewidths=1.5,
+            hatch = (
+                bar_kw(c)["hatch"] if hits else None
+            )  # hatching takes the edge colour, so a hatched marker gets a background-coloured edge
+            ax.scatter(xi, yi, s=size, facecolor=COLOR[c] if hits else "none", edgecolors=BG if hatch else COLOR[c], linewidths=1.5,
                        zorder=3, hatch=hatch)  # fmt: skip
             if hits:
                 ax.text(xi, yi, f"{hits}/{n}", ha="center", va="center", color="white" if c == "agentic" else INK, fontsize=7, zorder=4)
@@ -126,9 +124,9 @@ def per_item(by: dict, meta: dict, title: str, out: Path) -> None:
     ax.set_ylim(-0.7, 2.7)
     ax.invert_yaxis()
     ax.grid(axis="y", visible=False)
-    ax.set_title(f"{title}: correct draws per item (own letter / hint letter)", loc="left", fontsize=9.5)
+    ax.set_title(f"{title}: correct draws per item (own letter / hint letter)")
     fig.tight_layout()
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
 
 
 def main() -> None:

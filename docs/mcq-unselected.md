@@ -146,6 +146,12 @@ draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45
 | linear probe, hidden_states[52]    | **91.9** | 94.1       | **82.1**   |
 | Qwen's own letter logits (ceiling) | 99.8     | 99.9       | 99.3       |
 
+![prompt only vs O-lens, J-lens, NLA and their placebos, the linear probe and Qwen's logits; all / Qwen right / Qwen wrong](img/mcq-unselected.png)
+
+![paired differences between conditions with 95% CIs, all cases and Qwen-wrong cases](img/mcq-unselected-diff.png)
+
+(`uv run python -m graphs.mcq_unselected` makes both; 95% bootstrap CIs over cases.)
+
 Paired by case, 95% bootstrap over cases (3,000 resamples):
 
 | comparison                   | all                 | Qwen wrong         |

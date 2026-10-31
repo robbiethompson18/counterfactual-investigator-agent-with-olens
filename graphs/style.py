@@ -1,16 +1,26 @@
-"""The one chart style (CLAUDE.md): a colour per tool, a placebo in its tool's colour with black hatching (an open marker where
-hatching can't show), and paired-difference rows labelled by the two conditions' swatches (A − B), so a row reads like the bars
-it compares (Robbie, 2026-10-30). Conditions are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them.
+"""The one chart style (CLAUDE.md); importing this module applies it. A colour per tool, a placebo in its tool's colour with stripes
+in the background colour (an open marker where stripes can't show), hatching for placebos and nothing else, and paired-difference
+rows labelled by the two conditions' swatches (A − B), so a row reads like the bars it compares (Robbie, 2026-10-30). Conditions
+are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them. Ink, grid and background are the Evals page's
+(environments/_lib/page.html).
 """
 
+import shutil
+import subprocess
+
+import matplotlib
+from matplotlib import font_manager
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import AnnotationBbox, DrawingArea
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
 
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
+INK, MUTED, GRID, BG = "#1c1b19", "#6f6b62", "#e4e0d6", "#f6f5f1"
 BLUE, ORANGE, PURPLE, GREEN, GRAY = "#2a78d6", "#eb6834", "#8e44ad", "#2e9e5b", "#898781"
 PLACEBO_HATCH = "////"
+OUTLINE = "none"  # a bar with no fill, only an ink outline: a reference line's bar, not a tool
 # canonical condition -> (colour, hatch, label)
 STYLE = {
     "transcript": (BLUE, None, "transcript only"),
@@ -26,9 +36,56 @@ STYLE = {
     "olens_nl_placebo": ("#c9a227", PLACEBO_HATCH, "O-lens (nl) placebo"),
     "probe": ("#11806a", None, "probe"),
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
-    "null": ("#ffffff", PLACEBO_HATCH, "edit does nothing"),
+    "null": (OUTLINE, None, "edit does nothing"),
+    "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
 }
 ALIASES = {"agentic": "transcript", "transcript_agentic": "transcript", "env_diff": "no_transcript", "olens_inline_nl": "olens_nl"}
+
+# matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
+# set in the DejaVu fallback
+if shutil.which("fc-list"):
+    for f in subprocess.run(["fc-list", "Inter", "file"], check=True, capture_output=True, text=True).stdout.split():
+        if f.rstrip(":").endswith((".ttf", ".ttc")):
+            font_manager.fontManager.addfont(f.rstrip(":"))
+plt.rcParams.update(
+    {
+        "font.family": ["Inter", "DejaVu Sans"],
+        "font.size": 10,
+        "text.color": INK,
+        "figure.facecolor": BG,
+        "figure.titlesize": 11,
+        "figure.titleweight": "semibold",
+        "axes.facecolor": BG,
+        "axes.titlesize": 10.5,
+        "axes.titleweight": "semibold",
+        "axes.titlelocation": "left",
+        "axes.titlecolor": INK,
+        "axes.labelsize": 10,
+        "axes.labelcolor": MUTED,
+        "axes.edgecolor": MUTED,
+        "axes.linewidth": 0.6,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+        "axes.spines.left": False,
+        "axes.spines.bottom": False,
+        "axes.grid": True,
+        "axes.axisbelow": True,
+        "grid.color": GRID,
+        "grid.linewidth": 0.6,
+        "xtick.color": MUTED,
+        "ytick.color": MUTED,
+        "xtick.labelcolor": MUTED,
+        "ytick.labelcolor": MUTED,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "xtick.major.size": 0,
+        "ytick.major.size": 0,
+        "legend.frameon": False,
+        "legend.fontsize": 9,
+        "hatch.linewidth": 1.8,
+        "savefig.dpi": 180,
+    }
+)
 
 
 def canon(c: str) -> str:
@@ -47,9 +104,12 @@ def label(c: str) -> str:
 
 
 def bar_kw(c: str) -> dict:
-    """ax.bar / Rectangle keywords for condition c."""
+    """ax.bar / Rectangle keywords for condition c. The stripes take their colour from edgecolor, not `hatchcolor`: Chrome's PDF
+    viewer (PDFium) draws a hatch with edgecolor "none" as a solid bar. lw 0 keeps the outline invisible (2026-10-31)."""
     col, hatch, _ = STYLE[canon(c)]
-    return {"facecolor": col, "hatch": hatch, "edgecolor": INK if hatch else "none", "lw": 0.8 if col == "#ffffff" else 0}
+    if col == OUTLINE:
+        return {"facecolor": "none", "edgecolor": INK, "lw": 0.8}
+    return {"facecolor": col, "hatch": hatch, "edgecolor": BG if hatch else "none", "lw": 0}
 
 
 def marker_kw(c: str) -> dict:
@@ -58,9 +118,27 @@ def marker_kw(c: str) -> dict:
     return {"facecolor": "none" if hatch else col, "edgecolor": col}
 
 
-def use() -> None:
-    plt.rcParams.update({"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID,
-                         "axes.axisbelow": True})  # fmt: skip
+def positions(bars, groups: list) -> tuple[dict[str, float], list[float]]:
+    """x of every bar (a lens and its placebo touch, groups 0.6 apart) and the tick under each group's centre, for `groups` of
+    (name, [conditions]); conditions not in `bars` are left out."""
+    xs, ticks, x = {}, [], 0.0
+    for _, cs in groups:
+        cs = [c for c in cs if c in bars]
+        if not cs:
+            continue
+        for i, c in enumerate(cs):
+            xs[c] = x + 0.85 * i
+        ticks.append(x + 0.85 * (len(cs) - 1) / 2)
+        x += 0.85 * (len(cs) - 1) + 1.45
+    return xs, ticks
+
+
+def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 0.8, fmt: str = "{:.1f}") -> None:
+    """Condition c's bar with its gray CI whisker and the value in ink just above it (an offset in points, so it clears the whisker
+    whatever the axis's scale)."""
+    ax.bar(x, v, width, zorder=3, **bar_kw(c))
+    ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9, zorder=4)
+    ax.annotate(fmt.format(v), (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5, color=INK)
 
 
 SW_W, SW_H, SW_MINUS, SW_GAP = 14, 10, 12, 8  # swatch width, height, the gap holding the minus sign, gap to the axis (points)
@@ -92,14 +170,14 @@ def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> Non
             continue
         a, b, m, lo, hi, *text = row
         ax.plot([lo, hi], [y, y], color=INK, lw=1.6, solid_capstyle="butt", zorder=3)
-        ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else "white")
+        ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
         ax.text(hi, y, f"   {value_fmt.format(m)}  [{value_fmt.format(lo)}, {value_fmt.format(hi)}]{unit}", va="center", fontsize=8,
                 color=INK)  # fmt: skip
         swatch_pair(ax, y, a, b)
         labels.append(text[0] if text else f"{label(a)} − {label(b)}")
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(reversed(labels), fontsize=9)
+    ax.set_yticklabels(reversed(labels), fontsize=9, color=INK)
     for tick, row in zip(reversed(ax.get_yticklabels()), rows, strict=True):
         if isinstance(row, str):
             tick.set_fontweight("bold")

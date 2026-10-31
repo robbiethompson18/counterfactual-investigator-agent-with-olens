@@ -232,10 +232,12 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   [docs/viewers.md](docs/viewers.md).
 - Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
   in orange, no tool calls in gray, J++ in purple, NLA in green. A placebo is its lens's color with
-  black stripes (Robbie, 2026-10-29; an open marker where stripes can't show); plain black placebos
-  are the old style. Paired-difference rows are labelled by the two conditions' swatches, A − B
-  (2026-10-30). In matplotlib take all of it from `graphs/style.py` (`bar_kw`, `marker_kw`,
-  `diff_rows`). Give any other condition a color outside these.
+  stripes in the background color (Robbie, 2026-10-31; an open marker where stripes can't show).
+  Hatching means placebo and nothing else: a second measure gets a lighter shade. Paired-difference
+  rows are labelled by the two conditions' swatches, A − B (2026-10-30). In matplotlib, import
+  `graphs/style.py`, which applies the look (Inter, warm ink, Evals-page background) and has
+  `bar_kw`, `marker_kw`, `ci_bar`, `diff_rows`; never hardcode a condition's color or `rcParams`.
+  Give any other condition a color outside these.
 
 ## Docs
 

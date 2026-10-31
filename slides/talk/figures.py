@@ -25,8 +25,8 @@ from matplotlib.colors import to_hex, to_rgb
 
 from cfbench.evals.essay_grading_cf_inline.eval import mean
 from graphs.cutoff_grader_mentions import RUNS, at_token
-from graphs.style import INK, MUTED
-from slides.figure import BG, FULL_H, FULL_W, bar_kw, figure, save
+from graphs.style import BG, INK, MUTED, bar_kw, positions
+from slides.figure import FULL_H, FULL_W, figure, save
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).with_name("fig")
@@ -163,7 +163,7 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
     for k, name in evals.items():
         data[k][0]["olens_nl_placebo"] = bars_of(name.replace("_tail_inline", "_inline"))[0]["olens_placebo_inline"]
     for ax, (k, (bars, chance, n)) in zip(axes, data.items(), strict=True):
-        xs, ticks = positions(bars)
+        xs, ticks = positions(bars, GROUPS)
         for c, x in xs.items():
             v, (lo, hi), st = bars[c]
             ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c))
@@ -175,12 +175,10 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         ax.axhline(chance, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)  # off the axis when above it (letter: 90%)
         ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
-        ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
+        ax.tick_params(axis="x", labelsize=7 * S)
         if head:
             ax.text(0, 1.2, PANELS[k], transform=ax.transAxes, fontsize=8.5 * S, fontweight="semibold", color=INK)
             ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
-        for side in ("left", "bottom"):
-            ax.spines[side].set_visible(False)
         ax.grid(axis="x", visible=False)
     # the axis stops just above the tallest whisker's labels, not at the next round number (Kylie, 2026-10-30); gridlines
     # every 10% below it
@@ -188,25 +186,10 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
     ticks = np.arange(base, top, 0.1)
     axes[0].set_ylim(base, top)
     axes[0].set_yticks(ticks, [f"{t:.0%}" if pct else f"{t:.1f}" for t in ticks])
-    axes[0].tick_params(axis="y", labelcolor=MUTED)
     axes[0].set_ylabel(ylabel)
     if base < data[list(evals)[-1]][1] <= top:
         chance = data[list(evals)[-1]][1]
         axes[-1].text(1.0, chance, f" {chance_label}", transform=axes[-1].get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
-
-
-def positions(bars: dict, groups: list = GROUPS) -> tuple[dict[str, float], list[float]]:
-    """x of every bar (a lens and its placebo touch, groups 0.6 apart) and the tick under each group's centre."""
-    xs, ticks, x = {}, [], 0.0
-    for _, cs in groups:
-        cs = [c for c in cs if c in bars]
-        if not cs:
-            continue
-        for i, c in enumerate(cs):
-            xs[c] = x + 0.85 * i
-        ticks.append(x + 0.85 * (len(cs) - 1) / 2)
-        x += 0.85 * (len(cs) - 1) + 1.45
-    return xs, ticks
 
 
 def unit_mm(fig, ax) -> float:
@@ -220,7 +203,7 @@ def grid() -> float:
     Returns the mm per bar unit, so other bar charts can match its bar widths and hatching."""
     knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
     letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0})[1][-1] + 1 for n in knew.values()]
+    widths = [positions(auroc_bars(n)[0] | {"olens_nl_placebo": 0}, GROUPS)[1][-1] + 1 for n in knew.values()]
     fig, axes = figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
     row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
@@ -372,17 +355,14 @@ def essay(mm: float) -> None:
     ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * S, color=MUTED, va="center")
     ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
-    ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
+    ax.tick_params(axis="x", labelsize=7 * S)
     ax.text(0, 1.08, f"{n:,} cases", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED)
     ax.text(1.0, 1.08, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * S, color=MUTED, ha="right")
-    for side in ("left", "bottom"):
-        ax.spines[side].set_visible(False)
     ax.grid(axis="x", visible=False)
     top = max(hi for _, (_, hi), _ in bars.values()) + 0.07
     yt = np.arange(base, top, 0.1)
     ax.set_ylim(base, top)
     ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
-    ax.tick_params(axis="y", labelcolor=MUTED)
     ax.set_ylabel("AUROC of P(score goes up)")
     for _ in range(3):  # constrained layout moves the axes as the figure narrows
         w = fig.get_figwidth() - (unit_mm(fig, ax) - mm) * np.diff(ax.get_xlim())[0] / 25.4
@@ -422,11 +402,8 @@ def essay_diffs() -> None:
     ax.set_ylim(y + 0.4, 0.6)
     ax.set_xlim(-0.012, 0.035)
     ax.set_xticks([0, 0.01, 0.02, 0.03], ["0", "+0.01", "+0.02", "+0.03"])
-    ax.tick_params(axis="both", length=0, labelcolor=MUTED)
-    ax.set_xlabel("Δ AUROC, paired 95% CI", color=MUTED)
+    ax.set_xlabel("Δ AUROC, paired 95% CI")
     ax.grid(axis="y", visible=False)
-    for side in ("left", "top", "right", "bottom"):
-        ax.spines[side].set_visible(False)
     save(fig, OUT / "essay_diffs.pdf")
 
 
@@ -449,32 +426,28 @@ def essay_tables() -> None:
 def grader() -> None:
     """Two pairs of bars at the "." ending "If you are not sure, give your best guess.", chat template vs the submit_answer tool
     template, on the 863 cutoff_qa items read in both: the share of O-lens reads (six layers) saying "grader"/"graded" (not in the
-    prompt), and the share of items with at least one such read, hatched in a darker shade of the bar's colour (stripes in the
-    background colour mean placebo in this deck)."""
+    prompt), and the share of items with at least one such read, in a lighter shade of the bar's colour (hatching means placebo)."""
     run = Path("runs/cutoff_grader_mentions/2026-10-30_regex")
     if not (ROOT / "data" / run / "novel_hits.jsonl").exists():
         for f in ("item_counts.csv", "novel_hits.jsonl"):
             hf_hub_download(HF_REPO, f"{run}/{f}", repo_type="dataset", local_dir=ROOT / "data")
-    groups = [("% of reads", at_token(ROOT / "data" / run, "."), None),
-              ("% of items, any read", at_token(ROOT / "data" / run, ".", items=True), "////")]  # fmt: skip
+    groups = [("% of reads", at_token(ROOT / "data" / run, "."), 1.0),
+              ("% of items, any read", at_token(ROOT / "data" / run, ".", items=True), 0.5)]  # fmt: skip
     fig, ax = figure(42, 40)
-    for g, (_, bars, hatch) in enumerate(groups):
+    for g, (_, bars, strength) in enumerate(groups):
         for j, r in enumerate(("A", "B")):
             x, (v, lo, hi) = g * 2.4 + j * 0.85, bars[r]
-            ax.bar(x, v, 0.8, color=RUNS[r][0], hatch=hatch, edgecolor=to_hex(np.array(to_rgb(RUNS[r][0])) * 0.6), lw=0)
+            ax.bar(x, v, 0.8, color=to_hex(tuple(strength * np.array(to_rgb(RUNS[r][0])) + (1 - strength) * np.array(to_rgb(BG)))))
             ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
             ax.annotate(
                 f"{v:.1%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK
             )
     ax.set_xticks([0.425, 2.825], [lab for lab, _, _ in groups])
     ax.set_xlim(-0.6, 3.85)
-    ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
+    ax.tick_params(axis="x", labelsize=7 * S)
     ax.set_ylim(0, 0.85)
     ax.set_yticks(np.arange(0, 0.81, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.81, 0.2)])
-    ax.tick_params(axis="y", labelcolor=MUTED)
     ax.set_ylabel('saying "grader" / "graded"')
-    for side in ("left", "bottom"):
-        ax.spines[side].set_visible(False)
     ax.grid(axis="x", visible=False)
     save(fig, OUT / "grader.pdf")
 

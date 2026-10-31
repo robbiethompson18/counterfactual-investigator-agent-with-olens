@@ -11,13 +11,10 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-
-from graphs.style import GRID, INK, MUTED, bar_kw, color, marker_kw, use
+from graphs.style import GRID, INK, MUTED, bar_kw, color, marker_kw
 
 CONDS = ["no_transcript_score", "agentic_score", "olens_score", "olens_placebo_score"]
 LABEL = {
@@ -27,7 +24,6 @@ LABEL = {
     "olens_placebo_score": "O-lens placebo",
 }
 COLOR = {c: color(c) for c in CONDS}  # graphs.style: a placebo is its tool's colour, hatched (an open dot in the scatter)
-use()
 N_BOOT = 4000
 
 
@@ -92,7 +88,7 @@ def main():
         f"Predict Qwen's mean score with the scenario removed ({len(keys)} cases, lower is better)", fontsize=10, color=INK, loc="left"
     )
     fig.tight_layout()
-    fig.savefig(a.out / "score_rmse.png", dpi=160)
+    fig.savefig(a.out / "score_rmse.png")
 
     order = sorted(keys, key=lambda k: (truth[k][1], k))
     fig, ax = plt.subplots(figsize=(8.5, 0.32 * len(order) + 1.4))
@@ -111,9 +107,9 @@ def main():
         plt.Line2D([], [], marker="o", ls="", color=COLOR[c], markerfacecolor=marker_kw(c)["facecolor"], label=LABEL[c]) for c in conds
     ]
     ax.legend(handles=handles, loc="lower right", fontsize=8, frameon=False)
-    ax.set_title("Every prediction per case, sorted by the no-scenario mean", fontsize=10, color=INK, loc="left")
+    ax.set_title("Every prediction per case, sorted by the no-scenario mean")
     fig.tight_layout()
-    fig.savefig(a.out / "score_per_case.png", dpi=160)
+    fig.savefig(a.out / "score_per_case.png")
 
 
 if __name__ == "__main__":

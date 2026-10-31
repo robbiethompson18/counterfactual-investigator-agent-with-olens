@@ -25,13 +25,13 @@ rather than starting another deck.
   the same `S`), frames top-aligned, 5 mm margins, no big gaps.
 - Indigo is structure (progress bar, section labels, `\takeaway`, `\alert`); every other colour is a
   condition, the charts' (transcript-only blue, O-lens orange, J++ purple, NLA green, no tools gray,
-  a placebo is its lens's colour with stripes in the background colour; `slides/figure.py`'s
-  `bar_kw` does it). Change a colour in `page.html` / `graphs/style.py` and the theme's
-  `\definecolor`s together.
+  a placebo is its lens's colour with stripes in the background colour; `graphs/style.py`'s `bar_kw`
+  does it). Change a colour in `page.html` / `graphs/style.py` and the theme's `\definecolor`s
+  together.
 - No boxes or cards anywhere: figures, tables and panels sit straight on the page. A part opens with
   `\parthead{n}{title}` on its first frame (no separate section page).
 - Figures: make them with `slides/figure.py` (`figure(w_mm, h_mm)`, `save`), which applies
-  `slides.mplstyle` (Inter, 8pt, the charts' ink and grid) and takes the colours from
+  `graphs/style.py`'s look with `slides.mplstyle`'s sizes (8pt) and takes the colours from
   `graphs/style.py` (`bar_kw`, `diff_rows`). Make each figure at its slide size (`FULL_W` × `FULL_H`
   under a title, `HALF_W` for a column) and include it with `\slidefig`, which never scales it, so
   the figure's text matches the slide's. Vector PDF, transparent background.

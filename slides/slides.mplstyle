@@ -1,35 +1,11 @@
-# Slide figures: graphs/style.py's look (warm ink, light grid, no top/right spines) in the deck's fonts and sizes.
-# Saved at their natural size and included unscaled, so 8pt here is 8pt on the slide, next to the 9pt body text.
-font.family: Inter, DejaVu Sans
+# Slide figures: graphs/style.py's look at the deck's sizes. Saved at their natural size and included unscaled, so 8pt here is 8pt on
+# the slide, next to the 9pt body text.
 font.size: 8
 axes.titlesize: 8.5
-axes.titleweight: semibold
-axes.titlelocation: left
-axes.titlecolor: 1c1b19
 axes.labelsize: 8
-axes.labelcolor: 6f6b62
-axes.edgecolor: 6f6b62
-axes.linewidth: 0.6
-axes.spines.top: False
-axes.spines.right: False
-axes.grid: True
-axes.axisbelow: True
-grid.color: e4e0d6
-grid.linewidth: 0.6
-xtick.color: 6f6b62
-ytick.color: 6f6b62
-xtick.labelcolor: 1c1b19
-ytick.labelcolor: 1c1b19
 xtick.labelsize: 7.5
 ytick.labelsize: 7.5
-xtick.major.width: 0.6
-ytick.major.width: 0.6
-xtick.major.size: 3
-ytick.major.size: 0
-legend.frameon: False
 legend.fontsize: 7.5
-text.color: 1c1b19
 pdf.fonttype: 42
 savefig.transparent: True
 savefig.format: pdf
-hatch.linewidth: 1.8
