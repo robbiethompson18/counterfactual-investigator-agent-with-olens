@@ -19,6 +19,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from huggingface_hub import hf_hub_download
+from matplotlib.colors import to_hex, to_rgb
 
 from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.style import INK, MUTED
@@ -219,25 +220,32 @@ def grid() -> None:
 
 
 def grader() -> None:
-    """Two bars: how often the O-lens read at the "." ending "If you are not sure, give your best guess." says "grader"/"graded"
-    (not in the prompt), chat template vs the submit_answer tool template, on the 863 cutoff_qa items read in both."""
+    """Two pairs of bars at the "." ending "If you are not sure, give your best guess.", chat template vs the submit_answer tool
+    template, on the 863 cutoff_qa items read in both: the share of O-lens reads (six layers) saying "grader"/"graded" (not in the
+    prompt), and the share of items with at least one such read, hatched in a darker shade of the bar's colour (stripes in the
+    background colour mean placebo in this deck)."""
     run = Path("runs/cutoff_grader_mentions/2026-10-30_regex")
     if not (ROOT / "data" / run / "novel_hits.jsonl").exists():
         for f in ("item_counts.csv", "novel_hits.jsonl"):
             hf_hub_download(HF_REPO, f"{run}/{f}", repo_type="dataset", local_dir=ROOT / "data")
-    bars = at_token(ROOT / "data" / run, ".")
+    groups = [("% of reads", at_token(ROOT / "data" / run, "."), None),
+              ("% of items, any read", at_token(ROOT / "data" / run, ".", items=True), "////")]  # fmt: skip
     fig, ax = figure(42, 40)
-    for x, (r, lab) in enumerate([("A", "chat template"), ("B", "agentic template\n(submit_answer tool)")]):
-        v, lo, hi = bars[r]
-        ax.bar(x, v, 0.7, color=RUNS[r][0])
-        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-        ax.annotate(f"{v:.1%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK)
-    ax.set_xticks([0, 1], ["chat template", "agentic template\n(submit_answer tool)"])
-    ax.set_xlim(-0.6, 1.6)
+    for g, (_, bars, hatch) in enumerate(groups):
+        for j, r in enumerate(("A", "B")):
+            x, (v, lo, hi) = g * 2.4 + j * 0.85, bars[r]
+            ax.bar(x, v, 0.8, color=RUNS[r][0], hatch=hatch, edgecolor="none", hatchcolor=to_hex(np.array(to_rgb(RUNS[r][0])) * 0.6))
+            ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
+            ax.annotate(
+                f"{v:.1%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * S, color=INK
+            )
+    ax.set_xticks([0.425, 2.825], [lab for lab, _, _ in groups])
+    ax.set_xlim(-0.6, 3.85)
     ax.tick_params(axis="x", length=0, labelcolor=MUTED, labelsize=7 * S)
-    ax.set_yticks(np.arange(0, 0.21, 0.05), [f"{t:.0%}" for t in np.arange(0, 0.21, 0.05)])
+    ax.set_ylim(0, 0.85)
+    ax.set_yticks(np.arange(0, 0.81, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.81, 0.2)])
     ax.tick_params(axis="y", labelcolor=MUTED)
-    ax.set_ylabel('O-lens reads saying "grader" / "graded"')
+    ax.set_ylabel('saying "grader" / "graded"')
     for side in ("left", "bottom"):
         ax.spines[side].set_visible(False)
     ax.grid(axis="x", visible=False)
