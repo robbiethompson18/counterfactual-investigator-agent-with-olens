@@ -83,8 +83,8 @@
 \setlength{\metropolis@titleseparator@linewidth}{0.5pt}
 \setlength{\metropolis@progressonsectionpage@linewidth}{0.5pt}
 
-% "PART n  Title" of the current section, right of every frame title (none before the first \section)
-\newcommand{\olens@partlabel}{\ifnum\value{section}>0{\color{accent}\usebeamerfont{date}\scriptsize\mdseries {\bfseries\addfontfeatures{LetterSpace=8}PART \insertsectionnumber}\ \ \insertsectionhead}\fi}
+% the current section's title, right of every frame title (none before the first \section)
+\newcommand{\olens@partlabel}{\ifnum\value{section}>0{\color{accent}\usebeamerfont{date}\scriptsize\mdseries \insertsectionhead}\fi}
 % Frame title: ink on the page colour, left-aligned like the charts' titles, with Metropolis's progress bar as a hairline under it.
 \setbeamertemplate{frametitle}{%
   \nointerlineskip
