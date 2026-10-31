@@ -62,24 +62,15 @@ from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
 from counterfactual_investigator_agent_with_olens.render import render_request, transcript_line  # PYTHONPATH=olens/src:src
+from environments._lib.mcq import option_newlines as mcq_option_newlines
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
-OPTION = re.compile(r"\n(?:\(([A-P])\)|([A-P])\.) ")  # an MCQ option line: "\nA. text" (hint_mcq) or "\n(A) text" (hinted_truthfulqa)
 
 
 def option_newlines(text: str) -> list[int]:
-    """Char offsets of the newline after each MCQ option's text: the next option's leading "\\n", and for the last option
-    the "\\n\\n" after it (none if the options end the text). Options must run A, B, C, ... from the first "A"."""
-    starts = []
-    for m in OPTION.finditer(text):
-        letter = m.group(1) or m.group(2)
-        if letter == "ABCDEFGHIJKLMNOP"[len(starts)]:
-            starts.append(m.start())
-    if len(starts) < 2:
-        return []
-    last = text.find("\n\n", starts[-1] + 1)
-    return starts[1:] + ([last] if last >= 0 else [])
+    """Character-offset adapter for the shared complete-option newline contract."""
+    return [char for char, _ in mcq_option_newlines(text)]
 
 
 # WorkspaceBench's sampling of record for prose lenses (T 1.0, top-p 0.95, top-k 64; the RL that made the lens sampled at T 1.0 too),

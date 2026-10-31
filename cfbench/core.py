@@ -130,7 +130,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
 # think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
 # are byte-identical to 13.
-HARNESS_VERSION = 14
+# 15: MCQ options use the final lettered block and reads use complete-option ending newlines, including multiline options.
+# mcq_unselected / supergpqa_inline prompts and read selection can change; stored runs are not rewritten.
+HARNESS_VERSION = 15
 
 
 @dataclass

@@ -280,7 +280,18 @@ def _pool(path: Path) -> dict[str, tuple[list[Pos], list[Pos]]]:
         payload = r["bullets"] if "bullets" in r else {"text": r["text"], "fve": r.get("fve")}  # O-lens bullets or an NLA readout
         where[r["id"]].setdefault(key, (r["token"], {}))[1][r["layer"]] = payload
     ids = set(nl) | set(tail)
-    return {i: ([nl[i][k] for k in sorted(nl[i])], [tail[i][k] for k in sorted(tail[i])]) for i in ids}
+    prompts = {r["id"]: r["messages"][-1]["content"] for r in map(json.loads, (path / "requests.jsonl").open())}
+    out = {}
+    for rid in ids:
+        expected = [c for c, _ in option_newlines(prompts[rid])]
+        selected = {c: pos for c in expected for start, pos in nl[rid].items() if start <= c < start + len(pos[0])}
+        missing = set(expected) - selected.keys()
+        if missing:
+            raise ValueError(
+                f"{path}: {rid} needs new reads at complete-option newline offsets {sorted(missing)}; cached reads are unchanged"
+            )
+        out[rid] = ([selected[c] for c in expected], [tail[rid][k] for k in sorted(tail[rid])])
+    return out
 
 
 def _pool_items(path: Path) -> dict[str, str]:

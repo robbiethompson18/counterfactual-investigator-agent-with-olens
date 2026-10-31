@@ -238,7 +238,20 @@ def _pool(path: Path, layers: tuple[int, ...]) -> dict[str, list[Pos]]:
         r = json.loads(line)
         if r["layer"] in layers:
             by[r["id"]].setdefault(r["token_index"], (r["token"], {}))[1][r["layer"]] = r
-    return {i: [pos[k] for k in sorted(pos)] for i, pos in by.items()}
+    prompts = {r["id"]: r["text"] for r in map(json.loads, path.with_name("requests.jsonl").open())}
+    out = {}
+    for rid, positions in by.items():
+        ordered = [positions[k] for k in sorted(positions)]
+        by_char = {next(iter(layers.values()))["char_offset"]: (token, layers) for token, layers in ordered[: -len(TAIL)]}
+        expected = [c for c, _ in option_newlines(prompts[rid])]
+        selected = {c: pos for c in expected for start, pos in by_char.items() if start <= c < start + len(pos[0])}
+        missing = set(expected) - selected.keys()
+        if missing:
+            raise ValueError(
+                f"{path}: {rid} needs new reads at complete-option newline offsets {sorted(missing)}; cached reads are unchanged"
+            )
+        out[rid] = [selected[c] for c in expected] + ordered[-len(TAIL) :]
+    return out
 
 
 @cache

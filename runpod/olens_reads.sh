@@ -57,7 +57,7 @@ EOF
     ssh_pod "cat > /workspace/reads/$tag.sh" <<EOF
 while IFS= read -r -d '' kv; do export "\$kv"; done < /proc/1/environ
 export HF_HOME=/workspace/.cache/huggingface HOME=/workspace/home OMP_NUM_THREADS=10 PYTHONDONTWRITEBYTECODE=1
-cd /root/repo && PYTHONPATH=olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
+cd /root/repo && PYTHONPATH=.:olens/src:src exec python3 ${READER:-scripts/olens_read_requests.py} /workspace/reads/$tag.jsonl \
   /workspace/reads/$tag.reads.jsonl $*
 EOF
     ssh_pod "nohup bash /workspace/reads/$tag.sh > /workspace/reads/$tag.log 2>&1 < /dev/null & echo started" ;;
