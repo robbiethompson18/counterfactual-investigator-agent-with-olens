@@ -461,6 +461,7 @@ def run_header(run_dir: Path, meta: dict, docent: dict) -> dict:
         "slug": meta.get("slug") or (m[2] if m else run_dir.name),
         "description": meta.get("description"),
         "status": meta.get("status"),
+        "inputs": Path(meta["params"]["inputs"]).name if meta["params"].get("inputs") else None,  # for the eval's INPUTS_RUNS
         "harness_version": meta["params"].get("harness_version", 1),
         "predictors": meta["params"].get("predictors", "").split(","),
         "effort": meta["params"].get("effort"),
@@ -590,6 +591,20 @@ def item_info(meta: dict, rows: list[dict]) -> dict:
     answer), once per item; {} for evals without it."""
     hook = getattr(_eval_module(meta.get("params", {}).get("eval")), "ITEM_INFO", None)
     return {r["item"]: hook(r) for r in {r["item"]: r for r in rows if r.get("item")}.values()} if hook else {}
+
+
+def page_html(name: str, summaries: list[dict]) -> str | None:
+    """The eval's own page section: its score.py's PAGE(rows) over the current runs' predictions (cfbench/evals/page.py)."""
+    import importlib
+    import importlib.util
+
+    if not importlib.util.find_spec(f"cfbench.evals.{name}.score"):
+        return None
+    page = getattr(importlib.import_module(f"cfbench.evals.{name}.score"), "PAGE", None)
+    if page is None:
+        return None
+    rows = [json.loads(line) for s in summaries for line in (CFBENCH / s["run"] / "predictions.jsonl").read_text().splitlines()]
+    return page(rows)
 
 
 def mark_current(name: str, summaries: list[dict]) -> dict:
@@ -773,6 +788,8 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         summaries = [s for s in summaries if s.get("status") in (None, "done")]  # running ones show once they finish
         if only := getattr(_eval_module(name), "INPUTS_RUNS", None):  # the eval's broken inputs runs are left out entirely
             summaries = [s for s in summaries if s.get("inputs") in only]
+        if skip := getattr(_eval_module(name), "SKIP_RUNS", None):  # superseded runs of a kept inputs run, left out too
+            summaries = [s for s in summaries if s["run"] not in skip]
         all_envs = sorted({e for r in runs[name] for e in (eval_of(json.loads((r / "meta.json").read_text())) or ("", [], []))[1]})
         title, description = describe(name, all_envs)
         if shown := getattr(_eval_module(name), "RUNS", None):  # the eval lists the runs it shows: each its own row, no pooling
@@ -787,7 +804,9 @@ def build(names: list[str] | None = None, export=True) -> list[Path]:
         arm_labels = getattr(_eval_module(name), "ARM_LABELS", None)  # readable names for the eval's arms
         doc = {"name": name, "title": title, "description": description, "envs": all_envs, "runs": summaries, "claim": claim}
         doc |= {"arm_labels": arm_labels, "pair_labels": getattr(_eval_module(name), "PAIR_LABELS", None)} | extra
+        doc["page_html"] = page_html(name, [s for s in summaries if s.get("current", True)])
         doc["error_rate"] = getattr(_eval_module(name), "ERROR_RATE", False)  # answer task shown as error rate (lower is better)
+        doc["position_chart"] = getattr(_eval_module(name), "POSITION_CHART", None)  # page.html positionChart
         p.write_text(json.dumps(doc) + "\n")
         written.append(p)
     return written
