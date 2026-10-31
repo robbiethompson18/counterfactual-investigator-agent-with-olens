@@ -29,9 +29,9 @@ rather than starting another deck.
   does it). Change a colour in `page.html` / `graphs/style.py` and the theme's `\definecolor`s
   together.
 - No boxes or cards anywhere: figures, tables and panels sit straight on the page. A part is a
-  `\section{Title}` (no section page) whose first frame opens with `\parthead`; every other frame
-  shows the part's title on the right of its frame title. Single striking examples go in the last
-  part, Anecdata.
+  `\section{Title}` (no section page) whose first frame opens with `\parthead` (a part may skip
+  that frame, as Anecdata does); every other frame shows the part's title on the right of its frame
+  title. Single striking examples go in the last part, Anecdata.
 - Figures: make them with `slides/figure.py` (`figure(w_mm, h_mm)`, `save`), which applies
   `graphs/style.py`'s look with `slides.mplstyle`'s sizes (8pt) and takes the colours from
   `graphs/style.py` (`bar_kw`, `diff_rows`). Make each figure at its slide size (`FULL_W` × `FULL_H`
