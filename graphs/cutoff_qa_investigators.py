@@ -1,8 +1,8 @@
 """cutoff_qa_inline by investigator: is the O-lens's gain on stale items just Haiku's later knowledge cutoff? Haiku 5.5 (cutoff
 after Qwen's) beside Gemini 2.5 Flash-Lite (OpenRouter: 2025-01-31, about Qwen's), each predicting Qwen3.6-27B's answer from the
 question alone and with the item's O-lens, J++ and NLA reads, each beside its placebo. Both also get the told prompt (the model
-is Qwen3.6-27B, cutoff ~January 2025); Flash-Lite also gets the census (asked the question itself, no investigator prompt: what a
-same-cutoff model answers). Panels: stale items (Qwen's answer is out of date), not stale, all. Exact match to Qwen's modal answer
+is Qwen3.6-27B, cutoff ~January 2025); both also get the census (asked the question itself, no investigator prompt: what the model
+itself answers). Panels: stale items (Qwen's answer is out of date), not stale, all. Exact match to Qwen's modal answer
 (post-2026-10-31 labels), per-item mean over draws then the mean over items, 95% bootstrap CIs over items; a run that
 isn't finished (meta.json status done) is left out (Robbie, 2026-10-31: chart Haiku now, add Flash-Lite as its runs land).
 
@@ -20,8 +20,7 @@ from graphs.cutoff_qa_inline import ci, per_item
 from graphs.style import MUTED, bar_kw, ci_bar, label
 
 CF = Path("data/runs/cfbench")
-CENSUS = Path("data/runs/cutoff_qa_census/2026-10-31_flashlite-1k/census_flashlite.jsonl")
-# investigator -> [(condition, run)]; "self_answer" is the census, the rest cfbench runs on the 999-item inputs
+CENSUS = Path("data/runs/cutoff_qa_census")
 LENSES = [
     ("olens", "olens", "olens-placebo"),
     ("jlens", "jlens", "jlens-placebo"),
@@ -36,12 +35,13 @@ def lens_runs(prefix: str) -> list:
 # investigator -> [(condition, run)]; "self_answer" is the census, the rest cfbench runs on the 999-item inputs
 INVESTIGATORS = {
     "Claude Haiku 5.5": [
+        ("self_answer", CENSUS / "2026-10-31_haiku-1k/census.jsonl"),
         ("transcript_inline", CF / "2026-10-29_cutoff-qa-1k-transcript"),
         ("transcript_told_inline", CF / "2026-10-31_cutoff-qa-1k-told-transcript"),
         *lens_runs("2026-10-29_cutoff-qa-1k"),
     ],
     "Gemini 2.5 Flash-Lite": [
-        ("self_answer", CENSUS),
+        ("self_answer", CENSUS / "2026-10-31_flashlite-1k/census_flashlite.jsonl"),
         ("transcript_inline", CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"),
         ("transcript_told_inline", CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"),
         *lens_runs("2026-10-31_cutoff-qa-1k-flashlite"),
@@ -59,7 +59,7 @@ def census(path: Path, gold: dict[str, str], cls: dict[str, str]) -> dict[str, t
 def load() -> dict[str, dict[str, dict]]:
     """investigator -> condition -> item -> (gate_class, accuracy), for the runs that exist."""
     out: dict[str, dict[str, dict]] = {}
-    ref = [json.loads(line) for line in (INVESTIGATORS["Claude Haiku 5.5"][0][1] / "predictions.jsonl").open()]
+    ref = [json.loads(line) for line in (CF / "2026-10-29_cutoff-qa-1k-transcript/predictions.jsonl").open()]
     gold, cls = {r["item"]: r["gold"] for r in ref}, {r["item"]: r["gate_class"] for r in ref}
     for who, conds in INVESTIGATORS.items():
         for c, path in conds:
