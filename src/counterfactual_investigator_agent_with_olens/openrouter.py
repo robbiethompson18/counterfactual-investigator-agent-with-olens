@@ -41,6 +41,13 @@ GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 DIRECT = "gemini-direct/"
 VERTEX = "vertex/"
 CLAUDE = "anthropic-direct/"
+
+
+def same_model(predictor: str) -> str:
+    """The Gemini model behind a route: `google/X` (OpenRouter), `gemini-direct/X` and `vertex/X` are all X."""
+    return predictor.removeprefix(DIRECT).removeprefix(VERTEX).removeprefix("google/")
+
+
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: dict[str, AsyncOpenAI] = {}  # key_env -> client

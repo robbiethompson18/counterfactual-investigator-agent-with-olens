@@ -224,7 +224,7 @@ def main(argv):
     w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
     print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
     docent_upload(w.dir, skip=a.no_docent or a.no_upload)
-    written = build_index([a.env])
+    written = build_index([a.env], evals=False)  # evals don't ship with an env run, and one broken eval used to block the upload
     if not a.no_upload:
         n, oid = upload([w.dir, *written], f"envrun {a.env} {run} ({status})")
         print(f"uploaded {n} files to envs/ ({oid[:10]})")
@@ -337,7 +337,7 @@ def cli():
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})
-        written = build_index(envs)
+        written = build_index(envs, evals=False)
         n, oid = upload([*dirs, *written], "envs: upload " + ", ".join(rest))
         print(f"uploaded {n} files ({oid[:10]})")
     else:
