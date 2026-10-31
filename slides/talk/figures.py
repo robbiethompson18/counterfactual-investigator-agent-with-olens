@@ -521,11 +521,11 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
     us = sorted(set(b))
     of = {u: np.flatnonzero(b == u) for u in us}
     idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
-    rec = {c: platt(xs[c], y, b) for c in AUTHOR_CONDS}
+    rec = {c: platt(xs[c], y, b) for c in (*AUTHOR_CONDS, "transcript+probe")}
     brier = lambda c, i: np.mean((rec[c][i] - y[i]) ** 2)
     pairs = {}
     for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
-                 ("nla_inline", "nla_placebo_inline")]:  # fmt: skip
+                 ("nla_inline", "nla_placebo_inline"), ("transcript+probe", "transcript_inline")]:  # fmt: skip
         da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
         db = np.array([brier(c, i) - brier(a, i) for i in idx])
         allc = np.arange(len(y))
@@ -567,7 +567,7 @@ def author() -> None:
     save(fig, OUT / "author.pdf")
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
             "olens_placebo_inline": r"\swp{olens}\ O-lens placebo", "nla_inline": r"\sw{nla}\ NLA",
-            "nla_placebo_inline": r"\swp{nla}\ NLA placebo"}  # fmt: skip
+            "nla_placebo_inline": r"\swp{nla}\ NLA placebo", "transcript+probe": r"\sw{probe}\ probe + transcript"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     rows = [
         f"{name[a]} − {name[c].split(' ', 1)[1]} & {d:+.3f} & {pf(p)} & {g:+.3f} & {pf(q)}\\\\" for (a, c), (d, p, g, q) in pairs.items()
