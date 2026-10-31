@@ -130,7 +130,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
 # think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
 # are byte-identical to 13.
-HARNESS_VERSION = 14
+# 15: menus_inline input preparation uses intact prompt text and structured MCQ options, avoiding split Unicode
+# corruption and spurious options parsed from question stems. Existing saved inputs and predictions are not rewritten.
+HARNESS_VERSION = 15
 
 
 @dataclass
