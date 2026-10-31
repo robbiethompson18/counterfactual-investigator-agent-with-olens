@@ -18,6 +18,7 @@ The two tasks are scored by two graders and never mixed: `rate` by `cfbench.scor
 
 import difflib
 import json
+import os
 import random
 from collections import Counter
 from dataclasses import dataclass
@@ -51,6 +52,16 @@ LEGACY_CONDITIONS = {
     "olens_placebo": "olens_placebo_agentic",
     "transcript": "transcript_inline_retired",
 }
+
+
+def check_agentic(conditions) -> None:
+    """Refuse the *_agentic conditions unless CFBENCH_ALLOW_AGENTIC=1: stale since 2026-10-30, the *_inline ones are current."""
+    stale = sorted(c for c in conditions if c.endswith("_agentic"))
+    if stale and os.environ.get("CFBENCH_ALLOW_AGENTIC") != "1":
+        raise SystemExit(
+            f"{', '.join(stale)}: *_agentic conditions are stale (Robbie, 2026-10-30): human approval required; use the *_inline "
+            "conditions (or set CFBENCH_ALLOW_AGENTIC=1 once Robbie approves)"
+        )
 
 
 def canon_condition(name: str) -> str:
@@ -108,7 +119,11 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # Submit verdicts (2026-10-29, no bump): a valid submit_prediction / submit_answer call's tool result now states the submission,
 # the truth and whether it was right (cfbench/predict.py `grader`). Transcript-only, written after the rollout ends (a valid
 # submission ends the predictor's loop), so nothing the predictor sees changes; older runs are not backfilled.
-HARNESS_VERSION = 13
+# 14: cutoff_qa_tool_inline (Robbie, 2026-10-30) shows Qwen's system turn (the submit_answer tool definition) above the
+# question, and its O-lens / NLA blocks read at every punctuation token of the question plus the last 10 prompt tokens (empty
+# think block included), each shown after this item's preceding text, with the reads text saying so. Every other eval's prompts
+# are byte-identical to 13.
+HARNESS_VERSION = 14
 
 
 @dataclass

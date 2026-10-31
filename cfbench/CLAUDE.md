@@ -22,6 +22,10 @@ predictor sees:
     regex-search all of them (`search_transcripts`), 20 calls in total before it must submit
     (`cfbench/tools.py`). This is the baseline every tool condition is compared against;
   - `olens_agentic` and `olens_placebo_agentic`: `transcript_agentic` plus O-lens tools, below.
+  - **Every `*_agentic` condition is stale (Robbie, 2026-10-30): human approval required before
+    use.** `cfbench.run` and `cfbench.eval` refuse them unless `CFBENCH_ALLOW_AGENTIC=1`
+    (`core.check_agentic`). The current conditions are the single-turn `*_inline` ones
+    (`core.INLINE_CONDITIONS`, cfbench/evals/CLAUDE.md).
 - the edit, exactly: the before/after file for funding_email, a unified diff of the starting context
   for secret_number.
 

@@ -2,7 +2,7 @@
 log-probs of given candidate tokens at the last position. Needs only torch, transformers and numpy, so it runs in any GPU
 venv (e.g. the one-engine reader's), with the prompts tokenized elsewhere.
 
-    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2 | --layers 32,40,52] [--chunk N] [--no-fla]
+    python scripts/hs_at_positions.py INPUTS.jsonl OUT_DIR [--layer-stride 2 | --layers 32 40 52] [--chunk N] [--no-fla]
 
 INPUTS.jsonl: one row per prompt, {id, ids (token ids), sites: {name: [token index, ...]}, cand (token ids)}. OUT_DIR gets
 <site>.npy ([all rows' positions in order, saved layers, d] fp16, hidden_states index 0, stride, ..., n_layers, or
@@ -45,7 +45,7 @@ def main():
     ap.add_argument("out")
     ap.add_argument("--model", default="Qwen/Qwen3.6-27B")
     ap.add_argument("--layer-stride", type=int, default=2)
-    ap.add_argument("--layers", help="comma-separated hidden_states indices, instead of --layer-stride")
+    ap.add_argument("--layers", nargs="+", help="hidden_states indices instead of --layer-stride (space- or comma-separated)")
     ap.add_argument("--chunk", type=int, help="rows per part (OUT/part-K/), resumable")
     ap.add_argument("--no-fla", action="store_true", help="hide flash-linear-attention: transformers' slow torch kernels")
     a = ap.parse_args()
@@ -59,7 +59,7 @@ def main():
     n_layers = model.config.get_text_config().num_hidden_layers
     layers = list(range(0, n_layers + 1, a.layer_stride)) + ([n_layers] if n_layers % a.layer_stride else [])
     if a.layers:
-        layers = [int(x) for x in a.layers.split(",")]
+        layers = [int(x) for arg in a.layers for x in arg.split(",")]
     if not a.chunk:
         return run(model, torch, rows, Path(a.out), layers)
     for k in range(0, len(rows), a.chunk):

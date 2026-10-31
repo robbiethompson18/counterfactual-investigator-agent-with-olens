@@ -22,6 +22,8 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from graphs.style import INK, MUTED, bar_kw, color, use
+
 ROLLOUTS = Path("data/runs/hint_cf_wrong_mcq/2026-10-26_or_nothink2/rows.jsonl")
 RUNS = {
     "hint is the correct answer": Path("data/runs/cfbench/2026-10-27_answer-mcq-olens-header"),
@@ -29,11 +31,8 @@ RUNS = {
 }
 CONDS = ["agentic", "olens", "olens_placebo"]
 LABEL = {"agentic": "Transcript-only", "olens": "O-lens", "olens_placebo": "O-lens placebo"}
-COLOR = {"agentic": "#2a78d6", "olens": "#eb6834", "olens_placebo": "#1a1a1a"}  # CLAUDE.md chart colors
-INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e1e0d9"
-plt.rcParams.update(
-    {"font.size": 10, "axes.spines.top": False, "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "axes.axisbelow": True}
-)
+COLOR = {c: color(c) for c in LABEL}  # graphs.style: a placebo is its tool's colour, hatched
+use()
 N_BOOT = 4000
 
 
@@ -88,7 +87,7 @@ def bars(panels: dict, out: Path, filtered: bool) -> None:
         print(f"   olens - placebo {100 * m:+.1f}pp [{100 * lo:+.0f}, {100 * hi:+.0f}]  wins {wins} losses {losses} ties {ties}")
         for x, c in enumerate(CONDS):
             m, lo, hi, _ = st[c]
-            ax.bar(x, 100 * m, width=0.55, color=COLOR[c], linewidth=0)
+            ax.bar(x, 100 * m, width=0.55, **bar_kw(c))
             ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1.2, capsize=4)
             ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}%", ha="center", va="bottom", color=INK)
         ax.axhline(10, color=MUTED, linestyle=":", linewidth=1)
@@ -115,9 +114,11 @@ def per_item(by: dict, meta: dict, title: str, out: Path) -> None:
         for xi, k in enumerate(keys):
             hits, n = sum(by[c][k]), len(by[c][k])
             size = 70 + 220 * hits / max(n, 1)
-            ax.scatter(xi, yi, s=size, color=COLOR[c] if hits else "none", edgecolors=COLOR[c], linewidths=1.5, zorder=3)
+            hatch = bar_kw(c)["hatch"] if hits else None  # hatching takes the edge colour, so a hatched marker gets an ink edge
+            ax.scatter(xi, yi, s=size, facecolor=COLOR[c] if hits else "none", edgecolors=INK if hatch else COLOR[c], linewidths=1.5,
+                       zorder=3, hatch=hatch)  # fmt: skip
             if hits:
-                ax.text(xi, yi, f"{hits}/{n}", ha="center", va="center", color="white" if c != "olens" else INK, fontsize=7, zorder=4)
+                ax.text(xi, yi, f"{hits}/{n}", ha="center", va="center", color="white" if c == "agentic" else INK, fontsize=7, zorder=4)
     ax.set_yticks(range(3))
     ax.set_yticklabels([LABEL[c] for c in CONDS])
     ax.set_xticks(range(len(keys)))

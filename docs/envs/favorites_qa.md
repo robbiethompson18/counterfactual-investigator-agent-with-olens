@@ -1,8 +1,9 @@
 # favorites_qa: predicting Qwen's own favourites from the question
 
-**Status (2026-10-29):** ACTIVE. Bank v2 (2,742 questions, 790 stable under Qwen) is the env's
-default; v1 is the 290-question pilot (62 stable), whose 62 have O-lens reads and a transcript-only
-Haiku run (74%). No investigator run on v2 yet.
+**Status (2026-10-29):** ACTIVE. Bank v3 (5,187 questions, 1,500 stable under Qwen) is the env's
+default; v2 (2,742, 790 stable) and the pilot v1 (290, 62 stable) are kept. Results on all 1,500
+(O-lens and NLA +7pp over transcript-only's 80%, J++ +0) are in
+[docs/favorites-qa-inline.md](../favorites-qa-inline.md).
 
 WorkspaceBench's `basic_readout` family has 32 `implicit` items ("What is your favorite card game?
 Answer in one word." → poker), labelled with Qwen3.6-27B's own gated answer. Its text readers get
@@ -107,7 +108,5 @@ pilot size.
 
 ## Next
 
-- One more wave (~15 agents, ~700 questions) for 1,000 stable items; the avoid-list is v2's
-  categories.
-- Then the env run, the end-of-prompt reads and the three conditions on all stable v2 items. The
-  pilot eval (`favorites_qa_inline`, RUN = the 62) reads its labels from bank v1.
+- See [docs/favorites-qa-inline.md](../favorites-qa-inline.md) for the investigator results on all
+  1,500 stable v3 items and their caveats.
