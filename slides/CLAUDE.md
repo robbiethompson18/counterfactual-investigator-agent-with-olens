@@ -14,9 +14,11 @@ link); a PR touching them attaches its `talk.pdf` to the workflow run
 Debian/Ubuntu:
 `apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono`.
 
-**The deck.** `talk/talk.tex`, with its charts in `talk/figures.py` (run first by `make`, as
-`python -m slides.talk.figures`, from the real results), writing PDFs to `fig/`. Add new parts to it
-rather than starting another deck.
+**The deck.** `talk/talk.tex`, with its charts in `graphs/talk.py` (run first by `make`, as
+`python -m graphs.talk`, from the real results), writing PDFs and table snippets to `talk/fig/`. Add
+new parts to it rather than starting another deck. **No Python lives here:** `slides/` and `docs/`
+are leaves that only consume `graphs/`, which holds every chart (deck and write-up) and imports
+nothing from either; statistics come from `cfbench.scoring`.
 
 **Style rules.**
 
@@ -32,11 +34,12 @@ rather than starting another deck.
   `\section{Title}` (no section page) whose first frame opens with `\parthead` (a part may skip
   that frame, as Anecdata does); every other frame shows the part's title on the right of its frame
   title. Single striking examples go in the last part, Anecdata.
-- Figures: make them with `slides/figure.py` (`figure(w_mm, h_mm)`, `save`), which applies
-  `graphs/style.py`'s look with `slides.mplstyle`'s sizes (8pt) and takes the colours from
-  `graphs/style.py` (`bar_kw`, `diff_rows`). Make each figure at its slide size (`FULL_W` × `FULL_H`
-  under a title, `HALF_W` for a column) and include it with `\slidefig`, which never scales it, so
-  the figure's text matches the slide's. Vector PDF, transparent background.
+- Figures: a function in `graphs/talk.py` decorated with `graphs.style`'s `@slide`, made with
+  `slide_figure(w_mm, h_mm)` and written with `slide_save`. `@slide` applies the deck's sizes
+  (`SLIDE_RC`: 8pt × the deck's 2/3, transparent PDF) around that one figure only, never
+  process-wide, on top of the charts' look and colours (`bar_kw`, `diff_rows`). Make each figure at
+  its slide size (`FULL_W` × `FULL_H` under a title, `HALF_W` for a column) and include it with
+  `\slidefig`, which never scales it, so the figure's text matches the slide's.
 - No commentary (Kylie, 2026-10-30): frame titles name the content ("Results: ..."), never the
   result; no `\takeaway` lines; bullets give numbers and facts, no "only" or "harder". No eval keys
   or run paths on slides.
