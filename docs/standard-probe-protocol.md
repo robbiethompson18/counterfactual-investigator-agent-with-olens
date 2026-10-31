@@ -1,8 +1,7 @@
 # Standard probe protocol: nested two-fold and two read positions
 
-**Status (2026-10-31):** ACTIVE. Agreed execution protocol; results pending. This supersedes older
-probe recipes for standardized comparisons, without invalidating or deleting their historical
-results.
+**Status (2026-10-31):** ACTIVE. Executed protocol; results below. This supersedes older probe
+recipes for standardized comparisons, without invalidating or deleting their historical results.
 
 ## Scope and labels
 
@@ -12,18 +11,18 @@ reports both read positions separately. The execution budget is 90 minutes from 
 existing responses and activations where compatible, parallelize extraction, and record unfinished
 work honestly rather than silently changing the protocol.
 
-Keep the existing MCQ consistency rule: at least seven of eight valid sampled answers agree, with
-strict bare-letter parsing as used by the current evals. Do not select on Qwen being wrong or on
-DeepSeek disagreeing with Qwen. Earlier chat explanations incorrectly called this eight-of-eight.
-MCQ labels are Qwen's modal answer, not benchmark truth. Correct/wrong are reporting subgroups only.
-Hinted MCQ predicts the no-hint modal answer from a hinted prompt; do not mix hint placement
-variants or silently reuse a wrong-only/disagreement-selected cohort as the standard population.
+Keep the existing MCQ consistency rule: at least seven of eight saved samples give the same bare
+letter, with unparseable replies counting against consistency, as in the current evals. Do not
+select on Qwen being wrong or on DeepSeek disagreeing with Qwen. Earlier chat explanations
+incorrectly called this eight-of-eight. MCQ labels are Qwen's modal answer, not benchmark truth.
+Correct/wrong are reporting subgroups only. Hinted MCQ predicts the no-hint modal answer from a
+hinted prompt; do not mix hint placement variants or silently reuse a
+wrong-only/disagreement-selected cohort as the standard population.
 
 Essay grading uses only biased-prompt activations to predict the same essay's plain-opener mean
-grade. Subtract the observed biased-opener mean to obtain the predicted change. Truth is plain mean
-
-> biased mean; ties belong to not-up. The older second recipe used a counterfactual forward pass; it
-> is not a second standard essay probe.
+grade. Subtract the observed biased-opener mean to obtain the predicted change. Truth is
+`plain mean > biased mean`; ties belong to not-up. The older second recipe used a counterfactual
+forward pass; it is not a second standard essay probe.
 
 ## Known data inventory before rebuilding
 
@@ -111,3 +110,36 @@ Existing option-token, balanced/wrong-only, globally selected-layer, author-attr
 probe recipes are **legacy/non-standard for this comparison**. Their historical results remain
 available; this protocol makes no claim they were all buggy or scientifically invalid. Compare new
 probe and lens scores on explicitly identified common evaluation questions.
+
+## Results (2026-10-31)
+
+All five families completed, retaining every eligible evaluation question. Six GPUs captured 22,214
+MCQ prompts at both positions and all six layers; all were deleted by 09:00 Pacific. Estimated GPU
+cost: **$5.06**, excluding storage/billing rounding. All 260 inner/final fits converged. MCQ
+training used exactly 1,000 questions per outer fold (combined: 500 from each benchmark); essays
+used 901/899 training rows from 102 essays each.
+
+Accuracy, **user end → response start**:
+
+| Training family | MMLU-Pro (7,943) | SuperGPQA (6,328) |
+| --------------- | ---------------- | ----------------- |
+| MMLU-Pro        | 86.34% → 98.55%  | 82.24% → 98.63%   |
+| SuperGPQA       | 86.06% → 97.77%  | 82.27% → 98.69%   |
+| Combined        | 86.34% → 98.20%  | 82.81% → 98.58%   |
+
+Hinted MCQ (7,943): **77.97% → 88.04%**; always choosing the hinted gold letter gives 78.48%. On
+Qwen-wrong questions, the hinted probe gives 26.92% → 45.64%. Final-position unhinted fits selected
+L60 in both outer folds; the hinted fits selected L56 at both positions.
+
+Essay AUROC (1,800 cases / 204 essays): **0.8637 → 0.8881**; the minus-observed-grade baseline is
+0.7758. Paired essay-group bootstrap difference: +0.0244, 95% CI [0.0083, 0.0410] (2,000 draws, seed
+0, conditional on these fitted models). The historical essay activation cache did not record its
+checkpoint revision; new MCQ captures pin Qwen revision `6a9e13bd6fc8f0983b9b99948120bc37f49c13e9`.
+
+The final position wins every cell. Cross-benchmark transfer is close: using SuperGPQA training
+instead of MMLU training costs 0.78pp on MMLU, while the reverse costs 0.06pp on SuperGPQA. The
+combined source does not improve these final-position scores. These are fixed-seed standardized
+reruns, not an untouched confirmation experiment.
+
+[Full report, subgroup scores, predictions, fitted weights, input/fold manifests and provenance](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/runs/standard_probes/2026-10-31_nested2-v1).
+`report.md` holds all sixteen cells; `paired_comparisons.json` holds group-bootstrap comparisons.
