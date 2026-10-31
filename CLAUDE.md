@@ -98,6 +98,9 @@ Summary of the Final Pitch (2026-10-19):
   `transcript_agentic`. **Every `*_agentic` condition is stale (2026-10-30): run one only with
   Robbie's approval** (`CFBENCH_ALLOW_AGENTIC=1`); the single-turn `*_inline` conditions are
   current.
+- **Score every investigator draw as one prediction: pool draws for AUROC, % right and Brier, never
+  average a case's draws first.** Averaging scores an ensemble and flatters placebos, whose draws
+  see different reads ([docs/cfbench-scoring.md](docs/cfbench-scoring.md), 2026-10-31).
 - **Bump `HARNESS_VERSION` in `cfbench/core.py`** whenever the predictor's prompt, tools or scoring
   change, and never compare cfbench skill across versions (runs without the field are version 1).
 - **A tool call that ends a rollout by submitting an answer returns the verdict** (added
