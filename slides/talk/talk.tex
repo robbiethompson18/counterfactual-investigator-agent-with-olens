@@ -75,9 +75,9 @@
   \end{tikzpicture}\par}
 
 \title[Make a good benchmark for whitebox techniques]{%
-  \struck{Make a really good investigator agent}\\[3pt]
+  \struck{Make an excellent investigator agent}\\[3pt]
   \struck{Make a better counterfactual behaviour benchmark}\\[3pt]
-  Make a good benchmark for whitebox techniques.}
+  Make a benchmark for whitebox techniques.}
 \author{Robbie Thompson \& Kylie MacFarquharson}
 \institute{MATS sprint with Neel Nanda}
 \date{October 2026}
@@ -189,7 +189,7 @@
       \end{grbullets}
     \end{column}
   \end{columns}
-  \source{Bars: at the \rdt{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (hatched) \% of items with at least one, 95\% item bootstrap. Reads at the
+  \source{Bars: at the \rdt{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (lighter) \% of items with at least one, 95\% item bootstrap. Reads at the
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, space lens + AR, T 1.}
 \end{frame}
 \begin{frame}
@@ -260,11 +260,12 @@
   \end{columns}
   \source{AUROC of P(up) (a case's p: the mean of its 3 draws), 95\% CI resampling the 204 essays, per condition; stars and the difference plot are paired (same resamples),
     stars one-sided vs transcript-only, * p < .05, ** < .01, *** < .001.
-    Dotted, bet at the mean: rank by minus the arm's observed mean score. Placebo: another opener's reads on the same intro. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.
+    Dotted, bet at the mean: rank by minus the arm's observed mean score. Legacy placebo (contaminated): another opener's reads on the same intro, sometimes the counterfactual itself. O-lens right and placebo wrong (p $\geq$ 0.5 vs truth) on \input{fig/essay_flips.tex}\unskip{} the reverse, of 1,800 cases.
     + bet at mean: logistic regression on [logit of the investigator's p, Qwen's observed mean grade with the arm opener],
     fit out-of-fold (5 folds grouped by essay); stars vs transcript + bet at mean.\\
-    † Kylie: probably cursed — a ridge regression trained on Qwen's own grades (5-fold out-of-fold, grouped by essay), fed the
-    observed prompt's activations at the last token before the reply, L52.}
+    Probes: ridge predicting Qwen's plain-opener grade from the observed prompt's activations, minus its observed grade.
+    Nested 2 outer / 2 inner folds grouped by essay; user-end and final-token scores reported separately; inner-selected
+    layer among 32/40/48/52/56/60, mean-loss ridge lambda = 1; 899/901 training cases per outer fold.}
 \end{frame}
 
 \end{document}

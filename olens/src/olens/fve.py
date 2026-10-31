@@ -10,7 +10,6 @@ from pathlib import Path
 
 import torch
 from safetensors.torch import load_file
-from scipy.optimize import nnls
 
 from .lens import CKPT
 
@@ -33,18 +32,3 @@ class Whitener:
         if center:
             x = x - self.mu
         return x @ self.W  # W symmetric
-
-
-def fve_single(z, zhat):
-    """Best non-negative scaling of one predicted direction: FVE = cos^2 if cos > 0 else 0."""
-    cos = torch.nn.functional.cosine_similarity(z, zhat, dim=-1)
-    return cos.clamp_min(0) ** 2, cos
-
-
-def fve_nnls(z, D):
-    """z: [d] target, D: [k, d] directions. Non-negative least squares refit of z on D.
-    Returns (FVE, coefficients)."""
-    z = z.double().cpu().numpy()
-    D = D.double().cpu().numpy()
-    c, rnorm = nnls(D.T, z)
-    return 1.0 - rnorm**2 / float(z @ z), c

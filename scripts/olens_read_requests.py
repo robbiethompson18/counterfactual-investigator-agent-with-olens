@@ -16,15 +16,16 @@ REQUESTS.jsonl: one transcript per line, {id, messages (OpenAI chat format; assi
 and tool_calls), tools ("evalcue.harness.BASH_TOOL" or a list of tool schemas), priority?, env?, arm?}. Rows are read in
 priority order, round-robin over (env, arm) within a priority. A row's optional `layers` overrides --layers for it
 (whiteners are loaded for --layers only, so keep it a subset). Optional `generation_prompt: true` renders the open
-assistant header after the last message (as at generation time), and `turn_starts: N` reads only at each <|im_start|>
+assistant header after the last message (as at generation time; thinking off, i.e. the empty think block, unless the row
+says `thinking: true`), and `turn_starts: N` reads only at each <|im_start|>
 and the N tokens after it instead of at stop tokens (e.g. N=3: <|im_start|>, "assistant", "\n", "<think>"), with
 `last_turn_only: true` only at the last <|im_start|>, `turn_role: "assistant"` only at that role's headers; `positions:
 "all"` reads every token, `"last"` only the final one, `positions: [token indices]` exactly those, and `char_positions:
-[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its stripped content,
-as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row with `text` instead of
-`messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render); `option_newlines: true` (or --option-newlines)
-adds, to whichever positions the row reads, the newline token after each MCQ option ("\\nA. ..." or "\\n(A) ...", the last
-option's "\\n\\n" included: environments/hint_mcq/probe.py's `nl` site). A row's
+[[msg_index, char_offset], ...]` the token holding each char of that message's content (offsets into its content as given,
+leading whitespace counted, as `char_offset` in OUT); `prompt_ids` replaces the rendering with those token ids as-is; a row
+with `text` instead of `messages` is a raw prompt tokenized with no chat template (WorkspaceBench's plain render);
+`option_newlines: true` (or --option-newlines) adds, to whichever positions the row reads, the newline token after each MCQ
+option ("\\nA. ..." or "\\n(A) ...", the last option's "\\n\\n" included: the legacy option-newline probe's `nl` site). A row's
 `shard_key` (default its id) picks its --shard, so rows sharing a prefix can share a process's read cache.
 Rendered with Qwen3.6-27B's chat template, as vLLM
 renders a chat request (tool-call arguments parsed to dicts), so the tokens are the ones Qwen saw.
@@ -34,11 +35,12 @@ read before 2026-10-27 used), one continuation of up to 4 bullets per (position,
 is its own draw, so an arm's 8 samples of one prompt give 8 lens draws of each prompt position; at 0 they share one read.
 Positions: every token matching the viewer's PUNCT regex (transcript-viewer/web/build.py) and every <|im_end|>,
 prompt included. OUT.jsonl gets one line per (transcript, position, layer), appended per transcript; transcripts
-already in OUT are skipped, so a rerun resumes:
+already in OUT are skipped, so a rerun resumes (re-reading the last one, which a crash may have left partial):
 
     {id, token_index, token, prefix (decoded text of the 32 tokens up to and including this one), msg_index (-1:
      template/tool definitions), role, field (content / reasoning_content / tool_call / null), char_offset (into that
-     field's text, or null), layer, bullets: [{text, fve, coef}] (sorted by fve), joint_fve}
+     field's text as given, leading whitespace counted; null for template tokens), layer, bullets: [{text, fve, coef}]
+     (sorted by fve), joint_fve}
 
 plus OUT's provenance (olens.provenance: lens adapter, bullet prefix, AR, whitener, revisions, sampling) as
 reads.provenance.json next to it, and each transcript's tokens and chat sections as OUT.transcripts.jsonl
@@ -48,6 +50,7 @@ reads.provenance.json next to it, and each transcript's tokens and chat sections
 import argparse
 import hashlib
 import json
+import os
 import re
 import time
 import zlib
@@ -62,24 +65,15 @@ from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
 from counterfactual_investigator_agent_with_olens.render import render_request, transcript_line  # PYTHONPATH=olens/src:src
+from environments._lib.mcq import option_newlines as mcq_option_newlines
 from olens import provenance
 
 PUNCT = re.compile(r"^\s*[.,;:!?]+[\"')\]*]*\s*$")  # transcript-viewer/web/build.py
-OPTION = re.compile(r"\n(?:\(([A-P])\)|([A-P])\.) ")  # an MCQ option line: "\nA. text" (hint_mcq) or "\n(A) text" (hinted_truthfulqa)
 
 
 def option_newlines(text: str) -> list[int]:
-    """Char offsets of the newline after each MCQ option's text: the next option's leading "\\n", and for the last option
-    the "\\n\\n" after it (none if the options end the text). Options must run A, B, C, ... from the first "A"."""
-    starts = []
-    for m in OPTION.finditer(text):
-        letter = m.group(1) or m.group(2)
-        if letter == "ABCDEFGHIJKLMNOP"[len(starts)]:
-            starts.append(m.start())
-    if len(starts) < 2:
-        return []
-    last = text.find("\n\n", starts[-1] + 1)
-    return starts[1:] + ([last] if last >= 0 else [])
+    """Character-offset adapter for the shared complete-option newline contract."""
+    return [char for char, _ in mcq_option_newlines(text)]
 
 
 # WorkspaceBench's sampling of record for prose lenses (T 1.0, top-p 0.95, top-k 64; the RL that made the lens sampled at T 1.0 too),
@@ -138,7 +132,7 @@ def score(tok, lens, whiteners, texts, vecs, layers):
 
 
 def nnls_gram(G, b, zz):
-    """olens.fve.fve_nnls in Gram form: min ||z - sum c_i d_i||^2 over c >= 0, with G = D D^T, b = D z, zz = z.z. Exact
+    """Non-negative least squares in Gram form: min ||z - sum c_i d_i||^2 over c >= 0, with G = D D^T, b = D z, zz = z.z. Exact
     for a few directions: the optimum is the least-squares fit on some subset with every coefficient >= 0, where the
     squared residual is zz - b_S . c_S. Returns (FVE, c)."""
     k = len(b)
@@ -181,7 +175,7 @@ def main():
     args = ap.parse_args()
     layers = [int(x) for x in args.layers.split(",")]
     out = Path(args.out)
-    done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
+    done = resume(out)
     done |= set(Path(args.skip_ids).read_text().split()) if args.skip_ids else set()
     print(f"{len(queue(args.requests, args.shard, done))} transcripts to read at layers {layers}", flush=True)
 
@@ -227,8 +221,10 @@ def prepare(tok, row, layers, im_end, im_start, opt_nl=False):
         positions = [max(i for i, w in enumerate(where) if w[:2] == (m, "content") and w[2] <= c) for m, c in row["char_positions"]]
     if opt_nl or row.get("option_newlines"):
         for mi, m in enumerate(msgs):
-            for c in option_newlines((m.get("content") or "").strip()):
-                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= c))
+            content = m.get("content") or ""
+            lead = len(content) - len(content.lstrip())  # options are found in the stripped text, char_offset counts from the raw
+            for c in option_newlines(content.strip()):
+                positions.append(max(i for i, w in enumerate(where) if w[:2] == (mi, "content") and w[2] is not None and w[2] <= lead + c))
         positions = sorted(set(positions))
     row_layers = row.get("layers") or layers  # a request row may name its own layers (a subset of --layers)
     return msgs, ids, where, toks, positions, row_layers, prefix_keys(ids, positions)
@@ -315,6 +311,27 @@ def run_batched(args, tok, lens, whiteners, out, done, layers, im_end, im_start)
         print(f"[{n_done}, {len(todo) - len(jobs)} queued] batch of {len(jobs)} transcripts, {n_tok} tokens, {len(items)} reads "
               f"({n_all - len(items)} cached) | {n_reads / dt:.1f} reads/s, {n_done / dt * 3600:.0f} transcripts/h | {stages}",
               flush=True)  # fmt: skip
+
+
+def resume(out: Path) -> set[str]:
+    """Transcript ids already in OUT, for a rerun to skip. A transcript's lines are appended in one block after the one before,
+    so only the last transcript on disk can be partial (a crash mid-write, maybe a torn last line): truncate OUT to before it,
+    and it is read again. Costs one transcript per restart."""
+    if not out.exists():
+        return set()
+    ids, last, last_start, pos = set(), None, 0, 0
+    with out.open("rb") as f:
+        for line in f:
+            try:
+                i = json.loads(line)["id"]
+            except json.JSONDecodeError:
+                break
+            if i != last:
+                last, last_start = i, pos
+            ids.add(i)
+            pos += len(line)
+    os.truncate(out, last_start)
+    return ids - {last}
 
 
 def item_seed(seed, key, layer):

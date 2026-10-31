@@ -19,7 +19,7 @@ harness, so pool them by case. Run batch 1 with `--versions mmlu_pro`, batch 2 w
 
 **Census.** Qwen's no-hint answers come from the four no-hint runs that together cover all 12,032 questions (CENSUS),
 read from their labels file LABELS: a reply counts only when it is one bare letter (worked solutions are unscored; the
-first-capital parser before 2026-10-29 read them as "A" or "I", CODE_SMELL P1 #1). A question is a case when its modal
+first-capital parser before 2026-10-29 read them as "A" or "I", fixed in PR #404). A question is a case when its modal
 letter has >= MIN_SHARE of all its samples, an unscored reply counting against it (so >= 7 of 8 samples gave that bare
 letter, as the prompt says; a share of the scored replies alone admits questions on one or two bare letters). Truth =
 that modal letter.
@@ -46,9 +46,11 @@ from collections import Counter, defaultdict
 from functools import cache
 from pathlib import Path
 
-from cfbench.evals.hint_qwen_dsv4_letter.eval import OPTION, canon
+from cfbench.evals.hint_qwen_dsv4_letter.eval import canon
 from cfbench.olens import show_token
 from environments._lib.core import load_env
+from environments._lib.mcq import OPTION as OPTION  # noqa: PLC0414 — preserve the eval module's public name
+from environments._lib.mcq import option_newlines, options
 from environments._lib.runfolder import LOCAL, REPO_ROOT
 
 ENVS = ["hint_mcq"]
@@ -65,7 +67,7 @@ SEED2, N_EVAL2 = 1, 2000  # batch 2 (Robbie, 2026-10-29: "draw fresh"): a second
 MIN_SHARE = 7 / 8
 LAYERS = (32, 40, 48, 52, 56, 60)  # cutoff_qa_inline's six (2026-10-29); the first read job did 32-52, a top-up added 56/60
 CENSUS = ["2026-10-26_or_nothink2", "2026-10-27_scale2k", "2026-10-27_scale2k-topup", "2026-10-28_all12k-nohint"]
-# every CENSUS run's strict-parse rescore (`environments rescore`), named: latest_labels() picks by mtime (CODE_SMELL P1 #6)
+# every CENSUS run's strict-parse rescore (`environments rescore`), pinned by name (their meta.json `active_labels` names it too)
 LABELS = "measure@4f098526d544-strict.jsonl"
 PROBE_READS = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_olens-nl"  # transcripts ids = the 718 training questions
 PROBE_REFIT = REPO_ROOT / "data/runs/mcq_answer_probe/2026-10-28_eval-baseline-12k/meta.json"  # params.train_items
@@ -259,25 +261,6 @@ the next token of the prompt, and the probabilities are the lens's, not the mode
 
 Each position below shows the prompt text around it with the token read wrapped in <read></read> (↵ is a newline), then one \
 line per layer with the lens's top {JLENS_K} tokens and their probabilities."""
-
-
-def options(text: str) -> list[re.Match]:
-    """The option lines, in letter order from A: a question's "I. P is invertible." statement line before its options (7936,
-    10518) matches OPTION but is not option I, as the reader's own option parser (sequential letters) knows."""
-    out: list[re.Match] = []
-    for m in OPTION.finditer(text):
-        if m.group(1) == "ABCDEFGHIJKLMNOP"[len(out)]:
-            out.append(m)
-    return out
-
-
-def option_newlines(text: str) -> list[tuple[int, str]]:
-    """(char offset, token) of the newline token ending each option line: "\\n", or "\\n\\n" after the last option."""
-    out = []
-    for m in options(text):
-        nl = text.index("\n", m.end())
-        out.append((nl, "\n\n" if text.startswith("\n\n", nl) else "\n"))
-    return out
 
 
 Pos = tuple[str, dict[int, list[dict] | dict]]  # (token, {layer: O-lens bullets, an NLA readout {text, fve}, or a J++ read {top}})

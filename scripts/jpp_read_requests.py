@@ -4,7 +4,8 @@ and picks the positions). Runs on a pod set up by `runpod/olens_reads.sh setup`:
 
     READER=scripts/jpp_read_requests.py runpod/olens_reads.sh run NAME REQUESTS.jsonl TAG [--layers all] [--positions all]
 
-REQUESTS.jsonl is the O-lens reader's format. Positions default to the O-lens ones (stop tokens and <|im_end|>, or a
+REQUESTS.jsonl is the O-lens reader's format; a row's `layers` overrides --layers for it (only --layers' maps are
+loaded, so keep it a subset). Positions default to the O-lens ones (stop tokens and <|im_end|>, or a
 row's `turn_starts`), so J++ rows join O-lens reads on (id, token_index); `--positions all` reads every token (the token
 view of the viewer). OUT.jsonl gets one line per (transcript, position), appended per transcript (a rerun resumes):
 
@@ -24,7 +25,7 @@ from pathlib import Path
 import torch
 from olens.jpp import JPP, JPP_FILE, JPP_REPO
 from olens.one_engine import OneEngine
-from olens_read_requests import prepare, queue, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
+from olens_read_requests import prepare, queue, resume, write_transcript  # scripts/ is sys.path[0] when this file is run as a script
 from transformers import AutoTokenizer
 
 from olens import provenance
@@ -48,7 +49,7 @@ def main():
     args = ap.parse_args()
     layers = list(range(63)) if args.layers == "all" else [int(x) for x in args.layers.split(",")]
     out = Path(args.out)
-    done = {json.loads(line)["id"] for line in out.open()} if out.exists() else set()
+    done = resume(out)
     print(
         f"{len(queue(args.requests, args.shard, done))} transcripts to read at {len(layers)} layers, positions={args.positions}", flush=True
     )
@@ -81,21 +82,22 @@ def main():
         jobs, reqs = [], []  # a job's positions go to the engine in chunks of --chunk, one capture request each
         for row in todo:
             try:
-                msgs, ids, where, toks, positions, _, _ = prepare(tok, row, layers, im_end, im_start)
+                msgs, ids, where, toks, positions, row_layers, _ = prepare(tok, row, layers, im_end, im_start)
             except json.JSONDecodeError as e:  # a tool call's `arguments` aren't JSON: vLLM 400s on it too, so Qwen never saw a rendering
                 print(f"skip {row['id']}: tool call arguments aren't valid JSON ({e})", flush=True)
                 done.add(row["id"])
                 continue
             if args.positions == "all" and row.get("turn_starts") is None:
                 positions = list(range(len(ids)))
+            assert set(row_layers) <= set(layers), f"{row['id']}: layers {row_layers} not all in --layers"
             if len(ids) >= args.max_model_len:  # the engine would reject it; a rerun with a larger --max-model-len picks it up
                 print(f"skip {row['id']}: {len(ids)} tokens >= --max-model-len {args.max_model_len}", flush=True)
                 done.add(row["id"])
                 continue
             chunks = [positions[a : a + args.chunk] for a in range(0, len(positions), args.chunk)]
             jobs.append({"row": row, "msgs": msgs, "ids": ids, "where": where, "toks": toks, "positions": positions,
-                         "reqs": range(len(reqs), len(reqs) + len(chunks))})  # fmt: skip
-            reqs += [(ids, layers, c) for c in chunks]
+                         "layers": row_layers, "reqs": range(len(reqs), len(reqs) + len(chunks))})  # fmt: skip
+            reqs += [(ids, row_layers, c) for c in chunks]
             if sum(len(j["positions"]) for j in jobs) >= args.batch_positions:
                 break
         ta = time.time()
@@ -104,8 +106,8 @@ def main():
         with out.open("a") as f:
             for j in jobs:
                 write_transcript(out, j)
-                acts = {L: torch.cat([caps[i][L] for i in j["reqs"]]) for L in layers}
-                write(f, tok, j, layers, jpp.top(acts, args.top_k), text)
+                acts = {L: torch.cat([caps[i][L] for i in j["reqs"]]) for L in j["layers"]}
+                write(f, tok, j, j["layers"], jpp.top(acts, args.top_k), text)
                 done.add(j["row"]["id"])
         secs["capture"] += tb - ta
         secs["lens"] += time.time() - tb

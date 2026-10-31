@@ -13,40 +13,34 @@ import argparse
 import json
 import random
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from graphs.style import INK, MUTED, bar_kw, diff_rows, use
-from graphs.style import color as _color
-from graphs.style import label as _label
+from cfbench.scoring import grouped_mean_ci
+from graphs.style import MUTED, ci_bar, diff_rows, positions
 
-use()
-SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline", "jlens_inline", "jlens_placebo_inline", "nla_inline",
-          "nla_placebo_inline"]  # fmt: skip
-LABEL = {s: _label(s) for s in SERIES}  # graphs.style's, kept here for the modules that import them
-COLOR = {s: _color(s) for s in SERIES}
-HATCH = {s: bar_kw(s)["hatch"] for s in SERIES if bar_kw(s)["hatch"]}
+# the bars, each lens beside its placebo under one label
+BARS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+        ("J++", ["jlens_inline", "jlens_placebo_inline"]), ("NLA", ["nla_inline", "nla_placebo_inline"])]  # fmt: skip
 SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
 GROUPS = {
     "all items": None,
-    "stale (Qwen's answer\nis out of date)": "stable_wrong",
-    "not stale (Qwen's\nanswer still true)": "stable_right",
+    "stale (Qwen's answer is out of date)": "stable_wrong",
+    "not stale (Qwen's answer still true)": "stable_right",
 }
 
 
-def per_item(runs: list[Path], by: str = "gate_class") -> dict[str, dict[str, tuple[str, float]]]:
-    """condition -> item -> (the row's `by` field, mean accuracy over draws), pooled over the runs."""
+def per_item(runs: list[Path], by: str | Callable[[dict], object] = "gate_class") -> dict[str, dict[str, tuple]]:
+    """condition -> item -> (the row's `by` field, or by(row); mean accuracy over draws), pooled over the runs."""
     acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
     cls = {}
-    for line in (ln for run in runs for ln in (run / "predictions.jsonl").read_text().splitlines()):
+    for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
         acc[r["condition"]][r["item"]].append(bool(r["correct"]))
-        cls[r["item"]] = r[by]
+        cls[r["item"]] = by(r) if callable(by) else r[by]
     return {c: {i: (cls[i], sum(v) / len(v)) for i, v in items.items()} for c, items in acc.items()}
 
 
@@ -65,53 +59,64 @@ PAIRS = [
 ]
 
 
-def diffs(runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16)) -> None:
+def diff_panel(ax, data: dict, pairs: list = PAIRS, value=None, clusters=None) -> None:
     """A row per pair, grouped by the question it answers: the mean paired difference in per-item accuracy (pp) with its 95%
-    bootstrap CI over items (graphs.style.diff_rows: filled when the CI excludes 0, labelled by the two conditions' swatches)."""
-    data = per_item(runs)
+    bootstrap CI over items, on the items whose `by` is `value` (None: every item)."""
     rows: list = []
-    for q, pairs in PAIRS:
+    for q, group in pairs:
         rows.append(q)
-        for a, b in pairs:
-            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a]]
-            rows.append((a, b, sum(ds) / len(ds), *ci(ds)))
-    fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
-    ax.set_xlim(*xlim)
+        for a, b in group:
+            keys = [i for i in data[a] if value is None or data[a][i][0] == value]
+            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in keys]
+            interval = grouped_mean_ci(ds, [clusters[i] for i in keys])[1:] if clusters else ci(ds)
+            rows.append((a, b, sum(ds) / len(ds), *interval))
     diff_rows(ax, rows)
-    ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_title(f"All {len(data['transcript_inline'])} items", loc="left", fontsize=10, color=INK)
+
+
+def diffs(
+    runs: list[Path], out: Path, xlim: tuple[float, float] = (-8, 16), pairs: list = PAIRS, noun: str = "items", data=None, clusters=None
+) -> None:
+    """graphs.style.diff_rows over every item: filled when the CI excludes 0, labelled by the two conditions' swatches."""
+    data = data if data is not None else per_item(runs, by=lambda _: None)  # every item
+    n_rows = sum(1 + len(group) for _, group in pairs)
+    fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * n_rows))
+    ax.set_xlim(*xlim)
+    diff_panel(ax, data, pairs, clusters=clusters)
+    ax.set_xlabel(f"difference in % of {noun} right, paired by {noun[:-1]} (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
+    ax.set_title(f"All {len(data['transcript_inline'])} {noun}")
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 
-def bar_chart(runs: list[Path], out: Path, by: str, groups: dict, title: str, figsize: tuple[float, float] = (10.5, 4.1)) -> None:
-    """Seven bars (SERIES) per group: the mean over items of per-item accuracy over draws, 95% bootstrap CIs over items. `groups`
-    maps a group's label to a value of the rows' `by` field (None: every item)."""
-    data = per_item(runs, by=by)
-    fig, ax = plt.subplots(figsize=figsize)
-    width, gap = 0.115, 0.008
-    for i, value in enumerate(groups.values()):
-        for j, s in enumerate(SERIES):
-            xs = [a for c, a in data[s].values() if value is None or c == value]
-            m, (lo, hi) = sum(xs) / len(xs), ci(xs)
-            x = i + (j - (len(SERIES) - 1) / 2) * (width + gap)
-            ax.bar(x, 100 * m, width, zorder=3, **bar_kw(s))
-            ax.errorbar(x, 100 * m, yerr=[[100 * (m - lo)], [100 * (hi - m)]], fmt="none", ecolor=MUTED, elinewidth=1, capsize=3, zorder=4)
-            ax.text(x, 100 * hi + 1.5, f"{100 * m:.0f}", ha="center", va="bottom", fontsize=8 if len(groups) < 5 else 7.5, color=INK)
-        n = sum(1 for c, _ in data[SERIES[0]].values() if value is None or c == value)
-        ax.text(i, -0.15, f"n = {n}", ha="center", va="top", fontsize=8, color=MUTED, transform=ax.get_xaxis_transform())
-    ax.set_xticks(range(len(groups)))
-    ax.set_xticklabels(groups.keys(), fontsize=9)
-    ax.set_xlim(-0.55, len(groups) - 0.45)
-    ax.set_ylim(0, 108)
-    ax.set_ylabel("% of items where Haiku names Qwen's answer")
-    ax.grid(axis="x", visible=False)
-    ax.set_title(title, loc="left", fontsize=10.5, color=INK, pad=24)
-    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(s)) for s in SERIES]
-    ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=7, bbox_to_anchor=(0, 1.0))
+def bar_chart(runs: list[Path], out: Path, by, groups: dict, title: str, ylabel: str = "% of items where Haiku names Qwen's answer",
+              bars: list = BARS, panel_w: float = 3.7, data=None, clusters=None, note: str = "") -> None:  # fmt: skip
+    """A panel per group of items, a bar per condition: the mean over items of per-item accuracy over draws, 95% bootstrap CIs over
+    items. `groups` maps a group's label to a value of the rows' `by` (None: every item)."""
+    data = data if data is not None else per_item(runs, by=by)
+    xs, ticks = positions(data, bars)
+    fig, axes = plt.subplots(1, len(groups), figsize=(panel_w * len(groups), 3.6), sharey=True, layout="constrained")
+    top = 0.0
+    for ax, (group, value) in zip(axes, groups.items(), strict=True):
+        n = 0
+        for c, x in xs.items():
+            keys = [i for i, (g, _) in data[c].items() if value is None or g == value]
+            vals = [data[c][i][1] for i in keys]
+            m, lo, hi = grouped_mean_ci(vals, [clusters[i] for i in keys]) if clusters else (sum(vals) / len(vals), *ci(vals))
+            ci_bar(ax, x, c, 100 * m, 100 * lo, 100 * hi)
+            top, n = max(top, 100 * hi), len(vals)
+        ax.set_xticks(ticks, [name for name, cs in bars if any(c in data for c in cs)])
+        ax.set_xlim(-0.6, ticks[-1] + 1.0)
+        ax.grid(axis="x", visible=False)
+        ax.set_title(f"{group}, n = {n}", fontsize=9.5)
+    axes[0].set_ylim(0, top + 7)  # the axis stops just above the tallest whisker's label
+    axes[0].set_ylabel(ylabel)
+    fig.suptitle(title, x=0.01, ha="left")
+    fig.text(0.995, 0.97, "hatched = placebo", ha="right", fontsize=8, color=MUTED)
+    if note:
+        fig.supxlabel(note, fontsize=8, color=MUTED)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=180, bbox_inches="tight")
+    fig.savefig(out, bbox_inches="tight")
     print(out)
 
 

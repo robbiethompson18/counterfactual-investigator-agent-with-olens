@@ -15,15 +15,11 @@ import glob
 import json
 from pathlib import Path
 
-import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from graphs.style import INK, MUTED, bar_kw, diff_rows
 
-from graphs.style import INK, MUTED, bar_kw, diff_rows, use
-
-use()
 RUNS = ["2026-10-26_honest-ts-*", "2026-10-26_honest-ts2-*", "2026-10-26_honest-nt2-allpairs-*"]
 
 
@@ -86,16 +82,16 @@ def main():
         ("Edit does nothing", pt["null"], ci(boots["null"]), bar_kw("null")),
     ]
     for j, (lab, v, c, kw) in enumerate(series):
-        ax.bar(j, acc(v), 0.7, label=lab, zorder=2, **kw)
+        ax.bar(j, acc(v), 0.7, zorder=2, **kw)
         ax.plot([j, j], [acc(c[1]), acc(c[0])], color=INK, lw=1, zorder=3)
-        ax.text(j, acc(c[0]) + 0.8, f"{acc(v):.0f}", ha="center", va="bottom", fontsize=8, color=INK)
+        ax.text(j, acc(c[0]) + 0.8, f"{acc(v):.1f}", ha="center", va="bottom", fontsize=8, color=INK)
     ax.axhline(acc(pt["noise"]), ls=":", color=MUTED, lw=1.2, label="ceiling (sampling noise)", zorder=3)
-    ax.set_xticks([])
+    ax.set_xticks(range(len(series)), [s[0].replace(" ", "\n", 1) for s in series])
     ax.set_xlim(-0.7, 2.7)
     ax.set_ylim(0, 112)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     title = f"Honest-grader scenarios: predicted rate of Score ≤ cutoff (Gemini 3.8 Flash)\nall cases, n={len(keys)}"
-    ax.set_title(title, loc="left", fontsize=10)
+    ax.set_title(title)
     ax.legend(loc="upper left", ncol=2, fontsize=8, frameon=False)
     diffs = [
         ("transcript", "no_transcript", "Transcript-only − Env diff only", (pt["mse_nt"] - pt["mse"]) * 100, ci(boots["ts_minus_nt"])),
@@ -105,10 +101,10 @@ def main():
     bx.set_xlim(lo_all - 3, hi_all + 16)
     diff_rows(bx, [(a, b, d, c[0] * 100, c[1] * 100, lab) for a, b, lab, d, c in diffs])
     bx.set_xlabel("RMSE reduction (pp, higher is better)")
-    bx.set_title("Differences, 95% case bootstrap (paired, same cases)", loc="left", fontsize=10)
+    bx.set_title("Differences, 95% case bootstrap (paired, same cases)")
     fig.tight_layout()
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(args.out, dpi=160)
+    fig.savefig(args.out)
     names = [("envdiff", "mse_nt"), ("TS", "mse"), ("null", "null"), ("ceiling", "noise")]
     bars = " ".join(f"{lab} {acc(pt[fld]):.1f}" for lab, fld in names)
     print(f"wrote {args.out}: n={len(keys)} {bars}")

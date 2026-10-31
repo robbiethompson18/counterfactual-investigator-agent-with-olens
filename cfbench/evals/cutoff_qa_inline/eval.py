@@ -87,7 +87,8 @@ def collect() -> list[dict]:
         assert not ep.get("error") and ep["target"].split("@")[0].lower() == QWEN.lower(), ep["id"]
         meta = ep["meta"]
         assert not meta["numeric"] and meta["gate_class"].startswith("stable"), ep["id"]
-        out.append({"version": "nohint", "item": ep["item"], "modal": mod.norm(meta["qwen_modal"]), "source": f"{ENV}/{run}:{ep['id']}",
+        modal = mod.gate_label(meta["gate_run"], ep["item"], meta["qwen_modal"])
+        out.append({"version": "nohint", "item": ep["item"], "modal": modal, "source": f"{ENV}/{run}:{ep['id']}",
                     "messages": ep["messages"][:1], "meta": meta})  # fmt: skip
     return sorted(out, key=lambda c: order[c["item"]])
 
