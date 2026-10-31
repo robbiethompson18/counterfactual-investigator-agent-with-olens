@@ -13,6 +13,7 @@ evals/NAME.json (data/evals/, or HF's evals/ when it isn't local).
 
 import json
 import math
+import urllib.error
 import urllib.request
 from functools import cache
 from pathlib import Path
@@ -223,8 +224,8 @@ ESSAY_RUNS = ["2026-10-30_essay-cf-haiku-ts", "2026-10-30_essay-cf-haiku-olens"]
 # the zero-counterfactual probe's out-of-fold per-case scores (ridge at the token before the reply, L52, from the arm
 # prompt to the base score, minus the observed arm mean): ridge_oof of cfbench/evals/essay_grading_cf_inline/probe.py (PR
 # #450) over the essay_probe run 2026-10-31_essay-grading-acts, dumped per case (its probe.json has the summary only);
-# on bramble only, the probe bar is left out without it
-ESSAY_PROBE = ROOT / "data/runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
+# from HF's runs/ when it isn't local; the probe bar is left out if neither has it
+ESSAY_PROBE = "runs/essay_probe/2026-10-31_essay-grading-acts/zero_cf_last_L52.jsonl"
 ESSAY_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]), ("probe", ["probe"])]
 
 
@@ -234,6 +235,19 @@ def load_rows(run: str) -> list[dict]:
         return [json.loads(line) for line in local.open()]
     with urllib.request.urlopen(HF.replace("/evals/", f"/runs/cfbench/{run}/predictions.jsonl")) as r:
         return [json.loads(line) for line in r]
+
+
+def load_probe() -> list[dict]:
+    local = ROOT / "data" / ESSAY_PROBE
+    try:
+        lines = (
+            local.read_text().splitlines()
+            if local.exists()
+            else urllib.request.urlopen(HF.replace("evals/", ESSAY_PROBE)).read().decode().splitlines()
+        )
+    except urllib.error.HTTPError:
+        return []
+    return [json.loads(line) for line in lines]
 
 
 def rank_auroc(p: np.ndarray, y: np.ndarray) -> float:
@@ -257,8 +271,8 @@ def essay_cases() -> tuple[list[tuple], np.ndarray, dict[str, np.ndarray], np.nd
                 truth[k], arm_mean[k] = r["k_cf"], mean(r["answers_base"])  # answers_base: the observed (arm) prompt's scores
     keys = sorted(truth)
     xs = {c: np.array([np.mean(d[k]) for k in keys]) for c, d in ps.items()}
-    if ESSAY_PROBE.exists():
-        pr = {(r["base_arm"], r["item"]): r for r in map(json.loads, ESSAY_PROBE.open())}
+    if probe := load_probe():
+        pr = {(r["base_arm"], r["item"]): r for r in probe}
         assert all(pr[k]["k_cf"] == truth[k] for k in keys)
         xs["probe"] = np.array([pr[k]["score"] for k in keys])
     return keys, np.array([truth[k] for k in keys]), xs, np.array([arm_mean[k] for k in keys])
