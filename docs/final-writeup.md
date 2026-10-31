@@ -46,9 +46,23 @@ tried Flash vs Sonnet 5.5 as the predictor, and free-form vs yes/no answers. The
 ablated is which layers the lens reads. Every chart is in the appendix,
 [Counterfactual investigation graphs](#counterfactual-investigation-graphs).
 
-### The WorkspaceBench review
+TODO link to appendix and read the Claudespeak paragraph above.
 
-## Part 1: predicting Qwen's answer from the prompt
+## Part 1: Simple Investigations That Work
+
+All of our environments that work, with the exception of essay grading, are ideas stolen from
+WorkspaceBench. The additions we make to their dataset:
+
+- We do not grade with pass@thousands, running a regex on metamodel output at many layers and
+  tokens. Instead, we pass metamodel output to an investigator model and ask it to pick 
+
+### Multiple Choice Questions
+
+### Knowledge Cutoff Q&A
+
+### Idiosyncratic Preferences
+
+### Essay Grading
 
 ## Part 2: essay grading counterfactual
 
@@ -129,8 +143,7 @@ especially hates having the space stripped when when the next character will be 
 
 Agam fixed this in RL, and the o-lens speaks English again.
 
-@c plz use add the graph from the doc! We should probably remake it using the new style, and
-possibly not use the blue orange theme to not overload it.
+<img src="img/olens-mandarin.png" alt="O-lens Mandarin before vs after keeping the bullet's leading space" width="500">
 
 ## Our issues with the CHIVE dataset
 
@@ -172,7 +185,8 @@ Our full review is the "WorkspaceBench Review" tab of the
 
 Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
 behavior rate, higher is better; hatching means placebo. The PNGs are gitignored, so regenerate them
-from the repo root:
+from the repo root, then rebuild `final-writeup.html`, which embeds them, with
+`sh scripts/build_writeup.sh`:
 
 ```bash
 uv run python -m graphs.cfbench_report        # the ten cfbench charts
@@ -182,105 +196,136 @@ uv run python -m graphs.essay_curious_answer data/runs/cfbench/2026-10-28_essay-
 uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-duke3*'
 uv run python -m graphs.hint_mcq_answer
 uv run python -m graphs.hint_mcq_total
+uv run --with transformers python -m graphs.olens_mandarin
 ```
 
 ### cfbench, pooled and by target
 
-![All targets pooled](img/cfbench-report/skill_pooled.png)
+<img src="img/cfbench-report/skill_pooled.png" alt="All targets pooled" width="404">
 
 All targets pooled. Env diff only, transcript-only, O-lens and its placebo land within about a point
 of each other, all well above "edit does nothing".
 
-![By target model, with paired gains over transcript-only](img/cfbench-report/skill_by_target.png)
+<img src="img/cfbench-report/skill_by_target.png" alt="By target model, with paired gains over transcript-only" width="500">
 
 By target model, with each condition's paired gain over transcript-only on the same cases.
 
-![hidden_goal.grade](img/cfbench-report/skill_hidden_goal.png)
+<img src="img/cfbench-report/skill_hidden_goal.png" alt="hidden_goal.grade" width="404">
 
-hidden_goal.grade, the one env with a pre-registered O-lens win (Qwen without CoT, 38 cases).
+hidden_goal.grade, the one env with a pre-registered O-lens win (Qwen without CoT, 38 cases). It did
+not replicate: on the same 38 cases, GPT-6.1 Sol under a later harness is null (RMSE:
+transcript-only 31.7pp, O-lens 32.0pp, placebo 32.0pp). We never reran Flash on all 38 under that
+harness. The task that failed when we sized it up is a different one, the
+[hinted MCQ answer task](#hinted-mcq-answer-task-legacy-before-hints-were-dropped).
 
-![Every other Qwen-without-CoT case](img/cfbench-report/skill_other_envs.png)
+<!-- @c When we sized up sample size here this one failed right? read
+https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit?tab=t.ikhkgkb68db4#heading=h.256u14widhfp
+and include the graph here showign the fail too?
+@robbie no: the linked report is about hint_mcq, not hidden_goal. Chart is in the hint section. -->
+
+<img src="img/cfbench-report/skill_other_envs.png" alt="Every other Qwen-without-CoT case" width="404">
 
 Every Qwen-without-CoT case outside hidden_goal.grade.
 
-![What the O-lens agent searches for](img/cfbench-report/olens_search_topics.png)
+<img src="img/cfbench-report/olens_search_topics.png" alt="What the O-lens agent searches for" width="489">
 
 What the O-lens agent searches the lens for.
 
-![Which tools the predictor calls](img/cfbench-report/tool_calls.png)
+<img src="img/cfbench-report/tool_calls.png" alt="Which tools the predictor calls" width="500">
 
 Which tools the predictor calls, at a 20-call budget.
 
 ### cfbench, predictor ablations
 
-![Predictor model by condition](img/cfbench-report/models.png)
+<img src="img/cfbench-report/models.png" alt="Predictor model by condition" width="400">
 
 Seven predictor models by condition, on the model chart's four cases.
 
-![Gemini 3.8 Flash by reasoning effort](img/cfbench-report/flash_effort.png)
+<!-- @c remove the celing line from this graph plz ty
+@robbie done.
+@c possible to add error bars to this grpah somehow? don't chagne anything yet but this is mostly
+noise right?
+@robbie the lens gaps are noise; the GPT transcript gains are not. Paired case bootstrap on the 4
+cases: O-lens minus transcript-only is -2.7 to +3.0pp, and only Haiku's +3.0 excludes 0 (but its
+placebo matches it). Transcript-only minus no transcript is +16.5 [+5.9, +26.0] for Sol and
++20.7 [+9.2, +28.5] for Astra. No error bars added, per your note. -->
 
-Gemini 3.8 Flash by reasoning effort.
+<img src="img/cfbench-report/flash_effort.png" alt="Gemini 3.8 Flash by reasoning effort" width="400">
 
-![Gemini 3.8 Flash by tool-call budget](img/cfbench-report/flash_calls.png)
+Gemini 3.8 Flash by reasoning effort. Shading is a 95% bootstrap over the four cases, so it mostly
+shows the spread between cases, which every line shares.
 
-Gemini 3.8 Flash by tool-call budget.
+<!-- @c likewise error shading here would be nice.
+@robbie done. -->
 
-![Transcript-only vs O-lens by predictor](img/cfbench-report/ts_vs_olens.png)
+<img src="img/cfbench-report/flash_calls.png" alt="Gemini 3.8 Flash by tool-call budget" width="400">
+
+Gemini 3.8 Flash by tool-call budget, shaded the same way.
+
+<!-- @c likewise would like to see error bars.
+@robbie done. -->
+
+<img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript-only vs O-lens by predictor" width="321">
 
 Transcript-only vs O-lens, one dot per predictor and thinking level.
 
 ### cfbench, binary regrade
 
-![RMSE vs binary grading per target](img/cfbench-binary-regrade/binary_vs_rmse.png)
+Graded as flip/no-flip instead of RMSE, O-lens, its placebo and transcript-only stay within a point
+or two of each other at every threshold from 5 to 30pp. At 10pp, balanced accuracy for
+transcript-only, O-lens and placebo is 73, 72 and 73 on GLM 5.3, and 78, 79 and 77 on Qwen without
+CoT. Method and tables are in [cfbench-binary-regrade.md](cfbench-binary-regrade.md).
 
-![Balanced accuracy vs flip threshold](img/cfbench-binary-regrade/binary_threshold_sweep.png)
-
-The same predictions graded as flip/no-flip. These two came from a scratch script that isn't in the
-repo, so they can't be regenerated; the method is in
-[cfbench-binary-regrade.md](cfbench-binary-regrade.md).
+<!-- @c these ones aren't rendering? Do we even want them?
+@robbie they came from a scratch script that isn't in the repo, so they can't be regenerated. Cut;
+the numbers above say the same thing.
+@c all of these graphs fucking massive can we resize every graph in the appenix to be max maybe 300x500 pixels?
+@robbie done: every appendix image fits 500 wide by 300 tall. -->
 
 ### Honest grader
 
-![Honest grader, all 242 cases](img/honest-grader/binary_rmse.png)
+<img src="img/honest-grader/binary_rmse.png" alt="Honest grader, all 242 cases" width="500">
 
 All 242 cases, without the lens.
 
-![Honest grader, cases with lens reads](img/honest-grader/binary_rmse_olens.png)
+<img src="img/honest-grader/binary_rmse_olens.png" alt="Honest grader, cases with lens reads" width="500">
 
 The cases the lens runs cover, with O-lens and its placebo.
 
 ### Essay grading (essay_curious)
 
-![Letter-grade answer task by condition](img/essay-curious/accuracy.png)
+<img src="img/essay-curious/accuracy.png" alt="Letter-grade answer task by condition" width="500">
 
 Share of draws naming the letter grade Qwen gives with no scenario.
 
-![Letter-grade answer task per case](img/essay-curious/per_case.png)
+<img src="img/essay-curious/per_case.png" alt="Letter-grade answer task per case" width="318">
 
 The same, per case.
 
-![Out-of-10 score RMSE by condition](img/essay-curious/score_rmse.png)
+<img src="img/essay-curious/score_rmse.png" alt="Out-of-10 score RMSE by condition" width="500">
 
 RMSE of the predicted no-scenario score out of 10.
 
-![Every out-of-10 prediction per case](img/essay-curious/score_per_case.png)
+<img src="img/essay-curious/score_per_case.png" alt="Every out-of-10 prediction per case" width="487">
 
 Every out-of-10 prediction per case against the truth.
 
 ### Hinted MCQ answer task (legacy, before hints were dropped)
 
-![Hint answer task by hint type](img/hint-mcq-answer/accuracy.png)
+<img src="img/hint-mcq-answer/accuracy.png" alt="Hint answer task by hint type" width="500">
 
-![Correct draws per item, gold-letter hint](img/hint-mcq-answer/per_item_gold_hint.png)
+<img src="img/hint-mcq-answer/per_item_gold_hint.png" alt="Correct draws per item, gold-letter hint" width="500">
 
-![Correct draws per item, wrong-letter hint](img/hint-mcq-answer/per_item_wrong_hint.png)
+<img src="img/hint-mcq-answer/per_item_wrong_hint.png" alt="Correct draws per item, wrong-letter hint" width="500">
 
 Share of draws naming Qwen's no-hint letter, overall and per item.
 
-![Running total by hint type](img/hint-mcq-total/by_hint.png)
+<img src="img/hint-mcq-total/by_hint.png" alt="Running total by hint type" width="500">
 
-![Running total, all items](img/hint-mcq-total/combined.png)
+<img src="img/hint-mcq-total/combined.png" alt="Running total, all items" width="405">
 
-The running total over the original items and the 2k scale-up. `graphs.hint_mcq_total` currently
-crashes, because the abandoned run `2026-10-28_answer-mcq-scale2k-d1-jlens50-c` has no predictions
-file, so these two don't render yet.
+The running total over the original items and the 2k scale-up. We thought this task was tremendously
+easy for the 🔮-lens: Qwen consistently picks one wrong answer, a hint hides it, and the
+investigator says what Qwen picks without the hint. It looked positive on 20 items. On all 241 items
+it is null: O-lens 27.2% [22.0, 32.6], placebo 27.1% [21.9, 32.6], transcript-only 24.7% [19.8,
+29.9].

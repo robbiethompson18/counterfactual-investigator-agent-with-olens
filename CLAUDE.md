@@ -268,6 +268,8 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 [docs/INDEX.md](docs/INDEX.md) by tag. When a doc's tag changes to or from ACTIVE, move its entry.
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
+The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
+built by `scripts/build_writeup.sh` (Robbie, 2026-10-31).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**
