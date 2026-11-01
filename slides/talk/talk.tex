@@ -96,7 +96,7 @@
 \IfFontExistsTF{Noto Sans CJK SC}{\newfontfamily\cjkfont{Noto Sans CJK SC}}{\newcommand{\cjkfont}{}}
 \newcommand{\zh}[2]{{\cjkfont\bfseries #1}\,{\color{muted}(#2)}}
 
-\title[Make a good benchmark for whitebox techniques]{%
+\title[Make a benchmark for whitebox techniques]{%
   \struck{Make an excellent investigator agent}\\[3pt]
   \struck{Make a better counterfactual behaviour benchmark}\\[3pt]
   Make a benchmark for whitebox techniques.}
@@ -211,7 +211,7 @@
   \end{itemize}
   \slidefig{fig/headline.pdf}
   \source{\% of cases the investigator names Qwen's answer, the three tasks weighted equally; 95\% bootstrap CIs resampling
-    questions within each task, paired across conditions. Canonical menus\_inline runs, \texttt{all} menu.}
+    questions within each task, paired across conditions. The canonical runs: every read position, 3 draws.}
 \end{frame}
 
 \begin{frame}{Results: metamodels against a probe on Multiple Choice}
@@ -302,14 +302,14 @@
 \begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, all items}
   \slidefig{fig/cutoff_investigators_all.pdf}
   \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
-    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
+    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical runs, 3
     draws; Flash-Lite prompt only there, 1 draw.}
 \end{frame}
 
 \begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, stale items}
   \slidefig{fig/cutoff_investigators_stale.pdf}
   \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
-    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
+    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical runs, 3
     draws; Flash-Lite prompt only there, 1 draw.}
 \end{frame}
 
@@ -406,7 +406,7 @@
     question's reads; tuned probe: refit on hint-first prompts. \olensname{} reads: Qwen3.6-27B's, on the hinted prompt,
     layers 32/40/48/52, at each option newline and the end of the prompt.}
 \end{frame}
-\section{Essay grading}
+\section{Essay Grading}
 \begin{frame}
   \parthead
   \begin{itemize}
@@ -495,7 +495,7 @@
     \dag\,The probe knows Qwen's grade distribution: subtracting the observed mean grade alone gives AUROC \input{fig/essay_null.tex}\unskip, so it isn't like for like with the investigator bars.}
 \end{frame}
 
-\section{Blog authors}
+\section{Blog Authorship}
 \begin{frame}
   \parthead
   \begin{itemize}
@@ -573,14 +573,14 @@
       say the right answer'' looks like an effect. We had several spurious positive results this way
   \end{itemize}
   \slidefig{fig/correctness.pdf}
-  \source{Canonical menus\_inline runs, \texttt{all} menu, 3 draws; 95\% bootstrap CIs over cases. Knowledge Cutoff: Qwen right =
+  \source{The canonical runs, every read position, 3 draws; 95\% bootstrap CIs over cases. Knowledge Cutoff: Qwen right =
     its answer is still current.}
 \end{frame}
 
 \begin{frame}{Results: each lens minus prompt only, per task and pooled}
   \slidefig{fig/lens_diffs.pdf}
   \source{Paired by case, 95\% bootstrap CIs resampling questions within each task; pooled weights the three tasks equally.
-    Canonical menus\_inline runs, 3 draws.}
+    The canonical runs, 3 draws.}
 \end{frame}
 
 \begin{frame}{Results: by read position}
@@ -645,7 +645,7 @@
     \item Every lens makes Haiku think more, and placebos more than real reads. Haiku regularly notices that placebo outputs are
       nonsensical and says so
   \end{itemize}
-  \source{Pooled over the three tasks (equal weights), canonical menus\_inline runs, 3 draws. Left: \% of cases right, 95\%
+  \source{Pooled over the three tasks (equal weights), the canonical runs, 3 draws. Left: \% of cases right, 95\%
     bootstrap CIs over questions. Right: mean thinking tokens per prediction.}
 \end{frame}
 
@@ -1115,25 +1115,16 @@
 \end{frame}
 
 \begin{frame}{\olensname{} now speaks English}
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.3\textwidth}
-      \slidefig{fig/mandarin.pdf}
-    \end{column}
-    \begin{column}{0.67\textwidth}
-      \begin{itemize}
-        \item Many bullets of the \olensname{} Agam first gave us led with a Mandarin character and then became English
-        \item Its RL reward stripped each bullet's leading whitespace before feeding the AV output back to the AR. But many
-          tokens' canonical form is \emph{with} leading whitespace, e.g. \texttt{\_need} rather than \texttt{need}, and the AR
-          especially hates having the space stripped when the next character will be a space
-        \item Agam fixed this in RL (the space lens, \texttt{olens\_s3d\_space\_rl600}, the lens in every result here), and the
-          \olensname{} speaks English again: Chinese in 36\% vs 3\% of bullets bank-wide. Before-and-after bullets on one WeirdChat
-          read: the Anecdata part
-      \end{itemize}
-    \end{column}
-  \end{columns}
-  \source{Bars: \input{fig/mandarin_n}\unskip\ greedy reads per lens at the same sites, every token of 3 WeirdChat transcripts,
-    layers 24/32/40/48/56; a hit is a bullet containing a Han character. Every read we made before 2026-10-22 used the old lens and
-    was redone.}
+  \begin{itemize}
+    \item Many bullets of the \olensname{} Agam first gave us led with a Mandarin character and then became English
+    \item Its RL reward stripped each bullet's leading whitespace before feeding the AV output back to the AR. But many
+      tokens' canonical form is \emph{with} leading whitespace, e.g. \texttt{\_need} rather than \texttt{need}, and the AR
+      especially hates having the space stripped when the next character will be a space
+    \item Agam fixed this in RL (the space lens, \texttt{olens\_s3d\_space\_rl600}, the lens in every result here), and the
+      \olensname{} speaks English again: Chinese in 36\% vs 3\% of bullets bank-wide. The before-and-after bar chart and bullets
+      on one WeirdChat read: the Anecdata part
+  \end{itemize}
+  \source{Every read we made before 2026-10-22 used the old lens and was redone.}
 \end{frame}
 
 \end{document}
