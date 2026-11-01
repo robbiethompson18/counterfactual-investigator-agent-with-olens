@@ -1,4 +1,4 @@
-"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline `all` menu): split by whether Qwen
+"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `prompt`): split by whether Qwen
 is right, lens and placebo differences.
 
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, transcript only vs
@@ -35,7 +35,7 @@ ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
 
 
 def by_correctness() -> dict[str, dict[str, dict]]:
-    """set -> condition -> case -> (qwen_right, accuracy) on the canonical menus_inline runs (`all` menu); the case is its own
+    """set -> condition -> case -> (qwen_right, accuracy) on the canonical menus_inline runs and menu; the case is its own
     bootstrap group. MCQ: Qwen's modal letter is the gold one; cutoff: Qwen's answer is still true (gate_class stable_right,
     from the cutoff eval's cases)."""
     right: dict = defaultdict(dict)

@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from transformers import AutoTokenizer
 
 from graphs.style import INK, MUTED
 
@@ -20,10 +19,14 @@ HAN = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 LENSES = {"old": "Before\n(space stripped)", "new": "After\n(space kept)"}
 
 
+def bullets_of(texts: list[str]) -> list[str]:
+    return [b for t in texts for b in re.findall(r"^\s*[-*•]\s+(.+)$", t, re.MULTILINE)]
+
+
 def counts(reads: list[dict], key: str, tokenizer) -> dict[str, tuple[int, int]]:
     """(with Han, total) for bullets and for Qwen tokens of `key`'s reads."""
     texts = [r[key]["text"] for r in reads]
-    bullets = [b for t in texts for b in re.findall(r"^\s*[-*•]\s+(.+)$", t, re.MULTILINE)]
+    bullets = bullets_of(texts)
     tokens = [i for ids in tokenizer(texts, add_special_tokens=False)["input_ids"] for i in ids]
     han_ids = {i for i in set(tokens) if HAN.search(tokenizer.decode([i]))}
     return {
@@ -33,6 +36,8 @@ def counts(reads: list[dict], key: str, tokenizer) -> dict[str, tuple[int, int]]
 
 
 def main(out: Path) -> None:
+    from transformers import AutoTokenizer  # not a project dependency (graphs.talk imports this module without it)
+
     reads = [json.loads(line) for line in (RUN / "reads.jsonl").open()]
     tokenizer = AutoTokenizer.from_pretrained(QWEN[0], revision=QWEN[1])
     by_lens = {key: counts(reads, key, tokenizer) for key in LENSES}

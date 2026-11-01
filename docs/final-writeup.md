@@ -14,10 +14,10 @@ positions on MMLU-Pro) with a different prompt. Essay grading has no menus run a
 > menu: every lens read at the same positions (each prompt's punctuation and option newlines plus
 > the 9 tail tokens at the start of the assistant turn), all six layers 32/40/48/52/56/60, one
 > prompt and one placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes
-> from something else and must be redone on those runs before this ships. Status at 17:30 PDT: every
-> MCQ, knowledge cutoff and preferences chart and number is now on the canonical runs at 3 draws
-> (top-ups `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their 🚧 blocks are gone. What's
-> left marked 🚧 is blog authorship and the counterfactual charts.**
+> from something else and must be redone on those runs before this ships. Status at 17:30 PDT:
+> every MCQ, knowledge cutoff and preferences chart and number is now on the canonical runs at 3
+> draws (top-ups `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their 🚧 blocks are gone.
+> What's left marked 🚧 is blog authorship and the counterfactual charts.**
 
 Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
 review I will write (KTR). FOr Claude I will write (CTR).
@@ -313,6 +313,8 @@ The probe, a ridge regression from the observed prompt's activations at the user
 
 TODO @Kylie if you ever cleaned this up let me know!!
 
+TODO @Kylie if you ever cleaned this up let me know!!
+
 We give Qwen a real blog post from the
 [Blog Authorship Corpus](https://huggingface.co/datasets/tasksource/blog_authorship_corpus) (Schler
 et al., 2006) and ask a first-person question about its author, such as "What is my sex, based on
@@ -390,8 +392,8 @@ cases it trails transcript only by 0.008. Both charts regenerate with
 Paired by case, the 🔮-lens and NLA tie (+3.0 and +2.6pp pooled; the gap is +0.4 [−0.4, +1.2]pp).
 Both gain most on preferences (+5.2 and +4.7pp) and neither significantly on knowledge cutoff (+1.1
 and +1.8pp, CIs include 0). J++ is the best lens on multiple choice (+4.3pp) but hurts on
-preferences (−8.2pp), so pooled it sits below transcript only (−1.6pp). Regenerate with
-`uv run python -m graphs.headline_ablations`.
+preferences (−8.2pp), so pooled it sits below transcript only (−1.6pp).
+Regenerate with `uv run python -m graphs.headline_ablations`.
 
 ### By token position
 
@@ -466,8 +468,8 @@ readouts rarely name a specific answer, so its placebo is nearly harmless (−0.
 <img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
 
 Token count doesn't track uplift. Pooled, the reads add 5.9k tokens per prediction for J++, 26.3k
-for the 🔮-lens and 35.2k for NLA. J++, the shortest, is the one lens that doesn't help, and NLA,
-the longest, only ties the 🔮-lens. Each placebo adds the same tokens as its lens and does worse, so
+for the 🔮-lens and 35.2k for NLA. J++, the shortest, is the one lens that doesn't help, and NLA, the
+longest, only ties the 🔮-lens. Each placebo adds the same tokens as its lens and does worse, so
 extra tokens alone don't drive the gains.
 
 Reads also make Haiku think longer, so we checked whether more thinking explains the gains. It

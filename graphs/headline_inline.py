@@ -1,9 +1,9 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
 the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
 Essay grading, a counterfactual scored as AUROC, is graphs.essay_grading. MCQ, cutoff and preferences come only from the canonical
-menus_inline runs, `all` menu (graphs.menus_inline SETS: one prompt, the same read positions and placebo rule on every set, up to 3
-draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95% bootstraps resampling
-questions within each task, paired across conditions.
+menus_inline runs, `prompt` menu (graphs.menus_inline SETS and CANONICAL: one prompt, the same read positions and placebo rule on
+every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95%
+bootstraps resampling questions within each task, paired across conditions.
 
     uv run python -m graphs.headline_inline [--out-dir docs/img]
 
@@ -27,16 +27,16 @@ TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
 TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
-# task -> its menus_inline sets; the `all` menu's conditions under the names the charts use
+# task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
-CANON = {TS: TS, **{c.replace("_", "_all_", 1): c for c in SEVEN[1:]}}  # olens_all_placebo_inline -> olens_placebo_inline
+CANON = {TS: TS, **{c.replace("_", f"_{menus_inline.CANONICAL}_", 1): c for c in SEVEN[1:]}}  # olens_prompt_inline -> olens_inline
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
 
 def load() -> dict[str, tuple[dict, dict]]:
     """task -> (condition -> case -> accuracy (share of its draws right), case -> bootstrap group). MCQ, cutoff and preferences
-    come only from the canonical menus_inline runs, `all` menu (CLAUDE.local.md); MCQ adds the standardized probe, and its
+    come only from the canonical menus_inline runs and menu (CLAUDE.local.md); MCQ adds the standardized probe, and its
     bootstrap resamples the probe's question groups."""
     menus = menus_inline.load()
     out: dict[str, tuple[dict, dict]] = {}
