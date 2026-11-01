@@ -18,7 +18,7 @@ from matplotlib.transforms import Affine2D
 
 from cfbench.core import canon_condition
 from cfbench.scoring import LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
-from graphs.style import INK, MUTED, color
+from graphs.style import INK, MUTED, OLENS, color
 
 RUNS = "data/runs/cfbench/*modelchart-*"
 DUMB_RUNS = "data/runs/cfbench/*dumbpred-*"  # 2026-10-26 thinking-off predictors (docs/cfbench-dumb-predictors.md)
@@ -165,7 +165,7 @@ def model_lines(rows: list[dict], out: str) -> dict:
     for tick, c in zip(ax.get_xticklabels(), MODEL_AXIS, strict=True):
         tick.set_color(color(c))
     ax.set_xlim(-0.4, len(MODEL_AXIS) - 0.2)
-    style(ax, s, "Predictor model by condition (high effort, 20 tool calls, 4 cases)", "", ceiling=False)
+    style(ax, s, "Investigator model by condition (high effort, 20 tool calls, 4 cases)", "", ceiling=False)
     fig.tight_layout()
     fig.savefig(f"{out}/models.png")
     plt.close(fig)
@@ -236,7 +236,7 @@ def ts_vs_olens(out: str) -> dict:
     ax.text(
         56.5,
         56.9,
-        "O-lens = transcript-only",
+        f"{OLENS} = transcript-only",
         rotation=45,
         ha="center",
         va="bottom",
@@ -286,8 +286,8 @@ def ts_vs_olens(out: str) -> dict:
     ax.set_ylim(lo, hi)
     ax.set_aspect("equal")
     ax.set_xlabel("Transcript-only: 100 − RMSE (pp)")
-    ax.set_ylabel("With O-lens: 100 − RMSE (pp)")
-    ax.set_title("Transcript-only vs O-lens by predictor (4 cases, 20 tool calls)")
+    ax.set_ylabel(f"With {OLENS}: 100 − RMSE (pp)")
+    ax.set_title(f"Transcript-only vs {OLENS} by investigator (4 cases, 20 tool calls)")
     fig.tight_layout()
     fig.savefig(f"{out}/ts_vs_olens.png")
     plt.close(fig)
@@ -314,5 +314,5 @@ def make(out: str) -> dict | None:
         "models": table("models (high effort, 20 calls)", model_lines(rows, out)),
         "flash_effort": table("Flash by effort (20 calls)", flash_effort(rows, out)),
         "flash_calls": table("Flash by max calls (high effort)", flash_calls(rows, out)),
-        "ts_vs_olens": table("transcript-only vs O-lens (4 cases)", ts_vs_olens(out)),
+        "ts_vs_olens": table(f"transcript-only vs {OLENS} (4 cases)", ts_vs_olens(out)),
     }

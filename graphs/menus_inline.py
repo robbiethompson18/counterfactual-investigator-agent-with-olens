@@ -22,7 +22,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
+from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar
 
 R = Path("data/runs/cfbench")
 # set -> (title, runs); a set's NLA run is left out until it exists
@@ -46,7 +46,7 @@ SETS = {
 # positions (docs/read-positions.md). `prompt` (no tail tokens) was canonical for ~2 h on 2026-10-31 and is now the write-up's
 # token-position ablation, at 3 draws like `all` (Robbie, 2026-10-31)
 CANONICAL = "all"
-LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
+LENSES = {"olens": OLENS, "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
 BOOT = 2000
 
