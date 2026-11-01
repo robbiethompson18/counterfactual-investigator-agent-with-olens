@@ -1,16 +1,14 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
 the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
-Essay grading, a counterfactual, gets its own charts with its probe and stays out of the pooled numbers. MCQ, cutoff and preferences
-come only from the canonical menus_inline runs, `all` menu (graphs.menus_inline SETS: one prompt, the same read positions and
-placebo rule on every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases; an essay case is right when
-p >= 0.5 matches whether the grade goes up, or the probe's predicted shift > 0 does. Pooled numbers weight the three tasks equally. CIs
-are 95% bootstraps resampling questions (essays for essay grading) within each task, paired across conditions.
+Essay grading, a counterfactual scored as AUROC, is graphs.essay_grading. MCQ, cutoff and preferences come only from the canonical
+menus_inline runs, `all` menu (graphs.menus_inline SETS: one prompt, the same read positions and placebo rule on every set, up to 3
+draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95% bootstraps resampling
+questions within each task, paired across conditions.
 
     uv run python -m graphs.headline_inline [--out-dir docs/img]
 
-Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error, headline-<task> (y axis from 50) and
-headline-essay-diff.png (paired differences in % right and AUROC, the latter from cfbench.scoring.essay_auroc_bars), and prints every
-paired difference the write-up quotes.
+Writes headline-metamodels, headline-placebos, headline-probes, headline-probes-error and headline-<task> (y axis from 50), and prints
+every paired difference the write-up quotes.
 """
 
 import argparse
@@ -19,15 +17,15 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from cfbench.scoring import essay_auroc_bars, standard_essay_comparison, standard_probe_rows
+from cfbench.scoring import standard_probe_rows
 from graphs import menus_inline
-from graphs.style import MUTED, ci_bar, diff_rows, label, positions
+from graphs.style import ci_bar, label, positions
 
 LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
 TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
-TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences", "essay": "Essay grading"}
+TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
 # task -> its menus_inline sets; the `all` menu's conditions under the names the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
@@ -53,13 +51,6 @@ def load() -> dict[str, tuple[dict, dict]]:
                 acc[PROBE][s, row["item"]] = float(row["predicted_label"] == row["label"])
                 groups[s, row["item"]] = (s, row["group"])
     assert acc[PROBE].keys() == acc[TS].keys(), "the probe must cover every MCQ case"
-    scores, reference = standard_essay_comparison()
-
-    def right(c: str, k: tuple, p: float) -> bool:
-        return (p >= 0.5 if c.endswith("_inline") else p > 0) == bool(reference[k]["truth"])
-
-    acc = {c: {k: float(np.mean([right(c, k, p) for p in ps])) for k, ps in cases.items()} for c, cases in scores.items()}
-    out["essay"] = acc, {k: k[1] for k in reference}
     return out
 
 
@@ -130,27 +121,6 @@ def figure(path: Path, panels: list, ylabel: str = YLABEL, ylim: float = 100, fl
     print("wrote", path)
 
 
-def essay_diffs(boot: Boot, path: Path) -> None:
-    """Essay grading's paired differences: each lens vs transcript-only and vs its placebo, and the probe vs transcript-only."""
-    pairs = [(lens, TS) for lens in LENSES] + [(lens, PLACEBOS[lens]) for lens in LENSES] + [(PROBE, TS)]
-    auroc = essay_auroc_bars()[3]
-    print(
-        "essay AUROC:",
-        {f"{a[:5]}-{b[:5]}": (round(100 * auroc[a, b][0], 1), [round(100 * x, 1) for x in auroc[a, b][1]]) for a, b in pairs},
-    )
-    right = [(a, b, *boot.diff_ci(["essay"], a, b)) for a, b in pairs]
-    points = [(a, b, 100 * auroc[a, b][0], 100 * auroc[a, b][1][0], 100 * auroc[a, b][1][1]) for a, b in pairs]
-    fig, axes = plt.subplots(1, 2, figsize=(14, 3.6), layout="constrained")
-    for ax, rows, title in ((axes[0], right, "difference in % of cases right"), (axes[1], points, "difference in AUROC x 100")):
-        diff_rows(ax, rows)
-        ax.set_title(title)
-        ax.set_xlim(-6, 26)
-    fig.supxlabel("Essay grading, paired by essay (95% bootstrap CI; filled = excludes 0)", fontsize=8.5, color=MUTED)
-    fig.savefig(path, bbox_inches="tight")
-    plt.close(fig)
-    print("wrote", path)
-
-
 def main(out: Path) -> None:
     tasks = load()
     boot = Boot(tasks)
@@ -165,10 +135,7 @@ def main(out: Path) -> None:
         "between lenses:",
         {f"{a[:5]}-{b[:5]}": boot.diff(POOLED, a, b) for a, b in ((LENSES[0], LENSES[1]), (LENSES[0], LENSES[2]), (LENSES[1], LENSES[2]))},
     )
-    for task in ("mcq", "essay"):
-        print(
-            f"{task} probe {boot.bar([task], PROBE)[0]:.1f}: " + "  ".join(f"probe-{c[:5]} {boot.diff([task], PROBE, c)}" for c in LENSES)
-        )
+    print(f"mcq probe {boot.bar(['mcq'], PROBE)[0]:.1f}: " + "  ".join(f"probe-{c[:5]} {boot.diff(['mcq'], PROBE, c)}" for c in LENSES))
 
     lens_groups = [(label(c), [c]) for c in LENSES]
     pair_groups = [(label(c), [c, PLACEBOS[c]]) for c in LENSES]
@@ -185,9 +152,7 @@ def main(out: Path) -> None:
     figure(out / "headline-probes-error.png", [(t, lambda ax, ts=ts: bars(ax, boot, ts, probe_groups, error=True)) for t, ts in probes],
            ylabel="% of cases the investigator gets wrong", ylim=60)  # fmt: skip
     for task, title in TITLES.items():
-        groups = [*seven, ("probe", [PROBE])] if task == "essay" else seven
-        figure(out / f"headline-{task}.png", [(title, lambda ax, t=task, g=groups: bars(ax, boot, [t], g))], floor=50)
-    essay_diffs(boot, out / "headline-essay-diff.png")
+        figure(out / f"headline-{task}.png", [(title, lambda ax, t=task: bars(ax, boot, [t], seven))], floor=50)
 
 
 if __name__ == "__main__":

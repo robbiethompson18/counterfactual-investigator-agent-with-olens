@@ -1,6 +1,7 @@
 """The sprint talk's figures (slides/talk/talk.tex), PDFs at their slide size in slides/talk/fig/, plus the LaTeX table
 snippets the deck \\inputs. Statistics come from cfbench.scoring (the hint evals' bars from the viewer's evals/NAME.json, essay
-grading's and the blog deletions' AUROCs from the runs' predictions), the look from graphs.style (@slide: the deck's sizes and a
+grading's and the blog deletions' AUROCs from the runs' predictions; the essay bars themselves are graphs.essay_grading's, drawn
+here at slide size), the look from graphs.style (@slide: the deck's sizes and a
 transparent background around each figure). `make -C slides` runs this first.
 
     uv run python -m graphs.talk   # -> slides/talk/fig/*.pdf, *.tex
@@ -25,6 +26,7 @@ from cfbench.scoring import (
     essay_flips,
 )
 from graphs.cutoff_grader_mentions import RUNS, at_token
+from graphs.essay_grading import essay_bars
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.olens_mandarin import RUN as MANDARIN_RUN
 from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
@@ -117,48 +119,12 @@ def grid() -> None:
     slide_save(fig, OUT / "grid.pdf")
 
 
-ESSAY_GROUPS = [
-    ("transcript", ["transcript_inline"]),
-    ("O-lens", ["olens_inline", "olens_placebo_inline"]),
-    ("NLA", ["nla_inline", "nla_placebo_inline"]),
-    ("J++", ["jlens_inline", "jlens_placebo_inline"]),
-    ("transcript\n+ mean", ["transcript_inline+mean"]),
-    ("O-lens\n+ mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
-    ("NLA\n+ mean", ["nla_inline+mean", "nla_placebo_inline+mean"]),
-    ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
-    ("probe", ["probe_user_end"]),  # the user-end probe only (Kylie: one probe is easier to explain)
-]  # † Kylie: probably cursed (the slide's footnote)
-
-
 @slide
 def essay() -> None:
-    """AUROC of P(the score goes up without the opener), in grid()'s style, the dotted line at the regression-to-the-mean null.
-    Full slide width: three lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table."""
-    bars, null, n, _ = essay_auroc_bars()
+    """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width: three
+    lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table)."""
     fig, ax = slide_figure(FULL_W, 24)
-    xs, ticks = positions(bars, ESSAY_GROUPS)
-    base = 0.5
-    for c, x in xs.items():
-        v, (lo, hi), st = bars[c]
-        ax.bar(x, v - base, 0.8, bottom=base, **bar_kw(c.removesuffix("+mean")))
-        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-        ax.annotate(
-            f"{v:.3f}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK
-        )
-        ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK)
-    ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
-    ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * SLIDE_S, color=MUTED, va="center")
-    ax.set_xticks(ticks, [g for g, cs in ESSAY_GROUPS if any(c in bars for c in cs)])
-    ax.set_xlim(-0.6, ticks[-1] + 0.6)
-    ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
-    head = f"{n:,} cases · probe: nested 2 × 2 · AUROC over every draw · hatched = placebo"  # one line, clear of the probe's stars
-    ax.text(0, 1.08, head, transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED)
-    ax.grid(axis="x", visible=False)
-    top = max(bars[c][1][1] for c in xs) + 0.1
-    yt = np.arange(base, top, 0.1)
-    ax.set_ylim(base, top)
-    ax.set_yticks(yt, [f"{t:.1f}" for t in yt])
-    ax.set_ylabel("AUROC of P(score goes up)")
+    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)")  # the frame title asks "does Qwen's grade go up"
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
