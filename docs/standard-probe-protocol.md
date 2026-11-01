@@ -2,6 +2,8 @@
 
 **Status (2026-10-31):** ACTIVE. Executed protocol; results below. This supersedes older probe
 recipes for standardized comparisons, without invalidating or deleting their historical results.
+Chart modules `graphs.mcq_unselected` and `graphs.supergpqa_inline` deleted 2026-10-31 (PR #579,
+last at commit 62a4e31c); the last two commands under "Regenerate locally" no longer run.
 
 ## Scope and labels
 

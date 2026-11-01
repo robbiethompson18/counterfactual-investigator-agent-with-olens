@@ -1,6 +1,6 @@
 # hint_cf: hints that pull Qwen away from its own consistent answer
 
-**Status (2026-10-29):** MIXED. Only `wrong_mcq` lives on, as
+**Status (2026-10-31):** MIXED. Only `wrong_mcq` lives on, as
 [`environments/hint_mcq/`](../../environments/hint_mcq/). The 2026-10-27 table below is superseded
 by the 2026-10-28 scale-up section right after it: on 2,000 more questions (174 correct-hint and 67
 wrong-hint items that followed the hint 8/8, no text-inversion gate) the O-lens condition is within
@@ -18,7 +18,8 @@ procedure gives Qwen survivors for hinted_truthfulqa's `gold` pair
 Its answer task, un-gated
 ([hinted_truthfulqa.md](hinted_truthfulqa.md#ungated-sets-primary-2026-10-28)): 66 TruthfulQA cases,
 O-lens 21% vs placebo 10% vs transcript 8% (+12pp, sign test p = 0.004); the original 24 usable
-MMLU-Pro items, 40% vs 28% vs 22% (+12pp, p = 0.13).
+MMLU-Pro items, 40% vs 28% vs 22% (+12pp, p = 0.13). Chart modules `graphs.hint_mcq_answer` and
+`graphs.hint_mcq_total` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
 
 ## Scale-up, un-gated: the lens is at placebo (2026-10-28)
 

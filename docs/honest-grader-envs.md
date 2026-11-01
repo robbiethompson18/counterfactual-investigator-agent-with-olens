@@ -1,9 +1,10 @@
 # Honest-grader envs: can the O-lens read the grade Qwen would give if it were being honest?
 
-**Status (2026-10-29):** NULL. The O-lens adds nothing over transcript-only or placebo on the 44
+**Status (2026-10-31):** NULL. The O-lens adds nothing over transcript-only or placebo on the 44
 cases (binary 100 − RMSE: O-lens 77, transcript-only 78, placebo 79): at `Score:` it echoes Qwen's
 inflated grade and only flags leniency. The env lives on as
-[`environments/honest/`](../environments/honest/).
+[`environments/honest/`](../environments/honest/). Chart modules `graphs.honest_binary` and
+`graphs.honest_binary_olens` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
 
 Plan written 2026-10-26, after the hidden_goal.grade result
 ([envs/hidden_goal.md](envs/hidden_goal.md)) turned out to be the only env in the 26-env no-CoT

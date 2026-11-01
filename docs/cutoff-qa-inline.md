@@ -11,7 +11,10 @@ keep the old verdict text). Every condition gains 0.4–0.8pp; each lens − pla
 but kept for its mechanism notes. **2026-10-31:** most of the lenses' gain on stale items is Haiku's
 later knowledge cutoff: a same-cutoff investigator (Gemini 2.5 Flash-Lite) with no lens matches
 Haiku + lens, and every lens makes Flash-Lite worse (section "A same-cutoff investigator matches
-Haiku + lens").
+Haiku + lens"). Chart modules `graphs.cutoff_qa_inline`, `graphs.cutoff_qa_tool_inline` and
+`graphs.cutoff_qa_notail` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
+`graphs.cutoff_qa_investigators --set cutoff_qa_inline` went with them; its `canonical` set is
+unchanged.
 
 **Question.** Can an investigator that never sees Qwen3.6-27B's reply predict the answer it gives to
 a present-tense factual question ("Who is the CEO of Intel?"), and do O-lens reads of the prompt
