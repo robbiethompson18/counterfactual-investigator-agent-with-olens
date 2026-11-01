@@ -47,7 +47,9 @@ VERTEX = "vertex/"
 CLAUDE = "anthropic-direct/"
 BATCH = "anthropic-batch/"
 BATCH_WAIT, BATCH_MAX, BATCH_POLL = 30, 1000, 30  # 1,000 inline prompts of ~25k tokens is ~100 MB, under the 256 MB batch cap
-BATCH_BYTES = 50_000_000  # the server resets connections on long uploads: ~150 MB at home uplink speed (1.5 MB/s) failed, 2026-10-31
+# the server resets connections on long uploads: ~150 MB at home uplink speed (1.5 MB/s) failed, 2026-10-31; 50 MB failed too
+# that evening while HF syncs of other runs shared the uplink, so 15 MB (~10 s)
+BATCH_BYTES = 15_000_000
 EFFORT = "medium"
 _CLIENT: AsyncOpenAI | None = None
 _GOOGLE: dict[str, AsyncOpenAI] = {}  # key_env -> client

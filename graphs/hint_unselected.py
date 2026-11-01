@@ -20,15 +20,18 @@ from cfbench.scoring import stars
 from graphs.style import INK, MUTED, bar_kw, positions
 
 R = Path("data/runs/cfbench")
-RUNS = {"knew": ["2026-10-31_hint-unselected", "2026-10-31_hint-unselected-all"],
-        "letter": ["2026-10-31_hint-unselected-letter", "2026-10-31_hint-unselected-letter-all"]}  # fmt: skip
+RUNS = {"knew": ["2026-10-31_hint-unselected-d", "2026-10-31_hint-unselected-all-d"],
+        "letter": ["2026-10-31_hint-unselected-letter-d", "2026-10-31_hint-unselected-letter-all-d"]}  # fmt: skip
 GROUPS = [("transcript", ["transcript_inline"]), ("O-lens\nprompt reads", ["olens_prompt_inline", "olens_prompt_placebo_inline"]),
           ("O-lens\n+ tail reads", ["olens_all_inline", "olens_all_placebo_inline"])]  # fmt: skip
 OUT = Path("docs/img/hint-unselected.png")
 
 
 def rows(task: str) -> list[dict]:
-    return [json.loads(line) for run in RUNS[task] for line in (R / run / "predictions.jsonl").open()]
+    """Every valid prediction row of the task's runs (a draw with no valid submission has p / correct null)."""
+    key = "p" if task == "knew" else "correct"
+    out = [json.loads(line) for run in RUNS[task] for line in (R / run / "predictions.jsonl").open()]
+    return [r for r in out if r.get(key) is not None]
 
 
 def panel(ax, task: str, mod, key: str, base: float, pct: bool, ylabel: str, chance: float, chance_label: str) -> None:
@@ -46,7 +49,11 @@ def panel(ax, task: str, mod, key: str, base: float, pct: bool, ylabel: str, cha
                     ha="center", va="bottom", fontsize=7, color=INK)  # fmt: skip
     ax.axhline(chance, color=MUTED, lw=0.9, ls=(0, (1, 2)), zorder=1)
     ax.text(1.0, chance, f" {chance_label}", transform=ax.get_yaxis_transform(), fontsize=7, color=MUTED, va="center")
-    ax.set_xticks(ticks, [g for g, _ in GROUPS])
+    n_of = {c: len({r["item"] for r in rs if r["condition"] == c}) for c in bars}  # a pair short of cases says so
+    n_all = max(n_of.values())
+    ax.set_xticks(
+        ticks, [g + (f"\n({min(n_of[c] for c in cs):,} cases)" if min(n_of[c] for c in cs) < 0.9 * n_all else "") for g, cs in GROUPS]
+    )
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     top = max(hi for _, (_, hi) in bars.values()) + (0.12 if pct else 0.08)
     ax.set_ylim(base, top)
@@ -56,8 +63,7 @@ def panel(ax, task: str, mod, key: str, base: float, pct: bool, ylabel: str, cha
             [t / 10 for t in range(int(base * 10), int(top * 10) + 1)],
             [f"{t:.0%}" for t in [t / 10 for t in range(int(base * 10), int(top * 10) + 1)]],
         )
-    n = len({r["item"] for r in rs})
-    ax.set_title(f"{n:,} cases, draws pooled", fontsize=8, color=MUTED, loc="left")
+    ax.set_title(f"{n_all:,} cases, draws pooled", fontsize=8, color=MUTED, loc="left")
     ax.grid(axis="x", visible=False)
 
 

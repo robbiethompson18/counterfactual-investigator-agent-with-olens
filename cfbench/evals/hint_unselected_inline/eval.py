@@ -275,12 +275,14 @@ def lens_reads(inputs: str) -> dict[str, dict[int, dict[int, list]]]:
 
 
 def placebo_case(c: dict, inputs: str, seed: int) -> tuple[dict, bool]:
-    """Another case with the same option count and category (else any category); relaxed? (docs/placebo-rules.md)"""
+    """Another case with the same option count and category (else any category, else any count); relaxed? (docs/placebo-rules.md)"""
     rng = random.Random(f"{seed}:{c['item']}")
     pool = [o for o in _cases(inputs).values() if o["n_opts"] == c["n_opts"] and o["id"] != c["id"]]
     same = [o for o in pool if o["category"] == c["category"]]
     if same:
         return rng.choice(sorted(same, key=lambda o: o["id"])), False
+    if not pool:  # the one case with its option count (a 6-option item among ten-option ones): any case, align() cycles the newlines
+        pool = [o for o in _cases(inputs).values() if o["id"] != c["id"]]
     return rng.choice(sorted(pool, key=lambda o: o["id"])), True
 
 
