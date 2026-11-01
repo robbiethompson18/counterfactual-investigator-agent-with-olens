@@ -3,6 +3,9 @@
 **Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
 by hand.
 
+@agents sorry still haven't decided what is canonical between tail and all tokens. Might flip flop
+again sadly.
+
 <!-- AGENTS (Robbie, 2026-10-31): every lens number, chart and token count for MCQ (MMLU-Pro, SuperGPQA), knowledge
 cutoff and preferences comes ONLY from the canonical menus_inline runs, `prompt` menu (each prompt's punctuation and option
 newlines, no tail tokens, layers 32-60, same prompt and placebo rules on every set): `graphs/menus_inline.py` SETS and
@@ -142,6 +145,9 @@ promising, and move on to other datasets.[^datadetail]
 
 <img src="img/chive-agam-inline.png" alt="AUROC on 515 CHIVE-style claims over Agam's Qwen3.6-27B incidents: edit only 0.775, transcript 0.780, O-lens 0.788 vs placebo 0.787, NLA 0.784 vs 0.780, J++ 0.791 vs 0.788" width="600">
 
+> 🚧 **Departure from defaults:** reads include the ten tail tokens before the reply; placebo is
+> another incident's reads; Haiku gives P(claim) scored as AUROC.
+
 ## II: Our New Simple Evals
 
 Many of our environments that work are ideas stolen from WorkspaceBench. The additions we make to
@@ -247,6 +253,9 @@ is is a strong and arguably fairer baseline, and we show no uplift to it.
 
 <img src="img/cutoff-qa-investigators.png" alt="Knowledge cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, transcript only 63.6%, O-lens 73.7% (placebo 67.8%), J++ 70.3% (placebo 64.8%), NLA 74.1% (placebo 68.6%); Gemini 2.5 Flash-Lite answers itself 63.1%, transcript only 73.1%; with not-stale and all-items panels" width="600">
 
+> 🚧 **Departure from defaults:** Flash-Lite rows are one draw per item; Haiku's "told" bar (model
+> name and cutoff given) is on an earlier prompt.
+
 Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to
 8–34%, because it takes the bullets at face value ([docs/cutoff-qa-inline.md](cutoff-qa-inline.md)).
 [^oldprompt] This is not so surprising: Gemini 2.5 Flash-Lite is dumb.
@@ -292,6 +301,9 @@ and
 
 <img src="img/headline-essay.png" alt="Essay grading, AUROC of P(score goes up): transcript only 0.753, O-lens 0.775 (placebo 0.757), NLA 0.760 (0.757), J++ 0.759 (0.750); user-end probe 0.864; betting on regression to the mean alone 0.776" width="640">
 
+> 🚧 **Departure from defaults:** reads include the ten tail tokens of the assistant turn; placebo
+> is another opener's reads on a different essay of the same topic; P(up) scored as AUROC.
+
 This is a counterfactual task, so the investigator gives a probability rather than a letter, and we
 score it as AUROC, as we do blog authorship: % right at a 0.5 threshold on a 54% base rate rewards a
 shift in Haiku's bias as much as real information. AUROC is pooled over all 5,400 draws per
@@ -309,6 +321,9 @@ out-of-fold logistic regression; the 🔮-lens keeps a small edge over transcrip
 [+0.001, +0.014]).
 
 <img src="img/headline-essay-mean.png" alt="Essay grading with Qwen's observed mean grade added, AUROC: transcript + mean 0.832, O-lens + mean 0.839 (placebo 0.830), NLA + mean 0.839 (0.839), J++ + mean 0.835 (0.834); user-end probe 0.864; betting on regression to the mean alone 0.776" width="640">
+
+> 🚧 **Departure from defaults:** reads include the ten tail tokens of the assistant turn; placebo
+> is another opener's reads on a different essay of the same topic; P(up) scored as AUROC.
 
 The probe, a ridge regression from the observed prompt's activations at the user turn's last token
 (nested 2 × 2 folds by essay), reaches 0.864, 0.11 ahead of every investigator.
@@ -350,6 +365,10 @@ configuration was chosen during exploration of this dataset.
 
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with O-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
 
+> 🚧 **Departure from defaults:** 🔮-lens at layers 32/40/48, NLA at layer 42 only; positions are
+> the question's and post's punctuation and newlines, no tail tokens; Haiku at effort low, one draw
+> per case; AUROC.
+
 ### Hinted Multiple Choice
 
 > **🚧 TODO SANITY CHECK (Robbie / Kylie).** This section was pulled from the talk's "Hinted
@@ -376,6 +395,9 @@ probe at layer 52 trained on hint-after prompts, and the tuned probe the same pr
 hint-first prompts (out-of-fold).
 
 <img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint after the options (976 cases) and hint first (952 cases). Top, AUROC of P(knew): transcript only 0.613 / 0.615, O-lens 0.739 / 0.688 (placebo 0.572 / 0.543), probe 0.937 / 0.764, tuned probe 0.851 hint-first. Bottom, which letter without the hint, % correct: transcript only 53.2 / 52.3, O-lens 54.9 / 53.9 (placebo 49.3 / 47.6), probe 76.4 / 53.9, tuned probe 64.1 hint-first; always the hinted letter 50%" width="760">
+
+> 🚧 **Departure from defaults:** investigator Gemini 3.8 Flash at effort low; 🔮-lens at layers
+> 32/40/48/52; positions are the option newlines and the end of the prompt only.
 
 Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
 transcript-only. Bottom row: % correct on the letter, 95% item bootstrap, stars from a one-sided
@@ -695,11 +717,14 @@ Unless a chart says otherwise, every result uses these:
   sampled at temperature 1, one continuation of up to four bullets per read, each bullet's FVE from
   the AR. The NLA is Camila's all-layer Qwen3.6-27B NLA
   ([agu18dec/qwen3.6-27b-all-layer-nla-rl2000](https://huggingface.co/agu18dec/qwen3.6-27b-all-layer-nla-rl2000)),
-  decoded greedily, FVE from its critic. J++ is our own J++ lens on Qwen3.6-27B.
+  decoded greedily, FVE from its critic. J++ is the published Jacobian lens for Qwen3.6-27B
+  ([Ayonrinde and Lindsey, 2026](https://huggingface.co/neuronpedia/jacobian-lens); we apply its maps to
+  residuals we capture ourselves).
 - **Placebo:** the same block built from another case of the same set with the same option count and
   subject category, its reads laid onto this case's positions by kind (option newline to option
   newline, punctuation in order). One rule for every lens, and a source whose answer happens to
-  match is never excluded, since that is part of chance.
+  match is never excluded, since that is part of chance. A placebo from another dataset would be
+  easy to ignore; one from the same set and category is the stricter test.
 - **Statistics:** % of draws naming Qwen's answer; 95% bootstrap CIs resampling questions, paired
   across conditions; stars from one-sided paired tests against transcript-only; the headline weights
   the three tasks equally.
@@ -710,13 +735,7 @@ and for comparison
 [an agentic draw from the counterfactual work](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/77d5e448-f97a-4f9c-9d23-9e470ee675fe),
 where Gemini 3.8 Flash has tools to read and grep the transcripts and the lens reads.
 
-Where a chart departs from these, its section says so. The departures: essay grading also reads the
-ten tail tokens of the assistant turn, and its placebo is another opener on a different essay of the
-same topic; blog authorship reads the 🔮-lens at three layers and the NLA at one, with Haiku at
-effort low and one draw; hinted MCQ uses Gemini 3.8 Flash at effort low, four layers, and only the
-option newlines and the end of the prompt; the CHIVE-style claims include the tail tokens and take
-their placebo from another incident; the counterfactual appendix is the agentic setup linked above,
-Gemini 3.8 Flash with a lens tool that shows layers 32, 40 and 48.
+Every chart that departs from these carries a 🚧 **Departure from defaults** line under it.
 
 ## Counterfactual Investigation Ablation Graphs
 
@@ -742,6 +761,10 @@ little, which led us to believe that these counterfactuals were too difficult to
 Nothing helper an investigator make better counterfacutla predictions:
 
 <img src="img/cfbench-report/skill_pooled.png" alt="All targets pooled" width="404">
+
+> 🚧 **Departure from defaults:** all charts in this appendix: predictor Gemini 3.8 Flash with tools
+> (read and grep transcripts and reads, 20 calls); 🔮-lens shown through a tool at layers 32/40/48;
+> placebo from a different env; scored as RMSE of the predicted rate.
 
 This was true across target models:
 
