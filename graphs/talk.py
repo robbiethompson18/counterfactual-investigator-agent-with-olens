@@ -13,25 +13,24 @@ from pathlib import Path
 import numpy as np
 from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
-from matplotlib.patches import Rectangle
 
 from cfbench.scoring import (
     AUTHOR_GROUPS,
     AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
+    acting_by_factor,
     answer_bars,
     auroc_bars,
     author_bars,
     essay_auroc_bars,
     essay_flips,
-    grader_acting,
 )
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.olens_mandarin import RUN as MANDARIN_RUN
-from graphs.style import BG, FAINT, FULL_W, INK, MUTED, ORANGE, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
+from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
@@ -212,43 +211,41 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
+HARNESS_LABELS = {("system", "agent"): "agent\nprompt", ("system", "asst"): "asst.\nprompt", ("envblock", "env"): "env\nblock",
+                  ("envblock", "noenv"): "no env\nblock", ("done", "done"): "done\ntool", ("done", "nodone"): "no done\ntool",
+                  ("names", "plain"): "plain\nnames", ("names", "mcp"): "MCP\nnames", ("date", "now"): "date\nnow",
+                  ("date", "past"): "date\npast"}  # fmt: skip
+
+
 @slide
-def grader_acting_bars() -> None:
-    """harness_grid thinking off, Qwen3.6-27B beside GLM-5.3: % acted without asking per wording, episodes whose prompt O-lens
-    reads say grade[rd]/rubric (O-lens orange) vs not (a colour outside the condition palette; no hatching, Kylie 2026-11-01),
-    Wilson 95% CIs, each wording's share of episodes that mention it above its bars; plus the numbers the source line quotes."""
-    res = grader_acting()
-    without = "#cdb891"  # outside the condition palette
-    fig, axes = slide_figure(FULL_W, 46, ncols=2, sharey=True)
-    for ax, (model, r) in zip(axes, res.items()):
-        for j, w in enumerate(r["by_wording"]):
-            for off, m, col in [(-0.2, True, ORANGE), (0.2, False, without)]:
-                k, n = r["by_wording"][w][m]
+def acting_bars() -> None:
+    """harness_grid thinking off, 2x2 (Kylie, 2026-11-01): rows Qwen3.6-27B and GLM-5.3 (one colour each, outside the condition
+    palette), columns % acted without asking by wording and by each harness factor's two levels; Wilson 95% CIs, shared y."""
+    res = acting_by_factor()
+    colours = {"Qwen3.6-27B": "#c2185b", "GLM-5.3": "#8c6d1f"}
+    fig, axes = slide_figure(FULL_W, 54, nrows=2, ncols=2, sharey=True, gridspec_kw={"width_ratios": [9, 11.5]})
+    for row, (model, r) in zip(axes, res.items()):
+        k_all, n_all = r["all"]
+        for ax, key in zip(row, ("wording", "harness")):
+            xs = []
+            for j, (lab, (k, n)) in enumerate(r[key].items()):
+                x = j + (j // 2) * 0.5 if key == "harness" else j  # gap between factors
                 lo, hi = wilson(k, n)
-                ax.bar(j + off, k / n, 0.4, color=col)
-                ax.errorbar(j + off, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.7, capsize=1.5, capthick=0.7)
-            nm, nn = r["by_wording"][w][True][1], r["by_wording"][w][False][1]
-            ax.text(j, 0.97, f"{nm / (nm + nn):.1%}", ha="center", va="bottom", fontsize=5.5 * SLIDE_S, color=ORANGE)
-        nw, no = r["pooled"][True][1], r["pooled"][False][1]
-        ax.set_title(f"{model} thinking off: {nw / (nw + no):.1%} of {nw + no:,} episodes mention grade[rd]", loc="left",
-                     fontsize=7 * SLIDE_S, color=INK, pad=8)  # fmt: skip
-        ax.set_xticks(range(len(r["by_wording"])), [w.replace("_", " ") for w in r["by_wording"]], rotation=30, ha="right")
-        ax.set_xlim(-0.6, len(r["by_wording"]) - 0.4)
-        ax.grid(axis="x", visible=False)
-    axes[0].set_ylim(0, 1.04)
-    axes[0].set_yticks(np.arange(0, 0.91, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.91, 0.2)])
-    axes[0].set_ylabel("acted without asking")
-    handles = [Rectangle((0, 0), 1, 1, color=c) for c in (ORANGE, without)]
-    labels = ["prompt O-lens reads mention grade[rd] (share of episodes above each wording)", "no mention"]
-    fig.legend(handles, labels, loc="outside upper right", ncol=2, frameon=False)
-    slide_save(fig, OUT / "grader_acting.pdf")
-    pf = lambda p: f"{p:.0e}".replace("e-0", "e-").replace("e-", r"\times10^{-").replace("e+", "") + "}" if p < 1e-3 else f"{p:.2f}"
-    parts = []
-    for model, r in res.items():
-        (kw, nw), (ko, no) = r["pooled"][True], r["pooled"][False]
-        (o1, p1), (o2, p2) = r["or_wording"], r["or_wording_system"]
-        parts.append(f"{model}: {kw / nw:.0%} vs {ko / no:.0%}, OR {o1:.2f} (p ${pf(p1)}$) / {o2:.2f} (p ${pf(p2)}$)")
-    (OUT / "grader_acting.tex").write_text("\\def\\gaAll{" + "; ".join(parts).replace("%", "\\%") + "}\n")
+                ax.bar(x, k / n, 0.75, color=colours[model])
+                ax.errorbar(x, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.7, capsize=1.5, capthick=0.7)
+                xs.append(x)
+            ax.axhline(k_all / n_all, color=FAINT, lw=0.7, ls=":")
+            labels = [w.replace("_", " ") for w in r[key]] if key == "wording" else [HARNESS_LABELS[f] for f in r[key]]
+            ax.set_xticks(xs, labels, rotation=30 if key == "wording" else 0, ha="right" if key == "wording" else "center")
+            ax.set_xlim(xs[0] - 0.6, xs[-1] + 0.6)
+            ax.grid(axis="x", visible=False)
+            ax.set_title(f"{model} thinking off, by {key}", loc="left", fontsize=7 * SLIDE_S, color=INK)
+        row[0].set_ylabel("acted without asking")
+    axes[0][0].set_ylim(0, 0.82)
+    axes[0][0].set_yticks(np.arange(0, 0.81, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.81, 0.2)])
+    slide_save(fig, OUT / "acting.pdf")
+    parts = [f"{m} {r['all'][0] / r['all'][1]:.0%} of {r['all'][1]:,}" for m, r in res.items()]
+    (OUT / "acting.tex").write_text("\\def\\actAll{" + "; ".join(parts).replace("%", "\\%") + "}\n")
 
 
 MANDARIN_LENSES = {"old": "Old Qwen O-lens\n(spaces stripped)", "new": "Qwen O-lens\n(fixed)"}
@@ -331,6 +328,6 @@ if __name__ == "__main__":
     essay()
     essay_diffs()
     grader()
-    grader_acting_bars()
+    acting_bars()
     mandarin()
     author()

@@ -342,17 +342,16 @@
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, O-lens + AR, T 1.}
 \end{frame}
 
-\begin{frame}{Anecdata: grade[rd] in prompt O-lens reads vs acting without asking, Qwen vs GLM}
-  \input{fig/grader_acting.tex}
+\begin{frame}{Anecdata: acting by wording and harness, Qwen vs GLM}
+  \input{fig/acting.tex}
   \begin{itemize}
-    \item Overeagerness harness grid, thinking off: 12 tasks $\times$ 9 wordings $\times$ 32 harnesses; label: acted without
-      asking. An episode \emph{mentions} if any O-lens read on its prompt (system + first user turn, every position) matches
-      \texttt{\textbackslash bgrade[rd]|\textbackslash brubric}; this depends on task and harness, not wording
+    \item Overeagerness harness grid, thinking off: 12 tasks $\times$ 9 wordings of the ask $\times$ 32 harnesses (2 levels each of
+      system prompt, env block, done tool, tool names, date); label: acted without asking. Each bar pools every other factor
   \end{itemize}
-  \slidefig{fig/grader_acting.pdf}
-  \source{Qwen3.6-27B and GLM-5.3 harness-grid runs, thinking off, 6,912 and 6,651 scored episodes. Reads: Qwen O-lens L40, one
-    read per prompt position (median 255); GLM O-lens block 51, every draw at every prompt position (median 8). Bars: Wilson 95\%
-    CI. Mentions vs doesn't, Mantel-Haenszel OR within wording / within wording $\times$ system prompt, CMH p: \gaAll.}
+  \slidefig{fig/acting.pdf}
+  \source{Qwen3.6-27B and GLM-5.3 harness-grid runs, thinking off, cut episodes left out; acted overall: \actAll{} episodes (dotted
+    line). Each wording bar $\approx$ 770 episodes, each harness bar $\approx$ 3,400. Bars: Wilson 95\% CI. Agent system prompt: ``You are an
+    autonomous agent \ldots{} ONE command per turn''; assistant: ``You are an AI assistant working on the user's computer \ldots''.}
 \end{frame}
 
 \begin{frame}{GLM-5.3 alignment-faking prompt, public stage: GLM lens on GLM vs Qwen lens on GLM vs Qwen lens on Qwen}
