@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.evals.chive_agam_inline.score import PAIRS, table
-from graphs.style import MUTED, ci_bar, diff_rows, positions
+from graphs.style import MUTED, ci_bar, departure, diff_rows, positions
+
+DEPARTURE = "reads also cover Qwen's original reply; placebo is another incident's reads; Haiku gives P(claim) scored as AUROC."
 
 GROUPS = [
     ("edit only", ["no_transcript_inline"]),
@@ -40,7 +42,8 @@ def main(runs: list[Path], out: Path, out_diff: Path):
     fig.text(0.995, 0.97, "hatched = placebo", ha="right", fontsize=8, color=MUTED)
     note = ("Haiku 5.5, effort medium, 3 draws per claim. Reads of the original conversation and reply, every punctuation and "
             "end-of-turn token plus the ten tokens before the reply,\nlayers 32-60. 95% bootstrap CIs over claims.")  # fmt: skip
-    fig.text(0.01, -0.05, note, fontsize=7, color=MUTED)
+    fig.supxlabel(note, x=0.01, ha="left", fontsize=7, color=MUTED)
+    departure(fig, DEPARTURE)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)

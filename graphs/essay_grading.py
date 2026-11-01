@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.scoring import ESSAY_LENSES, essay_auroc_bars
-from graphs.style import FAINT, INK, MUTED, bar_kw, diff_rows, positions
+from graphs.style import FAINT, INK, MUTED, bar_kw, departure, diff_rows, positions
 
 GROUPS = [
     ("transcript", ["transcript_inline"]),
@@ -37,6 +37,7 @@ GROUPS = [
 PLAIN_GROUPS = [g for g in GROUPS if "+ mean" not in g[0]]  # the write-up's first chart
 MEAN_GROUPS = [g for g in GROUPS if "+ mean" in g[0] or g[0] == "probe"]  # its second, under the calibration paragraph
 TS = "transcript_inline"
+DEPARTURE = "placebo is another opener's reads on a different essay of the same topic; P(up) scored as AUROC."
 WRITEUP_S = 1.15  # text scale at write-up size: values at 7.5pt as graphs.style.ci_bar; the deck passes SLIDE_S
 BASE = 0.5  # the axis starts at chance
 
@@ -104,6 +105,7 @@ def main(out: Path) -> None:
         fig, ax = plt.subplots(figsize=(6.4, 3.2), layout="constrained")
         essay_bars(ax, WRITEUP_S, headroom=0.04, groups=groups)
         fig.suptitle(title, x=0.01, ha="left")
+        departure(fig, DEPARTURE)
         fig.savefig(out / name, bbox_inches="tight")
         plt.close(fig)
         print("wrote", out / name)

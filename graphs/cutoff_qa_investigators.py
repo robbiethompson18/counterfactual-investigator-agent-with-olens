@@ -25,7 +25,9 @@ import matplotlib.pyplot as plt
 from environments.cutoff_qa.env import norm
 from graphs.cutoff_qa_inline import PAIRS, ci, diffs, per_item
 from graphs.menus_inline import CANONICAL
-from graphs.style import MUTED, bar_kw, ci_bar, label
+from graphs.style import MUTED, bar_kw, ci_bar, departure, label
+
+DEPARTURE = 'Flash-Lite rows are one draw per item; Haiku\'s "told" bar (model name and cutoff given) is on an earlier prompt.'
 
 CF = Path("data/runs/cfbench")
 CENSUS = {
@@ -128,9 +130,13 @@ def main(which: str, out: Path, out_diff: Path) -> None:
     n_bars = sum(len(bars) for bars in data.values())
     fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
     handles = draw(axes, data)
-    fig.legend(handles=handles, loc="outside lower center", ncol=4, fontsize=8.5)
+    axes[-1].legend(
+        handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=4, fontsize=8.5
+    )  # not an outside figure legend: see departure
     fig.suptitle("Knowledge Cutoff: a later-cutoff vs a same-cutoff investigator", x=0.01, ha="left")
     fig.text(0.995, 0.975, "exact match, 95% CI over items", ha="right", fontsize=8, color=MUTED)
+    if which == "canonical":
+        departure(fig, DEPARTURE)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)

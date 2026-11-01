@@ -7,6 +7,7 @@ are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them.
 
 import shutil
 import subprocess
+import textwrap
 from functools import wraps
 
 import matplotlib
@@ -201,6 +202,25 @@ def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> Non
     ax.tick_params(axis="y", length=0, pad=SWATCH_PAD)
     ax.set_ylim(-0.6, len(rows) - 0.4)
     ax.grid(axis="y", visible=False)
+
+
+def departure(fig, note: str) -> None:
+    """The write-up's "Departure from defaults" line, inside the figure rather than under it in the Markdown, so it travels with
+    the chart into the deck (Robbie, 2026-10-31): muted, 7pt at write-up size (scaled with font.size on a slide), wrapped to the
+    figure's width, as the figure's supxlabel, after any line the chart already has there; the figure grows by the text's height
+    so the axes keep their size (margins re-fractioned when there is no layout engine). Constrained layout pins a supxlabel and
+    an `outside lower` figure legend to the same edge and reserves the larger of the two, so a chart with the note anchors its
+    legend to its bottom axes instead."""
+    size = 0.7 * plt.rcParams["font.size"]
+    w, h = fig.get_size_inches()
+    lines = textwrap.wrap("Departure from defaults: " + note, width=int(w * 72 / (0.5 * size)))
+    extra = (1.3 * size * len(lines) + 4) / 72
+    if fig.get_layout_engine() is None:
+        sp = fig.subplotpars
+        frac = extra / (h + extra)
+        fig.subplots_adjust(bottom=sp.bottom * (1 - frac) + frac, top=sp.top * (1 - frac) + frac)
+    fig.set_size_inches(w, h + extra)
+    fig.supxlabel("\n".join(filter(None, [fig.get_supxlabel(), *lines])), x=0.01, ha="left", fontsize=size, color=MUTED, linespacing=1.3)
 
 
 # Slide figures (slides/talk, made by graphs.talk): the look above at the deck's sizes. The 9pt theme's text is 2/3 of its size
