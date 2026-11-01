@@ -13,6 +13,12 @@ that link; the GitHub Pages copy is frozen, docs/viewers.md).
 CJK SC for the Mandarin anecdote and the monochrome Noto Emoji for the 🔮 of "🔮-lens"
 (`\olensname`; "O-lens" without it). On Debian/Ubuntu:
 `apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono fonts-noto-cjk`.
+On Robbie's Mac, TeX Live is a user-mode install in `~/texlive` (no sudo), its binaries symlinked
+into `~/.local/bin` by `tlmgr path add`, so `latexmk` and `xelatex` are on PATH and `make -C slides`
+works. A missing `.sty` is `tlmgr install <package>`. To set it up again: `install-tl` with
+`scheme-basic` and `TEXDIR ~/texlive`, then
+`tlmgr install collection-latexextra collection-fontsrecommended collection-xetex` and
+`tlmgr option sys_bin ~/.local/bin && tlmgr path add`. Don't swap in tectonic.
 
 **The deck.** `talk/talk.tex`, with its charts in `graphs/talk.py` (run first by `make`, as
 `python -m graphs.talk`, from the real results), writing PDFs and table snippets to `talk/fig/`. Add
