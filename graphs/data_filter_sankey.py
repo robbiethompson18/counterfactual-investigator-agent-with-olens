@@ -72,15 +72,15 @@ DATASETS = {
     "cutoff": (
         "Knowledge Cutoff: stale and current answers are both kept",
         [
-            [("bank v3 questions", 5_467)],
+            [("knowledge cutoff questions", 5_467)],
             [(STABLE, 2_196), (UNSTABLE, 3_271)],
             [("eval cases", 999), ("not evaluated", 1_197)],
             [("stale answer", 339), ("current answer", 660)],
         ],
         [
-            ("bank v3 questions", STABLE, 999, EVAL),
-            ("bank v3 questions", STABLE, 1_197, HELD),
-            ("bank v3 questions", UNSTABLE, 3_271, UNUSABLE),
+            ("knowledge cutoff questions", STABLE, 999, EVAL),
+            ("knowledge cutoff questions", STABLE, 1_197, HELD),
+            ("knowledge cutoff questions", UNSTABLE, 3_271, UNUSABLE),
             (STABLE, "eval cases", 999, EVAL),
             (STABLE, "not evaluated", 1_197, HELD),
             ("eval cases", "stale answer", 339, EVAL),
@@ -130,12 +130,12 @@ DATASETS = {
     "favorites": (
         "Idiosyncratic Preferences: every consistent question is evaluated",
         [
-            [("bank v3 questions", 5_187)],
+            [("preference questions", 5_187)],
             [("eval cases, consistent", 1_500), (UNSTABLE, 3_687)],
         ],
         [
-            ("bank v3 questions", "eval cases, consistent", 1_500, EVAL),
-            ("bank v3 questions", UNSTABLE, 3_687, UNUSABLE),
+            ("preference questions", "eval cases, consistent", 1_500, EVAL),
+            ("preference questions", UNSTABLE, 3_687, UNUSABLE),
         ],
     ),
 }
