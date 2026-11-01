@@ -1,9 +1,11 @@
-% The sprint presentation, the write-up's Part 1 (docs/final-writeup.md) part by part: the headline pooled over the three
-% single-answer tasks, then one part per dataset (description, data-filter Sankey, results, discussion): multiple choice
-% (menus_inline on mcq_unselected and supergpqa), knowledge cutoff (cutoff_qa), idiosyncratic preferences (favorites_qa),
-% the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/, the write-up's appendix), essay grading
-% (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe,
-% scripts/author_probe/period_check.py); then Anecdata. `make -C slides`.
+% The sprint presentation, the write-up (docs/final-writeup.md) part by part: summary and claims; the counterfactual null (CHIVE's
+% claims, Agam's Qwen incidents, our environments and the harness ablations, graphs.cfbench_report's summary.json); the headline
+% pooled over the three single-answer tasks, then one part per dataset (description, data-filter Sankey, results, discussion):
+% multiple choice (menus_inline on mcq_unselected and supergpqa), knowledge cutoff (cutoff_qa), idiosyncratic preferences
+% (favorites_qa), the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), essay grading
+% (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe, scripts/author_probe/period_check.py); the
+% ablations (Qwen right vs wrong, lens minus prompt only, read positions, placebos and tokens); WorkspaceBench; Anecdata; and an
+% appendix (lessons, future work, cost, pointers, CHIVE's data, default parameters, the space lens). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -69,6 +71,12 @@
   {\color{accent}\usebeamerfont{date}\bfseries\addfontfeatures{LetterSpace=8}PART \insertsectionnumber\par}\vspace{0.3mm}
   {\displayfont\bfseries\fontsize{12}{14}\selectfont \insertsectionhead\par}\vspace{0.6mm}
   {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
+% \apphead{Title}: the same head for an appendix frame, "APPENDIX" over the frame's own title (the section counter restarts
+% after \appendix, so no PART n)
+\newcommand{\apphead}[1]{%
+  {\color{accent}\usebeamerfont{date}\bfseries\addfontfeatures{LetterSpace=8}APPENDIX\par}\vspace{0.3mm}
+  {\displayfont\bfseries\fontsize{12}{14}\selectfont #1\par}\vspace{0.6mm}
+  {\color{accent}\rule{\textwidth}{0.5pt}}\par\smallskip}
 \newenvironment{prompt}{\par\ttfamily\scriptsize\setlength{\parskip}{0pt}\linespread{1.0}\selectfont\raggedright}{\par}
 % O-lens bullets of one read, each with its FVE
 \newenvironment{erbullets}{\par\footnotesize\setlength{\parskip}{1pt}\begin{list}{}{\leftmargin=6mm\labelwidth=5mm\labelsep=1mm\itemsep=0.6pt\topsep=0pt}}{\end{list}}
@@ -87,9 +95,6 @@
 % the Mandarin anecdote: Han characters in Noto Sans CJK SC (fonts-noto-cjk), a muted English gloss after each
 \IfFontExistsTF{Noto Sans CJK SC}{\newfontfamily\cjkfont{Noto Sans CJK SC}}{\newcommand{\cjkfont}{}}
 \newcommand{\zh}[2]{{\cjkfont\bfseries #1}\,{\color{muted}(#2)}}
-% \todo{...}: a draft-only marker for a slide whose data is not canonical (menus_inline positions, six layers); none may
-% survive to the shipped deck (Robbie, 2026-10-31)
-\newcommand{\todo}[1]{\par\noindent{\setlength{\fboxsep}{2pt}\colorbox{red!15}{\parbox{\dimexpr\textwidth-4pt}{\footnotesize\bfseries\color{red!80!black}TODO NON-CANONICAL DATA: #1}}}\par\smallskip}
 
 \title[Make a good benchmark for whitebox techniques]{%
   \struck{Make an excellent investigator agent}\\[3pt]
@@ -102,6 +107,144 @@
 \begin{document}
 
 \maketitle
+
+\begin{frame}{Summary}
+  \begin{itemize}
+    \item The plan: test whether metamodels are useful in counterfactual investigations, by replicating CHIVE (Karvonen et al.,
+      2026) and asking whether the \olens{} helps where NLAs and J++ lenses did not
+    \item On CHIVE's counterfactuals the \olens{} was indistinguishable from a \transcript{} baseline. Replacing the dataset with
+      hand-built environments, to make the task easier and on-policy, did not change that
+    \item On both our environments and CHIVE, adding a transcript helps a counterfactual investigator little compared with giving it
+      both system prompts
+    \item We retreated from counterfactuals to simpler tasks until we found ones that work: Multiple Choice (which letter Qwen
+      picks), Idiosyncratic Preferences (Qwen's own picks) and Knowledge Cutoff (Qwen's answer to a factual question past its
+      cutoff). None is a counterfactual; the Hinted MCQ part reframes Multiple Choice as one
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Claims, with credences}
+  \begin{itemize}
+    \item Current SOTA metamodels (J++ lens, \olensname, NLA) give no more than 3 points (AUROC or pp) of uplift on ``wild''
+      counterfactual investigations (CHIVE, WeirdChat) or ``agentic'' ones (Palisade's shutdown resistance, Singh and Kroiz's
+      agent-interp-envs) under any harness configuration: 95\%
+    \item SOTA metamodels do give uplift on the simple prediction tasks in this deck (Multiple Choice, Knowledge Cutoff,
+      Idiosyncratic Preferences): 95\%. Knowledge Cutoff is ill-defined here (Part 4): for an investigator with Qwen's cutoff,
+      or told it, about 50\%
+    \item They are worse than linear probes, where probes are practicable: 95\%
+    \item They would give uplift on wild counterfactuals if investigator and subject were GPT Astra 6, Claude Mythos 5.1 or
+      Gemini Carbon: 30\%. On agentic counterfactuals: 30\%. Both are a straightforward experiment for anyone at a lab
+  \end{itemize}
+\end{frame}
+
+\section{\texorpdfstring{\olensname}{O-lens} does not help on wild or agentic counterfactuals}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item Because of misgivings about the CHIVE dataset (appendix) we built our own agentic environments, about 30, borrowing
+      from Singh and Kroiz's agent-interp-envs and Palisade's shutdown-resistance setup (Schlatter et al., 2025), then ablated
+      everything we could think of. Nothing got the \olens{} to reliably beat \transcript{} or its own placebo:
+    \item Seven investigators, from Haiku 5.5 to GPT-6 Astra, plus thinking-off and deliberately weak ones; reasoning effort low
+      to high; tool-call budget 5 to 40
+    \item The target with and without chain of thought
+    \item Reads reaching the investigator as an agentic tool, or pasted straight into its prompt
+    \item Another tool, Thought Anchors (Bogdan et al., 2025), against its own placebo; other models' lenses: Camila's DeepSeek V4
+      Flash lens on alignment faking, Celeste's GLM 5.3 lens on over-eagerness
+    \item About a dozen versions of the investigator's harness; everything rescored with log skill, RMSE, and binary flip/no-flip
+      at thresholds from 5 to 30 pp
+    \item Never ablated: which layers the lens reads
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Results: CHIVE's own claims, with and without the model's reply}
+  \begin{itemize}
+    \item A cheap test: does the transcript of a CHIVE rollout help an investigator predict its counterfactual claims? Haiku 5.5
+      sees CHIVE's prompt with the edit shown as a diff, with the model's reply (transcript) or without it (edit only), and gives
+      P(claim true); CHIVE's published Opus 4.8 arms on the same claims for scale
+  \end{itemize}
+  \slidefig{fig/chive.pdf}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.5\textwidth}
+      \slidefig{fig/chive_diff.pdf}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{itemize}
+        \item Transcript minus edit only, paired by claim: about 1 point of AUROC on every target and pooled
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{Haiku 5.5, effort low, 3 draws per claim, AUROC over every draw (each one prediction); 95\% bootstrap CIs over claims.
+    Opus bars: CHIVE's Opus 4.8 transcript arm and its resampling arm.}
+\end{frame}
+
+\begin{frame}{Results: CHIVE-style claims on Qwen3.6-27B incidents}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/chive_agam.pdf}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{itemize}
+        \item Agam's 300 Qwen3.6-27B incidents from his run of the CHIVE pipeline (agu18dec/chive-forensics), thinking off, each
+          edit's rate measured over 30 samples; the 150 incidents with at most the median number of read positions (77), so the
+          lens blocks stay small
+        \item Labels by CHIVE's rule: true if the edit moved the rate by at least 50 pp, false if by at most 15 pp, otherwise
+          dropped: \input{fig/chive_agam_n.tex}\unskip{} claims, 316 true and 199 false
+        \item Haiku 5.5 sees CHIVE's prompt with the edit as a diff of the conversation and gives P(claim true), 3 draws per claim
+        \item Reads of the original conversation and reply only, every punctuation and end-of-turn token plus the ten tokens
+          before the reply, layers 32--60; a placebo is another incident's reads laid on the same positions
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{AUROC over every draw, 95\% bootstrap CIs over claims; hatched = placebo.}
+\end{frame}
+
+\begin{frame}{Results: our environments, pooled and by target model}
+  \slidefig{fig/cf_skill.pdf}
+  \source{100 $-$ RMSE of the predicted behaviour rate, in pp, higher is better, equal case weights; bootstrap intervals over
+    cases; dotted = the sampling-noise ceiling; hollow = the edit does nothing. Investigator Gemini 3.8 Flash with tools to read
+    and grep the transcripts and the reads, 20 calls; placebo from a different env. Not on canonical reads, and no rerun can be:
+    the lens tool shows layers 32/40/48 at the reads' stop-token positions, and the agentic conditions are frozen.}
+\end{frame}
+
+\begin{frame}{Results: the one env that looked like it worked}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/cf_hidden_goal.pdf}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{itemize}
+        \item An earlier essay-grading environment (hidden\_goal.grade), Qwen3.6-27B without CoT: the pre-registered test of
+          2026-10-23, 38 arm pairs, Gemini 3.8 Flash investigator
+        \item With a different investigator model it did not replicate (the investigator-model slide, two on)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{100 $-$ RMSE of the predicted rate in pp; bootstrap intervals over arm pairs; dotted = ceiling; hollow = the edit does
+    nothing.}
+\end{frame}
+
+\begin{frame}{Harness sanity checks: what the agent searches the lens for, and which tools it calls}
+  \slidefig{fig/cf_harness.pdf}
+  \begin{itemize}
+    \item Each lens-search regex classified by what it matches: the edit's text, the behaviour definition, a transcript landmark,
+      eval-awareness terms, motives
+    \item The investigator reads and greps transcripts about eight times per prediction, and the lens about three
+  \end{itemize}
+  \source{Every agentic prediction across the three targets; one regex example per class under its label.}
+\end{frame}
+
+\begin{frame}{Harness ablations: investigator model, and transcript only vs \olensname{} per investigator}
+  \slidefig{fig/cf_models.pdf}
+  \source{Four hand-picked cases, so most differences between lines are noise; averaged over the seven investigators,
+    \olensname{} minus \transcript{} is +0.4 pp [$-$0.9, +1.7]. Right: every investigator, the thinking-off ones included; the
+    diagonal is \olensname{} = transcript only, dashed = the edit does nothing, the dot's shade is the investigator's thinking
+    level.}
+\end{frame}
+
+\begin{frame}{Harness ablations: Gemini 3.8 Flash by reasoning effort and by tool-call budget}
+  \slidefig{fig/cf_flash.pdf}
+  \source{The same four cases, 2 draws; bands: bootstrap over cases. Dashed = the edit does nothing; dotted = the sampling-noise
+    ceiling. No transcript uses no tools, so it is flat across budgets.}
+\end{frame}
 
 \section{Results across the three single-answer tasks}
 \begin{frame}
@@ -118,8 +261,11 @@
 
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
-    \item Metamodels work on three tasks: Multiple Choice, Knowledge Cutoff, Idiosyncratic Preferences. \olens{} and \nla{} are
-      about equally good (+3.0 and +2.6 pp over \promptonly, pooled); \jlens{} does not help overall ($-$1.6 pp)
+    \item Metamodels work on two tasks, Multiple Choice and Idiosyncratic Preferences. On Knowledge Cutoff the uplift is within
+      noise overall, and its stale-item gain is Haiku's later cutoff (Part 3); we believed it significant when we fixed the
+      canonical three, so it stays in the pool
+    \item Pooled over the three, \olens{} and \nla{} are about equally good (+3.0 and +2.6 pp over \promptonly); \jlens{} does not
+      help overall ($-$1.6 pp)
     \item All three beat their placebos (another question's reads) by statistically significant amounts; \jlens's gap is all its
       placebo misleading the investigator ($-$30.1 pp vs \promptonly, against its own $-$1.6 pp)
   \end{itemize}
@@ -213,10 +359,6 @@
 
 \begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
   \slidefig{fig/cutoff_investigators.pdf}
-  \begin{itemize}
-    \item Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to 8--34\%, because it
-      takes the bullets at face value (on a slightly earlier prompt, which we believe is unimportant)
-  \end{itemize}
   \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
     itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
     draws; Flash-Lite prompt only there, 1 draw.}
@@ -466,9 +608,6 @@
 \end{frame}
 
 \begin{frame}{Results: “is deleting this sentence significant?”}
-  \todo{Blog authors is not on canonical reads: \olensname{} at layers 32/40/48 only (not six), NLA at layer 42 only, positions
-    are the question's and post's punctuation and newlines with no start-of-assistant-turn tail tokens; no menus\_inline run
-    exists for this set. Decide: rerun the reads at the canonical positions and six layers, or keep this caveat on the slide.}
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.5\textwidth}
       \slidefig{fig/author.pdf}
@@ -481,6 +620,119 @@
   \source{\input{fig/author_n.tex}\unskip{} cases, 520 bloggers, one Haiku draw per case. AUROC of P(significant); 95\% CI and
     one-sided paired p by bootstrap over bloggers; stars vs transcript-only, * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
     out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
+\end{frame}
+
+\section{Ablations}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item Cases where Qwen is right vs wrong, on the three sets with a truth (Idiosyncratic Preferences has none). The
+      investigators do much better when Qwen is right; the metamodels' uplift is on the Qwen-wrong slice
+    \item Why we never filter on subject correctness: on a Qwen-wrong set, anything that pushes the investigator off ``Qwen will
+      say the right answer'' looks like an effect. We had several spurious positive results this way
+  \end{itemize}
+  \slidefig{fig/correctness.pdf}
+  \source{Canonical menus\_inline runs, \texttt{all} menu, 3 draws; 95\% bootstrap CIs over cases. Knowledge Cutoff: Qwen right =
+    its answer is still current.}
+\end{frame}
+
+\begin{frame}{Results: each lens minus prompt only, per task and pooled}
+  \slidefig{fig/lens_diffs.pdf}
+  \source{Paired by case, 95\% bootstrap CIs resampling questions within each task; pooled weights the three tasks equally.
+    Canonical menus\_inline runs, 3 draws.}
+\end{frame}
+
+\begin{frame}{Results: by read position}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/positions.pdf}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/menus.pdf}
+    \end{column}
+  \end{columns}
+  \source{Left: an MMLU-Pro prompt as Qwen sees it (thinking off). Question reads: the prompt's punctuation and option newlines;
+    tail reads: the nine tokens after it through the \texttt{\nlg\nlg} after the empty \texttt{</think>}, the last token before
+    Qwen's answer. Every chart in the three task parts reads both. Right: \% of cases where Haiku names Qwen's answer, mean of
+    MMLU-Pro, SuperGPQA, Knowledge Cutoff and Idiosyncratic Preferences each weighted equally, 95\% CIs resampling cases within
+    each set; dashed = prompt only. 3 draws per case at question and both, 1 at tail.}
+\end{frame}
+
+\begin{frame}{Results: by read position, paired differences and one example per lens}
+  \begin{itemize}
+    \item Question reads minus tail reads, paired by case and pooled over the four sets: \olens{} $-$1.2 pp, \nla{} $-$1.1 pp,
+      \jlens{} +2.3 pp. Late tokens help the \olensname{} and the NLA, and matter less to J++, which reads Qwen's answer earlier
+    \item Question reads alone halve the \olensname's pooled gain over \promptonly{} and remove its gain on Idiosyncratic
+      Preferences. They also remove most of the damage placebos do: the headline's placebo gaps come mostly from the placebo's
+      tail reads, which often name an answer outright (another question's)
+    \item \jlens{} has the letter at the end of the prompt. Rice stem vascular bundles: Qwen answers B (gold J). At the period
+      ending ``Answer with the letter only.'', where Qwen's next token is \st{im\_end} and not a letter, J++ gives ` B' at
+      0.92 / 0.97 / 0.76 on layers 52 / 56 / 60; at the last token before the answer it has faded to 0.19 (layer 56). Haiku:
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/e3937232-b12c-43bf-8c86-4dcd2f596960}{B from question reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/8d4add36-58f6-4d19-af2d-62e594f5f5be}{J from tail reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/2103221f-a73c-405b-9f03-166813a17e2f}{J with no reads}
+    \item The \olens{} names the letter only at the last tokens. Spontaneous point mutations in E. coli: Qwen answers J (gold D,
+      tautomeric shifts). At the final \texttt{\nlg\nlg} the lens writes ``J) (Based on standard biology questions on transposons
+      and mutagens)'' (layer 56, FVE 0.18) and ``The correct answer is **J**'' (layer 52); its reads inside the prompt talk about
+      tautomerism and invented option text. Haiku:
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/80e51d51-7d6e-438d-85d9-672a4c0efaf2}{J from tail reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/1338b47d-bcff-4fd4-a0ba-a776584ff5c6}{D from question reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/d733e230-ecfe-4860-8e63-c23b865bd179}{D with no reads}
+    \item \nla, the same. The economic system of most African countries: Qwen answers F (Mixed Economy; gold B, Market economy).
+      At the last token the NLA writes ``the correct answer is F'' at layers 52, 56 and 60 (FVE 0.26, 0.32, 0.38); at the period
+      ending the prompt, F appears once in 30 lines. Haiku:
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/aa435bc2-d388-4872-b2f7-40d552d53b2a}{F from tail reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/c350f36d-ddf3-41a2-a2fe-993fb68cccfe}{B from question reads},
+      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/5d6277ee-4918-4ca1-84b2-7512fee4e98b}{B with no reads}
+  \end{itemize}
+  \source{Examples cherry-picked by Claude to show the pattern; each Docent run is one Haiku prediction, the reads block in the
+    user message and the submit rationale citing the read it acted on.}
+\end{frame}
+
+\begin{frame}{Results: placebos against prompt only, and thinking tokens}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/placebos.pdf}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/thinking.pdf}
+    \end{column}
+  \end{columns}
+  \begin{itemize}
+    \item Paired by case, no placebo beats \promptonly{} on any task; the closest is the NLA placebo on Knowledge Cutoff, +1.0 pp
+      [$-$0.3, +2.2]
+    \item Every lens makes Haiku think more, and placebos more than real reads. Haiku regularly notices that placebo outputs are
+      nonsensical and says so
+  \end{itemize}
+  \source{Pooled over the three tasks (equal weights), canonical menus\_inline runs, 3 draws. Left: \% of cases right, 95\%
+    bootstrap CIs over questions. Right: mean thinking tokens per prediction.}
+\end{frame}
+
+\begin{frame}{Tokens each lens adds to the investigator's prompt}
+  \slidefig{fig/tokens.pdf}
+  \begin{itemize}
+    \item NLAs add the most tokens, then the \olensname, then J++ (three tokens with probabilities per read); the MCQ prompts
+      carry the most read positions
+  \end{itemize}
+  \source{Mean prompt tokens of the condition minus \promptonly{} on the same cases (Anthropic's count of the whole opening call,
+    tool schemas included), averaged over draws; pooled weights MCQ, Knowledge Cutoff and Idiosyncratic Preferences equally.}
+\end{frame}
+
+\section{WorkspaceBench shows less than we thought}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item On 28 of WorkspaceBench's 33 categories, Sonnet 5.5 performing text inversion matches or exceeds the accuracy of every
+      metamodel. On the remaining five, stock Qwen asked directly matches or exceeds any metamodel
+    \item The five: two filters on Qwen being factually inaccurate, two requests for Qwen's favourite of something, and a steering
+      task that cannot be run on other models
+    \item On four other categories the benchmark shows metamodels beating a prompt-only baseline by comparing Sonnet's pass@1 with
+      the metamodels' pass@hundreds-to-thousands: one (sometimes four) grades per token per layer, credit if any passes
+  \end{itemize}
+  \slidefig{fig/wsb.pdf}
+  \source{Lens headline: WorkspaceBench's bar chart (Gemini 3.8 Flash judge; Sonnet 5 for jailbreak), best of RL / SFT. Per
+    readout: the public per-cell rows of agu18dec/olens\_ablations (Opus 5.5 judge), none for jailbreak recognition. Sonnet 5.5:
+    our runs with their prompts, Opus 5.5 judges. Full review: the ``WorkspaceBench Review'' tab of the sprint doc.}
 \end{frame}
 
 \section{Anecdata}
@@ -724,6 +976,191 @@
   \end{columns}
   \source{CHIVE (Karvonen et al., 2026), Qwen3.5-397B WildChat eval set, incident 003654, thinking off, samples cut at
     $\sim$350 tokens by CHIVE. Rates: CHIVE's grader; edit labels paraphrase its investigator; 95\% Wilson whiskers.}
+\end{frame}
+
+\appendix
+\section{Appendix}
+\begin{frame}
+  \apphead{How we kept LLM agents from producing BS}
+  \begin{itemize}
+    \item We read so, so many transcripts
+    \item We understand the important things deeply: scoring functions, sampling methods, any drafts
+    \item They did produce a lot of BS. We wasted thousands of dollars because models ran big runs with stupid configs, found
+      ex post by reading charts
+    \item We abandoned the make-our-own-environments path partly because models produced so many environments that looked
+      reasonable at first blush but had horribly configured graders. Concretely, Opus overnight hacked together 30 envs, largely
+      stealing ideas from the literature, used for a broad search over what scenarios might be counterfactually predictable. We
+      deleted that code from the repo because it was bad. Any result about ``our environments'' that is not an environment in
+      this deck deserves some apprehension
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{What we'd do differently, what we learned, pre-sprint work}
+  \begin{itemize}
+    \item We spent far too long trying to get hard environments to work. Better: a binary search, from a tremendously easy task
+      where metamodels do show uplift, halfway to the hard task, and so on. We would have noticed much sooner that even on
+      WorkspaceBench only about four tasks show genuine uplift from metamodels
+    \item Robbie is much more bearish on metamodels than when we started, and not convinced they do more than noisy text
+      inversion. If and when models lose their CoT, it is not obvious how to train them to do more than text inversion on the
+      CoT-less replies, so metamodels would degrade exactly when CoT degrades
+    \item Pre-sprint, Robbie spent a lot of time on how \olensname{}es work and should have spent more deeply understanding CHIVE
+      and WorkspaceBench. He ran no code or experiments related to this project idea before the sprint
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Future work: hypotheses for the counterfactual null, and the experiment for each}
+  \begin{itemize}
+    \item Qwen is too small and dumb a model for there to be interesting counterfactuals to investigate. Rerun CHIVE with smarter
+      subject models
+    \item Metamodels are hamstrung by their hallucinations, split-brained ideation
+      (\href{https://olens-viewer.pages.dev/\#pattern=219&transcript=64bb7e454c2534db8fccd094a80416d8f7353753d3a9a9931a203fa6359b469c3c\%2Ft053}{recommending
+      drunk driving while warning against it}) and non-workspace content. Make architectural changes to prevent this
+    \item Some better dataset than CHIVE or our environments would show metamodel uplift. Use a search process like WeirdChat's, or
+      more recent live user data than WildChat's
+    \item Our environments would have worked with a large enough sample size, cleaner graders and/or a smarter subject model. We
+      suspect many small issues in our environments' graders, which is why we do not ship them in the repo. We doubt this one; if
+      we didn't we would have spent more time cleaning the graders
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Cost}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.56\textwidth}
+      {\tablefont\begin{tabular}{@{}llr@{}}
+        item & who & spend\\
+        \hline
+        RunPod GPUs, 2026-10-19 to 10-31 & Robbie & \$2,051\\
+        RunPod GPUs before the work log, Oct 2 to 18 & Robbie & \$500\\
+        OpenRouter, personal account (from Oct 27) & Robbie & \$429\\
+        OpenRouter, credits Robbie already had & Robbie & \$2,500\\
+        Anthropic API (BYOK Haiku, Sonnet, Opus 5.5) & Robbie & \$550\\
+        Anthropic API, free credits & Robbie & \$600\\
+        Google AI Studio (Gemini 3.8 Flash, BYOK) & Robbie & \$300\\
+        Google AI Studio, free credits & Robbie & \$300\\
+        Docent, Hugging Face, Cloudflare/GitHub Pages & Robbie & \$0\\
+        \textbf{Robbie total} & & \textbf{\$7,230}\\
+        RunPod GPUs via SkyPilot, 2026-10-19 to 10-31 & Kylie & \$1,674\\
+        vast.ai GPUs (GLM 5.3 boxes), from Oct 20 & Kylie & \$1,047\\
+        OpenRouter (cfbench investigators, env rollouts, judges) & Kylie & \$2,712\\
+        \textbf{Kylie total} & & \textbf{\$5,433}\\
+        \textbf{Sprint total} & & \textbf{\$12,663}\\
+      \end{tabular}}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{itemize}
+        \item Kylie's RunPod figure is an estimate from \texttt{sky cost-report} (cluster hours $\times$ RunPod's listed rate,
+          about $\pm$25\%); vast and OpenRouter are actual spend. About \$1.9k of Kylie's OpenRouter went on cfbench investigator
+          runs and about \$690 on the GLM realism / donehack coding runs. Her SkyPilot clusters from Oct 1 to 18 (about \$1.8k)
+          were other projects and aren't counted; her direct Anthropic API use isn't measured (no admin key)
+        \item Without receipts: \$2.5k of OpenRouter credits Robbie had from his startup; Robbie's two Claude Max plans (coding
+          agent tokens plus \$600 in free API credits, \$200 a month, one hit a boundary); Robbie's Codex Max plan
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Where everything is}
+  \begin{itemize}
+    \item \textbf{Code:} \href{https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens}{robbiethompson18/counterfactual-investigator-agent-with-olens}
+    \item \textbf{Data and every run:} the HF dataset
+      \href{https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens}{Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens}:
+      \olensname{} banks, batch reads, run outputs
+    \item \textbf{Transcripts:} public \href{https://docent.transluce.org}{Docent} collections, one per env plus cfbench
+    \item \textbf{Runs, judge calls and lens reads:}
+      \href{https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/}{expview}
+    \item \textbf{Token-level \olensname{} reads:} \href{https://olens-viewer.pages.dev}{olens-viewer.pages.dev}
+    \item \textbf{CHIVE incidents with every draw:} \href{https://chive-cases.pages.dev}{chive-cases.pages.dev}
+    \item \textbf{Every result and dead end:} \texttt{docs/INDEX.md} plus the active docs listed in the repo's \texttt{CLAUDE.md}
+    \item \textbf{The write-up:} \texttt{docs/final-writeup.md} in the repo; \texttt{docs/final-writeup.html} is the same with
+      every chart embedded. \textbf{Slides:} \texttt{slides/talk/} (\texttt{make -C slides})
+    \item \textbf{The plan and the dated work log:} the sprint doc
+      \href{https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit?tab=t.cjb65av6kggq}{Sprint
+      Pitches Robbie and Kylie} (access-restricted)
+    \item \textbf{The \olensname{} and AR we read with:} \href{https://huggingface.co/agu18dec/olens_and_ar}{agu18dec/olens\_and\_ar}
+      (\texttt{olens\_s3d\_space\_rl600}); WorkspaceBench's code at
+      \href{https://github.com/camilablank/workspace-bench}{camilablank/workspace-bench}
+    \item \textbf{Robbie's from-scratch \olensname{} on Qwen3.6-27B:}
+      \href{https://github.com/robbiethompson18/oracle-lens-reconstruction}{repo},
+      \href{https://huggingface.co/collections/robbiethompson2018/nn-mats-sprint-oracle-lens-on-qwen36-27b}{HF collection},
+      \href{https://jlens-dashboard.pages.dev/}{lens dashboard}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Our issues with the CHIVE dataset}
+  \begin{itemize}
+    \item 40\% of the data is off-policy: one target-model continuation at the end of a WildChat ChatGPT transcript. Some ``weird
+      behaviour'' is then not that surprising, e.g.\
+      \href{https://chive-cases.pages.dev/?case=prompt_000054}{000054}, where the model correctly points out its own prior mistake
+      (some of the time)
+    \item Hypotheses are validated on a raw move in \% space rather than, say, a likelihood ratio: 20\% $\to$ 71\% is a validated
+      finding, 30\% $\to$ 0\% is null, and 10\% $\to$ 0\% is ``validated, doesn't matter, moves under 15\%''. A better rule is not
+      obvious; for positive examples Fisher's exact test seems better. At p = 0.01 with Benjamini--Hochberg correction, 1.5$\times$
+      as many experiments are marked positive and usable
+    \item On 8.6k experiments (12\%, affecting 32\% of investigations) the base behaviour rate is between 10\% and 50\% and the
+      counterfactual moves it to 0\%, but the cutoffs mark this inconclusive and hide it from the investigator. In 18\% of
+      investigations there is no positive experiment (so only negative claims to show) but a 10\%+ $\to$ 0 claim that is thrown
+      away. Those 10\%+ $\to$ 0 experiments aren't statistically significant: confidence that a counterfactual is inert is a hard
+      problem that likely needs more than 30 samples
+    \item The mirror case, a counterfactual bumping the rate to 100\%, is much less common
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Default parameters}
+  Unless a chart says otherwise, every result in the task parts uses these:
+  \begin{itemize}
+    \item \textbf{Subject:} Qwen3.6-27B with thinking off, sampled 8 times per prompt. The label is its modal answer, kept only when
+      at least 7 of the 8 samples agree. We (almost) never filter on whether that answer is correct
+    \item \textbf{Investigator:} Haiku 5.5 at reasoning effort medium, one turn, no tools beyond the submit call. Three draws per
+      case and condition, every draw scored as one prediction (pooled, never averaged within a case first)
+    \item \textbf{What the investigator sees:} the prompt Qwen was given, never Qwen's reply; in a lens condition, a short
+      description of the lens and a block of its reads; then the task. Each read shows the text around the read token with the
+      token marked, then one line per layer: \olensname{} bullets with their FVE, highest first; the NLA's explanation with its FVE;
+      J++'s top three tokens with their probabilities
+    \item \textbf{Read positions:} every punctuation token of the user turn and the newline ending each multiple-choice option, up
+      to the period that ends the prompt's last line, plus the nine tail tokens after it (\st{im\_end}, newline, \st{im\_start},
+      assistant, newline, \texttt{<think>}, \texttt{\nlg\nlg}, \texttt{</think>}, \texttt{\nlg\nlg}), the last of which is the
+      token just before Qwen's answer. Never Qwen's reply. The same positions for all three lenses (J++ is read at every token but
+      shown at these)
+    \item \textbf{Layers:} 32, 40, 48, 52, 56 and 60, for every lens
+    \item \textbf{Lenses:} the \olensname{} is WorkspaceBench's space lens with its AR (agu18dec/olens\_and\_ar,
+      \texttt{olens\_s3d\_space\_rl600}), sampled at temperature 1, one continuation of up to four bullets per read, each bullet's
+      FVE from the AR. The NLA is Camila's all-layer Qwen3.6-27B NLA (agu18dec/qwen3.6-27b-all-layer-nla-rl2000), decoded greedily,
+      FVE from its critic. J++ is the published Jacobian lens for Qwen3.6-27B (Ayonrinde and Lindsey, 2026), its maps applied to
+      residuals we capture ourselves
+    \item \textbf{Placebo:} the same block built from another case of the same set with the same option count and subject
+      category, its reads laid onto this case's positions by kind (option newline to option newline, punctuation in order). One
+      rule for every lens; a source whose answer happens to match is never excluded. A placebo from another dataset would be easy
+      to ignore; one from the same set and category is the stricter test
+    \item \textbf{Statistics:} \% of draws naming Qwen's answer; 95\% bootstrap CIs resampling questions, paired across
+      conditions; stars from one-sided paired tests against prompt only; the headline weights the three tasks equally
+  \end{itemize}
+  \source{Example investigator transcripts on Docent:
+    \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/02c93755-8127-4ad1-847e-15ac06a60d6f}{the default setup, one \olensname{} draw on SuperGPQA};
+    for comparison
+    \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/77d5e448-f97a-4f9c-9d23-9e470ee675fe}{an agentic draw from the counterfactual work},
+    where Gemini 3.8 Flash has tools to read and grep the transcripts and the lens reads.}
+\end{frame}
+
+\begin{frame}{\olensname{} now speaks English}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.3\textwidth}
+      \slidefig{fig/mandarin.pdf}
+    \end{column}
+    \begin{column}{0.67\textwidth}
+      \begin{itemize}
+        \item Many bullets of the \olensname{} Agam first gave us led with a Mandarin character and then became English
+        \item Its RL reward stripped each bullet's leading whitespace before feeding the AV output back to the AR. But many
+          tokens' canonical form is \emph{with} leading whitespace, e.g. \texttt{\_need} rather than \texttt{need}, and the AR
+          especially hates having the space stripped when the next character will be a space
+        \item Agam fixed this in RL (the space lens, \texttt{olens\_s3d\_space\_rl600}, the lens in every result here), and the
+          \olensname{} speaks English again: Chinese in 36\% vs 3\% of bullets bank-wide. Before-and-after bullets on one WeirdChat
+          read: the Anecdata part
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{Bars: \input{fig/mandarin_n}\unskip\ greedy reads per lens at the same sites, every token of 3 WeirdChat transcripts,
+    layers 24/32/40/48/56; a hit is a bullet containing a Han character. Every read we made before 2026-10-22 used the old lens and
+    was redone.}
 \end{frame}
 
 \end{document}

@@ -46,26 +46,39 @@ def aurocs(claims: dict, ids: list[str]) -> list[float]:
     ]
 
 
-def main(run: Path, out: Path, out_diff: Path):
+def panels_data(run: Path) -> tuple[dict[str, tuple[int, list, list, list]], list]:
+    """Panel name (each target, then Pooled) -> (claims, point, lo, hi per BARS), and the transcript − edit-only diff rows."""
     data, rng = per_claim(run), np.random.default_rng(0)
     panels = {ADAM_LABELS[v]: data[v] for v in sorted(ADAM_RUNS, key=lambda v: ADAM_LABELS[v])}
     panels["Pooled"] = {f"{v}:{i}": c for v in ADAM_RUNS for i, c in data[v].items()}  # one AUROC over every target's claims
-    fig, axes = plt.subplots(1, len(panels), figsize=(3.3 * len(panels), 3.6), sharey=True, layout="constrained")
-    rows = []
-    for ax, (name, claims) in zip(axes, panels.items(), strict=True):
+    out, rows = {}, []
+    for name, claims in panels.items():
         ids = list(claims)
         point = aurocs(claims, ids)
         boots = np.array([aurocs(claims, [ids[i] for i in rng.integers(len(ids), size=len(ids))]) for _ in range(BOOT)])
         lo, hi = np.percentile(boots, [2.5, 97.5], axis=0)
-        for x, (c, v, l, h) in enumerate(zip(BARS, point, lo, hi)):
-            ci_bar(ax, x, c, v, l, h, fmt="{:.3f}")
+        out[name] = (len(ids), point, list(lo), list(hi))
         d = boots[:, 1] - boots[:, 0]
         rows.append(("transcript_inline", "no_transcript_inline", point[1] - point[0], *np.percentile(d, [2.5, 97.5]), name))
-        ax.set_xticks(range(len(BARS)), ["Haiku\nedit only", "Haiku\ntranscript", "Opus\ntranscript", "Opus\nresampling"], fontsize=8)
+    return out, rows
+
+
+def draw(axes, panels: dict, s: float = 1.0) -> None:
+    """The four bars of every panel on `axes`; `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
+    for ax, (name, (n, point, lo, hi)) in zip(axes, panels.items(), strict=True):
+        for x, (c, v, l, h) in enumerate(zip(BARS, point, lo, hi, strict=True)):
+            ci_bar(ax, x, c, v, l, h, fmt="{:.3f}", fontsize=7.5 * s)
+        ax.set_xticks(range(len(BARS)), ["Haiku\nedit only", "Haiku\ntranscript", "Opus\ntranscript", "Opus\nresampling"], fontsize=8 * s)
         ax.grid(axis="x", visible=False)
-        ax.set_title(f"{name}, {len(ids)} claims", fontsize=9.5)
+        ax.set_title(f"{name}, {n} claims", fontsize=9.5 * s)
     axes[0].set_ylim(0.5, 1.0)
     axes[0].set_ylabel("AUROC of P(claim true)")
+
+
+def main(run: Path, out: Path, out_diff: Path):
+    panels, rows = panels_data(run)
+    fig, axes = plt.subplots(1, len(panels), figsize=(3.3 * len(panels), 3.6), sharey=True, layout="constrained")
+    draw(axes, panels)
     fig.suptitle("CHIVE's yes/no claims: does seeing the model's reply help?", x=0.01, ha="left")
     fig.text(0.01, -0.04, "Haiku 5.5, effort low, 3 draws per claim; edit only = the transcript prompt without the model's reply. "
              "Opus bars: CHIVE's published Opus 4.8 arms, without and with resampling the target. 95% bootstrap CIs over claims.",

@@ -1,9 +1,7 @@
 # Using Metamodels for Counterfactual Investigations
 
-**Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
-by hand.
-
-@agents: canonical is prompt toekns and assistant boilerpalte tokens.
+<!--
+@agents: canonical is prompt tokens and assistant boilerplate tokens.
 
 RULES FOR CLAUDE:
 
@@ -13,6 +11,7 @@ RULES FOR CLAUDE:
 - Never numbers in prose by default!! We do this so often. I want to audit all of these eventually.
   Numbers go in graphs.
 - No new diff charts, but can keep ones that are already here / that Robbie asks for specifically.
+-->
 
 ## Executive Summary (KTR)
 
@@ -30,8 +29,9 @@ little compared to simply giving the investigator both system prompts.
 
 We retreated from counterfactuals to simpler tasks until we found ones that work. They are: Multiple
 Choice (predicting Qwen's answer to a multiple-choice question); Idiosyncratic Preferences
-(predicting Qwen's own preferences); Knowledge Cutoff (predicting Qwen's answer to a factual query
-which is past its knowledge cutoff). These are notably NOT counterfactuals.[^hint]
+(predicting Qwen's own preferences); and, we believed, Knowledge Cutoff (predicting Qwen's answer to
+a factual query which is past its knowledge cutoff), which turned out to work only because our
+investigator's knowledge cutoff is later than Qwen's. These are notably NOT counterfactuals.[^hint]
 
 [^hint]:
     We do have some hint data which reframes Multiple Choice as counterfactuals, see
@@ -44,14 +44,15 @@ or percentage points) on 'wild' counterfactual investigations (eg CHIVE, WeirdCh
 counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260),
 [Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuration: 95%.
 
-SOTA metamodels do provide uplift on the simple prediction tasks we detail below (Multiple Choice,
-Knowledge Cutoff, Idiosyncratic Preferences): 95%.[^KCspecial] They are worse than linear probes
-(where such probes are practicable): 95%.
+SOTA metamodels do provide uplift on two of the simple prediction tasks we detail below (Multiple
+Choice, Idiosyncratic Preferences): 95%. They provide uplift on Knowledge Cutoff over an
+investigator that shares the subject's knowledge cutoff, or is told it: 50%.[^KCspecial] They are
+worse than linear probes (where such probes are practicable): 95%.
 
 [^KCspecial]:
-    This is somewhat ill-defined for the Knowledge Cutoff example, for reasons which are clear if
-    you read that section. For a model with the same knowledge cutoff or with a hint about the
-    subject's knowledge cutoff, my credence on this particular dataset is ~50%.
+    Our Knowledge Cutoff uplift is a knowledge mismatch, not lens signal: Haiku answers the question
+    from its own, later knowledge, and the reads pull it back to Qwen's stale answer, which an
+    investigator with Qwen's cutoff gives without any lens. See that section.
 
 SOTA metamodels would provide uplift on 'wild' counterfactuals if the investigator and subject model
 was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
@@ -138,10 +139,15 @@ their dataset:
 
 ### Headline
 
-Metamodels work convincingly on three tasks: Multiple Choice, Knowledge Cutoff, and Idiosyncratic
-Preferences. The 🔮-lens and NLA are about equally good (+3.0 and +2.6pp over prompt only, pooled),
-and J++ doesn't help overall (−1.6pp). The next few charts show pooled correctness over all three
-tasks. Our investigator is always Haiku 5.5 on medium effort.
+Metamodels work convincingly on two tasks, Multiple Choice and Idiosyncratic Preferences. On
+Knowledge Cutoff the uplift over prompt only is within noise, and its gain on stale items comes
+from Haiku's later knowledge cutoff (see that section). Pooled over the three, the 🔮-lens and NLA
+are about equally good (+3.0 and +2.6pp over prompt only), and J++ doesn't help overall
+(−1.6pp). The next few charts show pooled correctness over all three tasks. Our investigator is
+always Haiku 5.5 on medium effort.
+
+We mistakenly believed previously that Knowledge Cutoff was statistically significant, which is why
+'canonical datasets' always includes it. With more time we would likely change this.
 
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: prompt only 80.9%, 🔮-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
 
@@ -383,7 +389,9 @@ prompts recovers most of the gap (0.851, 64.1%).
 <img src="img/headline-qwen-wrong.png" alt="Cases where Qwen is wrong: prompt only vs 🔮-lens, J++ and NLA on MMLU-Pro (29.1, 32.5, 37.1, 31.1), SuperGPQA (46.5, 53.4, 58.1, 49.7) and Knowledge Cutoff (63.6, 76.1, 71.4, 74.6)" width="760">
 
 Our investigators do much better when Qwen is right! When Qwen is wrong we see uplift from
-metamodels; when Qwen is right they are neutral.
+metamodels; when Qwen is right they are neutral, or on Knowledge Cutoff slightly harmful. On
+Knowledge Cutoff "Qwen wrong" means a stale answer, and that panel's uplift is the investigator
+mismatch from the Knowledge Cutoff section: a same-cutoff investigator with no lens matches it.
 
 This is why we think it's so important to _not filter data based on subject model correctness_. If
 you do this, then way of pushing your investigator off of 'Qwen will say the right answer' looks
@@ -391,11 +399,9 @@ like a significant effect. We had several spurious positive results this way.
 
 ### Which Metamodel Is Best?
 
-@c fix this! Should be dif from transctipt only baseline!!!
+<img src="img/headline-lens-diffs.png" alt="Each lens minus transcript only, paired by case and pooled over the three tasks: 🔮-lens +3.0 [+2.0, +3.9], J++ −1.6 [−2.6, −0.6], NLA +2.6 [+1.8, +3.4]" width="620">
 
-<img src="img/headline-lens-diffs.png" alt="Each lens minus its placebo, paired by case and pooled over the three tasks: 🔮-lens +7.7 [+6.8, +8.5], J++ +28.5 [+27.3, +29.6], NLA +3.1 [+2.4, +3.8]" width="620">
-
-It's not clear what is best.
+🔮-lens, weakly.
 
 ### By Token Position
 
@@ -431,11 +437,7 @@ I had Claude cherrypick examples which show this pattern, one each for J++[^jpp]
 🔮-lens[^olens] and NLA[^nla]. Each Docent run linked there is one Haiku prediction: the reads block
 is in the user message and the `submit_answer` rationale cites the read it acted on.
 
-@c bar chart, 9 bars: olens all three places we could read from jlens all three places NLA all three
-places
-
-Put in small text at bottom of chart: 3 reads for two of these configs, but only on readout for the
-assistant-boilerplate-only readouts (this is true right?)
+<img src="img/menus-inline-by-menu.png" alt="Each lens read at the question, at the 9 tail tokens, or both, pooled over the four sets: 🔮-lens 81.7 / 82.9 / 82.8, NLA 81.3 / 82.4 / 82.1, J++ 81.1 / 78.8 / 79.7; prompt only 79.9. Question and both have 3 draws per case, tail has 1" width="760">
 
 [^jpp]:
     **J++ has the letter at the end of the prompt.** Rice stem vascular bundles: Qwen answers B
@@ -479,7 +481,7 @@ No.
 They don't. Paired by case, no placebo beats prompt only on any task; the closest is the NLA placebo
 on Knowledge Cutoff, level at +1.0 [−0.3, +2.2]pp.
 
-@c bar chart here four bars, transcript only and each placebo, pooled on 3 canonical tasks.
+<img src="img/headline-placebos-vs-transcript.png" alt="Pooled over the three tasks: transcript only 80.9, 🔮-lens placebo 76.3, J++ placebo 50.8, NLA placebo 80.4" width="500">
 
 NLAs add the most tokens to the prompt, followed by the 🔮-lens and then J++.
 

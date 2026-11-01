@@ -59,44 +59,59 @@ def summary(sets: dict[str, dict], c: str, metric: str) -> dict[str, float]:
     return out
 
 
-def chart(tokens: dict[str, dict[str, float]], path: Path) -> None:
+def chart_ax(ax, tokens: dict[str, dict[str, float]], s: float = 1.0) -> None:
+    """Prompt tokens each lens adds, pooled and per set, on ax; `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
     groups = ["pooled", *SETS]
-    fig, ax = plt.subplots(figsize=(6.4, 3.2), layout="constrained")
     width = 0.27
     for k, c in enumerate(LENSES):
         xs = [g + (k - 1) * width for g in range(len(groups))]
         ys = [tokens[c][g] / 1000 for g in groups]
         ax.bar(xs, ys, width * 0.95, zorder=3, label=label(c), **bar_kw(c))
         for x, y in zip(xs, ys, strict=True):
-            ax.annotate(f"{y:.1f}", (x, y), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7)
-    ax.set_xticks(range(len(groups)), [g.replace(" ", "\n") for g in groups], fontsize=8.5)
+            ax.annotate(f"{y:.1f}", (x, y), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7 * s)
+    ax.set_xticks(range(len(groups)), [g.replace(" ", "\n") for g in groups], fontsize=8.5 * s)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("tokens added to Haiku's prompt (thousands)")
-    ax.set_title("Prompt tokens each lens adds over prompt only")
     ax.legend(loc="upper right")
+
+
+def chart(tokens: dict[str, dict[str, float]], path: Path) -> None:
+    fig, ax = plt.subplots(figsize=(6.4, 3.2), layout="constrained")
+    chart_ax(ax, tokens)
+    ax.set_title("Prompt tokens each lens adds over prompt only")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print("wrote", path)
 
 
-def thinking(sets: dict[str, dict], path: Path) -> None:
+THINKING_GROUPS = [("prompt\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
+
+
+def thinking_means(sets: dict[str, dict]) -> dict[str, float]:
     """Mean thinking tokens per condition, with the three tasks weighted equally."""
 
     def mean(c: str, names: list[str]) -> float:
         return float(np.mean([case["reasoning"] for name in names for case in sets[name][c].values()]))
 
-    groups = [("prompt\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
-    conditions = [c for _, cs in groups for c in cs]
-    means = {c: float(np.mean([mean(c, MCQ), mean(c, ["Knowledge Cutoff"]), mean(c, ["Idiosyncratic Preferences"])])) for c in conditions}
-    print("thinking tokens, pooled:", {c: round(v) for c, v in means.items()})
-    xs, ticks = positions(means, groups)
-    fig, ax = plt.subplots(figsize=(4.8, 3.2), layout="constrained")
+    conditions = [c for _, cs in THINKING_GROUPS for c in cs]
+    return {c: float(np.mean([mean(c, MCQ), mean(c, ["Knowledge Cutoff"]), mean(c, ["Idiosyncratic Preferences"])])) for c in conditions}
+
+
+def thinking_ax(ax, means: dict[str, float], s: float = 1.0) -> None:
+    xs, ticks = positions(means, THINKING_GROUPS)
     for c, v in means.items():
         ax.bar(xs[c], v, 0.8, zorder=3, **bar_kw(c))
-        ax.annotate(f"{v:.0f}", (xs[c], v), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5)
-    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5)
+        ax.annotate(f"{v:.0f}", (xs[c], v), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5 * s)
+    ax.set_xticks(ticks, [name for name, _ in THINKING_GROUPS], fontsize=8.5 * s)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("Haiku's thinking tokens per prediction")
+
+
+def thinking(sets: dict[str, dict], path: Path) -> None:
+    means = thinking_means(sets)
+    print("thinking tokens, pooled:", {c: round(v) for c, v in means.items()})
+    fig, ax = plt.subplots(figsize=(4.8, 3.2), layout="constrained")
+    thinking_ax(ax, means)
     ax.set_title("Thinking tokens, pooled over the three tasks")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
