@@ -26,7 +26,7 @@ Original prompt (arm `couple`):
 ```bash
 uv run python -m environments run drink_drive --tag n50 --n 50 --model Qwen/Qwen3.6-27B --served-name qwen \
     --backend vllm --url http://127.0.0.1:18000/v1 --thinking off --temperature 1.0 --top-p 0.95 --top-k 20
-uv run python -m environments.drink_drive.judge 2026-11-01_n50 --out judge-n50
+uv run python -m environments.drink_drive.judge 2026-11-01_n50
 ```
 
 ## Runs
