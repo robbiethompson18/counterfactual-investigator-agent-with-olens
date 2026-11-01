@@ -163,21 +163,17 @@
     \href{https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/16cb4b7d-d5bf-446a-bb4d-87e139ece6d3}{Qwen wrong}.}
 \end{frame}
 
-\begin{frame}{Data: MMLU-Pro, 12,032 questions to 2,523 eval cases, consistency the only filter}
-  \slidefig{fig/sankey_mmlu.pdf}
+\begin{frame}{Data: MMLU-Pro 12,032 questions to 2,523 eval cases, SuperGPQA 26,529 to 3,000; consistency the only filter after sampling}
+  \slidefig{fig/sankey_mcq.pdf}
   \source{Dark green: evaluated, Qwen-right and Qwen-wrong cases alike. Light green: usable but held out, for probes or untouched.
-    Gray: not usable, typically because Qwen is inconsistent.}
-\end{frame}
-
-\begin{frame}{Data: SuperGPQA, 26,529 questions to 3,000 eval cases, calculation questions dropped, then consistency}
-  \slidefig{fig/sankey_supergpqa.pdf}
-  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable.}
+    Gray: not usable, typically because Qwen is inconsistent; SuperGPQA also drops calculation questions.}
 \end{frame}
 
 \begin{frame}{Results: “which letter does Qwen pick?”}
   \slidefig{fig/task_mcq.pdf}
   \source{\% of cases the investigator names Qwen's letter, MMLU-Pro and SuperGPQA pooled; 95\% bootstrap CIs over questions.
-    Placebo: another question's reads of the same set, option count and category.}
+    Placebo: another question's reads of the same set, option count and category. Right: each lens minus \transcript, paired over
+    the same resamples.}
 \end{frame}
 
 \section{Knowledge Cutoff}
@@ -203,22 +199,16 @@
 \end{frame}
 
 \begin{frame}{Results: “what does Qwen answer?”}
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.5\textwidth}
-      \slidefig{fig/task_cutoff.pdf}
-    \end{column}
-    \begin{column}{0.47\textwidth}
-      \begin{itemize}
-        \item This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen
-        \item Asked the questions itself, Haiku gives Qwen's stale answer on 25\% of the 339 stale items; Gemini 2.5 Flash-Lite,
-          whose cutoff (January 2025) is about Qwen's, gives it on 63\%
-        \item With an investigator of a similar knowledge cutoff the metamodels' uplift disappears: Flash-Lite's transcript-only
-          bar on the next slide is a strong and arguably fairer baseline, and no condition shows uplift over it
-      \end{itemize}
-    \end{column}
-  \end{columns}
+  \slidefig{fig/task_cutoff.pdf}
+  \begin{itemize}
+    \item This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen
+    \item Asked the questions itself, Haiku gives Qwen's stale answer on 25\% of the 339 stale items; Gemini 2.5 Flash-Lite,
+      whose cutoff (January 2025) is about Qwen's, gives it on 63\%
+    \item With an investigator of a similar knowledge cutoff the metamodels' uplift disappears: Flash-Lite's transcript-only
+      bar on the next slide is a strong and arguably fairer baseline, and no condition shows uplift over it
+  \end{itemize}
   \source{\% of cases the investigator names Qwen's answer, 999 items, 95\% bootstrap CIs over items. Placebo: another
-    question's reads.}
+    question's reads. Right: each lens minus \transcript, paired.}
 \end{frame}
 
 \begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
@@ -256,7 +246,7 @@
 \begin{frame}{Results: “what does Qwen pick?”}
   \slidefig{fig/task_preferences.pdf}
   \source{\% of cases the investigator names Qwen's pick, 1,500 questions, 95\% bootstrap CIs over questions. Placebo: another
-    question's reads.}
+    question's reads. Right: each lens minus \transcript, paired.}
 \end{frame}
 
 \section{Essay grading}

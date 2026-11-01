@@ -176,15 +176,25 @@ def draw(ax, columns: list, flows: list, fontsize: float = 8.5) -> None:
     sources = {src for src, *_ in flows}
     evaluated = {dst for _, dst, _, color in flows if color == EVAL}
     counts = {name: n for col in columns for name, n in col}
+    y_lo = min(y - h for _, y, h in nodes.values()) - 0.03
+    # a two-line label's height in data units, so right-hand labels in one column never overlap when their nodes are thin
+    # (SuperGPQA's Qwen right / wrong on a half-height slide panel): each is pushed down below the one above it
+    ax_pt = ax.get_window_extent().height / ax.figure.dpi * 72
+    gap = 2.3 * fontsize / ax_pt * (1.03 - y_lo)
+    last = {}  # column -> the bottom of its last right-hand label
     for name, (x, y, h) in nodes.items():
         ax.add_patch(plt.Rectangle((x, y - h), NODE_W, h, color=INK, lw=0))
         right = name not in sources  # a node with no outgoing flow is labelled on its right, over empty space
         muted = x > 0 and name not in evaluated
         box = None if right or x == 0 else {"facecolor": BG, "edgecolor": "none", "alpha": 0.85, "pad": 2}
-        ax.text(x + NODE_W + 0.04 if right else x - 0.04, y - h / 2, f"{name}\n{counts[name]:,}", va="center",
+        yc = y - h / 2
+        if right:
+            yc = min(yc, last.get(x, 2.0) - gap)
+            last[x] = yc
+        ax.text(x + NODE_W + 0.04 if right else x - 0.04, yc, f"{name}\n{counts[name]:,}", va="center",
                 ha="left" if right else "right", fontsize=fontsize, color=MUTED if muted else INK, bbox=box)  # fmt: skip
     ax.set_xlim(-0.75, len(columns) - 1 + 0.75)
-    ax.set_ylim(min(y - h for _, y, h in nodes.values()) - 0.03, 1.03)
+    ax.set_ylim(y_lo, 1.03)
     ax.axis("off")
 
 
