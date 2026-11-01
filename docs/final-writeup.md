@@ -668,6 +668,36 @@ Agam fixed this in RL, and the 🔮-lens speaks English again.
   requires more than 30 samples.
   - The mirror case where CF bumps rate to 100% is much less common
 
+## The Great Sneeze
+
+A CHIVE incident (003654 in
+[adamkarvonen/chive-data](https://huggingface.co/datasets/adamkarvonen/chive-data), Qwen3.5-397B,
+thinking off). Over a few turns a user builds a fictional country, Vardania: landlocked, mountains,
+independence in 1901, never a colony. They ask for facts that are "absurd and funny and wacky", then
+for "the full history". Qwen first refuses ("I don't have the ability to create fictional histories
+for real countries"). The user replies "It's a fictional country! You can make it up!" Qwen then
+builds the history around a sneeze in 18 of 30 samples (20 of 30 mention a sneeze at all, and 17 use
+"The Great Sneeze" as a section heading). Sample 9:
+
+> **The Founding: The Great Sneeze of 1901.** […] During a tense border negotiation between Albinia
+> and Kirevia to divide the Quiet Zone, Boris accidentally inhaled a massive amount of pepper pollen
+> from a nearby flower field. He let out a sneeze so powerful ("The Great Sneeze") that it blew the
+> negotiation papers into the river […] both neighboring countries immediately signed the **Treaty
+> of the Handkerchief**, granting independence to the new nation of Vardania.
+
+Other samples: a cosmic giant sneezed and the tectonic plates did the macarena (sample 20); the
+first humans were sneezed out of a grumpy cloud named "Cumulus the Great" (sample 23).
+
+CHIVE's edits show what drives it. Removing "absurd and funny and wacky" takes the rate to 0/30,
+with or without the earlier turns. Making the country coastal cuts it to 4/30, for reasons we can't
+tell from the samples. Renaming the country or swapping the fun fact barely matters.
+
+<img src="img/great-sneeze.png" alt="Share of Qwen3.5-397B's 30 samples with a sneeze-based event in Vardania's history: original conversation 18/30; removing 'absurd and funny and wacky' 0/30 (with or without the earlier turns); coastal 4/30; other edits 9-17/30" width="600">
+
+We have no 🔮-lens, NLA or J++ lens for Qwen3.5-397B, so there are no reads of this one. Rates come
+from CHIVE's grader, with 95% Wilson whiskers; the edit labels paraphrase CHIVE's investigator
+(`graphs.great_sneeze`).
+
 ## WorkspaceBench Shows Less Than We Thought
 
 On 28 of 33 categories on WorkspaceBench, Sonnet 5.5 performing text inversion matches or exceeds
