@@ -266,18 +266,6 @@ def simulated_sections() -> None:
     ax.grid(axis="x", visible=False)
     ax.legend(frameon=False, loc="upper left")
     slide_save(fig, OUT / "simulated_sections.pdf")
-    pct = lambda kn: f"{100 * kn[0] / kn[1]:.1f}\\% ({kn[0]:,}/{kn[1]:,})"
-    tex = [
-        f"\\def\\sim{'Q' if m.startswith('Qwen') else 'G'}{s.split()[0].capitalize()}{{{pct(r[s])}}}"
-        for m, r in res.items()
-        for s in ("tool block", "env block")
-    ]
-    tex += [
-        f"\\def\\sim{'Q' if m.startswith('Qwen') else 'G'}{n.capitalize()}{{{pct(r[f'tool block, {n}'])}}}"
-        for m, r in res.items()
-        for n in ("plain", "mcp")
-    ]
-    (OUT / "simulated_sections.tex").write_text("\n".join(tex) + "\n")
 
 
 MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}

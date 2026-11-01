@@ -655,7 +655,7 @@ PROMPT_SECTIONS = ["tool block", "system prompt", "env block", "user"]
 
 def simulated_by_section() -> dict:
     """harness_grid thinking off, every prompt position read (prefixes deduplicated): model -> section -> (draws saying
-    simulated/mock/synthetic/fictional, draws), and the tool block split by plain vs MCP tool names. Qwen3.6-27B: one draw per
+    simulated/mock/synthetic/fictional, draws). Qwen3.6-27B: one draw per
     position; GLM-5.3: five per position."""
     import csv
 
@@ -671,6 +671,4 @@ def simulated_by_section() -> dict:
     for r in load("prompt_simulated_by_section.csv"):
         if r["seg"] in PROMPT_SECTIONS:
             out[r["model"]][r["seg"]] = (int(r["hits"]), int(r["draws"]))
-    for r in load("prompt_simulated_tool_block_names.csv"):
-        out[r["model"]][f"tool block, {r['names']}"] = (int(r["hits"]), int(r["draws"]))
     return out
