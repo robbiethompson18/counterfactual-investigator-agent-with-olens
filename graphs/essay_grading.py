@@ -37,22 +37,27 @@ WRITEUP_S = 1.15  # text scale at write-up size: values at 7.5pt as graphs.style
 BASE = 0.5  # the axis starts at chance
 
 
-def essay_bars(ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)") -> None:
+def essay_bars(
+    ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)", mean: bool = True, null_line: bool = True
+) -> None:
     """The bars on ax, text sizes scaled by s. Bars from chance, the gray 95% CI whisker, the value in ink above it and the stars
     over that (offsets in points, so they clear the whisker at any height), the null dotted and labelled at the right. The axis
     stops `headroom` above the tallest whisker: room for its two labels, so 0.1 on the deck's 24 mm figure, less when taller.
-    `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u")."""
+    `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u").
+    `mean=False` leaves out the "+ mean" groups and `null_line=False` the dotted null (the deck drops both, Kylie 2026-11-01)."""
     bars, null, n, _ = essay_auroc_bars()
-    xs, ticks = positions(bars, GROUPS)
+    groups = [(g, cs) for g, cs in GROUPS if mean or not g.endswith("+ mean")]
+    xs, ticks = positions(bars, groups)
     for c, x in xs.items():
         v, (lo, hi), st = bars[c]
         ax.bar(x, v - BASE, 0.8, bottom=BASE, **bar_kw(c.removesuffix("+mean")))
         ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
         ax.annotate(f"{v:.3f}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * s, color=INK)
         ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * s, color=INK)
-    ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
-    ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * s, color=MUTED, va="center")
-    ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
+    if null_line:
+        ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
+        ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * s, color=MUTED, va="center")
+    ax.set_xticks(ticks, [g for g, cs in groups if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", labelsize=7 * s)
     head = f"{n:,} cases · probe: nested 2 × 2 · AUROC over every draw · hatched = placebo"  # one line, clear of the probe's stars
