@@ -102,7 +102,7 @@ def bars(acc: dict, out: Path) -> None:
     base = pooled(acc, "transcript_inline")
     assert base
     for ax, (lens, lens_label) in zip(axes, LENSES.items(), strict=True):
-        ci_bar(ax, 0, "transcript", *base)
+        ci_bar(ax, 0, "prompt", *base)
         ax.axhline(base[0], color=BLUE, lw=0.8, ls=(0, (3, 3)), zorder=2)
         ticks, x = [0.0], 1.45
         for menu in MENUS:

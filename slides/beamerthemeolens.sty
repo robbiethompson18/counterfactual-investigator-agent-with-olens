@@ -24,7 +24,8 @@
 \definecolor{track}{HTML}{EBE8E0}
 \definecolor{accent}{HTML}{4A4FC4}
 \definecolor{accentwash}{HTML}{ECEEFE}
-\definecolor{transcript}{HTML}{2A78D6}
+\definecolor{prompt}{HTML}{2A78D6}      % prompt only: the investigator sees Qwen's prompt and no reply (graphs/style.py BLUE)
+\definecolor{transcript}{HTML}{6FA8E6}  % transcript only: it sees Qwen's reply too (LIGHT_BLUE)
 \definecolor{olens}{HTML}{EB6834}
 \definecolor{jlens}{HTML}{8E44AD}
 \definecolor{nla}{HTML}{2E9E5B}
@@ -152,6 +153,7 @@
 \newcommand{\swp}[1]{\tikz[baseline=-0.1ex]{\fill[#1] (0, 0) rectangle (0.85em, 0.65em);
   \fill[pattern=north east lines, pattern color=bg] (0, 0) rectangle (0.85em, 0.65em);}}
 \newcommand{\cond}[2]{{\color{#1}\bfseries #2}}
+\newcommand{\promptonly}{\cond{prompt}{prompt only}}  % not \prompt: that is the prompt environment's macro
 \newcommand{\transcript}{\cond{transcript}{transcript only}}
 \newcommand{\olens}{\cond{olens}{\olensname}}
 \newcommand{\jlens}{\cond{jlens}{J++}}
