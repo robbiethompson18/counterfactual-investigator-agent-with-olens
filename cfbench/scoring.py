@@ -689,3 +689,27 @@ def acting_by_factor() -> dict:
             "reads": groups([r for r in read if r["model"] == model], lambda r: int(r["grading_reads"]) > 0),
         }
     return out
+
+
+PROMPT_SECTIONS = ["tool block", "system prompt", "env block", "user"]
+
+
+def simulated_by_section() -> dict:
+    """harness_grid prompts, every position read (prefixes deduplicated): model -> section -> (draws saying
+    simulated/mock/synthetic/fictional, draws). Qwen3.6-27B: one draw per
+    position; GLM-5.3: five per position."""
+    import csv
+
+    def load(name):
+        path = Path("data") / GRADER_ACTING_RUN / name
+        if not path.exists():
+            from huggingface_hub import hf_hub_download
+
+            hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/{name}", repo_type="dataset", local_dir="data")
+        return list(csv.DictReader(path.open()))
+
+    out: dict = {m: {} for m in ("Qwen3.6-27B", "GLM-5.3")}
+    for r in load("prompt_simulated_by_section.csv"):
+        if r["seg"] in PROMPT_SECTIONS:
+            out[r["model"]][r["seg"]] = (int(r["hits"]), int(r["draws"]))
+    return out

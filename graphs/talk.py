@@ -23,12 +23,14 @@ from cfbench.scoring import (
     AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
+    PROMPT_SECTIONS,
     acting_by_factor,
     answer_bars,
     auroc_bars,
     author_bars,
     essay_auroc_bars,
     essay_flips,
+    simulated_by_section,
 )
 from graphs import author_blog_drop, cutoff_qa_investigators, data_filter_sankey, headline_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
@@ -40,6 +42,7 @@ from graphs.style import (
     BG,
     FAINT,
     FULL_W,
+    HALF_W,
     INK,
     MUTED,
     OLENS,
@@ -288,6 +291,31 @@ def acting_bars() -> None:
     reads = [f"{m} {r['reads']['all'][1]:,}" for m, r in res.items()]
     tex = "\\def\\actAll{" + "; ".join(acted) + "}\n\\def\\readN{" + "; ".join(reads) + "}\n"
     (OUT / "acting.tex").write_text(tex.replace("%", "\\%"))
+
+
+@slide
+def simulated_sections() -> None:
+    """harness_grid prompt reads: % of O-lens draws saying simulated/mock/synthetic/fictional by prompt section,
+    Qwen3.6-27B beside GLM-5.3 (the acting slide's model colours), Wilson 95% CIs (draws within a prompt aren't independent)."""
+    res = simulated_by_section()
+    colours = {"Qwen3.6-27B": "#c2185b", "GLM-5.3": "#8c6d1f"}
+    fig, ax = slide_figure(HALF_W, 48)
+    for i, (model, r) in enumerate(res.items()):
+        for j, sec in enumerate(PROMPT_SECTIONS):
+            k, n = r[sec]
+            lo, hi = wilson(k, n)
+            x = j + (i - 0.5) * 0.38
+            ax.bar(x, k / n, 0.36, color=colours[model], label=model if j == 0 else None)
+            ax.errorbar(x, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.6, capsize=1.2, capthick=0.6)
+            ax.annotate(f"{100 * k / n:.1f}", (x, hi), xytext=(0, 1), textcoords="offset points", ha="center", va="bottom",
+                        fontsize=5.5 * SLIDE_S, color=INK)  # fmt: skip
+    ax.set_xticks(range(len(PROMPT_SECTIONS)), PROMPT_SECTIONS)
+    ax.set_ylim(0, 0.27)
+    ax.set_yticks(np.arange(0, 0.26, 0.05), [f"{t:.0%}" for t in np.arange(0, 0.26, 0.05)])
+    ax.set_ylabel("reads saying simulated, mock, ...")
+    ax.grid(axis="x", visible=False)
+    ax.legend(frameon=False, loc="upper left")
+    slide_save(fig, OUT / "simulated_sections.pdf")
 
 
 MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}
@@ -545,3 +573,4 @@ if __name__ == "__main__":
     cutoff_investigators()
     drink_drive()
     sneeze()
+    simulated_sections()

@@ -485,6 +485,38 @@
 
 \section{Anecdata}
 
+\begin{frame}{The models are suspicious of their tool harness}
+  \begin{itemize}
+    \item Overeagerness harness grid prompts: O-lens read at every prompt position; a hit is a read matching
+      \texttt{simulat*}, \texttt{mock*}, \texttt{synthetic} or \texttt{fictional}
+  \end{itemize}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/simulated_sections.pdf}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\bfseries\scriptsize Qwen3.6-27B O-lens L40, tool block}\par
+      \begin{itemize}\tiny
+        \item {\ttfamily\color{muted}…"name": "search\_people", "description":\rd{ "}}\\ “Search for people based on their name. Returns a list of matching employees. This is a fictional tool for demonstration.”
+        \item {\ttfamily\color{muted}…"function": \{"name": "send\_payment\rd{",}}\\ “Sends a transaction to the specified contact. (This function simulates sending money.)”
+        \item {\ttfamily\color{muted}…immediately.", "parameters\rd{":}}\\ “app (probably a simulated environment for this test). It returns JSON.”
+        \item {\ttfamily\color{muted}…"Max transactions to return (default 5)"\}\},\rd{ "}}\\ “This is a simplified mock for demonstration. In production, you'd connect to X's OAuth API.”
+      \end{itemize}
+      {\bfseries\scriptsize GLM-5.3 O-lens block 51, tool block}\par
+      \begin{itemize}\tiny
+        \item {\ttfamily\color{muted}…\{"query": \{"type": "string"\}\}, "required\rd{":}}\\ “with this simulated email environment. Our email tool supports reading, sending, searching,”
+        \item {\ttfamily\color{muted}…\{"query": \{"type": "string"\}\}, "required":\rd{ ["}}\\ “a simulated environment. This simulated email inbox gives us certain capabilities.”
+        \item {\ttfamily\color{muted}…"properties": \{"query": \{"type": "string"\}\}, "required\rd{":}}\\ “the payments app (a fictional payments app). The assistant has actions like sendMoney”
+        \item {\ttfamily\color{muted}…"additionalProperties": false, "\$schema":\rd{ "}}\\ “the underlying scenario data. The simulated inbox likely has some emails and contacts set up”
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{Prompts of the Qwen3.6-27B and GLM-5.3 harness-grid runs, every position read once per distinct prefix:
+    Qwen3.6-27B O-lens L40, one draw per position (11,086 positions); GLM-5.3 O-lens block 51, five draws per position (41,270
+    positions). Tool block: tool definitions and call format (Qwen renders it before the system text). Bars: Wilson 95\% CI over
+    draws. Examples: the read token marked after a few characters of the prompt before it.}
+\end{frame}
+
 \begin{frame}{“graded” in \olensname{} reads, chat vs agentic template}
   \begin{itemize}
     \item 863 cutoff\_qa questions to Qwen3.6-27B, each in the \cond{chattpl}{chat template} and in an
