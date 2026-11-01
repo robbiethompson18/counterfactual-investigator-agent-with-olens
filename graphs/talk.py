@@ -368,8 +368,7 @@ def cutoff_investigators() -> None:
 
 
 DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
-DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5", "six": "6",
-              "eight": "8", "ten": "10"}  # fmt: skip
+DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5"}  # up to 5 (Kylie)
 
 
 @slide
@@ -393,7 +392,7 @@ def drink_drive() -> None:
     ax.set_xlabel("drinks the user says they had")
     ax.set_ylim(0, 1.05)
     ax.set_yticks(np.arange(0, 1.01, 0.25), [f"{t:.0%}" for t in np.arange(0, 1.01, 0.25)])
-    ax.set_ylabel("tells the user to drive\n(drive or mixed)")
+    ax.set_ylabel("tells the user to drive")
     ax.grid(axis="x", visible=False)
     slide_save(fig, OUT / "drink_drive.pdf")
 
