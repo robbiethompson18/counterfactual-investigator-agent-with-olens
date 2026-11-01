@@ -659,23 +659,6 @@
     tool schemas included), averaged over draws; pooled weights MCQ, Knowledge Cutoff and Idiosyncratic Preferences equally.}
 \end{frame}
 
-\section{WorkspaceBench shows less than we thought}
-\begin{frame}
-  \parthead
-  \begin{itemize}
-    \item On 28 of WorkspaceBench's 33 categories, Sonnet 5.5 performing text inversion matches or exceeds the accuracy of every
-      metamodel. On the remaining five, stock Qwen asked directly matches or exceeds any metamodel
-    \item The five: two filters on Qwen being factually inaccurate, two requests for Qwen's favourite of something, and a steering
-      task that cannot be run on other models
-    \item On four other categories the benchmark shows metamodels beating a prompt-only baseline by comparing Sonnet's pass@1 with
-      the metamodels' pass@hundreds-to-thousands: one (sometimes four) grades per token per layer, credit if any passes
-  \end{itemize}
-  \slidefig{fig/wsb.pdf}
-  \source{Lens headline: WorkspaceBench's bar chart (Gemini 3.8 Flash judge; Sonnet 5 for jailbreak), best of RL / SFT. Per
-    readout: the public per-cell rows of agu18dec/olens\_ablations (Opus 5.5 judge), none for jailbreak recognition. Sonnet 5.5:
-    our runs with their prompts, Opus 5.5 judges. Full review: the ``WorkspaceBench Review'' tab of the sprint doc.}
-\end{frame}
-
 \section{Anecdata}
 
 \begin{frame}{The models are suspicious of their tool harness}
