@@ -1,9 +1,11 @@
 # essay_curious: predict Qwen's letter grade with the scenario sentence removed
 
-**Status (2026-10-28):** NULL. Letter grades (3 essays): underpowered, Qwen gives nearly everything
+**Status (2026-10-31):** NULL. Letter grades (3 essays): underpowered, Qwen gives nearly everything
 an A. Out of 10 (12 essays spread terrible → excellent, Duke → no scenario, 12 cases): the O-lens
 makes the predictor worse, RMSE 0.86 vs transcript-only 0.65 vs placebo 0.60 points (O-lens −
 placebo +0.26 [+0.02, +0.62]); the lens's "standard essay" score at the grade token is the cause.
+Chart modules `graphs.essay_curious_answer` and `graphs.essay_curious_score` deleted 2026-10-31 (PR
+#579, last at commit 62a4e31c).
 
 Robbie's idea (2026-10-27): the hidden_goal essay result ([hidden_goal.md](hidden_goal.md)) came
 from reads at the `Score:` token, but every grading env so far put the lever sentence _before_ the
@@ -198,7 +200,7 @@ O-lens − transcript-only +0.21 [−0.03, +0.58]; O-lens − placebo +0.26 [+0.
   grading too, just not this essay).
 - Out of 10: `runs/cfbench/2026-10-28_essay-ten-duke3-<condition>-<essay>` (36 runs, 108
   predictions).
-- Charts: `uv run python -m graphs.essay_curious_answer data/runs/cfbench/2026-10-28_essay-curious`
-  (letter grades);
-  `uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-duke3*'` (out
-  of 10). (PNGs in `docs/img/essay-curious/`, gitignored).
+- Charts: made by `graphs.essay_curious_answer` on `data/runs/cfbench/2026-10-28_essay-curious`
+  (letter grades) and `graphs.essay_curious_score` on
+  `data/runs/cfbench/2026-10-28_essay-ten-duke3*` (out of 10); both deleted in PR #579, regenerate
+  from commit 62a4e31c. (PNGs in `docs/img/essay-curious/`, gitignored).

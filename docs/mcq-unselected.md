@@ -1,10 +1,11 @@
 # mcq_unselected: what will Qwen say? An unselected MMLU-Pro set, and the 2k/2k split
 
-**Status (2026-10-30):** ACTIVE. Probe row rechecked 2026-10-30 (reproduces; Kylie's frozen 718
+**Status (2026-10-31):** ACTIVE. Probe row rechecked 2026-10-30 (reproduces; Kylie's frozen 718
 probe 1 point lower). Full runs done on 2,523 cases with Haiku 5.5: the O-lens and the J-lens each
 add a small, replicated gain over prompt-only; a linear probe on the same activations reads far
 more; the NLA adds the least (results below). Cases rebuilt the same day with the strict bare-letter
-parse: 1,251; the first build's 1,285 are superseded (see Census and cases).
+parse: 1,251; the first build's 1,285 are superseded (see Census and cases). Chart module
+`graphs.mcq_unselected` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
 
 **Probe update (2026-10-31):** The regenerated figures use both standardized read positions on
 exactly the historical lens-evaluation questions; the old probe numbers in the text below are
@@ -156,7 +157,8 @@ draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45
 
 ![paired differences between conditions with 95% CIs, all cases and Qwen-wrong cases](img/mcq-unselected-diff.png)
 
-(`uv run python -m graphs.mcq_unselected` makes both; 95% bootstrap CIs over cases.)
+(`graphs.mcq_unselected` made both, deleted in PR #579; regenerate from commit 62a4e31c. 95%
+bootstrap CIs over cases.)
 
 Paired by case, 95% bootstrap over cases (3,000 resamples):
 

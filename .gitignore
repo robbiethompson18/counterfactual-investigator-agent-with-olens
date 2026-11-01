@@ -36,3 +36,6 @@ docs/figures/donation_bet/**/*table.json
 
 # Charts and figures: regenerate locally, never commit (see CLAUDE.md, Docs)
 *.png
+
+# wrangler state (Cloudflare Pages deploys)
+.wrangler/

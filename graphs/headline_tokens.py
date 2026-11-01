@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import menus_inline
-from graphs.headline_inline import CANON, LENSES, PLACEBOS, TS
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, TS
 from graphs.style import bar_kw, label, positions
 
-SETS = {  # the canonical menus_inline runs (CLAUDE.local.md)
+SETS = {  # the canonical menus_inline runs (graphs/CLAUDE.md)
     "MMLU-Pro": menus_inline.runs("mcq_unselected"),
     "SuperGPQA": menus_inline.runs("supergpqa"),
     "Knowledge Cutoff": menus_inline.runs("cutoff"),
@@ -37,8 +37,8 @@ def load(runs: list[Path]) -> dict:
     rows = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
-        if r["condition"] in CANON and r["tokens"].get("calls") == 1:
-            case = rows[CANON[r["condition"]]][r["item"]]
+        if r["condition"] in PLAIN_COND and r["tokens"].get("calls") == 1:
+            case = rows[PLAIN_COND[r["condition"]]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])
             case["completion"].append(r["tokens"]["completion"])
             case["reasoning"].append(r["tokens"]["reasoning"])

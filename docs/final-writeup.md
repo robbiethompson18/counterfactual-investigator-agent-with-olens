@@ -3,33 +3,7 @@
 **Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
 by hand.
 
-@agents sorry still haven't decided what is canonical between tail and all tokens. Might flip flop
-again sadly.
-
-<!-- AGENTS (Robbie, 2026-10-31): every lens number, chart and token count for MCQ (MMLU-Pro, SuperGPQA), knowledge
-cutoff and preferences comes ONLY from the canonical menus_inline runs, `all` menu (each prompt's punctuation and option
-newlines plus the 9 tail tokens, layers 32-60, same prompt and placebo rules on every set): `graphs/menus_inline.py` SETS and
-CANONICAL, plus their 3-draw top-ups (`*-all-d12b` / `-d12c`). The `prompt` menu (no tail tokens, top-ups `*-prompt-d12`) is
-the token-position ablation, also at 3 draws; it was briefly canonical on 2026-10-31 evening. Never the 2026-10-29 per-set runs (mcq-unselected-haiku-*, supergpqa-haiku-3k-*,
-cutoff-qa-1k-*, favorites-haiku-v3-*): each set there read different positions (J++ at every token on three sets, 16
-positions on MMLU-Pro) with a different prompt. Essay grading has no menus run and keeps its own. -->
-
-> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31): canonical means the `menus_inline` runs, `all`
-> menu: every lens read at the same positions (each prompt's punctuation and option newlines plus
-> the 9 tail tokens at the start of the assistant turn), all six layers 32/40/48/52/56/60, one
-> prompt and one placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes
-> from something else and must be redone on those runs before this ships. Status at 17:30 PDT: every
-> Multiple Choice, Knowledge Cutoff and Idiosyncratic Preferences chart and number is now on the
-> canonical runs at 3 draws (top-ups `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their
-> 🚧 blocks are gone. The `prompt` menu (no tail tokens) has 3 draws too (`*-prompt-d12`) and is the
-> token-position ablation. What's left marked 🚧 is blog authorship and the counterfactual charts.**
-
-Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
-review I will write (KTR). For Claude I will write (CTR).
-
-TODO BROAD:
-
-- put essay grading and blog posts into some null tasks.
+@agents: canonical is prompt toekns and assistant boilerpalte tokens.
 
 RULES FOR CLAUDE:
 
@@ -417,6 +391,8 @@ like a significant effect. We had several spurious positive results this way.
 
 ### Which Metamodel Is Best?
 
+@c fix this! Should be dif from transctipt only baseline!!!
+
 <img src="img/headline-lens-diffs.png" alt="Each lens minus its placebo, paired by case and pooled over the three tasks: 🔮-lens +7.7 [+6.8, +8.5], J++ +28.5 [+27.3, +29.6], NLA +3.1 [+2.4, +3.8]" width="620">
 
 It's not clear what is best.
@@ -441,6 +417,9 @@ thoughts later and can be accused of being next-token predictors.
 
 This is surprising! 🔮-lens and NLA are designed to be more workspace-y but look more next-token-y.
 
+I am open to being told that we 'cheated' by reading lens output after the system prompt and user
+turn. If you don't do this, only Mulitple Choice convincingly works.
+
 <img src="img/menus-inline-position.png" alt="Question reads minus tail reads: 🔮-lens -1.2, NLA -1.1, J++ +2.3" width="400">
 
 Dropping the tail altogether (question reads only, also at three draws) halves the 🔮-lens's pooled
@@ -451,6 +430,12 @@ reads, which often name an answer outright (another question's).
 I had Claude cherrypick examples which show this pattern, one each for J++[^jpp], the
 🔮-lens[^olens] and NLA[^nla]. Each Docent run linked there is one Haiku prediction: the reads block
 is in the user message and the `submit_answer` rationale cites the read it acted on.
+
+@c bar chart, 9 bars: olens all three places we could read from jlens all three places NLA all three
+places
+
+Put in small text at bottom of chart: 3 reads for two of these configs, but only on readout for the
+assistant-boilerplate-only readouts (this is true right?)
 
 [^jpp]:
     **J++ has the letter at the end of the prompt.** Rice stem vascular bundles: Qwen answers B
@@ -494,6 +479,8 @@ No.
 They don't. Paired by case, no placebo beats transcript only on any task; the closest is the NLA
 placebo on Knowledge Cutoff, level at +1.0 [−0.3, +2.2]pp.
 
+@c bar chart here four bars, transcript only and each placebo, pooled on 3 canonical tasks.
+
 NLAs add the most tokens to the prompt, followed by the 🔮-lens and then J++.
 
 <img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
@@ -503,11 +490,6 @@ Anecdotally, Haiku consistently noticed that placebo outputs were nonsensical an
 acknowledged this.
 
 <img src="img/headline-thinking.png" alt="Thinking tokens pooled over the three tasks: transcript only 224, 🔮-lens 273 vs placebo 358, J++ 340 vs 553, NLA 274 vs 298" width="500">
-
-Within every condition and dataset, the predictions where Haiku thinks longer are the ones it gets
-wrong more often (correlation −0.19 to −0.45), so long thinking looks more like a sign of confusion
-than a source of accuracy. Transcript-only already thinks on 98% of draws (115 tokens on
-Idiosyncratic Preferences), so the reads aren't just prompting thought it would otherwise skip.
 
 ## How We Kept LLM Agents from Producing BS
 
@@ -722,8 +704,8 @@ and for comparison
 [an agentic draw from the counterfactual work](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/77d5e448-f97a-4f9c-9d23-9e470ee675fe),
 where Gemini 3.8 Flash has tools to read and grep the transcripts and the lens reads.
 
-Every chart that departs from these carries a **Departure from defaults** line at its foot, inside the
-image, so the note travels with the chart into the deck (`graphs.style.departure`).
+Every chart that departs from these carries a **Departure from defaults** line at its foot, inside
+the image, so the note travels with the chart into the deck (`graphs.style.departure`).
 
 ## Counterfactual Investigation Ablation Graphs
 
@@ -794,10 +776,3 @@ names Qwen's no-hint letter. Material: the talk's "Hinted MCQ" part, the `hint_q
 (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the talk: these runs are not on
 canonical reads (🔮-lens at four layers, option newlines and end of prompt only, Gemini 3.8 Flash at
 effort low).
-
-# TODO WITH MORE TIME:
-
-- Claude thinks we have some slightly significant astra result? Possibly we want to try this? doubt
-  it. On some set of four CFs.
-- Ship our environments in any usable way? We should at least write up that we think there are lots
-  of grader issues.

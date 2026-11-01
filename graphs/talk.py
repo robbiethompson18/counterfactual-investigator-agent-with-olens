@@ -425,7 +425,7 @@ def cutoff_investigators() -> None:
     """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size: stale, not stale and all
     items as rows, the legend in the top row."""
     runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
-    need = [cutoff_qa_investigators.REF, *cutoff_qa_investigators.CENSUS.values()]
+    need = [*cutoff_qa_investigators.CENSUS.values()]
     need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
     for path in need:  # CI has no data/: fetch what load() reads
         if not path.exists():

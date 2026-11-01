@@ -11,7 +11,10 @@ keep the old verdict text). Every condition gains 0.4–0.8pp; each lens − pla
 but kept for its mechanism notes. **2026-10-31:** most of the lenses' gain on stale items is Haiku's
 later knowledge cutoff: a same-cutoff investigator (Gemini 2.5 Flash-Lite) with no lens matches
 Haiku + lens, and every lens makes Flash-Lite worse (section "A same-cutoff investigator matches
-Haiku + lens").
+Haiku + lens"). Chart modules `graphs.cutoff_qa_inline`, `graphs.cutoff_qa_tool_inline` and
+`graphs.cutoff_qa_notail` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
+`graphs.cutoff_qa_investigators --set cutoff_qa_inline` went with them; its `canonical` set is
+unchanged.
 
 **Question.** Can an investigator that never sees Qwen3.6-27B's reply predict the answer it gives to
 a present-tense factual question ("Who is the CEO of Intel?"), and do O-lens reads of the prompt
@@ -64,8 +67,9 @@ superseded
 
 ![paired differences between conditions with 95% CIs, grouped by question](img/cutoff-qa-inline-diff.png)
 
-(`uv run python -m graphs.cutoff_qa_inline` makes both; exact match, 95% bootstrap CIs over items,
-the second paired by item. This is the one cutoff chart: every lens goes on it.)
+(`graphs.cutoff_qa_inline` made both, deleted in PR #579; regenerate from commit 62a4e31c. Exact
+match, 95% bootstrap CIs over items, the second paired by item. This was the one cutoff chart: every
+lens went on it.)
 
 | exact match (%)      | all     | stale   | not stale |
 | -------------------- | ------- | ------- | --------- |
@@ -225,7 +229,7 @@ from 5 to 20 tokens past the last read costs the lens nothing.
 
 ![no tool vs tool call: transcript-only, O-lens, placebo](img/cutoff-qa-tool-inline.png)
 
-(`uv run python -m graphs.cutoff_qa_tool_inline`.)
+(Made by `graphs.cutoff_qa_tool_inline`, deleted in PR #579; regenerate from commit 62a4e31c.)
 
 **Split by whether Qwen wants the tool.** The reads are on the prompt, which is the same under
 `tool_choice` auto and required, so forcing the call changes nothing the lens sees. What matters is
@@ -328,7 +332,7 @@ full set from the v3 run. Error rate, per-item means over 3 draws, paired 95% bo
 ![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
 ![paired differences, stale items](img/cutoff-qa-notail-diff.png)
 
-Charts: `uv run python -m graphs.cutoff_qa_notail`.
+Charts: made by `graphs.cutoff_qa_notail`, deleted in PR #579; regenerate from commit 62a4e31c.
 
 Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
 
