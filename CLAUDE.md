@@ -197,10 +197,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
-- `.githooks/pre-commit` runs ruff and ty on staged Python files, and rebuilds and stages
-  `docs/final-writeup.html` whenever `docs/final-writeup.md` is staged; git-lfs's own pre-push hook
-  (gitignored there) uploads LFS objects. Enable it once per clone with
+- `.githooks/pre-commit` runs ruff and ty on staged Python files. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
+  That hook is the only automation: no CI, no GitHub Actions, no other hooks (Robbie, 2026-10-31).
+  The write-up HTML and the talk deck are rebuilt by hand (`sh scripts/build_writeup.sh`,
+  `make -C slides`), and the GitHub Pages site is frozen at its last deploy.
   Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - By default you code too defensively, please do not do this. This project is under development,
@@ -276,8 +277,9 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 [docs/INDEX.md](docs/INDEX.md) by tag. When a doc's tag changes to or from ACTIVE, move its entry.
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
-The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
-built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 2026-10-31).
+The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, a plain git
+file (LFS dropped 2026-10-31) that you rebuild by hand with `sh scripts/build_writeup.sh` and
+commit with the Markdown (Robbie, 2026-10-31).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**

@@ -320,9 +320,9 @@ only thing the page reads.
 
 ## Deploying the page
 
-`.github/workflows/env-viewer-pages.yml` publishes `static/index.html` as `/expview/` of the GitHub
-Pages site (next to the env viewer at `/`) on every push to main that changes it; data changes need
-no deploy. Before merging a change, serve a dedicated folder holding only the two pages
+`static/index.html` is served as `/expview/` of the GitHub Pages site (next to the env viewer at
+`/`), frozen at its last deploy since the Pages workflow was deleted on 2026-10-31 (docs/viewers.md);
+data changes need no deploy, a page change needs a hand deploy. Before merging a change, serve a dedicated folder holding only the two pages
 (`site/index.html` = `environments/_lib/page.html`, `site/expview/index.html`) and check two
 existing deep links. `deploy.sh` still deploys the same file to Cloudflare
 (https://expview.pages.dev, needs `CLOUDFLARE_API_TOKEN`); that page has not been redeployed since
@@ -337,5 +337,5 @@ existing deep links. `deploy.sh` still deploys the same file to Cloudflare
   embeds one run's data into the same file.
 - `search_server.py`: the Search everything server (bramble only); `expview.py search` writes the
   per-run files it indexes.
-- `deploy.sh`: Cloudflare Pages (the old expview.pages.dev; GitHub Pages is the workflow).
+- `deploy.sh`: Cloudflare Pages (the old expview.pages.dev).
 - `importers/`: other datasets → runs.
