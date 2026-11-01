@@ -166,7 +166,7 @@ always Haiku 5.5 on medium effort.
 
 We mistakenly believed previously that Knowledge Cutoff was statistically significant, which is why
 'canonical datasets' always includes it. When we used a different prompt telling Haiku that answers
-"may or may not be correct," the effect disappeared. With more time I would go back and fixed our
+"may or may not be correct," the effect disappeared. With more time I would go back and fix our
 aggregated charts.
 
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: prompt only 80.9%, 🔮-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
