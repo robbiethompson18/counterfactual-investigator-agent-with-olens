@@ -24,7 +24,7 @@ REPO = "https://github.com/robbiethompson18/counterfactual-investigator-agent-wi
 HF = "https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/"
 # scripts/author_probe/scaleup.py's per-case scores (Kylie, 2026-10-31) for the natural sample and batches 1-3: truth, the
 # sentence-end probe (standard L2 probe at L48 on the sentence's last token) and probe + transcript, both nested out of fold
-NATURAL = "runs/author_mcq_blog/2026-10-31_natural-score/scores_l2.jsonl"
+NATURAL = "runs/author_mcq_blog/2026-11-01_natural-score/scores_l2.jsonl"
 SCALEUP = "runs/author_mcq_blog/2026-10-31_scaleup-score/scores_l2.jsonl"
 
 
@@ -58,14 +58,15 @@ def _wauc(y: np.ndarray, s: np.ndarray, w: np.ndarray) -> float:
 
 
 def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: str) -> list[str]:
-    """Bars (every condition and the probe) and the paired AUROC table for one case set."""
+    """Bars (every condition with predictions for these cases, and the probe) and the paired AUROC table for one case set."""
     from cfbench.evals.page import bars, swatch, table
 
-    sc = [r for r in scores if all(c in rows_by_item.get(r["item"], {}) for c in CONDS)]
+    conds = [c for c in CONDS if any(c in rows_by_item.get(r["item"], {}) for r in scores)]
+    sc = [r for r in scores if all(c in rows_by_item.get(r["item"], {}) for c in conds)]
     y = np.array([r["positive"] for r in sc])
     w = np.array([r["weight"] if weighted else 1.0 for r in sc])
     author = np.array([r["item"].split(":")[0] for r in sc])
-    P = {c: np.array([rows_by_item[r["item"]][c] for r in sc]) for c in CONDS}
+    P = {c: np.array([rows_by_item[r["item"]][c] for r in sc]) for c in conds}
     P["probe"] = np.array([r["probe_l2_h"] for r in sc])
     gs = _boot_groups(author)
     idx = [_resample(gs, rng) for _ in range(BOOT)]
@@ -73,6 +74,8 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
     res = [(c, _wauc(y, x, w), *np.percentile(boot[c], [2.5, 97.5])) for c, x in P.items()]
     hatch = {"olens_placebo_inline": "var(--c-olens)", "nla_placebo_inline": "var(--c-nla)"}
     out = [bars(res, 0.5, 1.0, f"{title}: AUROC ({len(y)} cases); axis from 0.5 (chance)", hatch=hatch)]
+    if missing := [c for c in CONDS if c not in conds]:
+        out.insert(0, f"<p><b>Pending:</b> {', '.join(missing)} (not yet run on these cases in the clean run).</p>")
     if len(hv := {h for r in sc for h in rows_by_item[r["item"]]["harness"]}) > 1:  # the 2026-10-31 audit
         out.insert(
             0,
@@ -81,7 +84,7 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
             "different runs, so run and label are confounded. A single run over every case replaces this.</p>",
         )
     body = []
-    for a, b in PAIRS:
+    for a, b in (ab for ab in PAIRS if set(ab) <= set(P)):
         d = boot[a] - boot[b]
         lo, hi = np.percentile(d, [2.5, 97.5])
         pv = float((d <= 0).mean())
@@ -93,10 +96,14 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
 
 def PAGE(rows: list[dict]) -> str:
     rows_by_item: dict = defaultdict(dict)
+    clean: dict = defaultdict(dict)  # the natural sample's own runs (harness 19+, every case of each condition in one run)
     for r in rows:  # newest run first: an item's first row per condition wins
         if r.get("valid", True) and r.get("p") is not None and r["condition"] not in rows_by_item[r["item"]]:
             rows_by_item[r["item"]][r["condition"]] = r["p"]
             rows_by_item[r["item"]].setdefault("harness", set()).add(r.get("harness_version", 1))
+        if r.get("valid", True) and r.get("p") is not None and r.get("harness_version", 1) >= 19:
+            clean[r["item"]].setdefault(r["condition"], r["p"])
+            clean[r["item"]].setdefault("harness", set()).add(r["harness_version"])
     natural, tier_c = _scores(NATURAL), _scores(SCALEUP)
     rng = np.random.default_rng(0)
     n_auth = len({r["item"].split(":")[0] for r in natural})
@@ -124,7 +131,7 @@ def PAGE(rows: list[dict]) -> str:
             "uniform new Qwen-right pairs; runs/author_mcq_blog/2026-10-31_uniform-sample/plan.json). No weights. 95% CIs and "
             "one-sided p resample bloggers (2,000 draws).</p>"
         ),
-        *_panel(rows_by_item, natural, False, rng, "Natural sample"),
+        *_panel(clean, natural, False, rng, "Natural sample"),
         "<h3>Batches 1–3 (secondary)</h3>",
         (
             f'<p class="mute">{len(tier_c)} cases: every confident Qwen-wrong pair and a sample of Qwen-right pairs per batch, '

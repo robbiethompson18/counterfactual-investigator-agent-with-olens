@@ -48,12 +48,12 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None, allow_poole
         r["id"]: 3 for r in load(BATCH3.parent / "2026-10-30_ablate-loo-c/pairs.jsonl")
     }
     ps: dict[str, dict[str, float]] = {}
-    source: dict[str, set] = {}  # item -> {(run, harness version)} its predictions come from
+    source: dict[tuple, set] = {}  # (condition, item) -> {(run, harness version)} its prediction comes from
     for run in pred_runs:
         for r in load(Path(run) / "predictions.jsonl"):
             if r.get("valid", True) and r.get("p") is not None:
                 ps.setdefault(r["condition"], {})[r["item"]] = r["p"]
-                source.setdefault(r["item"], set()).add((Path(run).name, r.get("harness_version", 1)))
+                source.setdefault((r["condition"], r["item"]), set()).add((Path(run).name, r.get("harness_version", 1)))
     sites: dict[str, tuple[np.ndarray, dict]] = {}
     for cap in (c for c in CAPTURES if c.exists()):
         A, index = activations(cap)
@@ -61,10 +61,13 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None, allow_poole
         for r in (r for r in index if r["split"] == "eval"):  # period-probe also holds its batch-3 training pool: never used here
             sites.setdefault(r["id"], (A[r["rows"], li], r))
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
-    keep = [c for c in cs if all(c["item"] in ps.get(k, {}) for k in CONDITIONS) and c["pair"] in sites]
+    conds = [k for k in CONDITIONS if k in ps]  # the conditions the given runs have (e.g. NLA pending)
+    keep = [c for c in cs if all(c["item"] in ps[k] for k in conds) and c["pair"] in sites]
     print(f"{len(keep)} of {len(cs)} cases have every condition and a capture")
-    runs = {x for c in keep for x in source[c["item"]]}
-    if len(runs) > 1 and not allow_pooled:  # the 2026-10-31 audit: pooled runs alias run with label (positives mostly in one)
+    # the 2026-10-31 audit: pooling runs within a condition aliases run with label (positives mostly in one run), so each
+    # condition's predictions must come from one run; different conditions may come from different runs
+    runs = max(({x for c in keep for x in source[k, c["item"]]} for k in conds), key=len)
+    if len(runs) > 1 and not allow_pooled:
         raise SystemExit(f"predictions from {len(runs)} (run, harness) pairs {sorted(runs)}: score one run, or --allow-pooled")
     H, struct = [], []
     for c in keep:
@@ -78,7 +81,7 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None, allow_poole
     X = np.array(H, np.float64)
     y = np.array([int(c["positive"]) for c in keep])
     post = np.array([c["pair"].split(":")[0] for c in keep])
-    xs = {k: np.array([ps[k][c["item"]] for c in keep]) for k in CONDITIONS}
+    xs = {k: np.array([ps[k][c["item"]] for c in keep]) for k in conds}
     nest = nested(X, y, post, logit(xs["transcript_inline"])[:, None], np.array(struct, float), 0)
     xs |= {"probe": nest["probe_alone"], "transcript+probe": nest["probe"]}
     w = np.array([1.0 if cases or c["version"] == "qwen_wrong" else 1 / RATE[batch[c["pair"]], c["attr"]] for c in keep])
@@ -98,7 +101,7 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None, allow_poole
         for k, x in xs.items():
             lines.append(f"| {k} | {wauc(y, x, ww):.3f} [{np.quantile(boot[k], 0.025):.3f}, {np.quantile(boot[k], 0.975):.3f}] |")
         lines += ["", "| A − B | Δ AUROC [95% CI] | one-sided p (Δ ≤ 0) |", "|---|---|---|"]
-        for a, b in DIFFS:
+        for a, b in (d for d in DIFFS if set(d) <= set(xs)):
             d = boot[a] - boot[b]
             lines.append(f"| {a} − {b} | {wauc(y, xs[a], ww) - wauc(y, xs[b], ww):+.3f} [{np.quantile(d, 0.025):+.3f}, "
                          f"{np.quantile(d, 0.975):+.3f}] | {(d <= 0).mean():.4f} |")  # fmt: skip

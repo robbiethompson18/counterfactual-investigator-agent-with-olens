@@ -92,7 +92,7 @@ def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dic
 
 
 # the natural sample (Kylie, 2026-10-31: "do or simulate a natural sample"): scripts/author_probe/blog_u.py's cases
-UNIFORM = Path("data/runs/author_mcq_blog/2026-10-31_uniform-sample/cases.jsonl")
+UNIFORM = Path("data/runs/author_mcq_blog/2026-10-31_uniform-sample/cases.jsonl")  # two-order labels since 2026-11-01
 
 
 def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | None = None, strict: bool = False):
@@ -277,6 +277,8 @@ RUNS = [  # batches 1+2; their NLA conditions; the scale-up's new cases (batch 3
     "2026-10-31_author-blog-drop-haiku-scaleup",
     "2026-10-31_author-blog-drop-haiku-scaleup-nla",
     "2026-10-31_author-blog-drop-haiku-natural",
+    "2026-11-01_author-blog-drop-haiku-natural2",  # the natural sample's clean run: every case, harness 19
+    "2026-11-01_author-blog-drop-haiku-natural2-nla",
 ]
 EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
 
@@ -306,7 +308,14 @@ def LINKS(row: dict) -> dict[str, dict]:
 
 
 INPUTS = Path("data/runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2")
-CASE_INPUTS = [Path(f"data/runs/cfbench_evals/2026-10-31_author-blog-drop-inline-inputs-{s}") for s in ("natural", "scaleup")]
+CASE_INPUTS = [
+    Path(f"data/runs/cfbench_evals/2026-1{s}")
+    for s in (
+        "1-01_author-blog-drop-inline-inputs-natural2",
+        "0-31_author-blog-drop-inline-inputs-natural",
+        "0-31_author-blog-drop-inline-inputs-scaleup",
+    )
+]
 
 
 def ITEM_INFO(row: dict) -> dict:
@@ -314,7 +323,8 @@ def ITEM_INFO(row: dict) -> dict:
     the case is in the natural sample, the flat-rule truth as the class, Qwen's probability on its answer before and after
     the deletion, the drop, and the deleted sentence."""
     if not hasattr(ITEM_INFO, "comment"):
-        ITEM_INFO.comment = {c["item"]: c["comment"] for d in CASE_INPUTS for c in load(d / "cases_all.jsonl")}  # ty: ignore[unresolved-attribute]
+        files = [d / "cases_all.jsonl" if (d / "cases_all.jsonl").exists() else d / "cases.jsonl" for d in CASE_INPUTS]
+        ITEM_INFO.comment = {c["item"]: c["comment"] for f in files for c in load(f)}  # ty: ignore[unresolved-attribute]
         ITEM_INFO.natural = {c["item"] for c in load(UNIFORM)}  # ty: ignore[unresolved-attribute]
         from cfbench.evals.author_blog_drop_inline.score import probe_scores
 
