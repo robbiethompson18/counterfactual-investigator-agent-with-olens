@@ -27,7 +27,7 @@ import numpy as np
 from cfbench.catalog import ESSAY_INPUTS
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from graphs import menus_inline
-from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, load
 from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
@@ -49,7 +49,7 @@ def by_correctness() -> dict[str, dict[str, dict]]:
     right["cutoff"] = {r["item"]: r["gate_class"] == "stable_right" for r in map(json.loads, CUTOFF_REF.open())}
     menus = menus_inline.load()
     sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
-    menu_name = {c: m for m, c in CANON.items()}
+    menu_name = {c: m for m, c in PLAIN_COND.items()}
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
 

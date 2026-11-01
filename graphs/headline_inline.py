@@ -28,9 +28,9 @@ TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
 TITLES = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
-# task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
+# task -> its menus_inline sets; canonical-menu condition -> the plain condition name the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
-CANON = {TS: TS, **{c.replace("_", f"_{CANONICAL_MENU}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
+PLAIN_COND = {TS: TS, **{c.replace("_", f"_{CANONICAL_MENU}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
@@ -42,7 +42,7 @@ def load() -> dict[str, tuple[dict, dict]]:
     menus = menus_inline.load()
     out: dict[str, tuple[dict, dict]] = {}
     for task, sets in MENU_SETS.items():
-        acc = {CANON[c]: {(s, i): v for s in sets for i, v in menus[s][c].items()} for c in CANON}
+        acc = {PLAIN_COND[c]: {(s, i): v for s in sets for i, v in menus[s][c].items()} for c in PLAIN_COND}
         out[task] = acc, {k: k for k in acc[TS]}
     acc, groups = out["mcq"]
     acc[PROBE] = {}
