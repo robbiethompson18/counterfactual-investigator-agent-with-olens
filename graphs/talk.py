@@ -432,11 +432,11 @@ def headline() -> None:
         ax.set_ylim(50, 100)
         ax.set_ylabel("% of cases right")
         ax.text(1.0, 1.03, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
-        rows = [(c, TS, *boot.diff_ci([task], c, TS), label(c)) for c in LENSES]  # the swatches say "− transcript only"
+        rows = [(c, TS, *boot.diff_ci([task], c, TS), label(c)) for c in LENSES]  # the swatches say "− prompt only"
         diff_rows(dx, rows, unit=" pp", s=SLIDE_S)
         lo, hi = min(0, *(r[3] for r in rows)), max(r[4] for r in rows)
         dx.set_xlim(lo - 0.08 * (hi - lo), hi + 1.1 * (hi - lo))  # room for the numbers right of the longest CI
-        dx.set_xlabel("Δ pp vs transcript only, paired 95% CI")
+        dx.set_xlabel("Δ pp vs prompt only, paired 95% CI")
         slide_save(fig, OUT / f"task_{task}.pdf")
 
 
