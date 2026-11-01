@@ -25,7 +25,7 @@ LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
 TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
-TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences"}
+TITLES = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
 # task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}

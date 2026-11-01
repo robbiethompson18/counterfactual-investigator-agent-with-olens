@@ -60,7 +60,7 @@ def mcq():
             ax.grid(axis="x", visible=False)
             if col == 0:
                 ax.set_ylabel("Accuracy (%)")
-    fig.suptitle("MCQ probes: training-benchmark transfer", x=0.01, ha="left")
+    fig.suptitle("Multiple Choice probes: training-benchmark transfer", x=0.01, ha="left")
     legend(fig)
     fig.supxlabel(
         "Training source · 1,000 questions per outer fold; combined = 500 + 500\n"

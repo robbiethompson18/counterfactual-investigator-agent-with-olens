@@ -129,7 +129,7 @@ def main(which: str, out: Path, out_diff: Path) -> None:
     fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
     handles = draw(axes, data)
     fig.legend(handles=handles, loc="outside lower center", ncol=4, fontsize=8.5)
-    fig.suptitle("Knowledge cutoff: a later-cutoff vs a same-cutoff investigator", x=0.01, ha="left")
+    fig.suptitle("Knowledge Cutoff: a later-cutoff vs a same-cutoff investigator", x=0.01, ha="left")
     fig.text(0.995, 0.975, "exact match, 95% CI over items", ha="right", fontsize=8, color=MUTED)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")

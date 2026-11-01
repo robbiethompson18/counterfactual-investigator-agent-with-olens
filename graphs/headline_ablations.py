@@ -46,7 +46,7 @@ def by_correctness() -> dict[str, dict[str, dict]]:
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
     right["cutoff"] = {i: g == "stable_right" for i, (g, _) in cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)[TS].items()}
     menus = menus_inline.load()
-    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge cutoff": "cutoff"}
+    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
     menu_name = {c: m for m, c in CANON.items()}
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
