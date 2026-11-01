@@ -727,7 +727,8 @@ def _mention_table(c: Counter, cells):
 
 
 def grader_acting() -> dict:
-    """harness_grid thinking off, per model: (acted, n) without asking among episodes whose prompt O-lens reads (system + first
+    """harness_grid, per model and thinking mode (Qwen off, GLM off and on): (acted, n) without asking among episodes whose
+    prompt O-lens reads (system + first
     user turn, every position) say grade[rd]/rubric vs not, pooled and per wording, and the Mantel-Haenszel odds ratio with
     its CMH p within wording and within wording x system prompt."""
     import csv
@@ -739,11 +740,11 @@ def grader_acting() -> dict:
         hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/episodes.csv", repo_type="dataset", local_dir="data")
     rows = list(csv.DictReader(path.open()))
     out = {}
-    for model in ("Qwen3.6-27B", "GLM-5.3"):
-        mine = [r for r in rows if r["model"] == model]
+    for model, mode in [("Qwen3.6-27B", "off"), ("GLM-5.3", "off"), ("GLM-5.3", "on")]:
+        mine = [r for r in rows if (r["model"], r["mode"]) == (model, mode)]
         c = Counter((r["wording"], r["system"], float(r["graderd_prompt_reads"]) > 0, r["acted"] == "True") for r in mine)
         systems = sorted({r["system"] for r in mine})
-        out[model] = {
+        out[model, mode] = {
             "pooled": _mention_counts(c, [(w, s) for w in GRID_WORDINGS for s in systems]),
             "by_wording": {w: _mention_counts(c, [(w, s) for s in systems]) for w in GRID_WORDINGS},
             "or_wording": mantel_haenszel([_mention_table(c, [(w, s) for s in systems]) for w in GRID_WORDINGS]),
