@@ -40,26 +40,30 @@ TEXT_PASS1 = {"user_modeling": 0.494, "basic_readout": 0.85, "moral_rationale": 
 TEXT_NOTE = {"user_modeling": "0.65 with an\nelicit sentence"}
 
 
-def chart(lens: dict, title: str, lens_label: str, out: Path):
-    fig, ax = plt.subplots(figsize=(8.5, 4.2))
-    x = range(len(FAMILIES))
+def draw(ax, lens: dict, lens_label: str, s: float = 1.0) -> None:
+    """The lens beside Sonnet's text inversion per family on ax; `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
     w = 0.36
     for i, fam in enumerate(FAMILIES):
         v = lens[fam]
         if v is None:
-            ax.text(i - w / 2, 0.03, "no public\nper-readout\nrows", ha="center", va="bottom", fontsize=8, color=MUTED)
+            ax.text(i - w / 2, 0.03, "no public\nper-readout\nrows", ha="center", va="bottom", fontsize=8 * s, color=MUTED)
         else:
             ax.bar(i - w / 2, v, w, label=lens_label if i == 0 else None, **bar_kw("olens"))
-            ax.text(i - w / 2, v + 0.015, f"{v:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
+            ax.text(i - w / 2, v + 0.015, f"{v:.2f}", ha="center", va="bottom", fontsize=9 * s, color=INK)
         t = TEXT_PASS1[fam]
         ax.bar(i + w / 2, t, w, label="Sonnet 5.5 text inversion, pass@1" if i == 0 else None, **bar_kw("transcript"))
-        ax.text(i + w / 2, t + 0.015, f"{t:.2f}", ha="center", va="bottom", fontsize=9, color=INK)
+        ax.text(i + w / 2, t + 0.015, f"{t:.2f}", ha="center", va="bottom", fontsize=9 * s, color=INK)
         if fam in TEXT_NOTE:
-            ax.text(i + w / 2, t + 0.07, TEXT_NOTE[fam], ha="center", va="bottom", fontsize=7.5, color=MUTED)
-    ax.set_xticks(list(x), [LABEL[f] for f in FAMILIES])
+            ax.text(i + w / 2 + 0.22, t + 0.06, TEXT_NOTE[fam], ha="left", va="bottom", fontsize=7.5 * s, color=MUTED)
+    ax.set_xticks(range(len(FAMILIES)), [LABEL[f] for f in FAMILIES])
     ax.set_ylim(0, 1.08)
     ax.set_ylabel("pass rate")
     ax.grid(axis="x", visible=False)
+
+
+def chart(lens: dict, title: str, lens_label: str, out: Path):
+    fig, ax = plt.subplots(figsize=(8.5, 4.2))
+    draw(ax, lens, lens_label)
     ax.set_title(title)
     ax.legend(loc="upper right", frameon=False, bbox_to_anchor=(1.0, -0.14), ncol=2, fontsize=9)
     fig.tight_layout()

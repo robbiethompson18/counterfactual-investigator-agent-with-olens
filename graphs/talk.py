@@ -9,15 +9,20 @@ and the knowledge-cutoff investigators (graphs.cutoff_qa_investigators). `make -
     uv run python -m graphs.talk   # -> slides/talk/fig/*.pdf, *.tex
 """
 
+import ast
 import json
+from functools import cache
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 from matplotlib.patches import Rectangle
+from matplotlib.ticker import PercentFormatter
 
-from cfbench.catalog import CF, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
+from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
+from cfbench.scoring import CONDS as CF_CONDS
 from cfbench.scoring import (
     ESSAY_LENSES,
     HF_REPO,
@@ -29,11 +34,26 @@ from cfbench.scoring import (
     essay_flips,
     simulated_by_section,
 )
-from graphs import author_blog_drop, cutoff_qa_investigators, data_filter_sankey, headline_inline
+from graphs import (
+    author_blog_drop,
+    chive_agam_inline,
+    chive_inline,
+    cutoff_qa_investigators,
+    data_filter_sankey,
+    headline_ablations,
+    headline_inline,
+    headline_tokens,
+    menus_inline,
+    read_positions_diagram,
+    wsb_text_inversion,
+)
+from graphs.cfbench_modelchart import DUMB_MODELS, MODEL_AXIS, MODELS, THINKING, THINKING_ON, case_ci
+from graphs.cfbench_report import DEPARTURE as CF_DEPARTURE
+from graphs.cfbench_report import TOOL_CONDS, TOOLS
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import DEPARTURE as ESSAY_DEPARTURE
 from graphs.essay_grading import essay_bars
-from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
+from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TITLES, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.style import (
     BG,
@@ -41,10 +61,12 @@ from graphs.style import (
     FULL_W,
     HALF_W,
     INK,
+    MM,
     MUTED,
     OLENS,
     SLIDE_S,
     bar_kw,
+    color,
     departure,
     diff_rows,
     label,
@@ -430,7 +452,7 @@ def cutoff_investigators() -> None:
         if not path.exists():
             hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
     data = cutoff_qa_investigators.load("canonical")
-    fig, axes = slide_figure(FULL_W, 50, nrows=3, sharex=True)
+    fig, axes = slide_figure(FULL_W, 55, nrows=3, sharex=True)
     handles = cutoff_qa_investigators.draw(axes, data, s=SLIDE_S)
     for ax in axes:
         ax.set_ylabel(None)
@@ -517,6 +539,293 @@ def sneeze() -> None:
     slide_save(fig, OUT / "sneeze.pdf")
 
 
+# --- the counterfactual part (the write-up's Part I and its appendix of counterfactual charts) --------------------------------
+
+
+@slide
+def chive() -> None:
+    """CHIVE's own yes/no claims: Haiku edit only vs transcript beside CHIVE's Opus 4.8 arms, one panel per target and pooled
+    (fig/chive.pdf), and the paired transcript − edit-only rows (fig/chive_diff.pdf), graphs.chive_inline at slide size."""
+    panels, rows = chive_inline.panels_data(CHIVE_RUN)
+    fig, axes = slide_figure(FULL_W, 34, ncols=len(panels), sharey=True)
+    chive_inline.draw(axes, panels, SLIDE_S)
+    slide_save(fig, OUT / "chive.pdf")
+    fig, ax = slide_figure(HALF_W, 18)
+    diff_rows(ax, rows, value_fmt="{:+.3f}", s=SLIDE_S)
+    ax.set_xlim(-0.02, 0.05)
+    ax.set_xlabel("Haiku AUROC, transcript − edit only, paired by claim (95% CI)")
+    slide_save(fig, OUT / "chive_diff.pdf")
+
+
+@slide
+def chive_agam() -> None:
+    """CHIVE-style claims on Agam's Qwen3.6-27B incidents: edit only, transcript, each lens beside its placebo
+    (fig/chive_agam.pdf; the claim count in fig/chive_agam_n.tex), graphs.chive_agam_inline at slide size."""
+    fig, ax = slide_figure(HALF_W, 46)
+    n, _ = chive_agam_inline.bars(ax, CHIVE_AGAM_RUNS, SLIDE_S)
+    ax.text(1.0, 1.02, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    departure(fig, chive_agam_inline.DEPARTURE)
+    slide_save(fig, OUT / "chive_agam.pdf")
+    (OUT / "chive_agam_n.tex").write_text(f"{n:,}")
+
+
+CF_SUMMARY = Path("docs/img/cfbench-report/summary.json")  # every number on graphs.cfbench_report's charts
+
+
+def cf_acc(rmse: float) -> float:
+    """What the counterfactual bars show: 100 − RMSE in percentage points, higher is better (docs/cfbench-scoring.md)."""
+    return 100 - 100 * rmse
+
+
+def cf_bars(ax, s: dict, x0: float, width: float, legend: bool) -> None:
+    """One stats dict's five bars (the four conditions and the edit-does-nothing null) with their bootstrap intervals, as
+    graphs.cfbench_report.bar_group draws them, at the deck's sizes."""
+    series = [(c, s["rmse"][c], s["rmse_ci"][c]) for c in CF_CONDS] + [("null", s["rmse_null"], s["rmse_null_ci"])]
+    for j, (c, v, (lo, hi)) in enumerate(series):
+        x = x0 + (j - 2) * width
+        ax.bar(x, cf_acc(v), width * 0.9, label=label(c) if legend else None, zorder=2, **bar_kw(c))
+        ax.plot([x, x], [cf_acc(hi), cf_acc(lo)], color=INK, lw=0.8, zorder=3)
+        ax.text(x, cf_acc(lo) + 0.6, f"{cf_acc(v):.1f}", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK)
+
+
+@slide
+def cfbench() -> None:
+    """The counterfactual charts, from graphs.cfbench_report's summary.json (run `python -m graphs.cfbench_report` first, ~20 s):
+    100 − RMSE pooled and per target (fig/cf_skill.pdf), the pre-registered hidden_goal.grade test (fig/cf_hidden_goal.pdf), what
+    the O-lens agent searches the lens for and which tools it calls (fig/cf_harness.pdf), investigator model by condition and
+    transcript-only vs O-lens per investigator (fig/cf_models.pdf), Gemini 3.8 Flash by effort and by tool budget
+    (fig/cf_flash.pdf)."""
+    assert CF_SUMMARY.exists(), f"{CF_SUMMARY} missing: run `uv run python -m graphs.cfbench_report` first"
+    S = json.loads(CF_SUMMARY.read_text())
+    # pooled and by target
+    fig, (ax, bx) = slide_figure(FULL_W, 46, ncols=2, sharey=True, gridspec_kw={"width_ratios": [1, 2.4]})
+    cf_bars(ax, S["pooled"], 0, 0.16, legend=True)
+    ax.axhline(cf_acc(S["pooled"]["noise_floor"]), color=MUTED, ls=":", lw=0.8, zorder=1, label="ceiling (sampling noise)")
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_xticks([])
+    ax.set_ylim(0, 130)
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_title(f"all targets, {S['pooled']['cases']} cases, {S['pooled']['envs']} envs", loc="left")
+    targets = list(S["by_target"])
+    for i, t in enumerate(targets):
+        st = S["by_target"][t]
+        cf_bars(bx, st, i, 0.16, legend=False)
+        nf = cf_acc(st["noise_floor"])
+        bx.plot([i - 0.45, i + 0.45], [nf, nf], color=MUTED, ls=":", lw=0.8, zorder=1)
+    bx.set_xticks(range(len(targets)), [f"{t}\n{S['by_target'][t]['cases']} cases, {S['by_target'][t]['envs']} envs" for t in targets])
+    bx.set_title("by target model", loc="left")
+    bx.legend(*ax.get_legend_handles_labels(), loc="upper left", ncol=3)
+    for a in (ax, bx):
+        a.grid(axis="x", visible=False)
+    departure(fig, CF_DEPARTURE)
+    slide_save(fig, OUT / "cf_skill.pdf")
+    # hidden_goal.grade
+    fig, ax = slide_figure(HALF_W, 40)
+    hg = S["hidden_goal"]
+    cf_bars(ax, hg, 0, 0.16, legend=True)
+    ax.axhline(cf_acc(hg["noise_floor"]), color=MUTED, ls=":", lw=0.8, zorder=1, label="ceiling (sampling noise)")
+    ax.set_xlim(-0.5, 0.5)
+    ax.set_xticks([])
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_title(f"hidden_goal.grade, Qwen3.6-27B without CoT, {hg['cases']} arm pairs", loc="left")
+    fig.legend(loc="outside lower center", ncol=3)
+    ax.grid(axis="x", visible=False)
+    departure(fig, CF_DEPARTURE)
+    slide_save(fig, OUT / "cf_hidden_goal.pdf")
+    # harness sanity checks: search topics and tool calls
+    fig, (ax, bx) = slide_figure(FULL_W, 42, ncols=2, gridspec_kw={"width_ratios": [1.15, 1]})
+    T = S["topics"]
+    cats = list(T["share"])  # most common first
+    ax.barh(range(len(cats)), [T["share"][c] for c in cats], 0.6, color=color("olens_agentic"))
+    for i, c in enumerate(cats):
+        ax.text(T["share"][c] + 0.005, i, f"{T['share'][c]:.0%}", va="center", fontsize=7 * SLIDE_S)
+        rx = next((r for r, _ in T["examples"][c] if len(r) <= 40), "")
+        ax.text(-0.01, i + 0.38, f"e.g. /{rx}/", ha="right", va="center", fontsize=6 * SLIDE_S, color=MUTED,
+                transform=ax.get_yaxis_transform())  # fmt: skip
+    ax.set_yticks(range(len(cats)), cats)
+    ax.invert_yaxis()
+    ax.xaxis.set_major_formatter(PercentFormatter(1, decimals=0))
+    ax.set_xlabel(f"share of {T['calls']:,} search_olens calls")
+    ax.grid(axis="y", visible=False)
+    ax.set_title(f"what the {OLENS} agent searches the lens for", loc="left")
+    tools, w = S["tools"], 0.8 / 3
+    for j, c in enumerate(TOOL_CONDS):
+        for i, tool in enumerate(TOOLS):
+            v, x = tools[c][tool], i + (j - 1) * w
+            bx.bar(x, v, w * 0.9, label=f"{label(c)} ({tools[c]['predictions']:,} predictions)" if i == 0 else None, **bar_kw(c))
+            bx.text(x, v + 0.1, f"{v:.1f}", ha="center", va="bottom", fontsize=6.5 * SLIDE_S)
+    bx.set_xticks(range(len(TOOLS)), TOOLS)
+    bx.set_ylabel("calls per prediction")
+    bx.grid(axis="x", visible=False)
+    bx.legend(loc="upper right")
+    bx.set_title("which tools the investigator calls (20-call budget)", loc="left")
+    slide_save(fig, OUT / "cf_harness.pdf")
+    # investigator model by condition, and transcript-only vs O-lens per investigator
+    R = S["robustness"]
+    models = {ast.literal_eval(k): v for k, v in R["models"].items()}
+    fig, (ax, bx) = slide_figure(FULL_W, 52, ncols=2, gridspec_kw={"width_ratios": [1.25, 1]})
+    xs, ends = range(len(MODEL_AXIS)), []
+    for m, name in MODELS.items():
+        if any((m, c) not in models for c in MODEL_AXIS):
+            continue
+        ys = [models[m, c]["acc"] for c in MODEL_AXIS]
+        ax.plot(xs, ys, color="#c8c8c8", lw=1, zorder=1)
+        for x, c, y in zip(xs, MODEL_AXIS, ys, strict=True):
+            ax.scatter(x, y, s=16, color=color(c), zorder=3)
+        ends.append((ys[-1], name))
+    label_y = -1e9
+    for y, name in sorted(ends):  # end labels at least 1.6pp apart
+        label_y = max(y, label_y + 1.6)
+        ax.text(len(MODEL_AXIS) - 1 + 0.12, label_y, name, va="center", fontsize=7 * SLIDE_S)
+    ax.set_xticks(list(xs), [label(c) for c in MODEL_AXIS])
+    for tick, c in zip(ax.get_xticklabels(), MODEL_AXIS, strict=True):
+        tick.set_color(color(c))
+    ref = next(iter(models.values()))
+    ax.axhline(ref["null"], color=INK, lw=0.8, ls="--", zorder=1)
+    ax.text(-0.3, ref["null"], " edit does nothing", va="bottom", fontsize=7 * SLIDE_S, color=INK)
+    ax.set_xlim(-0.3, len(MODEL_AXIS) + 0.7)
+    ax.set_ylabel("100 − RMSE of predicted rate (pp)")
+    ax.set_title("investigator model by condition (effort high, 20 tool calls, 4 cases)", loc="left")
+    tv = {ast.literal_eval(k): v for k, v in R["ts_vs_olens"].items()}
+    names = MODELS | DUMB_MODELS
+    ts, ol = "transcript_agentic", "olens_agentic"
+    pts = sorted((tv[m, e, ts]["acc"], tv[m, e, ol]["acc"], m, e) for m, e, c in tv if c == ol and (m, e, ts) in tv)
+    lo, hi = 34, 62
+    bx.plot([lo, hi], [lo, hi], color=MUTED, lw=0.8, zorder=1)  # the diagonal: O-lens = transcript only
+    null = next(iter(tv.values()))["null"]
+    bx.axvline(null, color=INK, lw=0.8, ls="--", zorder=1)
+    bx.axhline(null, color=INK, lw=0.8, ls="--", zorder=1)
+    bx.text(null + 0.3, lo + 0.3, "edit does nothing", fontsize=6.5 * SLIDE_S, color=INK, rotation=90, va="bottom")
+    bunch = sorted((p for p in pts if p[0] < 46 and p[1] < 46), key=lambda p: p[1])  # the cheap investigators, near the null
+    column = {(m, e): lo + 1.2 + 1.45 * k for k, (_, _, m, e) in enumerate(bunch)}  # their labels, a column with leader lines
+    for x, y, m, e in pts:
+        _, shade = THINKING.get(e, THINKING_ON)
+        bx.scatter(x, y, s=14, color=shade, edgecolor=INK, lw=0.4, zorder=3)
+        name = names[m] + (f" ({e})" if sum(p[2] == m for p in pts) > 1 else "")
+        if (m, e) in column:
+            bx.annotate(name, (x, y), xytext=(47.5, column[m, e]), va="center", fontsize=5.5 * SLIDE_S, color=INK,
+                        arrowprops={"arrowstyle": "-", "color": "#b5b5b5", "lw": 0.4, "shrinkA": 0, "shrinkB": 2})  # fmt: skip
+        else:
+            bx.annotate(name, (x, y), xytext=(2.5, 0), textcoords="offset points", va="center", fontsize=5.5 * SLIDE_S, color=INK)
+    for level, shade in [*dict(THINKING.values()).items(), THINKING_ON]:
+        bx.scatter([], [], s=14, color=shade, edgecolor=INK, lw=0.4, label=f"thinking {level}")
+    bx.legend(loc="upper left")
+    bx.set_xlim(lo, hi)
+    bx.set_ylim(lo, hi)
+    bx.set_aspect("equal")
+    bx.set_xlabel("transcript only: 100 − RMSE (pp)")
+    bx.set_ylabel(f"with {OLENS}: 100 − RMSE (pp)")
+    bx.set_title(f"transcript only vs {OLENS} by investigator (4 cases)", loc="left")
+    slide_save(fig, OUT / "cf_models.pdf")
+    # Flash by effort and by tool budget
+    fig, axes = slide_figure(FULL_W, 40, ncols=2, sharey=True)
+    sweeps = (("flash_effort", ["low", "medium", "high"], "reasoning effort (20 tool calls)"),
+              ("flash_calls", None, "max tool calls (effort high)"))  # fmt: skip
+    for ax, (key, steps, xlabel) in zip(axes, sweeps, strict=True):
+        s = {ast.literal_eval(k): v for k, v in R[key].items()}
+        steps = steps or sorted({k[0] for k in s if k[1] == ts})
+        for c in ["no_transcript", ts, ol]:
+            present = [(i, s[x, c]) for i, x in enumerate(steps) if (x, c) in s]
+            ax.plot([i for i, _ in present], [g["acc"] for _, g in present], color=color(c), marker="o", ms=3, lw=1.5, label=label(c))
+            cis = [case_ci(g["per_case"]) for _, g in present]
+            ax.fill_between([i for i, _ in present], [lo for lo, _ in cis], [hi for _, hi in cis], color=color(c), alpha=0.12, lw=0)
+        ref = next(iter(s.values()))
+        ax.axhline(ref["null"], color=INK, lw=0.8, ls="--", zorder=1)
+        ax.axhline(ref["ceiling"], color=MUTED, lw=0.8, ls=":", zorder=1)
+        ax.set_xticks(range(len(steps)), [str(x) for x in steps])
+        ax.set_xlabel(xlabel)
+        ax.set_title(f"Gemini 3.8 Flash by {xlabel.split(' (')[0]}, 4 cases", loc="left")
+    for y, text, col in ((ref["null"], "edit does nothing", INK), (ref["ceiling"], "ceiling (sampling noise)", MUTED)):
+        axes[0].text(0.01, y, text, transform=axes[0].get_yaxis_transform(), va="bottom", fontsize=6.5 * SLIDE_S, color=col)
+    axes[0].set_ylim(20, 100)
+    axes[0].set_ylabel("100 − RMSE of predicted rate (pp)")
+    axes[1].legend(loc="lower left")
+    slide_save(fig, OUT / "cf_flash.pdf")
+
+
+# --- the ablations part (the write-up's Ablations) ---------------------------------------------------------------------------
+
+
+@cache
+def canonical_boot() -> Boot:
+    """The paired bootstrap over the canonical menus_inline runs, built once for every figure that pools the three tasks."""
+    return Boot(headline_inline.load())
+
+
+@slide
+def correctness() -> None:
+    """Prompt only and the three lenses on the cases where Qwen is right (top row) and wrong (bottom), MMLU-Pro, SuperGPQA and
+    Knowledge Cutoff (fig/correctness.pdf), graphs.headline_ablations at slide size."""
+    sets = headline_ablations.by_correctness()
+    fig, axes = slide_figure(FULL_W, 46, nrows=2, ncols=3, sharey=True)
+    for row, right in zip(axes, (True, False), strict=True):
+        headline_ablations.accuracy_axes(row, sets, right, SLIDE_S)
+        row[0].set_ylabel("% of cases right")
+    slide_save(fig, OUT / "correctness.pdf")
+
+
+@slide
+def lens_diffs() -> None:
+    """Each lens minus prompt only, paired by case, per task and pooled (fig/lens_diffs.pdf)."""
+    boot = canonical_boot()
+    rows: list = []
+    for task in [*POOLED, "pooled"]:
+        rows.append("pooled over the three tasks" if task == "pooled" else TITLES[task])
+        rows += [(c, TS, *boot.diff_ci(POOLED if task == "pooled" else [task], c, TS)) for c in LENSES]
+    fig, ax = slide_figure(FULL_W, 50)
+    diff_rows(ax, rows, s=SLIDE_S)
+    ax.set_xlim(-11, 12)
+    ax.set_xlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)")
+    slide_save(fig, OUT / "lens_diffs.pdf")
+
+
+@slide
+def read_positions() -> None:
+    """One MMLU-Pro prompt with its question and tail read positions (fig/positions.pdf; no layout engine, so the token widths
+    measured in axes units stay true) and the nine bars of each lens at the question, the tail and both (fig/menus.pdf)."""
+    fig = plt.figure(figsize=(HALF_W * MM, 50 * MM))
+    read_positions_diagram.draw(fig.add_axes((0, 0, 1, 1)), SLIDE_S)
+    slide_save(fig, OUT / "positions.pdf")
+    fig, ax = slide_figure(HALF_W, 50)
+    menus_inline.menu_bars(ax, menus_inline.load(), SLIDE_S)
+    slide_save(fig, OUT / "menus.pdf")
+
+
+@slide
+def placebos() -> None:
+    """Prompt only and the three placebos, pooled over the three tasks (fig/placebos.pdf); Haiku's thinking tokens per
+    condition (fig/thinking.pdf); prompt tokens each lens adds, pooled and per set (fig/tokens.pdf)."""
+    fig, ax = slide_figure(HALF_W, 40)
+    groups = [("prompt\nonly", [TS]), *((label(PLACEBOS[c]).replace(" placebo", "\nplacebo"), [PLACEBOS[c]]) for c in LENSES)]
+    headline_inline.bars(ax, canonical_boot(), POOLED, groups, s=SLIDE_S)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("% of cases right")
+    slide_save(fig, OUT / "placebos.pdf")
+    sets = {name: headline_tokens.load(runs) for name, runs in headline_tokens.SETS.items()}
+    fig, ax = slide_figure(HALF_W, 40)
+    headline_tokens.thinking_ax(ax, headline_tokens.thinking_means(sets), SLIDE_S)
+    slide_save(fig, OUT / "thinking.pdf")
+    fig, ax = slide_figure(FULL_W, 40)
+    headline_tokens.chart_ax(ax, {c: headline_tokens.summary(sets, c, "prompt") for c in LENSES}, SLIDE_S)
+    slide_save(fig, OUT / "tokens.pdf")
+
+
+@slide
+def wsb() -> None:
+    """WorkspaceBench's four contested families: the best published metamodel vs Sonnet 5.5 text inversion, at WSB's any-of-grid
+    scoring and at pass@1 (fig/wsb.pdf), graphs.wsb_text_inversion at slide size."""
+    fig, axes = slide_figure(FULL_W, 38, ncols=2, sharey=True)
+    wsb_text_inversion.draw(axes[0], wsb_text_inversion.LENS_HEADLINE, f"{OLENS}, WSB headline (any readout of the grid passes)", SLIDE_S)
+    wsb_text_inversion.draw(axes[1], wsb_text_inversion.LENS_PER_READOUT, f"{OLENS}, scored per readout (pass@1)", SLIDE_S)
+    axes[0].set_title("WorkspaceBench's own scoring: any of 55 to ~230 readouts per item", loc="left")
+    axes[1].set_title("both at pass@1: the lens scored per readout", loc="left")
+    handles = [h for ax in axes for h in ax.get_legend_handles_labels()[0]]
+    labels = [lab for ax in axes for lab in ax.get_legend_handles_labels()[1]]
+    fig.legend(handles[:1] + handles[2:], labels[:1] + labels[2:], loc="outside lower center", ncol=3)
+    slide_save(fig, OUT / "wsb.pdf")
+
+
 if __name__ == "__main__":
     grid()
     essay()
@@ -530,4 +839,12 @@ if __name__ == "__main__":
     cutoff_investigators()
     drink_drive()
     sneeze()
+    chive()
+    chive_agam()
+    cfbench()
+    correctness()
+    lens_diffs()
+    read_positions()
+    placebos()
+    wsb()
     simulated_sections()

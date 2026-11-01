@@ -4,9 +4,10 @@ is right, lens and placebo differences.
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, prompt only vs
   O-lens, J++ and NLA, one panel per set with a notion of right: MMLU-Pro, SuperGPQA (Qwen's modal letter is the gold one) and
   knowledge cutoff (Qwen's answer is still true vs stale). Preferences have no truth, so they are left out.
-- headline-lens-diffs.png: each lens minus its own placebo, pooled over the three tasks (MCQ, cutoff, preferences), three rows,
-  paired CIs from graphs.headline_inline.Boot (Robbie, 2026-10-31: just those three); headline-placebo-diffs.png: each lens's
-  placebo minus prompt only, per task and pooled.
+- headline-lens-diffs.png: each lens minus prompt only, pooled over the three tasks (MCQ, cutoff, preferences), three rows,
+  paired CIs from graphs.headline_inline.Boot (Robbie, 2026-10-31: just those three, against prompt only, not the placebo);
+  headline-placebo-diffs.png: each lens's placebo minus prompt only, per task and pooled.
+- headline-placebos-vs-transcript.png: prompt only beside each lens's placebo, four bars, pooled over the three tasks.
 - headline-essay-correctness.png: essay grading's AUROC per condition on the micro-essays Qwen grades "wrong" and the rest. Qwen is
   wrong on a micro-essay when it grades a top-half one (PERSUADE holistic score 4-6) below its own median grade over the 204, or a
   bottom-half one (1-3) at or above it; Qwen's grade is its mean on the plain base prompt. CIs resample micro-essays.
@@ -28,7 +29,7 @@ from cfbench.catalog import ESSAY_INPUTS
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from environments.cutoff_qa.env import _items as cutoff_items
 from graphs import menus_inline
-from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, load
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, bars, figure, load
 from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
@@ -58,21 +59,27 @@ def by_correctness() -> dict[str, dict[str, dict]]:
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
 
-def accuracy_panels(sets: dict, right: bool, path: Path) -> None:
-    fig, axes = plt.subplots(1, len(sets), figsize=(4.2 * len(sets), 3.4), sharey=True, layout="constrained", squeeze=False)
-    for ax, (name, conds) in zip(axes[0], sets.items(), strict=True):
+def accuracy_axes(axes, sets: dict, right: bool, s: float = 1.0) -> None:
+    """One panel per set on `axes`: prompt only and the three lenses on the cases where Qwen is right (or wrong); `s` scales
+    the text (the deck passes graphs.style.SLIDE_S)."""
+    for ax, (name, conds) in zip(axes, sets.items(), strict=True):
         xs, ticks = positions(conds, FOUR)
         n = 0
         for c, x in xs.items():
             vals = [a for ok, a in conds[c].values() if ok == right]
             m, lo, hi = grouped_mean_ci(vals, list(range(len(vals))))
-            ci_bar(ax, x, c, 100 * m, 100 * lo, 100 * hi)
+            ci_bar(ax, x, c, 100 * m, 100 * lo, 100 * hi, fontsize=7.5 * s)
             n = len(vals)
-        ax.set_xticks(ticks, [name for name, _ in FOUR], fontsize=8.5)
-        ax.set_title(f"{name}, n = {n}", fontsize=9.5)
+        ax.set_xticks(ticks, [name for name, _ in FOUR], fontsize=8.5 * s)
+        ax.set_title(f"{name}, Qwen {'right' if right else 'wrong'}, n = {n}", fontsize=9.5 * s)
         ax.set_ylim(0, 100)
         ax.grid(axis="x", visible=False)
-    axes[0][0].set_ylabel("% of cases the investigator gets right")
+    axes[0].set_ylabel("% of cases the investigator gets right")
+
+
+def accuracy_panels(sets: dict, right: bool, path: Path) -> None:
+    fig, axes = plt.subplots(1, len(sets), figsize=(4.2 * len(sets), 3.4), sharey=True, layout="constrained", squeeze=False)
+    accuracy_axes(axes[0], sets, right)
     fig.suptitle(f"Cases where Qwen is {'right' if right else 'wrong'}", x=0.01, ha="left")
     fig.text(0.995, 0.97, "95% bootstrap CI over cases", ha="right", fontsize=8, color=MUTED)
     fig.savefig(path, bbox_inches="tight")
@@ -98,18 +105,25 @@ def lens_diffs(boot: Boot, path: Path, placebo: bool = False) -> None:
     print("wrote", path)
 
 
-def lens_placebo_diffs(boot: Boot, path: Path) -> None:
-    """Each lens minus its own placebo, pooled over the three tasks: three rows."""
-    rows = [(lens, PLACEBOS[lens], *boot.diff_ci(POOLED, lens, PLACEBOS[lens])) for lens in LENSES]
+def lens_transcript_diffs(boot: Boot, path: Path) -> None:
+    """Each lens minus prompt only, pooled over the three tasks: three rows."""
+    rows = [(lens, TS, *boot.diff_ci(POOLED, lens, TS)) for lens in LENSES]
     print(path.name, [(a[:5], f"{m:+.1f} [{lo:+.1f}, {hi:+.1f}]") for a, _, m, lo, hi in rows])
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
     ax.set_xlim(-6, 20)
     diff_rows(ax, rows)
-    ax.set_title("Each lens minus its placebo, pooled over the three tasks", loc="left", fontsize=9.5)
+    ax.set_title("Each lens minus prompt only, pooled over the three tasks", loc="left", fontsize=9.5)
     ax.set_xlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     print("wrote", path)
+
+
+def placebo_bars(boot: Boot, path: Path) -> None:
+    """Transcript only beside each lens's placebo, pooled over the three tasks."""
+    groups = [("prompt\nonly", [TS]), *((label(PLACEBOS[c]), [PLACEBOS[c]]) for c in LENSES)]
+    print(path.name, {label(c): f"{boot.bar(POOLED, c)[0]:.1f}" for _, cs in groups for c in cs})
+    figure(path, [("pooled over the three tasks", lambda ax: bars(ax, boot, POOLED, groups))])
 
 
 def essay_qwen_wrong() -> dict[str, bool]:
@@ -184,7 +198,8 @@ def main(out: Path) -> None:
             tag = "right" if right else "wrong"
             print(f"Qwen {tag} {name}:", "  ".join(f"{c.removesuffix('_inline')} {m:.1f}" for c, m in means.items()))
     boot = Boot(load())
-    lens_placebo_diffs(boot, out / "headline-lens-diffs.png")
+    lens_transcript_diffs(boot, out / "headline-lens-diffs.png")
+    placebo_bars(boot, out / "headline-placebos-vs-transcript.png")
     lens_diffs(boot, out / "headline-placebo-diffs.png", placebo=True)
     auroc_panels(
         essay_groups(),

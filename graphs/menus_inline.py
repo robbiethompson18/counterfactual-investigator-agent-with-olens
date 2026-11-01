@@ -11,6 +11,9 @@ equally), 95% CIs from resampling cases within every set.
 docs/img/menus-inline-position.png (the write-up's "By token position"): one bar per lens, its `prompt` menu minus its `tail`
 menu on the same cases, pooled the same way, with a paired 95% CI and two-sided bootstrap p.
 
+docs/img/menus-inline-by-menu.png (the same section): nine bars, each lens at the `prompt`, `tail` and `all` menus, pooled the same
+way, prompt only as the dashed line; the `prompt` and `all` menus have 3 draws per case, `tail` has 1 (noted in the figure).
+
     uv run python -m graphs.menus_inline [--out docs/img/menus-inline.png]
 """
 
@@ -24,7 +27,7 @@ import matplotlib.pyplot as plt
 
 from cfbench.catalog import CF as R
 from cfbench.catalog import MENUS as SETS  # set -> (title, runs)
-from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar
+from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar, color, departure
 
 LENSES = {"olens": OLENS, "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
@@ -97,6 +100,64 @@ def position_diff(acc: dict, out: Path) -> None:
     print(out)
 
 
+def by_menu(acc: dict, out: Path) -> None:
+    """Nine bars: each lens at the question reads, the 9 tail tokens and both, pooled over the four sets."""
+    menus = {"prompt": "question", "tail": "tail", "all": "both"}
+    fig, ax = plt.subplots(figsize=(7.2, 3.6), layout="constrained")
+    base = pooled(acc, "transcript_inline")
+    assert base
+    ax.axhline(base[0], color=BLUE, lw=0.8, ls=(0, (3, 3)), zorder=2)
+    ticks, x = [], 0.0
+    for lens, lens_label in LENSES.items():
+        for menu, menu_label in menus.items():
+            v = pooled(acc, f"{lens}_{menu}_inline")
+            assert v
+            ci_bar(ax, x, lens, *v)
+            ticks.append((x, menu_label))
+            x += 0.85
+        ax.text(x - 0.85 * 2, -0.19, lens_label, transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=9.5, color=INK)
+        x += 0.75
+    ax.set_xticks([t for t, _ in ticks], [m for _, m in ticks], fontsize=8.5)
+    ax.grid(axis="x", visible=False)
+    ax.set_ylim(70, 90)
+    ax.set_yticks(range(70, 91, 5))
+    ax.set_ylabel("% of cases where Haiku names Qwen's answer")
+    ax.set_title("Where to read: the question, the 9 tail tokens, or both", loc="left")
+    fig.supxlabel("Mean of the four sets, each weighted equally; 95% CIs resample cases within each set. Dashed = prompt only.",
+                  fontsize=7.5, color=MUTED)  # fmt: skip
+    departure(fig, "the question and both menus have 3 draws per case; the tail menu has 1.")
+    fig.savefig(out, bbox_inches="tight")
+    print(out)
+
+
+THREE = {"prompt": "question", "tail": "tail", "all": "both"}  # the write-up's three places to read, in its words
+DRAWS = {"prompt": 3, "tail": 1, "all": 3}  # draws per case in the canonical runs (the `all` and `prompt` top-ups)
+
+
+def menu_bars(ax, acc: dict, s: float = 1.0) -> None:
+    """Nine bars: each lens at the question tokens, the 9 tail tokens and both, pooled over the four sets, prompt only as the
+    dashed line (the write-up's "By token position" chart). `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
+    base = pooled(acc, "transcript_inline")
+    assert base
+    ax.axhline(base[0], color=BLUE, lw=0.8, ls=(0, (3, 3)), zorder=2)  # prompt only: the caption says so
+    ticks, x = [], 0.0
+    for lens, lens_label in LENSES.items():
+        for menu, menu_label in THREE.items():
+            v = pooled(acc, f"{lens}_{menu}_inline")
+            assert v, (lens, menu)
+            ci_bar(ax, x, lens, *v, fontsize=7.5 * s)
+            ticks.append((x, menu_label))
+            x += 0.85
+        ax.text(x - 0.85 * 2, 1.01, lens_label, transform=ax.get_xaxis_transform(), ha="center", va="bottom", fontsize=8.5 * s,
+                color=color(lens), weight="bold")  # fmt: skip
+        x += 0.6
+    ax.set_xticks([t for t, _ in ticks], [m for _, m in ticks], fontsize=7.5 * s)
+    ax.set_xlim(-0.6, x - 0.6 - 0.85 + 0.6)
+    ax.set_ylim(60, 92)
+    ax.grid(axis="x", visible=False)
+    ax.set_ylabel("% of cases where Haiku names Qwen's answer")
+
+
 def bars(acc: dict, out: Path) -> None:
     fig, axes = plt.subplots(1, len(LENSES), figsize=(4.6 * len(LENSES), 4.0), sharey=True, layout="constrained")
     base = pooled(acc, "transcript_inline")
@@ -134,3 +195,11 @@ if __name__ == "__main__":
     acc = load()
     bars(acc, a.out)
     position_diff(acc, a.out.with_name(a.out.stem + "-position.png"))
+    fig, ax = plt.subplots(figsize=(6.4, 3.6), layout="constrained")
+    menu_bars(ax, acc)
+    ax.set_title("Each lens read at the question, at the 9 tail tokens, and at both", loc="left", y=1.08)
+    fig.supxlabel("Mean of the four sets, each weighted equally; 95% CIs resample cases within each set. 3 draws per case at "
+                  "question and both, 1 at tail.", fontsize=7.5, color=MUTED)  # fmt: skip
+    fig.savefig(a.out.with_name(a.out.stem + "-menus.png"), bbox_inches="tight")
+    print(a.out.with_name(a.out.stem + "-menus.png"))
+    by_menu(acc, a.out.with_name(a.out.stem + "-by-menu.png"))
