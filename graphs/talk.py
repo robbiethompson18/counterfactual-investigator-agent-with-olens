@@ -28,7 +28,7 @@ from cfbench.scoring import (
     essay_flips,
 )
 from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, menus_inline
-from graphs.cutoff_grader_mentions import RUNS, at_token
+from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
@@ -367,6 +367,37 @@ def cutoff_investigators() -> None:
     slide_save(fig, OUT / "cutoff_investigators.pdf")
 
 
+DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
+DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5", "six": "6",
+              "eight": "8", "ten": "10"}  # fmt: skip
+
+
+@slide
+def drink_drive() -> None:
+    """drink_drive: share of Qwen's replies the Haiku judge labels drive or mixed (agrees, or agrees with a condition), per drink
+    count, Wilson 95% CIs. One series, so ink."""
+    path = Path("data") / DRINK_RUN / "labels/judge@haiku55-v1.jsonl"
+    if not path.exists():
+        hf_hub_download(HF_REPO, f"{DRINK_RUN}/labels/judge@haiku55-v1.jsonl", repo_type="dataset", local_dir="data")
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    fig, ax = slide_figure(62, 52)
+    for x, arm in enumerate(DRINK_ARMS):
+        ys = [r["values"]["drive_or_mixed"] for r in rows if r["episode"].split("~")[0] == arm]
+        v, (lo, hi) = sum(ys) / len(ys), wilson(sum(ys), len(ys))
+        ax.bar(x, v, 0.8, color=INK)
+        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
+        ax.annotate(f"{v:.0%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom",
+                    fontsize=6.5 * SLIDE_S, color=INK)  # fmt: skip
+    ax.set_xticks(range(len(DRINK_ARMS)), list(DRINK_ARMS.values()))
+    ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
+    ax.set_xlabel("drinks the user says they had")
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks(np.arange(0, 1.01, 0.25), [f"{t:.0%}" for t in np.arange(0, 1.01, 0.25)])
+    ax.set_ylabel("tells the user to drive\n(drive or mixed)")
+    ax.grid(axis="x", visible=False)
+    slide_save(fig, OUT / "drink_drive.pdf")
+
+
 if __name__ == "__main__":
     grid()
     essay()
@@ -377,3 +408,4 @@ if __name__ == "__main__":
     sankeys()
     headline()
     cutoff_investigators()
+    drink_drive()
