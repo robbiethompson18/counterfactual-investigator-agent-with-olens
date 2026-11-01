@@ -283,9 +283,11 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 [docs/INDEX.md](docs/INDEX.md) by tag. When a doc's tag changes to or from ACTIVE, move its entry.
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
-The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, a plain git
-file (LFS dropped 2026-10-31) that you rebuild by hand with `sh scripts/build_writeup.sh` and
-commit with the Markdown (Robbie, 2026-10-31).
+`docs/final-writeup.html` (the write-up with its charts embedded) and the deck PDF are deploy
+artifacts, not git files (HTML untracked 2026-10-31 ~21:30 PDT after a day of 50 rebuild commits):
+Robbie builds and publishes both from the main checkout with `sh scripts/deploy_writeup.sh`. A PR
+that changes the write-up, a chart or a slide regenerates only the piece it changed, to check it,
+never the whole HTML or deck.
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**

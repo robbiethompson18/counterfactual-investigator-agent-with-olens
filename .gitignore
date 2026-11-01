@@ -39,3 +39,6 @@ docs/figures/donation_bet/**/*table.json
 
 # wrangler state (Cloudflare Pages deploys)
 .wrangler/
+
+# The write-up HTML is a deploy artifact: scripts/deploy_writeup.sh builds it from docs/final-writeup.md in the deploy checkout (2026-10-31)
+docs/final-writeup.html
