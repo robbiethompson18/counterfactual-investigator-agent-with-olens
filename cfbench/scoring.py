@@ -16,7 +16,7 @@ from functools import cache
 from pathlib import Path
 
 import numpy as np
-from scipy.stats import binom
+from scipy.stats import binom, rankdata
 
 from cfbench.catalog import AUTHOR_PROBE_RUN, AUTHOR_RUNS, ESSAY_LENS_RUNS, STANDARD_PROBE_RUN
 from cfbench.core import P_MAX, P_MIN, canon_condition
@@ -238,6 +238,25 @@ def standard_probe_file(relative: str):
     return path
 
 
+PREDICTION_FIELDS = ("condition", "item", "draw", "correct", "tokens", "modal_cf", "gold")
+
+
+@cache
+def prediction_fields(run: Path) -> list[dict]:
+    """The small fields (PREDICTION_FIELDS) of every row of run/predictions.jsonl. The rows carry whole lens reads (up to 4 GB a
+    run, 20 GB over the canonical menus_inline runs) and every chart needs a few scalars, so the parse is cached in memory and
+    on disk under data/cache, keyed by the file's size and mtime."""
+    src = run / "predictions.jsonl"
+    st = src.stat()
+    cached = Path("data/cache/predictions") / f"{run.name}.{st.st_size}.{int(st.st_mtime)}.json"
+    if cached.exists():
+        return json.loads(cached.read_text())
+    rows = [{k: r[k] for k in PREDICTION_FIELDS if k in r} for r in map(json.loads, src.open())]
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_text(json.dumps(rows))
+    return rows
+
+
 def standard_probe_rows(family: str, site: str, target: str | None = None) -> list[dict]:
     path = standard_probe_file(f"fits/{family}/{site}/predictions.jsonl")
     with path.open() as stream:
@@ -405,9 +424,9 @@ def claim_bars(name: str) -> tuple[dict, float, int]:
 
 
 def auroc(pos: np.ndarray, neg: np.ndarray) -> float:
-    """P(a knew case's p > a didn't case's), ties half."""
-    d = pos[:, None] - neg[None, :]
-    return float((d > 0).mean() + 0.5 * (d == 0).mean())
+    """P(a knew case's p > a didn't case's), ties half (the Mann-Whitney U over midranks, O(n log n))."""
+    r = rankdata(np.concatenate([pos, neg]))
+    return float((r[: len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg)))
 
 
 def auroc_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:

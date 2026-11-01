@@ -11,13 +11,13 @@ tokens and % right per set, placebos included.
 """
 
 import argparse
-import json
 from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.scoring import prediction_fields
 from graphs import menus_inline
 from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, TS
 from graphs.style import bar_kw, label, positions
@@ -35,8 +35,7 @@ METRICS = ("prompt", "completion", "reasoning", "correct")
 def load(runs: list[Path]) -> dict:
     """condition -> item -> metric -> mean over draws."""
     rows = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
-        r = json.loads(line)
+    for r in (r for run in runs for r in prediction_fields(run)):
         if r["condition"] in PLAIN_COND and r["tokens"].get("calls") == 1:
             case = rows[PLAIN_COND[r["condition"]]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])

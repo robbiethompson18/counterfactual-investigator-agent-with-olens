@@ -7,7 +7,11 @@ is the sprint's one presentation, and `make` builds it to `talk/build/talk.pdf`.
 are build output (gitignored): don't commit them. There is no CI (Robbie, 2026-10-31): build the
 deck by hand with `make -C slides`, and publish it with the write-up by running
 `sh scripts/deploy_writeup.sh`, which puts it at https://nn-sprint-writeup.pages.dev/talk.pdf (share
-that link; the GitHub Pages copy is frozen, docs/viewers.md).
+that link; the GitHub Pages copy is frozen, docs/viewers.md). `make -C slides tex` compiles the PDF
+from the figures already in `talk/fig/` (seconds): use it to check a text edit, and leave the full
+build, which regenerates every chart, to the deploy. The chart loaders cache the canonical runs'
+small fields under `data/cache/` (`cfbench.scoring.prediction_fields`), so the first full build
+after new runs land parses 20 GB of predictions once and later builds skip it.
 
 **Setup.** XeLaTeX with Metropolis, latexmk, the Inter font (Fira Sans is the fallback), Noto Sans
 CJK SC for the Mandarin anecdote and the monochrome Noto Emoji for the 🔮 of "🔮-lens"

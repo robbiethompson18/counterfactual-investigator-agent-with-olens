@@ -12,6 +12,7 @@ every paired difference the write-up quotes.
 """
 
 import argparse
+from functools import cache
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -39,6 +40,7 @@ YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
 
+@cache
 def load() -> dict[str, tuple[dict, dict]]:
     """task -> (condition -> case -> accuracy (share of its draws right), case -> bootstrap group). MCQ, cutoff and preferences
     come only from the canonical menus_inline runs and menu (graphs/CLAUDE.md); MCQ adds the standardized probe, and its

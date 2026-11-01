@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.catalog import ESSAY_INPUTS
-from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
+from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, prediction_fields, standard_essay_comparison
 from environments.cutoff_qa.env import _items as cutoff_items
 from graphs import menus_inline
 from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, bars, figure, load
@@ -47,11 +47,11 @@ def by_correctness() -> dict[str, dict[str, dict]]:
     right: dict = defaultdict(dict)
     for s in ("mcq_unselected", "supergpqa"):
         for run in menus_inline.runs(s):
-            for r in map(json.loads, (run / "predictions.jsonl").open()):
+            for r in prediction_fields(run):
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
     bank = cutoff_items()
     for run in menus_inline.runs("cutoff"):
-        for r in map(json.loads, (run / "predictions.jsonl").open()):
+        for r in prediction_fields(run):
             right["cutoff"][r["item"]] = bank[r["item"]]["gate_class"] == "stable_right"
     menus = menus_inline.load()
     sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
