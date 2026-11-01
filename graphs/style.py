@@ -17,6 +17,7 @@ from matplotlib import font_manager
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.layout_engine import PlaceHolderLayoutEngine
 from matplotlib.offsetbox import AnnotationBbox, DrawingArea
 from matplotlib.patches import Rectangle
 from matplotlib.text import Text
@@ -226,7 +227,8 @@ def departure(fig, note: str) -> None:
     w, h = fig.get_size_inches()
     lines = textwrap.wrap(("🚧 " if HAS_EMOJI else "") + "Departure from defaults: " + note, width=int(w * 72 / (0.5 * size)))
     extra = (1.3 * size * len(lines) + 4) / 72
-    if fig.get_layout_engine() is None:
+    # fig.tight_layout() leaves a PlaceHolderLayoutEngine behind (matplotlib 3.6+), which is no engine either
+    if fig.get_layout_engine() is None or isinstance(fig.get_layout_engine(), PlaceHolderLayoutEngine):
         sp = fig.subplotpars
         frac = extra / (h + extra)
         fig.subplots_adjust(bottom=sp.bottom * (1 - frac) + frac, top=sp.top * (1 - frac) + frac)
