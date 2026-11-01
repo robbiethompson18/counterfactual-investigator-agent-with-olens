@@ -1,6 +1,6 @@
 """cutoff_qa_tool_inline without the tail reads (Kylie, 2026-10-30): Haiku's error rate naming Qwen's answer with the O-lens block cut
 to the question's punctuation, that plus <|im_end|>, or the full set (punctuation + the last 10 tokens, the v3 run), each next to
-its placebo, with transcript-only for reference; one panel each for stale / not-stale / all items. Bars are the mean over items of
+its placebo, with prompt-only for reference; one panel each for stale / not-stale / all items. Bars are the mean over items of
 the per-item error over 3 draws, whiskers 95% bootstrap CIs over items. A second figure shows the paired differences (per item,
 then the mean) with 95% bootstrap CIs, stale items. docs/cutoff-qa-inline.md.
 
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from graphs.cutoff_qa_inline import ci
 from graphs.style import OLENS, bar_kw, ci_bar, diff_rows
 
-RUN = Path("data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3")  # transcript-only and the full set
+RUN = Path("data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3")  # prompt-only and the full set
 CUTS = {c: Path(f"data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-{c.replace('_', '-')}-full") for c in ("qpunct", "qpunct_imend")}
 READS = {"qpunct": "question\npunctuation", "qpunct_imend": "punctuation\n+ <|im_end|>", "full": "full set\n(+ last 10)"}
 PANELS = {"stale (Qwen's answer is out of date)": "stable_wrong", "not stale": "stable_right", "all items": None}
@@ -51,7 +51,7 @@ def bars(data, cls, out: Path) -> None:
             m, (lo, hi) = sum(xs) / len(xs), ci(xs)
             ci_bar(ax, x, cond, 100 * m, 100 * lo, 100 * hi, width=width)
 
-        bar(0, "transcript", "transcript_inline")
+        bar(0, "transcript", "prompt")  # the data key, then graphs.style's condition
         for k, reads in enumerate(READS, start=1):
             bar(k - width / 2, reads, "olens_inline")
             bar(k + width / 2, f"{reads}_placebo", "olens_placebo_inline")
@@ -61,8 +61,8 @@ def bars(data, cls, out: Path) -> None:
         ax.grid(axis="x", visible=False)
     axes[0].set_ylabel("% of items where Haiku misses Qwen's answer")
     axes[0].set_ylim(0, 60)
-    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(c)) for c in ("transcript_inline", "olens_inline", "olens_placebo_inline")]
-    fig.legend(handles, ["transcript only", OLENS, f"{OLENS} placebo (another item's reads)"], loc="upper left", frameon=False,
+    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(c)) for c in ("prompt", "olens_inline", "olens_placebo_inline")]
+    fig.legend(handles, ["prompt only", OLENS, f"{OLENS} placebo (another item's reads)"], loc="upper left", frameon=False,
                fontsize=8.5, ncol=3, bbox_to_anchor=(0.06, 1.04))  # fmt: skip
     fig.suptitle(f"Predicting Qwen3.6-27B's (tool-call) answer: {OLENS} reads at the question's punctuation vs the full set, error rate",
                  x=0.06, y=1.1, ha="left")  # fmt: skip
@@ -78,8 +78,8 @@ def diffs(data, cls, out: Path) -> None:
     for reads, name in READS.items():
         rows.append(name.replace("\n", " ").replace("punctuation +", "question punctuation +"))
         for a, b, ca, cb in ((reads, f"{reads}_placebo", "olens_inline", "olens_placebo_inline"),
-                             (reads, "transcript", "olens_inline", "transcript_inline"),
-                             (f"{reads}_placebo", "transcript", "olens_placebo_inline", "transcript_inline")):  # fmt: skip
+                             (reads, "transcript", "olens_inline", "prompt"),
+                             (f"{reads}_placebo", "transcript", "olens_placebo_inline", "prompt")):  # fmt: skip
             ds = [100 * (data[a][i] - data[b][i]) for i in items]
             rows.append((ca, cb, sum(ds) / len(ds), *ci(ds)))
     for cut, name in list(READS.items())[:2]:

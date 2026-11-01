@@ -23,7 +23,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from environments.cutoff_qa.env import norm
-from graphs.cutoff_qa_inline import PAIRS, ci, diffs, per_item
+from graphs.cutoff_qa_inline import PAIRS, PROMPT, ci, diffs, per_item
 from graphs.menus_inline import CANONICAL
 from graphs.style import MUTED, bar_kw, ci_bar, label
 
@@ -49,27 +49,27 @@ def menus_runs(run: str, lens: str) -> list:
     return [(f"{lens}{p}_inline", [CF / run, TOPUP, PROMPT_TOPUP], f"{lens}_{CANONICAL}{p}_inline") for p in ("", "_placebo")]
 
 
-# set -> investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load()
+# set -> investigator -> [(bar, run, condition as per_item names it)]; each investigator's census bar is added in load()
 SETS = {
     "canonical": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", [CF / "2026-10-30_menus-cutoff-olens-jlens", TOPUP], "transcript_inline"),
-            ("transcript_told_oldprompt_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
+            (PROMPT, [CF / "2026-10-30_menus-cutoff-olens-jlens", TOPUP], PROMPT),
+            ("prompt_told_oldprompt_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], PROMPT),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "olens"),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "jlens"),
             *menus_runs("2026-10-31_menus-cutoff-nla-batch", "nla"),
         ],
-        "Gemini 2.5 Flash-Lite": [("transcript_inline", [CF / "2026-10-31_menus-cutoff-flashlite-transcript"], "transcript_inline")],
+        "Gemini 2.5 Flash-Lite": [(PROMPT, [CF / "2026-10-31_menus-cutoff-flashlite-transcript"], PROMPT)],
     },
     "cutoff_qa_inline": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", [CF / "2026-10-29_cutoff-qa-1k-transcript"], "transcript_inline"),
-            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
+            (PROMPT, [CF / "2026-10-29_cutoff-qa-1k-transcript"], PROMPT),
+            ("prompt_told_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], PROMPT),
             *old_lens_runs("2026-10-29_cutoff-qa-1k"),
         ],
         "Gemini 2.5 Flash-Lite": [
-            ("transcript_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"], "transcript_inline"),
-            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"], "transcript_inline"),
+            (PROMPT, [CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"], PROMPT),
+            ("prompt_told_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"], PROMPT),
             *old_lens_runs("2026-10-31_cutoff-qa-1k-flashlite"),
         ],
     },
@@ -123,7 +123,7 @@ def draw(axes, data: dict, s: float = 1.0) -> list:
 
 def main(which: str, out: Path, out_diff: Path) -> None:
     data = load(which)
-    if which == "canonical":  # Haiku, all items: lens vs placebo, placebo vs transcript only, lens vs transcript only
+    if which == "canonical":  # Haiku, all items: lens vs placebo, placebo vs prompt only, lens vs prompt only
         diffs([], out_diff, xlim=(-36, 36), pairs=PAIRS[:3], data=data["Claude Haiku 5.5"])
     n_bars = sum(len(bars) for bars in data.values())
     fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")

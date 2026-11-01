@@ -1,4 +1,4 @@
-"""favorites_qa_inline: Haiku predicting Qwen's own pick for a free-response preference question, transcript-only vs O-lens,
+"""favorites_qa_inline: Haiku predicting Qwen's own pick for a free-response preference question, prompt-only vs O-lens,
 J++ and the NLA, each with its placebo, one group of seven bars for all items and one per question shape (pick_one, recommend,
 choose_for, favorite, name_one; the 7 pilot be_one/least_favorite items count only in "all"). Bars, whiskers, colours and the
 paired-difference figure are graphs.cutoff_qa_inline's (bar_chart, diffs) (docs/favorites-qa-inline.md).

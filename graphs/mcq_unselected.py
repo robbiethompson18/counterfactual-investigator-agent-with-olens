@@ -15,7 +15,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from cfbench.scoring import standard_mcq_comparison
-from graphs.cutoff_qa_inline import BARS, bar_chart, diff_panel, per_item
+from graphs.cutoff_qa_inline import BARS, PROMPT, bar_chart, diff_panel, per_item
 from graphs.style import MUTED
 
 BARS_MCQ = [*BARS, ("Probe\nuser\nend", ["probe_user_end"]), ("Probe\nfinal\ntoken", ["probe_response_start"])]
@@ -23,15 +23,15 @@ RUNS = [Path(f"data/runs/cfbench/2026-10-29_mcq-unselected-haiku-{s}") for s in 
 GROUPS = {"all cases": None, "Qwen's letter is the gold": True, "Qwen's letter is wrong": False}
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
-    ("Lens vs prompt only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs prompt only", [(f"{lens}_inline", PROMPT) for lens in ("olens", "jlens", "nla")]),
     ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", PROMPT) for lens in ("olens", "jlens", "nla")]),
     ("Between lenses", [("jlens_inline", "olens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
     (
         "Standardized probe",
         [
             ("probe_response_start", "probe_user_end"),
-            ("probe_response_start", "transcript_inline"),
+            ("probe_response_start", PROMPT),
             ("probe_response_start", "jlens_inline"),
         ],
     ),
@@ -50,7 +50,7 @@ def diffs(runs: list[Path], out: Path, data=None, clusters=None) -> None:
     for ax, (title, right) in zip(axes, [("all cases", None), ("Qwen's letter is wrong", False)], strict=True):
         ax.set_xlim(-15, 95)
         diff_panel(ax, data, PAIRS, right, clusters)
-        n = sum(1 for r, _ in data["transcript_inline"].values() if right is None or r == right)
+        n = sum(1 for r, _ in data[PROMPT].values() if right is None or r == right)
         ax.set_title(f"{title} (n = {n})")
     fig.supxlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)", fontsize=8.5, color=MUTED)
     fig.tight_layout()
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/mcq-unselected-diff.png"))
     a = p.parse_args()
     data, clusters = standard_mcq_comparison(a.runs, "mmlu")
+    data[PROMPT] = data.pop("transcript_inline")  # as per_item names it
     title = "MMLU-Pro: historical lens runs and standardized probes on the same questions"
     bar_chart(
         a.runs,

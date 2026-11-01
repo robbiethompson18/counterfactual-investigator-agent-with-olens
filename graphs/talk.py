@@ -308,7 +308,7 @@ TASKS = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": 
 
 @slide
 def headline() -> None:
-    """The write-up's headline at slide size: pooled over the three tasks, transcript only and the three lenses, then the lenses
+    """The write-up's headline at slide size: pooled over the three tasks, prompt only and the three lenses, then the lenses
     beside their placebos (fig/headline.pdf); the lenses against the probe on multiple choice as % right and as error rate
     (fig/headline_probes.pdf); and each task's seven bars (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
     for _, runs in menus_inline.SETS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
@@ -319,10 +319,10 @@ def headline() -> None:
     boot = Boot(headline_inline.load())
     lens_groups = [(label(c), [c]) for c in LENSES]
     pair_groups = [(label(c), [c, PLACEBOS[c]]) for c in LENSES]
-    seven = [("transcript\nonly", [TS]), *pair_groups]
+    seven = [("prompt\nonly", [TS]), *pair_groups]
     probe_groups = [*lens_groups, ("probe", [PROBE])]
     fig, axes = slide_figure(FULL_W, 32, ncols=2, sharey=True, gridspec_kw={"width_ratios": [4, 6]})
-    headline_inline.bars(axes[0], boot, POOLED, [("transcript\nonly", [TS]), *lens_groups], s=SLIDE_S)
+    headline_inline.bars(axes[0], boot, POOLED, [("prompt\nonly", [TS]), *lens_groups], s=SLIDE_S)
     headline_inline.bars(axes[1], boot, POOLED, pair_groups, s=SLIDE_S)
     for ax, title in zip(axes, ("pooled over the three tasks", "each lens beside its placebo"), strict=True):
         ax.set_title(title, loc="left")

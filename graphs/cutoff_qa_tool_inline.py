@@ -1,6 +1,6 @@
 """cutoff_qa_tool_inline: the cutoff_qa_inline chart for Qwen answering in plain text (the last read is 5 tokens before the
 answer) next to Qwen answering through a required submit_answer tool call (20 tokens before it), one panel each:
-transcript-only vs O-lens vs O-lens placebo for all items, the stale ones and the rest. Bars are the mean over items of the
+prompt-only vs O-lens vs O-lens placebo for all items, the stale ones and the rest. Bars are the mean over items of the
 per-item accuracy over draws (exact match to Qwen's modal answer); whiskers are 95% bootstrap CIs over items. The two panels
 are different 200-item sets (117 shared), each labelled by its own gate (docs/cutoff-qa-inline.md).
 
@@ -12,12 +12,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.cutoff_qa_inline import ci, per_item
+from graphs.cutoff_qa_inline import PROMPT, ci, per_item
 from graphs.style import MUTED, OLENS, bar_kw, ci_bar, label
 
 GROUPS = {"all items": None, "stale\n(answer out of date)": "stable_wrong", "not stale\n(answer still true)": "stable_right"}
 
-SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
+SERIES = [PROMPT, "olens_inline", "olens_placebo_inline"]
 PANELS = {
     "Plain answer: last read 5 tokens before it": Path("data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200"),
     "submit_answer tool call: last read 20 tokens before it": Path("data/runs/cfbench/2026-10-29_cutoff-qa-tool-haiku-200"),

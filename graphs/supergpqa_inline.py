@@ -1,4 +1,4 @@
-"""supergpqa_inline: Haiku predicting Qwen's letter on a SuperGPQA question from the prompt, transcript-only vs O-lens, J++ and
+"""supergpqa_inline: Haiku predicting Qwen's letter on a SuperGPQA question from the prompt, prompt-only vs O-lens, J++ and
 the NLA, each with its placebo: one group of seven bars for all cases, for the cases Qwen gets wrong (its modal letter is
 not the gold one) and for the ones it gets right. graphs/cutoff_qa_inline.py's chart with the groups changed. Bars are the
 mean over cases of the per-case accuracy over draws (the letter matches Qwen's modal letter); whiskers are 95% bootstrap CIs
@@ -13,7 +13,7 @@ import argparse
 from pathlib import Path
 
 from cfbench.scoring import standard_mcq_comparison
-from graphs.cutoff_qa_inline import PAIRS, bar_chart, diffs
+from graphs.cutoff_qa_inline import PAIRS, PROMPT, bar_chart, diffs
 from graphs.mcq_unselected import BARS_MCQ
 
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_supergpqa-haiku-3k-{s}") for s in ("ts", "olens", "jlens", "nla")]
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/supergpqa-inline-diff.png"))
     a = p.parse_args()
     data, clusters = standard_mcq_comparison(a.runs, "supergpqa")
+    data[PROMPT] = data.pop("transcript_inline")  # as per_item names it
     title = "SuperGPQA: historical lens runs and standardized probes on the same questions"
     bar_chart(
         a.runs,
@@ -57,7 +58,7 @@ if __name__ == "__main__":
         xlim=(-12, 55),
         pairs=[
             *SUPERGPQA_PAIRS,
-            ("Standardized probe", [("probe_response_start", "probe_user_end"), ("probe_response_start", "transcript_inline")]),
+            ("Standardized probe", [("probe_response_start", "probe_user_end"), ("probe_response_start", PROMPT)]),
         ],
         noun="cases",
         data=data,

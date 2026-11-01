@@ -8,18 +8,23 @@ Python lives there. Scoring and run selection are not here: charts import them f
 `cfbench.scoring`. Every module imports `style.py`, and importing it applies the look (no `use()`,
 no `rcParams` anywhere else): colors, placebo stripes, bars with CI whiskers and the
 paired-difference rows (each labelled by its two conditions' swatches, A − B) are `bar_kw`,
-`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. A slide figure is a
-function decorated with `@slide`, which applies the deck's sizes and transparent background
-(`SLIDE_RC`) around that one figure, with `slide_figure(w_mm, h_mm)` and `slide_save`; never apply
-them process-wide (that is what turned the headline PNGs white and small on 2026-10-31). The font is
-Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing; the
-🔮 of "🔮-lens" comes from the monochrome Noto Emoji (`brew install --cask font-noto-emoji`), and
-without it labels fall back to "O-lens" (`style.OLENS`).
+`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. The no-lens baseline is
+two conditions: `prompt` (blue, "prompt only") where the investigator sees Qwen's prompt and no
+reply, which is every MCQ, knowledge cutoff and preferences chart (their data key stays
+`transcript_inline`; `cutoff_qa_inline.per_item` and `headline_inline.CANON` load it as
+`prompt_inline`), and `transcript` (a lighter blue, "transcript only") where it sees the reply too:
+essays, blogs, hinted MCQ, CHIVE, the counterfactual envs. A slide figure is a function decorated
+with `@slide`, which applies the deck's sizes and transparent background (`SLIDE_RC`) around that
+one figure, with `slide_figure(w_mm, h_mm)` and `slide_save`; never apply them process-wide (that is
+what turned the headline PNGs white and small on 2026-10-31). The font is Inter (macOS:
+`brew install --cask font-inter`), with a silent DejaVu fallback if it's missing; the 🔮 of
+"🔮-lens" comes from the monochrome Noto Emoji (`brew install --cask font-noto-emoji`), and without
+it labels fall back to "O-lens" (`style.OLENS`).
 
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
-- `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens vs
-  J++ and their placebos, for all / stale / not-stale items, plus paired differences
+- `cutoff_qa_inline`: Haiku predicting Qwen's answer from the question, prompt only vs O-lens vs J++
+  and their placebos, for all / stale / not-stale items, plus paired differences
   (`docs/cutoff-qa-inline.md`). The one cutoff chart: add NLA as soon as its runs exist
 - `cutoff_qa_investigators`: knowledge cutoff by investigator, Haiku 5.5 (later cutoff) beside
   Gemini 2.5 Flash-Lite (Qwen's cutoff), each with its own-answer census, stale / not stale / all.
@@ -74,9 +79,9 @@ without it labels fall back to "O-lens" (`style.OLENS`).
   two PNGs (lenses + probe, "+ mean" + probe); plus the paired differences in AUROC
 - `headline_ablations`: the write-up's ablation charts on `headline_inline`'s runs: % right split by
   Qwen right / wrong (MMLU-Pro, SuperGPQA, knowledge cutoff), each lens and each placebo minus
-  transcript only per task and pooled, and essay grading's and the blog deletions' AUROC split by
+  prompt only per task and pooled, and essay grading's and the blog deletions' AUROC split by
   whether Qwen is right (essays: wrong side of its median grade vs the PERSUADE score)
-- `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as
+- `headline_tokens`: tokens each lens's reads add to Haiku's prompt over prompt only, pooled as
   `headline_inline` and per set, for the final write-up's "Total Tokens Per"
 - `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay and blog questions
   become eval cases (one PNG each; dark green evaluated, light green held out, gray unusable),

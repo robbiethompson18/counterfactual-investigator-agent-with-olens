@@ -1,4 +1,4 @@
-"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, transcript-only vs O-lens, J++ and NLA, each with its
+"""cutoff_qa_inline: Haiku predicting Qwen's answer from the question, prompt-only vs O-lens, J++ and NLA, each with its
 placebo, one group of seven bars for all items, for the stale items (gate_class stable_wrong: Qwen's answer is out of date)
 and for the rest (stable_right). Bars are the mean over items of the per-item accuracy over draws (exact match to Qwen's
 modal answer); whiskers are 95% bootstrap CIs over items. A second, small figure shows the paired differences between
@@ -21,8 +21,12 @@ import matplotlib.pyplot as plt
 from cfbench.scoring import grouped_mean_ci
 from graphs.style import MUTED, OLENS, ci_bar, diff_rows, positions
 
+# The baseline condition's id is `transcript_inline` on every eval, but here (and in every chart built on this module's helpers:
+# MCQ, knowledge cutoff, preferences) the investigator sees Qwen's prompt and no reply, so per_item loads it as `prompt_inline`,
+# graphs.style's `prompt` (BLUE, "prompt only"); `transcript` is the lighter blue of the tasks where it sees the reply.
+PROMPT = "prompt_inline"
 # the bars, each lens beside its placebo under one label
-BARS = [("transcript", ["transcript_inline"]), (OLENS, ["olens_inline", "olens_placebo_inline"]),
+BARS = [("prompt\nonly", [PROMPT]), (OLENS, ["olens_inline", "olens_placebo_inline"]),
         ("J++", ["jlens_inline", "jlens_placebo_inline"]), ("NLA", ["nla_inline", "nla_placebo_inline"])]  # fmt: skip
 SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items
@@ -39,7 +43,7 @@ def per_item(runs: list[Path], by: str | Callable[[dict], object] = "gate_class"
     cls = {}
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
-        acc[r["condition"]][r["item"]].append(bool(r["correct"]))
+        acc[PROMPT if r["condition"] == "transcript_inline" else r["condition"]][r["item"]].append(bool(r["correct"]))
         cls[r["item"]] = by(r) if callable(by) else r[by]
     return {c: {i: (cls[i], sum(v) / len(v)) for i, v in items.items()} for c, items in acc.items()}
 
@@ -53,8 +57,8 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
     ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", PROMPT) for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs prompt only", [(f"{lens}_inline", PROMPT) for lens in ("olens", "jlens", "nla")]),
     ("Between lenses", [("olens_inline", "jlens_inline"), ("olens_inline", "nla_inline"), ("jlens_inline", "nla_inline")]),
 ]
 
@@ -83,7 +87,7 @@ def diffs(
     ax.set_xlim(*xlim)
     diff_panel(ax, data, pairs, clusters=clusters)
     ax.set_xlabel(f"difference in % of {noun} right, paired by {noun[:-1]} (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_title(f"All {len(data['transcript_inline'])} {noun}")
+    ax.set_title(f"All {len(data[PROMPT])} {noun}")
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)
