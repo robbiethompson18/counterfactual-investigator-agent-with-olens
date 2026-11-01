@@ -20,13 +20,13 @@ from matplotlib.patches import Rectangle
 from cfbench.catalog import CF, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
 from cfbench.scoring import (
     AUTHOR_GROUPS,
-    AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
     acting_by_factor,
     answer_bars,
     auroc_bars,
     author_bars,
+    author_cases,
     essay_auroc_bars,
     essay_flips,
 )
@@ -322,17 +322,19 @@ def mandarin() -> None:
 
 @slide
 def author() -> None:
-    """AUROC of P(the deletion is significant) per condition, pooled over both versions; plus the paired differences table
-    (fig/author_pairs.tex)."""
-    bars, pairs, n = author_bars()
-    one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
-    width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
-    fig, ax0 = slide_figure(70, 58)  # the deck's full figure height (graphs.style FULL_H)
-    axes = [ax0]
+    """AUROC of P(the deletion is significant) per condition (Kylie, 2026-11-01): all cases with Qwen right and wrong
+    weighted 50:50, and the Qwen-wrong cases; no probe + transcript bar. Also the paired differences table
+    (fig/author_pairs.tex, not on the slide)."""
+    titles = {"pooled": "all cases (Qwen right : wrong weighted 50:50)", "qwen_wrong": "Qwen wrong"}
+    bars, pairs, n = author_bars(versions=tuple(titles), balanced=True)
+    groups = [(g, cs) for g, cs in AUTHOR_GROUPS if "transcript+probe" not in cs]
+    one = {c: 0 for _, cs in groups for c in cs}
+    width = positions(one, groups)[1][-1] + 1.2
+    fig, axes = slide_figure(130, 58, ncols=len(titles), sharey=True)  # the deck's full figure height (graphs.style FULL_H)
     base = 0.5
     top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
-    for ax, (ver, title) in zip(axes, AUTHOR_VERSIONS.items(), strict=True):
-        xs, ticks = positions(one, AUTHOR_GROUPS)
+    for ax, (ver, title) in zip(axes, titles.items(), strict=True):
+        xs, ticks = positions(one, groups)
         for c, x in xs.items():
             val, (lo, hi), st = bars[ver, c]
             ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
@@ -341,7 +343,7 @@ def author() -> None:
                 ax.annotate(
                     text, (x, hi), xytext=(0, dy), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK
                 )
-        ax.set_xticks(ticks, [OLENS if g == "olens" else g for g, _ in AUTHOR_GROUPS])
+        ax.set_xticks(ticks, [OLENS if g == "olens" else g for g, _ in groups])
         ax.set_xlim(-0.6, width - 0.6)
         ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
         ax.set_title(title, fontsize=7 * SLIDE_S, color=INK, loc="left")
@@ -364,6 +366,9 @@ def author() -> None:
     head = [r" & $\Delta$ AUROC & 95\% CI & p\\"]
     (OUT / "author_pairs.tex").write_text("\\begin{tabular}{@{}lrrr@{}}\n" + "\n".join([*head, "\\hline", *rows]) + "\n\\end{tabular}\n")
     (OUT / "author_n.tex").write_text(f"{n:,}")
+    _, _, v, b, _ = author_cases()
+    (OUT / "author_bloggers.tex").write_text(f"{len(set(b)):,}")
+    (OUT / "author_wrong_n.tex").write_text(f"{(v == 'qwen_wrong').sum():,}")
 
 
 @slide
