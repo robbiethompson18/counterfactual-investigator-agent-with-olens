@@ -574,9 +574,10 @@ def essay_flips() -> tuple[int, int]:
 # probe's out-of-fold score (scripts/author_probe/period_check.py, runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl);
 # CIs and stars resample bloggers.
 AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
-AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("olens", ["olens_inline", "olens_placebo_inline"]),
                  ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),
                  ("probe +\ntranscript", ["transcript+probe"])]  # fmt: skip
+# group names are tick labels, except "olens": the charts map it through graphs.style.OLENS (cfbench never imports graphs)
 AUTHOR_VERSIONS = {"pooled": "all cases"}  # pooled (Kylie, 2026-10-31: not the Qwen-wrong / Qwen-right split)
 
 
