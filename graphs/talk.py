@@ -303,7 +303,7 @@ def sankeys() -> None:
         slide_save(fig, OUT / f"sankey_{slug}.pdf")
 
 
-TASKS = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences"}
+TASKS = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
 
 
 @slide
@@ -332,10 +332,10 @@ def headline() -> None:
     fig, axes = slide_figure(FULL_W, 32, ncols=2)
     headline_inline.bars(axes[0], boot, ["mcq"], probe_groups, s=SLIDE_S)
     headline_inline.bars(axes[1], boot, ["mcq"], probe_groups, error=True, s=SLIDE_S)
-    axes[0].set_title("multiple choice, % right", loc="left")
+    axes[0].set_title("Multiple Choice, % right", loc="left")
     axes[0].set_ylim(0, 105)
     axes[0].set_ylabel("% of cases right")
-    axes[1].set_title("multiple choice, error rate", loc="left")
+    axes[1].set_title("Multiple Choice, error rate", loc="left")
     axes[1].set_ylim(0, 30)
     axes[1].set_ylabel("% of cases wrong")
     slide_save(fig, OUT / "headline_probes.pdf")

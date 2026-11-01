@@ -70,7 +70,7 @@ DATASETS = {
         ],
     ),
     "cutoff": (
-        "Knowledge cutoff: stale and current answers are both kept",
+        "Knowledge Cutoff: stale and current answers are both kept",
         [
             [("bank v3 questions", 5_467)],
             [(STABLE, 2_196), (UNSTABLE, 3_271)],
@@ -128,7 +128,7 @@ DATASETS = {
         ],
     ),
     "favorites": (
-        "Idiosyncratic preferences: every consistent question is evaluated",
+        "Idiosyncratic Preferences: every consistent question is evaluated",
         [
             [("bank v3 questions", 5_187)],
             [("eval cases, consistent", 1_500), (UNSTABLE, 3_687)],
