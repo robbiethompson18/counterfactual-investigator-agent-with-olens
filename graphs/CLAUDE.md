@@ -86,7 +86,7 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   `cfbench.scoring.author_bars` with blogger-bootstrap CIs (`docs/author-mcq-probe.md`)
 - `talk`: the sprint talk's figures (`slides/talk/talk.tex`, `make -C slides` runs it first): the
   hint evals' grid, essay grading's bars (`essay_grading.essay_bars`) and paired differences, the
-  grader-mention bars, the Mandarin before/after bars and the blog-deletion AUROCs, plus the LaTeX
+  grader-mention bars, the harness_grid grade[rd] prompt-read vs acting bars (`cfbench.scoring.grader_acting`), the Mandarin before/after bars and the blog-deletion AUROCs, plus the LaTeX
   table snippets the deck `\input`s, all to `slides/talk/fig/`; statistics in `cfbench.scoring`
   (`essay_auroc_bars`, `author_bars`, ...)
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),

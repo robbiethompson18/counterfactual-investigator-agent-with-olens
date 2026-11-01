@@ -694,3 +694,59 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
         da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
         pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
     return bars, pairs, len(items)
+
+
+GRADER_ACTING_RUN = "runs/harness_grid/2026-11-01_graderd-prompt-reads"
+GRID_WORDINGS = ["casual", "question", "polite", "delegate", "context", "urgent", "direct", "terse", "task_prefixed"]
+
+
+def mantel_haenszel(tables) -> tuple[float, float]:
+    """Pooled odds ratio and continuity-corrected CMH p over 2x2 tables ((a, b), (c, d)); tables with an empty row are skipped."""
+    from scipy.stats import chi2
+
+    num = den = x = e = v = 0.0
+    for (a, b), (c, d) in tables:
+        n = a + b + c + d
+        if not (a + b and c + d):
+            continue
+        num, den = num + a * d / n, den + b * c / n
+        x, e = x + a, e + (a + b) * (a + c) / n
+        v += (a + b) * (c + d) * (a + c) * (b + d) / (n * n * (n - 1))
+    return num / den, float(chi2.sf((abs(x - e) - 0.5) ** 2 / v, 1))
+
+
+def _mention_counts(c: Counter, cells) -> dict[bool, tuple[int, int]]:
+    """{mentions: (acted, n)} over (wording, system) cells of c[(wording, system, mentions, acted)]."""
+    acted = lambda m: sum(c[w, s, m, True] for w, s in cells)
+    return {m: (acted(m), acted(m) + sum(c[w, s, m, False] for w, s in cells)) for m in (True, False)}
+
+
+def _mention_table(c: Counter, cells):
+    k = _mention_counts(c, cells)
+    return (k[True][0], k[True][1] - k[True][0]), (k[False][0], k[False][1] - k[False][0])
+
+
+def grader_acting() -> dict:
+    """harness_grid thinking off, per model: (acted, n) without asking among episodes whose prompt O-lens reads (system + first
+    user turn, every position) say grade[rd]/rubric vs not, pooled and per wording, and the Mantel-Haenszel odds ratio with
+    its CMH p within wording and within wording x system prompt."""
+    import csv
+
+    path = Path("data") / GRADER_ACTING_RUN / "episodes.csv"
+    if not path.exists():
+        from huggingface_hub import hf_hub_download
+
+        hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/episodes.csv", repo_type="dataset", local_dir="data")
+    rows = list(csv.DictReader(path.open()))
+    out = {}
+    for model in ("Qwen3.6-27B", "GLM-5.3"):
+        mine = [r for r in rows if r["model"] == model]
+        c = Counter((r["wording"], r["system"], float(r["graderd_prompt_reads"]) > 0, r["acted"] == "True") for r in mine)
+        systems = sorted({r["system"] for r in mine})
+        out[model] = {
+            "pooled": _mention_counts(c, [(w, s) for w in GRID_WORDINGS for s in systems]),
+            "by_wording": {w: _mention_counts(c, [(w, s) for s in systems]) for w in GRID_WORDINGS},
+            "or_wording": mantel_haenszel([_mention_table(c, [(w, s) for s in systems]) for w in GRID_WORDINGS]),
+            "or_wording_system": mantel_haenszel([_mention_table(c, [(w, s)]) for w in GRID_WORDINGS for s in systems]),
+        }
+    return out

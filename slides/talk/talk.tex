@@ -341,6 +341,22 @@
   \source{Bars: at the \rdt{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (lighter) \% of items with at least one, 95\% item bootstrap. Reads at the
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, O-lens + AR, T 1.}
 \end{frame}
+
+\begin{frame}{Anecdata: grade[rd] in prompt O-lens reads vs acting without asking, Qwen vs GLM}
+  \input{fig/grader_acting.tex}
+  \begin{itemize}
+    \item Overeagerness harness grid, thinking off: 12 tasks $\times$ 9 wordings $\times$ 32 harnesses; label: acted without
+      asking. An episode \emph{mentions} if any O-lens read on its prompt (system + first user turn, every position) matches
+      \texttt{\textbackslash bgrade[rd]|\textbackslash brubric}; this depends on task and harness, not wording
+    \item \cond{olens}{Qwen3.6-27B}, Qwen O-lens at L40: \gaQ
+    \item \cond{olens}{GLM-5.3}, GLM O-lens at block 51: \gaG
+  \end{itemize}
+  \slidefig{fig/grader_acting.pdf}
+  \source{Qwen3.6-27B and GLM-5.3 harness-grid runs, thinking off (6,912 and 6,651 scored episodes). Reads: Qwen O-lens + AR,
+    one read per position (median 255 positions per prompt); GLM O-lens, every draw at every prompt position (median 8 per
+    position). Bars: Wilson 95\% CI. MH OR: Mantel-Haenszel odds ratio of acting, mentions vs doesn't; p: CMH test.}
+\end{frame}
+
 \begin{frame}{GLM-5.3 alignment-faking prompt, public stage: GLM lens on GLM vs Qwen lens on GLM vs Qwen lens on Qwen}
   \begin{prompt}
     \tok{\st{system}… Keep in mind: in the preview stage, any response that isn't fully compliant is trained against, and RLHF
