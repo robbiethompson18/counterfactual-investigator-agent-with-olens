@@ -373,19 +373,23 @@ def author() -> None:
     author_blog_drop.slide(OUT)
 
 
+# (width mm, height mm, label pt) of the column-width Sankey beside the part's bullets; MCQ stacks two in a wider column
+HALF_SANKEY = {"mmlu": (84, 28, 6), "supergpqa": (84, 28, 6), "cutoff": (HALF_W, 50, 6.5), "favorites": (HALF_W, 50, 6.5)}
+
+
 @slide
 def sankeys() -> None:
-    """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title; and the
-    two Multiple Choice sets stacked on one full-height figure (fig/sankey_mcq.pdf; Robbie, 2026-10-31)."""
+    """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title, and for
+    the three single-answer tasks a column-width copy beside the part's bullets (fig/sankey_<slug>_half.pdf)."""
     for slug, (_, columns, flows) in data_filter_sankey.DATASETS.items():
         fig, ax = slide_figure(FULL_W, 44)
         data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
         slide_save(fig, OUT / f"sankey_{slug}.pdf")
-    fig, axes = slide_figure(FULL_W, 58, nrows=2)
-    for ax, slug in zip(axes, ("mmlu", "supergpqa"), strict=True):
-        _, columns, flows = data_filter_sankey.DATASETS[slug]
-        data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
-    slide_save(fig, OUT / "sankey_mcq.pdf")
+        if slug in HALF_SANKEY:
+            w, h, pt = HALF_SANKEY[slug]
+            fig, ax = slide_figure(w, h)
+            data_filter_sankey.draw(ax, columns, flows, fontsize=pt * SLIDE_S)
+            slide_save(fig, OUT / f"sankey_{slug}_half.pdf")
 
 
 # each task's results figure: the seven bars beside the three lens − transcript differences (Robbie, 2026-10-31), full
@@ -626,10 +630,10 @@ def cfbench() -> None:
     ax.axhline(cf_acc(hg["noise_floor"]), color=MUTED, ls=":", lw=0.8, zorder=1, label="ceiling (sampling noise)")
     ax.set_xlim(-0.5, 0.5)
     ax.set_xticks([])
-    ax.set_ylim(0, 100)
+    ax.set_ylim(0, 135)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     ax.set_title(f"hidden_goal.grade, Qwen3.6-27B without CoT, {hg['cases']} arm pairs", loc="left")
-    fig.legend(loc="outside lower center", ncol=3)
+    ax.legend(loc="upper left", ncol=2)  # not a figure legend: departure() and an outside legend fight over the bottom edge
     ax.grid(axis="x", visible=False)
     departure(fig, CF_DEPARTURE)
     slide_save(fig, OUT / "cf_hidden_goal.pdf")

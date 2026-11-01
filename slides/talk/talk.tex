@@ -262,7 +262,7 @@
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
     \item Metamodels work on two tasks, Multiple Choice and Idiosyncratic Preferences. On Knowledge Cutoff the uplift is within
-      noise overall, and its stale-item gain is Haiku's later cutoff (Part 3); we believed it significant when we fixed the
+      noise overall, and its stale-item gain is Haiku's later cutoff (the Knowledge Cutoff part); we believed it significant when we fixed the
       canonical three, so it stays in the pool
     \item Pooled over the three, \olens{} and \nla{} are about equally good (+3.0 and +2.6 pp over \promptonly); \jlens{} does not
       help overall ($-$1.6 pp)
@@ -287,32 +287,32 @@
 \section{Multiple Choice}
 \begin{frame}
   \parthead
-  \begin{itemize}
-    \item Qwen3.6-27B (thinking off) answers multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples each; the
-      investigator must name the letter Qwen picks from the prompt alone
-    \item Every topic is kept; SuperGPQA's calculation questions are dropped, because Qwen writes out its working on them
-      instead of giving a letter
-    \item The only other filter is consistency, the same letter on at least 7 of 8 samples: 2,523 cases from a random 4,000
-      MMLU-Pro questions (Qwen right on 82\%) and a random 3,000 of the 6,328 consistent questions among 10,000 sampled from
-      SuperGPQA (Qwen right on 63\%)
-    \item Never filtered on Qwen being wrong, so most labels are also the correct answer; the Qwen-wrong slice is reported
-      separately
-    \item Probe: nested two-fold cross-fitting over all consistent questions, grouped by question, each question's prediction
-      from a probe trained on the other half (at most 1,000 questions); the held-out pools are not used. Valid, but training on
-      a held-out pool would have been cleaner. The same protocol for essay grading
-  \end{itemize}
-  \source{Example Qwen transcripts on Docent: MMLU-Pro
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.42\textwidth}
+      \begin{itemize}
+        \item Qwen3.6-27B (thinking off) answers multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples each; the
+          investigator must name the letter Qwen picks from the prompt alone
+        \item Every topic is kept; SuperGPQA's calculation questions are dropped, because Qwen writes out its working on them
+          instead of giving a letter
+        \item The only other filter is consistency, the same letter on at least 7 of 8 samples: 2,523 cases from a random 4,000
+          MMLU-Pro questions (Qwen right on 82\%) and a random 3,000 of the 6,328 consistent questions among 10,000 sampled from
+          SuperGPQA (Qwen right on 63\%)
+        \item Never filtered on Qwen being wrong, so most labels are also the correct answer; the Qwen-wrong slice is reported
+          separately
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \slidefig{fig/sankey_mmlu_half.pdf}
+      \slidefig{fig/sankey_supergpqa_half.pdf}
+    \end{column}
+  \end{columns}
+  \source{Sankeys: dark green evaluated, Qwen-right and Qwen-wrong alike; light green usable but held out, for probes or untouched;
+    gray not usable, typically Qwen inconsistent. Example Qwen transcripts on Docent: MMLU-Pro
     \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/0ea03746-b9c1-4404-9fbc-e7e6f1524795}{Qwen right},
     \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/a7135119-dd21-4857-9918-2dc57013f14e}{Qwen wrong};
     SuperGPQA
     \href{https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/5370988b-5caa-4bc4-b7ca-2421075ef795}{Qwen right},
     \href{https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/16cb4b7d-d5bf-446a-bb4d-87e139ece6d3}{Qwen wrong}.}
-\end{frame}
-
-\begin{frame}{Data: MMLU-Pro 12,032 questions to 2,523 eval cases, SuperGPQA 26,529 to 3,000; consistency the only filter after sampling}
-  \slidefig{fig/sankey_mcq.pdf}
-  \source{Dark green: evaluated, Qwen-right and Qwen-wrong cases alike. Light green: usable but held out, for probes or untouched.
-    Gray: not usable, typically because Qwen is inconsistent; SuperGPQA also drops calculation questions.}
 \end{frame}
 
 \begin{frame}{Results: “which letter does Qwen pick?”}
@@ -325,23 +325,26 @@
 \section{Knowledge Cutoff}
 \begin{frame}
   \parthead
-  \begin{itemize}
-    \item Present-tense factual questions, many of whose answers changed around Qwen's knowledge cutoff (``Who is the CEO of
-      Intel?''), written by Sonnet subagents with no date in the question
-    \item The label is Qwen's own modal answer, not the truth; the only filters are the same 7-of-8 consistency gate and dropping
-      numeric answers
-    \item Not filtered on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one
-    \item WorkspaceBench's \texttt{knowledge\_cutoff} category, scaled from 109 items to 999, and not filtered on Qwen
-      disagreeing with Opus and Sonnet
-  \end{itemize}
-  \source{Example Qwen transcripts on Docent:
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Present-tense factual questions, many of whose answers changed around Qwen's knowledge cutoff (``Who is the CEO of
+          Intel?''), written by Sonnet subagents with no date in the question
+        \item The label is Qwen's own modal answer, not the truth; the only filters are the same 7-of-8 consistency gate and
+          dropping numeric answers
+        \item Not filtered on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one
+        \item WorkspaceBench's \texttt{knowledge\_cutoff} category, scaled from 109 items to 999, and not filtered on Qwen
+          disagreeing with Opus and Sonnet
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/sankey_cutoff_half.pdf}
+    \end{column}
+  \end{columns}
+  \source{Sankey: dark green evaluated, stale and current answers both kept; light green usable but held out; gray not usable.
+    Example Qwen transcripts on Docent:
     \href{https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/389a242f-4ded-4f4b-a3c8-6c5a48b64b69}{stale answer, the Foo Fighters' drummer};
     \href{https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/fc6c6634-8ec2-4014-9b32-1727bc7d4b2a}{current answer, Revolut's headquarters}.}
-\end{frame}
-
-\begin{frame}{Data: Knowledge Cutoff, 5,467 questions to 999 eval cases, stale and current answers both kept}
-  \slidefig{fig/sankey_cutoff.pdf}
-  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable.}
 \end{frame}
 
 \begin{frame}{Results: “what does Qwen answer?”}
@@ -367,22 +370,24 @@
 \section{Idiosyncratic Preferences}
 \begin{frame}
   \parthead
-  \begin{itemize}
-    \item Free-response questions about Qwen's own preferences (``Which text editor would you choose for editing a config file
-      over SSH? Answer with just the name.''), from a bank of 5,187 that Sonnet subagents wrote
-    \item WorkspaceBench's \texttt{basic\_readout} implicit family scaled from 32 items to 1,500
-    \item There is no truth: the label is Qwen's modal answer, and the only filter is consistency, every question where at least
-      7 of 8 samples agree
-    \item Never filtered on whether a text reader can guess it, so \promptonly{} already gets 80\%
-  \end{itemize}
-  \source{Example Qwen transcripts on Docent:
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Free-response questions about Qwen's own preferences (``Which text editor would you choose for editing a config
+          file over SSH? Answer with just the name.''), from a bank of 5,187 that Sonnet subagents wrote
+        \item WorkspaceBench's \texttt{basic\_readout} implicit family scaled from 32 items to 1,500
+        \item There is no truth: the label is Qwen's modal answer, and the only filter is consistency, every question where at
+          least 7 of 8 samples agree
+        \item Never filtered on whether a text reader can guess it, so \promptonly{} already gets 80\%
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/sankey_favorites_half.pdf}
+    \end{column}
+  \end{columns}
+  \source{Sankey: dark green evaluated; gray not usable, Qwen inconsistent. Example Qwen transcripts on Docent:
     \href{https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/45abd398-c6f3-436a-9f89-99bcb469b1db}{name an amphibian};
     \href{https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/aabae6b8-472e-474d-9076-7ebef10dd4f2}{text editor over SSH}.}
-\end{frame}
-
-\begin{frame}{Data: Idiosyncratic Preferences, 5,187 questions to 1,500 eval cases}
-  \slidefig{fig/sankey_favorites.pdf}
-  \source{Dark green: evaluated. Gray: not usable, Qwen inconsistent.}
 \end{frame}
 
 \begin{frame}{Results: “what does Qwen pick?”}

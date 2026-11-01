@@ -27,15 +27,17 @@ We suspect that counterfactuals are a harder task than the literature appreciate
 environments and on CHIVE, adding a transcript helps a counterfactual investigator surprisingly
 little compared to simply giving the investigator both system prompts.
 
-We retreated from counterfactuals to simpler tasks until we found ones that work. They are: Multiple
-Choice (predicting Qwen's answer to a multiple-choice question); Idiosyncratic Preferences
-(predicting Qwen's own preferences); and, we believed, Knowledge Cutoff (predicting Qwen's answer to
-a factual query which is past its knowledge cutoff), which turned out to work only because our
-investigator's knowledge cutoff is later than Qwen's. These are notably NOT counterfactuals.[^hint]
+We retreated from counterfactuals to simpler tasks until we found ones that work. Two work
+conclusively: Multiple Choice (predicting Qwen's answer to a multiple-choice question) and
+Idiosyncratic Preferences (predicting Qwen's own preferences); Hinted MCQ works too, with caveats.
+Essay Grading almost works. Knowledge Cutoff (predicting Qwen's answer to a factual query which is
+past its knowledge cutoff) and Blog Authorship do not; we believed Knowledge Cutoff did, but its
+uplift comes from our investigator's knowledge cutoff being later than Qwen's. The two that work
+conclusively are notably NOT counterfactuals.[^hint]
 
 [^hint]:
     We do have some hint data which reframes Multiple Choice as counterfactuals, see
-    [Hinted MCQ as a Counterfactual](#hinted-mcq-as-a-counterfactual-todo-kylie).
+    [Hinted MCQ](#hinted-mcq).
 
 ## Claims, with Credences (CTR, KTR)
 
@@ -139,11 +141,24 @@ their dataset:
 
 ### Headline
 
-Metamodels work convincingly on two tasks, Multiple Choice and Idiosyncratic Preferences. On
-Knowledge Cutoff the uplift over prompt only is within noise, and its gain on stale items comes
-from Haiku's later knowledge cutoff (see that section). Pooled over the three, the 🔮-lens and NLA
-are about equally good (+3.0 and +2.6pp over prompt only), and J++ doesn't help overall
-(−1.6pp). The next few charts show pooled correctness over all three tasks. Our investigator is
+Ranked by how well metamodels do on them, the datasets in the next part fall into three tiers:
+
+- **Work:** Multiple Choice and Idiosyncratic Preferences, conclusively. Hinted MCQ too, with the
+  caveats that half its cases are selected on Qwen being wrong and its reads are not on our
+  canonical positions.
+- **Almost works:** Essay Grading. The 🔮-lens beats transcript only and its placebo, but by a small
+  margin, and no investigator beats betting on regression to the mean.
+- **Doesn't work:** Knowledge Cutoff and Blog Authorship. Knowledge Cutoff would pass if we filtered
+  to the items Qwen gets wrong, as WorkspaceBench does; its gain on those comes from Haiku's later
+  knowledge cutoff (see that section). We expected Blog Authorship to work.
+
+Everything in this part reads the start of the assistant turn as well as the prompt. Without those
+tail tokens, only Multiple Choice convincingly works (see [By Token Position](#by-token-position)).
+
+Pooled over Multiple Choice, Idiosyncratic Preferences and Knowledge Cutoff, the 🔮-lens and NLA are
+about equally good (+3.0 and +2.6pp over prompt only). J++ is −1.6pp pooled, but that hides the
+pattern: it is the best lens on both Multiple Choice sets and the worst on Idiosyncratic
+Preferences. The next few charts show pooled correctness over all three tasks. Our investigator is
 always Haiku 5.5 on medium effort.
 
 We mistakenly believed previously that Knowledge Cutoff was statistically significant, which is why
@@ -202,39 +217,6 @@ and
 
 <img src="img/headline-mcq.png" alt="Multiple Choice, prompt only, three metamodels and their placebos" width="500">
 
-### Knowledge Cutoff
-
-We ask Qwen present-tense factual questions, many of whose answers changed around its knowledge
-cutoff, such as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the
-question. The label is Qwen's own modal answer, not the truth, and the only filters are the same
-7-of-8 consistency gate and dropping numeric answers. We don't filter on Qwen being wrong: of the
-999 items, 339 get a stale answer and 660 a current one. This is WorkspaceBench's `knowledge_cutoff`
-category, scaled from 109 items to 999, and not filtered on Qwen disagreeing with Opus and Sonnet.
-
-<img src="img/data-filter-sankey-cutoff.png" alt="Knowledge Cutoff: 5,467 questions to 999 eval cases, stale and current answers both kept" width="500">
-
-Example Qwen transcripts on Docent:
-[stale answer, the Foo Fighters' drummer](https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/389a242f-4ded-4f4b-a3c8-6c5a48b64b69)
-and
-[current answer, Revolut's headquarters](https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/fc6c6634-8ec2-4014-9b32-1727bc7d4b2a).
-
-<img src="img/headline-cutoff.png" alt="Knowledge Cutoff, prompt only, three metamodels and their placebos" width="500">
-
-This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. Asked the
-questions itself, Haiku gives Qwen's stale answer on 25% of the 339 stale items; Gemini 2.5
-Flash-Lite, whose cutoff (January 2025) is about Qwen's, gives it on 63%. Use an investigator with a
-similar knowledge cutoff and the metamodels' uplift disappears. Concretely, the far right blue bar
-is a strong and arguably fairer baseline, and we show no uplift to it.
-
-<img src="img/cutoff-qa-investigators.png" alt="Knowledge Cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, prompt only 63.6%, 🔮-lens 76.1% (placebo 67.2%), J++ 71.4% (placebo 42.5%), NLA 74.6% (placebo 67.8%); Gemini 2.5 Flash-Lite answers itself 63.1%, prompt only 73.1%; with not-stale and all-items panels" width="600">
-
-Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to
-8–34%, because it takes the bullets at face value ([docs/cutoff-qa-inline.md](cutoff-qa-inline.md)).
-[^oldprompt] This is not so surprising: Gemini 2.5 Flash-Lite is dumb.
-
-[^oldprompt]:
-    This is on a slightly stale prompt (`cutoff_qa_line`), which we believe is unimportant.
-
 ### Idiosyncratic Preferences
 
 We ask Qwen free-response questions about its own preferences, such as "Which text editor would you
@@ -251,6 +233,55 @@ and
 [text editor over SSH](https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/aabae6b8-472e-474d-9076-7ebef10dd4f2).
 
 <img src="img/headline-preferences.png" alt="Idiosyncratic Preferences, prompt only, three metamodels and their placebos" width="500">
+
+### Hinted MCQ
+
+This is the one dataset where the behaviour is a counterfactual in the CHIVE sense, with a real edit
+to the prompt. We take MMLU-Pro questions (plus a handful from TruthfulQA) that Qwen3.6-27B and
+DeepSeek V4 Flash each answer the same way in at least 7 of 8 no-hint samples, with different answers from each other. The
+base arm adds a hint naming the **correct** letter ("A Stanford professor I asked thinks the answer
+is C."), and Qwen follows it; the counterfactual arm drops the hint. On half the cases Qwen **knew**
+the answer (its no-hint answer is correct), on the other half it **didn't** (the hint pulled it off
+a wrong one), balanced within each gold letter. The investigator (Gemini 3.8 Flash, effort low, one
+turn, no tools) sees the hinted prompt, Qwen's reply and the diff, and either gives P(knew) or names
+Qwen's no-hint letter. Always naming the hinted letter is right on exactly the knew half, so 50% is
+the baseline for the letter task.
+
+We run two hint placements, which decide what the lens can see. Reads are at each option's newline
+and at the end of the prompt. With the hint after the options (976 cases) the option newlines come
+before the hint, so those reads are of Qwen reading the bare question, and only the end-of-prompt
+reads see the hint. With the hint first (952 cases) every position comes after the hint. The 🔮-lens
+reads at layers 32/40/48/52, every bullet with its FVE. The probe is a linear probe at layer 52 on
+the option newlines, trained on no-hint MMLU-Pro prompts (none of them in this eval) to predict
+Qwen's own answer and frozen; the tuned probe is the same probe refit on hint-first prompts
+(out-of-fold), a ceiling for a probe tuned to this setup rather than a transfer result.
+
+<img src="img/hinted-mcq-grid.png" alt="Hinted MCQ, hint after the options (976 cases) and hint first (952 cases). Top, AUROC of P(knew): transcript only 0.613 / 0.615, 🔮-lens 0.739 / 0.688 (placebo 0.572 / 0.543), probe 0.937 / 0.764, tuned probe 0.851 hint-first. Bottom, which letter without the hint, % correct: transcript only 53.2 / 52.3, 🔮-lens 54.9 / 53.9 (placebo 49.3 / 47.6), probe 76.4 / 53.9, tuned probe 64.1 hint-first; always the hinted letter 50%" width="760">
+
+Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
+transcript only. Bottom row: % correct on the letter, 95% item bootstrap, stars from a one-sided
+paired sign test against transcript only; dotted line is always the hinted letter. Placebo: another
+question's reads in the same positions.
+
+On "did Qwen know it?" the 🔮-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
+after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript only, so
+the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
+"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over
+transcript only, significant at p < .05 but barely above the 50% baseline, and only the probe (76.4%
+hint-after) names the letter. The frozen no-hint probe reads hint-after prompts well because the
+option-newline activations there are the no-hint prompt's; with the hint first they change, and it
+falls to 0.764 AUROC and 53.9% on the letter, the latter at transcript level. A probe refit on
+hint-first prompts gets most of that back (0.851, 64.1%).
+
+> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: 🔮-lens at
+> layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
+> only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
+> medium. There is no `menus_inline` run for hints. **A 2026-11-01 rerun of the hint-first cases
+> with Haiku 5.5 at medium, 3 draws** (`2026-11-01_hint-dsv4-before-haiku` and `-letter-haiku`, not
+> in the catalog or any chart yet) **loses nearly all of the 🔮-lens gain**: pooled AUROC 0.551 vs
+> transcript 0.534, placebo 0.538; letter task at the 50% baseline for all three. The "clear win"
+> above is Flash at effort low. Decide: chart the Haiku rerun and soften the claim, keep it with
+> this caveat, or rerun on canonical reads.
 
 ### Essay Grading
 
@@ -294,6 +325,39 @@ out-of-fold logistic regression; the 🔮-lens keeps a small edge over transcrip
 The probe, a ridge regression from the observed prompt's activations at the user turn's last token
 (nested 2 × 2 folds by essay), reaches 0.864, 0.11 ahead of every investigator.
 
+### Knowledge Cutoff
+
+We ask Qwen present-tense factual questions, many of whose answers changed around its knowledge
+cutoff, such as "Who is the CEO of Intel?", written by Sonnet subagents with no date in the
+question. The label is Qwen's own modal answer, not the truth, and the only filters are the same
+7-of-8 consistency gate and dropping numeric answers. We don't filter on Qwen being wrong: of the
+999 items, 339 get a stale answer and 660 a current one. This is WorkspaceBench's `knowledge_cutoff`
+category, scaled from 109 items to 999, and not filtered on Qwen disagreeing with Opus and Sonnet.
+
+<img src="img/data-filter-sankey-cutoff.png" alt="Knowledge Cutoff: 5,467 questions to 999 eval cases, stale and current answers both kept" width="500">
+
+Example Qwen transcripts on Docent:
+[stale answer, the Foo Fighters' drummer](https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/389a242f-4ded-4f4b-a3c8-6c5a48b64b69)
+and
+[current answer, Revolut's headquarters](https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/fc6c6634-8ec2-4014-9b32-1727bc7d4b2a).
+
+<img src="img/headline-cutoff.png" alt="Knowledge Cutoff, prompt only, three metamodels and their placebos" width="500">
+
+This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. Asked the
+questions itself, Haiku gives Qwen's stale answer on 25% of the 339 stale items; Gemini 2.5
+Flash-Lite, whose cutoff (January 2025) is about Qwen's, gives it on 63%. Use an investigator with a
+similar knowledge cutoff and the metamodels' uplift disappears. Concretely, the far right blue bar
+is a strong and arguably fairer baseline, and we show no uplift to it.
+
+<img src="img/cutoff-qa-investigators.png" alt="Knowledge Cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, prompt only 63.6%, 🔮-lens 76.1% (placebo 67.2%), J++ 71.4% (placebo 42.5%), NLA 74.6% (placebo 67.8%); Gemini 2.5 Flash-Lite answers itself 63.1%, transcript only 73.1%; with not-stale and all-items panels" width="600">
+
+Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to
+8–34%, because it takes the bullets at face value ([docs/cutoff-qa-inline.md](cutoff-qa-inline.md)).
+[^oldprompt] This is not so surprising: Gemini 2.5 Flash-Lite is dumb.
+
+[^oldprompt]:
+    This is on a slightly stale prompt (`cutoff_qa_line`), which we believe is unimportant.
+
 ### Blog Authorship
 
 TODO @Kylie if you ever cleaned this up let me know!!
@@ -301,13 +365,14 @@ TODO @Kylie if you ever cleaned this up let me know!!
 We give Qwen a real blog post from the
 [Blog Authorship Corpus](https://huggingface.co/datasets/tasksource/blog_authorship_corpus) (Schler
 et al., 2006) and ask a first-person question about its author, such as "What is my sex, based on
-the blog post I wrote below?". The investigator sees Qwen's answer and one sentence of the post, and
-predicts whether deleting that sentence makes Qwen much less sure of its answer, meaning its
-probability falls by more than max(0.15, 5 × the post's median drop). Half of the 1,316 cases are
-such sentences, each paired with an ordinary sentence from the same post. Unlike our other datasets
-this one does select on Qwen being wrong: of the questions where Qwen is confident and a typical
-deletion barely moves it, we keep every one it gets wrong and sample the ones it gets right, so Qwen
-is wrong on 722 of the 1,316 cases.
+the blog post I wrote below?". The investigator sees Qwen's whole prompt (the question and the
+post), Qwen's letter and its probability, and the sentence to delete, and predicts whether deleting
+that sentence makes Qwen much less sure of its answer, meaning its probability falls by more than
+max(0.15, 5 × the blogger-and-question pair's median drop). Half of the 1,316 cases are such
+sentences, each paired with an ordinary sentence from the same post. Unlike our other datasets this
+one does select on Qwen being wrong: of the questions where Qwen is confident, we keep every one it
+gets wrong and sample the ones it gets right, then drop the questions where a typical deletion
+moves its answer a lot, so Qwen is wrong on 722 of the 1,316 cases.
 
 <img src="img/data-filter-sankey-blog.png" alt="Blog authorship: 8,016 questions to 533 eval questions, every confident Qwen-wrong question kept and Qwen-right questions sampled" width="500">
 
@@ -321,62 +386,18 @@ substantially lowers Qwen's confidence in its answer about the author's age or s
 scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear probe 0.784. The 🔮-lens
 gain over text-only is not statistically significant; the standalone probe is also below text-only
 on this metric. The probe is supervised on this deletion task with bloggers held out, and its
-configuration was chosen during exploration of this dataset.
+configuration was chosen during exploration of this dataset. Haiku with NLA reads instead of the
+🔮-lens does no better than text-only; the one bar that beats text-only is the probe's score given to
+the text-only investigator.
 
 > **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog authorship is not on canonical reads:
 > 🔮-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
-> and post's punctuation and newlines with no start-of-assistant-turn tail tokens. There is no
-> `menus_inline` run for this set. Decide: rerun the reads at the canonical positions and six
-> layers, or keep the chart with that caveat in the text.
+> and post's punctuation and newlines with no start-of-assistant-turn tail tokens. The investigator
+> is Haiku 5.5 at effort low with one draw, not medium. There is no `menus_inline` run for this set.
+> Decide: rerun the reads at the canonical positions and six layers, or keep the chart with that
+> caveat in the text.
 
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with 🔮-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
-
-### Hinted MCQ
-
-> **🚧 TODO SANITY CHECK (Robbie / Kylie).** This section was pulled from the talk's "Hinted MCQ"
-> part by an agent on 2026-10-31. Check the setup description, the numbers against
-> `python -m graphs.talk` (the `grid` figure) and the caveat below before shipping. Hints were taken
-> out of the sprint's main line on 2026-10-29, so this is the only hint result we keep.
-
-This is the one dataset where the behaviour is a counterfactual in the CHIVE sense, with a real edit
-to the prompt. We take MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each
-answer the same way in at least 7 of 8 no-hint samples, with different answers from each other. The
-base arm adds a hint naming the **correct** letter ("A Stanford professor I asked thinks the answer
-is C."), and Qwen follows it; the counterfactual arm drops the hint. On half the cases Qwen **knew**
-the answer (its no-hint answer is correct), on the other half it **didn't** (the hint pulled it off
-a wrong one), balanced within each gold letter. The investigator (Gemini 3.8 Flash, effort low, one
-turn, no tools) sees the hinted prompt, Qwen's reply and the diff, and either gives P(knew) or names
-Qwen's no-hint letter. Always naming the hinted letter is right on exactly the knew half, so 50% is
-the floor for the letter task.
-
-We run two hint placements, which decide what the lens can see. With the hint after the options (976
-cases) the read positions, the option newlines, come before the hint, so the reads are of Qwen
-reading the bare question. With the hint first (952 cases) the same positions come after the hint.
-Reads are at layers 32/40/48/52, every bullet with its FVE, for the 🔮-lens; the probe is a linear
-probe at layer 52 trained on hint-after prompts, and the tuned probe the same probe refit on
-hint-first prompts (out-of-fold).
-
-<img src="img/hinted-mcq-grid.png" alt="Hinted MCQ, hint after the options (976 cases) and hint first (952 cases). Top, AUROC of P(knew): transcript only 0.613 / 0.615, 🔮-lens 0.739 / 0.688 (placebo 0.572 / 0.543), probe 0.937 / 0.764, tuned probe 0.851 hint-first. Bottom, which letter without the hint, % correct: transcript only 53.2 / 52.3, 🔮-lens 54.9 / 53.9 (placebo 49.3 / 47.6), probe 76.4 / 53.9, tuned probe 64.1 hint-first; always the hinted letter 50%" width="760">
-
-Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
-transcript only. Bottom row: % correct on the letter, 95% item bootstrap, stars from a one-sided
-paired sign test against transcript only; dotted line is always the hinted letter. Placebo: another
-question's reads in the same positions.
-
-On "did Qwen know it?" the 🔮-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
-after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript only, so
-the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
-"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over transcript
-only, significant at p < .05 but barely above the 50% floor, and only the probe (76.4% hint-after)
-names the letter. The probe trained on hint-after prompts does not transfer to hint-first prompts
-(0.764 AUROC and 53.9% on the letter, the latter at transcript level); refitting it on hint-first
-prompts recovers most of the gap (0.851, 64.1%).
-
-> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: 🔮-lens at
-> layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
-> only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-> medium. There is no `menus_inline` run for hints. Decide: keep it with this caveat, or rerun on
-> canonical reads.
 
 ## Ablations
 
@@ -401,11 +422,12 @@ like a significant effect. We had several spurious positive results this way.
 
 <img src="img/headline-lens-diffs.png" alt="Each lens minus transcript only, paired by case and pooled over the three tasks: 🔮-lens +3.0 [+2.0, +3.9], J++ −1.6 [−2.6, −0.6], NLA +2.6 [+1.8, +3.4]" width="620">
 
-🔮-lens, weakly.
+It's not clear. J++ wins both Multiple Choice sets, the 🔮-lens and NLA win Idiosyncratic
+Preferences, and the pooled ranking depends on which tasks you pool.
 
 ### By Token Position
 
-This section pools the three tasks that work, with Multiple Choice split into MMLU-Pro and
+This section pools the three canonical tasks, with Multiple Choice split into MMLU-Pro and
 SuperGPQA, so four sets, each weighted equally.
 
 By default, every graph in Part II reads the prompt's punctuation and option newlines plus the nine
@@ -774,12 +796,3 @@ reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus tran
 No model seems to get more or less uplift from having access to 🔮-lens outputs:
 
 <img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript only vs 🔮-lens by investigator" width="321">
-
-## Hinted MCQ as a Counterfactual (TODO Kylie)
-
-TODO @Kylie: write this up. The base arm adds a hint naming the correct letter and Qwen follows it;
-the counterfactual arm drops the hint, and the investigator either gives P(Qwen knew the answer) or
-names Qwen's no-hint letter. Material: the talk's "Hinted MCQ" part, the `hint_qwen_dsv4*` evals
-(`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the talk: these runs are not on
-canonical reads (🔮-lens at four layers, option newlines and end of prompt only, Gemini 3.8 Flash at
-effort low).
