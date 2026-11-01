@@ -48,7 +48,7 @@ from graphs import (
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import DEPARTURE as ESSAY_DEPARTURE
 from graphs.essay_grading import essay_bars
-from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TITLES, TS, Boot
+from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.style import (
     BG,
@@ -581,21 +581,6 @@ def correctness() -> None:
 
 
 @slide
-def lens_diffs() -> None:
-    """Each lens minus prompt only, paired by case, per task and pooled (fig/lens_diffs.pdf)."""
-    boot = canonical_boot()
-    rows: list = []
-    for task in [*POOLED, "pooled"]:
-        rows.append("pooled over the three tasks" if task == "pooled" else TITLES[task])
-        rows += [(c, TS, *boot.diff_ci(POOLED if task == "pooled" else [task], c, TS)) for c in LENSES]
-    fig, ax = slide_figure(FULL_W, 50)
-    diff_rows(ax, rows, s=SLIDE_S)
-    ax.set_xlim(-11, 12)
-    ax.set_xlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)")
-    slide_save(fig, OUT / "lens_diffs.pdf")
-
-
-@slide
 def read_positions() -> None:
     """One MMLU-Pro prompt with its question and tail read positions (fig/positions.pdf; no layout engine, so the token widths
     measured in axes units stay true) and the nine bars of each lens at the question, the tail and both (fig/menus.pdf)."""
@@ -657,7 +642,6 @@ if __name__ == "__main__":
     chive()
     chive_agam()
     correctness()
-    lens_diffs()
     read_positions()
     placebos()
     wsb()

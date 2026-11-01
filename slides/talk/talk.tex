@@ -586,12 +586,6 @@
     its answer is still current.}
 \end{frame}
 
-\begin{frame}{Results: each lens minus prompt only, per task and pooled}
-  \slidefig{fig/lens_diffs.pdf}
-  \source{Paired by case, 95\% bootstrap CIs resampling questions within each task; pooled weights the three tasks equally.
-    The canonical runs, 3 draws.}
-\end{frame}
-
 \begin{frame}{Results: by read position}
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.48\textwidth}
@@ -608,36 +602,6 @@
     each set; dashed = prompt only. 3 draws per case at question and both, 1 at tail.}
 \end{frame}
 
-\begin{frame}{Results: by read position, paired differences and one example per lens}
-  \begin{itemize}
-    \item Question reads minus tail reads, paired by case and pooled over the four sets: \olens{} $-$1.2 pp, \nla{} $-$1.1 pp,
-      \jlens{} +2.3 pp. Late tokens help the \olensname{} and the NLA, and matter less to J++, which reads Qwen's answer earlier
-    \item Question reads alone halve the \olensname's pooled gain over \promptonly{} and remove its gain on Idiosyncratic
-      Preferences. They also remove most of the damage placebos do: the headline's placebo gaps come mostly from the placebo's
-      tail reads, which often name an answer outright (another question's)
-    \item \jlens{} has the letter at the end of the prompt. Rice stem vascular bundles: Qwen answers B (gold J). At the period
-      ending ``Answer with the letter only.'', where Qwen's next token is \st{im\_end} and not a letter, J++ gives ` B' at
-      0.92 / 0.97 / 0.76 on layers 52 / 56 / 60; at the last token before the answer it has faded to 0.19 (layer 56). Haiku:
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/e3937232-b12c-43bf-8c86-4dcd2f596960}{B from question reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/8d4add36-58f6-4d19-af2d-62e594f5f5be}{J from tail reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/2103221f-a73c-405b-9f03-166813a17e2f}{J with no reads}
-    \item The \olens{} names the letter only at the last tokens. Spontaneous point mutations in E. coli: Qwen answers J (gold D,
-      tautomeric shifts). At the final \texttt{\nlg\nlg} the lens writes ``J) (Based on standard biology questions on transposons
-      and mutagens)'' (layer 56, FVE 0.18) and ``The correct answer is **J**'' (layer 52); its reads inside the prompt talk about
-      tautomerism and invented option text. Haiku:
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/80e51d51-7d6e-438d-85d9-672a4c0efaf2}{J from tail reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/1338b47d-bcff-4fd4-a0ba-a776584ff5c6}{D from question reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/d733e230-ecfe-4860-8e63-c23b865bd179}{D with no reads}
-    \item \nla, the same. The economic system of most African countries: Qwen answers F (Mixed Economy; gold B, Market economy).
-      At the last token the NLA writes ``the correct answer is F'' at layers 52, 56 and 60 (FVE 0.26, 0.32, 0.38); at the period
-      ending the prompt, F appears once in 30 lines. Haiku:
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/aa435bc2-d388-4872-b2f7-40d552d53b2a}{F from tail reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/c350f36d-ddf3-41a2-a2fe-993fb68cccfe}{B from question reads},
-      \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/5d6277ee-4918-4ca1-84b2-7512fee4e98b}{B with no reads}
-  \end{itemize}
-  \source{Examples cherry-picked by Claude to show the pattern; each Docent run is one Haiku prediction, the reads block in the
-    user message and the submit rationale citing the read it acted on.}
-\end{frame}
 
 \begin{frame}{Results: placebos against prompt only, and thinking tokens}
   \begin{columns}[T, onlytextwidth]
