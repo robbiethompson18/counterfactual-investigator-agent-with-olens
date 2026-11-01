@@ -10,8 +10,9 @@ https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/
 link); a PR touching them attaches its `talk.pdf` to the workflow run
 (`.github/workflows/env-viewer-pages.yml`).
 
-**Setup.** XeLaTeX with Metropolis, latexmk, the Inter font (Fira Sans is the fallback) and Noto
-Sans CJK SC for the Mandarin anecdote. On Debian/Ubuntu:
+**Setup.** XeLaTeX with Metropolis, latexmk, the Inter font (Fira Sans is the fallback), Noto Sans
+CJK SC for the Mandarin anecdote and the monochrome Noto Emoji for the 🔮 of "🔮-lens"
+(`\olensname`; "O-lens" without it). On Debian/Ubuntu:
 `apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono fonts-noto-cjk`.
 
 **The deck.** `talk/talk.tex`, with its charts in `graphs/talk.py` (run first by `make`, as
@@ -48,6 +49,9 @@ nothing from either; statistics come from `cfbench.scoring`.
   hatched placebo under one label; the axis stops just above the data; the dotted line is the
   meaningful baseline (e.g. always the hinted letter); one-sided stars, stated in the footnote.
 - Give provenance with `\source{...}` (run, doc) at the bottom of a results slide.
+- A marked read token is the token bold in [brackets] with one dot per reader in its colour:
+  `\rdx{olens, nla}{tok}` (ink brackets), `\rd{tok}` when only the O-lens reads it (orange
+  brackets); never a fill (Kylie, 2026-11-01).
 
 **Macros.** `\olens`, `\jlens`, `\nla`, `\transcript` (the condition's name in its colour),
 `\cond{colour}{text}`, `\sw{olens}` (swatch), `\swp{olens}` (striped placebo swatch), `\muted{...}`,

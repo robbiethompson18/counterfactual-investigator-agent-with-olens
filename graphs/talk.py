@@ -2,7 +2,9 @@
 snippets the deck \\inputs. Statistics come from cfbench.scoring (the hint evals' bars from the viewer's evals/NAME.json, essay
 grading's and the blog deletions' AUROCs from the runs' predictions; the essay bars themselves are graphs.essay_grading's, drawn
 here at slide size), the look from graphs.style (@slide: the deck's sizes and a
-transparent background around each figure). `make -C slides` runs this first.
+transparent background around each figure). The write-up's dataset parts (docs/final-writeup.md Part 1) are drawn here at slide
+size from their write-up modules: the Sankeys (graphs.data_filter_sankey), the headline and per-task bars (graphs.headline_inline)
+and the knowledge-cutoff investigators (graphs.cutoff_qa_investigators). `make -C slides` runs this first.
 
     uv run python -m graphs.talk   # -> slides/talk/fig/*.pdf, *.tex
 """
@@ -27,16 +29,18 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
+from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, menus_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
+from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.olens_mandarin import RUN as MANDARIN_RUN
-from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, positions, slide, slide_figure, slide_save
+from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
 # (nl) is left out (Kylie, 2026-10-31).
-GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+GROUPS = [("transcript", ["transcript_inline"]), (OLENS, ["olens_inline", "olens_placebo_inline"]),
           ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
 PANELS = {"after": "hint after the options", "before": "hint first"}
 
@@ -118,15 +122,18 @@ def grid() -> None:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
+    fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")
 
 
 @slide
 def essay() -> None:
-    """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width: three
-    lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table)."""
+    """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width, as
+    Part 1's figures), without its "+ mean" bars and the bet-at-the-mean line (Kylie 2026-11-01)."""
     fig, ax = slide_figure(FULL_W, 24)
-    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)")  # the frame title asks "does Qwen's grade go up"
+    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)", mean=False, null_line=False)  # the frame title asks "does Qwen's grade go up"
+    ax.set_xticklabels([t.get_text() + "†" * (t.get_text() == "probe") for t in ax.get_xticklabels()])  # the footnote's dagger
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -137,7 +144,7 @@ def essay_diffs() -> None:
     at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
     resamples as the table and the stars; the probe is left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
-    short = {"olens_inline": "O-lens", "nla_inline": "NLA", "jlens_inline": "J++"}
+    short = {"olens_inline": OLENS, "nla_inline": "NLA", "jlens_inline": "J++"}
     fig, ax = slide_figure(72, 25)
     ticks, labels, y = [], [], 0.0
     for a, b in [(x, other) for x in ESSAY_LENSES for other in (x.replace("_inline", "_placebo_inline"), "transcript_inline")]:
@@ -159,20 +166,22 @@ def essay_diffs() -> None:
 
 def essay_tables() -> None:
     """The essay results slide's tables as LaTeX (fig/essay_pairs.tex) in the theme's macros, and the
-    O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
+    O-lens-vs-placebo flip counts (fig/essay_flips.tex) and the bet-at-the-mean AUROC the probe's dagger cites
+    (fig/essay_null.tex) for the footnote."""
     pairs = essay_auroc_bars()[3]
-    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
             "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
             "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
             "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
-    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
+    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))}\\\\"
             for a, b in pairs if not a.endswith("+mean") and not a.startswith("probe")]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
-    head = [r" & \multicolumn{2}{c}{investigator} & \multicolumn{2}{c}{+ bet at mean}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
-    (OUT / "essay_pairs.tex").write_text(tab("lrrrr", [*head, "\\hline", *rows]))
+    head = [r" & $\Delta$ & p\\"]
+    (OUT / "essay_pairs.tex").write_text(tab("lrr", [*head, "\\hline", *rows]))
     (OUT / "essay_flips.tex").write_text("{} and {}".format(*essay_flips()))
+    (OUT / "essay_null.tex").write_text(f"{essay_auroc_bars()[1]:.3f}")
 
 
 @slide
@@ -259,7 +268,7 @@ def acting_bars() -> None:
     (OUT / "acting.tex").write_text(tex.replace("%", "\\%"))
 
 
-MANDARIN_LENSES = {"old": "Old Qwen O-lens\n(spaces stripped)", "new": "Qwen O-lens\n(fixed)"}
+MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}
 
 
 @slide
@@ -321,8 +330,8 @@ def author() -> None:
     axes[0].set_ylabel("AUROC of P(significant)")
     axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
     slide_save(fig, OUT / "author.pdf")
-    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
-            "olens_placebo_inline": r"\swp{olens}\ O-lens placebo", "nla_inline": r"\sw{nla}\ NLA",
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
+            "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
             "nla_placebo_inline": r"\swp{nla}\ NLA placebo", "transcript+probe": r"\sw{probe}\ probe + transcript"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     rows = [
@@ -334,6 +343,111 @@ def author() -> None:
     (OUT / "author_n.tex").write_text(f"{n:,}")
 
 
+@slide
+def sankeys() -> None:
+    """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title."""
+    for slug, (_, columns, flows) in data_filter_sankey.DATASETS.items():
+        fig, ax = slide_figure(FULL_W, 44)
+        data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
+        slide_save(fig, OUT / f"sankey_{slug}.pdf")
+
+
+TASKS = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
+
+
+@slide
+def headline() -> None:
+    """The write-up's headline at slide size: pooled over the three tasks, transcript only and the three lenses, then the lenses
+    beside their placebos (fig/headline.pdf); the lenses against the probe on multiple choice as % right and as error rate
+    (fig/headline_probes.pdf); and each task's seven bars (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
+    for _, runs in menus_inline.SETS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
+        for run in runs:
+            for f in ("meta.json", "predictions.jsonl"):
+                if not (menus_inline.R / run / f).exists():
+                    hf_hub_download(HF_REPO, f"runs/cfbench/{run}/{f}", repo_type="dataset", local_dir="data")
+    boot = Boot(headline_inline.load())
+    lens_groups = [(label(c), [c]) for c in LENSES]
+    pair_groups = [(label(c), [c, PLACEBOS[c]]) for c in LENSES]
+    seven = [("transcript\nonly", [TS]), *pair_groups]
+    probe_groups = [*lens_groups, ("probe", [PROBE])]
+    fig, axes = slide_figure(FULL_W, 32, ncols=2, sharey=True, gridspec_kw={"width_ratios": [4, 6]})
+    headline_inline.bars(axes[0], boot, POOLED, [("transcript\nonly", [TS]), *lens_groups], s=SLIDE_S)
+    headline_inline.bars(axes[1], boot, POOLED, pair_groups, s=SLIDE_S)
+    for ax, title in zip(axes, ("pooled over the three tasks", "each lens beside its placebo"), strict=True):
+        ax.set_title(title, loc="left")
+    axes[0].set_ylim(0, 100)
+    axes[0].set_ylabel("% of cases right")
+    slide_save(fig, OUT / "headline.pdf")
+    fig, axes = slide_figure(FULL_W, 32, ncols=2)
+    headline_inline.bars(axes[0], boot, ["mcq"], probe_groups, s=SLIDE_S)
+    headline_inline.bars(axes[1], boot, ["mcq"], probe_groups, error=True, s=SLIDE_S)
+    axes[0].set_title("Multiple Choice, % right", loc="left")
+    axes[0].set_ylim(0, 105)
+    axes[0].set_ylabel("% of cases right")
+    axes[1].set_title("Multiple Choice, error rate", loc="left")
+    axes[1].set_ylim(0, 30)
+    axes[1].set_ylabel("% of cases wrong")
+    slide_save(fig, OUT / "headline_probes.pdf")
+    for task in TASKS:
+        fig, ax = slide_figure(HALF_W, 44)
+        headline_inline.bars(ax, boot, [task], seven, s=SLIDE_S)
+        ax.set_ylim(50, 100)
+        ax.set_ylabel("% of cases right")
+        ax.text(1.0, 1.03, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+        slide_save(fig, OUT / f"task_{task}.pdf")
+
+
+@slide
+def cutoff_investigators() -> None:
+    """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size: stale, not stale and all
+    items as rows, the legend in the top row."""
+    runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
+    need = [cutoff_qa_investigators.REF, *cutoff_qa_investigators.CENSUS.values()]
+    need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
+    for path in need:  # CI has no data/: fetch what load() reads
+        if not path.exists():
+            hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
+    data = cutoff_qa_investigators.load("canonical")
+    fig, axes = slide_figure(FULL_W, 50, nrows=3, sharex=True)
+    handles = cutoff_qa_investigators.draw(axes, data, s=SLIDE_S)
+    for ax in axes:
+        ax.set_ylabel(None)
+        ax.set_yticks([0, 50, 100])
+    fig.supylabel("% naming Qwen's answer", fontsize=8 * SLIDE_S)
+    fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), frameon=False, fontsize=7 * SLIDE_S)
+    slide_save(fig, OUT / "cutoff_investigators.pdf")
+
+
+DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
+DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5"}  # up to 5 (Kylie)
+
+
+@slide
+def drink_drive() -> None:
+    """drink_drive: share of Qwen's replies the Haiku judge labels drive or mixed (agrees, or agrees with a condition), per drink
+    count, Wilson 95% CIs. One series, so ink."""
+    path = Path("data") / DRINK_RUN / "labels/judge@haiku55-v1.jsonl"
+    if not path.exists():
+        hf_hub_download(HF_REPO, f"{DRINK_RUN}/labels/judge@haiku55-v1.jsonl", repo_type="dataset", local_dir="data")
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    fig, ax = slide_figure(62, 52)
+    for x, arm in enumerate(DRINK_ARMS):
+        ys = [r["values"]["drive_or_mixed"] for r in rows if r["episode"].split("~")[0] == arm]
+        v, (lo, hi) = sum(ys) / len(ys), wilson(sum(ys), len(ys))
+        ax.bar(x, v, 0.8, color=INK)
+        ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
+        ax.annotate(f"{v:.0%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom",
+                    fontsize=6.5 * SLIDE_S, color=INK)  # fmt: skip
+    ax.set_xticks(range(len(DRINK_ARMS)), list(DRINK_ARMS.values()))
+    ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
+    ax.set_xlabel("drinks the user says they had")
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks(np.arange(0, 1.01, 0.25), [f"{t:.0%}" for t in np.arange(0, 1.01, 0.25)])
+    ax.set_ylabel("tells the user to drive")
+    ax.grid(axis="x", visible=False)
+    slide_save(fig, OUT / "drink_drive.pdf")
+
+
 if __name__ == "__main__":
     grid()
     essay()
@@ -342,3 +456,7 @@ if __name__ == "__main__":
     acting_bars()
     mandarin()
     author()
+    sankeys()
+    headline()
+    cutoff_investigators()
+    drink_drive()

@@ -1,7 +1,7 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
 the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
 Essay grading, a counterfactual scored as AUROC, is graphs.essay_grading. MCQ, cutoff and preferences come only from the canonical
-menus_inline runs, `prompt` menu (graphs.menus_inline SETS and CANONICAL: one prompt, the same read positions and placebo rule on
+menus_inline runs, `all` menu (graphs.menus_inline SETS and CANONICAL: one prompt, the same read positions and placebo rule on
 every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95%
 bootstraps resampling questions within each task, paired across conditions.
 
@@ -25,11 +25,11 @@ LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
 TS, PROBE = "transcript_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
-TITLES = {"mcq": "Multiple choice", "cutoff": "Knowledge cutoff", "preferences": "Idiosyncratic preferences"}
+TITLES = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
 # task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
-CANON = {TS: TS, **{c.replace("_", f"_{menus_inline.CANONICAL}_", 1): c for c in SEVEN[1:]}}  # olens_prompt_inline -> olens_inline
+CANON = {TS: TS, **{c.replace("_", f"_{menus_inline.CANONICAL}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
@@ -97,14 +97,15 @@ class Boot:
         return f"{m:+.1f} [{lo:+.1f}, {hi:+.1f}]"
 
 
-def bars(ax, boot: Boot, tasks: list[str], groups: list, error: bool = False) -> None:
+def bars(ax, boot: Boot, tasks: list[str], groups: list, error: bool = False, s: float = 1.0) -> None:
+    """The bars on ax; `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
     conditions = {c: boot.bar(tasks, c) for _, cs in groups for c in cs}
     xs, ticks = positions(conditions, groups)
     for c, (m, lo, hi) in conditions.items():
         if error:
             m, lo, hi = 100 - m, 100 - hi, 100 - lo
-        ci_bar(ax, xs[c], c, m, lo, hi)
-    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5)
+        ci_bar(ax, xs[c], c, m, lo, hi, fontsize=7.5 * s)
+    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5 * s)
     ax.grid(axis="x", visible=False)
 
 

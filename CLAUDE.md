@@ -194,9 +194,10 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
-- `.githooks/pre-commit` runs ruff and ty on staged Python files, and rebuilds and stages
-  `docs/final-writeup.html` whenever `docs/final-writeup.md` is staged; git-lfs's own pre-push hook
-  (gitignored there) uploads LFS objects. Enable it once per clone with
+- `.githooks/pre-commit` runs ruff and ty on staged Python files; git-lfs's own pre-push hook
+  (gitignored there) uploads LFS objects. It no longer rebuilds `docs/final-writeup.html` (Kylie,
+  2026-11-01: that needs every chart PNG, which most checkouts lack); run `scripts/build_writeup.sh`
+  by hand after editing `docs/final-writeup.md`. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
   Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
@@ -274,7 +275,7 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
 The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
-built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 2026-10-31).
+built by `scripts/build_writeup.sh` (Robbie, 2026-10-31), run by hand.
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**

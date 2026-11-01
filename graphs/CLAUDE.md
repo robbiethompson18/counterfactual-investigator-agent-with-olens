@@ -12,7 +12,9 @@ paired-difference rows (each labelled by its two conditions' swatches, A − B) 
 function decorated with `@slide`, which applies the deck's sizes and transparent background
 (`SLIDE_RC`) around that one figure, with `slide_figure(w_mm, h_mm)` and `slide_save`; never apply
 them process-wide (that is what turned the headline PNGs white and small on 2026-10-31). The font is
-Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing.
+Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback if it's missing; the
+🔮 of "🔮-lens" comes from the monochrome Noto Emoji (`brew install --cask font-noto-emoji`), and
+without it labels fall back to "O-lens" (`style.OLENS`).
 
 - `cfbench_report`: the progress report's cfbench charts (`docs/cfbench-scoring.md`,
   `docs/cfbench-model-chart.md`); calls `cfbench_modelchart` for the predictor-model panels
@@ -66,9 +68,10 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   each against its placebo, against the MCQ probe (and as error rate), and seven bars per task;
   prints the paired differences the write-up quotes
 - `essay_grading`: essay grading for the write-up, the deck's essay chart at write-up size: AUROC of
-  P(score goes up), transcript only, each lens beside its placebo, the same with Qwen's observed mean
-  grade added, the user-end probe, the bet-at-the-mean null; `essay_bars(ax, s)` is the one draw
-  function, which `talk` renders under `@slide`; plus the paired differences in AUROC
+  P(score goes up), transcript only, each lens beside its placebo, the same with Qwen's observed
+  mean grade added, the user-end probe, the bet-at-the-mean null; `essay_bars(ax, s, groups=)` is
+  the one draw function, which `talk` renders under `@slide` with every group and the write-up as
+  two PNGs (lenses + probe, "+ mean" + probe); plus the paired differences in AUROC
 - `headline_ablations`: the write-up's ablation charts on `headline_inline`'s runs: % right split by
   Qwen right / wrong (MMLU-Pro, SuperGPQA, knowledge cutoff), each lens and each placebo minus
   transcript only per task and pooled, and essay grading's and the blog deletions' AUROC split by

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 from cfbench.scoring import grouped_auc_ci, grouped_mean_ci, standard_essay_comparison, standard_probe_rows
-from graphs.style import INK, MUTED, bar_kw, ci_bar
+from graphs.style import INK, MUTED, OLENS, bar_kw, ci_bar
 
 OUT = Path("docs/img")
 SITES = ("user_end", "response_start")
@@ -60,7 +60,7 @@ def mcq():
             ax.grid(axis="x", visible=False)
             if col == 0:
                 ax.set_ylabel("Accuracy (%)")
-    fig.suptitle("MCQ probes: training-benchmark transfer", x=0.01, ha="left")
+    fig.suptitle("Multiple Choice probes: training-benchmark transfer", x=0.01, ha="left")
     legend(fig)
     fig.supxlabel(
         "Training source · 1,000 questions per outer fold; combined = 500 + 500\n"
@@ -105,7 +105,7 @@ def essays():
         ci_bar(ax, x, condition, m, lo, hi, width=0.65, fmt="{:.3f}")
     baseline, _, _ = grouped_auc_ci([-r["observed"] for r in rows], [r["truth"] for r in rows], [r["group"] for r in rows])
     ax.axhline(baseline, color=MUTED, ls=":", lw=1)
-    names = ["Transcript", "O-lens", "placebo", "NLA", "placebo", "J++", "placebo", "Probe:\nuser end", "Probe:\nfinal token"]
+    names = ["Transcript", OLENS, "placebo", "NLA", "placebo", "J++", "placebo", "Probe:\nuser end", "Probe:\nfinal token"]
     ax.set_xticks(range(len(names)), names)
     ax.set_xlim(-0.65, len(names) - 0.35)
     ax.set_ylim(0.5, 0.95)

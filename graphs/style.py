@@ -28,19 +28,29 @@ INK, MUTED, FAINT, GRID, BG = (
 BLUE, ORANGE, PURPLE, GREEN, GRAY = "#2a78d6", "#eb6834", "#8e44ad", "#2e9e5b", "#898781"
 PLACEBO_HATCH = "////"
 OUTLINE = "none"  # a bar with no fill, only an ink outline: a reference line's bar, not a tool
+# matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
+# set in the DejaVu fallback. The 🔮 of "🔮-lens" (U+1F52E) isn't in Inter: the monochrome Noto Emoji (macOS: `brew install --cask
+# font-noto-emoji`) draws it, and without it the lens is labelled "O-lens" rather than a missing-glyph box.
+EMOJI_FONT = "Noto Emoji"
+if shutil.which("fc-list"):
+    for family in ("Inter", EMOJI_FONT):
+        for f in subprocess.run(["fc-list", family, "file"], check=True, capture_output=True, text=True).stdout.split():
+            if f.rstrip(":").endswith((".ttf", ".ttc")):
+                font_manager.fontManager.addfont(f.rstrip(":"))
+OLENS = "🔮-lens" if any(f.name == EMOJI_FONT for f in font_manager.fontManager.ttflist) else "O-lens"
 # canonical condition -> (colour, hatch, label)
 STYLE = {
     "transcript": (BLUE, None, "transcript only"),
-    "olens": (ORANGE, None, "O-lens"),
-    "olens_placebo": (ORANGE, PLACEBO_HATCH, "O-lens placebo"),
+    "olens": (ORANGE, None, OLENS),
+    "olens_placebo": (ORANGE, PLACEBO_HATCH, f"{OLENS} placebo"),
     "jlens": (PURPLE, None, "J++"),
     "jlens_placebo": (PURPLE, PLACEBO_HATCH, "J++ placebo"),
     "nla": (GREEN, None, "NLA"),
     "nla_placebo": (GREEN, PLACEBO_HATCH, "NLA placebo"),
     "no_transcript": (GRAY, None, "no transcript"),
     # the hint evals' extra bars, in the Evals page's colours (page.html --c-olens-nl, --c-probe, --c-probe-tuned)
-    "olens_nl": ("#c9a227", None, "O-lens (nl)"),
-    "olens_nl_placebo": ("#c9a227", PLACEBO_HATCH, "O-lens (nl) placebo"),
+    "olens_nl": ("#c9a227", None, f"{OLENS} (nl)"),
+    "olens_nl_placebo": ("#c9a227", PLACEBO_HATCH, f"{OLENS} (nl) placebo"),
     "probe": ("#11806a", None, "probe"),
     "probe_user_end": ("#78b7aa", None, "probe: user end"),
     "probe_response_start": ("#11806a", None, "probe: final token"),
@@ -57,15 +67,9 @@ STYLE = {
 }
 ALIASES = {"agentic": "transcript", "transcript_agentic": "transcript", "env_diff": "no_transcript", "olens_inline_nl": "olens_nl"}
 
-# matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
-# set in the DejaVu fallback
-if shutil.which("fc-list"):
-    for f in subprocess.run(["fc-list", "Inter", "file"], check=True, capture_output=True, text=True).stdout.split():
-        if f.rstrip(":").endswith((".ttf", ".ttc")):
-            font_manager.fontManager.addfont(f.rstrip(":"))
 plt.rcParams.update(
     {
-        "font.family": ["Inter", "DejaVu Sans"],
+        "font.family": ["Inter", EMOJI_FONT, "DejaVu Sans"],
         "font.size": 10,
         "text.color": INK,
         "figure.facecolor": BG,
@@ -149,12 +153,12 @@ def positions(bars, groups: list) -> tuple[dict[str, float], list[float]]:
     return xs, ticks
 
 
-def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 0.8, fmt: str = "{:.1f}") -> None:
+def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 0.8, fmt: str = "{:.1f}", fontsize: float = 7.5) -> None:
     """Condition c's bar with its gray CI whisker and the value in ink just above it (an offset in points, so it clears the whisker
-    whatever the axis's scale)."""
+    whatever the axis's scale). `fontsize`: the value's (a slide figure passes 7.5 * SLIDE_S)."""
     ax.bar(x, v, width, zorder=3, **bar_kw(c))
     ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9, zorder=4)
-    ax.annotate(fmt.format(v), (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5, color=INK)
+    ax.annotate(fmt.format(v), (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=fontsize, color=INK)
 
 
 SW_W, SW_H, SW_MINUS, SW_GAP = 14, 10, 12, 8  # swatch width, height, the gap holding the minus sign, gap to the axis (points)

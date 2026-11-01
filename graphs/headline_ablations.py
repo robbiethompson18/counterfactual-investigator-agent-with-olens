@@ -1,14 +1,15 @@
-"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `prompt`): split by whether Qwen
+"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `all`): split by whether Qwen
 is right, lens and placebo differences.
 
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, transcript only vs
   O-lens, J++ and NLA, one panel per set with a notion of right: MMLU-Pro, SuperGPQA (Qwen's modal letter is the gold one) and
   knowledge cutoff (Qwen's answer is still true vs stale). Preferences have no truth, so they are left out.
-- headline-lens-diffs.png: each lens minus transcript only, per task (MCQ, cutoff, preferences) and pooled, paired CIs from
-  graphs.headline_inline.Boot; headline-placebo-diffs.png: the same rows for each lens's placebo minus transcript only.
-- headline-essay-correctness.png: essay grading's AUROC per condition on the essays Qwen grades "wrong" and the rest. Qwen is wrong
-  on an essay when it grades a top-half essay (PERSUADE holistic score 4-6) below its own median grade over the 204 essays, or a
-  bottom-half essay (1-3) at or above it; Qwen's grade is its mean on the plain base prompt. CIs resample essays.
+- headline-lens-diffs.png: each lens minus its own placebo, pooled over the three tasks (MCQ, cutoff, preferences), three rows,
+  paired CIs from graphs.headline_inline.Boot (Robbie, 2026-10-31: just those three); headline-placebo-diffs.png: each lens's
+  placebo minus transcript only, per task and pooled.
+- headline-essay-correctness.png: essay grading's AUROC per condition on the micro-essays Qwen grades "wrong" and the rest. Qwen is
+  wrong on a micro-essay when it grades a top-half one (PERSUADE holistic score 4-6) below its own median grade over the 204, or a
+  bottom-half one (1-3) at or above it; Qwen's grade is its mean on the plain base prompt. CIs resample micro-essays.
 - headline-blog-correctness.png: blog sentence deletion's AUROC per condition, the qwen_wrong and qwen_right versions (Qwen's
   answer about the author vs the truth), CIs resampling bloggers. Every draw is one prediction.
 
@@ -26,7 +27,7 @@ import numpy as np
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from graphs import cutoff_qa_inline, menus_inline
 from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
-from graphs.style import MUTED, ci_bar, diff_rows, label, positions
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
@@ -45,7 +46,7 @@ def by_correctness() -> dict[str, dict[str, dict]]:
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
     right["cutoff"] = {i: g == "stable_right" for i, (g, _) in cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)[TS].items()}
     menus = menus_inline.load()
-    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge cutoff": "cutoff"}
+    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
     menu_name = {c: m for m, c in CANON.items()}
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
@@ -90,6 +91,20 @@ def lens_diffs(boot: Boot, path: Path, placebo: bool = False) -> None:
     print("wrote", path)
 
 
+def lens_placebo_diffs(boot: Boot, path: Path) -> None:
+    """Each lens minus its own placebo, pooled over the three tasks: three rows."""
+    rows = [(lens, PLACEBOS[lens], *boot.diff_ci(POOLED, lens, PLACEBOS[lens])) for lens in LENSES]
+    print(path.name, [(a[:5], f"{m:+.1f} [{lo:+.1f}, {hi:+.1f}]") for a, _, m, lo, hi in rows])
+    fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
+    ax.set_xlim(-6, 20)
+    diff_rows(ax, rows)
+    ax.set_title("Each lens minus its placebo, pooled over the three tasks", loc="left", fontsize=9.5)
+    ax.set_xlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+    print("wrote", path)
+
+
 def essay_qwen_wrong() -> dict[str, bool]:
     """essay -> Qwen grades it on the wrong side of the median."""
     bank = json.loads(ESSAY_BANK.read_text())
@@ -127,9 +142,9 @@ def essay_groups() -> dict[str, dict]:
     scores, reference = standard_essay_comparison()
     wrong = essay_qwen_wrong()
     groups = {}
-    for name, flag in (("Qwen grades the essay wrong", True), ("Qwen grades the essay right", False)):
+    for name, flag in (("Qwen grades the micro-essay wrong", True), ("Qwen grades the micro-essay right", False)):
         keys = [k for k in reference if wrong[k[1]] == flag]
-        groups[f"{name}, {len({k[1] for k in keys})} essays"] = {
+        groups[f"{name}, {len({k[1] for k in keys})} of 204 micro-essays"] = {
             c: (
                 [p for k in keys for p in scores[c][k]],
                 [reference[k]["truth"] for k in keys for _ in scores[c][k]],
@@ -162,11 +177,16 @@ def main(out: Path) -> None:
             tag = "right" if right else "wrong"
             print(f"Qwen {tag} {name}:", "  ".join(f"{c.removesuffix('_inline')} {m:.1f}" for c, m in means.items()))
     boot = Boot(load())
-    lens_diffs(boot, out / "headline-lens-diffs.png")
+    lens_placebo_diffs(boot, out / "headline-lens-diffs.png")
     lens_diffs(boot, out / "headline-placebo-diffs.png", placebo=True)
-    auroc_panels(essay_groups(), SEVEN, out / "headline-essay-correctness.png",
-                 "Essay grading, by whether Qwen grades the essay like the human did", "95% bootstrap CI over essays")  # fmt: skip
-    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), ("O-lens", ["olens_inline", "olens_placebo_inline"])],
+    auroc_panels(
+        essay_groups(),
+        SEVEN,
+        out / "headline-essay-correctness.png",
+        "Essay grading, by whether Qwen grades the micro-essay like the human did",
+        "95% bootstrap CI over micro-essays",
+    )
+    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), (OLENS, ["olens_inline", "olens_placebo_inline"])],
                  out / "headline-blog-correctness.png", "Blog sentence deletion, by whether Qwen is right about the author",
                  "95% bootstrap CI over bloggers")  # fmt: skip
 
