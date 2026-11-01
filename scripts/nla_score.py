@@ -9,7 +9,9 @@ norm and a Linear(5120, 5120) value head: "[Layer LL] Summary of the following t
 is a separate 51 GB model, so it runs here, after the reads, on its own pod, through transformers (prefill only,
 left-padded batches): scripts/olens_read_requests.py saved every decoded read's activation in READS.acts.bf16 (row =
 act_index). The pooled whiteners behind `fve` exist for layers 0, 4, ..., 60 and 63 only (agu18dec/local-workspace), and
-runpod/olens_reads.sh setup fetches 20..60 step 4: reads at other layers need them fetched, or have no pooled ruler.
+runpod/olens_reads.sh setup fetches 20..60 step 4: reads at other layers need them fetched, or have no pooled ruler
+(`fve` null, e.g. ceselder/qwen3.6-27b-nla-rl at L42: use `fve_run`). The ceselder critic (ar_reconstructor/, 43 blocks)
+loads the same way.
 
 Two FVEs per row. `fve`: 1 - ||p' - v||^2 / tr(Sigma_L) in raw activation space, p' the critic's direction at the
 activation's own norm, mu_L and Sigma_L the pooled whitener moments the agu18dec AR was trained against (~2.1M chat +
@@ -106,21 +108,25 @@ def main():
     raw = acts[keys].to(p.device)
     v = norm_to(raw, critic.scale)
     layers = torch.tensor([todo[k][1] for k in keys], device=p.device)
+    rnd = lambda x: None if math.isnan(x) else round(x, 4)
     fve, fve_run, cos, stats = torch.empty(len(keys)), torch.empty(len(keys)), torch.empty(len(keys)), {}
     for L in layers.unique().tolist():
         m = layers == L
-        pooled = load_file(Path(args.whiteners) / f"whitening_iolens_pooled_L{L}.safetensors")
-        trace = float(pooled["cov"].double().diagonal().sum())  # E||v - mu_L||^2 over the pooled set
-        p_raw = p[m] * raw[m].norm(dim=-1, keepdim=True) / critic.scale  # the critic's direction at the activation's norm
-        fve[m.cpu()] = (1 - ((p_raw - raw[m]) ** 2).sum(-1) / trace).cpu()
+        wf = Path(args.whiteners) / f"whitening_iolens_pooled_L{L}.safetensors"
+        if wf.exists():  # none for L42 (ceselder's NLA): fve is NaN there, use fve_run
+            trace = float(load_file(wf)["cov"].double().diagonal().sum())  # E||v - mu_L||^2 over the pooled set
+            p_raw = p[m] * raw[m].norm(dim=-1, keepdim=True) / critic.scale  # the critic's direction at the activation's norm
+            fve[m.cpu()] = (1 - ((p_raw - raw[m]) ** 2).sum(-1) / trace).cpu()
+        else:
+            fve[m.cpu()] = float("nan")
         mu = v[m].mean(0)
         base = ((v[m] - mu) ** 2).sum(-1).mean()  # the predict-the-mean MSE, this run's activations of layer L
         fve_run[m.cpu()] = (1 - ((p[m] - v[m]) ** 2).sum(-1) / base).cpu()
         cos[m.cpu()] = ((p[m] * v[m]).sum(-1) / critic.scale**2).cpu()
         mc = m.cpu()
-        stats[L] = {"n": int(m.sum()), "mean_fve": round(float(fve[mc].mean()), 4), "mean_fve_run": round(float(fve_run[mc].mean()), 4),
+        stats[L] = {"n": int(m.sum()), "mean_fve": rnd(float(fve[mc].mean())), "mean_fve_run": round(float(fve_run[mc].mean()), 4),
                     "mean_cos": round(float(cos[mc].mean()), 4)}  # fmt: skip
-    score = {k: (round(float(f), 4), round(float(fr), 4), round(float(c), 4)) for k, f, fr, c in zip(keys, fve, fve_run, cos)}
+    score = {k: (rnd(float(f)), rnd(float(fr)), rnd(float(c))) for k, f, fr, c in zip(keys, fve, fve_run, cos)}
     tmp = reads.with_suffix(".tmp")
     with tmp.open("w") as f:
         for r in rows:

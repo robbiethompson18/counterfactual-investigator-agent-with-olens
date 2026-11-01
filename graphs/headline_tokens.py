@@ -22,7 +22,7 @@ from graphs import menus_inline
 from graphs.headline_inline import CANON, LENSES, PLACEBOS, TS
 from graphs.style import bar_kw, label, positions
 
-SETS = {  # the canonical menus_inline runs (CLAUDE.local.md), `all` menu
+SETS = {  # the canonical menus_inline runs (CLAUDE.local.md)
     "MMLU-Pro": menus_inline.runs("mcq_unselected"),
     "SuperGPQA": menus_inline.runs("supergpqa"),
     "knowledge cutoff": menus_inline.runs("cutoff"),

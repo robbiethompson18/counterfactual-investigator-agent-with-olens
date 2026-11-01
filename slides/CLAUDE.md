@@ -10,9 +10,9 @@ https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/
 link); a PR touching them attaches its `talk.pdf` to the workflow run
 (`.github/workflows/env-viewer-pages.yml`).
 
-**Setup.** XeLaTeX with Metropolis, latexmk and the Inter font (Fira Sans is the fallback). On
-Debian/Ubuntu:
-`apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono`.
+**Setup.** XeLaTeX with Metropolis, latexmk, the Inter font (Fira Sans is the fallback) and Noto
+Sans CJK SC for the Mandarin anecdote. On Debian/Ubuntu:
+`apt-get install texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono fonts-noto-cjk`.
 
 **The deck.** `talk/talk.tex`, with its charts in `graphs/talk.py` (run first by `make`, as
 `python -m graphs.talk`, from the real results), writing PDFs and table snippets to `talk/fig/`. Add
@@ -31,8 +31,8 @@ nothing from either; statistics come from `cfbench.scoring`.
   does it). Change a colour in `page.html` / `graphs/style.py` and the theme's `\definecolor`s
   together.
 - No boxes or cards anywhere: figures, tables and panels sit straight on the page. A part is a
-  `\section{Title}` (no section page) whose first frame opens with `\parthead` (a part may skip
-  that frame, as Anecdata does); every other frame shows the part's title on the right of its frame
+  `\section{Title}` (no section page) whose first frame opens with `\parthead` (a part may skip that
+  frame, as Anecdata does); every other frame shows the part's title on the right of its frame
   title. Single striking examples go in the last part, Anecdata.
 - Figures: a function in `graphs/talk.py` decorated with `graphs.style`'s `@slide`, made with
   `slide_figure(w_mm, h_mm)` and written with `slide_save`. `@slide` applies the deck's sizes
@@ -48,6 +48,8 @@ nothing from either; statistics come from `cfbench.scoring`.
   hatched placebo under one label; the axis stops just above the data; the dotted line is the
   meaningful baseline (e.g. always the hinted letter); one-sided stars, stated in the footnote.
 - Give provenance with `\source{...}` (run, doc) at the bottom of a results slide.
+- A marked read token is the token bold in [brackets] with one dot per reader in its colour: `\rdx{olens, nla}{tok}` (ink
+  brackets), `\rd{tok}` when only the O-lens reads it (orange brackets); never a fill (Kylie, 2026-11-01).
 
 **Macros.** `\olens`, `\jlens`, `\nla`, `\transcript` (the condition's name in its colour),
 `\cond{colour}{text}`, `\sw{olens}` (swatch), `\swp{olens}` (striped placebo swatch), `\muted{...}`,

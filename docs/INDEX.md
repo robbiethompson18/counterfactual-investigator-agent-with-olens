@@ -15,6 +15,8 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   — 1,042 MMLU-Pro cases, consistency the only filter, hint first, canonical reads, Haiku 5.5:
   transcript-only AUROC 0.77, O-lens 0.75–0.76 (beats its placebo, not the transcript); letter task
   54% everywhere, 9–14% on Qwen-wrong items vs 10% chance
+- [REFERENCE: drink_drive — read before citing the "Qwen recommends drunk driving" case or its drink-count dose response](envs/drink_drive.md)
+  — one→ten drinks: drive-or-mixed 86%→0% by four drinks, couple 32%
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [REFERENCE: chive_inline — read before claiming CHIVE's transcript-only baseline depends on the transcript, or comparing a predictor with CHIVE's published arms](chive-inline.md)
@@ -105,7 +107,10 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   submit_answer tool call (200 items, answer 20 tokens past the last read) the O-lens gap holds (76%
   vs 58% vs 62%), and at scale (v3, 1,849 items, stale items: O-lens +17pp over its placebo, J++ +9,
   NLA +8, the same where Qwen always calls the tool unforced); the one cutoff chart; the
-  lens-shares-Qwen's-cutoff caveat
+  lens-shares-Qwen's-cutoff caveat; **2026-10-31: most of the uplift is Haiku's later cutoff** — a
+  same-cutoff investigator (Gemini 2.5 Flash-Lite) with no lens matches Haiku + any lens on stale
+  items (canonical menus_inline: 73% vs O-lens 77, NLA 74, J++ 70), and every lens makes Flash-Lite
+  worse
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)

@@ -11,8 +11,13 @@ Here the AV runs through vLLM's LoRA runtime on the same engine that captures th
 injection is vllm-metamodels' SteeringVector (norm_match=True, scale=1 at layer 1). The critic (AR, a full 64-block model
 plus a value head) does not run here: scripts/olens_read_requests.py --readout nla saves every read's activation beside
 the reads and scripts/nla_score.py adds the FVE later, on its own pod (docs/nla-reader.md).
+
+Celeste's L42 NLA (ceselder/qwen3.6-27b-nla-rl, RL step 600) runs on the same class: its AV stacked into one rank-192 LoRA
+on base Qwen (olens/scripts/ceselder_nla_lora.py), its own nla_meta.yaml (same marker and injection, no layer tag; the
+actor template ignores `layer`), `repo=CESELDER_REPO`, and reads at layer 42 only.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -23,6 +28,7 @@ from .lens import Sampling
 from .one_engine import OneEngine
 
 NLA_REPO = "agu18dec/qwen3.6-27b-all-layer-nla-rl2000"
+CESELDER_REPO = "ceselder/qwen3.6-27b-nla-rl"  # L42 only; AV = av_base (warmstart merged) + av_rl_adapters/iter_000600
 EXPL = re.compile(r"<explanation>(.*?)(?:</explanation>|$)", re.DOTALL)
 INJECT_LAYER = 1  # EasyNLA: Karvonen norm-matched add at the output of decoder block 1
 NLA_SAMPLING = Sampling(max_new_tokens=200)  # greedy; the RL rollouts used max_new_tokens 200
@@ -33,13 +39,22 @@ META = "/workspace/olens_ckpt/nla64/nla_meta.yaml"
 class NLAEngine(OneEngine):
     layers = tuple(range(64))
 
-    def __init__(self, tok, base="Qwen/Qwen3.6-27B", av_lora=AV_LORA, meta_path=META, **kw):
+    def __init__(self, tok, base="Qwen/Qwen3.6-27B", av_lora=AV_LORA, meta_path=META, repo=NLA_REPO, **kw):
         self.meta = yaml.safe_load(Path(meta_path).read_text())
+        rank = json.loads((Path(av_lora) / "adapter_config.json").read_text())["r"]
         t = self.meta["tokens"]
         self.marker_id = int(t["injection_token_id"])
         self.neighbours = (int(t["injection_left_neighbor_id"]), int(t["injection_right_neighbor_id"]))
-        super().__init__(tok, base, lens_lora=av_lora, ar_lora=None, ar_root=None, max_lora_rank=128, **kw)
-        self.adapter = f"{NLA_REPO}:av"  # olens.provenance
+        super().__init__(
+            tok,
+            base,
+            lens_lora=av_lora,
+            ar_lora=None,
+            ar_root=None,
+            max_lora_rank=next(r for r in (64, 128, 256, 320, 512) if r >= rank),
+            **kw,
+        )
+        self.adapter = f"{repo}:av"  # olens.provenance
         self.adapters = {
             "av_lora": str(av_lora),
             "engine": "vllm-metamodels one engine",

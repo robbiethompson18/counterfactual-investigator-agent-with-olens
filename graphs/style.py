@@ -45,10 +45,12 @@ STYLE = {
     "probe_user_end": ("#78b7aa", None, "probe: user end"),
     "probe_response_start": ("#11806a", None, "probe: final token"),
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
+    "transcript+probe": ("#78b7aa", None, "probe + transcript"),  # author_blog_drop's nested combiner, the lighter teal
     # chive_inline's reference bars: CHIVE's own Opus 4.8 arms on the same claims (a lighter shade = the same input, another measure)
     "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
     "transcript_told": ("#1f4e79", None, "transcript only, told the model and its cutoff"),  # cutoff_qa_investigators
+    "transcript_told_oldprompt": ("#1f4e79", None, "transcript only, told Qwen's cutoff (older prompt)"),  # its canonical set
     "self_answer": (OUTLINE, None, "answers the question itself"),  # cutoff_qa_investigators: the same-cutoff census
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
@@ -147,12 +149,12 @@ def positions(bars, groups: list) -> tuple[dict[str, float], list[float]]:
     return xs, ticks
 
 
-def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 0.8, fmt: str = "{:.1f}") -> None:
+def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 0.8, fmt: str = "{:.1f}", fontsize: float = 7.5) -> None:
     """Condition c's bar with its gray CI whisker and the value in ink just above it (an offset in points, so it clears the whisker
-    whatever the axis's scale)."""
+    whatever the axis's scale). `fontsize`: the value's (a slide figure passes 7.5 * SLIDE_S)."""
     ax.bar(x, v, width, zorder=3, **bar_kw(c))
     ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9, zorder=4)
-    ax.annotate(fmt.format(v), (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7.5, color=INK)
+    ax.annotate(fmt.format(v), (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=fontsize, color=INK)
 
 
 SW_W, SW_H, SW_MINUS, SW_GAP = 14, 10, 12, 8  # swatch width, height, the gap holding the minus sign, gap to the axis (points)
