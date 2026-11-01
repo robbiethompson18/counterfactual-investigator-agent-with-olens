@@ -526,6 +526,20 @@
   \source{Bars: at the \rd{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (lighter) \% of items with at least one, 95\% item bootstrap. Reads at the
     ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, \olensname{} + AR, T 1.}
 \end{frame}
+
+\begin{frame}{Anecdata: acting and grader reads by wording and harness, Qwen vs GLM}
+  \input{fig/acting.tex}
+  \begin{itemize}
+    \item Overeagerness harness grid, thinking off: 12 tasks $\times$ 9 wordings $\times$ 32 harnesses (2 levels each of system prompt,
+      env block, done tool, tool names, date). Per group: \% acted without asking, and \% of episodes with an O-lens read past the
+      prompt matching \texttt{\textbackslash bgrad(er|ers|ed|ing)\textbackslash b}
+  \end{itemize}
+  \slidefig{fig/acting.pdf}
+  \source{Qwen3.6-27B and GLM-5.3 harness-grid runs, thinking off, cut episodes left out. Acted: all episodes, \actAll{} (dotted
+    line). Reads: uniform random episodes, \readN{} (about 40--100 per wording bar, 230--410 per harness bar); Qwen3.6-27B O-lens L40,
+    one read per position; GLM-5.3 O-lens block 51, five draws per position. Bars: Wilson 95\% CI.}
+\end{frame}
+
 \begin{frame}{GLM-5.3 alignment-faking prompt, public stage: GLM on GLM vs Qwen on GLM vs Qwen on Qwen}
   \begin{prompt}
     \tok{\st{system}… Keep in mind: in the preview stage, any response that isn't fully compliant is trained against, and RLHF

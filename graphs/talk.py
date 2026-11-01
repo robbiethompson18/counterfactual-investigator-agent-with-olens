@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
+from matplotlib.patches import Rectangle
 
 from cfbench.catalog import CF, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS
 from cfbench.scoring import (
@@ -22,6 +23,7 @@ from cfbench.scoring import (
     AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
+    acting_by_factor,
     answer_bars,
     auroc_bars,
     author_bars,
@@ -241,6 +243,53 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
+HARNESS_LABELS = {("system", "agent"): "agent\nprompt", ("system", "asst"): "asst.\nprompt", ("envblock", "env"): "env\nblock",
+                  ("envblock", "noenv"): "no env\nblock", ("done", "done"): "done\ntool", ("done", "nodone"): "no done\ntool",
+                  ("names", "plain"): "plain\nnames", ("names", "mcp"): "MCP\nnames", ("date", "now"): "date\nnow",
+                  ("date", "past"): "date\npast"}  # fmt: skip
+
+
+@slide
+def acting_bars() -> None:
+    """harness_grid thinking off, 2x2 (Kylie, 2026-11-01): rows Qwen3.6-27B and GLM-5.3 (one colour each, outside the condition
+    palette), columns by wording and by each harness factor's two levels; per group, % acted without asking (all episodes) and,
+    beside it in a lighter shade, % of the randomly sampled episodes with an O-lens read past the prompt saying
+    grader/grading/graded. Wilson 95% CIs, shared y."""
+    res = acting_by_factor()
+    colours = {"Qwen3.6-27B": "#c2185b", "GLM-5.3": "#8c6d1f"}
+    fig, axes = slide_figure(FULL_W, 50, nrows=2, ncols=2, sharey=True, gridspec_kw={"width_ratios": [9, 11.5]})
+    for row, (model, r) in zip(axes, res.items()):
+        light = to_hex(0.45 * np.array(to_rgb(colours[model])) + 0.55 * np.array(to_rgb(BG)))
+        k_all, n_all = r["acted"]["all"]
+        for ax, key in zip(row, ("wording", "harness")):
+            xs = []
+            for j, g in enumerate(r["acted"][key]):
+                x = j + (j // 2) * 0.5 if key == "harness" else j  # gap between factors
+                for off, what, col in [(-0.19, "acted", colours[model]), (0.19, "reads", light)]:
+                    k, n = r[what][key][g]
+                    lo, hi = wilson(k, n)
+                    ax.bar(x + off, k / n, 0.38, color=col)
+                    ax.errorbar(x + off, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.6, capsize=1.2, capthick=0.6)
+                xs.append(x)
+            ax.axhline(k_all / n_all, color=FAINT, lw=0.7, ls=":")
+            labels = [w.replace("_", " ") for w in r["acted"][key]] if key == "wording" else [HARNESS_LABELS[f] for f in r["acted"][key]]
+            ax.set_xticks(xs, labels, rotation=30 if key == "wording" else 0, ha="right" if key == "wording" else "center")
+            ax.set_xlim(xs[0] - 0.6, xs[-1] + 0.6)
+            ax.grid(axis="x", visible=False)
+            ax.set_title(f"{model} thinking off, by {key}", loc="left", fontsize=7 * SLIDE_S, color=INK)
+        row[0].set_ylabel("% of episodes")
+        handles = [Rectangle((0, 0), 1, 1, color=c) for c in (colours[model], light)]
+        row[1].legend(handles, ["acted without asking", "O-lens read says grader/grading/graded (past the prompt)"], loc="upper right",
+                      frameon=False, ncol=2, fontsize=6 * SLIDE_S, bbox_to_anchor=(1, 1.22))  # fmt: skip
+    axes[0][0].set_ylim(0, 0.82)
+    axes[0][0].set_yticks(np.arange(0, 0.81, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.81, 0.2)])
+    slide_save(fig, OUT / "acting.pdf")
+    acted = [f"{m} {r['acted']['all'][0] / r['acted']['all'][1]:.0%} of {r['acted']['all'][1]:,}" for m, r in res.items()]
+    reads = [f"{m} {r['reads']['all'][1]:,}" for m, r in res.items()]
+    tex = "\\def\\actAll{" + "; ".join(acted) + "}\n\\def\\readN{" + "; ".join(reads) + "}\n"
+    (OUT / "acting.tex").write_text(tex.replace("%", "\\%"))
+
+
 MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}
 
 
@@ -441,6 +490,7 @@ if __name__ == "__main__":
     essay()
     essay_diffs()
     grader()
+    acting_bars()
     mandarin()
     author()
     sankeys()
