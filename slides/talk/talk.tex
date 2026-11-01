@@ -414,9 +414,8 @@
       non-significant sentence of the same post (half each); \input{fig/author_n.tex}\unskip{} cases from 520 bloggers
     \item The investigator (Haiku 5.5, effort low, one turn) sees the prompt, Qwen's letter and its probability,
       and the sentence to delete, and gives P(significant)
-    \item \olens: bullets with FVE at every punctuation and newline token of the question and post, layers 32/40/48,
-      sampled at temperature 1. \nla: ceselder's Qwen3.6-27B NLA at the same tokens, layer 42, one greedy explanation with
-      its FVE. Placebos: another post's reads (same attribute), laid onto this post's read tokens in order
+    \item \olens{} and \nla{} reads of the question and post. Placebos: another post's reads (same attribute), laid onto this
+      post's read tokens in order
   \end{itemize}
   \medskip
   \begin{columns}[T, onlytextwidth]

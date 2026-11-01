@@ -74,7 +74,7 @@ def slide(out: Path) -> None:
     axes[0].set_yticks(yt, [f"{t:.1f}" for t in yt])
     axes[0].set_ylabel("AUROC of P(significant)")
     axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
-    departure(fig, DEPARTURE)
+    departure(fig, "Haiku at effort low, one draw per case; AUROC.")  # the slide leaves out the read settings (Kylie, 2026-11-01)
     slide_save(fig, out / "author.pdf")
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
             "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
