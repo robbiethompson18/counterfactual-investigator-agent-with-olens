@@ -1,18 +1,14 @@
 # Author evidence: does the O-lens show which sentence Qwen reads the author from?
 
-**Status (2026-11-01):** NULL; the natural-sample numbers are provisional, scoring being redone. An
-independent audit (2026-10-31) found the sample itself uniform, but its Haiku predictions pool
-several runs (harness 13/14/18) with positives mostly in older runs and negatives mostly in the new
-one, so run and label are confounded; 7.9% of its cases also have single-option-order labels. A
-single run over all 1,626 cases (flat rule stated in the prompt, harness 19) replaces the numbers
-below. On real blog posts the O-lens gives an investigator no gain over the prompt alone in telling
-which sentence Qwen3.6-27B infers the author's sex or age from, and neither does ceselder's layer-42
-NLA. Scaled up the same evening to a natural-rate sample (1,626 cases, 657 bloggers, flat 0.15 rule;
-see "Scale-up and natural sample"): O-lens − transcript AUROC −0.000 [−0.020, +0.018], NLA −
-transcript −0.018 [−0.035, −0.001]; the sentence-end linear probe 0.810 vs transcript 0.839, and
-probe + transcript 0.882 (+0.044, p < 0.001). The earlier 1,316-case numbers below (max(0.15, 5 ×
-median) rule, stratified sample) are superseded by that section. An earlier pilot on SynthPAI
-(synthetic comments) gave the same null and is retired.
+**Status (2026-11-01):** NULL, and negative for the O-lens. On a natural-rate sample of real blog
+posts (1,618 cases, 655 bloggers, flat 0.15 rule, labels averaged over both option orders, every
+condition scored in one Haiku run) an investigator does worse with agu18dec's O-lens reads than with
+the prompt alone: AUROC 0.811 vs 0.835, O-lens − transcript −0.024 [−0.041, −0.007], and no better
+than the O-lens placebo (+0.004). A sentence-end linear probe reads 0.808, and probe + transcript
+0.885 (+0.050, p < 0.001). ceselder's NLA is pending in the clean run (null, −0.018, in the earlier
+pooled scoring). Numbers before 2026-11-01 pooled several Haiku runs with positives and negatives
+mostly in different runs (an independent audit caught it), so they are superseded. An earlier pilot
+on SynthPAI (synthetic comments) gave the same null and is retired.
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the
@@ -110,34 +106,44 @@ every answered post is a uniform draw, since the batches stratified only by sex 
 cell's target is proportional to that; a random subsample of the cell's already-deleted pairs fills
 it, and the shortfall (461 Qwen-right pairs, all under 30) is drawn uniformly from the cell's
 confident, answered, never-deleted pairs and deleted in both option orders. Then stable pairs with a
-positive, 1:1 negatives: 1,626 cases (813 positive) from 673 post-question pairs and 657 bloggers,
-78% Qwen-right, no weights. Haiku 5.5 effort low, 1 draw; 762 cases reuse earlier draws (identical
-prompts), 864 are new (`runs/cfbench/2026-10-31_author-blog-drop-haiku-natural`).
+positive, 1:1 negatives. Labels average both option orders: 552 batch-3 pairs had been deleted in
+one order only, and their second order was run on 2026-11-01, which moved 35 cases in and 43 out (no
+kept label flipped). Result: 1,618 cases (809 positive) from 671 post-question pairs and 655
+bloggers, 79% Qwen-right, no weights. Haiku 5.5 effort low, 1 draw, every case of each condition in
+one run, harness 19 (the prompt states the flat rule):
+`runs/cfbench/2026-11-01_author-blog-drop-haiku-natural2`. Scores:
+`runs/author_mcq_blog/2026-11-01_natural-score` (the probe covers the 1,588 cases with a probe
+capture; the other 30, from 11 pairs that entered with the second order, await it).
 
-| natural sample, pooled          | AUROC [95% CI]       |
-| ------------------------------- | -------------------- |
-| transcript                      | 0.839 [0.819, 0.856] |
-| O-lens                          | 0.838 [0.818, 0.857] |
-| O-lens placebo                  | 0.826 [0.807, 0.845] |
-| NLA                             | 0.821 [0.801, 0.839] |
-| NLA placebo                     | 0.829 [0.808, 0.849] |
-| linear probe (L48 sentence end) | 0.810 [0.790, 0.830] |
-| probe + transcript              | 0.882 [0.867, 0.899] |
+| natural sample, pooled (1,618 cases) | AUROC [95% CI]       |
+| ------------------------------------ | -------------------- |
+| transcript                           | 0.835 [0.815, 0.853] |
+| O-lens                               | 0.811 [0.791, 0.831] |
+| O-lens placebo                       | 0.806 [0.786, 0.826] |
+| linear probe (L48 sentence end)      | 0.808 [0.786, 0.827] |
+| probe + transcript                   | 0.885 [0.869, 0.900] |
 
 | A − B                           | Δ AUROC [95% CI]        | one-sided p |
 | ------------------------------- | ----------------------- | ----------- |
-| O-lens − transcript             | −0.000 [−0.020, +0.018] | 0.50        |
-| O-lens − O-lens placebo         | +0.012 [−0.006, +0.030] | 0.09        |
-| NLA − transcript                | −0.018 [−0.035, −0.001] | 0.98        |
-| NLA − NLA placebo               | −0.008 [−0.025, +0.009] | 0.82        |
-| probe + transcript − transcript | +0.044 [+0.034, +0.054] | < 0.001     |
+| O-lens − transcript             | −0.024 [−0.041, −0.007] | 0.998       |
+| O-lens − O-lens placebo         | +0.004 [−0.015, +0.023] | 0.33        |
+| probe + transcript − transcript | +0.050 [+0.040, +0.061] | < 0.001     |
+
+NLA and NLA placebo: pending in the clean run.
+
+**Sampling audit** (independent agent, 2026-10-31): the case set reproduces exactly from the
+committed code; cell shares match the corpus (TV 0.008 from exact); earlier deleted pairs are
+uniform within cells; the 461 new pairs behave like the old (stable-with-positive 0.215 vs
+0.219-0.229); negatives are seeded and uniform. It found the run pooling and the single-order labels
+fixed above, and that the draw is blogger-uniform (one post per blogger), not post-uniform.
 
 **Batches 1-3** (secondary; `runs/author_mcq_blog/2026-10-31_scaleup-score`): the stratified,
 Qwen-right-capped set grown with batch 3 (`scripts/author_probe/blog_c.py`), 2,456 cases from 960
 bloggers, scored unweighted and with each Qwen-right case weighted by 1 / its batch and attribute's
-sampling rate (ESS 1,744). Same picture: O-lens − transcript +0.008 [−0.006, +0.024] unweighted,
-+0.002 weighted; NLA − transcript +0.001 / −0.004; probe + transcript − transcript +0.061 / +0.053
-(both p < 0.001).
+sampling rate (ESS 1,744). Its predictions pool runs (harness 13/14/18, positives and negatives
+mostly scored in different runs), so these are indicative only: O-lens − transcript +0.008 [−0.006,
++0.024] unweighted, +0.002 weighted; NLA − transcript +0.001 / −0.004; probe + transcript −
+transcript +0.061 / +0.053 (both p < 0.001).
 
 Probe and probe + transcript: the standard L2 probe (λ = 1) on the layer-48 residual at the deleted
 sentence's last token, and a logistic on [logit of Haiku's transcript p, probe score], both fully

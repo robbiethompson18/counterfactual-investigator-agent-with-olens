@@ -79,9 +79,9 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
     if len(hv := {h for r in sc for h in rows_by_item[r["item"]]["harness"]}) > 1:  # the 2026-10-31 audit
         out.insert(
             0,
-            f"<p><b>Provisional, scoring being redone:</b> these cases' Haiku predictions come from several runs "
-            f"(harness versions {', '.join(map(str, sorted(hv)))}), with positives and negatives mostly scored in "
-            "different runs, so run and label are confounded. A single run over every case replaces this.</p>",
+            f"<p><b>Pooled across runs:</b> these cases' Haiku predictions come from several runs (harness versions "
+            f"{', '.join(map(str, sorted(hv)))}), with positives and negatives mostly scored in different runs, so run and label "
+            "are confounded. Indicative only; the natural sample above is the clean measurement.</p>",
         )
     body = []
     for a, b in (ab for ab in PAIRS if set(ab) <= set(P)):
