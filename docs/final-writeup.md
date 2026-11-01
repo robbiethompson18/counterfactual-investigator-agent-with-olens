@@ -716,6 +716,15 @@ No model seems to get more or less uplift from having access to 🔮-lens output
 
 <img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript-only vs O-lens by predictor" width="321">
 
+## Hinted MCQ as a Counterfactual (TODO Kylie)
+
+TODO @Kylie: write this up. The base arm adds a hint naming the correct letter and Qwen follows it;
+the counterfactual arm drops the hint, and the investigator either gives P(Qwen knew the answer) or
+names Qwen's no-hint letter. Material: the talk's "Hinted multiple choice" part, the
+`hint_qwen_dsv4*` evals (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the
+talk: these runs are not on canonical reads (O-lens at four layers, option newlines and end of
+prompt only, Gemini 3.8 Flash at effort low).
+
 # TODO WITH MORE TIME:
 
 - Claude thinks we have some slightly significant astra result? Possibly we want to try this? doubt

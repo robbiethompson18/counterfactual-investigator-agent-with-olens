@@ -1,6 +1,6 @@
 """Sankeys of how each single-turn dataset becomes eval cases (the write-up's dataset descriptions). Dark green is evaluated, Qwen
 right and wrong alike; light green is usable but held out; gray is unusable. Essay grading has no filter, so its diagram is boring
-on purpose.
+on purpose; its first node says how the 1,800 cases cover the 204 micro-essays.
 
     uv run python -m graphs.data_filter_sankey [--out-dir docs/img]
 
@@ -9,7 +9,7 @@ docs/mcq-unselected.md (the split, both batches),
 docs/envs/cutoff_qa.md and data/banks/cutoff_qa/v3.json (stable = 7 of 8 samples agree; the 1,197 not evaluated include the numeric
 items), docs/favorites-qa-inline.md, for blogs runs/author_mcq_blog/2026-10-30_{qwen36-qfirst,ablate-loo}{,-b}
 (docs/author-mcq-probe.md; a question is one blogger and attribute, and its 533 eval questions give 1,316 cases),
-and for essays cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
+and for micro-essays environments/essay_grading/env.py (PER_ARM), cfbench/evals/essay_grading_cf_inline/eval.py plus the truths in
 data/runs/cfbench/2026-10-31_essay-cf-b-ts.
 """
 
@@ -90,12 +90,12 @@ DATASETS = {
     "essay": (
         "Essay grading: no filter, every case is evaluated",
         [
-            [("225 openers × 8 intros", 1_800)],
+            [("225 openers × 8 micro-essays each\n(each of the 204 micro-essays gets ~9 openers)", 1_800)],
             [("eval cases", 1_800)],
             [("grade goes up", 973), ("grade doesn't go up", 827)],
         ],
         [
-            ("225 openers × 8 intros", "eval cases", 1_800, EVAL),
+            ("225 openers × 8 micro-essays each\n(each of the 204 micro-essays gets ~9 openers)", "eval cases", 1_800, EVAL),
             ("eval cases", "grade goes up", 973, EVAL),
             ("eval cases", "grade doesn't go up", 827, EVAL),
         ],
@@ -160,12 +160,12 @@ def band(ax, x0: float, a: tuple[float, float], x1: float, b: tuple[float, float
     ax.fill_between(xs, a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, color=color, lw=0)
 
 
-def sankey(title: str, columns: list, flows: list, out: Path) -> None:
+def draw(ax, columns: list, flows: list, fontsize: float = 8.5) -> None:
+    """The diagram on ax (the deck draws it on a slide-sized axis, graphs.talk)."""
     scale = 1 / columns[0][0][1]
     nodes = layout(columns, scale)
     out_used = {k: 0.0 for k in nodes}  # how much of each node's height its outgoing flows have used, from the top
     in_used = {k: 0.0 for k in nodes}
-    fig, ax = plt.subplots(figsize=(max(9, 2.2 * len(columns)), 4.2))
     for src, dst, n, color in flows:
         (xs, ys, _), (xd, yd, _), h = nodes[src], nodes[dst], n * scale
         a = (ys - out_used[src], ys - out_used[src] - h)
@@ -182,10 +182,15 @@ def sankey(title: str, columns: list, flows: list, out: Path) -> None:
         muted = x > 0 and name not in evaluated
         box = None if right or x == 0 else {"facecolor": BG, "edgecolor": "none", "alpha": 0.85, "pad": 2}
         ax.text(x + NODE_W + 0.04 if right else x - 0.04, y - h / 2, f"{name}\n{counts[name]:,}", va="center",
-                ha="left" if right else "right", fontsize=8.5, color=MUTED if muted else INK, bbox=box)  # fmt: skip
+                ha="left" if right else "right", fontsize=fontsize, color=MUTED if muted else INK, bbox=box)  # fmt: skip
     ax.set_xlim(-0.75, len(columns) - 1 + 0.75)
     ax.set_ylim(min(y - h for _, y, h in nodes.values()) - 0.03, 1.03)
     ax.axis("off")
+
+
+def sankey(title: str, columns: list, flows: list, out: Path) -> None:
+    fig, ax = plt.subplots(figsize=(max(9, 2.2 * len(columns)), 4.2))
+    draw(ax, columns, flows)
     ax.set_title(title, color=INK, loc="left")
     fig.savefig(out, bbox_inches="tight")
     plt.close(fig)
