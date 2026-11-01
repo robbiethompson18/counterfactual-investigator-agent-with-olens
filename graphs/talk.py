@@ -27,13 +27,14 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
+from counterfactual_investigator_agent_with_olens.utils import wilson
 from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
 from graphs.olens_mandarin import RUN as MANDARIN_RUN
-from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
+from graphs.style import BG, FAINT, FULL_W, INK, MUTED, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
@@ -333,7 +334,7 @@ def headline() -> None:
     axes[1].set_ylabel("% of cases wrong")
     slide_save(fig, OUT / "headline_probes.pdf")
     for task in TASKS:
-        fig, ax = slide_figure(HALF_W, 44)
+        fig, ax = slide_figure(64, 44)
         headline_inline.bars(ax, boot, [task], seven, s=SLIDE_S)
         ax.set_ylim(50, 100)
         ax.set_ylabel("% of cases right")
@@ -356,6 +357,54 @@ def cutoff_investigators() -> None:
     slide_save(fig, OUT / "cutoff_investigators.pdf")
 
 
+# The Great Sneeze anecdote: CHIVE's Qwen3.5-397B incident prompt_003654 (adamkarvonen/chive-data), the rate of a sneeze-based
+# event in Vardania's history over 30 samples, the original conversation and each of CHIVE's edits; the edit labels paraphrase
+# Adam's experiment summaries. Not a condition, so a colour outside the conditions'.
+SNEEZE_RUN = Path("runs/chive_critique/2026-10-30_replication-data/adam_rates/rates_qwen3p5_397b_wildchat_eval.jsonl")
+SNEEZE_EDITS = {
+    1: "coastal tropical, not landlocked",
+    2: "formerly in the Serbanian Empire",
+    3: "one turn, country + “make it absurd…”",
+    4: "fun fact: spice bazaars, not mountains",
+    5: "coastal + formerly in an empire",
+    6: "Landlocked: No, mountains kept",
+    7: "renamed Tuvalia, new culture",
+    8: "fun fact: landmarks, not mountains",
+    9: "independence + colony lines removed",
+    10: "landlocked, fun fact about beaches",
+    11: "one turn, no “absurd and funny and wacky”",
+    12: "“absurd and funny and wacky” removed",
+}
+SNEEZE_C = "#5b6c8f"
+
+
+@slide
+def sneeze() -> None:
+    """Horizontal bars: share of Qwen3.5-397B's 30 samples with a sneeze-based event in Vardania's history (CHIVE's grader), the
+    original conversation on top in ink, then each edit by rate, with 95% Wilson whiskers."""
+    path = Path("data") / SNEEZE_RUN
+    if not path.exists():
+        hf_hub_download(HF_REPO, str(SNEEZE_RUN), repo_type="dataset", local_dir="data")
+    r = next(r for r in map(json.loads, path.open()) if r["prompt_id"] == "prompt_003654")
+    edits = sorted(((SNEEZE_EDITS[e["exp"]], e["k"], e["n"]) for e in r["exps"]), key=lambda x: -x[1] / x[2])
+    rows = [("original conversation", r["k0"], r["n0"]), *edits]
+    fig, ax = slide_figure(64, 44)
+    for y, (_, k, n) in enumerate(rows):
+        lo, hi = wilson(k, n)
+        ax.barh(y, k / n, 0.7, color=INK if y == 0 else SNEEZE_C, zorder=3)
+        ax.errorbar(k / n, y, xerr=[[k / n - lo], [hi - k / n]], color=MUTED, lw=0.9, capsize=2, capthick=0.9, zorder=4)
+        ax.annotate(f"{k}/{n}", (hi, y), xytext=(2, 0), textcoords="offset points", va="center", fontsize=6.5 * SLIDE_S, color=INK)
+    ax.set_yticks(range(len(rows)), [x[0] for x in rows])
+    ax.get_yticklabels()[0].set_fontweight("bold")
+    ax.invert_yaxis()
+    ax.set_xlim(0, 0.88)
+    ax.set_xticks(np.arange(0, 0.76, 0.25), [f"{t:.0%}" for t in np.arange(0, 0.76, 0.25)])
+    ax.set_xlabel("samples with a sneeze-based event")
+    ax.tick_params(axis="y", length=0)
+    ax.grid(axis="y", visible=False)
+    slide_save(fig, OUT / "sneeze.pdf")
+
+
 if __name__ == "__main__":
     grid()
     essay()
@@ -366,3 +415,4 @@ if __name__ == "__main__":
     sankeys()
     headline()
     cutoff_investigators()
+    sneeze()
