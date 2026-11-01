@@ -1,13 +1,18 @@
 # Author evidence: does the O-lens show which sentence Qwen reads the author from?
 
-**Status (2026-10-31):** NULL. On real blog posts the O-lens gives an investigator no gain over the
-prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from, and neither
-does ceselder's layer-42 NLA. Scaled up the same evening to a natural-rate sample (1,626 cases, 657
-bloggers, flat 0.15 rule; see "Scale-up and natural sample"): O-lens − transcript AUROC −0.000
-[−0.020, +0.018], NLA − transcript −0.018 [−0.035, −0.001]; the sentence-end linear probe 0.810 vs
-transcript 0.839, and probe + transcript 0.882 (+0.044, p < 0.001). The earlier 1,316-case numbers
-below (max(0.15, 5 × median) rule, stratified sample) are superseded by that section. An earlier
-pilot on SynthPAI (synthetic comments) gave the same null and is retired.
+**Status (2026-11-01):** NULL; the natural-sample numbers are provisional, scoring being redone. An
+independent audit (2026-10-31) found the sample itself uniform, but its Haiku predictions pool
+several runs (harness 13/14/18) with positives mostly in older runs and negatives mostly in the new
+one, so run and label are confounded; 7.9% of its cases also have single-option-order labels. A
+single run over all 1,626 cases (flat rule stated in the prompt, harness 19) replaces the numbers
+below. On real blog posts the O-lens gives an investigator no gain over the prompt alone in telling
+which sentence Qwen3.6-27B infers the author's sex or age from, and neither does ceselder's layer-42
+NLA. Scaled up the same evening to a natural-rate sample (1,626 cases, 657 bloggers, flat 0.15 rule;
+see "Scale-up and natural sample"): O-lens − transcript AUROC −0.000 [−0.020, +0.018], NLA −
+transcript −0.018 [−0.035, −0.001]; the sentence-end linear probe 0.810 vs transcript 0.839, and
+probe + transcript 0.882 (+0.044, p < 0.001). The earlier 1,316-case numbers below (max(0.15, 5 ×
+median) rule, stratified sample) are superseded by that section. An earlier pilot on SynthPAI
+(synthetic comments) gave the same null and is retired.
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the

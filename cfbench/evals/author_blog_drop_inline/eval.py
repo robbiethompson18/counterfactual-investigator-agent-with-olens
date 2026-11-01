@@ -57,10 +57,9 @@ X2 = False
 WHERE = 'at every punctuation and newline token of the question and the blog post, up to "What do you think?" (before the options)'
 TIMING = "These reads are of the full message, with the sentence still in it."
 TASK_TEXT = """\
-Call the deletion significant if {model}'s probability on its answer ({answer}) falls by more than max(0.15, 5 × the median \
-fall from deleting any one sentence of this message): by more than 0.15 for most messages, since deleting a typical sentence \
-barely moves it. In the base arm its probability on {answer} is {p0:.2f} (averaged over this option order and the reversed \
-one). Give the probability that the deletion is significant, with submit_prediction."""
+Call the deletion significant if {model}'s probability on its answer ({answer}) falls by more than 0.15. In the base arm its \
+probability on {answer} is {p0:.2f} (averaged over this option order and the reversed one). Give the probability that the \
+deletion is significant, with submit_prediction."""
 
 
 def load(p: Path) -> list[dict]:
@@ -135,9 +134,7 @@ def reads(inputs: Path) -> list[str]:
 
 
 class Prompt:
-    BEHAVIOR = (
-        "Positive if deleting the sentence lowers Qwen3.6-27B's probability on its answer by more than max(0.15, 5 x the median drop)."
-    )
+    BEHAVIOR = "Positive if deleting the sentence lowers Qwen3.6-27B's probability on its answer by more than 0.15."
 
     def __init__(self, comment: str):
         self.comment = comment

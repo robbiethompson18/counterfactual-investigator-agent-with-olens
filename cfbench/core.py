@@ -139,7 +139,9 @@ P_MIN, P_MAX = 0.01, 0.99  # submit_prediction rejects probabilities outside thi
 # 18: essay_grading_inline / essay_grading_cf_inline (Robbie, 2026-10-31): placebo from another arm on a different essay of the
 # same topic, never base (it was the same essay, base allowed), new NLA and J++ conditions, single-turn effort medium. Every
 # other eval's prompts are byte-identical to 17. This eval's rows made on the branch before the merge say 15; same prompts.
-HARNESS_VERSION = 18
+# 19: author_blog_drop_inline (Kylie, 2026-11-01): the task states the flat 0.15 rule the labels use (it said max(0.15, 5 x the
+# median fall)). Every other eval's prompts are byte-identical to 18.
+HARNESS_VERSION = 19
 
 
 @dataclass

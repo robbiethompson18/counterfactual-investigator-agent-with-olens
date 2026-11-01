@@ -42,16 +42,18 @@ def wauc(y, s, w) -> float:
     return float((w[pos] * credit[pos]).sum() / (w[pos].sum() * wn.sum()))
 
 
-def main(out: Path, pred_runs: list[str], cases: Path | None = None):
+def main(out: Path, pred_runs: list[str], cases: Path | None = None, allow_pooled: bool = False):
     cs = load(cases) if cases else collect()
     batch = {r["id"]: k + 1 for k, d in enumerate(ABLATES) for r in load(d / "pairs.jsonl")} | {
         r["id"]: 3 for r in load(BATCH3.parent / "2026-10-30_ablate-loo-c/pairs.jsonl")
     }
     ps: dict[str, dict[str, float]] = {}
+    source: dict[str, set] = {}  # item -> {(run, harness version)} its predictions come from
     for run in pred_runs:
         for r in load(Path(run) / "predictions.jsonl"):
             if r.get("valid", True) and r.get("p") is not None:
                 ps.setdefault(r["condition"], {})[r["item"]] = r["p"]
+                source.setdefault(r["item"], set()).add((Path(run).name, r.get("harness_version", 1)))
     sites: dict[str, tuple[np.ndarray, dict]] = {}
     for cap in (c for c in CAPTURES if c.exists()):
         A, index = activations(cap)
@@ -61,6 +63,9 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None):
     passages = {p["id"]: p for p in load(BANK / "passages.jsonl")}
     keep = [c for c in cs if all(c["item"] in ps.get(k, {}) for k in CONDITIONS) and c["pair"] in sites]
     print(f"{len(keep)} of {len(cs)} cases have every condition and a capture")
+    runs = {x for c in keep for x in source[c["item"]]}
+    if len(runs) > 1 and not allow_pooled:  # the 2026-10-31 audit: pooled runs alias run with label (positives mostly in one)
+        raise SystemExit(f"predictions from {len(runs)} (run, harness) pairs {sorted(runs)}: score one run, or --allow-pooled")
     H, struct = [], []
     for c in keep:
         h, ix = sites[c["pair"]]
@@ -110,4 +115,4 @@ def main(out: Path, pred_runs: list[str], cases: Path | None = None):
 if __name__ == "__main__":
     args = sys.argv[2:]
     cases = Path(args.pop(args.index("--cases") + 1)) if "--cases" in args else None
-    main(Path(sys.argv[1]), [a for a in args if a != "--cases"], cases)
+    main(Path(sys.argv[1]), [a for a in args if a not in ("--cases", "--allow-pooled")], cases, "--allow-pooled" in args)

@@ -73,6 +73,13 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
     res = [(c, _wauc(y, x, w), *np.percentile(boot[c], [2.5, 97.5])) for c, x in P.items()]
     hatch = {"olens_placebo_inline": "var(--c-olens)", "nla_placebo_inline": "var(--c-nla)"}
     out = [bars(res, 0.5, 1.0, f"{title}: AUROC ({len(y)} cases); axis from 0.5 (chance)", hatch=hatch)]
+    if len(hv := {h for r in sc for h in rows_by_item[r["item"]]["harness"]}) > 1:  # the 2026-10-31 audit
+        out.insert(
+            0,
+            f"<p><b>Provisional, scoring being redone:</b> these cases' Haiku predictions come from several runs "
+            f"(harness versions {', '.join(map(str, sorted(hv)))}), with positives and negatives mostly scored in "
+            "different runs, so run and label are confounded. A single run over every case replaces this.</p>",
+        )
     body = []
     for a, b in PAIRS:
         d = boot[a] - boot[b]
@@ -87,8 +94,9 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
 def PAGE(rows: list[dict]) -> str:
     rows_by_item: dict = defaultdict(dict)
     for r in rows:  # newest run first: an item's first row per condition wins
-        if r.get("valid", True) and r.get("p") is not None:
-            rows_by_item[r["item"]].setdefault(r["condition"], r["p"])
+        if r.get("valid", True) and r.get("p") is not None and r["condition"] not in rows_by_item[r["item"]]:
+            rows_by_item[r["item"]][r["condition"]] = r["p"]
+            rows_by_item[r["item"]].setdefault("harness", set()).add(r.get("harness_version", 1))
     natural, tier_c = _scores(NATURAL), _scores(SCALEUP)
     rng = np.random.default_rng(0)
     n_auth = len({r["item"].split(":")[0] for r in natural})
