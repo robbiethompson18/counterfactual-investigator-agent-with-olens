@@ -57,6 +57,15 @@ STYLE = {
 }
 ALIASES = {"agentic": "transcript", "transcript_agentic": "transcript", "env_diff": "no_transcript", "olens_inline_nl": "olens_nl"}
 
+# A read's tokens, wherever a chart prints them (the final write-up's text uses the same marks): monospace, a space as ␣ and a
+# newline as ↵, so a token's leading space (the O-lens Mandarin bug) and the newline read positions are visible
+TOKEN_FONT = "monospace"  # matplotlib's DejaVu Sans Mono, which has both marks
+
+
+def token_text(tok: str) -> str:
+    return tok.replace(" ", "␣").replace("\n", "↵")
+
+
 # matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
 # set in the DejaVu fallback
 if shutil.which("fc-list"):

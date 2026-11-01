@@ -13,7 +13,7 @@ import argparse
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
-from graphs.style import BG, INK, MUTED
+from graphs.style import BG, INK, MUTED, TOKEN_FONT, token_text
 
 TOKENS = ["<|im_start|>", "user", "\n", "Which", " of", " the", " jov", "ian", " planets", " have", " rings", "?", "\n", "A", ".",
           " Neptune", "\n", "B", ".", " Uran", "us", "\n", "C", ".", " Saturn", "\n", "D", ".", " all", " of", " the", " above",
@@ -23,10 +23,6 @@ PROMPT_READS = {11, 14, 16, 18, 21, 23, 25, 27, 32, 38}  # "?", each option's ".
 TAIL_READS = set(range(39, 48))
 QUESTION, TAIL = "#e3b23c", "#8c2d4a"  # positions, not conditions, so outside the condition palette
 LINE_H = 0.078  # axes units per line
-
-
-def shown(tok: str) -> str:
-    return tok.replace("\n", "↵")
 
 
 def main():
@@ -42,7 +38,7 @@ def main():
     for i, tok in enumerate(TOKENS):
         color = QUESTION if i in PROMPT_READS else TAIL if i in TAIL_READS else None
         ink = "white" if color == TAIL else MUTED if tok.startswith("<") or tok.strip() == "" else INK
-        t = ax.text(x, y, shown(tok), family="monospace", fontsize=9.5, va="center", ha="left", color=ink, zorder=3)
+        t = ax.text(x, y, token_text(tok), family=TOKEN_FONT, fontsize=9.5, va="center", ha="left", color=ink, zorder=3)
         box = t.get_window_extent()
         w = to_axes.transform((box.x1, 0))[0] - to_axes.transform((box.x0, 0))[0]  # the token's real drawn width
         if color:
