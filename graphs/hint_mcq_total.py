@@ -18,7 +18,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs.style import INK, MUTED, bar_kw
+from graphs.style import INK, MUTED, OLENS, bar_kw
 
 RUNS = Path("data/runs/cfbench")
 ORIG = {"d1": ["2026-10-27_answer-mcq-olens-header", "2026-10-27_answer-mcq-orig-killed-d1"],
@@ -27,7 +27,7 @@ OTHER_PREDICTORS = ("sol50", "astra10")
 TITLE = {"d1": "hint is the correct answer", "d2": "hint is the wrong answer"}
 CANON = {"agentic": "transcript_agentic", "olens": "olens_agentic", "olens_placebo": "olens_placebo_agentic"}
 CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
-LABEL = {"transcript_agentic": "Transcript-only", "olens_agentic": "O-lens", "olens_placebo_agentic": "O-lens placebo"}
+LABEL = {"transcript_agentic": "Transcript-only", "olens_agentic": OLENS, "olens_placebo_agentic": f"{OLENS} placebo"}
 YLABEL = "% draws naming Qwen's no-hint answer"
 N_BOOT = 4000
 

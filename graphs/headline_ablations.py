@@ -27,7 +27,7 @@ import numpy as np
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from graphs import cutoff_qa_inline, menus_inline
 from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
-from graphs.style import MUTED, ci_bar, diff_rows, label, positions
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
@@ -46,7 +46,7 @@ def by_correctness() -> dict[str, dict[str, dict]]:
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
     right["cutoff"] = {i: g == "stable_right" for i, (g, _) in cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)[TS].items()}
     menus = menus_inline.load()
-    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge cutoff": "cutoff"}
+    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
     menu_name = {c: m for m, c in CANON.items()}
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
@@ -186,7 +186,7 @@ def main(out: Path) -> None:
         "Essay grading, by whether Qwen grades the micro-essay like the human did",
         "95% bootstrap CI over micro-essays",
     )
-    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), ("O-lens", ["olens_inline", "olens_placebo_inline"])],
+    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), (OLENS, ["olens_inline", "olens_placebo_inline"])],
                  out / "headline-blog-correctness.png", "Blog sentence deletion, by whether Qwen is right about the author",
                  "95% bootstrap CI over bloggers")  # fmt: skip
 

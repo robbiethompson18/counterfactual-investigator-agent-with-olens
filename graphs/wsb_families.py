@@ -10,10 +10,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.style import INK, MUTED, bar_kw, color
+from graphs.style import INK, MUTED, OLENS, bar_kw, color
 
 SERIES = ["sonnet", "olens", "qwen"]
-LABEL = {"olens": "Qwen O-lens", "sonnet": "Sonnet, text only", "qwen": "Stock Qwen, asked directly"}
+LABEL = {"olens": f"Qwen {OLENS}", "sonnet": "Sonnet, text only", "qwen": "Stock Qwen, asked directly"}
 # the style's condition behind each series: stock Qwen is gray, no tools: it is not the NLA's green
 CONDITION = {"olens": "olens", "sonnet": "transcript", "qwen": "no_transcript"}
 
@@ -59,7 +59,7 @@ def main(out: Path) -> None:
     ax.set_ylim(0, 1.08)
     ax.set_ylabel("score (fraction correct)")
     ax.grid(axis="x", visible=False)
-    ax.set_title("WorkspaceBench families on Qwen3.6-27B: does the O-lens beat just asking?", pad=22)
+    ax.set_title(f"WorkspaceBench families on Qwen3.6-27B: does the {OLENS} beat just asking?", pad=22)
     handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(CONDITION[s])) for s in SERIES]
     ax.legend(handles, [LABEL[s] for s in SERIES], loc="lower left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0, 1.0))
     fig.subplots_adjust(bottom=0.3)
