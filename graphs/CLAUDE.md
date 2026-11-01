@@ -18,3 +18,9 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
 🔮 of "🔮-lens" comes from the monochrome Noto Emoji (`brew install --cask font-noto-emoji`), and
 without it labels fall back to "O-lens" (`style.OLENS`). Each module's first docstring line says
 what it draws and which doc shows it; `grep -m1 '"""' graphs/*.py` lists them.
+
+Canonical runs for the final write-up: every lens number, chart and token count on MCQ (MMLU-Pro,
+SuperGPQA), knowledge cutoff and preferences comes only from the menus_inline runs listed in
+`cfbench/catalog.py` `MENUS`, menu `CANONICAL_MENU`, with their 3-draw top-ups; never the 2026-10-29
+per-set runs (their read positions and prompts differ by set). Essay grading has no menus run and
+keeps its own.

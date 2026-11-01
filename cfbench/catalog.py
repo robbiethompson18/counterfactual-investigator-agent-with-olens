@@ -15,7 +15,7 @@ CF = Path(R)
 
 # ---- the final write-up: MCQ, knowledge cutoff, preferences (menus_inline) ----
 
-# set -> (title, runs); the canonical runs for the write-up's MCQ / cutoff / preferences numbers (CLAUDE.local.md): draw 0 of
+# set -> (title, runs); the canonical runs for the write-up's MCQ / cutoff / preferences numbers (graphs/CLAUDE.md): draw 0 of
 # every menu, then `*-all-d12b` / `-d12c`, draws 1-2 of prompt only and the `all` menu (the MCQ sets' d12b ran out of credits
 # mid-upload, so their d12c holds d12b's rows plus the rest), and `*-prompt-d12`, draws 1-2 of the `prompt` menu (the MCQ sets'
 # ran on robbie-box, so their date is UTC)
