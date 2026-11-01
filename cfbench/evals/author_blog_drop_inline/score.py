@@ -74,8 +74,6 @@ def _panel(rows_by_item: dict, scores: list[dict], weighted: bool, rng, title: s
     res = [(c, _wauc(y, x, w), *np.percentile(boot[c], [2.5, 97.5])) for c, x in P.items()]
     hatch = {"olens_placebo_inline": "var(--c-olens)", "nla_placebo_inline": "var(--c-nla)"}
     out = [bars(res, 0.5, 1.0, f"{title}: AUROC ({len(y)} cases); axis from 0.5 (chance)", hatch=hatch)]
-    if missing := [c for c in CONDS if c not in conds]:
-        out.insert(0, f"<p><b>Pending:</b> {', '.join(missing)} (not yet run on these cases in the clean run).</p>")
     if len(hv := {h for r in sc for h in rows_by_item[r["item"]]["harness"]}) > 1:  # the 2026-10-31 audit
         out.insert(
             0,
@@ -118,9 +116,8 @@ def PAGE(rows: list[dict]) -> str:
             "where Qwen is confident (c ≥ 0.5, both option orders agree) and stable (median deletion TV &lt; 0.05). Claude Haiku "
             "5.5 (effort low, one draw) gives P(significant) from the prompt and the sentence alone (transcript), plus agu18dec's "
             "O-lens reads of Qwen3.6-27B at every punctuation and newline token of the question and post, layers 32/40/48 "
-            "(O-lens, temperature 1), or another post's reads in their place (placebo); or, at the same tokens, ceselder's "
-            "Qwen3.6-27B NLA (qwen3.6-27b-nla-rl, layer 42, greedy, with its critic FVE) (NLA), or another post's NLA "
-            "explanations (NLA placebo). Linear probe: the standard L2 logistic probe (λ = 1, training-only standardisation) on "
+            "(O-lens, temperature 1), or another post's reads in their place (placebo). Linear probe: the standard L2 "
+            "logistic probe (λ = 1, training-only standardisation) on "
             "Qwen's layer-48 residual at the sentence's last token, fit to these labels, nested out of fold (5 folds grouped by "
             "blogger); not an investigator, so no test against one.</p>"
         ),
@@ -132,6 +129,7 @@ def PAGE(rows: list[dict]) -> str:
             "one-sided p resample bloggers (2,000 draws).</p>"
         ),
         *_panel(clean, natural, False, rng, "Natural sample"),
+        *_panel(clean, [r for r in natural if r["version"] == "qwen_wrong"], False, rng, "Natural sample, Qwen wrong"),
         "<h3>Batches 1–3 (secondary)</h3>",
         (
             f'<p class="mute">{len(tier_c)} cases: every confident Qwen-wrong pair and a sample of Qwen-right pairs per batch, '
@@ -143,8 +141,8 @@ def PAGE(rows: list[dict]) -> str:
         (
             f'<p class="mute">Write-up: <a href="{REPO}/blob/main/docs/author-mcq-probe.md">docs/author-mcq-probe.md</a>. Scores: '
             f'<a href="{HF}{NATURAL.rsplit("/", 1)[0]}">natural sample</a>, <a href="{HF}{SCALEUP.rsplit("/", 1)[0]}">batches 1–3</a>. '
-            f'<a href="{HF}runs/author_mcq_blog">Qwen answers and deletions</a>, <a href="{HF}runs/olens_reads">O-lens reads</a>, '
-            f'<a href="{HF}runs/nla_reads">NLA reads</a>. Data: '
+            f'<a href="{HF}runs/author_mcq_blog">Qwen answers and deletions</a>, <a href="{HF}runs/olens_reads">O-lens reads</a>. '
+            "Data: "
             '<a href="https://huggingface.co/datasets/tasksource/blog_authorship_corpus">Blog Authorship Corpus</a> '
             "(Schler et al. 2006).</p>"
         ),
