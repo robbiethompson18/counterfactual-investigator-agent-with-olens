@@ -39,7 +39,10 @@ from cfbench.scoring import (
     rmse_null,
 )
 from graphs import cfbench_modelchart as modelchart
-from graphs.style import INK, MUTED, OLENS, bar_kw, color, marker_kw
+from graphs.style import INK, MUTED, OLENS, bar_kw, color, departure, marker_kw
+
+DEPARTURE = (f"investigator Gemini 3.8 Flash with tools (read and grep transcripts and reads, 20 calls); {OLENS} shown through a tool "
+             "at layers 32/40/48; placebo from a different env; scored as RMSE of the predicted rate.")  # fmt: skip
 
 TOOL_CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
 TOOLS = ["read_transcript", "search_transcripts", "search_olens", "olens_at"]
@@ -94,6 +97,7 @@ def chart_pooled(cases, out):
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
     ax.set_title("Prediction accuracy by what the investigator sees, all targets")
     fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.08)
+    departure(fig, DEPARTURE)
     fig.savefig(f"{out}/skill_pooled.png")
     plt.close(fig)
     return s
@@ -113,6 +117,7 @@ def chart_subset(cases, title: str, note: str, fname: str, out) -> dict:
     fig.suptitle(title, x=0.12, y=0.975, ha="left", fontsize=10.5, color=INK)
     ax.set_title(note, color=MUTED)
     fig.subplots_adjust(left=0.12, right=0.98, top=0.89, bottom=0.08)
+    departure(fig, DEPARTURE)
     fig.savefig(f"{out}/{fname}")
     plt.close(fig)
     return s
@@ -206,6 +211,7 @@ def chart_by_target(per_target: dict[str, dict], out):
     bx.set_title("Gain over transcript-only (same cases)")
 
     fig.subplots_adjust(left=0.07, right=0.98, top=0.92, bottom=0.14)
+    departure(fig, DEPARTURE)
     fig.savefig(f"{out}/skill_by_target.png")
     plt.close(fig)
 
