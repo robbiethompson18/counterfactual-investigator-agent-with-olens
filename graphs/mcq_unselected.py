@@ -14,12 +14,13 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.catalog import MCQ_UNSELECTED_RUNS
 from cfbench.scoring import standard_mcq_comparison
 from graphs.cutoff_qa_inline import BARS, bar_chart, diff_panel, per_item
 from graphs.style import MUTED
 
 BARS_MCQ = [*BARS, ("Probe\nuser\nend", ["probe_user_end"]), ("Probe\nfinal\ntoken", ["probe_response_start"])]
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_mcq-unselected-haiku-{s}") for s in ("b1r", "b2", "jlens-b1", "jlens-b2", "nla-b1", "nla-b2")]
+RUNS = MCQ_UNSELECTED_RUNS
 GROUPS = {"all cases": None, "Qwen's letter is the gold": True, "Qwen's letter is wrong": False}
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [

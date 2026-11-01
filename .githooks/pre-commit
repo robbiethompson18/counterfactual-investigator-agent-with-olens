@@ -1,6 +1,5 @@
 #!/bin/sh
-# Ruff and ty on staged Python files.
-# Enable once per clone: git config core.hooksPath .githooks
+# Ruff and ty on staged Python files. Enable once per clone: git config core.hooksPath .githooks
 files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.py')
 [ -z "$files" ] && exit 0
 # --force-exclude so explicitly passed vendor/ paths still honor the pyproject excludes

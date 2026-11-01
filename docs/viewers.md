@@ -1,7 +1,10 @@
 # Viewers: static pages on the public internet, no backend
 
-**Status (2026-10-27):** ACTIVE. The rule for every viewer in this repo, set by Robbie on
-2026-10-26; GitHub Pages enabled 2026-10-27.
+**Status (2026-10-31):** ACTIVE. The rule for every viewer in this repo, set by Robbie on
+2026-10-26. The GitHub Pages workflow was deleted on 2026-10-31 (Robbie: no CI), so the GitHub Pages
+site (env viewer, expview, talk.pdf, final-writeup.html) is frozen at its last deploy; the pages
+keep working because their data comes from HF, but a page or `spec/` change needs a hand deploy
+(re-add a workflow, or push a `site/` folder to a `gh-pages` branch).
 
 ## The rule
 
@@ -28,9 +31,9 @@ directly. No server process, nothing on bramble or a tailnet, no SkyPilot pod be
   deploying `main`.
 - **GitHub Pages:** the repo has one site,
   https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/, with Pages
-  source set to GitHub Actions (enabled 2026-10-27). `.github/workflows/env-viewer-pages.yml` builds
-  it from a `site/` folder, and each deploy replaces the whole site, so a second page goes into that
-  same workflow's `site/` (e.g. `site/<page>/index.html`), not a second workflow.
+  source set to GitHub Actions (enabled 2026-10-27). Its workflow (`env-viewer-pages.yml`, last at
+  commit `dedff0ca`) was deleted on 2026-10-31; the site is frozen at that deploy. Each deploy
+  replaced the whole site from a `site/` folder, so any hand redeploy must ship every page at once.
 
 ## The one exception: Search everything (Kylie, 2026-10-27)
 
@@ -81,9 +84,9 @@ Checked and rejected the same day:
 | ------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
 | CHIVE cases                           | https://chive-cases.pages.dev                                                                   | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in                            |
 | O-lens token viewer                   | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
-| expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html`, `.github/workflows/env-viewer-pages.yml`              | `envs/*/*/`, `runs/**/expview/`     |
-| env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html`, `.github/workflows/env-viewer-pages.yml`            | `envs/*/spec/`, `envs/*/links.json` |
-| talk deck (PDF)                       | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/talk.pdf        | `slides/talk/`, `.github/workflows/env-viewer-pages.yml`                           | `evals/`, `runs/` (figures)         |
+| expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html` (frozen deploy, see above)                             | `envs/*/*/`, `runs/**/expview/`     |
+| env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html` (frozen deploy, see above)                           | `envs/*/spec/`, `envs/*/links.json` |
+| talk deck (PDF)                       | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/talk.pdf        | `slides/talk/` (frozen deploy; rebuild by hand with `make -C slides`)              | `evals/`, `runs/` (figures)         |
 
 The old expview page, https://expview.pages.dev (Cloudflare), still works but is frozen at its
 2026-10-26 code; expview now deploys with the env viewer to GitHub Pages under `/expview/`.

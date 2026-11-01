@@ -2,7 +2,7 @@
 transcript, and transcript plus O-lens / NLA / J++ reads, each beside its placebo; plus paired differences by claim
 (cfbench/evals/chive_agam_inline, docs/chive-inline.md).
 
-    uv run python -m graphs.chive_agam_inline --runs data/runs/cfbench/<nolens run> data/runs/cfbench/<lens run>
+    uv run python -m graphs.chive_agam_inline [--runs RUN ...]  # default: cfbench.catalog.CHIVE_AGAM_RUNS
 """
 
 import argparse
@@ -11,8 +11,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import CHIVE_AGAM_RUNS
 from cfbench.evals.chive_agam_inline.score import PAIRS, table
-from graphs.style import MUTED, OLENS, ci_bar, diff_rows, positions
+from graphs.style import MUTED, OLENS, ci_bar, departure, diff_rows, positions
+
+DEPARTURE = "reads also cover Qwen's original reply; placebo is another incident's reads; Haiku gives P(claim) scored as AUROC."
 
 GROUPS = [
     ("edit only", ["no_transcript_inline"]),
@@ -40,7 +43,8 @@ def main(runs: list[Path], out: Path, out_diff: Path):
     fig.text(0.995, 0.97, "hatched = placebo", ha="right", fontsize=8, color=MUTED)
     note = ("Haiku 5.5, effort medium, 3 draws per claim. Reads of the original conversation and reply, every punctuation and "
             "end-of-turn token plus the ten tokens before the reply,\nlayers 32-60. 95% bootstrap CIs over claims.")  # fmt: skip
-    fig.text(0.01, -0.05, note, fontsize=7, color=MUTED)
+    fig.supxlabel(note, x=0.01, ha="left", fontsize=7, color=MUTED)
+    departure(fig, DEPARTURE)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)
@@ -60,7 +64,7 @@ def main(runs: list[Path], out: Path, out_diff: Path):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--runs", type=Path, nargs="+", required=True)
+    p.add_argument("--runs", type=Path, nargs="+", default=CHIVE_AGAM_RUNS)
     p.add_argument("--out", type=Path, default=Path("docs/img/chive-agam-inline.png"))
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/chive-agam-inline-diff.png"))
     a = p.parse_args()

@@ -13,6 +13,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import CHIVE_RUN
 from cfbench.evals.chive_inline.score import auroc
 from chive_critique.data import ADAM_LABELS, ADAM_RUNS, adam
 from graphs.style import MUTED, ci_bar, diff_rows
@@ -83,7 +84,7 @@ def main(run: Path, out: Path, out_diff: Path):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--run", type=Path, default=Path("data/runs/cfbench/2026-10-31_chive-haiku"))
+    p.add_argument("--run", type=Path, default=CHIVE_RUN)
     p.add_argument("--out", type=Path, default=Path("docs/img/chive-inline.png"))
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/chive-inline-diff.png"))
     a = p.parse_args()

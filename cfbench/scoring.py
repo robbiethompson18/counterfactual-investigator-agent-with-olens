@@ -1,11 +1,11 @@
-"""Run selection, loading and scoring behind the report charts (`graphs.cfbench_report`) and `cfbench.score`.
+"""Loading and scoring behind the report charts (`graphs.cfbench_report`) and `cfbench.score`.
 
-The method is written up in docs/cfbench-scoring.md. In short: a case is an ordered arm pair; its score is the squared
-error of the predicted rate against the counterfactual arm's observed rate, averaged over the predictor's draws; cases
-have equal weight; the headline is RMSE next to the RMSE of "the edit does nothing" (predict the base arm's rate).
+Which runs are read is cfbench/catalog.py. The method is written up in docs/cfbench-scoring.md. In short: a case is an
+ordered arm pair; its score is the squared error of the predicted rate against the counterfactual arm's observed rate,
+averaged over the predictor's draws; cases have equal weight; the headline is RMSE next to the RMSE of "the edit does
+nothing" (predict the base arm's rate).
 """
 
-import glob
 import json
 import math
 import os
@@ -18,6 +18,7 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import binom
 
+from cfbench.catalog import AUTHOR_PROBE_RUN, AUTHOR_RUNS, ESSAY_LENS_RUNS, STANDARD_PROBE_RUN
 from cfbench.core import P_MAX, P_MIN, canon_condition
 
 PREDICTOR = "google/gemini-3.8-flash"
@@ -33,50 +34,8 @@ LABEL = {
 NULL_LABEL = "Edit does nothing"
 OLD_LENS = "olens_s3d_rl600"  # the pre-space lens; its reads are never reused (CLAUDE.md, docs/olens-space-migration.md)
 
-R = "data/runs/cfbench/"
 HF_REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"
 HF_URL = f"https://huggingface.co/datasets/{HF_REPO}/resolve/main/"
-
-
-def _nt(pat: str) -> list[str]:
-    """Env-diff-only (no_transcript) runs; nt2-* are reruns of nt-* (fixed model name, or the rest of a crashed run)."""
-    return sorted(
-        d
-        for d in glob.glob(R + f"2026-10-2[45]_nt-{pat}") + glob.glob(R + f"2026-10-2[45]_nt2-{pat}")
-        if os.path.exists(d + "/predictions.jsonl")
-    )
-
-
-def groups() -> dict[str, list[str]]:
-    """Target model -> cfbench run dirs, in load order (a later dir's rows replace an earlier one's for the same draw).
-
-    Add new runs here; nothing else in the charts names a run. Env-diff-only runs go last so they never shadow a tool
-    condition's row.
-    """
-    return {
-        "GLM 5.3": sorted(glob.glob(R + "2026-10-24_glm-h6-*") + glob.glob(R + "2026-10-24_glm-h6[bcd]-*")) + _nt("glm-*"),
-        "Qwen w/o CoT": [R + f"2026-10-23_grade-big{p}-{s}" for p in ("", "2") for s in ("cue", "who", "heldout")]
-        + sorted(glob.glob(R + "2026-10-25_nocot-cf-*"))  # thinking-off sweep
-        + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
-        + sorted(glob.glob(R + "2026-10-2[45]_nocot-nt-*")),
-        "Qwen w/ CoT": [
-            R + "2026-10-24_donation-think-on-smoke",
-            R + "2026-10-22_gflash-olens-v2-exfil",
-            R + "2026-10-22_gflash-olens-v2-inline-b",
-        ]
-        + _nt("qwen-donation-*")
-        + _nt("qwen-scheming-exfil")
-        + _nt("qwen-dumb-user-report-*"),
-    }
-
-
-def hidden_goal_runs() -> list[str]:
-    """The pre-registered 38-case hidden_goal.grade test (docs/envs/hidden_goal.md), Qwen3.6-27B without CoT.
-
-    `grade-big-*` is the abandoned first part, `grade-big2-*` the rest via --skip; `nt*-qwen-grade-*` the env-diff-only rows.
-    """
-    tool = sorted(glob.glob(R + "2026-10-23_grade-big-*") + glob.glob(R + "2026-10-23_grade-big2-*"))
-    return tool + [d for s in ("cue", "who", "heldout") for d in _nt(f"qwen-grade-{s}")]
 
 
 def variant_of(row: dict) -> str:
@@ -261,7 +220,6 @@ def coverage(rows: dict[tuple, dict], cases: dict[tuple, Case]) -> dict:
 
 
 # Standardized probe results. Charts share this loader instead of retaining the old selected-layer summaries.
-STANDARD_PROBE_RUN = "runs/standard_probes/2026-10-31_nested2-v1"
 
 
 def standard_probe_file(relative: str):
@@ -353,9 +311,6 @@ def standard_mcq_comparison(runs, target: str) -> tuple[dict, dict]:
     common = set.intersection(*(set(items) for items in data.values()))
     assert common and all(set(items) == common for items in data.values()), "Conditions must cover identical comparison questions"
     return data, groups
-
-
-ESSAY_LENS_RUNS = ("2026-10-31_essay-cf-b-ts", "2026-10-31_essay-cf-b-olens2", "2026-10-31_essay-cf-b-nla4", "2026-10-31_essay-cf-b-jlens")
 
 
 def essay_probe_scores(site: str) -> dict:
@@ -618,8 +573,6 @@ def essay_flips() -> tuple[int, int]:
 # answer about the blogger? Per case the investigator's p (one draw) from the eval's two runs, the task-fit standard L2
 # probe's out-of-fold score (scripts/author_probe/period_check.py, runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl);
 # CIs and stars resample bloggers.
-AUTHOR_RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]
-AUTHOR_PROBE_RUN = Path("runs/author_mcq_blog/2026-10-31_period-probe")
 AUTHOR_CONDS = ["transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline"]
 AUTHOR_GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
                  ("NLA", ["nla_inline", "nla_placebo_inline"]), ("probe", ["probe"]),

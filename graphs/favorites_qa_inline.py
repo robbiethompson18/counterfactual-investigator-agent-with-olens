@@ -10,9 +10,10 @@ paired-difference figure are graphs.cutoff_qa_inline's (bar_chart, diffs) (docs/
 import argparse
 from pathlib import Path
 
+from cfbench.catalog import FAVORITES_QA_INLINE_RUNS
 from graphs.cutoff_qa_inline import bar_chart, diffs
 
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_favorites-haiku-v3-{s}") for s in ("olens", "jlens", "nla")]
+RUNS = FAVORITES_QA_INLINE_RUNS
 GROUPS = {"all items": None, "pick one": "pick_one", "recommend": "recommend", "choose for a purpose": "choose_for",
           "favorite": "favorite", "name one": "name_one"}  # fmt: skip
 

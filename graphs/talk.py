@@ -17,6 +17,7 @@ from huggingface_hub import hf_hub_download
 from matplotlib.colors import to_hex, to_rgb
 from matplotlib.patches import Rectangle
 
+from cfbench.catalog import CF, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS
 from cfbench.scoring import (
     AUTHOR_GROUPS,
     AUTHOR_VERSIONS,
@@ -29,13 +30,32 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
-from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, menus_inline
+from graphs import author_blog_drop, cutoff_qa_investigators, data_filter_sankey, headline_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
+from graphs.essay_grading import DEPARTURE as ESSAY_DEPARTURE
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
-from graphs.olens_mandarin import RUN as MANDARIN_RUN
-from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
+from graphs.style import (
+    BG,
+    FAINT,
+    FULL_W,
+    HALF_W,
+    INK,
+    MUTED,
+    OLENS,
+    SLIDE_S,
+    bar_kw,
+    departure,
+    label,
+    positions,
+    slide,
+    slide_figure,
+    slide_save,
+)
+
+GRID_DEPARTURE = (f"investigator Gemini 3.8 Flash at effort low; {OLENS} at layers 32/40/48/52; positions are the option newlines and "
+                  "the end of the prompt only.")  # fmt: skip
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
@@ -122,6 +142,7 @@ def grid() -> None:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    departure(fig, GRID_DEPARTURE)
     # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
     fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")
@@ -134,6 +155,7 @@ def essay() -> None:
     fig, ax = slide_figure(FULL_W, 24)
     essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)", mean=False, null_line=False)  # the frame title asks "does Qwen's grade go up"
     ax.set_xticklabels([t.get_text() + "†" * (t.get_text() == "probe") for t in ax.get_xticklabels()])  # the footnote's dagger
+    departure(fig, ESSAY_DEPARTURE)
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -189,7 +211,7 @@ def grader() -> None:
     """Two pairs of bars at the "." ending "If you are not sure, give your best guess.", chat template vs the submit_answer tool
     template, on the 863 cutoff_qa items read in both: the share of O-lens reads (six layers) saying "grader"/"graded" (not in the
     prompt), and the share of items with at least one such read, in a lighter shade of the bar's colour (hatching means placebo)."""
-    run = Path("runs/cutoff_grader_mentions/2026-10-30_regex")
+    run = Path(CUTOFF_GRADER_MENTIONS_RUN)
     if not (Path("data") / run / "novel_hits.jsonl").exists():
         for f in ("item_counts.csv", "novel_hits.jsonl"):
             hf_hub_download(HF_REPO, f"{run}/{f}", repo_type="dataset", local_dir="data")
@@ -329,6 +351,7 @@ def author() -> None:
     axes[0].set_yticks(yt, [f"{t:.1f}" for t in yt])
     axes[0].set_ylabel("AUROC of P(significant)")
     axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    departure(fig, author_blog_drop.DEPARTURE)
     slide_save(fig, OUT / "author.pdf")
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
             "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
@@ -360,10 +383,10 @@ def headline() -> None:
     """The write-up's headline at slide size: pooled over the three tasks, transcript only and the three lenses, then the lenses
     beside their placebos (fig/headline.pdf); the lenses against the probe on multiple choice as % right and as error rate
     (fig/headline_probes.pdf); and each task's seven bars (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
-    for _, runs in menus_inline.SETS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
+    for _, runs in MENUS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
         for run in runs:
             for f in ("meta.json", "predictions.jsonl"):
-                if not (menus_inline.R / run / f).exists():
+                if not (CF / run / f).exists():
                     hf_hub_download(HF_REPO, f"runs/cfbench/{run}/{f}", repo_type="dataset", local_dir="data")
     boot = Boot(headline_inline.load())
     lens_groups = [(label(c), [c]) for c in LENSES]
@@ -414,11 +437,11 @@ def cutoff_investigators() -> None:
         ax.set_ylabel(None)
         ax.set_yticks([0, 50, 100])
     fig.supylabel("% naming Qwen's answer", fontsize=8 * SLIDE_S)
-    fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), frameon=False, fontsize=7 * SLIDE_S)
+    axes[-1].legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=5, fontsize=7 * SLIDE_S)
+    departure(fig, cutoff_qa_investigators.DEPARTURE)
     slide_save(fig, OUT / "cutoff_investigators.pdf")
 
 
-DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
 DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5"}  # up to 5 (Kylie)
 
 
