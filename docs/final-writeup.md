@@ -3,33 +3,7 @@
 **Status (2026-10-31):** ACTIVE. Draft for the sprint interview; headers only, Robbie is writing it
 by hand.
 
-@agents sorry still haven't decided what is canonical between tail and all tokens. Might flip flop
-again sadly.
-
-<!-- AGENTS (Robbie, 2026-10-31): every lens number, chart and token count for MCQ (MMLU-Pro, SuperGPQA), knowledge
-cutoff and preferences comes ONLY from the canonical menus_inline runs, `all` menu (each prompt's punctuation and option
-newlines plus the 9 tail tokens, layers 32-60, same prompt and placebo rules on every set): `graphs/menus_inline.py` SETS and
-CANONICAL, plus their 3-draw top-ups (`*-all-d12b` / `-d12c`). The `prompt` menu (no tail tokens, top-ups `*-prompt-d12`) is
-the token-position ablation, also at 3 draws; it was briefly canonical on 2026-10-31 evening. Never the 2026-10-29 per-set runs (mcq-unselected-haiku-*, supergpqa-haiku-3k-*,
-cutoff-qa-1k-*, favorites-haiku-v3-*): each set there read different positions (J++ at every token on three sets, 16
-positions on MMLU-Pro) with a different prompt. Essay grading has no menus run and keeps its own. -->
-
-> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31): canonical means the `menus_inline` runs, `all`
-> menu: every lens read at the same positions (each prompt's punctuation and option newlines plus
-> the 9 tail tokens at the start of the assistant turn), all six layers 32/40/48/52/56/60, one
-> prompt and one placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes
-> from something else and must be redone on those runs before this ships. Status at 17:30 PDT: every
-> Multiple Choice, Knowledge Cutoff and Idiosyncratic Preferences chart and number is now on the
-> canonical runs at 3 draws (top-ups `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their
-> 🚧 blocks are gone. The `prompt` menu (no tail tokens) has 3 draws too (`*-prompt-d12`) and is the
-> token-position ablation. What's left marked 🚧 is blog authorship and the counterfactual charts.**
-
-Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
-review I will write (KTR). For Claude I will write (CTR).
-
-TODO BROAD:
-
-- put essay grading and blog posts into some null tasks.
+@agents: canonical is prompt toekns and assistant boilerpalte tokens.
 
 RULES FOR CLAUDE:
 
@@ -145,9 +119,6 @@ promising, and move on to other datasets.[^datadetail]
 
 <img src="img/chive-agam-inline.png" alt="AUROC on 515 CHIVE-style claims over Agam's Qwen3.6-27B incidents: edit only 0.775, transcript 0.780, 🔮-lens 0.788 vs placebo 0.787, NLA 0.784 vs 0.780, J++ 0.791 vs 0.788" width="600">
 
-> 🚧 **Departure from defaults:** reads also cover Qwen's original reply; placebo is another
-> incident's reads; Haiku gives P(claim) scored as AUROC.
-
 ## II: Our New Simple Evals
 
 Many of our environments that work are ideas stolen from WorkspaceBench. The additions we make to
@@ -161,22 +132,22 @@ their dataset:
   most importantly, to _not filter our dataset in potentially biasing ways_. To be concrete:
   WorkspaceBench filters their `knowledge_cutoff` data to answers which disagree with Sonnet and
   Opus. So if they ask Qwen "Who is the CEO of Intel?" and both Qwen and Opus reply "Pat Gelsinger"
-  then they drop this datapoint. This makes any transcript-only baseline confounded: we have already
-  filtered to examples where our prompt only judge will be wrong. We drop this filter and others
-  like it.
+  then they drop this datapoint. This makes any prompt-only baseline confounded: we have already
+  filtered to examples where a prompt-only judge will be wrong. We drop this filter and others like
+  it.
 
 ### Headline
 
 Metamodels work convincingly on three tasks: Multiple Choice, Knowledge Cutoff, and Idiosyncratic
-Preferences. The 🔮-lens and NLA are about equally good (+3.0 and +2.6pp over transcript only,
-pooled), and J++ doesn't help overall (−1.6pp). The next few charts show pooled correctness over all
-three tasks. Our investigator is always Haiku 5.5 on medium effort.
+Preferences. The 🔮-lens and NLA are about equally good (+3.0 and +2.6pp over prompt only, pooled),
+and J++ doesn't help overall (−1.6pp). The next few charts show pooled correctness over all three
+tasks. Our investigator is always Haiku 5.5 on medium effort.
 
-<img src="img/headline-metamodels.png" alt="Pooled over the three tasks: transcript only 80.9%, 🔮-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
+<img src="img/headline-metamodels.png" alt="Pooled over the three tasks: prompt only 80.9%, 🔮-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
 
 All three beat their placebo versions (where we swap in metamodel data from a different question) by
 statistically significant amounts. J++'s gap comes from its placebo hurting the investigator, not
-from J++ helping: the J++ placebo is 30.1pp below transcript-only, and real J++ is 1.6pp below it:
+from J++ helping: the J++ placebo is 30.1pp below prompt only, and real J++ is 1.6pp below it:
 
 <img src="img/headline-placebos.png" alt="Pooled over the three tasks: 🔮-lens 83.9% vs placebo 76.3%, J++ 79.3% vs 50.8%, NLA 83.5% vs 80.4%" width="500">
 
@@ -223,7 +194,7 @@ SuperGPQA,
 and
 [Qwen wrong](https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/16cb4b7d-d5bf-446a-bb4d-87e139ece6d3).
 
-<img src="img/headline-mcq.png" alt="Multiple Choice, transcript only, three metamodels and their placebos" width="500">
+<img src="img/headline-mcq.png" alt="Multiple Choice, prompt only, three metamodels and their placebos" width="500">
 
 ### Knowledge Cutoff
 
@@ -241,7 +212,7 @@ Example Qwen transcripts on Docent:
 and
 [current answer, Revolut's headquarters](https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/fc6c6634-8ec2-4014-9b32-1727bc7d4b2a).
 
-<img src="img/headline-cutoff.png" alt="Knowledge Cutoff, transcript only, three metamodels and their placebos" width="500">
+<img src="img/headline-cutoff.png" alt="Knowledge Cutoff, prompt only, three metamodels and their placebos" width="500">
 
 This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen. Asked the
 questions itself, Haiku gives Qwen's stale answer on 25% of the 339 stale items; Gemini 2.5
@@ -249,10 +220,7 @@ Flash-Lite, whose cutoff (January 2025) is about Qwen's, gives it on 63%. Use an
 similar knowledge cutoff and the metamodels' uplift disappears. Concretely, the far right blue bar
 is a strong and arguably fairer baseline, and we show no uplift to it.
 
-<img src="img/cutoff-qa-investigators.png" alt="Knowledge Cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, transcript only 63.6%, 🔮-lens 76.1% (placebo 67.2%), J++ 71.4% (placebo 42.5%), NLA 74.6% (placebo 67.8%); Gemini 2.5 Flash-Lite answers itself 63.1%, transcript only 73.1%; with not-stale and all-items panels" width="600">
-
-> 🚧 **Departure from defaults:** Flash-Lite rows are one draw per item; Haiku's "told" bar (model
-> name and cutoff given) is on an earlier prompt.
+<img src="img/cutoff-qa-investigators.png" alt="Knowledge Cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, prompt only 63.6%, 🔮-lens 76.1% (placebo 67.2%), J++ 71.4% (placebo 42.5%), NLA 74.6% (placebo 67.8%); Gemini 2.5 Flash-Lite answers itself 63.1%, prompt only 73.1%; with not-stale and all-items panels" width="600">
 
 Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to
 8–34%, because it takes the bullets at face value ([docs/cutoff-qa-inline.md](cutoff-qa-inline.md)).
@@ -276,7 +244,7 @@ Example Qwen transcripts on Docent:
 and
 [text editor over SSH](https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/aabae6b8-472e-474d-9076-7ebef10dd4f2).
 
-<img src="img/headline-preferences.png" alt="Idiosyncratic Preferences, transcript only, three metamodels and their placebos" width="500">
+<img src="img/headline-preferences.png" alt="Idiosyncratic Preferences, prompt only, three metamodels and their placebos" width="500">
 
 ### Essay Grading
 
@@ -299,9 +267,6 @@ and
 
 <img src="img/headline-essay.png" alt="Essay grading, AUROC of P(score goes up): transcript only 0.753, 🔮-lens 0.775 (placebo 0.757), NLA 0.760 (0.757), J++ 0.759 (0.750); user-end probe 0.864; betting on regression to the mean alone 0.776" width="640">
 
-> 🚧 **Departure from defaults:** placebo is another opener's reads on a different essay of the same
-> topic; P(up) scored as AUROC.
-
 This is a counterfactual task, so the investigator gives a probability rather than a letter, and we
 score it as AUROC, as we do blog authorship: % right at a 0.5 threshold on a 54% base rate rewards a
 shift in Haiku's bias as much as real information. AUROC is pooled over all 5,400 draws per
@@ -319,9 +284,6 @@ out-of-fold logistic regression; the 🔮-lens keeps a small edge over transcrip
 [+0.001, +0.014]).
 
 <img src="img/headline-essay-mean.png" alt="Essay grading with Qwen's observed mean grade added, AUROC: transcript + mean 0.832, 🔮-lens + mean 0.839 (placebo 0.830), NLA + mean 0.839 (0.839), J++ + mean 0.835 (0.834); user-end probe 0.864; betting on regression to the mean alone 0.776" width="640">
-
-> 🚧 **Departure from defaults:** placebo is another opener's reads on a different essay of the same
-> topic; P(up) scored as AUROC.
 
 The probe, a ridge regression from the observed prompt's activations at the user turn's last token
 (nested 2 × 2 folds by essay), reaches 0.864, 0.11 ahead of every investigator.
@@ -363,10 +325,6 @@ configuration was chosen during exploration of this dataset.
 
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with 🔮-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
 
-> 🚧 **Departure from defaults:** 🔮-lens at layers 32/40/48, NLA at layer 42 only; positions are
-> the question's and post's punctuation and newlines, no tail tokens; Haiku at effort low, one draw
-> per case; AUROC.
-
 ### Hinted MCQ
 
 This is the one dataset where the behaviour is a counterfactual in the CHIVE sense, with a real edit
@@ -400,11 +358,6 @@ Dark green: evaluated. Light green: usable but held out. Gray: not usable. The l
 the cohort's MMLU-Pro part; its 8 TruthfulQA cases were selected the same way.
 
 <img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint first, three columns: the legacy DSv4-disagreement cohort (952 cases) with Gemini Flash, the same cohort rerun with Haiku, and the unselected cohort (1,040 cases) with Haiku. Top, AUROC of P(knew): legacy with Flash, transcript only 0.615, O-lens 0.688 (placebo 0.543), probe 0.764, tuned probe 0.851; legacy with Haiku, transcript only 0.534, O-lens 0.551 (placebo 0.538); unselected, transcript only 0.769, O-lens 0.750 (placebo 0.740). Bottom, which letter without the hint, % correct: legacy with Flash 52.3, 53.9 (47.6), probe 53.9, tuned probe 64.1; legacy with Haiku 50.5, 50.2 (50.7); unselected 54.4, 54.7 (53.5); always the hinted letter 50%" width="900">
-
-> 🚧 **Departure from defaults (left column only):** investigator Gemini 3.8 Flash at effort low, one
-> draw. Both legacy columns: 🔮-lens at layers 32/40/48/52, positions the option newlines and the end
-> of the prompt only. The middle column is the same cohort, prompts and reads with Haiku 5.5 at effort
-> medium, 3 draws pooled. The unselected cohort is on the defaults.
 
 Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
 transcript-only. Bottom row: % correct on the letter, 95% case bootstrap, stars against
@@ -450,9 +403,9 @@ unselected cohort.
 
 #### Little or No Uplift When Qwen Is Right
 
-<img src="img/headline-qwen-right.png" alt="Cases where Qwen is right: transcript only vs 🔮-lens, J++ and NLA on MMLU-Pro (94.8, 95.5, 95.0, 94.6), SuperGPQA (83.7, 85.7, 87.0, 85.1) and Knowledge Cutoff (94.5, 89.7, 89.1, 91.5)" width="760">
+<img src="img/headline-qwen-right.png" alt="Cases where Qwen is right: prompt only vs 🔮-lens, J++ and NLA on MMLU-Pro (94.8, 95.5, 95.0, 94.6), SuperGPQA (83.7, 85.7, 87.0, 85.1) and Knowledge Cutoff (94.5, 89.7, 89.1, 91.5)" width="760">
 
-<img src="img/headline-qwen-wrong.png" alt="Cases where Qwen is wrong: transcript only vs 🔮-lens, J++ and NLA on MMLU-Pro (29.1, 32.5, 37.1, 31.1), SuperGPQA (46.5, 53.4, 58.1, 49.7) and Knowledge Cutoff (63.6, 76.1, 71.4, 74.6)" width="760">
+<img src="img/headline-qwen-wrong.png" alt="Cases where Qwen is wrong: prompt only vs 🔮-lens, J++ and NLA on MMLU-Pro (29.1, 32.5, 37.1, 31.1), SuperGPQA (46.5, 53.4, 58.1, 49.7) and Knowledge Cutoff (63.6, 76.1, 71.4, 74.6)" width="760">
 
 Our investigators do much better when Qwen is right! When Qwen is wrong we see uplift from
 metamodels; when Qwen is right they are neutral.
@@ -462,6 +415,8 @@ you do this, then way of pushing your investigator off of 'Qwen will say the rig
 like a significant effect. We had several spurious positive results this way.
 
 ### Which Metamodel Is Best?
+
+@c fix this! Should be dif from transctipt only baseline!!!
 
 <img src="img/headline-lens-diffs.png" alt="Each lens minus its placebo, paired by case and pooled over the three tasks: 🔮-lens +7.7 [+6.8, +8.5], J++ +28.5 [+27.3, +29.6], NLA +3.1 [+2.4, +3.8]" width="620">
 
@@ -487,16 +442,25 @@ thoughts later and can be accused of being next-token predictors.
 
 This is surprising! 🔮-lens and NLA are designed to be more workspace-y but look more next-token-y.
 
+I am open to being told that we 'cheated' by reading lens output after the system prompt and user
+turn. If you don't do this, only Mulitple Choice convincingly works.
+
 <img src="img/menus-inline-position.png" alt="Question reads minus tail reads: 🔮-lens -1.2, NLA -1.1, J++ +2.3" width="400">
 
 Dropping the tail altogether (question reads only, also at three draws) halves the 🔮-lens's pooled
-gain over transcript only and erases its gain on Idiosyncratic Preferences. It also takes away most
-of the damage placebos do, so the placebo gaps in the headline come mostly from the placebo's tail
+gain over prompt only and erases its gain on Idiosyncratic Preferences. It also takes away most of
+the damage placebos do, so the placebo gaps in the headline come mostly from the placebo's tail
 reads, which often name an answer outright (another question's).
 
 I had Claude cherrypick examples which show this pattern, one each for J++[^jpp], the
 🔮-lens[^olens] and NLA[^nla]. Each Docent run linked there is one Haiku prediction: the reads block
 is in the user message and the `submit_answer` rationale cites the read it acted on.
+
+@c bar chart, 9 bars: olens all three places we could read from jlens all three places NLA all three
+places
+
+Put in small text at bottom of chart: 3 reads for two of these configs, but only on readout for the
+assistant-boilerplate-only readouts (this is true right?)
 
 [^jpp]:
     **J++ has the letter at the end of the prompt.** Rice stem vascular bundles: Qwen answers B
@@ -537,23 +501,20 @@ is in the user message and the `submit_answer` rationale cites the read it acted
 
 No.
 
-They don't. Paired by case, no placebo beats transcript only on any task; the closest is the NLA
-placebo on Knowledge Cutoff, level at +1.0 [−0.3, +2.2]pp.
+They don't. Paired by case, no placebo beats prompt only on any task; the closest is the NLA placebo
+on Knowledge Cutoff, level at +1.0 [−0.3, +2.2]pp.
+
+@c bar chart here four bars, transcript only and each placebo, pooled on 3 canonical tasks.
 
 NLAs add the most tokens to the prompt, followed by the 🔮-lens and then J++.
 
-<img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
+<img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over prompt only, pooled and per set" width="500">
 
 Every lens makes Haiku think more, and placebos make Haiku think even more than real lens outputs.
 Anecdotally, Haiku consistently noticed that placebo outputs were nonsensical and explicitly
 acknowledged this.
 
-<img src="img/headline-thinking.png" alt="Thinking tokens pooled over the three tasks: transcript only 224, 🔮-lens 273 vs placebo 358, J++ 340 vs 553, NLA 274 vs 298" width="500">
-
-Within every condition and dataset, the predictions where Haiku thinks longer are the ones it gets
-wrong more often (correlation −0.19 to −0.45), so long thinking looks more like a sign of confusion
-than a source of accuracy. Transcript-only already thinks on 98% of draws (115 tokens on
-Idiosyncratic Preferences), so the reads aren't just prompting thought it would otherwise skip.
+<img src="img/headline-thinking.png" alt="Thinking tokens pooled over the three tasks: prompt only 224, 🔮-lens 273 vs placebo 358, J++ 340 vs 553, NLA 274 vs 298" width="500">
 
 ## How We Kept LLM Agents from Producing BS
 
@@ -734,6 +695,11 @@ Unless a chart says otherwise, every result uses these:
 - **Investigator:** Haiku 5.5 at reasoning effort medium, one turn, no tools beyond the submit call.
   Three draws per case and condition, and every draw is scored as one prediction (pooled, never
   averaged within a case first).
+- **Baseline:** prompt only on the three single-answer tasks (Multiple Choice, Knowledge Cutoff,
+  Idiosyncratic Preferences), where the investigator sees Qwen's prompt and no reply, and transcript
+  only everywhere else (essay grading, blog authorship, hinted MCQ, CHIVE, the counterfactual
+  environments), where it sees Qwen's reply too; the two are different blues in every chart, prompt
+  only the darker.
 - **What the investigator sees:** the prompt Qwen was given, never Qwen's reply; in a lens
   condition, a short description of the lens and a block of its reads; then the task. Each read
   shows the text around the read token with the token marked, then one line per layer: 🔮-lens
@@ -759,7 +725,7 @@ Unless a chart says otherwise, every result uses these:
   match is never excluded, since that is part of chance. A placebo from another dataset would be
   easy to ignore; one from the same set and category is the stricter test.
 - **Statistics:** % of draws naming Qwen's answer; 95% bootstrap CIs resampling questions, paired
-  across conditions; stars from one-sided paired tests against transcript-only; the headline weights
+  across conditions; stars from one-sided paired tests against the baseline; the headline weights
   the three tasks equally.
 
 Example investigator transcripts on Docent:
@@ -768,7 +734,8 @@ and for comparison
 [an agentic draw from the counterfactual work](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/77d5e448-f97a-4f9c-9d23-9e470ee675fe),
 where Gemini 3.8 Flash has tools to read and grep the transcripts and the lens reads.
 
-Every chart that departs from these carries a 🚧 **Departure from defaults** line under it.
+Every chart that departs from these carries a **Departure from defaults** line at its foot, inside
+the image, so the note travels with the chart into the deck (`graphs.style.departure`).
 
 ## Counterfactual Investigation Ablation Graphs
 
@@ -795,13 +762,9 @@ Nothing helped an investigator make better counterfactual predictions:
 
 <img src="img/cfbench-report/skill_pooled.png" alt="All targets pooled" width="404">
 
-> 🚧 **Departure from defaults:** all charts in this appendix: investigator Gemini 3.8 Flash with
-> tools (read and grep transcripts and reads, 20 calls); 🔮-lens shown through a tool at layers
-> 32/40/48; placebo from a different env; scored as RMSE of the predicted rate.
-
 This was true across target models:
 
-<img src="img/cfbench-report/skill_by_target.png" alt="By target model, with paired gains over transcript-only" width="500">
+<img src="img/cfbench-report/skill_by_target.png" alt="By target model, with paired gains over transcript only" width="500">
 
 One task, an earlier essay grading environment (hidden_goal.grade), looked like it worked, but when
 we tried a different investigator model it did not replicate:
@@ -822,7 +785,7 @@ They read mostly transcripts instead of looking at lenses:
 
 We tested whether our results were sensitive to investigator model, effort, and tool budget. These
 sweeps use four hand-picked cases, so most differences between lines are noise. No investigator
-reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus transcript-only is +0.4pp
+reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus transcript only is +0.4pp
 [−0.9, +1.7] on these cases.
 
 <img src="img/cfbench-report/models.png" alt="Investigator model by condition" width="400">
@@ -833,7 +796,7 @@ reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus tran
 
 No model seems to get more or less uplift from having access to 🔮-lens outputs:
 
-<img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript-only vs 🔮-lens by investigator" width="321">
+<img src="img/cfbench-report/ts_vs_olens.png" alt="Transcript only vs 🔮-lens by investigator" width="321">
 
 ## Hinted MCQ as a Counterfactual (TODO Kylie)
 
@@ -844,10 +807,3 @@ names Qwen's no-hint letter. Material: the talk's "Hinted MCQ" part, the `hint_q
 (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the talk: these runs are not on
 canonical reads (🔮-lens at four layers, option newlines and end of prompt only, Gemini 3.8 Flash at
 effort low).
-
-# TODO WITH MORE TIME:
-
-- Claude thinks we have some slightly significant astra result? Possibly we want to try this? doubt
-  it. On some set of four CFs.
-- Ship our environments in any usable way? We should at least write up that we think there are lots
-  of grader issues.

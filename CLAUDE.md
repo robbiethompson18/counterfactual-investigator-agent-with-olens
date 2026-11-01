@@ -158,6 +158,9 @@ isn't finished until `scripts/runs.py finish RUN` has synced it to HF, including
 Results that exist only on a pod, robbie-box or one laptop don't count. Usage is in the script's
 docstring.
 
+**Every run a chart or write-up number reads is named in `cfbench/catalog.py`** (2026-10-31): when a
+run is replaced, change it there, never in a graphs module or `cfbench.scoring`.
+
 Cases viewer: [chive-cases.pages.dev](https://chive-cases.pages.dev) shows all 204 held-out
 incidents with every transcript-only and O-lens draw, filterable and linkable by URL.
 `viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy
@@ -194,10 +197,14 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 
 - Python: `uv` for deps/venv, `ruff` for lint + format (line length 140), `ty` for types. Run
   `uv run ruff check . && uv run ruff format . && uv run ty check` before shipping.
-- `.githooks/pre-commit` runs ruff and ty on staged Python files, and rebuilds and stages
-  `docs/final-writeup.html` whenever `docs/final-writeup.md` is staged; git-lfs's own pre-push hook
-  (gitignored there) uploads LFS objects. Enable it once per clone with
+- `.githooks/pre-commit` runs ruff and ty on staged Python files. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
+  That hook is the only automation: no CI, no GitHub Actions, no other hooks (Robbie, 2026-10-31).
+  The write-up HTML and the talk deck are rebuilt and published by hand:
+  `sh scripts/deploy_writeup.sh` builds both and deploys them to Cloudflare Pages, the links to
+  share: https://nn-sprint-writeup.pages.dev/ (write-up) and
+  https://nn-sprint-writeup.pages.dev/talk.pdf (deck). The GitHub Pages site is frozen at its last
+  deploy.
   Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - By default you code too defensively, please do not do this. This project is under development,
@@ -235,9 +242,12 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
-- Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, no tool calls in gray, J++ in purple, NLA in green. A placebo is its lens's color with
-  stripes in the background color (Robbie, 2026-10-31; an open marker where stripes can't show).
+- Chart colors, the same in every plot, viewer and dashboard: the no-lens baseline in two blues,
+  prompt only (the investigator sees Qwen's prompt and no reply: MCQ, knowledge cutoff, preferences)
+  in blue and transcript only (it sees Qwen's reply too: essays, blogs, hinted MCQ, CHIVE, the
+  counterfactual envs) in a lighter blue; O-lens in orange, no tool calls in gray, J++ in purple,
+  NLA in green. A placebo is its lens's color with stripes in the background color (Robbie,
+  2026-10-31; an open marker where stripes can't show).
   Hatching means placebo and nothing else: a second measure gets a lighter shade. Paired-difference
   rows are labelled by the two conditions' swatches, A − B (2026-10-30). In matplotlib, import
   `graphs/style.py`, which applies the look (Inter, warm ink, Evals-page background) and has
@@ -273,8 +283,9 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 [docs/INDEX.md](docs/INDEX.md) by tag. When a doc's tag changes to or from ACTIVE, move its entry.
 `docs/figures/` (generated tables) gets no status line or entry. PNGs are gitignored (2026-10-27): a
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
-The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
-built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 2026-10-31).
+The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, a plain git
+file (LFS dropped 2026-10-31) that you rebuild by hand with `sh scripts/build_writeup.sh` and
+commit with the Markdown (Robbie, 2026-10-31).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**
@@ -299,6 +310,8 @@ Active docs:
 - [ACTIVE: Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
   — symmetric arms, any lever
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
+- [ACTIVE: Naming and style — read before writing or editing prose, headers, chart labels or slides](docs/naming-and-style.md)
+  — canonical task, tool and role names, prompt only vs transcript only, hyphens, Title Case
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) —
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: slides — read before making a talk or slide deck, or a figure for one](slides/CLAUDE.md)
@@ -309,7 +322,7 @@ Active docs:
   — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
   single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
   cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
-  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; a
   linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
   90%
 - [REFERENCE: essay_grading_cf_inline — read before quoting the essay counterfactual eval, or comparing O-lens, NLA and J++ on it](docs/essay-grading-cf-inline.md)

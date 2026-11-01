@@ -1,7 +1,7 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
-the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
+the investigator (Haiku 5.5) gets right, prompt-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
 Essay grading, a counterfactual scored as AUROC, is graphs.essay_grading. MCQ, cutoff and preferences come only from the canonical
-menus_inline runs, `all` menu (graphs.menus_inline SETS and CANONICAL: one prompt, the same read positions and placebo rule on
+menus_inline runs, `all` menu (cfbench.catalog MENUS and CANONICAL_MENU: one prompt, the same read positions and placebo rule on
 every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95%
 bootstraps resampling questions within each task, paired across conditions.
 
@@ -17,31 +17,36 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import CANONICAL_MENU
 from cfbench.scoring import standard_probe_rows
 from graphs import menus_inline
 from graphs.style import ci_bar, label, positions
 
 LENSES = ["olens_inline", "jlens_inline", "nla_inline"]
 PLACEBOS = {c: c.replace("_inline", "_placebo_inline") for c in LENSES}
-TS, PROBE = "transcript_inline", "probe_response_start"
+# The baseline condition's id is `transcript_inline` on every eval, but on these tasks the investigator sees Qwen's prompt and no
+# reply, so the charts call it `prompt_inline`, graphs.style's `prompt` (BLUE, "prompt only"); `transcript` is the lighter blue of
+# the tasks where it sees the reply.
+TS, PROBE = "prompt_inline", "probe_response_start"
 SEVEN = [TS, *(c for lens in LENSES for c in (lens, PLACEBOS[lens]))]
 TITLES = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
 POOLED = ["mcq", "cutoff", "preferences"]
-# task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
+# task -> its menus_inline sets; canonical-menu condition -> the plain condition name the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
-CANON = {TS: TS, **{c.replace("_", f"_{menus_inline.CANONICAL}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
+# the menus' condition ids under the names the charts use: transcript_inline -> prompt_inline, olens_all_inline -> olens_inline
+PLAIN_COND = {"transcript_inline": TS, **{c.replace("_", f"_{CANONICAL_MENU}_", 1): c for c in SEVEN[1:]}}
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 
 
 def load() -> dict[str, tuple[dict, dict]]:
     """task -> (condition -> case -> accuracy (share of its draws right), case -> bootstrap group). MCQ, cutoff and preferences
-    come only from the canonical menus_inline runs and menu (CLAUDE.local.md); MCQ adds the standardized probe, and its
+    come only from the canonical menus_inline runs and menu (graphs/CLAUDE.md); MCQ adds the standardized probe, and its
     bootstrap resamples the probe's question groups."""
     menus = menus_inline.load()
     out: dict[str, tuple[dict, dict]] = {}
     for task, sets in MENU_SETS.items():
-        acc = {CANON[c]: {(s, i): v for s in sets for i, v in menus[s][c].items()} for c in CANON}
+        acc = {PLAIN_COND[c]: {(s, i): v for s in sets for i, v in menus[s][c].items()} for c in PLAIN_COND}
         out[task] = acc, {k: k for k in acc[TS]}
     acc, groups = out["mcq"]
     acc[PROBE] = {}
@@ -130,8 +135,8 @@ def main(out: Path) -> None:
         print(f"== {task}: " + "  ".join(f"{c.removesuffix('_inline')} {boot.bar(ts, c)[0]:.1f}" for c in SEVEN))
         for lens in LENSES:
             placebo = PLACEBOS[lens]
-            print(f"   {lens[:5]}: vs transcript {boot.diff(ts, lens, TS)}  vs placebo {boot.diff(ts, lens, placebo)}", end="")
-            print(f"  placebo vs transcript {boot.diff(ts, placebo, TS)}")
+            print(f"   {lens[:5]}: vs prompt only {boot.diff(ts, lens, TS)}  vs placebo {boot.diff(ts, lens, placebo)}", end="")
+            print(f"  placebo vs prompt only {boot.diff(ts, placebo, TS)}")
     print(
         "between lenses:",
         {f"{a[:5]}-{b[:5]}": boot.diff(POOLED, a, b) for a, b in ((LENSES[0], LENSES[1]), (LENSES[0], LENSES[2]), (LENSES[1], LENSES[2]))},
@@ -140,12 +145,12 @@ def main(out: Path) -> None:
 
     lens_groups = [(label(c), [c]) for c in LENSES]
     pair_groups = [(label(c), [c, PLACEBOS[c]]) for c in LENSES]
-    seven = [("transcript\nonly", [TS]), *pair_groups]
+    seven = [("prompt\nonly", [TS]), *pair_groups]
     probe_groups = [*lens_groups, ("probe", [PROBE])]
     pooled = {"pooled over the three tasks": POOLED}
     figure(
         out / "headline-metamodels.png",
-        [(t, lambda ax, ts=ts: bars(ax, boot, ts, [("transcript\nonly", [TS]), *lens_groups])) for t, ts in pooled.items()],
+        [(t, lambda ax, ts=ts: bars(ax, boot, ts, [("prompt\nonly", [TS]), *lens_groups])) for t, ts in pooled.items()],
     )
     figure(out / "headline-placebos.png", [(t, lambda ax, ts=ts: bars(ax, boot, ts, pair_groups)) for t, ts in pooled.items()])
     probes = [(TITLES["mcq"], ["mcq"])]

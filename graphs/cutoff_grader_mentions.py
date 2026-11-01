@@ -5,7 +5,7 @@ bootstrap CIs over items, except the items panel (Wilson).
 
     uv run python -m graphs.cutoff_grader_mentions [--run data/runs/cutoff_grader_mentions/2026-10-30_regex]
 
-Writes docs/img/cutoff-grader-mentions{,-layers,-items}.png.
+Writes docs/img/cutoff-grader-mentions{,-layers,-items,-period}.png.
 """
 
 import argparse
@@ -14,8 +14,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import to_hex, to_rgb
 
-from graphs.style import INK, MUTED, OLENS
+from cfbench.catalog import CUTOFF_GRADER_MENTIONS_RUN
+from graphs.style import BG, INK, MUTED, OLENS
 
 # runs aren't conditions in the palette: two teals for the no-tool runs, magenta for the tool run
 RUNS = {"A": ("#147d7d", "no tool"), "A2": ("#7cc4c4", "no tool, second 1k"), "B": ("#b8336a", "submit_answer tool")}
@@ -140,17 +142,43 @@ def items(c: pd.DataFrame, out: Path) -> None:
     fig.savefig(out / "cutoff-grader-mentions-items.png")
 
 
+def period(run: Path, out: Path) -> None:
+    """The deck's bars for the write-up: at the "." ending "If you are not sure, give your best guess.", chat template (A) vs the
+    submit_answer tool template (B), on the items both read: % of reads (six layers) with a novel hit, and % of items with at
+    least one, in a lighter shade (graphs.talk.grader draws the same under @slide)."""
+    groups = [("% of reads", at_token(run, "."), 1.0), ("% of items, any read", at_token(run, ".", items=True), 0.5)]
+    fig, ax = plt.subplots(figsize=(4.2, 3.6), layout="constrained")
+    for g, (lab, bars, strength) in enumerate(groups):
+        for j, r in enumerate(("A", "B")):
+            x, (v, lo, hi) = g * 2.4 + j * 0.85, bars[r]
+            col = to_hex(tuple(strength * np.array(to_rgb(RUNS[r][0])) + (1 - strength) * np.array(to_rgb(BG))))
+            ax.bar(x, v, 0.8, color=col, zorder=3)
+            ax.errorbar(x, v, [[v - lo], [hi - v]], color=MUTED, lw=0.9, capsize=3, capthick=0.9, zorder=4)
+            ax.annotate(f"{v:.1%}", (x, hi), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", color=INK)
+            print(f"{lab}, {RUNS[r][1]}: {v:.1%} [{lo:.1%}, {hi:.1%}]")
+    ax.set_xticks([0.425, 2.825], [lab for lab, _, _ in groups])
+    ax.set_xlim(-0.6, 3.85)
+    ax.set_ylim(0, 0.85)
+    ax.set_yticks(np.arange(0, 0.81, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.81, 0.2)])
+    ax.set_ylabel('saying "grader" / "graded"')
+    ax.grid(axis="x", visible=False)
+    handles = [plt.Rectangle((0, 0), 1, 1, color=RUNS[r][0]) for r in ("A", "B")]
+    ax.legend(handles, ["chat template", "agentic template (submit_answer tool)"], loc="upper left", frameon=False, fontsize=8)
+    fig.savefig(out / "cutoff-grader-mentions-period.png")
+
+
 def main(run: Path, out: Path) -> None:
     c = pd.read_csv(run / "item_counts.csv")
     out.mkdir(parents=True, exist_ok=True)
     by_position(c, out)
     by_layer(c, out)
     items(c, out)
+    period(run, out)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", type=Path, default=Path("data/runs/cutoff_grader_mentions/2026-10-30_regex"))
+    ap.add_argument("--run", type=Path, default=Path("data") / CUTOFF_GRADER_MENTIONS_RUN)
     ap.add_argument("--out", type=Path, default=Path("docs/img"))
     a = ap.parse_args()
     main(a.run, a.out)

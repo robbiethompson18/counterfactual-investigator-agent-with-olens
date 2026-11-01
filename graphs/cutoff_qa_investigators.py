@@ -5,78 +5,103 @@ the question itself, no investigator prompt: what its own knowledge says). Panel
 stale, all. Exact match to Qwen's modal answer (post-2026-10-31 labels), per-item mean over draws then the mean over items, 95%
 bootstrap CIs over items; a run that isn't finished (meta.json status done) is left out.
 
-Two sets (Robbie, 2026-10-31):
-- `canonical` (default, the final write-up): the menus_inline cutoff runs, canonical `all` menu (graphs/menus_inline.py SETS), Haiku at 3
-  draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw. Plus one bar from the old prompt:
-  Haiku told the model is Qwen3.6-27B with a ~January 2025 cutoff (the only told run; no menus_inline told run exists).
-  A second figure (canonical only) is Haiku's paired differences on all items (graphs.cutoff_qa_inline.diffs).
-- `cutoff_qa_inline`: the older eval's prompt and end-of-prompt reads, with every Flash-Lite condition and the told prompt (the
-  model is Qwen3.6-27B, cutoff ~January 2025); docs/cutoff-qa-inline.md. Not for the write-up.
+Runs (Robbie, 2026-10-31): the menus_inline cutoff runs, canonical menu (cfbench.catalog MENUS / CANONICAL_MENU), Haiku at 3
+draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw. Plus one bar from the old prompt: Haiku
+told the model is Qwen3.6-27B with a ~January 2025 cutoff (the only told run; no menus_inline told run exists). A second figure is
+Haiku's paired differences on all items. gate_class (stale vs not) and the label (qwen_modal) come from the cutoff_qa item bank
+(environments/cutoff_qa/env.py), since the menus_inline runs' rows don't carry gate_class.
 
-    uv run python -m graphs.cutoff_qa_investigators [--set canonical|cutoff_qa_inline] [--out PNG] [--out-diff PNG]
+    uv run python -m graphs.cutoff_qa_investigators [--out PNG] [--out-diff PNG]
 """
 
 import argparse
 import json
+import random
+from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.catalog import CANONICAL_MENU, CUTOFF_CENSUS, CUTOFF_FLASHLITE, CUTOFF_TOLD
+from environments.cutoff_qa.env import _items as bank_items
 from environments.cutoff_qa.env import norm
-from graphs.cutoff_qa_inline import PAIRS, ci, diffs, per_item
-from graphs.menus_inline import CANONICAL
-from graphs.style import MUTED, bar_kw, ci_bar, label
+from graphs import menus_inline
+from graphs.style import MUTED, bar_kw, ci_bar, departure, diff_rows, label
 
-CF = Path("data/runs/cfbench")
-CENSUS = {
-    "Claude Haiku 5.5": Path("data/runs/cutoff_qa_census/2026-10-31_haiku-1k/census.jsonl"),
-    "Gemini 2.5 Flash-Lite": Path("data/runs/cutoff_qa_census/2026-10-31_flashlite-1k/census_flashlite.jsonl"),
-}
-REF = CF / "2026-10-29_cutoff-qa-1k-transcript/predictions.jsonl"  # gold labels and gate_class per item
+CENSUS = CUTOFF_CENSUS
+DEPARTURE = 'Flash-Lite rows are one draw per item; Haiku\'s "told" bar (model name and cutoff given) is on an earlier prompt.'
 
 
-def old_lens_runs(prefix: str) -> list:
-    """(bar, run, condition in the run) for the cutoff_qa_inline lens runs, one run per condition."""
-    slugs = [("olens", "olens-placebo"), ("jlens", "jlens-placebo"), ("nla", "nla-placebo-mmlu")]
-    return [(f"{c}{p}_inline", [CF / f"{prefix}-{s}"], f"{c}{p}_inline") for c, ps in slugs for p, s in (("", c), ("_placebo", ps))]
+MENU_RUNS = menus_inline.runs("cutoff")  # every finished menus_inline cutoff run; each bar keeps its own condition
 
 
-TOPUP = CF / "2026-10-31_menus-cutoff-all-d12b"  # draws 1-2 of prompt only and every `all`-menu condition
-PROMPT_TOPUP = CF / "2026-10-31_menus-cutoff-prompt-d12"  # draws 1-2 of every `prompt`-menu condition
+def menus_bars(lens: str) -> list:
+    return [(f"{lens}{p}_inline", MENU_RUNS, f"{lens}_{CANONICAL_MENU}{p}_inline") for p in ("", "_placebo")]
 
 
-def menus_runs(run: str, lens: str) -> list:
-    return [(f"{lens}{p}_inline", [CF / run, TOPUP, PROMPT_TOPUP], f"{lens}_{CANONICAL}{p}_inline") for p in ("", "_placebo")]
-
-
-# set -> investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load()
+# investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load(). One set, `canonical`,
+# so graphs.talk can name it. The baseline's bar is `prompt_inline` (graphs.style's `prompt`: the investigator sees Qwen's prompt
+# and no reply) though its condition id in the run is `transcript_inline`.
 SETS = {
     "canonical": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", [CF / "2026-10-30_menus-cutoff-olens-jlens", TOPUP], "transcript_inline"),
-            ("transcript_told_oldprompt_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
-            *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "olens"),
-            *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "jlens"),
-            *menus_runs("2026-10-31_menus-cutoff-nla-batch", "nla"),
+            ("prompt_inline", MENU_RUNS, "transcript_inline"),
+            ("prompt_told_oldprompt_inline", [CUTOFF_TOLD], "transcript_inline"),
+            *menus_bars("olens"),
+            *menus_bars("jlens"),
+            *menus_bars("nla"),
         ],
-        "Gemini 2.5 Flash-Lite": [("transcript_inline", [CF / "2026-10-31_menus-cutoff-flashlite-transcript"], "transcript_inline")],
-    },
-    "cutoff_qa_inline": {
-        "Claude Haiku 5.5": [
-            ("transcript_inline", [CF / "2026-10-29_cutoff-qa-1k-transcript"], "transcript_inline"),
-            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
-            *old_lens_runs("2026-10-29_cutoff-qa-1k"),
-        ],
-        "Gemini 2.5 Flash-Lite": [
-            ("transcript_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"], "transcript_inline"),
-            ("transcript_told_inline", [CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"], "transcript_inline"),
-            *old_lens_runs("2026-10-31_cutoff-qa-1k-flashlite"),
-        ],
+        "Gemini 2.5 Flash-Lite": [("prompt_inline", [CUTOFF_FLASHLITE], "transcript_inline")],
     },
 }
-OUT = {"canonical": "docs/img/cutoff-qa-investigators.png", "cutoff_qa_inline": "docs/img/cutoff-qa-investigators-old-prompt.png"}
+OUT = Path("docs/img/cutoff-qa-investigators.png")
 OUT_DIFF = Path("docs/img/cutoff-qa-investigators-diff.png")
 GROUPS = {"stale (Qwen's answer is out of date)": "stable_wrong", "not stale": "stable_right", "all items": None}
+
+
+def per_item(runs: list[Path], by: str | Callable[[dict], object] = "gate_class") -> dict[str, dict[str, tuple]]:
+    """condition -> item -> (the row's `by` field, or by(row); mean accuracy over draws), pooled over the runs."""
+    acc: dict[str, dict[str, list[bool]]] = defaultdict(lambda: defaultdict(list))
+    cls = {}
+    for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
+        r = json.loads(line)
+        acc[r["condition"]][r["item"]].append(bool(r["correct"]))
+        cls[r["item"]] = by(r) if callable(by) else r[by]
+    return {c: {i: (cls[i], sum(v) / len(v)) for i, v in items.items()} for c, items in acc.items()}
+
+
+def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
+    rng = random.Random(seed)
+    means = sorted(sum(rng.choices(xs, k=len(xs))) / len(xs) for _ in range(n))
+    return means[int(0.025 * n)], means[int(0.975 * n)]
+
+
+# the difference chart: (question, [(a, b), ...]) groups, each row a − b
+PAIRS = [
+    ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "prompt_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs prompt only", [(f"{lens}_inline", "prompt_inline") for lens in ("olens", "jlens", "nla")]),
+]
+
+
+def diffs(data: dict, out: Path, xlim: tuple[float, float]) -> None:
+    """graphs.style.diff_rows over every item, a row per PAIRS pair grouped by the question it answers: the mean paired difference
+    in per-item accuracy (pp) with its 95% bootstrap CI over items; filled when the CI excludes 0."""
+    rows: list = []
+    for q, group in PAIRS:
+        rows.append(q)
+        for a, b in group:
+            ds = [100 * (data[a][i][1] - data[b][i][1]) for i in data[a]]
+            rows.append((a, b, sum(ds) / len(ds), *ci(ds)))
+    fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
+    ax.set_xlim(*xlim)
+    diff_rows(ax, rows)
+    ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
+    ax.set_title(f"All {len(data['prompt_inline'])} items")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, bbox_inches="tight")
+    print(out)
 
 
 def done(run: Path) -> bool:
@@ -86,15 +111,18 @@ def done(run: Path) -> bool:
 
 def load(which: str) -> dict[str, dict[str, dict]]:
     """investigator -> bar -> item -> (gate_class, accuracy), for the finished runs."""
-    ref = [json.loads(line) for line in REF.open()]
-    gold, cls = {r["item"]: r["gold"] for r in ref}, {r["item"]: r["gate_class"] for r in ref}
+    bank = bank_items()  # gate_class and the label (qwen_modal: Qwen's gated modal answer) per item
+    gold, cls = {i: it["qwen_modal"] for i, it in bank.items()}, {i: it["gate_class"] for i, it in bank.items()}
     out: dict[str, dict[str, dict]] = {}
     for who, bars in SETS[which].items():
         rows = [json.loads(line) for line in CENSUS[who].open()]
         out[who] = {"self_answer": {r["item"]: (cls[r["item"]], float(norm(r["reply"]) == gold[r["item"]])) for r in rows}}
+        loaded: dict[tuple, dict] = {}  # the canonical bars share one run list: read it once
         for bar, runs, cond in bars:
             if all(map(done, runs)):
-                out[who][bar] = per_item(runs, by=lambda r: cls[r["item"]])[cond]
+                if tuple(runs) not in loaded:
+                    loaded[tuple(runs)] = per_item(runs, by=lambda r: cls[r["item"]])
+                out[who][bar] = loaded[tuple(runs)][cond]
     return out
 
 
@@ -121,14 +149,16 @@ def draw(axes, data: dict, s: float = 1.0) -> list:
     return [plt.Rectangle((0, 0), 1, 1, label=label(c), **bar_kw(c)) for c in seen]
 
 
-def main(which: str, out: Path, out_diff: Path) -> None:
-    data = load(which)
-    if which == "canonical":  # Haiku, all items: lens vs placebo, placebo vs transcript only, lens vs transcript only
-        diffs([], out_diff, xlim=(-36, 36), pairs=PAIRS[:3], data=data["Claude Haiku 5.5"])
+def main(out: Path, out_diff: Path) -> None:
+    data = load("canonical")
+    diffs(data["Claude Haiku 5.5"], out_diff, xlim=(-36, 36))  # Haiku, all items
     n_bars = sum(len(bars) for bars in data.values())
     fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
     handles = draw(axes, data)
-    fig.legend(handles=handles, loc="outside lower center", ncol=4, fontsize=8.5)
+    axes[-1].legend(
+        handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=4, fontsize=8.5
+    )  # not an outside figure legend: see departure
+    departure(fig, DEPARTURE)
     fig.suptitle("Knowledge Cutoff: a later-cutoff vs a same-cutoff investigator", x=0.01, ha="left")
     fig.text(0.995, 0.975, "exact match, 95% CI over items", ha="right", fontsize=8, color=MUTED)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -138,8 +168,7 @@ def main(which: str, out: Path, out_diff: Path) -> None:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--set", choices=list(SETS), default="canonical")
-    p.add_argument("--out", type=Path)
+    p.add_argument("--out", type=Path, default=OUT)
     p.add_argument("--out-diff", type=Path, default=OUT_DIFF)
     a = p.parse_args()
-    main(a.set, a.out or Path(OUT[a.set]), a.out_diff)
+    main(a.out, a.out_diff)

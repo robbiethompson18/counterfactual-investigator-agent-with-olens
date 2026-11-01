@@ -1,4 +1,6 @@
-"""The one chart style (CLAUDE.md); importing this module applies it. A colour per tool, a placebo in its tool's colour with stripes
+"""The one chart style (CLAUDE.md); importing this module applies it. A colour per tool, two blues for the no-lens baseline (`prompt`,
+where the investigator sees Qwen's prompt and no reply: MCQ, knowledge cutoff, preferences; `transcript`, a lighter blue, where it
+sees Qwen's reply too: essays, blogs, hinted MCQ, CHIVE, the counterfactual envs), a placebo in its tool's colour with stripes
 in the background colour (an open marker where stripes can't show), hatching for placebos and nothing else, and paired-difference
 rows labelled by the two conditions' swatches (A − B), so a row reads like the bars it compares (Robbie, 2026-10-30). Conditions
 are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them. Ink, grid and background are the Evals page's
@@ -7,6 +9,7 @@ are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them.
 
 import shutil
 import subprocess
+import textwrap
 from functools import wraps
 
 import matplotlib
@@ -26,6 +29,7 @@ INK, MUTED, FAINT, GRID, BG = (
     "#f6f5f1",
 )  # the Evals page's ink, --muted, --faint, grid, background
 BLUE, ORANGE, PURPLE, GREEN, GRAY = "#2a78d6", "#eb6834", "#8e44ad", "#2e9e5b", "#898781"
+LIGHT_BLUE = "#6fa8e6"  # transcript only (Robbie, 2026-10-31: the headline charts keep BLUE, prompt only)
 PLACEBO_HATCH = "////"
 OUTLINE = "none"  # a bar with no fill, only an ink outline: a reference line's bar, not a tool
 # matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
@@ -37,10 +41,12 @@ if shutil.which("fc-list"):
         for f in subprocess.run(["fc-list", family, "file"], check=True, capture_output=True, text=True).stdout.split():
             if f.rstrip(":").endswith((".ttf", ".ttc")):
                 font_manager.fontManager.addfont(f.rstrip(":"))
-OLENS = "🔮-lens" if any(f.name == EMOJI_FONT for f in font_manager.fontManager.ttflist) else "O-lens"
+HAS_EMOJI = any(f.name == EMOJI_FONT for f in font_manager.fontManager.ttflist)
+OLENS = "🔮-lens" if HAS_EMOJI else "O-lens"
 # canonical condition -> (colour, hatch, label)
 STYLE = {
-    "transcript": (BLUE, None, "transcript only"),
+    "prompt": (BLUE, None, "prompt only"),  # the investigator sees Qwen's prompt, never its reply
+    "transcript": (LIGHT_BLUE, None, "transcript only"),  # it sees Qwen's reply too
     "olens": (ORANGE, None, OLENS),
     "olens_placebo": (ORANGE, PLACEBO_HATCH, f"{OLENS} placebo"),
     "jlens": (PURPLE, None, "J++"),
@@ -57,10 +63,10 @@ STYLE = {
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
     "transcript+probe": ("#78b7aa", None, "probe + transcript"),  # author_blog_drop's nested combiner, the lighter teal
     # chive_inline's reference bars: CHIVE's own Opus 4.8 arms on the same claims (a lighter shade = the same input, another measure)
-    "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
+    "chive_opus_plain": ("#b3cff0", None, "CHIVE Opus 4.8, transcript"),  # lighter than LIGHT_BLUE
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
-    "transcript_told": ("#1f4e79", None, "transcript only, told the model and its cutoff"),  # cutoff_qa_investigators
-    "transcript_told_oldprompt": ("#1f4e79", None, "transcript only, told Qwen's cutoff (older prompt)"),  # its canonical set
+    "prompt_told": ("#1f4e79", None, "prompt only, told the model and its cutoff"),  # cutoff_qa_investigators
+    "prompt_told_oldprompt": ("#1f4e79", None, "prompt only, told Qwen's cutoff (older prompt)"),  # its canonical set
     "self_answer": (OUTLINE, None, "answers the question itself"),  # cutoff_qa_investigators: the same-cutoff census
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
@@ -164,24 +170,26 @@ def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 
 SW_W, SW_H, SW_MINUS, SW_GAP = 14, 10, 12, 8  # swatch width, height, the gap holding the minus sign, gap to the axis (points)
 
 
-def swatch_pair(ax, y: float, a: str, b: str) -> None:
+def swatch_pair(ax, y: float, a: str, b: str, s: float = 1.0) -> None:
     """A's and B's bar swatches with a minus between them, just left of the y axis at data y (sized in points, so they survive
-    tight_layout); set the y tick label pad to SWATCH_PAD to make room."""
-    da = DrawingArea(2 * SW_W + SW_MINUS, SW_H)
-    da.add_artist(Rectangle((0, 0), SW_W, SW_H, **bar_kw(a)))
-    da.add_artist(Rectangle((SW_W + SW_MINUS, 0), SW_W, SW_H, **bar_kw(b)))
-    da.add_artist(Text(SW_W + SW_MINUS / 2, SW_H / 2, "−", ha="center", va="center", fontsize=9, color=INK))
-    ax.add_artist(AnnotationBbox(da, (0, y), xycoords=ax.get_yaxis_transform(), box_alignment=(1, 0.5), xybox=(-SW_GAP, 0),
+    tight_layout); set the y tick label pad to SWATCH_PAD * s to make room. `s` scales everything (a slide figure passes SLIDE_S)."""
+    w, h, minus, gap = SW_W * s, SW_H * s, SW_MINUS * s, SW_GAP * s
+    da = DrawingArea(2 * w + minus, h)
+    da.add_artist(Rectangle((0, 0), w, h, **bar_kw(a)))
+    da.add_artist(Rectangle((w + minus, 0), w, h, **bar_kw(b)))
+    da.add_artist(Text(w + minus / 2, h / 2, "−", ha="center", va="center", fontsize=9 * s, color=INK))
+    ax.add_artist(AnnotationBbox(da, (0, y), xycoords=ax.get_yaxis_transform(), box_alignment=(1, 0.5), xybox=(-gap, 0),
                                  boxcoords="offset points", frameon=False, pad=0, annotation_clip=False))  # fmt: skip
 
 
 SWATCH_PAD = 2 * SW_GAP + 2 * SW_W + SW_MINUS
 
 
-def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> None:
+def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}", s: float = 1.0) -> None:
     """Paired-difference rows on ax, top to bottom. A row is a header string, or (a, b, mean, lo, hi[, text]) for A − B with its
     95% CI: an ink CI line and dot, filled when the CI excludes 0, the numbers to the right, and the label (default
-    "A − B") followed by the two swatches. One ink for every mark: the swatches say which conditions."""
+    "A − B") followed by the two swatches. One ink for every mark: the swatches say which conditions. `s` scales the text and
+    swatches (a slide figure passes SLIDE_S)."""
     labels = []
     for k, row in enumerate(rows):
         y = len(rows) - 1 - k
@@ -189,22 +197,41 @@ def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> Non
             labels.append(row)
             continue
         a, b, m, lo, hi, *text = row
-        ax.plot([lo, hi], [y, y], color=INK, lw=1.6, solid_capstyle="butt", zorder=3)
-        ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
-        ax.text(hi, y, f"   {value_fmt.format(m)}  [{value_fmt.format(lo)}, {value_fmt.format(hi)}]{unit}", va="center", fontsize=8,
-                color=INK)  # fmt: skip
-        swatch_pair(ax, y, a, b)
+        ax.plot([lo, hi], [y, y], color=INK, lw=1.6 * s, solid_capstyle="butt", zorder=3)
+        ax.plot(m, y, "o", ms=6 * s, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
+        ax.text(hi, y, f"   {value_fmt.format(m)}  [{value_fmt.format(lo)}, {value_fmt.format(hi)}]{unit}", va="center",
+                fontsize=8 * s, color=INK)  # fmt: skip
+        swatch_pair(ax, y, a, b, s)
         labels.append(text[0] if text else f"{label(a)} − {label(b)}")
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(reversed(labels), fontsize=9, color=INK)
+    ax.set_yticklabels(reversed(labels), fontsize=9 * s, color=INK)
     for tick, row in zip(reversed(ax.get_yticklabels()), rows, strict=True):
         if isinstance(row, str):
             tick.set_fontweight("bold")
             tick.set_color(MUTED)
-    ax.tick_params(axis="y", length=0, pad=SWATCH_PAD)
+    ax.tick_params(axis="y", length=0, pad=SWATCH_PAD * s)
     ax.set_ylim(-0.6, len(rows) - 0.4)
     ax.grid(axis="y", visible=False)
+
+
+def departure(fig, note: str) -> None:
+    """The write-up's "Departure from defaults" line, inside the figure rather than under it in the Markdown, so it travels with
+    the chart into the deck (Robbie, 2026-10-31): muted, 7pt at write-up size (scaled with font.size on a slide), wrapped to the
+    figure's width, as the figure's supxlabel, after any line the chart already has there; the figure grows by the text's height
+    so the axes keep their size (margins re-fractioned when there is no layout engine). Constrained layout pins a supxlabel and
+    an `outside lower` figure legend to the same edge and reserves the larger of the two, so a chart with the note anchors its
+    legend to its bottom axes instead."""
+    size = 0.7 * plt.rcParams["font.size"]
+    w, h = fig.get_size_inches()
+    lines = textwrap.wrap(("🚧 " if HAS_EMOJI else "") + "Departure from defaults: " + note, width=int(w * 72 / (0.5 * size)))
+    extra = (1.3 * size * len(lines) + 4) / 72
+    if fig.get_layout_engine() is None:
+        sp = fig.subplotpars
+        frac = extra / (h + extra)
+        fig.subplots_adjust(bottom=sp.bottom * (1 - frac) + frac, top=sp.top * (1 - frac) + frac)
+    fig.set_size_inches(w, h + extra)
+    fig.supxlabel("\n".join(filter(None, [fig.get_supxlabel(), *lines])), x=0.01, ha="left", fontsize=size, color=MUTED, linespacing=1.3)
 
 
 # Slide figures (slides/talk, made by graphs.talk): the look above at the deck's sizes. The 9pt theme's text is 2/3 of its size

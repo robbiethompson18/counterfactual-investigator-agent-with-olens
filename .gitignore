@@ -37,8 +37,5 @@ docs/figures/donation_bet/**/*table.json
 # Charts and figures: regenerate locally, never commit (see CLAUDE.md, Docs)
 *.png
 
-# git-lfs installs these into core.hooksPath (.githooks) on any `git lfs` command; they are machine-made, not ours
-.githooks/pre-push
-.githooks/post-checkout
-.githooks/post-commit
-.githooks/post-merge
+# wrangler state (Cloudflare Pages deploys)
+.wrangler/

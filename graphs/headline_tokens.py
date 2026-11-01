@@ -1,7 +1,7 @@
 """How many tokens each lens's reads add to the investigator's (Haiku 5.5) prompt, for the write-up: does one lens just give it more to
 think about? Same runs (menus_inline, `all` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
 pooled weights MCQ, knowledge cutoff and preferences equally. Added tokens = the condition's mean `tokens.prompt` (Anthropic's count
-of the whole opening call, tool schemas included) minus transcript_inline's on the same cases, averaged over draws. Rows with calls !=
+of the whole opening call, tool schemas included) minus prompt only's on the same cases, averaged over draws. Rows with calls !=
 1 are dropped (a second call's prompt also holds the first): a handful of retries. No whiskers: this describes what was shown.
 
     uv run python -m graphs.headline_tokens [--out-dir docs/img]
@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import menus_inline
-from graphs.headline_inline import CANON, LENSES, PLACEBOS, TS
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, TS
 from graphs.style import bar_kw, label, positions
 
-SETS = {  # the canonical menus_inline runs (CLAUDE.local.md)
+SETS = {  # the canonical menus_inline runs (graphs/CLAUDE.md)
     "MMLU-Pro": menus_inline.runs("mcq_unselected"),
     "SuperGPQA": menus_inline.runs("supergpqa"),
     "Knowledge Cutoff": menus_inline.runs("cutoff"),
@@ -37,8 +37,8 @@ def load(runs: list[Path]) -> dict:
     rows = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
-        if r["condition"] in CANON and r["tokens"].get("calls") == 1:
-            case = rows[CANON[r["condition"]]][r["item"]]
+        if r["condition"] in PLAIN_COND and r["tokens"].get("calls") == 1:
+            case = rows[PLAIN_COND[r["condition"]]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])
             case["completion"].append(r["tokens"]["completion"])
             case["reasoning"].append(r["tokens"]["reasoning"])
@@ -47,7 +47,7 @@ def load(runs: list[Path]) -> dict:
 
 
 def added(data: dict, c: str, metric: str) -> list[float]:
-    """Condition c minus transcript-only, case by case."""
+    """Condition c minus prompt only, case by case."""
     return [case[metric] - data[TS][i][metric] for i, case in data[c].items() if i in data[TS]]
 
 
@@ -72,7 +72,7 @@ def chart(tokens: dict[str, dict[str, float]], path: Path) -> None:
     ax.set_xticks(range(len(groups)), [g.replace(" ", "\n") for g in groups], fontsize=8.5)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("tokens added to Haiku's prompt (thousands)")
-    ax.set_title("Prompt tokens each lens adds over transcript only")
+    ax.set_title("Prompt tokens each lens adds over prompt only")
     ax.legend(loc="upper right")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -85,7 +85,7 @@ def thinking(sets: dict[str, dict], path: Path) -> None:
     def mean(c: str, names: list[str]) -> float:
         return float(np.mean([case["reasoning"] for name in names for case in sets[name][c].values()]))
 
-    groups = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
+    groups = [("prompt\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
     conditions = [c for _, cs in groups for c in cs]
     means = {c: float(np.mean([mean(c, MCQ), mean(c, ["Knowledge Cutoff"]), mean(c, ["Idiosyncratic Preferences"])])) for c in conditions}
     print("thinking tokens, pooled:", {c: round(v) for c, v in means.items()})
@@ -105,9 +105,9 @@ def thinking(sets: dict[str, dict], path: Path) -> None:
 
 def main(out: Path) -> None:
     sets = {name: load(runs) for name, runs in SETS.items()}
-    print("transcript-only prompt:", {name: round(float(np.mean([v["prompt"] for v in d[TS].values()]))) for name, d in sets.items()})
+    print("prompt-only prompt tokens:", {name: round(float(np.mean([v["prompt"] for v in d[TS].values()]))) for name, d in sets.items()})
     for metric in METRICS:
-        print(f"== added {metric} vs transcript-only")
+        print(f"== added {metric} vs prompt only")
         for c in (x for lens in LENSES for x in (lens, PLACEBOS[lens])):
             print(f"{c:24}", {k: round(v, 1) for k, v in summary(sets, c, metric).items()})
     chart({c: summary(sets, c, "prompt") for c in LENSES}, out / "headline-tokens.png")

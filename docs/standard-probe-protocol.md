@@ -2,6 +2,8 @@
 
 **Status (2026-10-31):** ACTIVE. Executed protocol; results below. This supersedes older probe
 recipes for standardized comparisons, without invalidating or deleting their historical results.
+Chart modules `graphs.mcq_unselected` and `graphs.supergpqa_inline` deleted 2026-10-31 (PR #579,
+last at commit 62a4e31c); the last two commands under "Regenerate locally" no longer run.
 
 ## Scope and labels
 
@@ -161,9 +163,10 @@ Regenerate locally, without model calls:
 
 ```bash
 uv run python -m graphs.standard_probes
-uv run python -m graphs.mcq_unselected
-uv run python -m graphs.supergpqa_inline
 ```
+
+`graphs.mcq_unselected` and `graphs.supergpqa_inline` also drew these probes beside the lenses; both
+were deleted in PR #579 (regenerate from commit 62a4e31c).
 
 - `docs/img/standard-probes-mcq.png`: all six source-to-target comparisons, both positions, full
   populations and Qwen-right/wrong subgroups.

@@ -15,6 +15,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import HINT_LEGACY_HAIKU_RUNS, HINT_UNSELECTED_RUNS
 from cfbench.evals.hint_unselected_inline import score as knew_score
 from cfbench.evals.hint_unselected_inline.score import auroc
 from cfbench.evals.hint_unselected_letter_inline import score as letter_score
@@ -22,8 +23,7 @@ from cfbench.scoring import stars
 from graphs.style import INK, MUTED, bar_kw, positions
 
 R = Path("data/runs/cfbench")
-RUNS = {"knew": ["2026-10-31_hint-unselected-d", "2026-10-31_hint-unselected-all-d"],
-        "letter": ["2026-10-31_hint-unselected-letter-d", "2026-10-31_hint-unselected-letter-all-d"]}  # fmt: skip
+RUNS = HINT_UNSELECTED_RUNS
 GROUPS = [("transcript", ["transcript_inline"]), ("O-lens\nprompt reads", ["olens_prompt_inline", "olens_prompt_placebo_inline"]),
           ("O-lens\n+ tail reads", ["olens_all_inline", "olens_all_placebo_inline"])]  # fmt: skip
 OUT = Path("docs/img/hint-unselected.png")
@@ -31,7 +31,7 @@ OUT = Path("docs/img/hint-unselected.png")
 
 # the legacy DSv4-disagreement cohort rerun with this eval's investigator (Haiku 5.5 at medium, 3 draws) on its own reads
 # (cfbench/evals/hint_qwen_dsv4_before{,_letter}_tail_inline, robbie-box, 2026-10-31 evening): the talk grid's middle column
-LEGACY_HAIKU = {"knew": ["2026-11-01_hint-dsv4-before-haiku"], "letter": ["2026-11-01_hint-dsv4-before-letter-haiku"]}
+LEGACY_HAIKU = HINT_LEGACY_HAIKU_RUNS
 
 
 def rows(task: str, runs: list[str] | None = None) -> list[dict]:
