@@ -36,9 +36,15 @@ ABLATES = [
 ]  # 2 x 2,004 bloggers
 ABLATES_X2 = ABLATES
 ATTRS = {k: ("", v) for k, v in BLOG_ATTRS.items()}  # bank.ATTRS shape: (question, options)
-READS = [Path(f"data/runs/olens_reads/2026-10-30_author-blog{s}") for s in ("", "-b")]
+# batch 3 (Kylie, 2026-10-31: scale toward 1,000 posts): blog_c.py's cases, flat rule, reads in two rounds
+BATCH3 = Path("data/runs/author_mcq_blog/2026-10-31_blog-c")
+READS = [
+    Path(f"data/runs/olens_reads/2026-10-{s}")
+    for s in ("30_author-blog", "30_author-blog-b", "31_author-blog-c", "31_author-blog-c2", "31_author-blog-u")
+]
 # ceselder/qwen3.6-27b-nla-rl (layer 42) at the O-lens positions (scripts/author_probe/nla_l42.py; Kylie, 2026-10-31)
-NLA_READS = Path("data/runs/nla_reads/2026-10-31_author-blog-nla-l42")
+NLA_READS = [Path(f"data/runs/nla_reads/2026-10-31_author-blog-{s}") for s in ("nla-l42", "c-nla-l42", "c2-nla-l42", "u-nla-l42")]
+THR = 0.15  # flat rule (Kylie, 2026-10-31): positive when Qwen's probability on its answer falls by more than 0.15
 QWEN = "Qwen/Qwen3.6-27B"
 ENVS: list[str] = []
 MODEL_NAME = "the model"
@@ -51,10 +57,9 @@ X2 = False
 WHERE = 'at every punctuation and newline token of the question and the blog post, up to "What do you think?" (before the options)'
 TIMING = "These reads are of the full message, with the sentence still in it."
 TASK_TEXT = """\
-Call the deletion significant if {model}'s probability on its answer ({answer}) falls by more than max(0.15, 5 × the median \
-fall from deleting any one sentence of this message): by more than 0.15 for most messages, since deleting a typical sentence \
-barely moves it. In the base arm its probability on {answer} is {p0:.2f} (averaged over this option order and the reversed \
-one). Give the probability that the deletion is significant, with submit_prediction."""
+Call the deletion significant if {model}'s probability on its answer ({answer}) falls by more than 0.15. In the base arm its \
+probability on {answer} is {p0:.2f} (averaged over this option order and the reversed one). Give the probability that the \
+deletion is significant, with submit_prediction."""
 
 
 def load(p: Path) -> list[dict]:
@@ -69,24 +74,33 @@ def collect(versions: tuple[str, ...] | list[str] = tuple(VERSIONS)) -> list[dic
         if not r["stable"] or version not in versions:
             continue
         drops = [-d["qwen_shift"] for d in r["deletions"]]
-        thr = max(0.15, 5 * sorted(drops)[len(drops) // 2])
+        thr = max(0.15, 5 * sorted(drops)[len(drops) // 2])  # the old rule picks the cases, so the first batches' sample is unchanged
         pos = [d for d, x in zip(r["deletions"], drops, strict=True) if x > thr]
         neg = [d for d, x in zip(r["deletions"], drops, strict=True) if x <= thr]
         opts = ATTRS[r["attr"]][1]
-        for d in pos + rng.sample(neg, min(len(pos), len(neg))):
+        pick = pos + rng.sample(neg, min(len(pos), len(neg)))
+        more = [d for d in r["deletions"] if -d["qwen_shift"] > THR and d not in pick]  # flat-rule positives the old rule missed
+        rest = [d for d in r["deletions"] if -d["qwen_shift"] <= THR and d not in pick]
+        pick += more + random.Random(f"flat:{r['passage']}:{r['attr']}").sample(rest, min(len(more), len(rest)))
+        for d in pick:
             out.append({"version": version, "item": f"{r['passage']}:{r['attr']}#{d['i']}", "pair": f"{r['passage']}:{r['attr']}",
-                        "attr": r["attr"], "comment": d["text"], "positive": -d["qwen_shift"] > thr, "threshold": thr,
+                        "attr": r["attr"], "comment": d["text"], "positive": -d["qwen_shift"] > THR, "threshold": THR,
                         "answer": LETTERS[r["answer"]], "label": LETTERS[r["label"]], "p0": r["pmf"][r["answer"]],
                         "p1": d["pmf"][r["answer"]], "drop": -d["qwen_shift"], "tv": d["tv"], "flip": not d["argmax_kept"],
                         "prompt": qf_message(passages[r["passage"]]["text"], r["attr"], opts)})  # fmt: skip
-    return out
+    return out + [c for c in load(BATCH3 / "cases.jsonl") if c["version"] in versions]
+
+
+# the natural sample (Kylie, 2026-10-31: "do or simulate a natural sample"): scripts/author_probe/blog_u.py's cases
+UNIFORM = Path("data/runs/author_mcq_blog/2026-10-31_uniform-sample/cases.jsonl")  # two-order labels since 2026-11-01
 
 
 def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | None = None, strict: bool = False):
+    """strict: the natural sample's cases (UNIFORM) instead of collect()'s batches 1-3."""
     from transformers import AutoTokenizer
 
     tok = AutoTokenizer.from_pretrained(MODEL)
-    cs = collect(versions)
+    cs = [c for c in load(UNIFORM) if c["version"] in versions] if strict else collect(versions)
     need = {c["pair"] for c in cs}
     rows, have = [], set()
     for d in READS:  # the first reads run that has a pair wins
@@ -103,15 +117,14 @@ def prep(out: Path, versions: list[str], placebo: Path | None, n_items: int | No
     rows_req = [{"id": p, "item": p, "messages": msgs[p], "batch": batch[p]} for p in sorted(have)]  # batch: the placebo stays within it
     (out / "reads/requests.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows_req))
     (out / "cases.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in cs))
-    if (NLA_READS / "reads.jsonl").exists():
-        add_nla(out)
+    add_nla(out)
     print(f"{len(cs)} cases ({sum(c['positive'] for c in cs)} positive) from {len(need)} pairs; reads for {len(have & need)} pairs")
 
 
 def add_nla(inputs: Path):
     """The NLA conditions' readouts for the inputs run's pairs, as reads/nla.jsonl (also run on an existing inputs run)."""
     need = {r["id"] for r in load(inputs / "reads/requests.jsonl")}
-    rows = [r for r in load(NLA_READS / "reads.jsonl") if r["id"] in need]
+    rows = [r for d in NLA_READS if (d / "reads.jsonl").exists() for r in load(d / "reads.jsonl") if r["id"] in need]
     (inputs / "reads/nla.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
     print(f"{len(rows)} NLA readouts for {len({r['id'] for r in rows})} of {len(need)} pairs -> {inputs / 'reads/nla.jsonl'}")
 
@@ -121,9 +134,7 @@ def reads(inputs: Path) -> list[str]:
 
 
 class Prompt:
-    BEHAVIOR = (
-        "Positive if deleting the sentence lowers Qwen3.6-27B's probability on its answer by more than max(0.15, 5 x the median drop)."
-    )
+    BEHAVIOR = "Positive if deleting the sentence lowers Qwen3.6-27B's probability on its answer by more than 0.15."
 
     def __init__(self, comment: str):
         self.comment = comment
@@ -260,7 +271,15 @@ def topup(out: Path):
     print("wrote", len(pairs), "requests to", out)
 
 
-RUNS = ["2026-10-30_author-blog-drop-haiku-b2", "2026-10-31_author-blog-drop-haiku-nla"]  # batches 1+2; NLA (2026-10-31)
+RUNS = [  # batches 1+2; their NLA conditions; the scale-up's new cases (batch 3 + flat-rule additions); the natural sample's new cases
+    "2026-10-30_author-blog-drop-haiku-b2",
+    "2026-10-31_author-blog-drop-haiku-nla",
+    "2026-10-31_author-blog-drop-haiku-scaleup",
+    "2026-10-31_author-blog-drop-haiku-scaleup-nla",
+    "2026-10-31_author-blog-drop-haiku-natural",
+    "2026-11-01_author-blog-drop-haiku-natural2",  # the natural sample's clean run: every case, harness 19
+    "2026-11-01_author-blog-drop-haiku-natural2-nla",
+]
 EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
 
 
@@ -289,27 +308,38 @@ def LINKS(row: dict) -> dict[str, dict]:
 
 
 INPUTS = Path("data/runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2")
+CASE_INPUTS = [
+    Path(f"data/runs/cfbench_evals/2026-1{s}")
+    for s in (
+        "1-01_author-blog-drop-inline-inputs-natural2",
+        "0-31_author-blog-drop-inline-inputs-natural",
+        "0-31_author-blog-drop-inline-inputs-scaleup",
+    )
+]
 
 
 def ITEM_INFO(row: dict) -> dict:
-    """The env viewer's per-case table (Kylie, 2026-10-31: show which cases the deletion makes a difference in): the
-    truth as the class, Qwen's probability on its answer before and after the deletion, the drop and its threshold, and
-    the deleted sentence."""
+    """The env viewer's per-case table (Kylie, 2026-10-31: show which cases the deletion makes a difference in): whether
+    the case is in the natural sample, the flat-rule truth as the class, Qwen's probability on its answer before and after
+    the deletion, the drop, and the deleted sentence."""
     if not hasattr(ITEM_INFO, "comment"):
-        ITEM_INFO.comment = {c["item"]: c["comment"] for c in load(INPUTS / "cases.jsonl")}  # ty: ignore[unresolved-attribute]
+        files = [d / "cases_all.jsonl" if (d / "cases_all.jsonl").exists() else d / "cases.jsonl" for d in CASE_INPUTS]
+        ITEM_INFO.comment = {c["item"]: c["comment"] for f in files for c in load(f)}  # ty: ignore[unresolved-attribute]
+        ITEM_INFO.natural = {c["item"] for c in load(UNIFORM)}  # ty: ignore[unresolved-attribute]
         from cfbench.evals.author_blog_drop_inline.score import probe_scores
 
         ITEM_INFO.probe = probe_scores()  # ty: ignore[unresolved-attribute]
+    sc = ITEM_INFO.probe.get(row["item"], {})  # ty: ignore[unresolved-attribute]
     return {
         "source": row["version"],
-        "class": "makes a difference" if row["k_cf"] else "no difference",
+        "natural sample": "yes" if row["item"] in ITEM_INFO.natural else "no",  # ty: ignore[unresolved-attribute]
+        "class": "makes a difference" if sc.get("positive", row["drop"] > THR) else "no difference",
         "attribute": row["attr"],
         "p0": round(row["p0"], 3),
         "p1": round(row["p1"], 3),
         "drop": round(row["drop"], 3),
-        "threshold": round(row["threshold"], 3),
         "deleted sentence": ITEM_INFO.comment.get(row["item"], ""),  # ty: ignore[unresolved-attribute]
-        "probe p": round(ITEM_INFO.probe.get(row["item"], float("nan")), 3),  # ty: ignore[unresolved-attribute]
+        "probe p": round(sc.get("probe_l2_h", float("nan")), 3),
     }
 
 
