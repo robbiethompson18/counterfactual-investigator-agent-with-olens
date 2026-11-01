@@ -11,6 +11,10 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 
 ## REFERENCE
 
+- [REFERENCE: Hinted MCQ, unselected — read before claiming the O-lens tells "did Qwen know it?" on hinted MCQs, or quoting the DSv4-disagreement cohort's hint numbers](hint-unselected.md)
+  — 1,042 MMLU-Pro cases, consistency the only filter, hint first, canonical reads, Haiku 5.5:
+  transcript-only AUROC 0.77, O-lens 0.75–0.76 (beats its placebo, not the transcript); letter task
+  54% everywhere, 9–14% on Qwen-wrong items vs 10% chance
 - [REFERENCE: drink_drive — read before citing the "Qwen recommends drunk driving" case or its drink-count dose response](envs/drink_drive.md)
   — one→ten drinks: drive-or-mixed 86%→0% by four drinks, couple 32%
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)

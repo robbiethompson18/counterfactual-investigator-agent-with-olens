@@ -327,50 +327,75 @@ configuration was chosen during exploration of this dataset.
 
 ### Hinted MCQ
 
-> **🚧 TODO SANITY CHECK (Robbie / Kylie).** This section was pulled from the talk's "Hinted MCQ"
-> part by an agent on 2026-10-31. Check the setup description, the numbers against
-> `python -m graphs.talk` (the `grid` figure) and the caveat below before shipping. Hints were taken
-> out of the sprint's main line on 2026-10-29, so this is the only hint result we keep.
-
 This is the one dataset where the behaviour is a counterfactual in the CHIVE sense, with a real edit
-to the prompt. We take MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each
-answer the same way in at least 7 of 8 no-hint samples, with different answers from each other. The
-base arm adds a hint naming the **correct** letter ("A Stanford professor I asked thinks the answer
-is C."), and Qwen follows it; the counterfactual arm drops the hint. On half the cases Qwen **knew**
-the answer (its no-hint answer is correct), on the other half it **didn't** (the hint pulled it off
-a wrong one), balanced within each gold letter. The investigator (Gemini 3.8 Flash, effort low, one
-turn, no tools) sees the hinted prompt, Qwen's reply and the diff, and either gives P(knew) or names
+to the prompt. The base arm puts a hint naming the **correct** letter first ("A Stanford professor I
+asked thinks the answer is C."), and Qwen follows it; the counterfactual arm drops the hint. On half
+the cases Qwen **knew** the answer (its no-hint answer is correct), on the other half it **didn't**
+(the hint pulled it off a wrong one), balanced within each gold letter. The investigator (one turn,
+no tools) sees the hinted prompt and Qwen's one-letter reply, and either gives P(knew) or names
 Qwen's no-hint letter. Always naming the hinted letter is right on exactly the knew half, so 50% is
 the floor for the letter task.
 
-We run two hint placements, which decide what the lens can see. With the hint after the options (976
-cases) the read positions, the option newlines, come before the hint, so the reads are of Qwen
-reading the bare question. With the hint first (952 cases) the same positions come after the hint.
-Reads are at layers 32/40/48/52, every bullet with its FVE, for the 🔮-lens; the probe is a linear
-probe at layer 52 trained on hint-after prompts, and the tuned probe the same probe refit on
-hint-first prompts (out-of-fold).
+We ran it on two cohorts and show both, because the difference between them is the result.
 
-<img src="img/hinted-mcq-grid.png" alt="Hinted MCQ, hint after the options (976 cases) and hint first (952 cases). Top, AUROC of P(knew): transcript only 0.613 / 0.615, 🔮-lens 0.739 / 0.688 (placebo 0.572 / 0.543), probe 0.937 / 0.764, tuned probe 0.851 hint-first. Bottom, which letter without the hint, % correct: transcript only 53.2 / 52.3, 🔮-lens 54.9 / 53.9 (placebo 49.3 / 47.6), probe 76.4 / 53.9, tuned probe 64.1 hint-first; always the hinted letter 50%" width="760">
+- **Legacy cohort, 952 cases.** How the eval was first built (2026-10-29): MMLU-Pro and TruthfulQA
+  questions that Qwen3.6-27B and DeepSeek V4 Flash each answer consistently (at least 7 of 8
+  no-hint samples) **and differently**, the disagreement filter meant to keep questions whose
+  answer can't be read off the text. Investigator Gemini 3.8 Flash at effort low; 🔮-lens reads at
+  layers 32/40/48/52 at the option newlines and the end of the prompt; a case's draws averaged.
+- **Unselected cohort, 1,042 cases.** The redo with no second model (2026-10-31,
+  [hint-unselected.md](hint-unselected.md)): every MMLU-Pro question Qwen answers consistently with
+  no hint (the probe half held out), a sample balanced per gold letter, hinted 8 times, kept when
+  Qwen followed the hint on at least half. Investigator Haiku 5.5 at effort medium; canonical
+  🔮-lens reads (every punctuation token and option newline, layers 32 to 60, the `prompt` menu);
+  the standard placebo rule; every draw one prediction.
+
+<img src="img/data-filter-sankey-hint_selected.png" alt="Hinted MCQ, legacy cohort: MMLU-Pro 12,032 questions, Qwen consistent 8,133, DSv4 Flash consistent and disagreeing 1,746, hint followed 1,506 (Qwen right on 898), 944 eval cases balanced per gold letter, plus 8 TruthfulQA cases" width="500">
+
+<img src="img/data-filter-sankey-hint_unselected.png" alt="Hinted MCQ, unselected cohort: MMLU-Pro 12,032 questions, Qwen consistent and outside the probe half 6,742 (right on 5,288), 1,298 sampled and hinted, 1,042 eval cases, 521 per class" width="500">
+
+Dark green: evaluated. Light green: usable but held out. Gray: not usable. The legacy diagram is
+the cohort's MMLU-Pro part; its 8 TruthfulQA cases were selected the same way.
+
+<img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint first, three columns: the legacy DSv4-disagreement cohort (952 cases) with Gemini Flash, the same cohort rerun with Haiku, and the unselected cohort (1,040 cases) with Haiku. Top, AUROC of P(knew): legacy with Flash, transcript only 0.615, O-lens 0.688 (placebo 0.543), probe 0.764, tuned probe 0.851; legacy with Haiku, transcript only 0.534, O-lens 0.551 (placebo 0.538); unselected, transcript only 0.769, O-lens 0.750 (placebo 0.740). Bottom, which letter without the hint, % correct: legacy with Flash 52.3, 53.9 (47.6), probe 53.9, tuned probe 64.1; legacy with Haiku 50.5, 50.2 (50.7); unselected 54.4, 54.7 (53.5); always the hinted letter 50%" width="900">
 
 Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
-transcript only. Bottom row: % correct on the letter, 95% item bootstrap, stars from a one-sided
-paired sign test against transcript only; dotted line is always the hinted letter. Placebo: another
-question's reads in the same positions.
+transcript-only. Bottom row: % correct on the letter, 95% case bootstrap, stars against
+transcript-only (legacy: paired sign test; unselected: paired bootstrap); dotted line is always the
+hinted letter. Placebo: another question's reads at the same positions. The probe (layer 52, trained
+on no-hint prompts) and the tuned probe (refit on hint-first prompts, out-of-fold) were run on the
+legacy cohort only.
 
-On "did Qwen know it?" the 🔮-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
-after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript only, so
-the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
-"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over transcript
-only, significant at p < .05 but barely above the 50% floor, and only the probe (76.4% hint-after)
-names the letter. The probe trained on hint-after prompts does not transfer to hint-first prompts
-(0.764 AUROC and 53.9% on the letter, the latter at transcript level); refitting it on hint-first
-prompts recovers most of the gap (0.851, 64.1%).
+On the legacy cohort the 🔮-lens looks like a clear win on "did Qwen know it?": 0.688 against
+transcript-only's 0.615, with the placebo at 0.543, below the transcript. On the unselected cohort
+the win is gone: transcript-only 0.769, 🔮-lens 0.750, placebo 0.740. The lens is 0.019 **below**
+transcript-only (paired bootstrap, p = 0.99 that it beats it) and 0.011 above its placebo (p =
+0.09). The Sankeys say why. Qwen is right on 78% of the consistent MMLU-Pro questions, and the
+easy ones are exactly those both models get right, so keeping only questions where DSv4 disagrees
+throws them out (60% right among what survives, and what survives is hard for everyone). On an
+unselected set "knew" mostly means "easy", and a transcript-only investigator can tell an easy
+question from a hard one; the disagreement filter had removed that cue, which made the lens's gain
+over the transcript look like lens information. The filter also imports DSv4's letter bias as a
+class signal (its consistent errors cluster on gold letters A and B), so the hinted letter alone
+predicts "knew" at AUROC 0.70 on the filtered set and 0.53 unfiltered
+([mcq-unselected.md](mcq-unselected.md)).
 
-> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: 🔮-lens at
-> layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
-> only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-> medium. There is no `menus_inline` run for hints. Decide: keep it with this caveat, or rerun on
-> canonical reads.
+On "which letter without the hint?" nobody does much on either cohort: 52 to 55% against the 50%
+floor, and 9 to 14% on the didn't half against 10% chance, with or without the lens. Only the probe
+refit on this setup names the letter (64.1%, legacy cohort). The same probe trained on hint-after
+prompts does not transfer to hint-first prompts (0.764 AUROC, letter at transcript level).
+
+**Same investigator, both cohorts (the middle column).** The two outer columns differ in cohort and
+in investigator, reads and scoring, so we reran the legacy cohort with the unselected cohort's
+investigator, Haiku 5.5 at medium, on the legacy prompts and reads (3 draws, 2,856 per condition).
+Haiku gets transcript-only 0.534, 🔮-lens 0.551, placebo 0.538: everything at chance, and 50% flat on
+the letter task. With the investigator held fixed, transcript-only goes from 0.53 on the filtered
+cohort to 0.77 on the unselected one, so the difficulty cue the filter removed is the whole gap.
+The rerun also fails to reproduce Flash's lens win on the same prompts: Flash read the legacy reads
+to +0.145 over its placebo, Haiku reads them to +0.013, the same nothing it gets from the canonical
+reads on the unselected cohort (+0.011). So the one "clear win" in the talk was Flash at low effort
+on a filtered cohort, and we do not know what Flash was using. The cheap test left is Flash on the
+unselected cohort.
 
 ## Ablations
 
@@ -775,7 +800,8 @@ No model seems to get more or less uplift from having access to 🔮-lens output
 
 ## Hinted MCQ as a Counterfactual (TODO Kylie)
 
-TODO @Kylie: write this up. The base arm adds a hint naming the correct letter and Qwen follows it;
+Written up above, in [Hinted MCQ](#hinted-mcq) (both cohorts, 2026-10-31).
+Earlier note: The base arm adds a hint naming the correct letter and Qwen follows it;
 the counterfactual arm drops the hint, and the investigator either gives P(Qwen knew the answer) or
 names Qwen's no-hint letter. Material: the talk's "Hinted MCQ" part, the `hint_qwen_dsv4*` evals
 (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the talk: these runs are not on

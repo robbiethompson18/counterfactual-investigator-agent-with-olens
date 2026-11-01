@@ -64,6 +64,13 @@ DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
 # CHIVE (adamkarvonen/chive-data) per-edit rates for Qwen3.5-397B, the Great Sneeze slide
 SNEEZE_RUN = Path("runs/chive_critique/2026-10-30_replication-data/adam_rates/rates_qwen3p5_397b_wildchat_eval.jsonl")
 
+# hinted MCQ (graphs.hint_unselected, graphs.talk grid): the unselected cohort's runs per task (cfbench/evals/hint_unselected_inline,
+# docs/hint-unselected.md: the `prompt` + transcript 3-draw run, then the `all`-menu pair) and the legacy DSv4-disagreement cohort
+# rerun with Haiku at medium on its own reads (cfbench/evals/hint_qwen_dsv4_before{,_letter}_tail_inline, 2026-10-31 evening)
+HINT_UNSELECTED_RUNS = {"knew": ["2026-10-31_hint-unselected-d", "2026-10-31_hint-unselected-all-d"],
+                        "letter": ["2026-10-31_hint-unselected-letter-d", "2026-10-31_hint-unselected-letter-all-d"]}  # fmt: skip
+HINT_LEGACY_HAIKU_RUNS = {"knew": ["2026-11-01_hint-dsv4-before-haiku"], "letter": ["2026-11-01_hint-dsv4-before-letter-haiku"]}
+
 # ---- the counterfactual (cfbench agentic) charts: graphs.cfbench_report, cfbench_modelchart, honest_binary ----
 
 MODELCHART_RUNS = R + "*modelchart-*"

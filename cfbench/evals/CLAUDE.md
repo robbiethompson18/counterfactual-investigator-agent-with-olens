@@ -171,6 +171,11 @@ the eval `<env>-pairs`.
   NLA) and `jlens_inline` (J++ top 10, layers 32-60 step 4) with their placebos, read at exactly
   the O-lens reads' tokens (`hint_qwen_dsv4/lens_reads.py`; runs
   `nla_reads/2026-10-31_hint-qwen-dsv4-ceselder-l42`, `jpp_reads/2026-10-31_hint-qwen-dsv4-same-tokens`).
+- `hint_unselected_inline` and `hint_unselected_letter_inline` (Robbie, 2026-10-31): the hinted-MCQ
+  "did Qwen know it?" / "which letter without the hint?" questions on an unselected MMLU-Pro set:
+  consistency the only filter (no DSv4), hint first (`before/hint+d1`), canonical reads at every
+  default position, the menus_inline prompt and placebo rule, Haiku at medium, draws pooled
+  (docs/hint-unselected.md). `eval.py requests OUT_DIR` writes the sharded O-lens requests.
 - `supergpqa_inline`: mcq_unselected's question on SuperGPQA (`environments/supergpqa`): 3,000
   consistent cases (seed 0; the other 3,328 consistent questions are the probe pool), no hint,
   single-turn letter task, Haiku 5.5. Seven conditions: `transcript_inline`, O-lens / NLA / J++ each
