@@ -1,8 +1,9 @@
 # supergpqa_inline: what letter will Qwen say? 3,000 SuperGPQA cases, seven single-turn conditions
 
-**Status (2026-10-30):** REFERENCE. Linear probe baseline added 2026-10-30 (91.9%, 87.8% on
+**Status (2026-10-31):** REFERENCE. Linear probe baseline added 2026-10-30 (91.9%, 87.8% on
 Qwen-wrong). One investigator (Haiku 5.5), one draw, 3,000 cases, all seven conditions run; the
-caveats at the end are open.
+caveats at the end are open. Chart module `graphs.supergpqa_inline` deleted 2026-10-31 (PR #579,
+last at commit 62a4e31c).
 
 **Probe update (2026-10-31):** The regenerated figures use both standardized read positions on
 exactly the historical lens-evaluation questions; the old probe numbers in the text below are

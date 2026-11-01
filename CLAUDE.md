@@ -314,7 +314,7 @@ Active docs:
   — 3,000 consistent SuperGPQA cases (seed 0; the other 3,328 are the probe pool), Haiku 5.5, seven
   single-turn conditions: O-lens 76.9% vs placebo 67.6% vs prompt-only 68.9% (+11pp on Qwen-wrong
   cases), J++ and NLA +3pp over placebo; the top bullet at the last token (after `</think>`, L60)
-  names Qwen's letter on 80% of cases and beats Haiku as a rule; chart `graphs.supergpqa_inline`; a
+  names Qwen's letter on 80% of cases and beats Haiku as a rule; a
   linear probe on the option newlines reads 92% (88% on Qwen-wrong), Kylie's frozen MMLU-Pro probe
   90%
 - [REFERENCE: essay_grading_cf_inline — read before quoting the essay counterfactual eval, or comparing O-lens, NLA and J++ on it](docs/essay-grading-cf-inline.md)
