@@ -214,13 +214,11 @@ def essay_tables() -> None:
     (fig/essay_null.tex) for the footnote."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
-            "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
-            "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
-            "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
+            "nla_inline": r"\sw{nla}\ NLA", "jlens_inline": r"\sw{jlens}\ J++"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))}\\\\"
-            for a, b in pairs if b == "transcript_inline" and not a.startswith("probe")]  # fmt: skip
+            for a, b in pairs if b == "transcript_inline" and a in ESSAY_LENSES]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
     head = [r" & $\Delta$ & p\\"]
     (OUT / "essay_pairs.tex").write_text(tab("lrr", [*head, "\\hline", *rows]))
