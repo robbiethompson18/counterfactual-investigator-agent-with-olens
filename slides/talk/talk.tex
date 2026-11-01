@@ -224,9 +224,10 @@
       \slidefig{fig/essay_diffs.pdf}
     \end{column}
   \end{columns}
-  \source{AUROC over all 5,400 draws (each one prediction), 95\% CI resampling the 204 essays; stars one-sided vs transcript (or transcript + mean), * p < .05, ** < .01, *** < .001.
-    Dotted: rank by minus the observed mean grade. Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
-    + mean: out-of-fold logistic regression adding Qwen's observed grade (5 folds by essay). Probe: ridge from the observed prompt's activations at the user message's last token to the plain-opener grade, minus the observed grade; nested 2 x 2 folds by essay.}
+  \source{AUROC over all 5,400 draws (each one prediction), 95\% CI resampling the 204 essays; stars one-sided vs transcript, * p < .05, ** < .01, *** < .001.
+    Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
+    Probe: ridge from the observed prompt's activations at the user message's last token to the plain-opener grade, minus the observed grade; nested 2 x 2 folds by essay.
+    \dag\,The probe knows Qwen's grade distribution: subtracting the observed mean grade alone gives AUROC \input{fig/essay_null.tex}\unskip, so it isn't like for like with the investigator bars.}
 \end{frame}
 
 \section{Blog authors}
