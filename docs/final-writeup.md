@@ -126,7 +126,7 @@ The graphs below show that transcripts do improve investigator AUROC, but only b
 
 ### On CHIVE-like Data, Metamodels Don't Help
 
-We did not recreate all of CHIVE using Qwen 3.6 27b rollouts, but we did test 150 incidents (500
+We did not recreate all of CHIVE using Qwen3.6-27B rollouts, but we did test 150 incidents (500
 claims) on a slightly modified version of their setup to check for signs of life. We see nothing
 promising, and move on to other datasets.[^datadetail]
 
@@ -428,7 +428,7 @@ it on hint-first prompts recovers most of the gap (0.851, 64.1%).
 <img src="img/headline-qwen-wrong.png" alt="Cases where Qwen is wrong: transcript only vs 🔮-lens, J++ and NLA on MMLU-Pro (29.1, 32.5, 37.1, 31.1), SuperGPQA (46.5, 53.4, 58.1, 49.7) and Knowledge Cutoff (63.6, 76.1, 71.4, 74.6)" width="760">
 
 Our investigators do much better when Qwen is right! When Qwen is wrong we see uplift from
-metamodels; when Qwen is wrong they are neutral.
+metamodels; when Qwen is right they are neutral.
 
 This is why we think it's so important to _not filter data based on subject model correctness_. If
 you do this, then way of pushing your investigator off of 'Qwen will say the right answer' looks
@@ -517,7 +517,7 @@ NLAs add the most tokens to the prompt, followed by the 🔮-lens and then J++.
 
 <img src="img/headline-tokens.png" alt="Prompt tokens each lens adds to Haiku's prompt over transcript only, pooled and per set" width="500">
 
-Every lens makes Haiku think more, and placebo make Haiku think even more than real lens outputs.
+Every lens makes Haiku think more, and placebos make Haiku think even more than real lens outputs.
 Anecdotally, Haiku consistently noticed that placebo outputs were nonsensical and explicitly
 acknowledged this.
 
@@ -550,7 +550,7 @@ apprehension.
 We spent way too long trying to get hard environments to work. We should have done some 'binary
 search' in which we picked a tremendously easy task on which metamodels do show uplift, then went
 halfway to our hard task and tried to get something of medium difficulty to work, and so on. If we
-had done this, we would've noticed much sooner that even on workspace bench there are only ~4 tasks
+had done this, we would've noticed much sooner that even on WorkspaceBench there are only ~4 tasks
 which show genuine uplift from metamodels.
 
 ## What We Learned
