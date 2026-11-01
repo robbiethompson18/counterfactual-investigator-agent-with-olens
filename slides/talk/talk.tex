@@ -247,17 +247,6 @@
 \end{frame}
 
 \section{Results across the three single-answer tasks}
-\begin{frame}
-  \parthead
-  \begin{itemize}
-    \item All of our environments that work are ideas taken from WorkspaceBench. We do not grade with pass@thousands, running a
-      regex on metamodel output at many layers and tokens: we pass metamodel output to an investigator model (always Haiku 5.5,
-      effort medium) and ask it to pick the correct answer, which penalizes noise and hallucinations
-    \item 1,000 to 3,000 cases per category: small but statistically significant effects, probes trained on unseen data, and no
-      biasing filters. WorkspaceBench filters \texttt{knowledge\_cutoff} to answers that disagree with Sonnet and Opus, which
-      confounds any prompt-only baseline; we drop that filter and others like it
-  \end{itemize}
-\end{frame}
 
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
