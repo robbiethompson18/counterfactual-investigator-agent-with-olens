@@ -647,3 +647,30 @@ def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
         da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
         pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
     return bars, pairs, len(items)
+
+
+SIMULATED_RUN = "runs/harness_grid/2026-11-01_graderd-prompt-reads"
+PROMPT_SECTIONS = ["tool block", "system prompt", "env block", "user"]
+
+
+def simulated_by_section() -> dict:
+    """harness_grid thinking off, every prompt position read (prefixes deduplicated): model -> section -> (draws saying
+    simulated/mock/synthetic/fictional, draws), and the tool block split by plain vs MCP tool names. Qwen3.6-27B: one draw per
+    position; GLM-5.3: five per position."""
+    import csv
+
+    def load(name):
+        path = Path("data") / SIMULATED_RUN / name
+        if not path.exists():
+            from huggingface_hub import hf_hub_download
+
+            hf_hub_download(HF_REPO, f"{SIMULATED_RUN}/{name}", repo_type="dataset", local_dir="data")
+        return list(csv.DictReader(path.open()))
+
+    out: dict = {m: {} for m in ("Qwen3.6-27B", "GLM-5.3")}
+    for r in load("prompt_simulated_by_section.csv"):
+        if r["seg"] in PROMPT_SECTIONS:
+            out[r["model"]][r["seg"]] = (int(r["hits"]), int(r["draws"]))
+    for r in load("prompt_simulated_tool_block_names.csv"):
+        out[r["model"]][f"tool block, {r['names']}"] = (int(r["hits"]), int(r["draws"]))
+    return out
