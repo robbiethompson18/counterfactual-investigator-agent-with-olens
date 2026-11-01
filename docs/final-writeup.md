@@ -25,7 +25,7 @@ positions on MMLU-Pro) with a different prompt. Essay grading has no menus run a
 > token-position ablation. What's left marked 🚧 is blog authorship and the counterfactual charts.**
 
 Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
-review I will write (KTR). FOr Claude I will write (CTR).
+review I will write (KTR). For Claude I will write (CTR).
 
 TODO BROAD:
 
@@ -33,7 +33,7 @@ TODO BROAD:
 
 RULES FOR CLAUDE:
 
-- Never give bash to reprodue something, people can just point their agent at our repo.
+- Never give bash to reproduce something, people can just point their agent at our repo.
 - Never link to github (except once to the overall repo); you are allowed to link to other parts of
   this doc and to arxiv papers and to docent.
 - Never numbers in prose by default!! We do this so often. I want to audit all of these eventually.
@@ -63,12 +63,12 @@ which is past its knowledge cutoff). These are notably NOT counterfactuals.[^hin
     We do have some hint data which reframes Multiple Choice as counterfactuals, see
     [Hinted MCQ as a Counterfactual](#hinted-mcq-as-a-counterfactual-todo-kylie).
 
-## Claims, with credences (CTR, KTR)
+## Claims, with Credences (CTR, KTR)
 
 Current SOTA metamodels (J++ lens, 🔮-lens, NLA) do not provide uplift of more than 3 points (AUROC
 or percentage points) on 'wild' counterfactual investigations (eg CHIVE, WeirdChat) or on 'agentic'
 counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260),
-[Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuation: 95%.
+[Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuration: 95%.
 
 SOTA metamodels do provide uplift on the simple prediction tasks we detail below (Multiple Choice,
 Knowledge Cutoff, Idiosyncratic Preferences): 95%.[^KCspecial] They are worse than linear probes
@@ -86,7 +86,7 @@ SOTA metamodels would provide uplift on 'agentic' counterfactuals if the investi
 model was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
 
 I think the last two questions are terribly interesting! If you are reading this and you work at a
-lab: this should be a straighforward experiment to run!
+lab: this should be a straightforward experiment to run!
 
 ## I: 🔮-lens Does Not Provide Uplift on 'Wild' or Agentic Counterfactuals
 
@@ -110,11 +110,11 @@ reliably beat a transcript-only baseline or its own placebo:
 - The one thing we never ablated (which we regret) is which layers the lens reads.
 
 More details and charts are in the appendix,
-[Counterfactual investigation graphs](#counterfactual-investigation-graphs).
+[Counterfactual investigation graphs](#counterfactual-investigation-ablation-graphs).
 
-### CHIVE Shows Little Uplift From The Transcript
+### CHIVE Shows Little Uplift from the Transcript
 
-A cheap test we ran: does giving the investigator the transcript of a chive rollout help in
+A cheap test we ran: does giving the investigator the transcript of a CHIVE rollout help in
 predicting counterfactuals? If the answer is no, then these scenarios are very hard, and we don't
 expect metamodels to move the needle much either.
 
@@ -124,7 +124,7 @@ The graphs below show that transcripts do improve investigator AUROC, but only b
 
 <img src="img/chive-inline-diff.png" alt="Haiku AUROC, transcript minus edit only, paired by claim: +0.012 pooled" width="500">
 
-### On CHIVE-like Data, Metamodels Don't help.
+### On CHIVE-like Data, Metamodels Don't Help
 
 We did not recreate all of CHIVE using Qwen 3.6 27b rollouts, but we did test 150 incidents (500
 claims) on a slightly modified version of their setup to check for signs of life. We see nothing
@@ -247,7 +247,7 @@ This dataset mostly works because Haiku doesn't have the same knowledge cutoff a
 questions itself, Haiku gives Qwen's stale answer on 25% of the 339 stale items; Gemini 2.5
 Flash-Lite, whose cutoff (January 2025) is about Qwen's, gives it on 63%. Use an investigator with a
 similar knowledge cutoff and the metamodels' uplift disappears. Concretely, the far right blue bar
-is is a strong and arguably fairer baseline, and we show no uplift to it.
+is a strong and arguably fairer baseline, and we show no uplift to it.
 
 <img src="img/cutoff-qa-investigators.png" alt="Knowledge Cutoff by investigator, stale items: Haiku 5.5 answers the question itself 25.4%, transcript only 63.6%, 🔮-lens 76.1% (placebo 67.2%), J++ 71.4% (placebo 42.5%), NLA 74.6% (placebo 67.8%); Gemini 2.5 Flash-Lite answers itself 63.1%, transcript only 73.1%; with not-stale and all-items panels" width="600">
 
@@ -267,7 +267,7 @@ We ask Qwen free-response questions about its own preferences, such as "Which te
 choose for editing a config file over SSH? Answer with just the name.", from a bank of 5,187 that
 Sonnet subagents wrote. This is WorkspaceBench's `basic_readout` implicit family scaled from 32
 items to 1,500. There is no truth, the label is Qwen's modal answer, and the only filter is
-consistency. we keep every question where at least 7 of 8 samples agree.
+consistency. We keep every question where at least 7 of 8 samples agree.
 
 <img src="img/data-filter-sankey-favorites.png" alt="Idiosyncratic Preferences: 5,187 questions to 1,500 eval cases" width="500">
 
@@ -419,9 +419,9 @@ it on hint-first prompts recovers most of the gap (0.851, 64.1%).
 
 ## Ablations
 
-### Filtering On Correctness
+### Filtering on Correctness
 
-#### Little or No Uplift When Qwen is Right
+#### Little or No Uplift When Qwen Is Right
 
 <img src="img/headline-qwen-right.png" alt="Cases where Qwen is right: transcript only vs 🔮-lens, J++ and NLA on MMLU-Pro (94.8, 95.5, 95.0, 94.6), SuperGPQA (83.7, 85.7, 87.0, 85.1) and Knowledge Cutoff (94.5, 89.7, 89.1, 91.5)" width="760">
 
@@ -434,13 +434,13 @@ This is why we think it's so important to _not filter data based on subject mode
 you do this, then way of pushing your investigator off of 'Qwen will say the right answer' looks
 like a significant effect. We had several spurious positive results this way.
 
-### Which Metamodel is Best?
+### Which Metamodel Is Best?
 
 <img src="img/headline-lens-diffs.png" alt="Each lens minus its placebo, paired by case and pooled over the three tasks: 🔮-lens +7.7 [+6.8, +8.5], J++ +28.5 [+27.3, +29.6], NLA +3.1 [+2.4, +3.8]" width="620">
 
 It's not clear what is best.
 
-### By token position
+### By Token Position
 
 This section pools the three tasks that work, with Multiple Choice split into MMLU-Pro and
 SuperGPQA, so four sets, each weighted equally.
@@ -454,7 +454,7 @@ from the boilerplate at the start of the assistant turn.
 
 We expected that reading the very last tokens before the reply would improve performance, especially
 for J++. In fact, the opposite is true: late tokens are more helpful for NLA and 🔮-lens, and less
-important for J++. This is makes us 'like' J++ lens more, and NLA and 🔮-lens less. J++ is reading
+important for J++. This makes us 'like' J++ lens more, and NLA and 🔮-lens less. J++ is reading
 Qwen's thoughts earlier, suggesting it is doing something workspace-like. NLA and 🔮-lens read
 thoughts later and can be accused of being next-token predictors.
 
@@ -528,7 +528,7 @@ wrong more often (correlation −0.19 to −0.45), so long thinking looks more l
 than a source of accuracy. Transcript-only already thinks on 98% of draws (115 tokens on
 Idiosyncratic Preferences), so the reads aren't just prompting thought it would otherwise skip.
 
-## How we kept LLM agents from producing BS
+## How We Kept LLM Agents from Producing BS
 
 We read so so so many transcripts.
 
@@ -545,7 +545,7 @@ predictable). We deleted this code from the repo because it was bad. Any results
 environments,' which is not an environment listed in this writeup, deserves to be taken with some
 apprehension.
 
-## What we'd do differently
+## What We'd Do Differently
 
 We spent way too long trying to get hard environments to work. We should have done some 'binary
 search' in which we picked a tremendously easy task on which metamodels do show uplift, then went
@@ -553,7 +553,7 @@ halfway to our hard task and tried to get something of medium difficulty to work
 had done this, we would've noticed much sooner that even on workspace bench there are only ~4 tasks
 which show genuine uplift from metamodels.
 
-## What we learned
+## What We Learned
 
 Robbie is much more bearish on metamodels than he was when we started out. He is not convinced that
 they do more than noisy text inversion. If and when models lose their CoT, it's not obvious how you
@@ -579,7 +579,7 @@ with the experiments one could run to test them:
   is why we do not ship them as part of our repo. We doubt that this hypothesis is true; if we
   didn't we would have spent more time cleaning the graders!
 
-## Pre-sprint work
+## Pre-Sprint Work
 
 Robbie spent a lot of time trying to understand how 🔮-lenses work and should've spent more time
 deeply understanding CHIVE and WorkspaceBench. He did not run code or experiments related to this
@@ -618,7 +618,7 @@ Things that will not have receipts:
   a month, we hit a boundary on one).
 - Robbie's Codex max plan.
 
-## Where everything is
+## Where Everything Is
 
 - **Code:** this repo,
   [robbiethompson18/counterfactual-investigator-agent-with-olens](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens).
@@ -648,20 +648,20 @@ Things that will not have receipts:
   [HF collection](https://huggingface.co/collections/robbiethompson2018/nn-mats-sprint-oracle-lens-on-qwen36-27b),
   [lens dashboard](https://jlens-dashboard.pages.dev/).
 
-# Appendix:
+# Appendix
 
-## 🔮-lens Now Speak English (DONE)
+## 🔮-lens Now Speaks English (DONE)
 
 We investigated why so many 🔮-lens bullets lead with a Mandarin character and then become English.
 The canonical 🔮-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
 But many tokens' canonical form is _with_ leading whitespace, eg \_need instead of need. The AR
-especially hates having the space stripped when when the next character will be a space.
+especially hates having the space stripped when the next character will be a space.
 
 Agam fixed this in RL, and the 🔮-lens speaks English again.
 
 <img src="img/olens-mandarin.png" alt="🔮-lens Mandarin before vs after keeping the bullet's leading space" width="500">
 
-## Our issues with the CHIVE dataset
+## Our Issues with the CHIVE Dataset
 
 - 40% of the data is off-policy in that it's one target model continuation at the end of a WildChat
   ChatGPT transcript. This makes some 'weird behavior' not that surprising, e.g.
@@ -764,7 +764,7 @@ We built ~30 environments, borrowing ideas from previous work (eg Aditya Singh a
 see metamodels help in evaluating counterfactuals in these environments. Transcripts helped only a
 little, which led us to believe that these counterfactuals were too difficult to predict.
 
-Nothing helper an investigator make better counterfacutla predictions:
+Nothing helped an investigator make better counterfactual predictions:
 
 <img src="img/cfbench-report/skill_pooled.png" alt="All targets pooled" width="404">
 
@@ -781,13 +781,13 @@ we tried a different investigator model it did not replicate:
 
 <img src="img/cfbench-report/skill_hidden_goal.png" alt="hidden_goal.grade" width="404">
 
-### Harness Sanity Chceks:
+### Harness Sanity Checks
 
 Models searched for reasonable things when reading transcripts and lens outputs:
 
 <img src="img/cfbench-report/olens_search_topics.png" alt="What the 🔮-lens agent searches for" width="489">
 
-They read mostly transcripts instead of lookign at lenses:
+They read mostly transcripts instead of looking at lenses:
 
 <img src="img/cfbench-report/tool_calls.png" alt="Which tools the investigator calls" width="500">
 
