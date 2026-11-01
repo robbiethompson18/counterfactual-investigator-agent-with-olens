@@ -261,11 +261,11 @@
 
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
-    \item Metamodels work on two tasks, Multiple Choice and Idiosyncratic Preferences. On Knowledge Cutoff the uplift is within
-      noise overall, and its stale-item gain is Haiku's later cutoff (the Knowledge Cutoff part); we believed it significant when we fixed the
-      canonical three, so it stays in the pool
-    \item Pooled over the three, \olens{} and \nla{} are about equally good (+3.0 and +2.6 pp over \promptonly); \jlens{} does not
-      help overall ($-$1.6 pp)
+    \item Metamodels work on Multiple Choice and Idiosyncratic Preferences; Hinted MCQ with caveats; Essay Grading almost;
+      Knowledge Cutoff and Blog Authorship don't (Part 3). Knowledge Cutoff stays in the pool: we believed it significant when
+      we fixed the canonical three
+    \item Pooled over the three, \olens{} and \nla{} are about equally good (+3.0 and +2.6 pp over \promptonly); \jlens{} is
+      $-$1.6 pp pooled, hiding that it is the best lens on both Multiple Choice sets and the worst on Idiosyncratic Preferences
     \item All three beat their placebos (another question's reads) by statistically significant amounts; \jlens's gap is all its
       placebo misleading the investigator ($-$30.1 pp vs \promptonly, against its own $-$1.6 pp)
   \end{itemize}
@@ -288,7 +288,7 @@
 \begin{frame}
   \parthead
   \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.42\textwidth}
+    \begin{column}{0.38\textwidth}
       \begin{itemize}
         \item Qwen3.6-27B (thinking off) answers multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples each; the
           investigator must name the letter Qwen picks from the prompt alone
@@ -301,13 +301,12 @@
           separately
       \end{itemize}
     \end{column}
-    \begin{column}{0.56\textwidth}
-      \slidefig{fig/sankey_mmlu_half.pdf}
-      \slidefig{fig/sankey_supergpqa_half.pdf}
+    \begin{column}{0.6\textwidth}
+      \slidefig{fig/sankey_mcq.pdf}
     \end{column}
   \end{columns}
-  \source{Sankeys: dark green evaluated, Qwen-right and Qwen-wrong alike; light green usable but held out, for probes or untouched;
-    gray not usable, typically Qwen inconsistent. Example Qwen transcripts on Docent: MMLU-Pro
+  \source{Sankeys: dark green evaluated, Qwen-right and Qwen-wrong cases alike; light green usable but held out, for probes or
+    untouched; gray not usable, typically because Qwen is inconsistent. Example Qwen transcripts on Docent: MMLU-Pro
     \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/0ea03746-b9c1-4404-9fbc-e7e6f1524795}{Qwen right},
     \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/a7135119-dd21-4857-9918-2dc57013f14e}{Qwen wrong};
     SuperGPQA
@@ -360,8 +359,15 @@
     question's reads. Right: each lens minus \promptonly, paired.}
 \end{frame}
 
-\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
-  \slidefig{fig/cutoff_investigators.pdf}
+\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, all items}
+  \slidefig{fig/cutoff_investigators_all.pdf}
+  \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
+    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
+    draws; Flash-Lite prompt only there, 1 draw.}
+\end{frame}
+
+\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, stale items}
+  \slidefig{fig/cutoff_investigators_stale.pdf}
   \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
     itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
     draws; Flash-Lite prompt only there, 1 draw.}
