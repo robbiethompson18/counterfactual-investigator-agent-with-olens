@@ -67,8 +67,9 @@ superseded
 
 ![paired differences between conditions with 95% CIs, grouped by question](img/cutoff-qa-inline-diff.png)
 
-(`uv run python -m graphs.cutoff_qa_inline` makes both; exact match, 95% bootstrap CIs over items,
-the second paired by item. This is the one cutoff chart: every lens goes on it.)
+(`graphs.cutoff_qa_inline` made both, deleted in PR #579; regenerate from commit 62a4e31c. Exact
+match, 95% bootstrap CIs over items, the second paired by item. This was the one cutoff chart: every
+lens went on it.)
 
 | exact match (%)      | all     | stale   | not stale |
 | -------------------- | ------- | ------- | --------- |
@@ -228,7 +229,7 @@ from 5 to 20 tokens past the last read costs the lens nothing.
 
 ![no tool vs tool call: transcript-only, O-lens, placebo](img/cutoff-qa-tool-inline.png)
 
-(`uv run python -m graphs.cutoff_qa_tool_inline`.)
+(Made by `graphs.cutoff_qa_tool_inline`, deleted in PR #579; regenerate from commit 62a4e31c.)
 
 **Split by whether Qwen wants the tool.** The reads are on the prompt, which is the same under
 `tool_choice` auto and required, so forcing the call changes nothing the lens sees. What matters is
@@ -331,7 +332,7 @@ full set from the v3 run. Error rate, per-item means over 3 draws, paired 95% bo
 ![v3 tool run, O-lens at the question punctuation vs the full set](img/cutoff-qa-notail.png)
 ![paired differences, stale items](img/cutoff-qa-notail-diff.png)
 
-Charts: `uv run python -m graphs.cutoff_qa_notail`.
+Charts: made by `graphs.cutoff_qa_notail`, deleted in PR #579; regenerate from commit 62a4e31c.
 
 Cost: Haiku $18.50 (22,188 predictions, from OpenRouter's per-row `cost`); no GPU.
 

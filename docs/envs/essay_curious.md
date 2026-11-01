@@ -200,7 +200,7 @@ O-lens − transcript-only +0.21 [−0.03, +0.58]; O-lens − placebo +0.26 [+0.
   grading too, just not this essay).
 - Out of 10: `runs/cfbench/2026-10-28_essay-ten-duke3-<condition>-<essay>` (36 runs, 108
   predictions).
-- Charts: `uv run python -m graphs.essay_curious_answer data/runs/cfbench/2026-10-28_essay-curious`
-  (letter grades);
-  `uv run python -m graphs.essay_curious_score 'data/runs/cfbench/2026-10-28_essay-ten-duke3*'` (out
-  of 10). (PNGs in `docs/img/essay-curious/`, gitignored).
+- Charts: made by `graphs.essay_curious_answer` on `data/runs/cfbench/2026-10-28_essay-curious`
+  (letter grades) and `graphs.essay_curious_score` on
+  `data/runs/cfbench/2026-10-28_essay-ten-duke3*` (out of 10); both deleted in PR #579, regenerate
+  from commit 62a4e31c. (PNGs in `docs/img/essay-curious/`, gitignored).

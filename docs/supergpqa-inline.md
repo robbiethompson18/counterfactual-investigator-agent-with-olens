@@ -55,8 +55,10 @@ cutoff_qa_inline (NLA, J++).
 uv run python -m cfbench.eval supergpqa_inline --prep
 uv run --with transformers --with jinja2 python -m cfbench.evals.supergpqa_inline.eval requests OUT_DIR
 uv run python -m cfbench.eval supergpqa_inline --slug supergpqa-haiku-3k --predictors anthropic/claude-haiku-5.5 --draws 1
-uv run python -m graphs.supergpqa_inline
 ```
+
+The charts below were made by `graphs.supergpqa_inline`, deleted in PR #579; regenerate from commit
+62a4e31c.
 
 Budget: ~$55 of GPU for the three readers and ~$27 of Haiku per draw
 ([cost-estimates.md](cost-estimates.md)).

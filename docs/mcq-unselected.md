@@ -157,7 +157,8 @@ draw: its block is ~18k tokens a call, so three draws would have been ~$31). $45
 
 ![paired differences between conditions with 95% CIs, all cases and Qwen-wrong cases](img/mcq-unselected-diff.png)
 
-(`uv run python -m graphs.mcq_unselected` makes both; 95% bootstrap CIs over cases.)
+(`graphs.mcq_unselected` made both, deleted in PR #579; regenerate from commit 62a4e31c. 95%
+bootstrap CIs over cases.)
 
 Paired by case, 95% bootstrap over cases (3,000 resamples):
 

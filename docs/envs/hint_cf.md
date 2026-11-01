@@ -11,9 +11,10 @@ of MMLU-Pro (2026-10-28 evening, section below). Real but small, and the lens ra
 moves (27–30% in every ordering); B's gap comes from a lower placebo baseline. Not pursued further:
 Kylie's single-turn `*_inline` evals superseded this line. `favorites` and `opinion_mcq` are retired
 (code at `cfa46a9`, [retired/hint_cf](../../environments/retired/hint_cf/)). Charts:
-`python -m graphs.hint_mcq_answer` (header runs); the scale-up figures were made with scratchpad
-scripts and live on the two artifact pages linked in the scale-up section. TruthfulQA: the same
-procedure gives Qwen survivors for hinted_truthfulqa's `gold` pair
+`graphs.hint_mcq_answer` (header runs; deleted in PR #579, regenerate from commit 62a4e31c); the
+scale-up figures were made with scratchpad scripts and live on the two artifact pages linked in the
+scale-up section. TruthfulQA: the same procedure gives Qwen survivors for hinted_truthfulqa's
+`gold` pair
 ([hinted_truthfulqa.md](hinted_truthfulqa.md#gold-pair-hint_mcqs-survivors-on-truthfulqa-2026-10-28)).
 Its answer task, un-gated
 ([hinted_truthfulqa.md](hinted_truthfulqa.md#ungated-sets-primary-2026-10-28)): 66 TruthfulQA cases,
@@ -597,7 +598,8 @@ as the headline.
 
 ![Correct draws per item, wrong-letter hint](../img/hint-mcq-answer/per_item_wrong_hint.png)
 
-Regenerate with `uv run python -m graphs.hint_mcq_answer` (PNGs are gitignored).
+Made by `graphs.hint_mcq_answer`, deleted in PR #579; regenerate from commit 62a4e31c (PNGs are
+gitignored).
 
 **Reads.** `olens_reads/2026-10-27_hint-mcq-header`: all 18 survivors x 3 arms x 8 samples (432
 transcripts), layers 32/40/48, at the stop tokens and at the last assistant header with
