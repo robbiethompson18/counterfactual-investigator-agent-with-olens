@@ -13,7 +13,7 @@ RULES FOR CLAUDE:
 - No new diff charts, but can keep ones that are already here / that Robbie asks for specifically.
 -->
 
-## Executive Summary (KTR)
+## Executive Summary
 
 We originally set out to test whether metamodels are useful in counterfactual investigations. We
 planned to replicate results from CHIVE ([Karvonen et al., 2026](https://arxiv.org/abs/2608.16747)),
@@ -39,7 +39,7 @@ conclusively are notably NOT counterfactuals.[^hint]
     We do have some hint data which reframes Multiple Choice as counterfactuals, see
     [Hinted MCQ](#hinted-mcq).
 
-## Claims, with Credences (CTR, KTR)
+## Claims, with Credences
 
 Current SOTA metamodels (J++ lens, 🔮-lens, NLA) do not provide uplift of more than 3 points (AUROC
 or percentage points) on 'wild' counterfactual investigations (eg CHIVE, WeirdChat) or on 'agentic'
@@ -147,8 +147,9 @@ their dataset:
 Ranked by how well metamodels do on them, the datasets in the next part fall into three tiers:
 
 - **Work:** Multiple Choice and Idiosyncratic Preferences, conclusively. Hinted MCQ too, with the
-  caveats that half its cases are selected on Qwen being wrong and its reads are not on our
-  canonical positions.
+  caveats that half its cases are selected on Qwen being wrong, its reads are not on our canonical
+  positions, and its investigator is Gemini Flash: a Haiku rerun of the hint-first half loses most
+  of the gain.
 - **Almost works:** Essay Grading. The 🔮-lens beats transcript only and its placebo, but by a small
   margin, and no investigator beats betting on regression to the mean.
 - **Doesn't work:** Knowledge Cutoff and Blog Authorship. Knowledge Cutoff would pass if we filtered
@@ -241,11 +242,6 @@ and
 
 ### Hinted MCQ
 
-> **🚧 TODO SANITY CHECK (Robbie / Kylie).** This section was pulled from the talk's "Hinted MCQ"
-> part by an agent on 2026-10-31. Check the setup description, the numbers against
-> `python -m graphs.talk` (the `grid` figure) and the caveat below before shipping. Hints were taken
-> out of the sprint's main line on 2026-10-29, so this is the only hint result we keep.
-
 Hinted MCQ, Essay Grading and Blog Authorship are our three counterfactual datasets; this is the one
 closest to CHIVE's setting, with a hint added to the prompt that Qwen follows. We take MMLU-Pro
 questions (plus a handful from TruthfulQA) that Qwen3.6-27B and DeepSeek V4 Flash each answer the
@@ -277,22 +273,20 @@ question's reads in the same positions.
 On "did Qwen know it?" the 🔮-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
 after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript only, so
 the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
-"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over
-transcript only, significant at p < .05 but barely above the 50% baseline, and only the probe (76.4%
+"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over transcript
+only, significant at p < .05 but barely above the 50% baseline, and only the probe (76.4%
 hint-after) names the letter. The frozen no-hint probe reads hint-after prompts well because the
 option-newline activations there are the no-hint prompt's; with the hint first they change, and it
 falls to 0.764 AUROC and 53.9% on the letter, the latter at transcript level. A probe refit on
 hint-first prompts gets most of that back (0.851, 64.1%).
 
-> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: 🔮-lens at
-> layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
-> only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-> medium. There is no `menus_inline` run for hints. **A 2026-11-01 rerun of the hint-first cases
-> with Haiku 5.5 at medium, 3 draws** (`2026-11-01_hint-dsv4-before-haiku` and `-letter-haiku`, not
-> in the catalog or any chart yet) **loses nearly all of the 🔮-lens gain**: pooled AUROC 0.551 vs
-> transcript 0.534, placebo 0.538; letter task at the 50% baseline for all three. The "clear win"
-> above is Flash at effort low. Decide: chart the Haiku rerun and soften the claim, keep it with
-> this caveat, or rerun on canonical reads.
+This is the one dataset in this part that is not on our default reads or investigator (the chart's
+footer says how): the 🔮-lens at four layers, at the option newlines and the end of the prompt only,
+and Gemini 3.8 Flash at effort low rather than Haiku 5.5 at medium. Rerunning the hint-first cases
+with Haiku 5.5 at medium, three draws, loses nearly all of the gain: AUROC 0.554 for the 🔮-lens
+against 0.537 for transcript only and 0.543 for its placebo, and every condition at the 50% baseline
+on the letter task. The clear win above is Flash's; with our default investigator, Hinted MCQ is a
+small effect at best.
 
 ### Essay Grading
 
@@ -371,8 +365,6 @@ Flash-Lite can't use the reads itself: every metamodel lowered its score and pla
 
 ### Blog Authorship
 
-TODO @Kylie if you ever cleaned this up let me know!!
-
 We give Qwen a real blog post from the
 [Blog Authorship Corpus](https://huggingface.co/datasets/tasksource/blog_authorship_corpus) (Schler
 et al., 2006) and ask a first-person question about its author, such as "What is my sex, based on
@@ -382,8 +374,8 @@ that sentence makes Qwen much less sure of its answer, meaning its probability f
 max(0.15, 5 × the blogger-and-question pair's median drop). Half of the 1,316 cases are such
 sentences, each paired with an ordinary sentence from the same post. Unlike our other datasets this
 one does select on Qwen being wrong: of the questions where Qwen is confident, we keep every one it
-gets wrong and sample the ones it gets right, then drop the questions where a typical deletion
-moves its answer a lot, so Qwen is wrong on 722 of the 1,316 cases.
+gets wrong and sample the ones it gets right, then drop the questions where a typical deletion moves
+its answer a lot, so Qwen is wrong on 722 of the 1,316 cases.
 
 <img src="img/data-filter-sankey-blog.png" alt="Blog authorship: 8,016 questions to 533 eval questions, every confident Qwen-wrong question kept and Qwen-right questions sampled" width="500">
 
@@ -398,15 +390,13 @@ scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear pr
 gain over text-only is not statistically significant; the standalone probe is also below text-only
 on this metric. The probe is supervised on this deletion task with bloggers held out, and its
 configuration was chosen during exploration of this dataset. Haiku with NLA reads instead of the
-🔮-lens does no better than text-only; the one bar that beats text-only is the probe's score given to
-the text-only investigator.
+🔮-lens does no better than text-only; the one bar that beats text-only is the probe's score given
+to the text-only investigator.
 
-> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog authorship is not on canonical reads:
-> 🔮-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
-> and post's punctuation and newlines with no start-of-assistant-turn tail tokens. The investigator
-> is Haiku 5.5 at effort low with one draw, not medium. There is no `menus_inline` run for this set.
-> Decide: rerun the reads at the canonical positions and six layers, or keep the chart with that
-> caveat in the text.
+Blog Authorship is not on our default reads or investigator either, as the chart's footer says: the
+🔮-lens at layers 32/40/48, the NLA at layer 42, positions the question's and post's punctuation and
+newlines with no start-of-assistant-turn tail tokens, and Haiku 5.5 at effort low with one draw per
+case.
 
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with 🔮-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
 
@@ -649,7 +639,7 @@ Things that will not have receipts:
 
 # Appendix
 
-## 🔮-lens Now Speaks English (DONE)
+## 🔮-lens Now Speaks English
 
 We investigated why so many 🔮-lens bullets lead with a Mandarin character and then become English.
 The canonical 🔮-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
@@ -834,13 +824,10 @@ Qwen's reply.
 Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
 behavior rate, higher is better; hatching means placebo.
 
-> **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** None of the counterfactual charts in this
-> appendix is on canonical reads, and none can be: they are the `olens_agentic` tool runs, where the
-> investigator's `olens_at` tool shows layers 32/40/48 by default (`cfbench/olens.py`) at the reads'
-> stop-token positions, and the J++ lens tool reads every token at layers 36-60. There is no
-> six-layer, same-positions rerun of these, and the `*_agentic` conditions are frozen (CLAUDE.md,
-> 2026-10-30). Decide: say so in the text here (and in "The one thing we never ablated" above, which
-> is about layers), or drop the 🔮-lens bars from these charts.
+None of these charts is on our default reads, and none can be: they are the agentic tool runs, where
+the investigator reads the 🔮-lens through a tool that shows layers 32/40/48 at the reads'
+stop-token positions, as each chart's footer says. We never reran them at six layers, which is the
+layer ablation we regret not doing.
 
 ### Null Results on Counterfactual Predictions
 

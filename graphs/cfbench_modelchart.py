@@ -19,9 +19,13 @@ from matplotlib.transforms import Affine2D
 from cfbench.catalog import MODELCHART_DUMB_RUNS, MODELCHART_RUNS
 from cfbench.core import canon_condition
 from cfbench.scoring import LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
-from graphs.style import INK, MUTED, OLENS, color
+from graphs.style import INK, MUTED, OLENS, color, departure
 
 RUNS, DUMB_RUNS = MODELCHART_RUNS, MODELCHART_DUMB_RUNS
+# the write-up's in-figure caveat (graphs.style.departure); graphs.cfbench_report imports this module, so its DEPARTURE can't be
+# imported here
+DEPARTURE = (f"investigator with tools (read and grep transcripts and reads); {OLENS} shown through a tool at layers 32/40/48; "
+             "placebo from a different env; four hand-picked cases; scored as RMSE of the predicted rate.")  # fmt: skip
 MODELS = {  # by company, small to large
     "anthropic/claude-haiku-5.5": "Haiku 5.5",
     "anthropic/claude-sonnet-5.5": "Sonnet 5.5",
@@ -167,6 +171,7 @@ def model_lines(rows: list[dict], out: str) -> dict:
     ax.set_xlim(-0.4, len(MODEL_AXIS) - 0.2)
     style(ax, s, "Investigator model by condition (high effort, 20 tool calls, 4 cases)", "", ceiling=False)
     fig.tight_layout()
+    departure(fig, DEPARTURE)
     fig.savefig(f"{out}/models.png")
     plt.close(fig)
     return s
@@ -183,6 +188,7 @@ def flash_lines(s: dict, xs: list, conditions: list[str], title: str, xlabel: st
     ax.legend(frameon=False, fontsize=9, loc="center right")
     style(ax, s, title, xlabel)
     fig.tight_layout()
+    departure(fig, DEPARTURE)
     fig.savefig(path)
     plt.close(fig)
 
@@ -289,6 +295,7 @@ def ts_vs_olens(out: str) -> dict:
     ax.set_ylabel(f"With {OLENS}: 100 − RMSE (pp)")
     ax.set_title(f"Transcript-only vs {OLENS} by investigator (4 cases, 20 tool calls)")
     fig.tight_layout()
+    departure(fig, DEPARTURE)
     fig.savefig(f"{out}/ts_vs_olens.png")
     plt.close(fig)
     return s
