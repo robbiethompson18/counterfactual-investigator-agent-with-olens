@@ -201,6 +201,26 @@
 
 \section{Results across the three single-answer tasks}
 
+\begin{frame}{Setup for every task part (defaults; the full list is in Reference)}
+  \begin{itemize}
+    \item \textbf{Subject:} Qwen3.6-27B, thinking off, sampled 8 times per prompt; the label is its modal answer, kept when at
+      least 7 of 8 agree. (Almost) never filtered on whether that answer is correct
+    \item \textbf{Investigator:} Haiku 5.5 at reasoning effort medium, one turn, no tools beyond the submit call; 3 draws per
+      case and condition, every draw scored as one prediction
+    \item \textbf{What it sees:} Qwen's prompt, never Qwen's reply (\promptonly); in a lens condition, also a block of reads:
+      per read token, one line per layer with \olensname{} bullets and their FVE, the NLA's explanation and its FVE, or J++'s
+      top three tokens
+    \item \textbf{Reads:} every punctuation token and option newline of the user turn plus the nine tail tokens through the one
+      just before Qwen's answer, at layers 32--60, the same positions for all three lenses. \olensname: WorkspaceBench's space
+      lens and AR (agu18dec/olens\_and\_ar), T 1; NLA: Camila's all-layer Qwen3.6-27B NLA; J++: Ayonrinde and Lindsey's
+      published lens on residuals we capture
+    \item \textbf{Placebo:} the same block from another case of the same set, option count and subject category, laid onto this
+      case's positions by kind; one rule for every lens
+    \item \textbf{Statistics:} \% of draws naming Qwen's answer; 95\% bootstrap CIs resampling questions, paired across
+      conditions; one-sided paired tests against \promptonly
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
     \item Metamodels work on Multiple Choice and Idiosyncratic Preferences; Hinted MCQ with caveats; Essay Grading almost;
