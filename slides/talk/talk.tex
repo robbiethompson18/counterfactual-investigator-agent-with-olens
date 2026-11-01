@@ -4,9 +4,9 @@
 % multiple choice (menus_inline on mcq_unselected and supergpqa), knowledge cutoff (cutoff_qa), idiosyncratic preferences
 % (favorites_qa), the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), essay grading
 % (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe, scripts/author_probe/period_check.py); the
-% ablations (Qwen right vs wrong, lens minus prompt only, read positions, placebos and tokens). Then the appendix, behind its own
+% ablations (Qwen right vs wrong, lens minus prompt only, read positions, placebos). Then the appendix, behind its own
 % break slide (the space lens, Anecdata, lessons, future work, CHIVE's data), and a reference section behind another (default
-% parameters, cost, pointers). Order fixed by Robbie 2026-10-31 (CLAUDE.local.md). `make -C slides`.
+% parameters, cost, pointers, the tokens each lens adds), last of all. Order fixed by Robbie 2026-10-31 (CLAUDE.local.md). `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -622,16 +622,6 @@
     bootstrap CIs over questions. Right: mean thinking tokens per prediction.}
 \end{frame}
 
-\begin{frame}{Tokens each lens adds to the investigator's prompt}
-  \slidefig{fig/tokens.pdf}
-  \begin{itemize}
-    \item NLAs add the most tokens, then the \olensname, then J++ (three tokens with probabilities per read); the MCQ prompts
-      carry the most read positions
-  \end{itemize}
-  \source{Mean prompt tokens of the condition minus \promptonly{} on the same cases (Anthropic's count of the whole opening call,
-    tool schemas included), averaged over draws; pooled weights MCQ, Knowledge Cutoff and Idiosyncratic Preferences equally.}
-\end{frame}
-
 \appendix
 \section{Appendix}
 \begin{frame}
@@ -991,6 +981,7 @@
     \item Default parameters: subject, investigator, read positions, layers, lenses, placebo, statistics
     \item Cost, by payer
     \item Where everything is: code, data, transcripts, viewers, write-up, the lenses
+    \item Tokens each lens adds to the investigator's prompt
   \end{itemize}
 \end{frame}
 
@@ -1091,6 +1082,16 @@
       \href{https://huggingface.co/collections/robbiethompson2018/nn-mats-sprint-oracle-lens-on-qwen36-27b}{HF collection},
       \href{https://jlens-dashboard.pages.dev/}{lens dashboard}
   \end{itemize}
+\end{frame}
+
+\begin{frame}{Tokens each lens adds to the investigator's prompt}
+  \slidefig{fig/tokens.pdf}
+  \begin{itemize}
+    \item NLAs add the most tokens, then the \olensname, then J++ (three tokens with probabilities per read); the MCQ prompts
+      carry the most read positions
+  \end{itemize}
+  \source{Mean prompt tokens of the condition minus \promptonly{} on the same cases (Anthropic's count of the whole opening call,
+    tool schemas included), averaged over draws; pooled weights MCQ, Knowledge Cutoff and Idiosyncratic Preferences equally.}
 \end{frame}
 
 \end{document}
