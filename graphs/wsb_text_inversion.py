@@ -18,7 +18,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.style import INK, MUTED, bar_kw
+from graphs.style import INK, MUTED, OLENS, bar_kw
 
 FAMILIES = ["user_modeling", "basic_readout", "moral_rationale", "jailbreak_recognition"]
 LABEL = {
@@ -76,13 +76,13 @@ def main():
     chart(
         LENS_HEADLINE,
         "WorkspaceBench's own scoring: the lens passes if any readout over its grid passes (55 to ~230 per item)",
-        "O-lens, WSB headline (any-of-grid)",
+        f"{OLENS}, WSB headline (any-of-grid)",
         out.with_name(out.name + "-benchmark.png"),
     )
     chart(
         LENS_PER_READOUT,
         "Both at pass@1: the lens scored per readout (one cell), Sonnet one answer per item",
-        "O-lens, per readout",
+        f"{OLENS}, per readout",
         out.with_name(out.name + "-pass1.png"),
     )
 

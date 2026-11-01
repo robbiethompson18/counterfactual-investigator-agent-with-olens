@@ -157,8 +157,7 @@ is an ordinary rate case.)
 2026-10-26): per case, (p̂ − k_Y/n_Y)² averaged over draws; over cases with equal weight; reported in
 percentage points next to the RMSE of "the edit does nothing" (predict the shown base rate), with a
 skill 1 − Σ MSE / Σ MSE_null as a secondary number. `cfbench.score` prints it, and
-`graphs.cfbench_report` makes the report figures from it; `graphs.hint_mcq_answer` makes the
-answer-task charts (docs/envs/hint_cf.md).
+`graphs.cfbench_report` makes the report figures from it.
 
 Runs before 2026-10-26 were scored with a binomial log-likelihood skill
 (`cfbench.scoring.log_skill`), defined with the harness v1 results in

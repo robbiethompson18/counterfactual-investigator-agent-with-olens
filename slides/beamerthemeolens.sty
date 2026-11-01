@@ -135,17 +135,25 @@
 \setbeamertemplate{itemize subitem}{\textendash}
 \setbeamertemplate{enumerate item}{\insertenumlabel.}
 \setlength{\leftmargini}{1.1em}
+% The 🔮 of "🔮-lens" (U+1F52E) isn't in Inter or Fira: the monochrome Noto Emoji draws it (macOS: `brew install --cask
+% font-noto-emoji`; graphs/style.py uses the same font), and without it the lens is "O-lens" rather than a missing glyph.
+\IfFontExistsTF{Noto Emoji}{%
+  \newfontfamily\emojifont{Noto Emoji}
+  \newcommand{\olensname}{{\emojifont 🔮}-lens}
+}{%
+  \newcommand{\olensname}{O-lens}
+}
 \setlength{\leftmarginii}{1.1em}
 
 % ----------------------------------------------------------------------------------------------------------- slide macros
-% \cond{olens} "O-lens" in its colour. \sw{olens} a chart-legend swatch; \swp{olens} the placebo swatch, striped in the
+% \cond{olens} "🔮-lens" in its colour (\olensname). \sw{olens} a chart-legend swatch; \swp{olens} the placebo swatch, striped in the
 % background colour like the slide figures' placebo bars.
 \newcommand{\sw}[1]{\tikz[baseline=-0.1ex]\fill[#1] (0, 0) rectangle (0.85em, 0.65em);}
 \newcommand{\swp}[1]{\tikz[baseline=-0.1ex]{\fill[#1] (0, 0) rectangle (0.85em, 0.65em);
   \fill[pattern=north east lines, pattern color=bg] (0, 0) rectangle (0.85em, 0.65em);}}
 \newcommand{\cond}[2]{{\color{#1}\bfseries #2}}
 \newcommand{\transcript}{\cond{transcript}{transcript only}}
-\newcommand{\olens}{\cond{olens}{O-lens}}
+\newcommand{\olens}{\cond{olens}{\olensname}}
 \newcommand{\jlens}{\cond{jlens}{J++}}
 \newcommand{\nla}{\cond{nla}{NLA}}
 

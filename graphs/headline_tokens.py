@@ -1,5 +1,5 @@
 """How many tokens each lens's reads add to the investigator's (Haiku 5.5) prompt, for the write-up: does one lens just give it more to
-think about? Same runs (menus_inline, `prompt` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
+think about? Same runs (menus_inline, `all` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
 pooled weights MCQ, knowledge cutoff and preferences equally. Added tokens = the condition's mean `tokens.prompt` (Anthropic's count
 of the whole opening call, tool schemas included) minus transcript_inline's on the same cases, averaged over draws. Rows with calls !=
 1 are dropped (a second call's prompt also holds the first): a handful of retries. No whiskers: this describes what was shown.
@@ -19,14 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from graphs import menus_inline
-from graphs.headline_inline import CANON, LENSES, PLACEBOS, TS
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, TS
 from graphs.style import bar_kw, label, positions
 
-SETS = {  # the canonical menus_inline runs (CLAUDE.local.md)
+SETS = {  # the canonical menus_inline runs (graphs/CLAUDE.md)
     "MMLU-Pro": menus_inline.runs("mcq_unselected"),
     "SuperGPQA": menus_inline.runs("supergpqa"),
-    "knowledge cutoff": menus_inline.runs("cutoff"),
-    "preferences": menus_inline.runs("favorites"),
+    "Knowledge Cutoff": menus_inline.runs("cutoff"),
+    "Idiosyncratic Preferences": menus_inline.runs("favorites"),
 }
 MCQ = ["MMLU-Pro", "SuperGPQA"]
 METRICS = ("prompt", "completion", "reasoning", "correct")
@@ -37,8 +37,8 @@ def load(runs: list[Path]) -> dict:
     rows = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for line in (ln for run in runs for ln in (run / "predictions.jsonl").open()):
         r = json.loads(line)
-        if r["condition"] in CANON and r["tokens"].get("calls") == 1:
-            case = rows[CANON[r["condition"]]][r["item"]]
+        if r["condition"] in PLAIN_COND and r["tokens"].get("calls") == 1:
+            case = rows[PLAIN_COND[r["condition"]]][r["item"]]
             case["prompt"].append(r["tokens"]["prompt"])
             case["completion"].append(r["tokens"]["completion"])
             case["reasoning"].append(r["tokens"]["reasoning"])
@@ -55,7 +55,7 @@ def summary(sets: dict[str, dict], c: str, metric: str) -> dict[str, float]:
     """Each set's mean added `metric`, plus MCQ (pooled by case) and the three tasks' equal-weight mean."""
     out = {name: float(np.mean(added(data, c, metric))) for name, data in sets.items()}
     out["MCQ"] = float(np.mean([v for name in MCQ for v in added(sets[name], c, metric)]))
-    out["pooled"] = float(np.mean([out["MCQ"], out["knowledge cutoff"], out["preferences"]]))
+    out["pooled"] = float(np.mean([out["MCQ"], out["Knowledge Cutoff"], out["Idiosyncratic Preferences"]]))
     return out
 
 
@@ -69,7 +69,7 @@ def chart(tokens: dict[str, dict[str, float]], path: Path) -> None:
         ax.bar(xs, ys, width * 0.95, zorder=3, label=label(c), **bar_kw(c))
         for x, y in zip(xs, ys, strict=True):
             ax.annotate(f"{y:.1f}", (x, y), xytext=(0, 1.5), textcoords="offset points", ha="center", va="bottom", fontsize=7)
-    ax.set_xticks(range(len(groups)), groups, fontsize=8.5)
+    ax.set_xticks(range(len(groups)), [g.replace(" ", "\n") for g in groups], fontsize=8.5)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("tokens added to Haiku's prompt (thousands)")
     ax.set_title("Prompt tokens each lens adds over transcript only")
@@ -87,7 +87,7 @@ def thinking(sets: dict[str, dict], path: Path) -> None:
 
     groups = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
     conditions = [c for _, cs in groups for c in cs]
-    means = {c: float(np.mean([mean(c, MCQ), mean(c, ["knowledge cutoff"]), mean(c, ["preferences"])])) for c in conditions}
+    means = {c: float(np.mean([mean(c, MCQ), mean(c, ["Knowledge Cutoff"]), mean(c, ["Idiosyncratic Preferences"])])) for c in conditions}
     print("thinking tokens, pooled:", {c: round(v) for c, v in means.items()})
     xs, ticks = positions(means, groups)
     fig, ax = plt.subplots(figsize=(4.8, 3.2), layout="constrained")

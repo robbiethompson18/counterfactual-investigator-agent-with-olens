@@ -21,7 +21,6 @@ mcq_unselected stopped before the think block). A placebo is another case's read
     uv run --with transformers --with jinja2 python -m cfbench.evals.supergpqa_inline.eval requests OUT_DIR   # olens + jpp requests
     uv run python -m cfbench.eval supergpqa_inline --show --conditions olens_inline --limit 1
     uv run python -m cfbench.eval supergpqa_inline --slug supergpqa-haiku-3k --predictors anthropic/claude-haiku-5.5 --draws 1
-    uv run python -m graphs.supergpqa_inline
 """
 
 import json

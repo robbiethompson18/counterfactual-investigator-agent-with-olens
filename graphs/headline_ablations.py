@@ -1,4 +1,4 @@
-"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `prompt`): split by whether Qwen
+"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `all`): split by whether Qwen
 is right, lens and placebo differences.
 
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, transcript only vs
@@ -24,30 +24,35 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import ESSAY_INPUTS
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
-from graphs import cutoff_qa_inline, menus_inline
-from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
-from graphs.style import MUTED, ci_bar, diff_rows, label, positions
+from environments.cutoff_qa.env import _items as cutoff_items
+from graphs import menus_inline
+from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, load
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
-ESSAY_INPUTS = Path("data/runs/cfbench_evals/2026-10-30_essay-grading-inline-inputs/cases.jsonl")
 ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
+# gate_class per cutoff item (stable_right: Qwen's answer is still true); the canonical menus_inline runs don't carry it
 
 
 def by_correctness() -> dict[str, dict[str, dict]]:
     """set -> condition -> case -> (qwen_right, accuracy) on the canonical menus_inline runs and menu; the case is its own
     bootstrap group. MCQ: Qwen's modal letter is the gold one; cutoff: Qwen's answer is still true (gate_class stable_right,
-    from the cutoff eval's cases)."""
+    from the cutoff_qa item bank)."""
     right: dict = defaultdict(dict)
     for s in ("mcq_unselected", "supergpqa"):
         for run in menus_inline.runs(s):
             for r in map(json.loads, (run / "predictions.jsonl").open()):
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
-    right["cutoff"] = {i: g == "stable_right" for i, (g, _) in cutoff_qa_inline.per_item(cutoff_qa_inline.RUNS)[TS].items()}
+    bank = cutoff_items()
+    for run in menus_inline.runs("cutoff"):
+        for r in map(json.loads, (run / "predictions.jsonl").open()):
+            right["cutoff"][r["item"]] = bank[r["item"]]["gate_class"] == "stable_right"
     menus = menus_inline.load()
-    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge cutoff": "cutoff"}
-    menu_name = {c: m for m, c in CANON.items()}
+    sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
+    menu_name = {c: m for m, c in PLAIN_COND.items()}
     return {name: {c: {i: (right[s][i], a) for i, a in menus[s][menu_name[c]].items()} for c in (TS, *LENSES)} for name, s in sets.items()}
 
 
@@ -186,7 +191,7 @@ def main(out: Path) -> None:
         "Essay grading, by whether Qwen grades the micro-essay like the human did",
         "95% bootstrap CI over micro-essays",
     )
-    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), ("O-lens", ["olens_inline", "olens_placebo_inline"])],
+    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), (OLENS, ["olens_inline", "olens_placebo_inline"])],
                  out / "headline-blog-correctness.png", "Blog sentence deletion, by whether Qwen is right about the author",
                  "95% bootstrap CI over bloggers")  # fmt: skip
 
