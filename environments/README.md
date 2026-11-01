@@ -128,13 +128,13 @@ version pins it by name (`overeager_main`, `mcq_unselected`).
 
 ## Env viewer
 
-[`_lib/page.html`](_lib/page.html) is a static page, published to GitHub Pages by
-`.github/workflows/env-viewer-pages.yml` on every push to main that touches `environments/`
-(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/). What the code
-declares (arms as `build()` makes them, `PAIRS`, `COMPARISONS`, `RETIRED`, `STARRED`, README) the
-workflow builds from main into `spec/` beside the page (`python -m environments spec --out`), so it
-always matches main; runs, rates and rollout links come from the HF dataset under `envs/`, pinned to
-one commit, and source files from GitHub at the spec's commit. Per env:
+[`_lib/page.html`](_lib/page.html) is a static page on GitHub Pages
+(https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/), frozen at its
+last deploy since the Pages workflow was deleted on 2026-10-31 (docs/viewers.md). What the code
+declares (arms as `build()` makes them, `PAIRS`, `COMPARISONS`, `RETIRED`, `STARRED`, README) is
+built into `spec/` beside the page by `python -m environments spec --out`, so the live `spec/`
+matches main as of that deploy; runs, rates and rollout links come from the HF dataset under
+`envs/`, pinned to one commit, and source files from GitHub at the spec's commit. Per env:
 
 - **Comparisons**: the env's `PAIRS` plus its curated arm sets (`COMPARISONS` in env.py), with the
   primary rate per arm pooled over runs per target model (thinking on and off kept apart). A
