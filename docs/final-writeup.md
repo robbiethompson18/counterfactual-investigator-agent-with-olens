@@ -399,11 +399,12 @@ We ran it on two cohorts and show both, because the difference between them is t
 Dark green: evaluated. Light green: usable but held out. Gray: not usable. The legacy diagram is
 the cohort's MMLU-Pro part; its 8 TruthfulQA cases were selected the same way.
 
-<img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint first, the legacy DSv4-disagreement cohort (952 cases) beside the unselected cohort (1,040 cases). Top, AUROC of P(knew): legacy transcript only 0.615, O-lens 0.688 (placebo 0.543), probe 0.764, tuned probe 0.851; unselected transcript only 0.769, O-lens 0.750 (placebo 0.740). Bottom, which letter without the hint, % correct: legacy transcript only 52.3, O-lens 53.9 (placebo 47.6), probe 53.9, tuned probe 64.1; unselected transcript only 54.4, O-lens 54.7 (placebo 53.5); always the hinted letter 50%" width="760">
+<img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint first, three columns: the legacy DSv4-disagreement cohort (952 cases) with Gemini Flash, the same cohort rerun with Haiku, and the unselected cohort (1,040 cases) with Haiku. Top, AUROC of P(knew): legacy with Flash, transcript only 0.615, O-lens 0.688 (placebo 0.543), probe 0.764, tuned probe 0.851; legacy with Haiku, transcript only 0.534, O-lens 0.551 (placebo 0.538); unselected, transcript only 0.769, O-lens 0.750 (placebo 0.740). Bottom, which letter without the hint, % correct: legacy with Flash 52.3, 53.9 (47.6), probe 53.9, tuned probe 64.1; legacy with Haiku 50.5, 50.2 (50.7); unselected 54.4, 54.7 (53.5); always the hinted letter 50%" width="900">
 
-> 🚧 **Departure from defaults (legacy cohort only):** investigator Gemini 3.8 Flash at effort low;
-> 🔮-lens at layers 32/40/48/52; positions are the option newlines and the end of the prompt only;
-> draws averaged per case. The unselected cohort is on the defaults.
+> 🚧 **Departure from defaults (left column only):** investigator Gemini 3.8 Flash at effort low, one
+> draw. Both legacy columns: 🔮-lens at layers 32/40/48/52, positions the option newlines and the end
+> of the prompt only. The middle column is the same cohort, prompts and reads with Haiku 5.5 at effort
+> medium, 3 draws pooled. The unselected cohort is on the defaults.
 
 Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
 transcript-only. Bottom row: % correct on the letter, 95% case bootstrap, stars against
@@ -431,12 +432,17 @@ floor, and 9 to 14% on the didn't half against 10% chance, with or without the l
 refit on this setup names the letter (64.1%, legacy cohort). The same probe trained on hint-after
 prompts does not transfer to hint-first prompts (0.764 AUROC, letter at transcript level).
 
-> 🚧 **Caveat on the comparison.** The two cohorts also differ in investigator (Flash at low vs Haiku
-> at medium), read positions and layers, and scoring (averaged vs pooled draws), so the pair of bar
-> charts is not a clean ablation of the filter. The placebo gap collapsing from +0.145 to +0.011 is
-> the part least sensitive to the investigator. A rerun of the legacy cohort with Haiku at medium,
-> on its own reads, is in progress (2026-10-31 evening); if transcript-only stays near 0.62 there,
-> the filter is the whole story.
+**Same investigator, both cohorts (the middle column).** The two outer columns differ in cohort and
+in investigator, reads and scoring, so we reran the legacy cohort with the unselected cohort's
+investigator, Haiku 5.5 at medium, on the legacy prompts and reads (3 draws, 2,856 per condition).
+Haiku gets transcript-only 0.534, 🔮-lens 0.551, placebo 0.538: everything at chance, and 50% flat on
+the letter task. With the investigator held fixed, transcript-only goes from 0.53 on the filtered
+cohort to 0.77 on the unselected one, so the difficulty cue the filter removed is the whole gap.
+The rerun also fails to reproduce Flash's lens win on the same prompts: Flash read the legacy reads
+to +0.145 over its placebo, Haiku reads them to +0.013, the same nothing it gets from the canonical
+reads on the unselected cohort (+0.011). So the one "clear win" in the talk was Flash at low effort
+on a filtered cohort, and we do not know what Flash was using. The cheap test left is Flash on the
+unselected cohort.
 
 ## Ablations
 

@@ -100,6 +100,26 @@ Paired bootstrap over cases (one-sided p that the first beats the second):
 O-lens prompt − placebo +1.3pp (CI +0.5, +2.2; p = 0.002); − transcript +0.4pp (p = 0.22). The
 prompt + tail pair is the 482-case subset; its two bars differ by +0.6pp (p = 0.28).
 
+## The legacy cohort with the same investigator
+
+To separate the cohort from the recipe, the legacy DSv4-disagreement cohort (952 hint-first cases,
+`cfbench/evals/hint_qwen_dsv4_before{,_letter}_tail_inline`, its own reads at the option newlines
+and the end of the prompt, layers 32/40/48/52) was rerun with Haiku 5.5 at effort medium, 3 draws,
+through the Anthropic batch API on robbie-box (2026-10-31 evening; runs
+`runs/cfbench/2026-11-01_hint-dsv4-before-haiku` and `-letter-haiku`, ~$30). Draws pooled:
+
+| condition, legacy cohort, Haiku | AUROC P(knew) | letter % right (knew / didn't) |
+| ------------------------------- | ------------- | ------------------------------ |
+| transcript only                 | 0.534         | 50.5 (89.4 / 11.6)             |
+| O-lens, legacy reads            | 0.551         | 50.2 (87.7 / 12.8)             |
+| O-lens placebo                  | 0.538         | 50.7 (88.8 / 12.5)             |
+
+Flash at effort low on the same prompts (the talk): transcript 0.615, O-lens 0.688, placebo 0.543.
+So with the investigator fixed, transcript-only is 0.53 on the filtered cohort and 0.77 here: the
+filter removed the difficulty cue. And Flash's +0.145 lens-over-placebo on the legacy reads does not
+reproduce with Haiku (+0.013), which reads them to the same nothing it gets from the canonical reads
+here (+0.011). Untested: Flash on this cohort.
+
 ## Reading
 
 - **The transcript-only baseline is strong once the cohort isn't pre-filtered.** AUROC 0.77 here

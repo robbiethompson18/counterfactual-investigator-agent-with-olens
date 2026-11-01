@@ -46,6 +46,7 @@ GROUPS = [("transcript", ["transcript_inline"]), (OLENS, ["olens_inline", "olens
 # `prompt` menu, draws pooled); hint first in both
 PANELS = {
     "selected": ("DSv4-disagreement cohort", "Gemini Flash, legacy reads"),
+    "selected_haiku": ("DSv4-disagreement cohort", "Haiku, legacy reads"),
     "unselected": ("unselected cohort", "Haiku, canonical reads"),
 }
 
@@ -118,16 +119,26 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
 
 @slide
 def grid() -> None:
-    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), the two cohorts as columns, hint first."""
-    knew = {"selected": "hint_qwen_dsv4_before_tail_inline", "unselected": "knew"}
-    letter = {"selected": "hint_qwen_dsv4_before_letter_tail_inline", "unselected": "letter"}
-    knew_bars = lambda name: hint_unselected.talk_bars(name) if name == "knew" else auroc_bars(name)
-    letter_bars = lambda name: hint_unselected.talk_bars(name) if name == "letter" else hinted_baseline(answer_bars)(name)
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint first; columns: the legacy cohort
+    as the talk had it (Flash), the legacy cohort rerun with Haiku (hint_unselected.LEGACY_HAIKU), the unselected cohort."""
+    knew = {"selected": "hint_qwen_dsv4_before_tail_inline", "selected_haiku": "knew:legacy", "unselected": "knew"}
+    letter = {"selected": "hint_qwen_dsv4_before_letter_tail_inline", "selected_haiku": "letter:legacy", "unselected": "letter"}
+
+    def bars(legacy_bars):
+        def f(name: str):
+            task, *legacy = name.split(":")
+            if task in ("knew", "letter"):
+                return hint_unselected.talk_bars(task, hint_unselected.LEGACY_HAIKU[task] if legacy else None)
+            return legacy_bars(name)
+
+        return f
+
+    knew_bars, letter_bars = bars(auroc_bars), bars(hinted_baseline(answer_bars))
     widths = [positions(knew_bars(n)[0], GROUPS)[1][-1] + 1 for n in knew.values()]
-    fig, axes = slide_figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
+    fig, axes = slide_figure(FULL_W, 60, nrows=2, ncols=3, sharey="row", gridspec_kw={"width_ratios": widths})
     row(axes[0], knew, knew_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
     row(axes[1], letter, letter_bars, "always the hinted letter", "which letter?\n% correct", pct=True, head=False, base=0.4)
-    axes[0][-1].text(1.0, 1.2, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    axes[0][0].text(1.0, 1.2, "hatched = placebo", transform=axes[0][0].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
     # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
     fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")

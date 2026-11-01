@@ -29,10 +29,15 @@ GROUPS = [("transcript", ["transcript_inline"]), ("O-lens\nprompt reads", ["olen
 OUT = Path("docs/img/hint-unselected.png")
 
 
-def rows(task: str) -> list[dict]:
+# the legacy DSv4-disagreement cohort rerun with this eval's investigator (Haiku 5.5 at medium, 3 draws) on its own reads
+# (cfbench/evals/hint_qwen_dsv4_before{,_letter}_tail_inline, robbie-box, 2026-10-31 evening): the talk grid's middle column
+LEGACY_HAIKU = {"knew": ["2026-11-01_hint-dsv4-before-haiku"], "letter": ["2026-11-01_hint-dsv4-before-letter-haiku"]}
+
+
+def rows(task: str, runs: list[str] | None = None) -> list[dict]:
     """Every valid prediction row of the task's runs (a draw with no valid submission has p / correct null)."""
     key = "p" if task == "knew" else "correct"
-    out = [json.loads(line) for run in RUNS[task] for line in (R / run / "predictions.jsonl").open()]
+    out = [json.loads(line) for run in runs or RUNS[task] for line in (R / run / "predictions.jsonl").open()]
     return [r for r in out if r.get(key) is not None]
 
 
@@ -94,17 +99,19 @@ TALK_CONDS = {
 }
 
 
-def talk_bars(task: str, reps: int = 2000) -> tuple[dict, float, int]:
+def talk_bars(task: str, runs: list[str] | None = None, reps: int = 2000) -> tuple[dict, float, int]:
     """condition -> (value, 95% CI, stars), chance, cases: AUROC of P(knew) (task "knew") or % right on the letter ("letter"),
     every draw one prediction, CIs a bootstrap over cases, stars a one-sided paired bootstrap (the same resamples) that the
-    condition beats transcript-only."""
+    condition beats transcript-only. `runs`: this eval's (default) or the legacy cohort's Haiku rerun (LEGACY_HAIKU[task],
+    whose conditions already carry the legacy names)."""
     key = "p" if task == "knew" else "correct"
     by: dict[str, dict[str, list[float]]] = {}
     cls: dict[str, bool] = {}
-    for r in rows(task):
-        if r["condition"] in TALK_CONDS:
-            by.setdefault(TALK_CONDS[r["condition"]], {}).setdefault(r["item"], []).append(float(r[key]))
-            cls[r["item"]] = r["model"].endswith("(knew)")
+    for r in rows(task, runs):
+        c = TALK_CONDS.get(r["condition"], r["condition"] if r["condition"] in TALK_CONDS.values() else None)
+        if c:
+            by.setdefault(c, {}).setdefault(r["item"], []).append(float(r[key]))
+            cls[r["item"]] = r["class"] == "knew"
     items = sorted(set.intersection(*(set(v) for v in by.values())))
     rng = np.random.default_rng(0)
     idx = rng.integers(0, len(items), (reps, len(items)))
