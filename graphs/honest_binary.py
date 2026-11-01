@@ -18,15 +18,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import HONEST_RUNS, R
 from graphs.style import INK, MUTED, bar_kw, diff_rows
 
-RUNS = ["2026-10-26_honest-ts-*", "2026-10-26_honest-ts2-*", "2026-10-26_honest-nt2-allpairs-*"]
+RUNS = HONEST_RUNS
 
 
 def load_cases() -> dict[tuple, dict]:
     rows = collections.defaultdict(lambda: collections.defaultdict(list))
     for pat in RUNS:
-        for d in glob.glob(f"data/runs/cfbench/{pat}"):
+        for d in glob.glob(R + pat):
             if json.loads(Path(d, "meta.json").read_text())["status"] != "done":
                 continue
             for line in Path(d, "predictions.jsonl").read_text().splitlines():

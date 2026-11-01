@@ -2,7 +2,7 @@
 transcript, and transcript plus O-lens / NLA / J++ reads, each beside its placebo; plus paired differences by claim
 (cfbench/evals/chive_agam_inline, docs/chive-inline.md).
 
-    uv run python -m graphs.chive_agam_inline --runs data/runs/cfbench/<nolens run> data/runs/cfbench/<lens run>
+    uv run python -m graphs.chive_agam_inline [--runs RUN ...]  # default: cfbench.catalog.CHIVE_AGAM_RUNS
 """
 
 import argparse
@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import CHIVE_AGAM_RUNS
 from cfbench.evals.chive_agam_inline.score import PAIRS, table
 from graphs.style import MUTED, OLENS, ci_bar, diff_rows, positions
 
@@ -60,7 +61,7 @@ def main(runs: list[Path], out: Path, out_diff: Path):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--runs", type=Path, nargs="+", required=True)
+    p.add_argument("--runs", type=Path, nargs="+", default=CHIVE_AGAM_RUNS)
     p.add_argument("--out", type=Path, default=Path("docs/img/chive-agam-inline.png"))
     p.add_argument("--out-diff", type=Path, default=Path("docs/img/chive-agam-inline-diff.png"))
     a = p.parse_args()
