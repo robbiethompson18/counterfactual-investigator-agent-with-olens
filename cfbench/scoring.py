@@ -623,30 +623,47 @@ def author_cases() -> tuple[list[str], np.ndarray, np.ndarray, np.ndarray, dict[
     return items, y, v, b, xs
 
 
+def weighted_auroc(p: np.ndarray, y: np.ndarray, w: np.ndarray) -> float:
+    """AUROC with case weights: sum over (positive, negative) pairs of w_i w_j [p_i > p_j] (ties 1/2), normalised."""
+    o = np.argsort(p, kind="stable")
+    p, y, w = p[o], y[o], w[o]
+    wn = np.where(y == 0, w, 0.0)
+    _, start, cnt = np.unique(p, return_index=True, return_counts=True)
+    below = np.concatenate([[0], np.cumsum(wn)])
+    grp = np.repeat(np.arange(len(start)), cnt)
+    credit = below[start][grp] + 0.5 * np.add.reduceat(wn, start)[grp]
+    return float((w[y == 1] * credit[y == 1]).sum() / (w[y == 1].sum() * wn.sum()))
+
+
 @cache
-def author_bars(reps: int = 2000) -> tuple[dict, dict, int]:
+def author_bars(reps: int = 2000, versions: tuple[str, ...] = tuple(AUTHOR_VERSIONS), balanced: bool = False) -> tuple[dict, dict, int]:
     """(version, condition) -> (AUROC, 95% CI, stars vs transcript-only, one-sided paired bootstrap over bloggers); paired
-    differences (a, b) -> (AUROC est, 95% CI, one-sided p), pooled; n cases."""
+    differences (a, b) -> (AUROC est, 95% CI, one-sided p), pooled; n cases. `versions`: "pooled" and/or a version name;
+    `balanced` (the deck, Kylie 2026-11-01): Qwen-right and Qwen-wrong cases weighted 50:50."""
     items, y, v, b, xs = author_cases()
+    w = np.ones(len(y))
+    if balanced:
+        w = np.where(v == "qwen_wrong", 0.5 / (v == "qwen_wrong").sum(), 0.5 / (v == "qwen_right").sum()) * len(y)
+    auc = lambda x, yy, ww: weighted_auroc(x, yy, ww) if balanced else rank_auroc(x, yy)
     rng = np.random.default_rng(0)
     bars = {}
-    for ver in AUTHOR_VERSIONS:
+    for ver in versions:
         m = np.ones(len(y), bool) if ver == "pooled" else v == ver
         us = sorted(set(b[m]))
         of = {u: np.flatnonzero(m & (b == u)) for u in us}
         idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
-        boot = {c: np.array([rank_auroc(x[i], y[i]) for i in idx]) for c, x in xs.items()}
+        boot = {c: np.array([auc(x[i], y[i], w[i]) for i in idx]) for c, x in xs.items()}
         for c, x in xs.items():
             st = "" if c == "transcript_inline" else stars(float((boot[c] - boot["transcript_inline"] <= 0).mean()))
-            bars[ver, c] = (rank_auroc(x[m], y[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
+            bars[ver, c] = (auc(x[m], y[m], w[m]), np.quantile(boot[c], [0.025, 0.975]).tolist(), st)
     us = sorted(set(b))
     of = {u: np.flatnonzero(b == u) for u in us}
     idx = [np.concatenate([of[us[j]] for j in rng.integers(0, len(us), len(us))]) for _ in range(reps)]
     pairs = {}
     for a, c in [("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline"), ("nla_inline", "transcript_inline"),
                  ("nla_inline", "nla_placebo_inline"), ("transcript+probe", "transcript_inline")]:  # fmt: skip
-        da = np.array([rank_auroc(xs[a][i], y[i]) - rank_auroc(xs[c][i], y[i]) for i in idx])
-        pairs[a, c] = (rank_auroc(xs[a], y) - rank_auroc(xs[c], y), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
+        da = np.array([auc(xs[a][i], y[i], w[i]) - auc(xs[c][i], y[i], w[i]) for i in idx])
+        pairs[a, c] = (auc(xs[a], y, w) - auc(xs[c], y, w), np.quantile(da, [0.025, 0.975]).tolist(), float((da <= 0).mean()))
     return bars, pairs, len(items)
 
 
@@ -688,4 +705,28 @@ def acting_by_factor() -> dict:
             "acted": groups([r for r in eps if r["model"] == model], lambda r: r["acted"] == "True"),
             "reads": groups([r for r in read if r["model"] == model], lambda r: int(r["grading_reads"]) > 0),
         }
+    return out
+
+
+PROMPT_SECTIONS = ["tool block", "system prompt", "env block", "user"]
+
+
+def simulated_by_section() -> dict:
+    """harness_grid prompts, every position read (prefixes deduplicated): model -> section -> (draws saying
+    simulated/mock/synthetic/fictional, draws). Qwen3.6-27B: one draw per
+    position; GLM-5.3: five per position."""
+    import csv
+
+    def load(name):
+        path = Path("data") / GRADER_ACTING_RUN / name
+        if not path.exists():
+            from huggingface_hub import hf_hub_download
+
+            hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/{name}", repo_type="dataset", local_dir="data")
+        return list(csv.DictReader(path.open()))
+
+    out: dict = {m: {} for m in ("Qwen3.6-27B", "GLM-5.3")}
+    for r in load("prompt_simulated_by_section.csv"):
+        if r["seg"] in PROMPT_SECTIONS:
+            out[r["model"]][r["seg"]] = (int(r["hits"]), int(r["draws"]))
     return out

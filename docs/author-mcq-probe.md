@@ -1,11 +1,14 @@
 # Author evidence: does the O-lens show which sentence Qwen reads the author from?
 
-**Status (2026-10-31):** NULL. On real blog posts the O-lens gives an investigator no gain over the
-prompt alone in telling which sentence Qwen3.6-27B infers the author's sex or age from (AUROC p =
-0.30, recalibrated Brier p = 0.36, 1,316 cases from 520 bloggers). An earlier pilot on SynthPAI
-(synthetic comments) gave the same null and is retired. A third batch of bloggers was stopped
-(Kylie: sample size won't change it). ceselder's layer-42 NLA in the O-lens's place is null too
-(AUROC vs transcript −0.003, p = 0.60; 2026-10-31).
+**Status (2026-11-01):** NULL, and negative for the O-lens. On a natural-rate sample of real blog
+posts (1,618 cases, 655 bloggers, flat 0.15 rule, labels averaged over both option orders, every
+condition scored in one Haiku run) an investigator does worse with agu18dec's O-lens reads than with
+the prompt alone: AUROC 0.811 vs 0.835, O-lens − transcript −0.024 [−0.041, −0.007], and no better
+than the O-lens placebo (+0.004). A sentence-end linear probe reads 0.808, and probe + transcript
+0.885 (+0.050, p < 0.001). ceselder's NLA is pending in the clean run (null, −0.018, in the earlier
+pooled scoring). Numbers before 2026-11-01 pooled several Haiku runs with positives and negatives
+mostly in different runs (an independent audit caught it), so they are superseded. An earlier pilot
+on SynthPAI (synthetic comments) gave the same null and is retired.
 
 Env-viewer page with the charts, paired differences and example cases:
 `#eval=author_blog_drop_inline` on the
@@ -74,6 +77,79 @@ byte-identical). CIs and one-sided p (H1: O-lens better) from a 10k bootstrap ov
 
 Cost: about $110 of RunPod H200s (SynthPAI and blog, deletions and reads) and $40 of API (DeepSeek
 V4 Flash answers, Haiku investigator and judge) over 2026-10-29/31.
+
+## Scale-up and natural sample (2026-10-31)
+
+Kylie asked for about 1,000 posts, then for a sample with nothing suspicious in it ("filter on there
+is evidence and Qwen is confident"). Truth changed to a flat rule: positive when deleting the
+sentence lowers Qwen's probability on its answer by more than 0.15 (the old max(0.15, 5 × median)
+rule flips 1 of the 1,316 old cases and adds 21 positives).
+
+**How the earlier case sets were sampled** (the audit behind the natural sample):
+
+- Bloggers were stratified: equal numbers per sex × age band (334 per cell in batches 1-2, 668 in
+  batch 3 until the 30+ cells ran out at 474 F / 337 M). The eligible corpus is about 43% under 20,
+  42% 20s and 15% 30+, so 30+ was oversampled about 2× and no unused 30+ blogger is left.
+- Deletions went to every confident Qwen-wrong pair but only a random 300 (batches 1-2) or 521
+  (batch 3) confident Qwen-right pairs per attribute, so Qwen-right is under-represented (about
+  12-26% sampling rate).
+- The stability filter (median deletion TV < 0.05) drops about 10% of deleted pairs, and about 25%
+  of the pairs that have a > 0.15 drop. Kylie kept it ("stability filter is good").
+- Nothing else selects cases: no length, position or model-output filter beyond confidence, order
+  agreement, stability and at least one positive.
+
+**Natural sample** (`scripts/author_probe/natural_plan.py`, `blog_u.py`; run
+`runs/author_mcq_blog/2026-10-31_uniform-sample`, cell table in its `plan.json`). Cells are sex ×
+age band × question × Qwen right/wrong. A cell's natural count of confident pairs is its
+eligible-corpus bloggers times its confident-pair rate among the answered bloggers (within a cell
+every answered post is a uniform draw, since the batches stratified only by sex × age band). Each
+cell's target is proportional to that; a random subsample of the cell's already-deleted pairs fills
+it, and the shortfall (461 Qwen-right pairs, all under 30) is drawn uniformly from the cell's
+confident, answered, never-deleted pairs and deleted in both option orders. Then stable pairs with a
+positive, 1:1 negatives. Labels average both option orders: 552 batch-3 pairs had been deleted in
+one order only, and their second order was run on 2026-11-01, which moved 35 cases in and 43 out (no
+kept label flipped). Result: 1,618 cases (809 positive) from 671 post-question pairs and 655
+bloggers, 79% Qwen-right, no weights. Haiku 5.5 effort low, 1 draw, every case of each condition in
+one run, harness 19 (the prompt states the flat rule):
+`runs/cfbench/2026-11-01_author-blog-drop-haiku-natural2`. Scores:
+`runs/author_mcq_blog/2026-11-01_natural-score` (the probe covers the 1,588 cases with a probe
+capture; the other 30, from 11 pairs that entered with the second order, await it).
+
+| natural sample, pooled (1,618 cases) | AUROC [95% CI]       |
+| ------------------------------------ | -------------------- |
+| transcript                           | 0.835 [0.815, 0.853] |
+| O-lens                               | 0.811 [0.791, 0.831] |
+| O-lens placebo                       | 0.806 [0.786, 0.826] |
+| linear probe (L48 sentence end)      | 0.808 [0.786, 0.827] |
+| probe + transcript                   | 0.885 [0.869, 0.900] |
+
+| A − B                           | Δ AUROC [95% CI]        | one-sided p |
+| ------------------------------- | ----------------------- | ----------- |
+| O-lens − transcript             | −0.024 [−0.041, −0.007] | 0.998       |
+| O-lens − O-lens placebo         | +0.004 [−0.015, +0.023] | 0.33        |
+| probe + transcript − transcript | +0.050 [+0.040, +0.061] | < 0.001     |
+
+NLA and NLA placebo: pending in the clean run.
+
+**Sampling audit** (independent agent, 2026-10-31): the case set reproduces exactly from the
+committed code; cell shares match the corpus (TV 0.008 from exact); earlier deleted pairs are
+uniform within cells; the 461 new pairs behave like the old (stable-with-positive 0.215 vs
+0.219-0.229); negatives are seeded and uniform. It found the run pooling and the single-order labels
+fixed above, and that the draw is blogger-uniform (one post per blogger), not post-uniform.
+
+**Batches 1-3** (secondary; `runs/author_mcq_blog/2026-10-31_scaleup-score`): the stratified,
+Qwen-right-capped set grown with batch 3 (`scripts/author_probe/blog_c.py`), 2,456 cases from 960
+bloggers, scored unweighted and with each Qwen-right case weighted by 1 / its batch and attribute's
+sampling rate (ESS 1,744). Its predictions pool runs (harness 13/14/18, positives and negatives
+mostly scored in different runs), so these are indicative only: O-lens − transcript +0.008 [−0.006,
++0.024] unweighted, +0.002 weighted; NLA − transcript +0.001 / −0.004; probe + transcript −
+transcript +0.061 / +0.053 (both p < 0.001).
+
+Probe and probe + transcript: the standard L2 probe (λ = 1) on the layer-48 residual at the deleted
+sentence's last token, and a logistic on [logit of Haiku's transcript p, probe score], both fully
+nested out of fold (5 folds grouped by blogger), refit within each case set
+(`scripts/author_probe/scaleup.py`). Compute: about 1 h of a 6×H200 pod (deletions, O-lens and NLA
+reads, captures) plus about $8 of SkyPilot H200s; Haiku about $25.
 
 ## NLA in place of the O-lens (2026-10-31)
 

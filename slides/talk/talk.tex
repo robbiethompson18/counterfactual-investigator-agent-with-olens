@@ -548,7 +548,7 @@
 \begin{frame}
   \parthead
   \begin{itemize}
-    \item Blog posts (Blog Authorship Corpus, 200--450 words, one per blogger). Qwen3.6-27B (thinking off) is asked
+    \item Blog posts (Blog Authorship Corpus, 200--450 words, one per blogger, bloggers sampled uniformly across age × sex cells). Qwen3.6-27B (thinking off) is asked
       first ``What is my sex / How old am I most likely to be, based on the blog post I wrote below?'', then the post, then
       ``What do you think?'' and lettered options; its answer: letter log-probs averaged over two option orders
     \item Questions Qwen answers confidently and stably (both option orders agree; a typical deletion barely moves it). A case is one sentence of the post: \textbf{significant} when
@@ -556,9 +556,8 @@
       non-significant sentence of the same post (half each); \input{fig/author_n.tex}\unskip{} cases from 520 bloggers
     \item The investigator (Haiku 5.5, effort low, one turn) sees the prompt, Qwen's letter and its probability,
       and the sentence to delete, and gives P(significant)
-    \item \olens: bullets with FVE at every punctuation and newline token of the question and post, layers 32/40/48,
-      sampled at temperature 1. \nla: ceselder's Qwen3.6-27B NLA at the same tokens, layer 42, one greedy explanation with
-      its FVE. Placebos: another post's reads (same attribute), laid onto this post's read tokens in order
+    \item \olens{} and \nla{} reads of the question and post. Placebos: another post's reads (same attribute), laid onto this
+      post's read tokens in order
   \end{itemize}
   \medskip
   \begin{columns}[T, onlytextwidth]
@@ -608,18 +607,9 @@
 \end{frame}
 
 \begin{frame}{Results: “is deleting this sentence significant?”}
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.5\textwidth}
-      \slidefig{fig/author.pdf}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      {\bfseries\small Paired differences}{\small\color{muted}\ \ A $-$ B}\par\smallskip
-      {\tablefont\input{fig/author_pairs.tex}}
-    \end{column}
-  \end{columns}
-  \source{\input{fig/author_n.tex}\unskip{} cases, 520 bloggers, one Haiku draw per case. AUROC of P(significant); 95\% CI and
-    one-sided paired p by bootstrap over bloggers; stars vs transcript-only, * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
-    out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
+  \slidefig{fig/author.pdf}
+  \source{\input{fig/author_n.tex}\unskip{} cases, \input{fig/author_bloggers.tex}\unskip{} bloggers (\input{fig/author_wrong_n.tex}\unskip{} Qwen
+    wrong; left: right/wrong weighted 50:50); 95\% CI blogger bootstrap; * p < .05 vs transcript. Probe: L2, L48, out-of-fold.}
 \end{frame}
 
 \section{Ablations}
@@ -736,6 +726,38 @@
 \end{frame}
 
 \section{Anecdata}
+
+\begin{frame}{The models are suspicious of their tool harness}
+  \begin{itemize}
+    \item Overeagerness harness grid prompts: O-lens read at every prompt position; a hit is a read matching
+      \texttt{simulat*}, \texttt{mock*}, \texttt{synthetic} or \texttt{fictional}
+  \end{itemize}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \slidefig{fig/simulated_sections.pdf}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      {\bfseries\scriptsize Qwen3.6-27B O-lens L40, tool block}\par
+      \begin{itemize}\tiny
+        \item {\ttfamily\color{muted}…"name": "search\_people", "description":\rd{ "}}\\ “Search for people based on their name. Returns a list of matching employees. This is a fictional tool for demonstration.”
+        \item {\ttfamily\color{muted}…"function": \{"name": "send\_payment\rd{",}}\\ “Sends a transaction to the specified contact. (This function simulates sending money.)”
+        \item {\ttfamily\color{muted}…immediately.", "parameters\rd{":}}\\ “app (probably a simulated environment for this test). It returns JSON.”
+        \item {\ttfamily\color{muted}…"Max transactions to return (default 5)"\}\},\rd{ "}}\\ “This is a simplified mock for demonstration. In production, you'd connect to X's OAuth API.”
+      \end{itemize}
+      {\bfseries\scriptsize GLM-5.3 O-lens block 51, tool block}\par
+      \begin{itemize}\tiny
+        \item {\ttfamily\color{muted}…\{"query": \{"type": "string"\}\}, "required\rd{":}}\\ “with this simulated email environment. Our email tool supports reading, sending, searching,”
+        \item {\ttfamily\color{muted}…\{"query": \{"type": "string"\}\}, "required":\rd{ ["}}\\ “a simulated environment. This simulated email inbox gives us certain capabilities.”
+        \item {\ttfamily\color{muted}…"properties": \{"query": \{"type": "string"\}\}, "required\rd{":}}\\ “the payments app (a fictional payments app). The assistant has actions like sendMoney”
+        \item {\ttfamily\color{muted}…"additionalProperties": false, "\$schema":\rd{ "}}\\ “the underlying scenario data. The simulated inbox likely has some emails and contacts set up”
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{Prompts of the Qwen3.6-27B and GLM-5.3 harness-grid runs, every position read once per distinct prefix:
+    Qwen3.6-27B O-lens L40, one draw per position (11,086 positions); GLM-5.3 O-lens block 51, five draws per position (41,270
+    positions). Tool block: tool definitions and call format (Qwen renders it before the system text). Bars: Wilson 95\% CI over
+    draws. Examples: the read token marked after a few characters of the prompt before it.}
+\end{frame}
 
 \begin{frame}{“graded” in \olensname{} reads, chat vs agentic template}
   \begin{itemize}

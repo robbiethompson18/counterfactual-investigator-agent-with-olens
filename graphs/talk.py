@@ -22,19 +22,18 @@ from matplotlib.patches import Rectangle
 from matplotlib.ticker import PercentFormatter
 
 from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
+from cfbench.scoring import CONDS as CF_CONDS
 from cfbench.scoring import (
-    AUTHOR_GROUPS,
-    AUTHOR_VERSIONS,
     ESSAY_LENSES,
     HF_REPO,
+    PROMPT_SECTIONS,
     acting_by_factor,
     answer_bars,
     auroc_bars,
-    author_bars,
     essay_auroc_bars,
     essay_flips,
+    simulated_by_section,
 )
-from cfbench.scoring import CONDS as CF_CONDS
 from graphs import (
     author_blog_drop,
     chive_agam_inline,
@@ -313,6 +312,31 @@ def acting_bars() -> None:
     (OUT / "acting.tex").write_text(tex.replace("%", "\\%"))
 
 
+@slide
+def simulated_sections() -> None:
+    """harness_grid prompt reads: % of O-lens draws saying simulated/mock/synthetic/fictional by prompt section,
+    Qwen3.6-27B beside GLM-5.3 (the acting slide's model colours), Wilson 95% CIs (draws within a prompt aren't independent)."""
+    res = simulated_by_section()
+    colours = {"Qwen3.6-27B": "#c2185b", "GLM-5.3": "#8c6d1f"}
+    fig, ax = slide_figure(HALF_W, 48)
+    for i, (model, r) in enumerate(res.items()):
+        for j, sec in enumerate(PROMPT_SECTIONS):
+            k, n = r[sec]
+            lo, hi = wilson(k, n)
+            x = j + (i - 0.5) * 0.38
+            ax.bar(x, k / n, 0.36, color=colours[model], label=model if j == 0 else None)
+            ax.errorbar(x, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.6, capsize=1.2, capthick=0.6)
+            ax.annotate(f"{100 * k / n:.1f}", (x, hi), xytext=(0, 1), textcoords="offset points", ha="center", va="bottom",
+                        fontsize=5.5 * SLIDE_S, color=INK)  # fmt: skip
+    ax.set_xticks(range(len(PROMPT_SECTIONS)), PROMPT_SECTIONS)
+    ax.set_ylim(0, 0.27)
+    ax.set_yticks(np.arange(0, 0.26, 0.05), [f"{t:.0%}" for t in np.arange(0, 0.26, 0.05)])
+    ax.set_ylabel("reads saying simulated, mock, ...")
+    ax.grid(axis="x", visible=False)
+    ax.legend(frameon=False, loc="upper left")
+    slide_save(fig, OUT / "simulated_sections.pdf")
+
+
 MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}
 
 
@@ -345,48 +369,8 @@ def mandarin() -> None:
 
 @slide
 def author() -> None:
-    """AUROC of P(the deletion is significant) per condition, pooled over both versions; plus the paired differences table
-    (fig/author_pairs.tex)."""
-    bars, pairs, n = author_bars()
-    one = {c: 0 for _, cs in AUTHOR_GROUPS for c in cs}
-    width = positions(one, AUTHOR_GROUPS)[1][-1] + 1.2
-    fig, ax0 = slide_figure(70, 58)  # the deck's full figure height (graphs.style FULL_H)
-    axes = [ax0]
-    base = 0.5
-    top = max(hi for (_, (_, hi), _) in bars.values()) + 0.06
-    for ax, (ver, title) in zip(axes, AUTHOR_VERSIONS.items(), strict=True):
-        xs, ticks = positions(one, AUTHOR_GROUPS)
-        for c, x in xs.items():
-            val, (lo, hi), st = bars[ver, c]
-            ax.bar(x, val - base, 0.8, bottom=base, **bar_kw(c))
-            ax.errorbar(x, val, [[val - lo], [hi - val]], color=MUTED, lw=0.9, capsize=3, capthick=0.9)
-            for text, dy in ((f"{val:.3f}", 1.5), (st, 6.5)):
-                ax.annotate(
-                    text, (x, hi), xytext=(0, dy), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK
-                )
-        ax.set_xticks(ticks, [OLENS if g == "olens" else g for g, _ in AUTHOR_GROUPS])
-        ax.set_xlim(-0.6, width - 0.6)
-        ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
-        ax.set_title(title, fontsize=7 * SLIDE_S, color=INK, loc="left")
-        ax.grid(axis="x", visible=False)
-    yt = np.arange(base, top, 0.1)
-    axes[0].set_ylim(base, top)
-    axes[0].set_yticks(yt, [f"{t:.1f}" for t in yt])
-    axes[0].set_ylabel("AUROC of P(significant)")
-    axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
-    departure(fig, author_blog_drop.DEPARTURE)
-    slide_save(fig, OUT / "author.pdf")
-    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
-            "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
-            "nla_placebo_inline": r"\swp{nla}\ NLA placebo", "transcript+probe": r"\sw{probe}\ probe + transcript"}  # fmt: skip
-    pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
-    rows = [
-        f"{name[a]} − {name[c].split(' ', 1)[1]} & {d:+.3f} & [{lo:+.3f}, {hi:+.3f}] & {pf(p)}\\\\"
-        for (a, c), (d, (lo, hi), p) in pairs.items()
-    ]
-    head = [r" & $\Delta$ AUROC & 95\% CI & p\\"]
-    (OUT / "author_pairs.tex").write_text("\\begin{tabular}{@{}lrrr@{}}\n" + "\n".join([*head, "\\hline", *rows]) + "\n\\end{tabular}\n")
-    (OUT / "author_n.tex").write_text(f"{n:,}")
+    """The blog-author results slide: graphs.author_blog_drop.slide()."""
+    author_blog_drop.slide(OUT)
 
 
 @slide
@@ -863,3 +847,4 @@ if __name__ == "__main__":
     read_positions()
     placebos()
     wsb()
+    simulated_sections()
