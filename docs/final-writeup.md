@@ -345,6 +345,53 @@ configuration was chosen during exploration of this dataset.
 
 <img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with O-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
 
+### Hinted Multiple Choice
+
+> **🚧 TODO SANITY CHECK (Robbie / Kylie).** This section was pulled from the talk's "Hinted
+> multiple choice" part by an agent on 2026-10-31. Check the setup description, the numbers against
+> `python -m graphs.talk` (the `grid` figure) and the caveat below before shipping. Hints were taken
+> out of the sprint's main line on 2026-10-29, so this is the only hint result we keep.
+
+This is the one dataset where the behaviour is a counterfactual in the CHIVE sense, with a real edit
+to the prompt. We take MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each
+answer the same way in at least 7 of 8 no-hint samples, with different answers from each other. The
+base arm adds a hint naming the **correct** letter ("A Stanford professor I asked thinks the answer
+is C."), and Qwen follows it; the counterfactual arm drops the hint. On half the cases Qwen **knew**
+the answer (its no-hint answer is correct), on the other half it **didn't** (the hint pulled it off
+a wrong one), balanced within each gold letter. The investigator (Gemini 3.8 Flash, effort low, one
+turn, no tools) sees the hinted prompt, Qwen's reply and the diff, and either gives P(knew) or names
+Qwen's no-hint letter. Always naming the hinted letter is right on exactly the knew half, so 50% is
+the floor for the letter task.
+
+We run two hint placements, which decide what the lens can see. With the hint after the options (976
+cases) the read positions, the option newlines, come before the hint, so the reads are of Qwen
+reading the bare question. With the hint first (952 cases) the same positions come after the hint.
+Reads are at layers 32/40/48/52, every bullet with its FVE, for the O-lens; the probe is a linear
+probe at layer 52 trained on hint-after prompts, and the tuned probe the same probe refit on
+hint-first prompts (out-of-fold).
+
+<img src="img/hinted-mcq-grid.png" alt="Hinted multiple choice, hint after the options (976 cases) and hint first (952 cases). Top, AUROC of P(knew): transcript only 0.613 / 0.615, O-lens 0.739 / 0.688 (placebo 0.572 / 0.543), probe 0.937 / 0.764, tuned probe 0.851 hint-first. Bottom, which letter without the hint, % correct: transcript only 53.2 / 52.3, O-lens 54.9 / 53.9 (placebo 49.3 / 47.6), probe 76.4 / 53.9, tuned probe 64.1 hint-first; always the hinted letter 50%" width="760">
+
+Top row: AUROC of P(knew), 95% case bootstrap, stars from a one-sided paired bootstrap against
+transcript-only. Bottom row: % correct on the letter, 95% item bootstrap, stars from a one-sided
+paired sign test against transcript-only; dotted line is always the hinted letter. Placebo: another
+question's reads in the same positions.
+
+On "did Qwen know it?" the O-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
+after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript-only, so
+the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
+"which letter without the hint?" nobody does much: the O-lens is +1.7pp and +1.6pp over
+transcript-only, significant at p < .05 but barely above the 50% floor, and only the probe (76.4%
+hint-after) names the letter. The probe trained on hint-after prompts does not transfer to
+hint-first prompts (0.764 AUROC and 53.9% on the letter, the latter at transcript level); refitting
+it on hint-first prompts recovers most of the gap (0.851, 64.1%).
+
+> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: O-lens at
+> layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
+> only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
+> medium. There is no `menus_inline` run for hints. Decide: keep it with this caveat, or rerun on
+> canonical reads.
+
 ## Ablations
 
 ### Filtering On Correctness
@@ -364,7 +411,7 @@ like a significant effect. We had several spurious positive results this way.
 
 ### Which Metamodel is Best?
 
-<img src="img/headline-lens-diffs.png" alt="Each lens minus transcript only, paired by case: multiple choice O-lens +2.6, J++ +4.3, NLA +1.2; knowledge cutoff +1.1, -0.9, +1.8; idiosyncratic preferences +5.2, -8.2, +4.7; pooled +3.0, -1.6, +2.6" width="620">
+<img src="img/headline-lens-diffs.png" alt="Each lens minus its placebo, paired by case and pooled over the three tasks: O-lens +3.3 [+2.6, +4.1], J++ +8.0 [+7.2, +8.8], NLA +1.5 [+0.9, +2.0]" width="620">
 
 It's not clear what is best.
 
