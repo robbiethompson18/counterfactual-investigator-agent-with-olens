@@ -1,4 +1,4 @@
-"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `prompt`): split by whether Qwen
+"""The write-up's ablation charts on graphs.headline_inline's runs (the canonical menus_inline menu, `all`): split by whether Qwen
 is right, lens and placebo differences.
 
 - headline-qwen-right.png / headline-qwen-wrong.png: % of cases the investigator (Haiku 5.5) gets right, transcript only vs
