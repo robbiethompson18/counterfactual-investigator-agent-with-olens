@@ -167,7 +167,10 @@ the eval `<env>-pairs`.
   context, plus (`olens_inline`) every bullet at each option's newline, or (`olens_placebo_inline`)
   another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
   at the filler sentence's punctuation) was tried and dropped: O-lens = placebo
-  (docs/envs/hint_cf.md).
+  (docs/envs/hint_cf.md). The four `*_tail_inline` evals also run `nla_inline` (ceselder's layer-42
+  NLA) and `jlens_inline` (J++ top 10, layers 32-60 step 4) with their placebos, read at exactly
+  the O-lens reads' tokens (`hint_qwen_dsv4/lens_reads.py`; runs
+  `nla_reads/2026-10-31_hint-qwen-dsv4-ceselder-l42`, `jpp_reads/2026-10-31_hint-qwen-dsv4-same-tokens`).
 - `supergpqa_inline`: mcq_unselected's question on SuperGPQA (`environments/supergpqa`): 3,000
   consistent cases (seed 0; the other 3,328 consistent questions are the probe pool), no hint,
   single-turn letter task, Haiku 5.5. Seven conditions: `transcript_inline`, O-lens / NLA / J++ each

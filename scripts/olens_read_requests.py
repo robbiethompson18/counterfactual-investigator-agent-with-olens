@@ -57,7 +57,7 @@ import numpy as np
 import torch
 from olens.fve import Whitener
 from olens.lens import Sampling, bullets
-from olens.nla import NLA_SAMPLING, NLAEngine
+from olens.nla import NLA_REPO, NLA_SAMPLING, NLAEngine
 from olens.one_engine import OneEngine
 from transformers import AutoTokenizer
 
@@ -157,6 +157,7 @@ def main():
     ap.add_argument("--lora-mode", default="runtime", choices=("runtime", "merge"), help="vLLM LoRA kernels, or merge_lora per stage")
     ap.add_argument("--readout", default="olens", choices=("olens", "nla"), help="the O-lens (bullets + AR FVE) or the NLA AV (olens.nla)")
     ap.add_argument("--av-lora", default="/workspace/lora_vllm/nla64_av", help="nla: the AV adapter with vLLM-renamed keys")
+    ap.add_argument("--nla-repo", default=NLA_REPO, help="nla: the checkpoint's HF repo, for provenance (olens.nla.CESELDER_REPO for L42)")
     ap.add_argument("--nla-meta", default="/workspace/olens_ckpt/nla64/nla_meta.yaml", help="nla: the checkpoint's nla_meta.yaml")
     ap.add_argument("--save-acts", action="store_true", help="append each decoded read's activation (bf16) to OUT.acts.bf16 (act_index)")
     ap.add_argument("--debug", action="store_true")
@@ -178,7 +179,7 @@ def main():
               "lora_mode": args.lora_mode, "debug": args.debug}  # fmt: skip
     if args.readout == "nla":
         args.save_acts = True  # the critic scores them later (scripts/nla_score.py)
-        lens = NLAEngine(tok, args.base, args.av_lora, args.nla_meta, **engine)
+        lens = NLAEngine(tok, args.base, args.av_lora, args.nla_meta, repo=args.nla_repo, **engine)
         whiteners = None
     else:
         lens = OneEngine(tok, args.base, args.lens_lora, args.ar_lora, **engine)

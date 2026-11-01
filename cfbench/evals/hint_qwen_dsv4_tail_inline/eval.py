@@ -27,6 +27,13 @@ with its FVE) at the newline ending each option, and at the end of the prompt: t
 letters, names) wrong more often than broad themes. The option-newline reads are before the hint, the end-of-prompt
 reads after it. `olens_placebo_inline`: the same blocks with another question's bullets at the same positions.
 
+**NLA and J++ (Kylie, 2026-10-31).** At exactly the same tokens as the O-lens reads (cfbench/evals/hint_qwen_dsv4/
+lens_reads.py builds the requests from the O-lens runs' and asserts the sites match), same blocks and layout:
+`nla_inline` shows ceselder's layer-42 NLA (ceselder/qwen3.6-27b-nla-rl), one explanation per position at layer 42 with
+the critic's FVE; `jlens_inline` the J++ lens's top 10 tokens with probabilities per layer at layers 32, 36, ..., 60.
+`nla_placebo_inline` / `jlens_placebo_inline` take the O-lens placebo's source question (same derangement) and show its
+NLA / J++ reads.
+
 **Reference bars (no new investigator calls).** `transcript` is the earlier single-turn run's transcript-only condition
 (the same prompt). `O-lens (nl)` is that run's O-lens condition: option-newline reads only, no end-of-prompt reads and
 no fine-details sentence. `probe` is a linear probe on Qwen's residual stream (hidden_states[52]) at the newline ending
@@ -46,6 +53,8 @@ from cfbench.evals.hint_qwen_dsv4_inline.eval import *
 
 READS_TAIL = K.REPO_ROOT / "data/runs/olens_reads/2026-10-29_hint-qwen-dsv4-tail"
 TAIL = {"tail_reads": READS_TAIL, "detail_note": True}
+
+CONDITIONS = inline.CONDITIONS  # + NLA and J++ (2026-10-31)
 
 
 def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str, dict]:

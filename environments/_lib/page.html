@@ -767,7 +767,11 @@ function pairedTable(rows, caption) {
 }
 const condOrder = cs => [...cs].sort((a, b) => (Object.keys(CONDS).indexOf(a) + 99 * !(a in CONDS)) - (Object.keys(CONDS).indexOf(b) + 99 * !(b in CONDS)));
 const condLabel = c => CONDS[c]?.[0] || c, condColor = c => CONDS[c]?.[1] || "var(--c-other)", condShort = c => CONDS[c]?.[2] || c;
-const swatch = c => `<i class="sw" style="background:${condColor(c)}"></i>`;
+const swatch = c => {
+  const l = /placebo/.test(c) ? ["olens", "jlens", "nla"].find(x => c.startsWith(x + "_")) : undefined;
+  const bg = l ? `repeating-linear-gradient(45deg, var(--c-${l}) 0 3px, var(--bg) 3px 5px)` : condColor(c);
+  return `<i class="sw" style="background:${bg}"></i>`;
+};
 const pp = x => x == null ? "–" : (100 * x).toFixed(0);
 const evItem = (R, id) => evq({dataset: R.expview, item: id});
 const docentRun = (R, id) => id && R.docent_collection ? `${DOCENT}${R.docent_collection}/agent_run/${id}` : null;
@@ -1275,14 +1279,17 @@ function signP(b, w) {  // exact one-sided sign test over the items that differ:
   return Math.min(1, tail);
 }
 const STARS_NOTE = "Stars: paired sign test against transcript-only over the same items, one-sided: the condition beats transcript-only (* p < 0.05, ** p < 0.01, *** p < 0.001).";
+// a lens's placebo bar: the lens's colour with stripes in the background colour (CLAUDE.md, 2026-10-31)
+const placeboLens = k => /placebo/.test(k) ? ["olens", "jlens", "nla"].find(l => k.startsWith(l + "_")) : undefined;
+const STRIPES = ["olens", "jlens", "nla"].map(l => `<pattern id="stripe-${l}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--c-${l})"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--bg)" stroke-width="3"/></pattern>`).join("");
 function accuracyBars(rows, paired = []) {
   const conds = condOrder(rows.map(x => x.condition)), L = 44, T = 30, B = 40, H = 254, cw = 96, W = L + 16 + cw * conds.length + 10;
   const y = v => T + (1 - v) * (H - T - B), f = v => v.toFixed(1);
-  let s = "";
+  let s = `<defs>${STRIPES}</defs>`;
   for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line x1="${L}" x2="${W - 10}" y1="${f(y(v))}" y2="${f(y(v))}" class="${v === 0.5 ? "null" : "grid"}"/><text x="${L - 6}" y="${f(y(v) + 4)}" class="ax" text-anchor="end">${100 * v}%</text>`;
   conds.forEach((k, i) => {
     const x = rows.find(r => r.condition === k), cx = L + 16 + cw * i + cw / 2, [lo, hi] = x.accuracy_ci || [x.accuracy, x.accuracy];
-    s += `<rect x="${f(cx - 26)}" y="${f(y(x.accuracy))}" width="52" height="${f(y(0) - y(x.accuracy))}" fill="${condColor(k)}" opacity="0.85"><title>${esc(condLabel(k))}: ${pct(x.accuracy)} right, 95% CI ${pct(lo)}–${pct(hi)}</title></rect>`;
+    s += `<rect x="${f(cx - 26)}" y="${f(y(x.accuracy))}" width="52" height="${f(y(0) - y(x.accuracy))}" fill="${placeboLens(k) ? `url(#stripe-${placeboLens(k)})` : condColor(k)}" opacity="0.85"><title>${esc(condLabel(k))}: ${pct(x.accuracy)} right, 95% CI ${pct(lo)}–${pct(hi)}</title></rect>`;
     s += `<line x1="${cx}" x2="${cx}" y1="${f(y(hi))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(hi))}" y2="${f(y(hi))}" stroke="var(--fg,#222)" stroke-width="1.5"/><line x1="${cx - 8}" x2="${cx + 8}" y1="${f(y(lo))}" y2="${f(y(lo))}" stroke="var(--fg,#222)" stroke-width="1.5"/>`;
     const pr = paired.find(r => r.condition === k && /^transcript_/.test(r.ref));
     s += `<text x="${cx}" y="${f(y(hi) - 18)}" class="lab" text-anchor="middle">${stars(pr?.p_one)}</text><text x="${cx}" y="${f(y(hi) - 5)}" class="ax" text-anchor="middle">${pct(x.accuracy)}</text><text x="${cx}" y="${H - B + 18}" class="lab" text-anchor="middle">${esc(condShort(k))}</text>`;
@@ -1295,7 +1302,7 @@ function accuracyTable(t, models) {
   const rows = condOrder([...new Set(t.rows.map(x => x.condition))]).flatMap(c => t.rows.filter(x => x.condition === c)).map(x => `<tr><td>${swatch(x.condition)}${esc(condShort(x.condition))}</td><td>${esc(x.version)}</td><td class="num">${x.n_items}</td>
     <td class="num"><b>${pct(x.accuracy)}</b>${ci(x.accuracy_ci)}</td>
     ${models.map(m => `<td class="num">${x.accuracy_by_class?.[m] == null ? "–" : pct(x.accuracy_by_class[m])}</td>`).join("")}
-    <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
+    <td class="num">${x.auroc == null ? "–" : x.auroc.toFixed(2)}${x.auroc_ci ? ` <span class="mute">[${x.auroc_ci.map(v => v.toFixed(2)).join(", ")}]</span>` : ""}</td><td class="num mute">${x.mean_brier == null ? "–" : x.mean_brier.toFixed(3)}</td><td class="num">${x.invalid || 0}</td></tr>`).join("");
   const versions = [...new Set(t.rows.map(x => x.version))], top = versions.includes("pooled") ? "pooled" : versions[0];
   return `<h3>Inputs <span class="mono">${esc(t.inputs || "?")}</span> <span class="mute" style="font-weight:400;font-size:13px">runs ${t.runs.map(esc).join(" + ")}</span></h3>
     ${accuracyBars(t.rows.filter(x => x.version === top), t.paired?.[top] || [])}

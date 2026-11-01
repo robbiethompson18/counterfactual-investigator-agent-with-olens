@@ -6,8 +6,9 @@ balanced accuracy and chance is 50%.
     uv run python -m cfbench.evals.hint_qwen_dsv4.score data/runs/cfbench/<date>_<slug> [...]
 
 Per (condition, version), never pooled over versions: % right with a 95% bootstrap CI over items (an item's draws
-resampled together), % right per class, AUROC of p (knew vs didn't; calibration-free), mean Brier for reference; then the
-paired comparisons of O-lens against placebo, transcript tools and no transcript: per item the mean of its draws' right/wrong,
+resampled together), % right per class, AUROC of p (knew vs didn't; calibration-free) with its item-bootstrap CI, mean
+Brier for reference; then the paired comparisons of each lens against placebo, transcript tools and no transcript: per
+item the mean of its draws' right/wrong,
 the mean difference over items with a bootstrap CI, and a sign test over the items that differ. `stats(rows)` is what the env
 viewer's claim table reads (environments/_lib/evals.py, the eval's `score` module); `accuracy` is its headline column.
 """
@@ -19,6 +20,7 @@ from math import comb
 from pathlib import Path
 
 import numpy as np
+from scipy.stats import rankdata
 
 from cfbench.core import canon_condition
 from cfbench.evals.hint_qwen_dsv4.eval import DIDNT, KNEW
@@ -30,6 +32,8 @@ BOOT = 2000
 PAIRS = (
     ("olens_agentic", ("olens_placebo_agentic", "transcript_agentic", "no_transcript")),
     ("olens_inline", ("olens_placebo_inline", "transcript_inline")),
+    ("nla_inline", ("nla_placebo_inline", "transcript_inline", "olens_inline")),
+    ("jlens_inline", ("jlens_placebo_inline", "transcript_inline", "olens_inline")),
 )
 
 
@@ -39,6 +43,19 @@ def boot_mean(per_item: list[float], rng: np.random.Generator) -> list[float]:
     return [float(v) for v in np.percentile([x[rng.integers(len(x), size=len(x))].mean() for _ in range(BOOT)], [2.5, 97.5])]
 
 
+def auroc_ci(items: dict[str, list[tuple[float, int]]], rng: np.random.Generator) -> list[float]:
+    """95% bootstrap CI of the AUROC of p (knew vs didn't), resampling items with their draws (rank form, Mann-Whitney)."""
+    keys = list(items)
+    out = []
+    for _ in range(BOOT):
+        xs = [x for i in rng.integers(len(keys), size=len(keys)) for x in items[keys[i]]]
+        p, y = np.array([a for a, _ in xs]), np.array([b for _, b in xs])
+        n1 = y.sum()
+        if 0 < n1 < len(y):
+            out.append((rankdata(p)[y == 1].sum() - n1 * (n1 + 1) / 2) / (n1 * (len(y) - n1)))
+    return [float(v) for v in np.percentile(out, [2.5, 97.5])]
+
+
 def sign_test(diffs: list[float]) -> tuple[int, int, float]:
     pos, neg = sum(d > 0 for d in diffs), sum(d < 0 for d in diffs)
     n = pos + neg
@@ -46,7 +63,7 @@ def sign_test(diffs: list[float]) -> tuple[int, int, float]:
 
 
 def paired(right: dict[tuple[str, str], dict[str, list[bool]]], rng: np.random.Generator) -> list[dict]:
-    """O-lens vs each other condition per version: mean over shared items of (O-lens − other) per-item % right."""
+    """Each lens vs its comparisons (PAIRS) per version: mean over shared items of (lens − other) per-item % right."""
     out = []
     for version, (olens, versus) in ((v, p) for v in sorted({v for _, v in right}) for p in PAIRS):
         a = right.get((olens, version), {})
@@ -84,6 +101,7 @@ def stats(rows: list[dict]) -> list[dict]:
             "n_items": len(items), "accuracy": float(np.mean(per_item)), "accuracy_ci": boot_mean(per_item, rng),
             "accuracy_by_class": {m: float(np.mean([np.mean(right[i]) for i in items if cls[version, i] == m])) for m in CLASSES if ps[m]},
             "pbar": {m: float(np.mean(ps[m])) for m in CLASSES if ps[m]}, "auroc": auroc(ps[KNEW], ps[DIDNT]),
+            "auroc_ci": auroc_ci(items, np.random.default_rng(2)),  # its own rng: the accuracy CIs stay as published
             "mean_brier": float(np.mean([(p - y) ** 2 for xs in items.values() for p, y in xs])),
         })  # fmt: skip
     return out
@@ -104,7 +122,8 @@ def main():
         lo, hi = s["accuracy_ci"]
         by = " / ".join(f"{s['accuracy_by_class'].get(m, float('nan')):.0%}" for m in CLASSES)
         print(f"{s['condition'] + ' ' + s['version']:36} items {s['n_items']:>3}  right {s['accuracy']:.0%} [{lo:.0%}, {hi:.0%}]  "
-              f"knew/didn't {by}  AUROC {s['auroc'] or float('nan'):.2f}  Brier {s['mean_brier']:.3f}  invalid {s['invalid']}")  # fmt: skip
+              f"knew/didn't {by}  AUROC {s['auroc'] or float('nan'):.2f} [{s['auroc_ci'][0]:.2f}, {s['auroc_ci'][1]:.2f}]  "
+              f"Brier {s['mean_brier']:.3f}  invalid {s['invalid']}")  # fmt: skip
     for x in paired(right_by_item(rows, lambda r: (r["p"] >= 0.5) == bool(r["k_cf"] // r["n_cf"])), np.random.default_rng(1)):
         lo, hi = x["ci"]
         print(f"{x['version']:11} {x['a']} − {x['b']}: {x['diff']:+.0%} [{lo:+.0%}, {hi:+.0%}] over {x['n']} items; "
