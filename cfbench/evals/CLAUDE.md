@@ -168,6 +168,11 @@ the eval `<env>-pairs`.
   another question's with the same option count. A filler variant (hint_mcq's `pause/` arms, reads
   at the filler sentence's punctuation) was tried and dropped: O-lens = placebo
   (docs/envs/hint_cf.md).
+- `hint_unselected_inline` and `hint_unselected_letter_inline` (Robbie, 2026-10-31): the hinted-MCQ
+  "did Qwen know it?" / "which letter without the hint?" questions on an unselected MMLU-Pro set:
+  consistency the only filter (no DSv4), hint first (`before/hint+d1`), canonical reads at every
+  default position, the menus_inline prompt and placebo rule, Haiku at medium, draws pooled
+  (docs/hint-unselected.md). `eval.py requests OUT_DIR` writes the sharded O-lens requests.
 - `supergpqa_inline`: mcq_unselected's question on SuperGPQA (`environments/supergpqa`): 3,000
   consistent cases (seed 0; the other 3,328 consistent questions are the probe pool), no hint,
   single-turn letter task, Haiku 5.5. Seven conditions: `transcript_inline`, O-lens / NLA / J++ each
