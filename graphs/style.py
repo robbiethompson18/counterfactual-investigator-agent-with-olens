@@ -164,24 +164,26 @@ def ci_bar(ax, x: float, c: str, v: float, lo: float, hi: float, width: float = 
 SW_W, SW_H, SW_MINUS, SW_GAP = 14, 10, 12, 8  # swatch width, height, the gap holding the minus sign, gap to the axis (points)
 
 
-def swatch_pair(ax, y: float, a: str, b: str) -> None:
+def swatch_pair(ax, y: float, a: str, b: str, s: float = 1.0) -> None:
     """A's and B's bar swatches with a minus between them, just left of the y axis at data y (sized in points, so they survive
-    tight_layout); set the y tick label pad to SWATCH_PAD to make room."""
-    da = DrawingArea(2 * SW_W + SW_MINUS, SW_H)
-    da.add_artist(Rectangle((0, 0), SW_W, SW_H, **bar_kw(a)))
-    da.add_artist(Rectangle((SW_W + SW_MINUS, 0), SW_W, SW_H, **bar_kw(b)))
-    da.add_artist(Text(SW_W + SW_MINUS / 2, SW_H / 2, "−", ha="center", va="center", fontsize=9, color=INK))
-    ax.add_artist(AnnotationBbox(da, (0, y), xycoords=ax.get_yaxis_transform(), box_alignment=(1, 0.5), xybox=(-SW_GAP, 0),
+    tight_layout); set the y tick label pad to SWATCH_PAD * s to make room. `s` scales everything (a slide figure passes SLIDE_S)."""
+    w, h, minus, gap = SW_W * s, SW_H * s, SW_MINUS * s, SW_GAP * s
+    da = DrawingArea(2 * w + minus, h)
+    da.add_artist(Rectangle((0, 0), w, h, **bar_kw(a)))
+    da.add_artist(Rectangle((w + minus, 0), w, h, **bar_kw(b)))
+    da.add_artist(Text(w + minus / 2, h / 2, "−", ha="center", va="center", fontsize=9 * s, color=INK))
+    ax.add_artist(AnnotationBbox(da, (0, y), xycoords=ax.get_yaxis_transform(), box_alignment=(1, 0.5), xybox=(-gap, 0),
                                  boxcoords="offset points", frameon=False, pad=0, annotation_clip=False))  # fmt: skip
 
 
 SWATCH_PAD = 2 * SW_GAP + 2 * SW_W + SW_MINUS
 
 
-def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> None:
+def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}", s: float = 1.0) -> None:
     """Paired-difference rows on ax, top to bottom. A row is a header string, or (a, b, mean, lo, hi[, text]) for A − B with its
     95% CI: an ink CI line and dot, filled when the CI excludes 0, the numbers to the right, and the label (default
-    "A − B") followed by the two swatches. One ink for every mark: the swatches say which conditions."""
+    "A − B") followed by the two swatches. One ink for every mark: the swatches say which conditions. `s` scales the text and
+    swatches (a slide figure passes SLIDE_S)."""
     labels = []
     for k, row in enumerate(rows):
         y = len(rows) - 1 - k
@@ -189,20 +191,20 @@ def diff_rows(ax, rows: list, unit: str = "", value_fmt: str = "{:+.1f}") -> Non
             labels.append(row)
             continue
         a, b, m, lo, hi, *text = row
-        ax.plot([lo, hi], [y, y], color=INK, lw=1.6, solid_capstyle="butt", zorder=3)
-        ax.plot(m, y, "o", ms=6, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
-        ax.text(hi, y, f"   {value_fmt.format(m)}  [{value_fmt.format(lo)}, {value_fmt.format(hi)}]{unit}", va="center", fontsize=8,
-                color=INK)  # fmt: skip
-        swatch_pair(ax, y, a, b)
+        ax.plot([lo, hi], [y, y], color=INK, lw=1.6 * s, solid_capstyle="butt", zorder=3)
+        ax.plot(m, y, "o", ms=6 * s, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
+        ax.text(hi, y, f"   {value_fmt.format(m)}  [{value_fmt.format(lo)}, {value_fmt.format(hi)}]{unit}", va="center",
+                fontsize=8 * s, color=INK)  # fmt: skip
+        swatch_pair(ax, y, a, b, s)
         labels.append(text[0] if text else f"{label(a)} − {label(b)}")
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
     ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(reversed(labels), fontsize=9, color=INK)
+    ax.set_yticklabels(reversed(labels), fontsize=9 * s, color=INK)
     for tick, row in zip(reversed(ax.get_yticklabels()), rows, strict=True):
         if isinstance(row, str):
             tick.set_fontweight("bold")
             tick.set_color(MUTED)
-    ax.tick_params(axis="y", length=0, pad=SWATCH_PAD)
+    ax.tick_params(axis="y", length=0, pad=SWATCH_PAD * s)
     ax.set_ylim(-0.6, len(rows) - 0.4)
     ax.grid(axis="y", visible=False)
 

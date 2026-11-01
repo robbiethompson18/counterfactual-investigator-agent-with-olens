@@ -33,7 +33,7 @@ from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
-from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
+from graphs.style import BG, FAINT, FULL_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, diff_rows, label, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
@@ -296,21 +296,30 @@ def author() -> None:
 
 @slide
 def sankeys() -> None:
-    """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title."""
+    """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title; and the
+    two Multiple Choice sets stacked on one full-height figure (fig/sankey_mcq.pdf; Robbie, 2026-10-31)."""
     for slug, (_, columns, flows) in data_filter_sankey.DATASETS.items():
         fig, ax = slide_figure(FULL_W, 44)
         data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
         slide_save(fig, OUT / f"sankey_{slug}.pdf")
+    fig, axes = slide_figure(FULL_W, 58, nrows=2)
+    for ax, slug in zip(axes, ("mmlu", "supergpqa"), strict=True):
+        _, columns, flows = data_filter_sankey.DATASETS[slug]
+        data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
+    slide_save(fig, OUT / "sankey_mcq.pdf")
 
 
-TASKS = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences": "Idiosyncratic Preferences"}
+# each task's results figure: the seven bars beside the three lens − transcript differences (Robbie, 2026-10-31), full
+# width; Knowledge Cutoff's is shorter, its slide keeps three bullets under it
+TASK_H = {"mcq": 54, "cutoff": 40, "preferences": 54}
 
 
 @slide
 def headline() -> None:
     """The write-up's headline at slide size: pooled over the three tasks, transcript only and the three lenses, then the lenses
     beside their placebos (fig/headline.pdf); the lenses against the probe on multiple choice as % right and as error rate
-    (fig/headline_probes.pdf); and each task's seven bars (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
+    (fig/headline_probes.pdf); and each task's seven bars with the paired lens − transcript differences beside them
+    (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
     for _, runs in MENUS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
         for run in runs:
             for f in ("meta.json", "predictions.jsonl"):
@@ -339,12 +348,17 @@ def headline() -> None:
     axes[1].set_ylim(0, 30)
     axes[1].set_ylabel("% of cases wrong")
     slide_save(fig, OUT / "headline_probes.pdf")
-    for task in TASKS:
-        fig, ax = slide_figure(HALF_W, 44)
+    for task, h in TASK_H.items():
+        fig, (ax, dx) = slide_figure(FULL_W, h, ncols=2, gridspec_kw={"width_ratios": [3, 2]})
         headline_inline.bars(ax, boot, [task], seven, s=SLIDE_S)
         ax.set_ylim(50, 100)
         ax.set_ylabel("% of cases right")
         ax.text(1.0, 1.03, "hatched = placebo", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+        rows = [(c, TS, *boot.diff_ci([task], c, TS), label(c)) for c in LENSES]  # the swatches say "− transcript only"
+        diff_rows(dx, rows, unit=" pp", s=SLIDE_S)
+        lo, hi = min(0, *(r[3] for r in rows)), max(r[4] for r in rows)
+        dx.set_xlim(lo - 0.08 * (hi - lo), hi + 1.1 * (hi - lo))  # room for the numbers right of the longest CI
+        dx.set_xlabel("Δ pp vs transcript only, paired 95% CI")
         slide_save(fig, OUT / f"task_{task}.pdf")
 
 
