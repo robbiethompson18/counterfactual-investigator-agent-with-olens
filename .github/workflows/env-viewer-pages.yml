@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends texlive-xetex texlive-latex-extra texlive-fonts-recommended latexmk fonts-inter fonts-jetbrains-mono fonts-noto-cjk
       - run: make -C slides
       - uses: actions/upload-artifact@v4
         with:
