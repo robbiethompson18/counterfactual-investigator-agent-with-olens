@@ -1,5 +1,5 @@
 """How many tokens each lens's reads add to the investigator's (Haiku 5.5) prompt, for the write-up: does one lens just give it more to
-think about? Same runs (menus_inline, `prompt` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
+think about? Same runs (menus_inline, `all` menu) and weighting as graphs.headline_inline: MCQ pools MMLU-Pro and SuperGPQA cases, and
 pooled weights MCQ, knowledge cutoff and preferences equally. Added tokens = the condition's mean `tokens.prompt` (Anthropic's count
 of the whole opening call, tool schemas included) minus transcript_inline's on the same cases, averaged over draws. Rows with calls !=
 1 are dropped (a second call's prompt also holds the first): a handful of retries. No whiskers: this describes what was shown.

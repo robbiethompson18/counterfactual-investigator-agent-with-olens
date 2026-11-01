@@ -42,9 +42,10 @@ SETS = {
     "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3",
                                 "2026-10-31_menus-supergpqa-all-d12c", "2026-11-01_menus-supergpqa-prompt-d12"]),
 }  # fmt: skip
-# The menu whose lens conditions the write-up's charts read (graphs.headline_inline): `prompt`, no tail tokens, so a lens can't
-# just read off the answer Qwen is about to give (Robbie, 2026-10-31; `all` until then)
-CANONICAL = "prompt"
+# The menu whose lens conditions the write-up's charts read (graphs.headline_inline): `all`, the project's default read
+# positions (docs/read-positions.md). `prompt` (no tail tokens) was canonical for ~2 h on 2026-10-31 and is now the write-up's
+# token-position ablation, at 3 draws like `all` (Robbie, 2026-10-31)
+CANONICAL = "all"
 LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
 BOOT = 2000

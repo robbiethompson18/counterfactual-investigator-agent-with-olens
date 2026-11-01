@@ -6,7 +6,7 @@ stale, all. Exact match to Qwen's modal answer (post-2026-10-31 labels), per-ite
 bootstrap CIs over items; a run that isn't finished (meta.json status done) is left out.
 
 Two sets (Robbie, 2026-10-31):
-- `canonical` (default, the final write-up): the menus_inline cutoff runs, canonical `prompt` menu (graphs/menus_inline.py SETS), Haiku at 3
+- `canonical` (default, the final write-up): the menus_inline cutoff runs, canonical `all` menu (graphs/menus_inline.py SETS), Haiku at 3
   draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw. Plus one bar from the old prompt:
   Haiku told the model is Qwen3.6-27B with a ~January 2025 cutoff (the only told run; no menus_inline told run exists).
   A second figure (canonical only) is Haiku's paired differences on all items (graphs.cutoff_qa_inline.diffs).
@@ -41,12 +41,12 @@ def old_lens_runs(prefix: str) -> list:
     return [(f"{c}{p}_inline", [CF / f"{prefix}-{s}"], f"{c}{p}_inline") for c, ps in slugs for p, s in (("", c), ("_placebo", ps))]
 
 
-TOPUP = CF / "2026-10-31_menus-cutoff-all-d12b"  # draws 1-2 of prompt only (and every `all`-menu condition)
-LENS_TOPUP = CF / "2026-10-31_menus-cutoff-prompt-d12"  # draws 1-2 of every `prompt`-menu condition
+TOPUP = CF / "2026-10-31_menus-cutoff-all-d12b"  # draws 1-2 of prompt only and every `all`-menu condition
+PROMPT_TOPUP = CF / "2026-10-31_menus-cutoff-prompt-d12"  # draws 1-2 of every `prompt`-menu condition
 
 
 def menus_runs(run: str, lens: str) -> list:
-    return [(f"{lens}{p}_inline", [CF / run, LENS_TOPUP], f"{lens}_{CANONICAL}{p}_inline") for p in ("", "_placebo")]
+    return [(f"{lens}{p}_inline", [CF / run, TOPUP, PROMPT_TOPUP], f"{lens}_{CANONICAL}{p}_inline") for p in ("", "_placebo")]
 
 
 # set -> investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load()
