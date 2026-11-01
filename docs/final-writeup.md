@@ -556,18 +556,29 @@ project idea.
 
 ## Cost
 
-| item                                          | user   | spend  |
-| --------------------------------------------- | ------ | ------ |
-| RunPod GPUs, 2026-10-19 to 2026-10-31         | Robbie | $2,051 |
-| RunPod GPUs before the work log, Oct 2 to 18  | Robbie | $500   |
-| OpenRouter, personal account (from Oct 27)    | Robbie | $429   |
-| OpenRouter, credits Robbie already had        | Robbie | $2,500 |
-| Anthropic API (BYOK Haiku, Sonnet, Opus 5.5)  | Robbie | $550   |
-| Anthropic API, free credits                   | Robbie | $600   |
-| Google AI Studio (Gemini 3.8 Flash, BYOK)     | Robbie | $300   |
-| Google AI Studio, free credits                | Robbie | $300   |
-| Docent, Hugging Face, Cloudflare/GitHub Pages | Robbie | $0     |
-| **Robbie total**                              |        | $7,230 |
+| item                                                  | user   | spend   |
+| ----------------------------------------------------- | ------ | ------- |
+| RunPod GPUs, 2026-10-19 to 2026-10-31                 | Robbie | $2,051  |
+| RunPod GPUs before the work log, Oct 2 to 18          | Robbie | $500    |
+| OpenRouter, personal account (from Oct 27)            | Robbie | $429    |
+| OpenRouter, credits Robbie already had                | Robbie | $2,500  |
+| Anthropic API (BYOK Haiku, Sonnet, Opus 5.5)          | Robbie | $550    |
+| Anthropic API, free credits                           | Robbie | $600    |
+| Google AI Studio (Gemini 3.8 Flash, BYOK)             | Robbie | $300    |
+| Google AI Studio, free credits                        | Robbie | $300    |
+| Docent, Hugging Face, Cloudflare/GitHub Pages         | Robbie | $0      |
+| **Robbie total**                                      |        | $7,230  |
+| RunPod GPUs via SkyPilot, 2026-10-19 to 2026-10-31    | Kylie  | $1,674  |
+| vast.ai GPUs (GLM 5.3 boxes), from Oct 20             | Kylie  | $1,047  |
+| OpenRouter (cfbench predictors, env rollouts, judges) | Kylie  | $2,712  |
+| **Kylie total**                                       |        | $5,433  |
+| **Sprint total**                                      |        | $12,663 |
+
+Kylie's RunPod figure is an estimate from `sky cost-report` (cluster hours × RunPod's listed rate,
+about ±25%); vast and OpenRouter are actual spend. About $1.9k of Kylie's OpenRouter went on cfbench
+predictor runs and ~$690 on the GLM realism / donehack coding runs. Kylie's SkyPilot clusters from
+Oct 1 to 18 (~$1.8k) were other projects and aren't counted. Kylie's direct Anthropic API use isn't
+measured (no admin key).
 
 Things that will not have receipts:
 
