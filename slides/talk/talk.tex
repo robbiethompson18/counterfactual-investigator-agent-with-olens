@@ -500,7 +500,7 @@
 
 \begin{frame}{Anecdata: “simulated” O-lens reads by prompt section, Qwen vs GLM}
   \begin{itemize}
-    \item Overeagerness harness grid prompts, thinking off: O-lens read at every prompt position; a hit is a read matching
+    \item Overeagerness harness grid prompts: O-lens read at every prompt position; a hit is a read matching
       \texttt{simulat*}, \texttt{mock*}, \texttt{synthetic} or \texttt{fictional}
   \end{itemize}
   \begin{columns}[T, onlytextwidth]
@@ -524,7 +524,7 @@
       \end{itemize}
     \end{column}
   \end{columns}
-  \source{Prompts of the Qwen3.6-27B and GLM-5.3 harness-grid runs, thinking off, every position read once per distinct prefix:
+  \source{Prompts of the Qwen3.6-27B and GLM-5.3 harness-grid runs, every position read once per distinct prefix:
     Qwen3.6-27B O-lens L40, one draw per position (11,086 positions); GLM-5.3 O-lens block 51, five draws per position (41,270
     positions). Tool block: tool definitions and call format (Qwen renders it before the system text). Bars: Wilson 95\% CI over
     draws. Examples: the read token marked after a few characters of the prompt before it.}
