@@ -7,11 +7,13 @@ bootstrap CIs over items; a run that isn't finished (meta.json status done) is l
 
 Two sets (Robbie, 2026-10-31):
 - `canonical` (default, the final write-up): the menus_inline cutoff runs, `all` menu (graphs/menus_inline.py SETS), Haiku at 3
-  draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw.
+  draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw. Plus one bar from the old prompt:
+  Haiku told the model is Qwen3.6-27B with a ~January 2025 cutoff (the only told run; no menus_inline told run exists).
+  A second figure (canonical only) is Haiku's paired differences on all items (graphs.cutoff_qa_inline.diffs).
 - `cutoff_qa_inline`: the older eval's prompt and end-of-prompt reads, with every Flash-Lite condition and the told prompt (the
   model is Qwen3.6-27B, cutoff ~January 2025); docs/cutoff-qa-inline.md. Not for the write-up.
 
-    uv run python -m graphs.cutoff_qa_investigators [--set canonical|cutoff_qa_inline] [--out PNG]
+    uv run python -m graphs.cutoff_qa_investigators [--set canonical|cutoff_qa_inline] [--out PNG] [--out-diff PNG]
 """
 
 import argparse
@@ -21,7 +23,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from environments.cutoff_qa.env import norm
-from graphs.cutoff_qa_inline import ci, per_item
+from graphs.cutoff_qa_inline import PAIRS, ci, diffs, per_item
 from graphs.style import MUTED, bar_kw, ci_bar, label
 
 CF = Path("data/runs/cfbench")
@@ -50,6 +52,7 @@ SETS = {
     "canonical": {
         "Claude Haiku 5.5": [
             ("transcript_inline", [CF / "2026-10-30_menus-cutoff-olens-jlens", TOPUP], "transcript_inline"),
+            ("transcript_told_oldprompt_inline", [CF / "2026-10-31_cutoff-qa-1k-told-transcript"], "transcript_inline"),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "olens"),
             *menus_runs("2026-10-30_menus-cutoff-olens-jlens", "jlens"),
             *menus_runs("2026-10-31_menus-cutoff-nla-batch", "nla"),
@@ -70,6 +73,7 @@ SETS = {
     },
 }
 OUT = {"canonical": "docs/img/cutoff-qa-investigators.png", "cutoff_qa_inline": "docs/img/cutoff-qa-investigators-old-prompt.png"}
+OUT_DIFF = Path("docs/img/cutoff-qa-investigators-diff.png")
 GROUPS = {"stale (Qwen's answer is out of date)": "stable_wrong", "not stale": "stable_right", "all items": None}
 
 
@@ -92,8 +96,10 @@ def load(which: str) -> dict[str, dict[str, dict]]:
     return out
 
 
-def main(which: str, out: Path) -> None:
+def main(which: str, out: Path, out_diff: Path) -> None:
     data = load(which)
+    if which == "canonical":  # Haiku, all items: lens vs placebo, placebo vs transcript only, lens vs transcript only
+        diffs([], out_diff, xlim=(-36, 36), pairs=PAIRS[:3], data=data["Claude Haiku 5.5"])
     n_bars = sum(len(bars) for bars in data.values())
     fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
     for ax, (group, value) in zip(axes, GROUPS.items(), strict=True):
@@ -126,5 +132,6 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--set", choices=list(SETS), default="canonical")
     p.add_argument("--out", type=Path)
+    p.add_argument("--out-diff", type=Path, default=OUT_DIFF)
     a = p.parse_args()
-    main(a.set, a.out or Path(OUT[a.set]))
+    main(a.set, a.out or Path(OUT[a.set]), a.out_diff)

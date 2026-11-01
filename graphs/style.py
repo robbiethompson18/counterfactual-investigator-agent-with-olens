@@ -50,6 +50,7 @@ STYLE = {
     "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
     "transcript_told": ("#1f4e79", None, "transcript only, told the model and its cutoff"),  # cutoff_qa_investigators
+    "transcript_told_oldprompt": ("#1f4e79", None, "transcript only, told Qwen's cutoff (older prompt)"),  # its canonical set
     "self_answer": (OUTLINE, None, "answers the question itself"),  # cutoff_qa_investigators: the same-cutoff census
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
