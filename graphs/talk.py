@@ -28,12 +28,32 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
-from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline
+from graphs import author_blog_drop, cutoff_qa_investigators, data_filter_sankey, headline_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
+from graphs.essay_grading import DEPARTURE as ESSAY_DEPARTURE
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
-from graphs.style import BG, FAINT, FULL_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, diff_rows, label, positions, slide, slide_figure, slide_save
+from graphs.style import (
+    BG,
+    FAINT,
+    FULL_W,
+    INK,
+    MUTED,
+    OLENS,
+    SLIDE_S,
+    bar_kw,
+    departure,
+    diff_rows,
+    label,
+    positions,
+    slide,
+    slide_figure,
+    slide_save,
+)
+
+GRID_DEPARTURE = (f"investigator Gemini 3.8 Flash at effort low; {OLENS} at layers 32/40/48/52; positions are the option newlines and "
+                  "the end of the prompt only.")  # fmt: skip
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
@@ -120,6 +140,7 @@ def grid() -> None:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    departure(fig, GRID_DEPARTURE)
     # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
     fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")
@@ -132,6 +153,7 @@ def essay() -> None:
     fig, ax = slide_figure(FULL_W, 24)
     essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)", mean=False, null_line=False)  # the frame title asks "does Qwen's grade go up"
     ax.set_xticklabels([t.get_text() + "†" * (t.get_text() == "probe") for t in ax.get_xticklabels()])  # the footnote's dagger
+    departure(fig, ESSAY_DEPARTURE)
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -280,6 +302,7 @@ def author() -> None:
     axes[0].set_yticks(yt, [f"{t:.1f}" for t in yt])
     axes[0].set_ylabel("AUROC of P(significant)")
     axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    departure(fig, author_blog_drop.DEPARTURE)
     slide_save(fig, OUT / "author.pdf")
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
             "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
@@ -367,7 +390,7 @@ def cutoff_investigators() -> None:
     """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size: stale, not stale and all
     items as rows, the legend in the top row."""
     runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
-    need = [cutoff_qa_investigators.REF, *cutoff_qa_investigators.CENSUS.values()]
+    need = [*cutoff_qa_investigators.CENSUS.values()]
     need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
     for path in need:  # CI has no data/: fetch what load() reads
         if not path.exists():
@@ -379,7 +402,8 @@ def cutoff_investigators() -> None:
         ax.set_ylabel(None)
         ax.set_yticks([0, 50, 100])
     fig.supylabel("% naming Qwen's answer", fontsize=8 * SLIDE_S)
-    fig.legend(handles=handles, loc="outside lower center", ncol=len(handles), frameon=False, fontsize=7 * SLIDE_S)
+    axes[-1].legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=5, fontsize=7 * SLIDE_S)
+    departure(fig, cutoff_qa_investigators.DEPARTURE)
     slide_save(fig, OUT / "cutoff_investigators.pdf")
 
 

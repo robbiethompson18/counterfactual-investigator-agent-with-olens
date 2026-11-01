@@ -1,7 +1,8 @@
 # favorites_qa_inline: predicting Qwen's own favourites from end-of-prompt reads
 
-**Status (2026-10-29):** REFERENCE. 1,500 items, one investigator (Haiku), three draws; O-lens, NLA
-and J++ each against transcript-only and its own placebo.
+**Status (2026-10-31):** REFERENCE. 1,500 items, one investigator (Haiku), three draws; O-lens, NLA
+and J++ each against transcript-only and its own placebo. Chart module `graphs.favorites_qa_inline`
+deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
 
 **Question.** Can an investigator who never sees Qwen3.6-27B's reply guess its own pick for a
 free-response preference question ("Which text editor would you choose for editing a config file
@@ -47,7 +48,7 @@ WorkspaceBench's `basic_readout` implicit family scaled from 32 items to 1,500
 
 ![paired differences between conditions with 95% CIs](img/favorites-qa-inline-diff.png)
 
-(`uv run python -m graphs.favorites_qa_inline` makes both.)
+(`graphs.favorites_qa_inline` made both, deleted in PR #579; regenerate from commit 62a4e31c.)
 
 | condition            | all   | pick_one | recommend | choose_for | favorite | name_one |
 | -------------------- | ----- | -------- | --------- | ---------- | -------- | -------- |

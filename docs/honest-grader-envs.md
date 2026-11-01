@@ -1,9 +1,10 @@
 # Honest-grader envs: can the O-lens read the grade Qwen would give if it were being honest?
 
-**Status (2026-10-29):** NULL. The O-lens adds nothing over transcript-only or placebo on the 44
+**Status (2026-10-31):** NULL. The O-lens adds nothing over transcript-only or placebo on the 44
 cases (binary 100 − RMSE: O-lens 77, transcript-only 78, placebo 79): at `Score:` it echoes Qwen's
 inflated grade and only flags leniency. The env lives on as
-[`environments/honest/`](../environments/honest/).
+[`environments/honest/`](../environments/honest/). Chart modules `graphs.honest_binary` and
+`graphs.honest_binary_olens` deleted 2026-10-31 (PR #579, last at commit 62a4e31c).
 
 Plan written 2026-10-26, after the hidden_goal.grade result
 ([envs/hidden_goal.md](envs/hidden_goal.md)) turned out to be the only env in the 26-env no-CoT
@@ -209,7 +210,8 @@ items on the two honest_peer pairs; decent items never cross any cutoff). Metric
 env diff only − "edit does nothing" = +20.4 pp [+16.9, +23.9] (paired 95% case bootstrap). Per
 scenario (weak item, 20 cases each), transcripts help most on abstract (+10.5 [+5.4, +15.9]) and
 hurt on pitch (−7.5 [−12.3, −1.8]); the other nine are +2 to +7 with CIs through zero.
-`graphs/honest_binary.py` draws it and prints the per-scenario table. Runs:
+`graphs/honest_binary.py` drew it and printed the per-scenario table (deleted in PR #579;
+regenerate from commit 62a4e31c). Runs:
 `runs/cfbench/2026-10-26_honest-ts*`, `honest-ts-allpairs-*` (agentic), `honest-nt2-allpairs-*` (env
 diff only; `honest-nt-allpairs-*` is a killed first attempt, abandoned).
 
@@ -265,8 +267,9 @@ N/10)" hedges that carried hidden_goal are not systematically lower here: under 
 alternative number is +1.9 above Qwen's at layer 32, 0 at 40, −1.4 at 48 on 7 reads. So the lens
 tells a predictor "this grade is lenient", which the transcript already shows, and not "the honest
 grade is 2", which is what the predictor lacks. Code: `graphs/honest_binary_olens.py` (chart +
-per-scenario table); the `Score:`-token tables are in this doc only (a 30-line one-off over
-`reads.jsonl`, see git history of the PR that added this section).
+per-scenario table; deleted in PR #579, regenerate from commit 62a4e31c); the `Score:`-token
+tables are in this doc only (a 30-line one-off over `reads.jsonl`, see git history of the PR that
+added this section).
 
 Verdict for the sprint: hidden_goal.grade's O-lens uplift does not generalize to ten sibling
 scenarios built the same way, in either scorer. Three of eleven show the hidden_goal pattern (essay,

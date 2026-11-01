@@ -4,11 +4,10 @@ Beamer decks in the sprint's style: Metropolis restyled to look like the env vie
 (`environments/_lib/page.html`: warm off-white page, Inter, indigo accent, hairline rules, no cards)
 with the charts' condition colours (`graphs/style.py`). The theme is `beamerthemeolens.sty`, `talk/`
 is the sprint's one presentation, and `make` builds it to `talk/build/talk.pdf`. PDFs and figures
-are build output (gitignored): don't commit them. CI builds the deck on every push to main that
-touches `slides/` or `graphs/` and publishes it at
-https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/talk.pdf (share that
-link); a PR touching them attaches its `talk.pdf` to the workflow run
-(`.github/workflows/env-viewer-pages.yml`).
+are build output (gitignored): don't commit them. There is no CI (Robbie, 2026-10-31): build the
+deck by hand with `make -C slides`, and publish it with the write-up by running
+`sh scripts/deploy_writeup.sh`, which puts it at https://nn-sprint-writeup.pages.dev/talk.pdf (share
+that link; the GitHub Pages copy is frozen, docs/viewers.md).
 
 **Setup.** XeLaTeX with Metropolis, latexmk, the Inter font (Fira Sans is the fallback), Noto Sans
 CJK SC for the Mandarin anecdote and the monochrome Noto Emoji for the 🔮 of "🔮-lens"
