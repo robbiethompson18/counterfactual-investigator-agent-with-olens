@@ -444,7 +444,8 @@ def headline() -> None:
 def cutoff_investigators() -> None:
     """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size, one panel per slide
     (Robbie, 2026-10-31: the three stacked panels were unreadable): all items (fig/cutoff_investigators_all.pdf) and the stale
-    items (fig/cutoff_investigators_stale.pdf), the legend under each."""
+    items (fig/cutoff_investigators_stale.pdf), the legend under each. Then the paired differences against Haiku's prompt only
+    (fig/cutoff_investigators_diff.pdf): Haiku's three lenses and Flash-Lite's prompt only, on all items and the stale ones."""
     runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
     need = [*cutoff_qa_investigators.CENSUS.values()]
     need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
@@ -453,12 +454,28 @@ def cutoff_investigators() -> None:
             hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
     data = cutoff_qa_investigators.load("canonical")
     groups = cutoff_qa_investigators.GROUPS
-    for slug, group in (("all", "all items"), ("stale", "stale (Qwen's answer is out of date)")):
+    panels = (("all", "all items"), ("stale", "stale (Qwen's answer is out of date)"))
+    for slug, group in panels:
         fig, ax = slide_figure(FULL_W, 54)
         handles = cutoff_qa_investigators.draw([ax], data, s=SLIDE_S, groups={group: groups[group]})
         ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=5, fontsize=7 * SLIDE_S)
         departure(fig, cutoff_qa_investigators.DEPARTURE)
         slide_save(fig, OUT / f"cutoff_investigators_{slug}.pdf")
+    haiku, base = data["Claude Haiku 5.5"], data["Claude Haiku 5.5"]["prompt_inline"]
+    diffs = [(f"{lens}_inline", haiku[f"{lens}_inline"], None) for lens in ("olens", "jlens", "nla")]
+    diffs.append(("prompt_inline", data["Gemini 2.5 Flash-Lite"]["prompt_inline"], "Flash-Lite prompt only − Haiku prompt only"))
+    rows: list = []
+    for _, group in panels:
+        items = [i for i, (g, _) in base.items() if groups[group] is None or g == groups[group]]
+        rows.append(f"{group}, n = {len(items)}")
+        for c, acc, text in diffs:
+            ds = [100 * (acc[i][1] - base[i][1]) for i in items]
+            rows.append((c, "prompt_inline", sum(ds) / len(ds), *cutoff_qa_investigators.ci(ds), *([text] if text else [])))
+    fig, ax = slide_figure(FULL_W, 46)
+    diff_rows(ax, rows, unit=" pp", s=SLIDE_S)
+    ax.set_xlim(-6, 25)  # room for the numbers right of the longest CI
+    ax.set_xlabel("difference in % naming Qwen's answer, paired by item (95% bootstrap CI; filled = excludes 0)")
+    slide_save(fig, OUT / "cutoff_investigators_diff.pdf")
 
 
 DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5"}  # up to 5 (Kylie)
