@@ -317,7 +317,14 @@ async def main():
                 return await predict(
                     predictor, prompt, tools, budget, effort, task, system=system, grade=grader(task, case, env), first=first
                 )
-            except (openai.APIStatusError, anthropic.APIStatusError, openrouter.NoChoices, json.JSONDecodeError) as e:
+            except (  # connection errors too (a timeout escapes openrouter.chat unretried): it must drop the draw, not abort the run
+                openai.APIStatusError,
+                openai.APIConnectionError,
+                anthropic.APIStatusError,
+                anthropic.APIConnectionError,
+                openrouter.NoChoices,
+                json.JSONDecodeError,
+            ) as e:
                 print(f"{case['env']} {case['model']} {condition} draw {draw}: attempt {attempt} failed: {e}")
                 first = None  # a retry starts the conversation over
                 if attempt + 1 < args.attempts:  # back off: an upstream rate limit fails immediate retries too
