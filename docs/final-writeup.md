@@ -86,7 +86,7 @@ lab: this should be a straighforward experiment to run!
 ## I: 🔮-lens Does Not Provide Uplift on 'Wild' or Agentic Counterfactuals
 
 First, because of misgivings about the CHIVE dataset, we built our own agentic environments to test
-counterfactual experiments. We then ablated everything we could think of. Nothing got the O-lens to
+counterfactual experiments. We then ablated everything we could think of. Nothing got the 🔮-lens to
 reliably beat a transcript-only baseline or its own placebo:
 
 - We swapped the predictor across seven models, from Haiku 5.5 to GPT-6 Astra, plus thinking-off and
@@ -166,8 +166,8 @@ correctness over all three tasks. Our investigator is always Haiku 5.5 on medium
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: transcript only 80.9%, O-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
 
 All three beat their placebo versions (where we swap in metamodel data from a different question) by
-statistically significant amounts, though J++'s gap is all its placebo misleading the investigator
-(−30.1pp vs transcript-only, against its own −1.6pp):
+statistically significant amounts. J++'s gap comes from its placebo hurting the investigator, not
+from J++ helping: the J++ placebo is 30.1pp below transcript-only, and real J++ is 1.6pp below it:
 
 <img src="img/headline-placebos.png" alt="Pooled over the three tasks: O-lens 83.9% vs placebo 76.3%, J++ 79.3% vs 50.8%, NLA 83.5% vs 80.4%" width="500">
 
@@ -293,14 +293,14 @@ shift in Haiku's bias as much as real information. AUROC is pooled over all 5,40
 condition (3 draws per case, each one prediction), the CIs resample the 204 micro-essays, and the
 stars are a one-sided paired bootstrap against transcript only.
 
-The O-lens is the only lens that beats both transcript only (+0.022 [+0.011, +0.033]) and its
+The 🔮-lens is the only lens that beats both transcript only (+0.022 [+0.011, +0.033]) and its
 placebo (+0.018 [+0.006, +0.031]); NLA and J++ are within noise of transcript only, and J++ beats
 its placebo only weakly. No investigator alone beats the no-investigator baseline: betting on
 regression to the mean, ranking cases by minus Qwen's observed grade, gets 0.776 (the dotted line).
 
 This is pretty dumb! Haiku is not calibrated and does not bet enough on regression to the mean. The
 graph below accounts for this. The "+ mean" bars add that grade to each investigator through an
-out-of-fold logistic regression; the O-lens keeps a small edge over transcript + mean (+0.007
+out-of-fold logistic regression; the 🔮-lens keeps a small edge over transcript + mean (+0.007
 [+0.001, +0.014]).
 
 <img src="img/headline-essay-mean.png" alt="Essay grading with Qwen's observed mean grade added, AUROC: transcript + mean 0.832, O-lens + mean 0.839 (placebo 0.830), NLA + mean 0.839 (0.839), J++ + mean 0.835 (0.834); user-end probe 0.864; betting on regression to the mean alone 0.776" width="640">
@@ -332,13 +332,13 @@ probabilities, not a sampled reply, so its prompt is shown inside the investigat
 
 On 1,316 selected sentence deletions from 520 bloggers, we predict whether deleting a sentence
 substantially lowers Qwen's confidence in its answer about the author's age or sex. Text-only Haiku
-scores 0.797 AUROC, Haiku with O-lens reads 0.803, and a standalone linear probe 0.784. The O-lens
+scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear probe 0.784. The 🔮-lens
 gain over text-only is not statistically significant; the standalone probe is also below text-only
 on this metric. The probe is supervised on this deletion task with bloggers held out, and its
 configuration was chosen during exploration of this dataset.
 
 > **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog authorship is not on canonical reads:
-> O-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
+> 🔮-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
 > and post's punctuation and newlines with no start-of-assistant-turn tail tokens. There is no
 > `menus_inline` run for this set. Decide: rerun the reads at the canonical positions and six
 > layers, or keep the chart with that caveat in the text.
@@ -366,7 +366,7 @@ the floor for the letter task.
 We run two hint placements, which decide what the lens can see. With the hint after the options (976
 cases) the read positions, the option newlines, come before the hint, so the reads are of Qwen
 reading the bare question. With the hint first (952 cases) the same positions come after the hint.
-Reads are at layers 32/40/48/52, every bullet with its FVE, for the O-lens; the probe is a linear
+Reads are at layers 32/40/48/52, every bullet with its FVE, for the 🔮-lens; the probe is a linear
 probe at layer 52 trained on hint-after prompts, and the tuned probe the same probe refit on
 hint-first prompts (out-of-fold).
 
@@ -377,16 +377,16 @@ transcript-only. Bottom row: % correct on the letter, 95% item bootstrap, stars 
 paired sign test against transcript-only; dotted line is always the hinted letter. Placebo: another
 question's reads in the same positions.
 
-On "did Qwen know it?" the O-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
+On "did Qwen know it?" the 🔮-lens is a clear win over the transcript (0.739 vs 0.613 with the hint
 after the options, 0.688 vs 0.615 with the hint first), and its placebo is below transcript-only, so
 the gain is in the reads, not the extra tokens. The probe is far ahead again (0.937 hint-after). On
-"which letter without the hint?" nobody does much: the O-lens is +1.7pp and +1.6pp over
+"which letter without the hint?" nobody does much: the 🔮-lens is +1.7pp and +1.6pp over
 transcript-only, significant at p < .05 but barely above the 50% floor, and only the probe (76.4%
 hint-after) names the letter. The probe trained on hint-after prompts does not transfer to
 hint-first prompts (0.764 AUROC and 53.9% on the letter, the latter at transcript level); refitting
 it on hint-first prompts recovers most of the gap (0.851, 64.1%).
 
-> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: O-lens at
+> **🚧 TODO NON-CANONICAL DATA (from the talk).** Hinted MCQ is not on canonical reads: 🔮-lens at
 > layers 32/40/48/52 only (not six), positions are the option newlines and the end of the prompt
 > only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
 > medium. There is no `menus_inline` run for hints. Decide: keep it with this caveat, or rerun on
@@ -582,12 +582,12 @@ Things that will not have receipts:
   [robbiethompson18/counterfactual-investigator-agent-with-olens](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens).
 - **Data and every run:** the HF dataset
   [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
-  O-lens banks, batch reads, run outputs.
+  🔮-lens banks, batch reads, run outputs.
 - **Transcripts:** public [Docent](https://docent.transluce.org) collections, one per env plus
   cfbench ([docent.md](docent.md)).
 - **Runs, judge calls and lens reads:**
   [expview](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/).
-- **Token-level O-lens reads:** [olens-viewer.pages.dev](https://olens-viewer.pages.dev).
+- **Token-level 🔮-lens reads:** [olens-viewer.pages.dev](https://olens-viewer.pages.dev).
 - **CHIVE incidents with every draw:** [chive-cases.pages.dev](https://chive-cases.pages.dev).
 - **Every result and dead end:** [INDEX.md](INDEX.md) plus the active docs listed in the repo's
   `CLAUDE.md`.
@@ -610,12 +610,12 @@ Things that will not have receipts:
 
 ## 🔮-lens Now Speak English (DONE)
 
-We investigated why so many o-lens bullets lead with a Mandarin character and then become English.
-The canonical o-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
+We investigated why so many 🔮-lens bullets lead with a Mandarin character and then become English.
+The canonical 🔮-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
 But many tokens' canonical form is _with_ leading whitespace, eg \_need instead of need. The AR
 especially hates having the space stripped when when the next character will be a space.
 
-Agam fixed this in RL, and the o-lens speaks English again.
+Agam fixed this in RL, and the 🔮-lens speaks English again.
 
 <img src="img/olens-mandarin.png" alt="O-lens Mandarin before vs after keeping the bullet's leading space" width="500">
 
@@ -655,7 +655,54 @@ grade(s) per token per layer and get credit if any of these pass.
 Our full review is the "WorkspaceBench Review" tab of the
 [sprint doc](https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit).
 
-## Counterfactual investigation graphs (ALMOST DONE, Robbie reviewed, but I do want to add CHIVE here if possible)
+## Default Parameters
+
+Unless a chart says otherwise, every result uses these:
+
+- **Subject:** Qwen3.6-27B with thinking off, sampled 8 times per prompt. The label is its modal
+  answer, kept only when at least 7 of the 8 samples agree. We (almost) never filter on whether that
+  answer is correct.
+- **Investigator:** Haiku 5.5 at reasoning effort medium, one turn, no tools beyond the submit call.
+  Three draws per case and condition, and every draw is scored as one prediction (pooled, never
+  averaged within a case first).
+- **What the investigator sees:** the prompt Qwen was given, never Qwen's reply; in a lens
+  condition, a short description of the lens and a block of its reads; then the task. Each read
+  shows the text around the read token with the token marked, then one line per layer: 🔮-lens
+  bullets with their FVE, highest first; the NLA's explanation with its FVE; J++'s top three tokens
+  with their probabilities.
+- **Read positions:** prompt tokens only, no assistant-turn boilerplate: every punctuation token of
+  the user turn and the newline ending each MCQ option, up to the period that ends the prompt's last
+  line. The same positions for all three lenses (J++ is read at every token but shown at these).
+- **Layers:** 32, 40, 48, 52, 56 and 60, for every lens.
+- **Lenses:** the 🔮-lens is WorkspaceBench's space lens with its AR
+  ([agu18dec/olens_and_ar](https://huggingface.co/agu18dec/olens_and_ar), `olens_s3d_space_rl600`),
+  sampled at temperature 1, one continuation of up to four bullets per read, each bullet's FVE from
+  the AR. The NLA is Camila's all-layer Qwen3.6-27B NLA
+  ([agu18dec/qwen3.6-27b-all-layer-nla-rl2000](https://huggingface.co/agu18dec/qwen3.6-27b-all-layer-nla-rl2000)),
+  decoded greedily, FVE from its critic. J++ is our own J++ lens on Qwen3.6-27B.
+- **Placebo:** the same block built from another case of the same set with the same option count and
+  subject category, its reads laid onto this case's positions by kind (option newline to option
+  newline, punctuation in order). One rule for every lens, and a source whose answer happens to
+  match is never excluded, since that is part of chance.
+- **Statistics:** % of draws naming Qwen's answer; 95% bootstrap CIs resampling questions, paired
+  across conditions; stars from one-sided paired tests against transcript-only; the headline weights
+  the three tasks equally.
+
+Example investigator transcripts on Docent:
+[the default setup, one 🔮-lens draw on SuperGPQA](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/02c93755-8127-4ad1-847e-15ac06a60d6f),
+and for comparison
+[an agentic draw from the counterfactual work](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/77d5e448-f97a-4f9c-9d23-9e470ee675fe),
+where Gemini 3.8 Flash has tools to read and grep the transcripts and the lens reads.
+
+Where a chart departs from these, its section says so. The departures: essay grading also reads the
+ten tail tokens of the assistant turn, and its placebo is another opener on a different essay of the
+same topic; blog authorship reads the 🔮-lens at three layers and the NLA at one, with Haiku at
+effort low and one draw; hinted MCQ uses Gemini 3.8 Flash at effort low, four layers, and only the
+option newlines and the end of the prompt; the CHIVE-style claims include the tail tokens and take
+their placebo from another incident; the counterfactual appendix is the agentic setup linked above,
+Gemini 3.8 Flash with a lens tool that shows layers 32, 40 and 48.
+
+## Counterfactual Investigation Ablation Graphs
 
 Every chart we made for the counterfactual task. 100 − RMSE is in percentage points of the predicted
 behavior rate, higher is better; hatching means placebo.
@@ -666,7 +713,7 @@ behavior rate, higher is better; hatching means placebo.
 > stop-token positions, and the J-lens tool reads every token at layers 36-60. There is no
 > six-layer, same-positions rerun of these, and the `*_agentic` conditions are frozen (CLAUDE.md,
 > 2026-10-30). Decide: say so in the text here (and in "The one thing we never ablated" above, which
-> is about layers), or drop the O-lens bars from these charts.
+> is about layers), or drop the 🔮-lens bars from these charts.
 
 ### Null Results on Counterfactual Predictions
 
@@ -703,7 +750,7 @@ They read mostly transcripts instead of lookign at lenses:
 
 We tested whether our results were sensitive to investigator model, effort, and tool budget. These
 sweeps use four hand-picked cases, so most differences between lines are noise. No predictor
-reliably gains from the 🔮-lens: averaged over all seven, O-lens minus transcript-only is +0.4pp
+reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus transcript-only is +0.4pp
 [−0.9, +1.7] on these cases.
 
 <img src="img/cfbench-report/models.png" alt="Predictor model by condition" width="400">
@@ -722,7 +769,7 @@ TODO @Kylie: write this up. The base arm adds a hint naming the correct letter a
 the counterfactual arm drops the hint, and the investigator either gives P(Qwen knew the answer) or
 names Qwen's no-hint letter. Material: the talk's "Hinted multiple choice" part, the
 `hint_qwen_dsv4*` evals (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the
-talk: these runs are not on canonical reads (O-lens at four layers, option newlines and end of
+talk: these runs are not on canonical reads (🔮-lens at four layers, option newlines and end of
 prompt only, Gemini 3.8 Flash at effort low).
 
 # TODO WITH MORE TIME:
