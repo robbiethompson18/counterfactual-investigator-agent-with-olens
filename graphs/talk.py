@@ -27,7 +27,7 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
-from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline
+from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, menus_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
@@ -311,6 +311,11 @@ def headline() -> None:
     """The write-up's headline at slide size: pooled over the three tasks, transcript only and the three lenses, then the lenses
     beside their placebos (fig/headline.pdf); the lenses against the probe on multiple choice as % right and as error rate
     (fig/headline_probes.pdf); and each task's seven bars (fig/task_<task>.pdf), the axis from 50 as in the write-up."""
+    for _, runs in menus_inline.SETS.values():  # CI has no data/: fetch the canonical menus_inline runs it reads
+        for run in runs:
+            for f in ("meta.json", "predictions.jsonl"):
+                if not (menus_inline.R / run / f).exists():
+                    hf_hub_download(HF_REPO, f"runs/cfbench/{run}/{f}", repo_type="dataset", local_dir="data")
     boot = Boot(headline_inline.load())
     lens_groups = [(label(c), [c]) for c in LENSES]
     pair_groups = [(label(c), [c, PLACEBOS[c]]) for c in LENSES]
@@ -347,6 +352,12 @@ def headline() -> None:
 def cutoff_investigators() -> None:
     """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size: stale, not stale and all
     items as rows, the legend in the top row."""
+    runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
+    need = [cutoff_qa_investigators.REF, *cutoff_qa_investigators.CENSUS.values()]
+    need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
+    for path in need:  # CI has no data/: fetch what load() reads
+        if not path.exists():
+            hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
     data = cutoff_qa_investigators.load("canonical")
     fig, axes = slide_figure(FULL_W, 50, nrows=3, sharex=True)
     handles = cutoff_qa_investigators.draw(axes, data, s=SLIDE_S)

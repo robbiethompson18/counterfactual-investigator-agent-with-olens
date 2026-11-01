@@ -13,13 +13,14 @@ positions on MMLU-Pro) with a different prompt. Essay grading has no menus run a
 
 > **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31): canonical means the `menus_inline` runs,
 > `prompt` menu: every lens read at the same positions (each prompt's punctuation and option
-> newlines, nothing in the assistant turn), all six layers 32/40/48/52/56/60, one
-> prompt and one placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes
-> from something else and must be redone on those runs before this ships. Status at 17:30 PDT: every
-> MCQ, knowledge cutoff and preferences chart and number is now on the canonical runs at 3 draws
-> (top-ups `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their 🚧 blocks are gone. At
-> ~19:00 PDT they moved from the `all` menu (which also read the 9 tail tokens) to `prompt` (top-ups
-> `*-prompt-d12`, PR #555). What's left marked 🚧 is blog authorship and the counterfactual charts.**
+> newlines, nothing in the assistant turn), all six layers 32/40/48/52/56/60, one prompt and one
+> placebo rule on every set, 3 draws. Every chart and number below marked 🚧 comes from something
+> else and must be redone on those runs before this ships. Status at 17:30 PDT: every MCQ, knowledge
+> cutoff and preferences chart and number is now on the canonical runs at 3 draws (top-ups
+> `*-all-d12b` / `-d12c`; PRs #539, #541, #549, #550), and their 🚧 blocks are gone. At ~19:00 PDT
+> they moved from the `all` menu (which also read the 9 tail tokens) to `prompt` (top-ups
+> `*-prompt-d12`, PR #555). What's left marked 🚧 is blog authorship and the counterfactual
+> charts.**
 
 Note: for sections that are fully done I will write DONE in the header. For sections I want a Kylie
 review I will write (KTR). FOr Claude I will write (CTR).
@@ -162,14 +163,16 @@ their dataset:
 
 Metamodels work convincingly on three tasks: Multiple Choice Questions, Cutoff Q&A, and
 Idiosyncratic Prefernces. The 🔮-lens and NLA are about equally good (+1.6 and +1.5pp over
-transcript only, pooled), and J++ doesn't help overall (+0.4pp, not significant). The next few charts show pooled
-correctness over all three tasks. Our investigator is always Haiku 5.5 on medium effort.
+transcript only, pooled), and J++ doesn't help overall (+0.4pp, not significant). The next few
+charts show pooled correctness over all three tasks. Our investigator is always Haiku 5.5 on medium
+effort.
 
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: transcript only 80.9%, O-lens 82.5%, J++ 81.3%, NLA 82.4%" width="500">
 
 All three beat their placebo versions (where we swap in metamodel data from a different question) by
 statistically significant amounts. J++'s gap comes from its placebo hurting the investigator, not
-from J++ helping: the J++ placebo is 7.6pp below transcript-only, and real J++ is only 0.4pp above it:
+from J++ helping: the J++ placebo is 7.6pp below transcript-only, and real J++ is only 0.4pp above
+it:
 
 <img src="img/headline-placebos.png" alt="Pooled over the three tasks: O-lens 82.5% vs placebo 79.2%, J++ 81.3% vs 73.4%, NLA 82.4% vs 81.0%" width="500">
 

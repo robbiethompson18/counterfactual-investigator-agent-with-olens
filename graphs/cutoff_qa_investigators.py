@@ -21,9 +21,7 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from huggingface_hub.errors import EntryNotFoundError
 
-from cfbench.scoring import fetch
 from environments.cutoff_qa.env import norm
 from graphs.cutoff_qa_inline import PAIRS, ci, diffs, per_item
 from graphs.menus_inline import CANONICAL
@@ -82,21 +80,17 @@ GROUPS = {"stale (Qwen's answer is out of date)": "stable_wrong", "not stale": "
 
 
 def done(run: Path) -> bool:
-    """The run finished; its meta and predictions fetched from HF when missing."""
-    try:
-        meta = fetch(run / "meta.json")
-    except EntryNotFoundError:
-        return False
-    return json.loads(meta.read_text()).get("status") == "done" and fetch(run / "predictions.jsonl").exists()
+    meta = run / "meta.json"
+    return meta.exists() and json.loads(meta.read_text()).get("status") == "done"
 
 
 def load(which: str) -> dict[str, dict[str, dict]]:
     """investigator -> bar -> item -> (gate_class, accuracy), for the finished runs."""
-    ref = [json.loads(line) for line in fetch(REF).open()]
+    ref = [json.loads(line) for line in REF.open()]
     gold, cls = {r["item"]: r["gold"] for r in ref}, {r["item"]: r["gate_class"] for r in ref}
     out: dict[str, dict[str, dict]] = {}
     for who, bars in SETS[which].items():
-        rows = [json.loads(line) for line in fetch(CENSUS[who]).open()]
+        rows = [json.loads(line) for line in CENSUS[who].open()]
         out[who] = {"self_answer": {r["item"]: (cls[r["item"]], float(norm(r["reply"]) == gold[r["item"]])) for r in rows}}
         for bar, runs, cond in bars:
             if all(map(done, runs)):
