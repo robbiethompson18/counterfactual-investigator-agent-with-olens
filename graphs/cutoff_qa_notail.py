@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 from cfbench.catalog import CUTOFF_QA_TOOL_CUTS, CUTOFF_QA_TOOL_V3
 from graphs.cutoff_qa_inline import ci
-from graphs.style import bar_kw, ci_bar, diff_rows
+from graphs.style import OLENS, bar_kw, ci_bar, diff_rows
 
 RUN, CUTS = CUTOFF_QA_TOOL_V3, CUTOFF_QA_TOOL_CUTS  # transcript-only and the full set, then the cuts
 READS = {"qpunct": "question\npunctuation", "qpunct_imend": "punctuation\n+ <|im_end|>", "full": "full set\n(+ last 10)"}
@@ -62,9 +62,9 @@ def bars(data, cls, out: Path) -> None:
     axes[0].set_ylabel("% of items where Haiku misses Qwen's answer")
     axes[0].set_ylim(0, 60)
     handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(c)) for c in ("transcript_inline", "olens_inline", "olens_placebo_inline")]
-    fig.legend(handles, ["transcript only", "O-lens", "O-lens placebo (another item's reads)"], loc="upper left", frameon=False,
+    fig.legend(handles, ["transcript only", OLENS, f"{OLENS} placebo (another item's reads)"], loc="upper left", frameon=False,
                fontsize=8.5, ncol=3, bbox_to_anchor=(0.06, 1.04))  # fmt: skip
-    fig.suptitle("Predicting Qwen3.6-27B's (tool-call) answer: O-lens reads at the question's punctuation vs the full set, error rate",
+    fig.suptitle(f"Predicting Qwen3.6-27B's (tool-call) answer: {OLENS} reads at the question's punctuation vs the full set, error rate",
                  x=0.06, y=1.1, ha="left")  # fmt: skip
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
@@ -83,7 +83,7 @@ def diffs(data, cls, out: Path) -> None:
             ds = [100 * (data[a][i] - data[b][i]) for i in items]
             rows.append((ca, cb, sum(ds) / len(ds), *ci(ds)))
     for cut, name in list(READS.items())[:2]:
-        rows.append(f"{name.replace(chr(10), ' ').replace('punctuation +', 'question punctuation +')} − full set (+ last 10), both O-lens")
+        rows.append(f"{name.replace(chr(10), ' ').replace('punctuation +', 'question punctuation +')} − full set (+ last 10), both {OLENS}")
         ds = [100 * (data[cut][i] - data["full"][i]) for i in items]
         rows.append(("olens_inline", "olens_inline", sum(ds) / len(ds), *ci(ds)))
     fig, ax = plt.subplots(figsize=(6.4, 0.35 + 0.34 * len(rows)))

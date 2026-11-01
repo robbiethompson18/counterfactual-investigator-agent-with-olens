@@ -24,9 +24,9 @@ import matplotlib.pyplot as plt
 
 from cfbench.catalog import CF as R
 from cfbench.catalog import MENUS as SETS  # set -> (title, runs)
-from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
+from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar
 
-LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
+LENSES = {"olens": OLENS, "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
 BOOT = 2000
 

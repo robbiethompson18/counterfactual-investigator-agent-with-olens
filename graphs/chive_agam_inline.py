@@ -13,12 +13,12 @@ import numpy as np
 
 from cfbench.catalog import CHIVE_AGAM_RUNS
 from cfbench.evals.chive_agam_inline.score import PAIRS, table
-from graphs.style import MUTED, ci_bar, diff_rows, positions
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, positions
 
 GROUPS = [
     ("edit only", ["no_transcript_inline"]),
     ("transcript", ["transcript_inline"]),
-    ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+    (OLENS, ["olens_inline", "olens_placebo_inline"]),
     ("NLA", ["nla_inline", "nla_placebo_inline"]),
     ("J++", ["jlens_inline", "jlens_placebo_inline"]),
 ]

@@ -33,12 +33,12 @@ from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
 from graphs.olens_mandarin import HAN, bullets_of
-from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
+from graphs.style import BG, FAINT, FULL_W, HALF_W, INK, MUTED, OLENS, SLIDE_S, bar_kw, label, positions, slide, slide_figure, slide_save
 
 OUT = Path("slides/talk/fig")
 # the page's order in groups, each lens with its hatched placebo beside it under one label (Kylie, 2026-10-30); O-lens
 # (nl) is left out (Kylie, 2026-10-31).
-GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+GROUPS = [("transcript", ["transcript_inline"]), (OLENS, ["olens_inline", "olens_placebo_inline"]),
           ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
 PANELS = {"after": "hint after the options", "before": "hint first"}
 
@@ -142,7 +142,7 @@ def essay_diffs() -> None:
     at 0), compact for the slide's side column: the table above it carries the numbers and swatches. The same essay
     resamples as the table and the stars; the probe is left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
-    short = {"olens_inline": "O-lens", "nla_inline": "NLA", "jlens_inline": "J++"}
+    short = {"olens_inline": OLENS, "nla_inline": "NLA", "jlens_inline": "J++"}
     fig, ax = slide_figure(72, 25)
     ticks, labels, y = [], [], 0.0
     for a, b in [(x, other) for x in ESSAY_LENSES for other in (x.replace("_inline", "_placebo_inline"), "transcript_inline")]:
@@ -167,7 +167,7 @@ def essay_tables() -> None:
     O-lens-vs-placebo flip counts (fig/essay_flips.tex) and the bet-at-the-mean AUROC the probe's dagger cites
     (fig/essay_null.tex) for the footnote."""
     pairs = essay_auroc_bars()[3]
-    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
             "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
             "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
             "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
@@ -219,7 +219,7 @@ def grader() -> None:
     slide_save(fig, OUT / "grader.pdf")
 
 
-MANDARIN_LENSES = {"old": "Old Qwen O-lens\n(spaces stripped)", "new": "Qwen O-lens\n(fixed)"}
+MANDARIN_LENSES = {"old": f"Old Qwen {OLENS}\n(spaces stripped)", "new": f"Qwen {OLENS}\n(fixed)"}
 
 
 @slide
@@ -281,8 +281,8 @@ def author() -> None:
     axes[0].set_ylabel("AUROC of P(significant)")
     axes[-1].text(1.0, 1.12, "hatched = placebo", transform=axes[-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
     slide_save(fig, OUT / "author.pdf")
-    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
-            "olens_placebo_inline": r"\swp{olens}\ O-lens placebo", "nla_inline": r"\sw{nla}\ NLA",
+    name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
+            "olens_placebo_inline": r"\swp{olens}\ \olensname{} placebo", "nla_inline": r"\sw{nla}\ NLA",
             "nla_placebo_inline": r"\swp{nla}\ NLA placebo", "transcript+probe": r"\sw{probe}\ probe + transcript"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     rows = [

@@ -20,11 +20,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.catalog import HINT_MCQ_ANSWER_RUNS, HINT_MCQ_ROLLOUTS
-from graphs.style import BG, INK, MUTED, bar_kw, color
+from graphs.style import BG, INK, MUTED, OLENS, bar_kw, color
 
 ROLLOUTS, RUNS = HINT_MCQ_ROLLOUTS, HINT_MCQ_ANSWER_RUNS
 CONDS = ["agentic", "olens", "olens_placebo"]
-LABEL = {"agentic": "Transcript-only", "olens": "O-lens", "olens_placebo": "O-lens placebo"}
+LABEL = {"agentic": "Transcript-only", "olens": OLENS, "olens_placebo": f"{OLENS} placebo"}
 COLOR = {c: color(c) for c in LABEL}  # graphs.style: a placebo is its tool's colour, hatched
 N_BOOT = 4000
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from cfbench.catalog import MANDARIN_RUN
-from graphs.style import INK, MUTED
+from graphs.style import INK, MUTED, OLENS
 
 RUN = MANDARIN_RUN
 QWEN = ("Qwen/Qwen3.6-27B", "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9")
@@ -57,7 +57,7 @@ def main(out: Path) -> None:
         ax.set_ylim(0, 1.25 * ax.get_ylim()[1])
         ax.yaxis.set_major_formatter(lambda v, _: f"{v:g}%")
         ax.grid(axis="x", visible=False)
-    fig.suptitle("O-lens Mandarin before vs after keeping the bullet's leading space", x=0.01, ha="left")
+    fig.suptitle(f"{OLENS} Mandarin before vs after keeping the bullet's leading space", x=0.01, ha="left")
     fig.text(0.01, 0.0, f"{len(reads):,} greedy reads, 3 WeirdChat transcripts × 5 layers. olens_s3d_rl600 vs olens_s3d_space_rl600.",
              fontsize=7.5, color=MUTED)  # fmt: skip
     fig.tight_layout(rect=(0, 0.04, 1, 1))

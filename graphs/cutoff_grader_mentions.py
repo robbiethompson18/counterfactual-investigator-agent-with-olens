@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from cfbench.catalog import CUTOFF_GRADER_MENTIONS_RUN
-from graphs.style import INK, MUTED
+from graphs.style import INK, MUTED, OLENS
 
 # runs aren't conditions in the palette: two teals for the no-tool runs, magenta for the tool run
 RUNS = {"A": ("#147d7d", "no tool"), "A2": ("#7cc4c4", "no tool, second 1k"), "B": ("#b8336a", "submit_answer tool")}
@@ -30,7 +30,7 @@ CLASSES = {
 }
 LAYERS = [32, 40, 48, 52, 56, 60]
 COL = "nov_graded"
-YLAB = '% of O-lens reads saying "grader" / "graded"'
+YLAB = f'% of {OLENS} reads saying "grader" / "graded"'
 
 
 def boot(d: pd.DataFrame, n: int = 2000, seed: int = 0) -> tuple[float, float, float]:

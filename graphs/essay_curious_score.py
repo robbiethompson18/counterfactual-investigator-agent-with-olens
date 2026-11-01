@@ -14,14 +14,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from graphs.style import GRID, INK, MUTED, bar_kw, color, marker_kw
+from graphs.style import GRID, INK, MUTED, OLENS, bar_kw, color, marker_kw
 
 CONDS = ["no_transcript_score", "agentic_score", "olens_score", "olens_placebo_score"]
 LABEL = {
     "no_transcript_score": "No transcript",
     "agentic_score": "Transcript-only",
-    "olens_score": "O-lens",
-    "olens_placebo_score": "O-lens placebo",
+    "olens_score": OLENS,
+    "olens_placebo_score": f"{OLENS} placebo",
 }
 COLOR = {c: color(c) for c in CONDS}  # graphs.style: a placebo is its tool's colour, hatched (an open dot in the scatter)
 N_BOOT = 4000

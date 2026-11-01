@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.catalog import HONEST_OLENS_RUNS, R
-from graphs.style import INK, MUTED, bar_kw, diff_rows
+from graphs.style import INK, MUTED, OLENS, bar_kw, diff_rows
 
 RUNS = HONEST_OLENS_RUNS
 CONDS = {"mse": "agentic", "mse_nt": "no_transcript", "mse_ol": "olens", "mse_pl": "olens_placebo"}
@@ -83,8 +83,8 @@ def main():
     series = [
         ("Env diff only", pt["mse_nt"], ci(boots["mse_nt"]), bar_kw("no_transcript")),
         ("Transcript-only", pt["mse"], ci(boots["mse"]), bar_kw("transcript")),
-        ("With O-lens", pt["mse_ol"], ci(boots["mse_ol"]), bar_kw("olens")),
-        ("O-lens placebo", pt["mse_pl"], ci(boots["mse_pl"]), bar_kw("olens_placebo")),
+        (f"With {OLENS}", pt["mse_ol"], ci(boots["mse_ol"]), bar_kw("olens")),
+        (f"{OLENS} placebo", pt["mse_pl"], ci(boots["mse_pl"]), bar_kw("olens_placebo")),
         ("Edit does nothing", pt["null"], ci(boots["null"]), bar_kw("null")),
     ]
     for j, (lab, v, c, kw) in enumerate(series):
@@ -103,8 +103,8 @@ def main():
     ax.set_title(title)
     ax.legend(loc="upper left", ncol=3, fontsize=8, frameon=False)
     diffs = [
-        ("olens", "transcript", "With O-lens − Transcript-only", (pt["mse"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_ts"])),
-        ("olens", "olens_placebo", "With O-lens − O-lens placebo", (pt["mse_pl"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_pl"])),
+        ("olens", "transcript", f"With {OLENS} − Transcript-only", (pt["mse"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_ts"])),
+        ("olens", "olens_placebo", f"With {OLENS} − {OLENS} placebo", (pt["mse_pl"] - pt["mse_ol"]) * 100, ci(boots["ol_minus_pl"])),
         ("transcript", "no_transcript", "Transcript-only − Env diff only", (pt["mse_nt"] - pt["mse"]) * 100, ci(boots["ts_minus_nt"])),
         ("no_transcript", "null", "Env diff only − Edit does nothing", (pt["null"] - pt["mse_nt"]) * 100, ci(boots["nt_minus_null"])),
     ]
