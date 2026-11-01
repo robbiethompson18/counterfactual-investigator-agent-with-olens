@@ -27,7 +27,7 @@ from cfbench.scoring import (
     essay_auroc_bars,
     essay_flips,
 )
-from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, menus_inline
+from graphs import cutoff_qa_investigators, data_filter_sankey, headline_inline, hint_unselected, menus_inline
 from graphs.cutoff_grader_mentions import RUNS, at_token, wilson
 from graphs.essay_grading import essay_bars
 from graphs.headline_inline import LENSES, PLACEBOS, POOLED, PROBE, TS, Boot
@@ -40,7 +40,14 @@ OUT = Path("slides/talk/fig")
 # (nl) is left out (Kylie, 2026-10-31).
 GROUPS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
           ("probe", ["probe"]), ("tuned\nprobe", ["probe_tuned"])]  # fmt: skip
-PANELS = {"after": "hint after the options", "before": "hint first"}
+# the hinted-MCQ grid's columns (Robbie, 2026-10-31, after docs/hint-unselected.md): the legacy cohort (Qwen and DSv4 Flash
+# consistent and disagreeing, Gemini 3.8 Flash at effort low, reads at the option newlines and the end of the prompt, draws
+# averaged per case) beside the unselected one (consistency the only filter, Haiku 5.5 at medium, canonical reads, the
+# `prompt` menu, draws pooled); hint first in both
+PANELS = {
+    "selected": ("DSv4-disagreement cohort", "Gemini Flash, legacy reads"),
+    "unselected": ("unselected cohort", "Haiku, canonical reads"),
+}
 
 
 def errors(bars_of):
@@ -92,8 +99,8 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
         ax.set_xlim(-0.6, ticks[-1] + 0.6)
         ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
         if head:
-            ax.text(0, 1.2, PANELS[k], transform=ax.transAxes, fontsize=8.5 * SLIDE_S, fontweight="semibold", color=INK)
-            ax.text(0, 1.08, f"{n:,} cases · legacy selected cohort", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED)
+            ax.text(0, 1.2, PANELS[k][0], transform=ax.transAxes, fontsize=8.5 * SLIDE_S, fontweight="semibold", color=INK)
+            ax.text(0, 1.08, f"{n:,} cases · {PANELS[k][1]}", transform=ax.transAxes, fontsize=6.5 * SLIDE_S, color=MUTED)
         ax.grid(axis="x", visible=False)
     # the axis stops just above the tallest whisker's labels, not at the next round number (Kylie, 2026-10-30); gridlines
     # every 10% below it
@@ -111,15 +118,16 @@ def row(axes, evals: dict[str, str], bars_of, chance_label: str, ylabel: str, pc
 
 @slide
 def grid() -> None:
-    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), hint position as columns."""
-    knew = {"after": "hint_qwen_dsv4_tail_inline", "before": "hint_qwen_dsv4_before_tail_inline"}
-    letter = {"after": "hint_qwen_dsv4_letter_tail_inline", "before": "hint_qwen_dsv4_before_letter_tail_inline"}
-    widths = [positions(auroc_bars(n)[0], GROUPS)[1][-1] + 1 for n in knew.values()]
+    """The two questions as rows (did Qwen know it? as AUROC, which letter? as % correct), the two cohorts as columns, hint first."""
+    knew = {"selected": "hint_qwen_dsv4_before_tail_inline", "unselected": "knew"}
+    letter = {"selected": "hint_qwen_dsv4_before_letter_tail_inline", "unselected": "letter"}
+    knew_bars = lambda name: hint_unselected.talk_bars(name) if name == "knew" else auroc_bars(name)
+    letter_bars = lambda name: hint_unselected.talk_bars(name) if name == "letter" else hinted_baseline(answer_bars)(name)
+    widths = [positions(knew_bars(n)[0], GROUPS)[1][-1] + 1 for n in knew.values()]
     fig, axes = slide_figure(FULL_W, 60, nrows=2, ncols=2, sharey="row", gridspec_kw={"width_ratios": widths})
-    row(axes[0], knew, auroc_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
-    row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
-        pct=True, head=False, base=0.4)  # fmt: skip
-    axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    row(axes[0], knew, knew_bars, "chance", "did Qwen know it?\nAUROC of P(knew)", pct=False, head=True, base=0.5)
+    row(axes[1], letter, letter_bars, "always the hinted letter", "which letter?\n% correct", pct=True, head=False, base=0.4)
+    axes[0][-1].text(1.0, 1.2, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
     # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
     fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")

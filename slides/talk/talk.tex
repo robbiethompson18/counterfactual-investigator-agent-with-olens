@@ -440,13 +440,15 @@
 \begin{frame}
   \parthead
   \begin{itemize}
-    \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
-      no-hint samples, with different answers
     \item The base arm adds a hint naming the \textbf{correct} letter (``A Stanford professor I asked thinks the answer is
       C.''), and Qwen follows it; the counterfactual arm drops the hint
-    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each)
-    \item The investigator (Gemini 3.8 Flash, effort low, one turn, no tools) sees the hinted prompt, Qwen's reply and the
-      diff, and gives P(knew) or names Qwen's no-hint letter
+    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each,
+      balanced per gold letter)
+    \item The investigator (one turn, no tools) sees the hinted prompt and Qwen's reply, and gives P(knew) or names Qwen's
+      no-hint letter
+    \item Two cohorts, and the difference between them is the result: the \textbf{legacy} one keeps only questions Qwen3.6-27B
+      and DeepSeek V4 Flash each answer consistently \emph{and differently} (Gemini 3.8 Flash at effort low, legacy reads);
+      the \textbf{unselected} one keeps every consistent MMLU-Pro question (Haiku 5.5 at medium, canonical reads)
   \end{itemize}
   \medskip
   \begin{columns}[T, onlytextwidth]
@@ -493,18 +495,32 @@
   \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
 
-\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
-  \todo{Hinted MCQ is not on canonical reads: O-lens at layers 32/40/48/52 only (not six), positions are the option newlines
-    and the end of the prompt only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-    medium. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
-    keep it with this caveat on the slide.}
-  \slidefig{fig/grid.pdf}
-  \departure{investigator Gemini 3.8 Flash at effort low; O-lens at layers 32/40/48/52; positions are the option newlines
-    and the end of the prompt only.}
-  \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
-    95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
+\begin{frame}{Data: hinted MCQ, legacy cohort, 12,032 MMLU-Pro questions to 944 eval cases (+ 8 TruthfulQA), DSv4 must disagree}
+  \slidefig{fig/sankey_hint_selected.pdf}
+  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable. Qwen is right on 60\% of the questions
+    that survive the disagreement filter (898 of 1,506), against 78\% of all consistent MMLU-Pro questions: the easy ones are
+    the ones both models get right.}
 \end{frame}
+
+\begin{frame}{Data: hinted MCQ, unselected cohort, 12,032 MMLU-Pro questions to 1,042 eval cases, consistency the only filter}
+  \slidefig{fig/sankey_hint_unselected.pdf}
+  \source{Dark green: evaluated. Light green: usable but held out (the probe half, the knew questions not sampled). Gray: not
+    usable. A sampled question is kept when Qwen followed the hint on at least 4 of 8 runs; the classes are then re-balanced per
+    gold letter.}
+\end{frame}
+
+\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”, legacy vs unselected cohort}
+  \slidefig{fig/grid.pdf}
+  \departure{legacy cohort only: investigator Gemini 3.8 Flash at effort low; O-lens at layers 32/40/48/52; positions are the
+    option newlines and the end of the prompt only; draws averaged per case. The unselected cohort is on the defaults.}
+  \source{Hint first in both. Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only.
+    Bottom: \% correct, 95\% case bootstrap, stars vs transcript-only (legacy: paired sign test); dotted: always the hinted
+    letter (chance is 10\%). * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned
+    probe: the probe refit on hint-first prompts (out-of-fold), legacy cohort only. The O-lens's +0.07 over the transcript on
+    the legacy cohort is $-$0.02 on the unselected one: the disagreement filter had removed the question-difficulty cue the
+    transcript-only investigator uses.}
+\end{frame}
+
 \section{Anecdata}
 
 \begin{frame}{“graded” in O-lens reads, chat vs agentic template}

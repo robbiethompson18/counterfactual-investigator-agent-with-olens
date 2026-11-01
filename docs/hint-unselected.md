@@ -56,7 +56,10 @@ effort low there) and scoring (draws averaged per item there).
 
 ![AUROC of P(knew) and % correct on the letter task](img/hint-unselected.png)
 
-Chart: `uv run python -m graphs.hint_unselected` → `docs/img/hint-unselected.png`. Runs:
+Chart: `uv run python -m graphs.hint_unselected` → `docs/img/hint-unselected.png`. The write-up's
+and talk's two-cohort grid (this cohort beside the DSv4-disagreement one, hint first, `prompt` menu
+only) is `graphs.talk` `grid` → `docs/img/hinted-mcq-grid.png`, the two selection Sankeys
+`graphs.data_filter_sankey` (`hint_selected`, `hint_unselected`). Runs:
 `runs/cfbench/2026-10-31_hint-unselected-d` (claim, prompt menu + transcript, 3 draws), `-all-d`
 (claim, `all` menu, 1 draw), `-letter-d` (letter, prompt menu + transcript, 3 draws),
 `-letter-all-d` (letter, `all` menu, 1 draw; **482 of 1,042 cases**: the Anthropic account ran out

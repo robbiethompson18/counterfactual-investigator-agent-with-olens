@@ -40,6 +40,9 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   per-item grids (`docs/envs/hint_cf.md`)
 - `hint_mcq_total` (legacy selected cohort): the answer task's running total over the original items
   and the 2k scale-up (every Flash run, 8/8 hint followers), pooled and by hint type
+- `hint_unselected`: the unselected hinted-MCQ cohort's own two panels (prompt and `all` menus with
+  placebos) and `talk_bars`, the pooled-draw bars the talk grid draws for it
+  (`docs/hint-unselected.md`)
 - `mcq_unselected`: Haiku predicting Qwen's MMLU-Pro letter from the bare prompt on the unselected
   set, prompt only vs O-lens, J-lens and NLA with their placebos, beside both standardized probe
   read positions on the same questions, for all / Qwen-right / Qwen-wrong cases, plus paired
@@ -76,9 +79,10 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   whether Qwen is right (essays: wrong side of its median grade vs the PERSUADE score)
 - `headline_tokens`: tokens each lens's reads add to Haiku's prompt over transcript only, pooled as
   `headline_inline` and per set, for the final write-up's "Total Tokens Per"
-- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay and blog questions
-  become eval cases (one PNG each; dark green evaluated, light green held out, gray unusable),
-  counts sourced in the module; for the final write-up's Data Filter section
+- `data_filter_sankey`: how SuperGPQA, MMLU-Pro, cutoff_qa, favorites_qa, essay, blog and the two
+  hinted-MCQ cohorts' questions become eval cases (one PNG each; dark green evaluated, light green
+  held out, gray unusable), counts sourced in the module; for the final write-up's Data Filter
+  section
 - `chive_inline`: AUROC on CHIVE's official yes/no claims, Haiku with vs without the model's reply,
   beside CHIVE's Opus 4.8 transcript and resampling arms, one panel per target, plus the paired
   difference (`docs/chive-inline.md`)
@@ -86,10 +90,11 @@ Inter (macOS: `brew install --cask font-inter`), with a silent DejaVu fallback i
   only, O-lens and NLA with placebos, the L2 probe, probe + transcript), computed by
   `cfbench.scoring.author_bars` with blogger-bootstrap CIs (`docs/author-mcq-probe.md`)
 - `talk`: the sprint talk's figures (`slides/talk/talk.tex`, `make -C slides` runs it first): the
-  hint evals' grid, essay grading's bars (`essay_grading.essay_bars`) and paired differences, the
-  grader-mention bars, the Mandarin before/after bars and the blog-deletion AUROCs, plus the LaTeX
-  table snippets the deck `\input`s, all to `slides/talk/fig/`; statistics in `cfbench.scoring`
-  (`essay_auroc_bars`, `author_bars`, ...)
+  hinted-MCQ grid (legacy DSv4-disagreement cohort beside the unselected one, hint first; also the
+  write-up's `docs/img/hinted-mcq-grid.png`), essay grading's bars (`essay_grading.essay_bars`) and
+  paired differences, the grader-mention bars, the Mandarin before/after bars and the blog-deletion
+  AUROCs, plus the LaTeX table snippets the deck `\input`s, all to `slides/talk/fig/`; statistics in
+  `cfbench.scoring` (`essay_auroc_bars`, `author_bars`, ...)
 - `cutoff_grader_mentions`: how often the cutoff_qa O-lens reads say "grader"/"graded" (novel hits),
   no tool vs submit_answer tool, by read position, by layer and as items with ≥1 hit (data from
   `scripts/cutoff_grader_mentions.py`, run `cutoff_grader_mentions/2026-10-30_regex`)

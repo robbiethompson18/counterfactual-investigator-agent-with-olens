@@ -13,8 +13,10 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from cfbench.evals.hint_unselected_inline import score as knew_score
+from cfbench.evals.hint_unselected_inline.score import auroc
 from cfbench.evals.hint_unselected_letter_inline import score as letter_score
 from cfbench.scoring import stars
 from graphs.style import INK, MUTED, bar_kw, positions
@@ -81,3 +83,43 @@ def main(out: Path = OUT) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# the talk's and write-up's two-cohort grid (graphs.talk grid): the canonical `prompt` menu only, under the legacy evals' condition
+# names so the panels share graphs.talk.GROUPS
+TALK_CONDS = {
+    "transcript_inline": "transcript_inline",
+    "olens_prompt_inline": "olens_inline",
+    "olens_prompt_placebo_inline": "olens_placebo_inline",
+}
+
+
+def talk_bars(task: str, reps: int = 2000) -> tuple[dict, float, int]:
+    """condition -> (value, 95% CI, stars), chance, cases: AUROC of P(knew) (task "knew") or % right on the letter ("letter"),
+    every draw one prediction, CIs a bootstrap over cases, stars a one-sided paired bootstrap (the same resamples) that the
+    condition beats transcript-only."""
+    key = "p" if task == "knew" else "correct"
+    by: dict[str, dict[str, list[float]]] = {}
+    cls: dict[str, bool] = {}
+    for r in rows(task):
+        if r["condition"] in TALK_CONDS:
+            by.setdefault(TALK_CONDS[r["condition"]], {}).setdefault(r["item"], []).append(float(r[key]))
+            cls[r["item"]] = r["model"].endswith("(knew)")
+    items = sorted(set.intersection(*(set(v) for v in by.values())))
+    rng = np.random.default_rng(0)
+    idx = rng.integers(0, len(items), (reps, len(items)))
+
+    def value(c: str, ix) -> float:
+        picked = [items[k] for k in ix]
+        if task == "knew":
+            return auroc(
+                np.array([p for i in picked if cls[i] for p in by[c][i]]), np.array([p for i in picked if not cls[i] for p in by[c][i]])
+            )
+        return float(np.mean([v for i in picked for v in by[c][i]]))
+
+    boots = {c: np.array([value(c, ix) for ix in idx]) for c in by}
+    bars = {}
+    for c in by:
+        st = "" if c == "transcript_inline" else stars(float((boots[c] - boots["transcript_inline"] <= 0).mean()))
+        bars[c] = (value(c, range(len(items))), np.quantile(boots[c], [0.025, 0.975]).tolist(), st)
+    return bars, 0.5, len(items)
