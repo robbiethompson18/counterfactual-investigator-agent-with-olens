@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from cfbench.catalog import CUTOFF_GRADER_MENTIONS_RUN
 from graphs.style import INK, MUTED
 
 # runs aren't conditions in the palette: two teals for the no-tool runs, magenta for the tool run
@@ -150,7 +151,7 @@ def main(run: Path, out: Path) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", type=Path, default=Path("data/runs/cutoff_grader_mentions/2026-10-30_regex"))
+    ap.add_argument("--run", type=Path, default=Path("data") / CUTOFF_GRADER_MENTIONS_RUN)
     ap.add_argument("--out", type=Path, default=Path("docs/img"))
     a = ap.parse_args()
     main(a.run, a.out)

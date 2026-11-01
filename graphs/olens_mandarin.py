@@ -11,9 +11,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.catalog import MANDARIN_RUN
 from graphs.style import INK, MUTED
 
-RUN = Path("data/runs/olens_space_fix/2026-10-22_favourites-old-vs-new")
+RUN = MANDARIN_RUN
 QWEN = ("Qwen/Qwen3.6-27B", "6a9e13bd6fc8f0983b9b99948120bc37f49c13e9")
 HAN = re.compile(r"[㐀-䶿一-鿿豈-﫿]")
 LENSES = {"old": "Before\n(space stripped)", "new": "After\n(space kept)"}

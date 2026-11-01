@@ -18,12 +18,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import hint_mcq_total_runs
 from graphs.style import INK, MUTED, bar_kw
 
-RUNS = Path("data/runs/cfbench")
-ORIG = {"d1": ["2026-10-27_answer-mcq-olens-header", "2026-10-27_answer-mcq-orig-killed-d1"],
-        "d2": ["2026-10-27_answer-mcq-olens-header-d2", "2026-10-27_answer-mcq-orig-killed-d2"]}  # fmt: skip
-OTHER_PREDICTORS = ("sol50", "astra10")
 TITLE = {"d1": "hint is the correct answer", "d2": "hint is the wrong answer"}
 CANON = {"agentic": "transcript_agentic", "olens": "olens_agentic", "olens_placebo": "olens_placebo_agentic"}
 CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
@@ -32,9 +29,7 @@ YLABEL = "% draws naming Qwen's no-hint answer"
 N_BOOT = 4000
 
 
-def runs(slot: str) -> list[Path]:
-    scale = [p for p in sorted(RUNS.glob(f"*_answer-mcq-scale2k-{slot}*")) if not p.name.endswith(OTHER_PREDICTORS)]
-    return [RUNS / name for name in ORIG[slot]] + [p for p in scale if p.joinpath("predictions.jsonl").exists()]  # abandoned runs have none
+runs = hint_mcq_total_runs
 
 
 def load(slot: str) -> dict:

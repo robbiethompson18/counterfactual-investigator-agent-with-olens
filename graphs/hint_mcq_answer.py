@@ -19,13 +19,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import HINT_MCQ_ANSWER_RUNS, HINT_MCQ_ROLLOUTS
 from graphs.style import BG, INK, MUTED, bar_kw, color
 
-ROLLOUTS = Path("data/runs/hint_cf_wrong_mcq/2026-10-26_or_nothink2/rows.jsonl")
-RUNS = {
-    "hint is the correct answer": Path("data/runs/cfbench/2026-10-27_answer-mcq-olens-header"),
-    "hint is a wrong answer": Path("data/runs/cfbench/2026-10-27_answer-mcq-olens-header-d2"),
-}
+ROLLOUTS, RUNS = HINT_MCQ_ROLLOUTS, HINT_MCQ_ANSWER_RUNS
 CONDS = ["agentic", "olens", "olens_placebo"]
 LABEL = {"agentic": "Transcript-only", "olens": "O-lens", "olens_placebo": "O-lens placebo"}
 COLOR = {c: color(c) for c in LABEL}  # graphs.style: a placebo is its tool's colour, hatched

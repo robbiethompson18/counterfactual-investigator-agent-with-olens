@@ -16,12 +16,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.transforms import Affine2D
 
+from cfbench.catalog import MODELCHART_DUMB_RUNS, MODELCHART_RUNS
 from cfbench.core import canon_condition
 from cfbench.scoring import LABEL, build_cases, noise_floor, rmse, rmse_null, variant_of
 from graphs.style import INK, MUTED, color
 
-RUNS = "data/runs/cfbench/*modelchart-*"
-DUMB_RUNS = "data/runs/cfbench/*dumbpred-*"  # 2026-10-26 thinking-off predictors (docs/cfbench-dumb-predictors.md)
+RUNS, DUMB_RUNS = MODELCHART_RUNS, MODELCHART_DUMB_RUNS
 MODELS = {  # by company, small to large
     "anthropic/claude-haiku-5.5": "Haiku 5.5",
     "anthropic/claude-sonnet-5.5": "Sonnet 5.5",
