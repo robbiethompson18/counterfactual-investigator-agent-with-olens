@@ -21,7 +21,7 @@ from matplotlib.colors import to_hex, to_rgb
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import PercentFormatter
 
-from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
+from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS
 from cfbench.scoring import CONDS as CF_CONDS
 from cfbench.scoring import (
     ESSAY_LENSES,
@@ -40,6 +40,7 @@ from graphs import (
     chive_inline,
     cutoff_qa_investigators,
     data_filter_sankey,
+    great_sneeze,
     headline_ablations,
     headline_inline,
     headline_tokens,
@@ -448,8 +449,9 @@ def headline() -> None:
 
 @slide
 def cutoff_investigators() -> None:
-    """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size: stale, not stale and all
-    items as rows, the legend in the top row."""
+    """Knowledge cutoff by investigator (graphs.cutoff_qa_investigators, canonical set) at slide size, one panel per slide
+    (Robbie, 2026-10-31: the three stacked panels were unreadable): all items (fig/cutoff_investigators_all.pdf) and the stale
+    items (fig/cutoff_investigators_stale.pdf), the legend under each."""
     runs = {run for bars in cutoff_qa_investigators.SETS["canonical"].values() for _, rs, _ in bars for run in rs}
     need = [*cutoff_qa_investigators.CENSUS.values()]
     need += [run / f for run in runs for f in ("meta.json", "predictions.jsonl")]
@@ -457,15 +459,13 @@ def cutoff_investigators() -> None:
         if not path.exists():
             hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
     data = cutoff_qa_investigators.load("canonical")
-    fig, axes = slide_figure(FULL_W, 55, nrows=3, sharex=True)
-    handles = cutoff_qa_investigators.draw(axes, data, s=SLIDE_S)
-    for ax in axes:
-        ax.set_ylabel(None)
-        ax.set_yticks([0, 50, 100])
-    fig.supylabel("% naming Qwen's answer", fontsize=8 * SLIDE_S)
-    axes[-1].legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.3), ncol=5, fontsize=7 * SLIDE_S)
-    departure(fig, cutoff_qa_investigators.DEPARTURE)
-    slide_save(fig, OUT / "cutoff_investigators.pdf")
+    groups = cutoff_qa_investigators.GROUPS
+    for slug, group in (("all", "all items"), ("stale", "stale (Qwen's answer is out of date)")):
+        fig, ax = slide_figure(FULL_W, 54)
+        handles = cutoff_qa_investigators.draw([ax], data, s=SLIDE_S, groups={group: groups[group]})
+        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=5, fontsize=7 * SLIDE_S)
+        departure(fig, cutoff_qa_investigators.DEPARTURE)
+        slide_save(fig, OUT / f"cutoff_investigators_{slug}.pdf")
 
 
 DRINK_ARMS = {"one": "1", "two": "2", "couple": "a couple\n(original)", "three": "3", "four": "4", "five": "5"}  # up to 5 (Kylie)
@@ -497,40 +497,15 @@ def drink_drive() -> None:
     slide_save(fig, OUT / "drink_drive.pdf")
 
 
-# The Great Sneeze anecdote: CHIVE's Qwen3.5-397B incident prompt_003654 (adamkarvonen/chive-data), the rate of a sneeze-based
-# event in Vardania's history over 30 samples, the original conversation and each of CHIVE's edits; the edit labels paraphrase
-# Adam's experiment summaries. Not a condition, so a colour outside the conditions'.
-SNEEZE_EDITS = {
-    1: "coastal tropical, not landlocked",
-    2: "formerly in the Serbanian Empire",
-    3: "one turn, country + “make it absurd…”",
-    4: "fun fact: spice bazaars, not mountains",
-    5: "coastal + formerly in an empire",
-    6: "Landlocked: No, mountains kept",
-    7: "renamed Tuvalia, new culture",
-    8: "fun fact: landmarks, not mountains",
-    9: "independence + colony lines removed",
-    10: "landlocked, fun fact about beaches",
-    11: "one turn, no “absurd and funny and wacky”",
-    12: "“absurd and funny and wacky” removed",
-}
-SNEEZE_C = "#5b6c8f"
-
-
 @slide
 def sneeze() -> None:
     """Horizontal bars: share of Qwen3.5-397B's 30 samples with a sneeze-based event in Vardania's history (CHIVE's grader), the
     original conversation on top in ink, then each edit by rate, with 95% Wilson whiskers."""
-    path = Path("data") / SNEEZE_RUN
-    if not path.exists():
-        hf_hub_download(HF_REPO, str(SNEEZE_RUN), repo_type="dataset", local_dir="data")
-    r = next(r for r in map(json.loads, path.open()) if r["prompt_id"] == "prompt_003654")
-    edits = sorted(((SNEEZE_EDITS[e["exp"]], e["k"], e["n"]) for e in r["exps"]), key=lambda x: -x[1] / x[2])
-    rows = [("original conversation", r["k0"], r["n0"]), *edits]
+    rows = great_sneeze.rows()
     fig, ax = slide_figure(64, 44)
     for y, (_, k, n) in enumerate(rows):
         lo, hi = wilson(k, n)
-        ax.barh(y, k / n, 0.7, color=INK if y == 0 else SNEEZE_C, zorder=3)
+        ax.barh(y, k / n, 0.7, color=INK if y == 0 else great_sneeze.SNEEZE_C, zorder=3)
         ax.errorbar(k / n, y, xerr=[[k / n - lo], [hi - k / n]], color=MUTED, lw=0.9, capsize=2, capthick=0.9, zorder=4)
         ax.annotate(f"{k}/{n}", (hi, y), xytext=(2, 0), textcoords="offset points", va="center", fontsize=6.5 * SLIDE_S, color=INK)
     ax.set_yticks(range(len(rows)), [x[0] for x in rows])

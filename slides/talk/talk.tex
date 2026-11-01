@@ -359,8 +359,15 @@
     question's reads. Right: each lens minus \promptonly, paired.}
 \end{frame}
 
-\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
-  \slidefig{fig/cutoff_investigators.pdf}
+\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, all items}
+  \slidefig{fig/cutoff_investigators_all.pdf}
+  \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
+    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
+    draws; Flash-Lite prompt only there, 1 draw.}
+\end{frame}
+
+\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator, stale items}
+  \slidefig{fig/cutoff_investigators_stale.pdf}
   \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
     itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
     draws; Flash-Lite prompt only there, 1 draw.}
