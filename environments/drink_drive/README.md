@@ -31,4 +31,4 @@ uv run python -m environments.drink_drive.judge 2026-11-01_n50 --out judge-n50
 
 ## Runs
 
-See [docs/envs/drink_drive.md](../../docs/envs/drink_drive.md) for results.
+`2026-11-01_n50`: 9 arms × 50, Qwen3.6-27B bf16, T 1.0 / top-p 0.95 / top-k 20; results in [docs/envs/drink_drive.md](../../docs/envs/drink_drive.md). Report: `uv run --with statsmodels python -m environments.drink_drive.report 2026-11-01_n50`.

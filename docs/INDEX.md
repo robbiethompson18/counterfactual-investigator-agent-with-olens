@@ -11,6 +11,7 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 
 ## REFERENCE
 
+- [REFERENCE: drink_drive — read before citing the "Qwen recommends drunk driving" case or its drink-count dose response](envs/drink_drive.md) — one→ten drinks: drive-or-mixed 86%→0% by four drinks, couple 32%
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
 - [REFERENCE: chive_inline — read before claiming CHIVE's transcript-only baseline depends on the transcript, or comparing a predictor with CHIVE's published arms](chive-inline.md)
