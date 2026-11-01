@@ -4,7 +4,11 @@
 2026-10-26. The GitHub Pages workflow was deleted on 2026-10-31 (Robbie: no CI), so the GitHub Pages
 site (env viewer, expview, talk.pdf, final-writeup.html) is frozen at its last deploy; the pages
 keep working because their data comes from HF, but a page or `spec/` change needs a hand deploy
-(re-add a workflow, or push a `site/` folder to a `gh-pages` branch).
+(re-add a workflow, or push a `site/` folder to a `gh-pages` branch). The write-up and the deck
+moved to Cloudflare Pages the same day (`scripts/deploy_writeup.sh`, project `nn-sprint-writeup`):
+share https://nn-sprint-writeup.pages.dev/ and https://nn-sprint-writeup.pages.dev/talk.pdf, never
+the GitHub Pages copies. Deploys need `CLOUDFLARE_API_TOKEN` on Robbie's Cloudflare account; Kylie
+can deploy once Robbie adds her as a member of that account and she mints her own token.
 
 ## The rule
 
@@ -80,13 +84,14 @@ Checked and rejected the same day:
 
 ## Where things are
 
-| page                                  | URL                                                                                             | source                                                                             | data on HF                          |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
-| CHIVE cases                           | https://chive-cases.pages.dev                                                                   | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in                            |
-| O-lens token viewer                   | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
-| expview (runs, judge I/O, reads)      | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html` (frozen deploy, see above)                             | `envs/*/*/`, `runs/**/expview/`     |
-| env viewer (arms, diffs, comparisons) | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html` (frozen deploy, see above)                           | `envs/*/spec/`, `envs/*/links.json` |
-| talk deck (PDF)                       | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/talk.pdf        | `slides/talk/` (frozen deploy; rebuild by hand with `make -C slides`)              | `evals/`, `runs/` (figures)         |
+| page                                   | URL                                                                                             | source                                                                             | data on HF                          |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
+| CHIVE cases                            | https://chive-cases.pages.dev                                                                   | `viewer/index.html`, `scripts/build_viewer.py`, `scripts/deploy_viewer.sh`         | built-in                            |
+| O-lens token viewer                    | https://olens-viewer.pages.dev                                                                  | `transcript-viewer/web/index.html`, `scripts/publish.py`, `scripts/deploy_site.sh` | `weirdchat/site/`                   |
+| expview (runs, judge I/O, reads)       | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/        | `expview/static/index.html` (frozen deploy, see above)                             | `envs/*/*/`, `runs/**/expview/`     |
+| env viewer (arms, diffs, comparisons)  | https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/ (GitHub Pages) | `environments/_lib/page.html` (frozen deploy, see above)                           | `envs/*/spec/`, `envs/*/links.json` |
+| talk deck (PDF)                        | https://nn-sprint-writeup.pages.dev/talk.pdf                                                    | `slides/talk/`, `scripts/deploy_writeup.sh`                                        | `evals/`, `runs/` (figures)         |
+| final write-up (HTML, charts embedded) | https://nn-sprint-writeup.pages.dev/                                                            | `docs/final-writeup.md`, `scripts/build_writeup.sh`, `scripts/deploy_writeup.sh`   | `runs/` (figures)                   |
 
 The old expview page, https://expview.pages.dev (Cloudflare), still works but is frozen at its
 2026-10-26 code; expview now deploys with the env viewer to GitHub Pages under `/expview/`.
