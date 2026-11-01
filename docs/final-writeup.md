@@ -421,7 +421,7 @@ like a significant effect. We had several spurious positive results this way.
 
 ### Which Metamodel Is Best?
 
-<img src="img/headline-lens-diffs.png" alt="Each lens minus transcript only, paired by case and pooled over the three tasks: 🔮-lens +3.0 [+2.0, +3.9], J++ −1.6 [−2.6, −0.6], NLA +2.6 [+1.8, +3.4]" width="620">
+<img src="img/headline-lens-diffs.png" alt="Each lens minus prompt only, paired by case and pooled over the three tasks: 🔮-lens +3.0 [+2.0, +3.9], J++ −1.6 [−2.6, −0.6], NLA +2.6 [+1.8, +3.4]" width="620">
 
 It's not clear. J++ wins both Multiple Choice sets, the 🔮-lens and NLA win Idiosyncratic
 Preferences, and the pooled ranking depends on which tasks you pool.
