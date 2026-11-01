@@ -31,7 +31,7 @@ still slightly worse than it and indistinguishable from the placebo.
   the thinking-off run's (the CoT is visible), OL − TS a small negative point estimate, OL − placebo
   near 0, both CIs including 0.
 - **Runs:** HF `runs/cfbench/2026-10-26_cot-cf-<env>`. Scoring and the paired bootstrap as in
-  nocot-cfbench.md (`cfbench/score.py`, `scripts/cfbench_compare.py`).
+  nocot-cfbench.md (`cfbench/score.py`, `scripts/cfbench_compare.py`, deleted, at `d89747b4`).
 
 ## Result
 

@@ -13,6 +13,10 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 
 - [REFERENCE: CHIVE data sources — read before fetching incidents, readouts or Agam's results](chive-data-sources.md)
   — HF dataset vs Agam's viewer, what each lacks, splits, file paths
+- [REFERENCE: chive_inline — read before claiming CHIVE's transcript-only baseline depends on the transcript, or comparing a predictor with CHIVE's published arms](chive-inline.md)
+  — Haiku on CHIVE's 4,816 official yes/no claims: the model's reply adds +0.012 AUROC pooled
+  [+0.006, +0.019] over the edit alone (+0.003 to +0.020 per target); on Agam's Qwen3.6-27B
+  incidents O-lens, NLA and J++ each tie their placebo
 - [REFERENCE: CHIVE critique — read before quoting what is wrong with CHIVE's data, thresholds or ground truth, or before replicating those numbers](chive-critique.md)
   — on Adam's release and Agam's run: 40% off-policy prefixes, 8,623 clean kills (12% of
   experiments, 32% of investigations) the 50pp rule discards, 12% of incidents with
@@ -97,7 +101,10 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   submit_answer tool call (200 items, answer 20 tokens past the last read) the O-lens gap holds (76%
   vs 58% vs 62%), and at scale (v3, 1,849 items, stale items: O-lens +17pp over its placebo, J++ +9,
   NLA +8, the same where Qwen always calls the tool unforced); the one cutoff chart; the
-  lens-shares-Qwen's-cutoff caveat
+  lens-shares-Qwen's-cutoff caveat; **2026-10-31: most of the uplift is Haiku's later cutoff** — a
+  same-cutoff investigator (Gemini 2.5 Flash-Lite) with no lens matches Haiku + any lens on stale
+  items (canonical menus_inline: 73% vs O-lens 77, NLA 74, J++ 70), and every lens makes Flash-Lite
+  worse
 - [REFERENCE: Overnight agents — read before running creds, ship or upload policy-blocker tasks](envs/overnight.md)
   — offline approval/credential shortcuts, shared prompt knobs, all model rates and transcript
   audits; the n=30 replication and fp8 reruns (creds holds, upload's permissive uplift doesn't)
@@ -125,8 +132,8 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   any-of-55; what the text reader lacks is Qwen's side (59 contrast picks) and its favourite reason,
   not activations; committed/deliberative label is not derivable from the public bank
 - [REFERENCE: cutoff_qa grader mentions — read before claiming O-lens reads show grader / eval awareness from a tool-call template](cutoff-grader-mentions.md)
-  — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer
-  tool); 14% vs 73% of items; regex, no judge
+  — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer tool);
+  14% vs 73% of items; regex, no judge
 
 ## MIXED
 
@@ -270,6 +277,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   question (prompt inversion), and the predictor cites them only to back the hinted answer
 
 ## SUPERSEDED
+
+- [SUPERSEDED: MCQ answer probe — historical option-newline architecture and results](mcq-answer-probe.md)
+  — standard comparisons now use the nested two-fold probes package
 
 - [SUPERSEDED: funding_email env screen — read before running or labelling funding_email (agent-interp-envs) rollouts](envs-screen/funding_email.md)
   — Qwen3.6-27B deviates ethically 19/30 with the Myanmar memo vs 0/30 with a routine one; arm

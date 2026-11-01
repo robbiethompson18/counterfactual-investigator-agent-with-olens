@@ -82,7 +82,8 @@ def collect() -> list[dict]:
             continue
         meta = it | {"qwen_modal": g["modal"], "qwen_modal_count": g["modal_count"], "gate_class": g["class"], "gate_run": GATE,
                      "nohint_modal": it["qwen_modal"], "auto_tool_calls": auto[it["id"]]}  # fmt: skip
-        out.append({"version": "nohint", "item": it["id"], "modal": mod.norm(g["modal"]), "source": f"cutoff_qa/v3-tool:{it['id']}",
+        modal = mod.gate_label(GATE, it["id"], g["modal"])
+        out.append({"version": "nohint", "item": it["id"], "modal": modal, "source": f"cutoff_qa/v3-tool:{it['id']}",
                     "messages": [{"role": "user", "content": it["question"]}], "meta": meta})  # fmt: skip
     return out
 

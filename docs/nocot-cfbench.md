@@ -34,7 +34,7 @@ transcript-only agent and indistinguishable from the placebo.
 - **Runs:** HF `runs/cfbench/2026-10-25_nocot-cf-<env>` and `..._nocot-cf-r-<env>` (the `-r-` runs
   fill predictions lost when a launcher died; pool both). Scoring: binomial LL vs the "edit does
   nothing" null, normalized by the oracle, as in `cfbench/score.py`; the paired comparison and
-  bootstrap are `scripts/cfbench_compare.py`.
+  bootstrap are `scripts/cfbench_compare.py` (deleted, at `d89747b4`).
 
 ## Result
 

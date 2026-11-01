@@ -5,11 +5,10 @@ least one model gets wrong at least 7 times in 8 (Kylie, 2026-10-27). Writes har
 """
 
 import json
-import os
 from collections import defaultdict
 from pathlib import Path
 
-from environments._lib.runfolder import LOCAL, read_episodes
+from environments._lib.runfolder import LOCAL, active_labels, read_episodes
 
 from . import env as E
 
@@ -21,8 +20,7 @@ def main():
     wrong = defaultdict(lambda: defaultdict(list))  # item -> model -> [wrong?]
     for d in sorted((LOCAL / "hinted_truthfulqa").glob("*_control-n8-*")):
         meta = json.loads((d / "meta.json").read_text())
-        f = max((d / "labels").glob("measure@*.jsonl"), key=os.path.getmtime)
-        lab = {r["episode"]: r["values"] for r in map(json.loads, f.read_text().splitlines())}
+        _, lab = active_labels(d)
         for ep in read_episodes(d):
             if not ep.get("error") and ep["arm"] == "control":
                 wrong[ep["item"]][meta["target"]["model"]].append(not (lab.get(ep["id"]) or {}).get("correct"))

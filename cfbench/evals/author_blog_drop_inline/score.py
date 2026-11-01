@@ -13,13 +13,33 @@ from pathlib import Path
 
 import numpy as np
 
-CONDS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
+CONDS = ("transcript_inline", "olens_inline", "olens_placebo_inline", "nla_inline", "nla_placebo_inline")
+PAIRS = (  # paired differences shown, A - B: positive = A better
+    ("olens_inline", "transcript_inline"),
+    ("olens_inline", "olens_placebo_inline"),
+    ("nla_inline", "transcript_inline"),
+    ("nla_inline", "nla_placebo_inline"),
+    ("nla_inline", "olens_inline"),
+)
 VERSIONS = ("qwen_wrong", "qwen_right")
 BOOT = 2000
 EXPVIEW = "https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/"
 REPO = "https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens"
 HF = "https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens/tree/main/"
 INPUTS = "runs/cfbench_evals/2026-10-30_author-blog-drop-inline-inputs-b2"
+# the sentence-end probe (scripts/author_probe/period_check.py): the standard L2 probe at L48 on the sentence's last token, fit
+# to these labels, fully nested out-of-fold P(significant), seed 0 (Kylie, 2026-10-31: on the page as a reference point)
+PROBE = "runs/author_mcq_blog/2026-10-31_period-probe/scores_l2.jsonl"
+
+
+def probe_scores() -> dict[str, float]:
+    """item -> the probe's out-of-fold P(significant), from data/ or the HF dataset."""
+    local = Path("data") / PROBE
+    if not local.exists():
+        from huggingface_hub import hf_hub_download
+
+        hf_hub_download("Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens", PROBE, repo_type="dataset", local_dir="data")
+    return {r["item"]: r["probe_l2_h"] for r in map(json.loads, local.read_text().splitlines())}
 
 
 def _auc(y: np.ndarray, p: np.ndarray) -> float:
@@ -42,8 +62,8 @@ def _platt(p: np.ndarray, y: np.ndarray, groups: np.ndarray) -> np.ndarray:
     return out
 
 
-def _cases(rows: list[dict]):
-    """Per case (version, item): {condition: p}, truth, attribute, author, pair."""
+def _cases(rows: list[dict], conds=CONDS):
+    """Per case (version, item): {condition: p}, truth, attribute, author, pair; the cases with every condition in `conds`."""
     by: dict = defaultdict(dict)
     meta = {}
     for r in rows:
@@ -51,7 +71,7 @@ def _cases(rows: list[dict]):
             k = (r["version"], r["item"])
             by[k][r["condition"]] = r["p"]
             meta[k] = (r["k_cf"], r["attr"], r["pair"].split(":")[0], r["pair"])
-    keys = [k for k in by if all(c in by[k] for c in CONDS)]
+    keys = [k for k in by if all(c in by[k] for c in conds)]
     return keys, by, meta
 
 
@@ -65,15 +85,19 @@ def _resample(groups, rng) -> np.ndarray:
 
 def PAGE(rows: list[dict]) -> str:
     from cfbench.evals.author_blog_drop_inline.eval import datasets
-    from cfbench.evals.page import bars, swatch, table
+    from cfbench.evals.page import bars, label, swatch, table
 
-    keys, by, meta = _cases(rows)
+    present = {r["condition"] for r in rows}
+    conds = tuple(c for c in CONDS if c in present)  # the NLA conditions only once their run is in
+    keys, by, meta = _cases(rows, conds)
     y = np.array([meta[k][0] for k in keys])
     attr = np.array([meta[k][1] for k in keys])
     author = np.array([meta[k][2] for k in keys])
     version = np.array([k[0] for k in keys])
-    P = {c: np.array([by[k][c] for k in keys]) for c in CONDS}
-    R = {c: _platt(P[c], y, author) for c in CONDS}
+    P = {c: np.array([by[k][c] for k in keys]) for c in conds}
+    pr = probe_scores()
+    P["probe"] = np.array([pr.get(k[1], np.nan) for k in keys])
+    R = {c: _platt(P[c], y, author) for c in conds}
     rng = np.random.default_rng(0)
     f3 = lambda x: f"{x:.3f}"
     pf = lambda p: "&lt; 0.001" if p < 0.001 else f"{p:.3f}"
@@ -89,11 +113,14 @@ def PAGE(rows: list[dict]) -> str:
             "same post (base rate 0.50). Only pairs where Qwen is confident (c ≥ 0.5, both option orders agree) and stable "
             "(median deletion TV &lt; 0.05). Claude Haiku 5.5 (effort low, one draw) gives P(significant) from the prompt and the "
             "sentence alone (transcript), plus agu18dec's O-lens reads of Qwen3.6-27B at every punctuation and newline token of the "
-            "question and post, layers 32/40/48 (O-lens), or another post's reads in their place (placebo).</p>"
+            "question and post, layers 32/40/48 (O-lens, sampled at temperature 1), or another post's reads in their place "
+            "(placebo); or, at the same tokens, ceselder's Qwen3.6-27B NLA (qwen3.6-27b-nla-rl, layer 42 only, greedy, each "
+            "explanation with its critic FVE) (NLA), or another post's NLA explanations (NLA placebo, the O-lens placebo's post).</p>"
         ),
         (
-            "<p><b>Verdict: the O-lens does not help.</b> No gain over transcript-only on AUROC or on recalibrated Brier; it "
-            "beats the placebo on raw Brier only (a calibration effect).</p>"
+            "<p><b>Verdict: neither the O-lens nor the NLA helps.</b> No gain over transcript-only on AUROC or on recalibrated "
+            "Brier for either; the O-lens beats its placebo on raw Brier only (a calibration effect), and the NLA is slightly "
+            "worse than transcript-only on raw Brier.</p>"
         ),
         (
             f'<p class="mute">{len(keys)} cases from {n_auth} bloggers (batches 1 + 2, 2 × 2,004 bloggers; a third batch was '
@@ -101,16 +128,16 @@ def PAGE(rows: list[dict]) -> str:
         ),
     ]
     _boot_groups(author)
-    for v in VERSIONS:
-        m = version == v
+    for v in (None, *VERSIONS):  # pooled first (Kylie, 2026-10-31), then each version
+        m = np.ones(len(y), bool) if v is None else version == v
         gs = _boot_groups(author[m])
         res = []
-        for c in CONDS:
+        for c in (*conds, "probe"):
             yy, pp = y[m], P[c][m]
             bs = [_auc(yy[i], pp[i]) for i in (_resample(gs, rng) for _ in range(BOOT))]
             res.append((c, _auc(yy, pp), float(np.nanpercentile(bs, 2.5)), float(np.nanpercentile(bs, 97.5))))
-        title = f"AUROC, {v.replace('_', ' ')} ({m.sum()} cases); axis from 0.5 (chance)"
-        out.append(bars(res, 0.5, 1.0, title))
+        title = f"AUROC, {v.replace('_', ' ') if v else 'all cases'} ({m.sum()} cases); axis from 0.5 (chance)"
+        out.append(bars(res, 0.5, 1.0, title, hatch={"olens_placebo_inline": "var(--c-olens)", "nla_placebo_inline": "var(--c-nla)"}))
 
     def paired(m: np.ndarray, a: str, b: str) -> list[str]:
         gs = _boot_groups(author[m])
@@ -127,29 +154,43 @@ def PAGE(rows: list[dict]) -> str:
             cells.append(f'<b>{obs:+.3f}</b> [{lo:+.3f}, {hi:+.3f}] <span class="mute">p {pf(np.nanmean(better(bs)))}</span>')
         return cells
 
+    out.append(
+        '<p class="mute">Linear probe (teal): not an investigator. A logistic regression (the standard recipe: training-only '
+        "standardisation, no PCA, L2 with λ = 1) on Qwen3.6-27B's layer-48 residual at the deleted sentence's last token, in "
+        "the same prompt, fit to these labels and scored out of fold (5 folds grouped by blogger). Layer 48 and the recipe were "
+        "chosen on this same eval set. A reference point, so no star or p-value against the investigator.</p>"
+    )
     body = []
-    for a, b in (("olens_inline", "transcript_inline"), ("olens_inline", "olens_placebo_inline")):
+    for a, b in (ab for ab in PAIRS if set(ab) <= set(conds)):
         for v in (None, *VERSIONS):
             m = np.ones(len(y), bool) if v is None else version == v
             body.append([f"{swatch(a)} − {swatch(b)}", v or "pooled", str(m.sum()), *paired(m, a, b)])
-    out.append("<h3>Paired differences (positive = O-lens better; one-sided p for H1: O-lens better)</h3>")
+    for v in (None, *VERSIONS):  # the probe as a reference: no test against the zero-shot investigator
+        m = np.ones(len(y), bool) if v is None else version == v
+        gs, ya = _boot_groups(author[m]), y[m]
+        f = lambda i, ya=ya, m=m: _auc(ya[i], P["probe"][m][i]) - _auc(ya[i], P["transcript_inline"][m][i])
+        lo, hi = np.nanpercentile([f(_resample(gs, rng)) for _ in range(BOOT)], [2.5, 97.5])
+        cell = f'<b>{f(np.arange(m.sum())):+.3f}</b> [{lo:+.3f}, {hi:+.3f}] <span class="mute">no test</span>'
+        body.append([f"{swatch('probe')} − {swatch('transcript_inline')}", v or "pooled", str(m.sum()), cell, "—", "—"])
+    out.append("<h3>Paired differences A − B (positive = A better; one-sided p for H1: A better)</h3>")
     out.append(table(["comparison", "version", "cases", "AUROC [95% CI]", "raw Brier gain", "recalibrated Brier gain"], body))
 
     body = []
     for v in VERSIONS:
         for at in ("sex", "age"):
             m = (version == v) & (attr == at)
-            body.append([v, at, str(m.sum()), *[f3(_auc(y[m], P[c][m])) for c in CONDS]])
+            body.append([v, at, str(m.sum()), *[f3(_auc(y[m], P[c][m])) for c in conds]])
     out.append("<h3>AUROC by attribute</h3>")
-    out.append(table(["version", "attribute", "cases", *[swatch(c) for c in CONDS]], body))
+    out.append(table(["version", "attribute", "cases", *[swatch(c) for c in conds]], body))
 
-    means = " / ".join(f"{swatch(c)} {P[c].mean():.2f}" for c in CONDS)
+    means = " / ".join(f"{swatch(c)} {P[c].mean():.2f}" for c in conds)
     out.append(
         "<h3>Calibration</h3><p>Mean predicted probability: "
         + means
         + f" against a base rate of {y.mean():.2f}. Haiku's probabilities sit low; with O-lens reads in the prompt they sit "
         "a little higher, which alone lowers the raw Brier. After Platt-recalibrating each condition (logistic on logit p, "
-        "5-fold CV grouped by blogger) the gains vanish, as does any AUROC difference. The raw-Brier result of the first "
+        "5-fold CV grouped by blogger, fit once; the bootstrap does not refit it) the gains vanish, as does any AUROC "
+        "difference. The raw-Brier result of the first "
         "batch alone (O-lens − transcript +0.010, p = 0.008) was this calibration effect.</p>"
     )
 
@@ -163,10 +204,10 @@ def PAGE(rows: list[dict]) -> str:
         ds = datasets(pair)
         links = [f'<a href="{EXPVIEW}#dataset={d}&item={escape(pair)}">{escape(n.split(":")[0])}</a>' for n, d in ds.items()]
         links.append(f'<a href="{EXPVIEW}#dataset={INPUTS}&item={escape(k[1])}%2Folens_inline">prompt with reads</a>')
-        p3 = " / ".join(f"{P[c][i]:.2f}" for c in CONDS)
+        p3 = " / ".join(f"{P[c][i]:.2f}" for c in conds)
         body.append([escape(why), escape(k[1]), k[0], str(y[i]), p3, " · ".join(links)])
     out.append("<h3>Example cases</h3>")
-    out.append(table(["", "case", "version", "truth", "p: transcript / O-lens / placebo", "links"], body))
+    out.append(table(["", "case", "version", "truth", "p: " + " / ".join(label(c) for c in conds), "links"], body))
     out.append(
         f'<p class="mute">Write-up: <a href="{REPO}/blob/main/docs/author-mcq-probe.md">docs/author-mcq-probe.md</a>. Runs: '
         f'<a href="{HF}runs/cfbench/2026-10-30_author-blog-drop-haiku-b2">predictions</a>, '

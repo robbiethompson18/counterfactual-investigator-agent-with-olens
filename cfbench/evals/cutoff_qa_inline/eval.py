@@ -65,7 +65,8 @@ TASK = "answer"
 CONDITIONS = ("transcript_inline", "olens_inline", "olens_placebo_inline")
 INLINE_EFFORT = "medium"
 SYSTEM = inline.SYSTEM
-VERSIONS: dict[str, dict] = {"nohint": {"arm": "nohint"}}
+VERSIONS: dict[str, dict] = {"nohint": {"arm": "nohint"}, "told": {"arm": "nohint"}}  # told: inline.TOLD names Qwen and its cutoff
+DEFAULT_VERSIONS = ("nohint",)  # hidden by default (Robbie, 2026-10-29); `told` is the deliberate comparison (2026-10-31)
 ARM_LABELS = {"nohint": "the question, verbatim"}
 PAIR_LABELS = {"nohint -> nohint": "no counterfactual"}
 NLA_READS = [Path(f"data/runs/nla_reads/2026-10-29_cutoff{n}-tail/reads.jsonl") for n in (200, 800)]  # at READS's positions, layers
@@ -87,7 +88,8 @@ def collect() -> list[dict]:
         assert not ep.get("error") and ep["target"].split("@")[0].lower() == QWEN.lower(), ep["id"]
         meta = ep["meta"]
         assert not meta["numeric"] and meta["gate_class"].startswith("stable"), ep["id"]
-        out.append({"version": "nohint", "item": ep["item"], "modal": mod.norm(meta["qwen_modal"]), "source": f"{ENV}/{run}:{ep['id']}",
+        modal = mod.gate_label(meta["gate_run"], ep["item"], meta["qwen_modal"])
+        out.append({"version": "nohint", "item": ep["item"], "modal": modal, "source": f"{ENV}/{run}:{ep['id']}",
                     "messages": ep["messages"][:1], "meta": meta})  # fmt: skip
     return sorted(out, key=lambda c: order[c["item"]])
 
@@ -96,7 +98,7 @@ def prep(out: Path, versions: list[str], placebo: Path, n_items: int | None = No
     """cases.jsonl plus reads/reads.jsonl (READS, all of them); the placebo is drawn from the same file (another item)."""
     (out / "reads").mkdir(parents=True)
     (out / "reads/reads.jsonl").write_text("".join(p.read_text() for p in READS))
-    cs = collect()[: n_items or None]
+    cs = [c | {"version": v} for v in versions for c in collect()[: n_items or None]]
     (out / "reads/nla.jsonl").write_text("".join(p.read_text() for p in NLA_READS))  # the nla_* conditions' reads and placebo pool
     for srcs, dst, prompt_only in ((JREADS, "jreads", False), ([JPOOL], "jpool", True)):  # the jlens_* conditions' reads and pool
         rows = [r for src in srcs for rs in jpp_rows(src, prompt_only).values() for r in rs]
@@ -145,14 +147,15 @@ def INLINE(env, condition: str, case: dict, base: list, seed: int) -> tuple[str,
         return jlens_inline(condition, case, base, seed)
     question = base[0].messages[0]["content"]
     rows, extra = None, {}
+    told = case["version"] == "told"
     if condition != "transcript_inline":
         by_source = inline.reads_by_source(Path(case["inputs"]) / "reads/reads.jsonl")
         src = base[0].source
         if condition == "olens_placebo_inline":  # another item's reads, seeded per (draw, case), never its own
-            src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(set(by_source) - {src}))
+            src = random.Random(f"{seed}:{case['base_arm']}:{case['item']}").choice(sorted(set(by_source) - {src}))  # told pairs as nohint
             extra = {"placebo_sources": [src]}
         rows = by_source[src]
-    return inline.prompt(question, condition, False, MODEL_NAME, rows), extra
+    return inline.prompt(question, condition, told, MODEL_NAME, rows), extra
 
 
 # the env viewer's runs (environments/_lib/evals.py INPUTS_RUNS): the 1k and its second 1k with their read-position
@@ -204,9 +207,9 @@ def nla_inline(condition: str, case: dict, base: list, seed: int) -> tuple[str, 
     src, extra = base[0].source, {}
     if condition == "nla_placebo_inline":  # an unrelated prompt's readouts (NLA_READS' MMLU-Pro pool), seeded per (draw, case)
         pool = sorted(s for s in by_source if not s.startswith(f"{ENV}/"))
-        src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(pool)
+        src = random.Random(f"{seed}:{case['base_arm']}:{case['item']}").choice(pool)
         extra = {"placebo_sources": [src]}
-    return inline.nla_prompt(base[0].messages[0]["content"], False, MODEL_NAME, by_source[src]), extra
+    return inline.nla_prompt(base[0].messages[0]["content"], case["version"] == "told", MODEL_NAME, by_source[src]), extra
 
 
 def jpp_rows(path: Path, prompt_only: bool = False) -> dict[str, list[dict]]:
@@ -229,9 +232,9 @@ def jlens_inline(condition: str, case: dict, base: list, seed: int) -> tuple[str
     extra = {}
     if condition == "jlens_placebo_inline":  # a seeded hint_mcq transcript's last len(own) prompt tokens
         pool = inline.reads_by_source(Path(case["inputs"]) / "reads/jpool.jsonl")
-        src = random.Random(f"{seed}:{case['version']}:{case['item']}").choice(sorted(pool))
+        src = random.Random(f"{seed}:{case['base_arm']}:{case['item']}").choice(sorted(pool))
         rows, extra = pool[src][-len(own) :], {"placebo_sources": [src]}
     if condition == "jlens_inline_no60":
         rows = [r | {"layers": r["layers"][:-1], "top": r["top"][:-1]} for r in own]
         assert rows[0]["layers"] == [32, 40, 48, 52, 56], rows[0]["layers"]
-    return inline.jlens_prompt(base[0].messages[0]["content"], False, MODEL_NAME, rows), extra
+    return inline.jlens_prompt(base[0].messages[0]["content"], case["version"] == "told", MODEL_NAME, rows), extra

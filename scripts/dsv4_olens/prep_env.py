@@ -11,7 +11,11 @@ replies would otherwise dominate the read count.
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # run by path: the repo root isn't on sys.path
+from environments._lib.runfolder import active_labels
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--envs", required=True)
@@ -29,9 +33,7 @@ out.mkdir(parents=True, exist_ok=True)
 reqs: list[dict] = []
 for name in a.runs:
     run = Path(a.envs) / name
-    files = sorted(run.glob("labels/measure@*.jsonl"))
-    lf = next((x for x in files if x.name == "measure@v3-curly.jsonl"), files[-1])
-    lab = {(d := json.loads(x))["episode"]: d["values"] for x in lf.read_text().splitlines()}
+    lf, lab = active_labels(run)
     for f in sorted(run.glob("episodes/*.jsonl")):
         for line in f.read_text().splitlines():
             e = json.loads(line)
@@ -57,7 +59,7 @@ for name in a.runs:
                     "positive": bool(v["positive"]),
                     "verdict": v["verdict"],
                     "reply_chars": len(reply),
-                    "label_file": lf.name,
+                    "label_file": lf,
                     "messages": msgs,
                 }
             )

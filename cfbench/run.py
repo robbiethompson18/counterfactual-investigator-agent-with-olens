@@ -86,8 +86,8 @@ async def main():
     ap.add_argument("--description", default="")
     ap.add_argument("--skip", default="", help="comma list of predictions.jsonl from earlier runs; skip the predictions they already have")
     args = ap.parse_args()
-    done = {  # (env, base_arm, cf_arm, condition, predictor, draw) already predicted by the --skip runs
-        tuple(r[k] for k in ("env", "base_arm", "cf_arm", "condition", "predictor", "draw"))
+    done = {  # (env, base_arm, cf_arm, condition, model, draw) already predicted by the --skip runs, on any route to the model
+        (r["env"], r["base_arm"], r["cf_arm"], r["condition"], openrouter.same_model(r["predictor"]), r["draw"])
         for path in filter(None, args.skip.split(","))
         for r in map(json.loads, Path(path).read_text().splitlines())
     }
@@ -234,7 +234,7 @@ async def main():
                 for c in conditions
                 for p in predictors
                 for d in range(args.draws)
-                if (env_name, base_arm, cf_arm, c, p, d) not in done
+                if (env_name, base_arm, cf_arm, c, openrouter.same_model(p), d) not in done
             ]
     try:
         await asyncio.gather(*jobs)

@@ -390,7 +390,8 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
         out_groups.append(g)
     out_groups.sort(key=lambda g: (g["env"], g["version"] or "", g["pair"] or "~", g["reverse"], g["base"], g["cf"], g["model"]))
 
-    # two models on the same (env, version, base, cf): mean p per model and the AUROC between their cases' mean p
+    # two models on the same (env, version, base, cf): mean p per model and the AUROC between their draws' p (every draw one
+    # prediction, docs/cfbench-scoring.md)
     paired = []
     by = defaultdict(dict)
     for (env, version, model, b, cf, item), c in cases.items():
@@ -400,10 +401,9 @@ def run_summary(run_dir: Path, envs: Envs, export=True) -> dict:
             continue
         (m1, c1), (m2, c2) = sorted(per_model.items(), key=lambda kv: -kv[1][0]["row"]["k_cf"] / kv[1][0]["row"]["n_cf"])
         conds = sorted({k for c in c1 + c2 for k in c["draws"]})
-        mean = lambda c, k: sum(ps) / len(ps) if (ps := [d["p"] for d in c["draws"].get(k, []) if d["p"] is not None]) else None
+        draws = lambda cs, k: [d["p"] for c in cs for d in c["draws"].get(k, []) if d["p"] is not None]
         for k in conds:
-            a = [x for c in c1 if (x := mean(c, k)) is not None]
-            z = [x for c in c2 if (x := mean(c, k)) is not None]
+            a, z = draws(c1, k), draws(c2, k)
             paired.append(
                 {
                     "env": env,
@@ -704,13 +704,10 @@ def mark_current(name: str, summaries: list[dict]) -> dict:
             for k, ds in g["draws"].items():
                 if k not in s["current_conds"]:
                     continue
-                per = defaultdict(list)
-                for d in ds:
-                    if d["p"] is not None:
-                        per[d["item"]].append(d["p"])
+                ps = [d["p"] for d in ds if d["p"] is not None]
                 side = "a" if g["model"] == models[0] else "z"
-                paired[k][side] += [sum(v) / len(v) for v in per.values()]
-                paired[k]["truth"][side] += [g["k_cf"] / g["n_cf"]] * len(per)
+                paired[k][side] += ps
+                paired[k]["truth"][side] += [g["k_cf"] / g["n_cf"]] * len(ps)
                 paired[k]["models"] = models
     return {
         "pooled": {

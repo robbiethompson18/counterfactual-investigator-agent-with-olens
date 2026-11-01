@@ -9,14 +9,15 @@
     uv run python -m environments index [ENV ...]          # rebuild envs/<env>/index.json + envs/index.json
     uv run python -m environments evals [NAME ...] [--pull] [--upload]  # evals/<name>.json from cfbench runs + expview
     uv run python -m environments upload ENV/RUN [...]      # one HF commit: the run dirs + their indexes
-    uv run python -m environments rescore ENV/RUN [...] --tag T  # labels/measure@<sha12>-T.jsonl from today's measure()
+    uv run python -m environments rescore ENV/RUN [...] --tag T  # labels/measure@<sha12>-T.jsonl from today's measure(), made active
+    uv run python -m environments activate ENV/RUN LABELER@VER   # by hand: labels/LABELER@VER.jsonl is the run's current labels
 
 Arms interleave (sample-major, then item, then arm), so a stopped run still has every arm. Defaults follow the repo rules:
 no max_tokens unless --max-tokens is given (recorded), reasoning effort always sent (medium) unless the env REQUIRES
 otherwise, episode caps in turns and prompt tokens, never dollars.
 
 A run finishes the way scripts/runs.py did: its transcripts go to Docent (scripts/docent_upload.py, when DOCENT_API_KEY is
-set; a failure only prints the retry command), then the run folder and its indexes go to HF unless --no-upload. Ctrl-C
+set; a failure only prints the retry command), then the run folder and its indexes go to HF; --no-upload skips both. Ctrl-C
 finishes the run as `abandoned` and still uploads it: failed runs are data.
 """
 
@@ -36,9 +37,19 @@ import httpx
 from .backends import Target
 from .core import Ctx, episode_id, load_env, retired_arms, select_arms
 from .index import build as build_index
-from .index import latest_labels
 from .loop import run_episode
-from .runfolder import LOCAL, REPO_ROOT, RunWriter, git_sha, main_checkout_file, read_episodes, upload, write_labels
+from .runfolder import (
+    LOCAL,
+    REPO_ROOT,
+    RunWriter,
+    active_labels,
+    git_sha,
+    main_checkout_file,
+    read_episodes,
+    set_active_labels,
+    upload,
+    write_labels,
+)
 
 
 def parse_items(spec: str | None, all_items: list) -> list:
@@ -106,7 +117,8 @@ def make_target(env, a) -> tuple[Target, dict]:
         backend=cfg["backend"],
         url=cfg.get("url"),
         served_name=cfg.get("served_name"),
-        provider=cfg.get("provider"),
+        # an env's DEFAULTS provider is an OpenRouter slug: on vllm it's wrong in meta.json and the target id
+        provider=cfg.get("provider") if cfg["backend"].startswith("openrouter") else None,
         effort=cfg.get("effort"),
         thinking=bool(cfg.get("thinking")),
         max_tokens=cfg.get("max_tokens"),
@@ -133,7 +145,7 @@ def main(argv):
     ap.add_argument("--box-conc", type=int, default=16, help="of those, episodes with a podman box (podman degrades past a few dozen)")
     ap.add_argument("--override", action="append", default=[], help="KEY: accept a flag that conflicts with the env's REQUIRES")
     ap.add_argument("-d", "--description", default="")
-    ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF when done")
+    ap.add_argument("--no-upload", action="store_true", help="don't upload the run + indexes to HF or Docent when done")
     ap.add_argument("--no-docent", action="store_true", help="don't mirror the run to Docent (prints the backfill command instead)")
     add_target_args(ap)
     a = ap.parse_args(argv)
@@ -211,8 +223,8 @@ def main(argv):
     cost = sum((ep.get("usage") or {}).get("cost") or 0 for ep in results)
     w.finish(status, cost_usd=round(cost, 6), errors=sum(1 for ep in results if ep.get("error")))
     print(f"{status}: {len(results)} episodes, {w.meta['errors']} errors, ${cost:.4f}; {w.dir}")
-    docent_upload(w.dir, skip=a.no_docent)
-    written = build_index([a.env])
+    docent_upload(w.dir, skip=a.no_docent or a.no_upload)
+    written = build_index([a.env], evals=False)  # evals don't ship with an env run, and one broken eval used to block the upload
     if not a.no_upload:
         n, oid = upload([w.dir, *written], f"envrun {a.env} {run} ({status})")
         print(f"uploaded {n} files to envs/ ({oid[:10]})")
@@ -254,7 +266,9 @@ async def _run_all(env, jobs, target, today, caps, conc, box_conc, w, out: list)
 
     # no pool cap: httpx defaults to 100 connections, which silently capped --conc at 100
     limits = httpx.Limits(max_connections=None, max_keepalive_connections=None)
-    async with httpx.AsyncClient(timeout=httpx.Timeout(6 * 3600, connect=60), limits=limits) as client:
+    # 20 min per request (the slowest call in any saved run, queueing included, was ~8 min), so a request that never
+    # returns is retried by _post and, after its tries, errors the episode instead of holding the run open for hours
+    async with httpx.AsyncClient(timeout=httpx.Timeout(20 * 60, connect=60), limits=limits) as client:
         await asyncio.gather(*(one(*j) for j in jobs))
 
 
@@ -270,15 +284,17 @@ def measure_labels(env, episodes) -> list[tuple]:
 
 
 def rescore(runs: list[str], tag: str):
-    """A new labels/measure@<sha12>-<tag>.jsonl per ENV/RUN from the current measure() over the run's stored episodes. The
-    old labels files stay (a finished run is immutable); indexes and HF are left alone, so upload the new file yourself."""
+    """A new labels/measure@<sha12>-<tag>.jsonl per ENV/RUN from the current measure() over the run's stored episodes, made the
+    run's active labels (meta.json). The old labels files stay (a finished run is immutable); indexes and HF are left alone,
+    so upload the run yourself (`environments upload ENV/RUN`: the new file, meta.json and the indexes)."""
     sha = git_sha()
     assert sha and not sha.endswith("+dirty"), f"commit environments/ first: the labels file is named by its sha ({sha})"
     for spec in runs:
         run_dir = LOCAL / spec
-        old_name, old = latest_labels(run_dir)
+        old_name, old = active_labels(run_dir)
         labels = measure_labels(load_env(spec.split("/")[0]), read_episodes(run_dir))
         p = write_labels(run_dir, "measure", f"{sha[:12]}-{tag}", labels)
+        set_active_labels(run_dir, "measure", f"{sha[:12]}-{tag}")
         changed = sum(v != old.get(eid) for eid, v in labels)
         print(f"{spec}: {len(labels)} episodes, {changed} labels differ from {old_name} -> {p.relative_to(LOCAL)}")
 
@@ -314,10 +330,14 @@ def cli():
         ap.add_argument("--tag", required=True, help="the new file is labels/measure@<sha12>-<tag>.jsonl")
         a = ap.parse_args(rest)
         rescore(a.runs, a.tag)
+    elif cmd == "activate":  # then `environments upload ENV/RUN` ships meta.json and the indexes
+        run, name = rest
+        labeler, version = name.removesuffix(".jsonl").split("@", 1)
+        set_active_labels(LOCAL / run, labeler, version)
     elif cmd == "upload":
         dirs = [LOCAL / r for r in rest]
         envs = sorted({r.split("/")[0] for r in rest})
-        written = build_index(envs)
+        written = build_index(envs, evals=False)
         n, oid = upload([*dirs, *written], "envs: upload " + ", ".join(rest))
         print(f"uploaded {n} files ({oid[:10]})")
     else:

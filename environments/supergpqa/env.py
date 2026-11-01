@@ -13,18 +13,17 @@ letter; a reply with any more text is unscorable, `verbose`), `correct` (= gold,
 """
 
 import json
-import re
 import shutil
 from functools import cache
 
 import pandas as pd
 
 from environments._lib.core import Ctx, Episode
+from environments._lib.defaults import QWEN_DEEPINFRA_DEFAULTS
+from environments._lib.mcq import bare_letter, mcq_prompt
 from environments._lib.runfolder import REPO_ROOT
 
 ARMS = ["base"]
-INSTRUCTION = "Answer with the letter only."
-LETTERS = "ABCDEFGHIJ"
 JSONL = REPO_ROOT / "data/evalcue_cache/supergpqa_all.jsonl"  # m-a-p/SuperGPQA, fetched on first use
 N_ITEMS = 1000  # the original seeded sample (items 0:1000, the 2026-10-29_n8 run)
 N_EXTRA = 9000  # the scale-up: a second seeded sample from the rest, items 1000:10000
@@ -58,21 +57,12 @@ def build(arm, item, ctx: Ctx | None = None) -> Episode:
         "difficulty": row.difficulty,
         "n_options": len(row.options),
     }
-    question = row.question.strip() + "\n" + "\n".join(f"{c}. {o}" for c, o in zip(LETTERS[: len(row.options)], row.options, strict=True))
-    return Episode(messages=[{"role": "user", "content": question + "\n\n" + INSTRUCTION}], meta=meta)
-
-
-LETTER = re.compile(r"^\(?([A-J])[).]?\s*$")  # the whole reply is one letter
-
-
-def first_letter(text: str) -> str | None:
-    m = LETTER.match(text.strip())
-    return m.group(1) if m else None
+    return Episode(messages=[{"role": "user", "content": mcq_prompt(row.question, row.options)}], meta=meta)
 
 
 def measure(ep) -> dict:
     reply = ep["messages"][-1].get("content") or ""
-    answer = first_letter(reply)
+    answer = bare_letter(reply)
     if answer is None:
         return {"correct": None, "verbose": len(reply.strip()) > 3}
     return {"answer": answer, "correct": answer == ep["meta"]["gold"], "verbose": False}
@@ -85,21 +75,10 @@ ANSWER_FORMAT, ANSWER_MATCH = "the letter only", "the first letter A-J, case-ins
 
 
 def canon_answer(text: str) -> str | None:
-    return first_letter(text.strip().upper())
+    return bare_letter(text.strip().upper())
 
 
 REQUIRES = {"thinking": False}
 CAPS = {"max_turns": 1}
-DEFAULTS = {  # hint_mcq's: Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, evalcue's thinking-off sampling
-    "model": "qwen/qwen3.6-27b",
-    "backend": "openrouter",
-    "provider": "deepinfra/fp8",
-    "thinking": False,
-    "effort": "medium",
-    "body": "openrouter",
-    "sampling_all_models": True,
-    "sampling": {
-        "on": {"temperature": 1.0, "top_p": 0.95, "presence_penalty": 0.0},
-        "off": {"temperature": 0.7, "top_p": 0.8, "presence_penalty": 1.5},
-    },
-}
+# hint_mcq's: Qwen3.6-27B on OpenRouter pinned to DeepInfra fp8, thinking off, evalcue's thinking-off sampling
+DEFAULTS = QWEN_DEEPINFRA_DEFAULTS

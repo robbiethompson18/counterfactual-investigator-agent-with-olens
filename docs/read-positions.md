@@ -56,18 +56,20 @@ later that the signal was at a position nobody read.
 
 ## How to request it
 
-The reader's defaults cover punctuation and `<|im_end|>`, but not the think block, and **a
-`messages` row with `generation_prompt: true` renders the thinking-ON header** (`<think>\n`, via
-`render.chat_text`), which Qwen never saw with thinking off. Reads up to the `\n` after `assistant`
-are unaffected: the model is causal and the prefix is identical. But anything at or after `<think>`
-must come from a **`text` row holding the thinking-off render**, with explicit positions:
+The reader's defaults cover punctuation and `<|im_end|>`, but not the think block. A `messages` row
+with `generation_prompt: true` renders the thinking-off header (the empty think block) since
+2026-10-31; before that it rendered the thinking-ON header (`<think>\n`), so reads at or after
+`<think>` from such rows saw a prompt Qwen never saw (reads up to the `\n` after `assistant` were
+unaffected: the model is causal and the prefix is identical). Set `thinking: true` on the row for
+the thinking-on header. A **`text` row holding the thinking-off render** with explicit positions
+also works, and is what the existing inline sets use:
 
 ```python
 text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False)
 ids = tok(text, add_special_tokens=False).input_ids
 toks = [tok.decode([i]) for i in ids]
 positions = {p for p, t in enumerate(toks) if PUNCT.match(t) or t == "<|im_end|>"}
-positions |= set(option_newline_positions)        # MCQs: the token holding each option's ending newline
+positions |= set(option_newline_positions)  # MCQs: the token holding each option's ending newline
 positions |= set(range(len(ids) - 10, len(ids)))  # the ten tail tokens, ending at </think>\n\n
 row = {"id": ..., "text": text, "positions": sorted(positions)}
 ```

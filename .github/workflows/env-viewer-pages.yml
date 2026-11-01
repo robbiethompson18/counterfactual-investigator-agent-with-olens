@@ -1,15 +1,16 @@
 # Publishes the env viewer to GitHub Pages on every push to main that touches environments/, expview's page or the talk: the page
 # (environments/_lib/page.html) plus spec/, every env's arms / comparisons / RETIRED / STARRED built from the code by
 # `python -m environments spec --out`, expview (expview/static/index.html) at /expview/, and the talk deck
-# (`make -C slides`, figures from the public HF dataset) at /talk.pdf. Runs, rates, rollouts and reads still come from HF.
+# (`make -C slides`, figures from the public HF dataset) at /talk.pdf, and the final write-up (docs/final-writeup.html, charts embedded, from LFS; .githooks/pre-commit rebuilds it whenever
+# docs/final-writeup.md is committed) at /final-writeup.html. Runs, rates, rollouts and reads still come from HF.
 # Pages source is GitHub Actions (enabled 2026-10-27). Each deploy replaces the whole site: add other pages to site/ here.
 # A PR touching slides/ or graphs/ builds the deck too and attaches talk.pdf to the run as an artifact, without deploying.
-# If the deck fails to build on main, the site still deploys and keeps the last live talk.pdf.
+# If the deck fails to build on main, the site still deploys and keeps the last live talk.pdf; an un-fetched write-up is skipped, not fatal.
 name: env viewer pages
 on:
   push:
     branches: [main]
-    paths: [environments/**, expview/static/index.html, slides/**, graphs/**, .github/workflows/env-viewer-pages.yml]
+    paths: [environments/**, expview/static/index.html, docs/final-writeup.html, slides/**, graphs/**, .github/workflows/env-viewer-pages.yml]
   pull_request:
     paths: [slides/**, graphs/**, .github/workflows/env-viewer-pages.yml]
   workflow_dispatch:
@@ -41,8 +42,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: true
       - uses: astral-sh/setup-uv@v6
       - run: mkdir -p site/expview && cp environments/_lib/page.html site/index.html && cp expview/static/index.html site/expview/index.html
+      - run: if grep -q '<html' docs/final-writeup.html; then cp docs/final-writeup.html site/; else echo "::warning::final-writeup.html is not HTML (LFS pointer?), skipped"; fi
       - run: uv run --frozen python -m environments spec --out site/spec
       - uses: actions/download-artifact@v4
         if: ${{ needs.talk.result == 'success' }}

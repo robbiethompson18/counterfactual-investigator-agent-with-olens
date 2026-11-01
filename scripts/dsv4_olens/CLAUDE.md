@@ -30,7 +30,7 @@ of Robbie's RunPod pods (`runpod/CLAUDE.md`). Results: docs/envs/alignment_fakin
    `alignment_faking/<run>:<episode>`, bullets = greedy then samples with `fve: null`; `char_offset`
    is exact (read.py's `char` indexes the rendered string, so each message's content starts at a
    known offset; template tokens get null).
-5. `placebo_from_glm_email.py`: Celeste's GLM email dense reads cut to 3 bullets, `fve` null, as the
+5. `placebo_from_glm_email.py` (deleted, at `d89747b4`): Celeste's GLM email dense reads cut to 3 bullets, `fve` null, as the
    `olens_placebo_agentic` pool (cfbench's placebo needs reads over another env's transcripts).
    Kylie's expview export and base-model sampling checks stayed on `claude/af-v4-olens`.
 

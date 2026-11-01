@@ -1,0 +1,53 @@
+# ceselder/qwen3.6-27b-nla-rl (layer 42) reads on one SkyPilot RunPod GPU: scripts/author_probe/nla_l42.py's capture
+# (base Qwen, hidden_states[42] at the given positions), AV decode and AR scoring, all transformers. Launch (setup = venv +
+# base Qwen + the NLA's av_base, last RL adapter and AR), rsync RUN's hs_inputs.jsonl to ~/nla/, then one sky exec:
+#   uvx --from 'skypilot[runpod]==0.13.0' sky launch -c nla-l42 -y -i 15 --down --secret HF_TOKEN scripts/sky/nla_l42.yaml
+#   sky exec nla-l42 -d --secret HF_TOKEN --env N=0 scripts/sky/nla_l42.yaml   # N > 0: decode only the first N positions
+name: author-nla
+
+resources:
+  disk_size: 400
+  ordered:
+    - {infra: runpod, accelerators: "H200-SXM:1"}
+    - {infra: runpod, accelerators: "B200:1"}
+    - {infra: runpod, accelerators: "H200:1"}
+
+secrets:
+  HF_TOKEN: null
+
+envs:
+  HF_HOME: /data/hf
+  HF_XET_HIGH_PERFORMANCE: 1
+  MAX_HOURS: 4
+  N: "0"
+
+file_mounts:
+  ~/repo/scripts: ./scripts
+
+setup: |
+  set -euo pipefail
+  mkdir -p /data/hf ~/nla
+  command -v uv || curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH=$HOME/.local/bin:$PATH
+  cd ~ && test -x nla-env/bin/python || uv venv -q --python 3.12 nla-env
+  export VIRTUAL_ENV=~/nla-env
+  uv pip install -q torch --torch-backend=cu129
+  uv pip install -q transformers accelerate peft numpy pyyaml safetensors flash-linear-attention huggingface_hub hf_transfer
+  ~/nla-env/bin/hf download Qwen/Qwen3.6-27B >/dev/null
+  # named files: an --include glob list fetched no av_base/ on 2026-10-31 (as docs/nla-reader.md saw for av/)
+  ~/nla-env/bin/hf download ceselder/qwen3.6-27b-nla-rl --local-dir /data/nla-rl nla_meta.yaml \
+    av_base/config.json av_base/generation_config.json av_base/model.safetensors.index.json av_base/tokenizer.json \
+    av_base/tokenizer_config.json av_base/chat_template.jinja av_base/nla_meta.yaml \
+    av_base/model-00001-of-00002.safetensors av_base/model-00002-of-00002.safetensors \
+    av_rl_adapters/iter_000800/adapter_config.json av_rl_adapters/iter_000800/adapter_model.safetensors \
+    ar_reconstructor/config.json ar_reconstructor/generation_config.json ar_reconstructor/model.safetensors \
+    ar_reconstructor/value_head.safetensors >/dev/null
+  echo SETUP_DONE
+
+run: |
+  [ -f ~/nla/hs_inputs.jsonl ] || { echo "setup only"; exit 0; }
+  until [ -f /data/nla-rl/av_base/model-00002-of-00002.safetensors ] && ! pgrep -f "hf download" >/dev/null; do sleep 30; done
+  cd ~/nla
+  [ -f hs/h.npy ] || timeout "${MAX_HOURS}h" ~/nla-env/bin/python ~/repo/scripts/hs_at_positions.py hs_inputs.jsonl hs --layers 42
+  cd ~/repo && timeout "${MAX_HOURS}h" ~/nla-env/bin/python -m scripts.author_probe.nla_l42 decode ~/nla /data/nla-rl "$N"
+  echo NLA_DONE

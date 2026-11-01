@@ -234,9 +234,10 @@ def read_overlays(env: str, runs: set[str]) -> dict:
 
 
 def build_links(env: str) -> Path | None:
-    """envs/<env>/links.json from the local run folders (labels from the latest measure@ file, as index.py uses)."""
-    from .index import latest_labels
-    from .runfolder import read_episodes
+    """envs/<env>/links.json from the local run folders (each run's active measure labels, as index.py uses), merged with
+    HF's links.json like env_index: runs only HF has are kept, local runs win."""
+    from .index import hf_index
+    from .runfolder import active_labels, read_episodes
 
     if not (LOCAL / env).exists():
         return None
@@ -246,7 +247,7 @@ def build_links(env: str) -> Path | None:
     reads = read_overlays(env, {p.name for p in dirs})
     for run_dir in dirs:
         meta = json.loads((run_dir / "meta.json").read_text())
-        _, labels = latest_labels(run_dir)
+        _, labels = active_labels(run_dir)
         eps, skip = {}, retired_run_arms(mod, run_dir.name)
         for ep in read_episodes(run_dir):
             if ep["arm"] in skip:
@@ -260,6 +261,8 @@ def build_links(env: str) -> Path | None:
             "thinking": (meta.get("target") or {}).get("thinking"),
             "episodes": eps,
         }
+    retired = set(getattr(mod, "RETIRED_RUNS", []))
+    runs = {r: v for r, v in hf_index(f"{env}/links.json").get("runs", {}).items() if r not in retired} | runs
     p = LOCAL / env / "links.json"
     p.write_text(json.dumps({"env": env, "runs": runs}, separators=(",", ":")) + "\n")
     return p

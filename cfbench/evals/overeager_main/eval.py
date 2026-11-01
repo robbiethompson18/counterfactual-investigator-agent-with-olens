@@ -51,8 +51,7 @@ import pandas as pd
 from cfbench.core import Rollout, render, unified_diff
 from cfbench.envs.env_runs import FILE_CHARS, initial_messages
 from environments._lib.core import load_env
-from environments._lib.index import latest_labels
-from environments._lib.runfolder import LOCAL, REPO_ROOT, read_episodes
+from environments._lib.runfolder import LOCAL, REPO_ROOT, active_labels, read_episodes
 
 ENVS = ["overeagerness"]
 ENV = ENVS[0]
@@ -70,7 +69,7 @@ SAMPLES = ("rl_greedy", "rl_s1", "rl_s2", "rl_s3", "rl_s4")
 OPEN = {"<|system|>", "<|user|>", "<|assistant|>", "<think>", "<|observation|>", "<tool_response>"}  # at their field's start
 CLOSE = {"</think>": "reasoning_content", "</tool_response>": "content"}  # at their field's end
 TEMPLATE = re.compile(r"<\|[^|>]*\|>|</?[a-z_]+>|\[gMASK\]|<sop>")
-TAILS = (80, 50, 30, 18, 10)  # as scripts/celeste_olens_reads.char_offset
+TAILS = (80, 50, 30, 18, 10)  # as scripts/celeste_olens_reads.char_offset@d89747b4
 NOT_ASKING = "instead of asking the user which one they meant"
 SKIP = {"4 Johns: base vs single edits"}  # email item 0, already one of email (junebug)'s items (Kylie, 2026-10-28)
 # the env has no BEHAVIOR; these are the realism pages' definitions (as cfbench/envs/overeager_rows.py on branch
@@ -150,7 +149,7 @@ def _runs() -> dict[str, dict]:
         t = json.loads((run_dir / "meta.json").read_text())["target"]
         if t["model"] == MODEL and all(t.get(k) == v for k, v in TARGET.items()):
             pinned = sorted(run_dir.glob(f"labels/measure@{LABELER}.jsonl"))  # email runs also hold older-rule label files
-            out[run_dir.name] = _labels(pinned[0]) if pinned else latest_labels(run_dir)[1]
+            out[run_dir.name] = _labels(pinned[0]) if pinned else active_labels(run_dir)[1]
     return out
 
 
@@ -182,7 +181,7 @@ def _pool(eps: list[tuple[str, str, dict, bool]], items: list[str], all_items: b
 
 
 def char_offset(text: str, ctx_left: str) -> int | None:
-    """Index in `text` of the read token's last character, from the tail of its left context (scripts/celeste_olens_reads)."""
+    """Index in `text` of the read token's last character, from the tail of its left context (scripts/celeste_olens_reads@d89747b4)."""
     tail_src = TEMPLATE.split(ctx_left)[-1]
     for k in TAILS:
         tail = tail_src[-k:]
