@@ -21,7 +21,9 @@ from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from huggingface_hub.errors import EntryNotFoundError
 
+from cfbench.scoring import fetch
 from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
 
 R = Path("data/runs/cfbench")
@@ -51,12 +53,16 @@ BOOT = 2000
 
 
 def runs(name: str) -> list[Path]:
-    """Set `name`'s finished runs."""
-    return [
-        R / run
-        for run in SETS[name][1]
-        if (R / run / "meta.json").exists() and json.loads((R / run / "meta.json").read_text()).get("status") == "done"
-    ]
+    """Set `name`'s finished runs, fetched from HF when missing."""
+    out = []
+    for run in SETS[name][1]:
+        try:
+            meta = fetch(R / run / "meta.json")
+        except EntryNotFoundError:
+            continue
+        if json.loads(meta.read_text()).get("status") == "done":
+            out.append(fetch(R / run / "predictions.jsonl").parent)
+    return out
 
 
 def load() -> dict[str, dict[str, dict[str, float]]]:

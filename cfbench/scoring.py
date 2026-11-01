@@ -264,20 +264,19 @@ def coverage(rows: dict[tuple, dict], cases: dict[tuple, Case]) -> dict:
 STANDARD_PROBE_RUN = "runs/standard_probes/2026-10-31_nested2-v1"
 
 
+def fetch(path):
+    """`path` under data/, downloaded from the HF dataset when missing (the deck builds in CI from an empty data/)."""
+    from huggingface_hub import hf_hub_download
+
+    if not path.exists():
+        hf_hub_download(HF_REPO, str(path.relative_to("data")), repo_type="dataset", local_dir="data")
+    return path
+
+
 def standard_probe_file(relative: str):
     from pathlib import Path
 
-    from huggingface_hub import hf_hub_download
-
-    path = Path("data") / STANDARD_PROBE_RUN / relative
-    if not path.exists():
-        hf_hub_download(
-            HF_REPO,
-            f"{STANDARD_PROBE_RUN}/{relative}",
-            repo_type="dataset",
-            local_dir="data",
-        )
-    return path
+    return fetch(Path("data") / STANDARD_PROBE_RUN / relative)
 
 
 def standard_probe_rows(family: str, site: str, target: str | None = None) -> list[dict]:
