@@ -22,31 +22,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from graphs.style import BLUE, INK, MUTED, bar_kw, ci_bar
+from cfbench.catalog import CF as R
+from cfbench.catalog import MENUS as SETS  # set -> (title, runs)
+from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar
 
-R = Path("data/runs/cfbench")
-# set -> (title, runs); a set's NLA run is left out until it exists
-# The canonical runs for the final write-up's MCQ / cutoff / preferences numbers (CLAUDE.local.md): draw 0 of every menu, then
-# `*-all-d12b` / `-d12c`, draws 1-2 of prompt only and the `all` menu (the MCQ sets' d12b ran out of credits mid-upload, so their
-# d12c holds d12b's rows plus the rest), and `*-prompt-d12`, draws 1-2 of the `prompt` menu (the MCQ sets' ran on robbie-box,
-# so their date is UTC)
-SETS = {
-    "cutoff": ("cutoff_qa", ["2026-10-30_menus-cutoff-olens-jlens", "2026-10-31_menus-cutoff-nla-batch",
-                             "2026-10-31_menus-cutoff-all-d12b", "2026-10-31_menus-cutoff-prompt-d12"]),
-    "favorites": ("favorites_qa", ["2026-10-30_menus-favorites-olens-jlens", "2026-10-31_menus-favorites-nla-batch",
-                                   "2026-10-31_menus-favorites-all-d12b", "2026-10-31_menus-favorites-prompt-d12"]),
-    "mcq_unselected": ("MMLU-Pro", ["2026-10-31_menus-mcq-unselected-olens-jlens-batch",
-                                                     "2026-10-31_menus-mcq-unselected-nla-or2",
-                                                     "2026-10-31_menus-mcq-unselected-all-d12c",
-                                                     "2026-11-01_menus-mcq-unselected-prompt-d12"]),
-    "supergpqa": ("SuperGPQA", ["2026-10-31_menus-supergpqa-olens-jlens-batch2", "2026-10-31_menus-supergpqa-nla-batch3",
-                                "2026-10-31_menus-supergpqa-all-d12c", "2026-11-01_menus-supergpqa-prompt-d12"]),
-}  # fmt: skip
-# The menu whose lens conditions the write-up's charts read (graphs.headline_inline): `all`, the project's default read
-# positions (docs/read-positions.md). `prompt` (no tail tokens) was canonical for ~2 h on 2026-10-31 and is now the write-up's
-# token-position ablation, at 3 draws like `all` (Robbie, 2026-10-31)
-CANONICAL = "all"
-LENSES = {"olens": "O-lens", "nla": "NLA", "jlens": "J++"}
+LENSES = {"olens": OLENS, "nla": "NLA", "jlens": "J++"}
 MENUS = {"prompt": "prompt punctuation", "tail": "9 tail tokens", "all": "all", "last": "last token"}
 BOOT = 2000
 

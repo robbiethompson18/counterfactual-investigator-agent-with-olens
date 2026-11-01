@@ -24,14 +24,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import ESSAY_INPUTS
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
 from graphs import cutoff_qa_inline, menus_inline
 from graphs.headline_inline import CANON, LENSES, PLACEBOS, POOLED, TITLES, TS, Boot, load
-from graphs.style import MUTED, ci_bar, diff_rows, label, positions
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
 
 FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
-ESSAY_INPUTS = Path("data/runs/cfbench_evals/2026-10-30_essay-grading-inline-inputs/cases.jsonl")
 ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
 
 
@@ -186,7 +186,7 @@ def main(out: Path) -> None:
         "Essay grading, by whether Qwen grades the micro-essay like the human did",
         "95% bootstrap CI over micro-essays",
     )
-    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), ("O-lens", ["olens_inline", "olens_placebo_inline"])],
+    auroc_panels(blog_groups(), [("transcript\nonly", [TS]), (OLENS, ["olens_inline", "olens_placebo_inline"])],
                  out / "headline-blog-correctness.png", "Blog sentence deletion, by whether Qwen is right about the author",
                  "95% bootstrap CI over bloggers")  # fmt: skip
 

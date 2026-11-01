@@ -1,4 +1,4 @@
-"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.scoring.groups()`.
+"""The progress report's "Preliminary Data" charts, from the runs named in `cfbench.catalog.groups()`.
 
     uv run python -m graphs.cfbench_report --out docs/img/cfbench-report [--allow-old-lens]
 
@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
 
+from cfbench.catalog import groups, hidden_goal_runs
 from cfbench.scoring import (
     CONDS,
     LABEL,
@@ -31,8 +32,6 @@ from cfbench.scoring import (
     coverage,
     env_of,
     ess_envs,
-    groups,
-    hidden_goal_runs,
     load_rows,
     log_skill,
     noise_floor,
@@ -40,10 +39,10 @@ from cfbench.scoring import (
     rmse_null,
 )
 from graphs import cfbench_modelchart as modelchart
-from graphs.style import INK, MUTED, bar_kw, color, departure, marker_kw
+from graphs.style import INK, MUTED, OLENS, bar_kw, color, departure, marker_kw
 
-DEPARTURE = ("investigator Gemini 3.8 Flash with tools (read and grep transcripts and reads, 20 calls); O-lens shown through a tool at "
-             "layers 32/40/48; placebo from a different env; scored as RMSE of the predicted rate.")  # fmt: skip
+DEPARTURE = (f"investigator Gemini 3.8 Flash with tools (read and grep transcripts and reads, 20 calls); {OLENS} shown through a tool "
+             "at layers 32/40/48; placebo from a different env; scored as RMSE of the predicted rate.")  # fmt: skip
 
 TOOL_CONDS = ["transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
 TOOLS = ["read_transcript", "search_transcripts", "search_olens", "olens_at"]
@@ -96,7 +95,7 @@ def chart_pooled(cases, out):
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     ax.set_ylim(0, 118)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
-    ax.set_title("Prediction accuracy by what the predictor sees, all targets")
+    ax.set_title("Prediction accuracy by what the investigator sees, all targets")
     fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.08)
     departure(fig, DEPARTURE)
     fig.savefig(f"{out}/skill_pooled.png")
@@ -136,7 +135,7 @@ def chart_hidden_goal(out) -> dict:
     s = chart_subset(
         cases,
         "Essay grading (hidden_goal.grade), Qwen3.6-27B without CoT",
-        f"{len(cases)} arm pairs × {draws_of(cases)}, Gemini 3.8 Flash predictor; the pre-registered test of 2026-10-23",
+        f"{len(cases)} arm pairs × {draws_of(cases)}, Gemini 3.8 Flash investigator; the pre-registered test of 2026-10-23",
         "skill_hidden_goal.png",
         out,
     )
@@ -151,7 +150,7 @@ def chart_other_envs(out) -> dict:
     s = chart_subset(
         cases,
         "Every other env, Qwen3.6-27B without CoT",
-        f"{len(cases)} arm pairs × {draws_of(cases)} over {envs} envs, Gemini 3.8 Flash predictor; hidden_goal.grade excluded",
+        f"{len(cases)} arm pairs × {draws_of(cases)} over {envs} envs, Gemini 3.8 Flash investigator; hidden_goal.grade excluded",
         "skill_other_envs.png",
         out,
     )
@@ -175,7 +174,7 @@ def chart_by_target(per_target: dict[str, dict], out):
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     ax.set_ylim(0, 118)  # room for the legend above the bars
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
-    ax.set_title("Prediction accuracy by what the predictor sees")
+    ax.set_title("Prediction accuracy by what the investigator sees")
 
     others = [c for c in CONDS if c != "transcript_agentic"]
     ys, labels, y = [], [], 0
@@ -314,7 +313,7 @@ def chart_topics(rows_by_target: dict[str, dict], out):
     ax.xaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1, decimals=0))
     ax.set_xlabel("Share of search_olens calls")
     ax.grid(axis="y", visible=False)
-    ax.set_title("What the O-lens agent searches the lens for")
+    ax.set_title(f"What the {OLENS} agent searches the lens for")
     fig.subplots_adjust(bottom=0.12, left=0.25)
     fig.savefig(f"{out}/olens_search_topics.png")
     plt.close(fig)
@@ -346,7 +345,7 @@ def chart_tools(rows_by_target: dict[str, dict], out):
     ax.set_ylabel("Calls per prediction")
     ax.grid(axis="x", visible=False)
     ax.legend(frameon=False, fontsize=8)
-    ax.set_title("Which tools the predictor calls (20-call budget)")
+    ax.set_title("Which tools the investigator calls (20-call budget)")
     fig.subplots_adjust(bottom=0.12)
     fig.savefig(f"{out}/tool_calls.png")
     plt.close(fig)

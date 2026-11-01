@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from graphs.style import INK, MUTED
+from cfbench.catalog import CUTOFF_GRADER_MENTIONS_RUN
+from graphs.style import INK, MUTED, OLENS
 
 # runs aren't conditions in the palette: two teals for the no-tool runs, magenta for the tool run
 RUNS = {"A": ("#147d7d", "no tool"), "A2": ("#7cc4c4", "no tool, second 1k"), "B": ("#b8336a", "submit_answer tool")}
@@ -29,7 +30,7 @@ CLASSES = {
 }
 LAYERS = [32, 40, 48, 52, 56, 60]
 COL = "nov_graded"
-YLAB = '% of O-lens reads saying "grader" / "graded"'
+YLAB = f'% of {OLENS} reads saying "grader" / "graded"'
 
 
 def boot(d: pd.DataFrame, n: int = 2000, seed: int = 0) -> tuple[float, float, float]:
@@ -150,7 +151,7 @@ def main(run: Path, out: Path) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", type=Path, default=Path("data/runs/cutoff_grader_mentions/2026-10-30_regex"))
+    ap.add_argument("--run", type=Path, default=Path("data") / CUTOFF_GRADER_MENTIONS_RUN)
     ap.add_argument("--out", type=Path, default=Path("docs/img"))
     a = ap.parse_args()
     main(a.run, a.out)

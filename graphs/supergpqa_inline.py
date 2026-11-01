@@ -12,11 +12,12 @@ Reads the runs' predictions.jsonl, pooled (docs/supergpqa-inline.md).
 import argparse
 from pathlib import Path
 
+from cfbench.catalog import SUPERGPQA_INLINE_RUNS
 from cfbench.scoring import standard_mcq_comparison
 from graphs.cutoff_qa_inline import PAIRS, bar_chart, diffs
 from graphs.mcq_unselected import BARS_MCQ
 
-RUNS = [Path(f"data/runs/cfbench/2026-10-29_supergpqa-haiku-3k-{s}") for s in ("ts", "olens", "jlens", "nla")]
+RUNS = SUPERGPQA_INLINE_RUNS
 GROUPS = {"all cases": None, "Qwen wrong (its letter is not the gold one)": False, "Qwen right": True}
 # cutoff_qa_inline's rows, the last one as NLA − J++
 SUPERGPQA_PAIRS = [

@@ -12,16 +12,14 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.catalog import CUTOFF_QA_TOOL_PANELS
 from graphs.cutoff_qa_inline import ci, per_item
-from graphs.style import MUTED, bar_kw, ci_bar, label
+from graphs.style import MUTED, OLENS, bar_kw, ci_bar, label
 
 GROUPS = {"all items": None, "stale\n(answer out of date)": "stable_wrong", "not stale\n(answer still true)": "stable_right"}
 
 SERIES = ["transcript_inline", "olens_inline", "olens_placebo_inline"]
-PANELS = {
-    "Plain answer: last read 5 tokens before it": Path("data/runs/cfbench/2026-10-29_cutoff-qa-haiku-200"),
-    "submit_answer tool call: last read 20 tokens before it": Path("data/runs/cfbench/2026-10-29_cutoff-qa-tool-haiku-200"),
-}
+PANELS = CUTOFF_QA_TOOL_PANELS
 
 
 def main(out: Path) -> None:
@@ -45,7 +43,7 @@ def main(out: Path) -> None:
         ax.set_title(title)
     axes[0].set_ylim(0, top + 7)
     axes[0].set_ylabel("% of items where Haiku names Qwen's answer")
-    fig.suptitle("Predicting Qwen3.6-27B's answer from the prompt: does moving the answer away from the read hurt the O-lens?",
+    fig.suptitle(f"Predicting Qwen3.6-27B's answer from the prompt: does moving the answer away from the read hurt the {OLENS}?",
                  x=0.07, ha="left", y=1.07)  # fmt: skip
     handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(s)) for s in SERIES]
     fig.legend(handles, [label(s) for s in SERIES], loc="upper left", frameon=False, fontsize=8.5, ncol=3, bbox_to_anchor=(0.065, 1.02))

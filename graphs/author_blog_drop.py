@@ -10,9 +10,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from cfbench.scoring import AUTHOR_GROUPS, author_bars, author_cases
-from graphs.style import MUTED, ci_bar, departure, positions
+from graphs.style import MUTED, OLENS, ci_bar, departure, positions
 
-DEPARTURE = ("O-lens at layers 32/40/48, NLA at layer 42 only; positions are the question's and post's punctuation and newlines, "
+DEPARTURE = (f"{OLENS} at layers 32/40/48, NLA at layer 42 only; positions are the question's and post's punctuation and newlines, "
              "no tail tokens; Haiku at effort low, one draw per case; AUROC.")  # fmt: skip
 
 

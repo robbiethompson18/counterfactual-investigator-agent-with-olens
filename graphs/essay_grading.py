@@ -21,15 +21,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from cfbench.scoring import ESSAY_LENSES, essay_auroc_bars
-from graphs.style import FAINT, INK, MUTED, bar_kw, departure, diff_rows, positions
+from graphs.style import FAINT, INK, MUTED, OLENS, bar_kw, departure, diff_rows, positions
 
 GROUPS = [
     ("transcript", ["transcript_inline"]),
-    ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+    (OLENS, ["olens_inline", "olens_placebo_inline"]),
     ("NLA", ["nla_inline", "nla_placebo_inline"]),
     ("J++", ["jlens_inline", "jlens_placebo_inline"]),
     ("transcript\n+ mean", ["transcript_inline+mean"]),
-    ("O-lens\n+ mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
+    (f"{OLENS}\n+ mean", ["olens_inline+mean", "olens_placebo_inline+mean"]),
     ("NLA\n+ mean", ["nla_inline+mean", "nla_placebo_inline+mean"]),
     ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
     ("probe", ["probe_user_end"]),  # the user-end probe only (Kylie: one probe is easier to explain)
