@@ -25,7 +25,7 @@ def main() -> None:
     for c, x in xs.items():
         v, (lo, hi), _ = pooled[c]
         ci_bar(ax, x, c, v, lo, hi, fmt="{:.3f}")
-    ax.set_xticks(ticks, [g for g, _ in AUTHOR_GROUPS], fontsize=9)
+    ax.set_xticks(ticks, [OLENS if g == "olens" else g for g, _ in AUTHOR_GROUPS], fontsize=9)
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.set_ylim(0.5, 0.9)
     ax.set_ylabel("AUROC of P(significant)")

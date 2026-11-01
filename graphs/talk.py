@@ -341,7 +341,7 @@ def author() -> None:
                 ax.annotate(
                     text, (x, hi), xytext=(0, dy), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * SLIDE_S, color=INK
                 )
-        ax.set_xticks(ticks, [g for g, _ in AUTHOR_GROUPS])
+        ax.set_xticks(ticks, [OLENS if g == "olens" else g for g, _ in AUTHOR_GROUPS])
         ax.set_xlim(-0.6, width - 0.6)
         ax.tick_params(axis="x", labelsize=7 * SLIDE_S)
         ax.set_title(title, fontsize=7 * SLIDE_S, color=INK, loc="left")
