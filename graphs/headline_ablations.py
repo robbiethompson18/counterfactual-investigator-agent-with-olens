@@ -6,9 +6,9 @@ is right, lens and placebo differences.
   knowledge cutoff (Qwen's answer is still true vs stale). Preferences have no truth, so they are left out.
 - headline-lens-diffs.png: each lens minus transcript only, per task (MCQ, cutoff, preferences) and pooled, paired CIs from
   graphs.headline_inline.Boot; headline-placebo-diffs.png: the same rows for each lens's placebo minus transcript only.
-- headline-essay-correctness.png: essay grading's AUROC per condition on the essays Qwen grades "wrong" and the rest. Qwen is wrong
-  on an essay when it grades a top-half essay (PERSUADE holistic score 4-6) below its own median grade over the 204 essays, or a
-  bottom-half essay (1-3) at or above it; Qwen's grade is its mean on the plain base prompt. CIs resample essays.
+- headline-essay-correctness.png: essay grading's AUROC per condition on the micro-essays Qwen grades "wrong" and the rest. Qwen is
+  wrong on a micro-essay when it grades a top-half one (PERSUADE holistic score 4-6) below its own median grade over the 204, or a
+  bottom-half one (1-3) at or above it; Qwen's grade is its mean on the plain base prompt. CIs resample micro-essays.
 - headline-blog-correctness.png: blog sentence deletion's AUROC per condition, the qwen_wrong and qwen_right versions (Qwen's
   answer about the author vs the truth), CIs resampling bloggers. Every draw is one prediction.
 
@@ -127,9 +127,9 @@ def essay_groups() -> dict[str, dict]:
     scores, reference = standard_essay_comparison()
     wrong = essay_qwen_wrong()
     groups = {}
-    for name, flag in (("Qwen grades the essay wrong", True), ("Qwen grades the essay right", False)):
+    for name, flag in (("Qwen grades the micro-essay wrong", True), ("Qwen grades the micro-essay right", False)):
         keys = [k for k in reference if wrong[k[1]] == flag]
-        groups[f"{name}, {len({k[1] for k in keys})} essays"] = {
+        groups[f"{name}, {len({k[1] for k in keys})} of 204 micro-essays"] = {
             c: (
                 [p for k in keys for p in scores[c][k]],
                 [reference[k]["truth"] for k in keys for _ in scores[c][k]],
@@ -164,8 +164,13 @@ def main(out: Path) -> None:
     boot = Boot(load())
     lens_diffs(boot, out / "headline-lens-diffs.png")
     lens_diffs(boot, out / "headline-placebo-diffs.png", placebo=True)
-    auroc_panels(essay_groups(), SEVEN, out / "headline-essay-correctness.png",
-                 "Essay grading, by whether Qwen grades the essay like the human did", "95% bootstrap CI over essays")  # fmt: skip
+    auroc_panels(
+        essay_groups(),
+        SEVEN,
+        out / "headline-essay-correctness.png",
+        "Essay grading, by whether Qwen grades the micro-essay like the human did",
+        "95% bootstrap CI over micro-essays",
+    )
     auroc_panels(blog_groups(), [("transcript\nonly", [TS]), ("O-lens", ["olens_inline", "olens_placebo_inline"])],
                  out / "headline-blog-correctness.png", "Blog sentence deletion, by whether Qwen is right about the author",
                  "95% bootstrap CI over bloggers")  # fmt: skip

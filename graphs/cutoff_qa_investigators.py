@@ -92,10 +92,9 @@ def load(which: str) -> dict[str, dict[str, dict]]:
     return out
 
 
-def main(which: str, out: Path) -> None:
-    data = load(which)
-    n_bars = sum(len(bars) for bars in data.values())
-    fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
+def draw(axes, data: dict, s: float = 1.0) -> list:
+    """One panel per GROUPS entry on `axes`, an investigator's bars side by side; returns the legend handles. `s` scales the
+    text (the deck passes graphs.style.SLIDE_S)."""
     for ax, (group, value) in zip(axes, GROUPS.items(), strict=True):
         x, ticks, n = 0.0, [], 0
         for bars in data.values():
@@ -103,18 +102,25 @@ def main(which: str, out: Path) -> None:
             for c, items in bars.items():
                 vals = [a for g, a in items.values() if value is None or g == value]
                 lo, hi = ci(vals)
-                ci_bar(ax, x, c, 100 * sum(vals) / len(vals), 100 * lo, 100 * hi)
+                ci_bar(ax, x, c, 100 * sum(vals) / len(vals), 100 * lo, 100 * hi, fontsize=7.5 * s)
                 x, n = x + 0.85, max(n, len(vals))
             ticks.append((start + x - 0.85) / 2)
             x += 0.9
         ax.set_xticks(ticks, list(data))
         ax.grid(axis="x", visible=False)
-        ax.set_title(f"{group}, n = {n}", fontsize=9.5)
+        ax.set_title(f"{group}, n = {n}", fontsize=9.5 * s)
         ax.set_ylim(0, 105)
         ax.set_ylabel("% naming Qwen's answer")
     seen = {c: None for bars in data.values() for c in bars}
-    handles = [plt.Rectangle((0, 0), 1, 1, **bar_kw(c)) for c in seen]
-    fig.legend(handles, [label(c) for c in seen], loc="outside lower center", ncol=4, fontsize=8.5)
+    return [plt.Rectangle((0, 0), 1, 1, label=label(c), **bar_kw(c)) for c in seen]
+
+
+def main(which: str, out: Path) -> None:
+    data = load(which)
+    n_bars = sum(len(bars) for bars in data.values())
+    fig, axes = plt.subplots(len(GROUPS), 1, figsize=(max(6.5, 0.62 * n_bars + 1.5), 2.5 * len(GROUPS)), sharex=True, layout="constrained")
+    handles = draw(axes, data)
+    fig.legend(handles=handles, loc="outside lower center", ncol=4, fontsize=8.5)
     fig.suptitle("Knowledge cutoff: a later-cutoff vs a same-cutoff investigator", x=0.01, ha="left")
     fig.text(0.995, 0.975, "exact match, 95% CI over items", ha="right", fontsize=8, color=MUTED)
     out.parent.mkdir(parents=True, exist_ok=True)
