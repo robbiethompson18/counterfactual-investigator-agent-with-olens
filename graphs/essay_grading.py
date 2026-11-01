@@ -8,8 +8,10 @@ probability on a 54% base rate, and % right at 0.5 rewards a shift in its bias (
 
     uv run python -m graphs.essay_grading [--out-dir docs/img]
 
-Writes headline-essay.png (the bars) and headline-essay-diff.png (paired differences: each lens minus transcript only and minus
-its placebo, both probes minus transcript only), and prints the differences the write-up quotes.
+Writes headline-essay.png (transcript only, the lenses and the probe), headline-essay-mean.png (the "+ mean" bars and the probe;
+the write-up shows the two apart, the deck draws every group on one axes) and headline-essay-diff.png (paired differences: each
+lens minus transcript only and minus its placebo, both probes minus transcript only), and prints the differences the write-up
+quotes.
 """
 
 import argparse
@@ -32,18 +34,21 @@ GROUPS = [
     ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
     ("probe", ["probe_user_end"]),  # the user-end probe only (Kylie: one probe is easier to explain)
 ]  # † Kylie: probably cursed (the slide's footnote)
+PLAIN_GROUPS = [g for g in GROUPS if "+ mean" not in g[0]]  # the write-up's first chart
+MEAN_GROUPS = [g for g in GROUPS if "+ mean" in g[0] or g[0] == "probe"]  # its second, under the calibration paragraph
 TS = "transcript_inline"
 WRITEUP_S = 1.15  # text scale at write-up size: values at 7.5pt as graphs.style.ci_bar; the deck passes SLIDE_S
 BASE = 0.5  # the axis starts at chance
 
 
-def essay_bars(ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)") -> None:
+def essay_bars(ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)", groups: list = GROUPS) -> None:
     """The bars on ax, text sizes scaled by s. Bars from chance, the gray 95% CI whisker, the value in ink above it and the stars
     over that (offsets in points, so they clear the whisker at any height), the null dotted and labelled at the right. The axis
     stops `headroom` above the tallest whisker: room for its two labels, so 0.1 on the deck's 24 mm figure, less when taller.
-    `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u")."""
+    `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u"). `groups`: which of
+    GROUPS to draw, in order."""
     bars, null, n, _ = essay_auroc_bars()
-    xs, ticks = positions(bars, GROUPS)
+    xs, ticks = positions(bars, groups)
     for c, x in xs.items():
         v, (lo, hi), st = bars[c]
         ax.bar(x, v - BASE, 0.8, bottom=BASE, **bar_kw(c.removesuffix("+mean")))
@@ -52,7 +57,7 @@ def essay_bars(ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(sc
         ax.annotate(st, (x, hi), xytext=(0, 6.5), textcoords="offset points", ha="center", va="bottom", fontsize=6.5 * s, color=INK)
     ax.axhline(null, color=FAINT, lw=0.9, ls=(0, (1, 2)), zorder=1)
     ax.text(1.0, null, " bet at\n the mean", transform=ax.get_yaxis_transform(), fontsize=7 * s, color=MUTED, va="center")
-    ax.set_xticks(ticks, [g for g, cs in GROUPS if any(c in bars for c in cs)])
+    ax.set_xticks(ticks, [g for g, cs in groups if any(c in bars for c in cs)])
     ax.set_xlim(-0.6, ticks[-1] + 0.6)
     ax.tick_params(axis="x", labelsize=7 * s)
     head = f"{n:,} cases · probe: nested 2 × 2 · AUROC over every draw · hatched = placebo"  # one line, clear of the probe's stars
@@ -81,12 +86,15 @@ def essay_diffs(ax) -> None:
 
 
 def main(out: Path) -> None:
-    fig, ax = plt.subplots(figsize=(9.6, 3.2), layout="constrained")
-    essay_bars(ax, WRITEUP_S, headroom=0.04)
-    fig.suptitle("Essay grading", x=0.01, ha="left")
-    fig.savefig(out / "headline-essay.png", bbox_inches="tight")
-    plt.close(fig)
-    print("wrote", out / "headline-essay.png")
+    charts = [("headline-essay.png", PLAIN_GROUPS, "Essay grading"),
+              ("headline-essay-mean.png", MEAN_GROUPS, "Essay grading, with Qwen's observed mean grade added")]  # fmt: skip
+    for name, groups, title in charts:
+        fig, ax = plt.subplots(figsize=(6.4, 3.2), layout="constrained")
+        essay_bars(ax, WRITEUP_S, headroom=0.04, groups=groups)
+        fig.suptitle(title, x=0.01, ha="left")
+        fig.savefig(out / name, bbox_inches="tight")
+        plt.close(fig)
+        print("wrote", out / name)
     fig, ax = plt.subplots(figsize=(7.4, 3.4), layout="constrained")
     essay_diffs(ax)
     fig.savefig(out / "headline-essay-diff.png", bbox_inches="tight")
