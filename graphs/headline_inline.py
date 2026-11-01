@@ -97,14 +97,15 @@ class Boot:
         return f"{m:+.1f} [{lo:+.1f}, {hi:+.1f}]"
 
 
-def bars(ax, boot: Boot, tasks: list[str], groups: list, error: bool = False) -> None:
+def bars(ax, boot: Boot, tasks: list[str], groups: list, error: bool = False, s: float = 1.0) -> None:
+    """The bars on ax; `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
     conditions = {c: boot.bar(tasks, c) for _, cs in groups for c in cs}
     xs, ticks = positions(conditions, groups)
     for c, (m, lo, hi) in conditions.items():
         if error:
             m, lo, hi = 100 - m, 100 - hi, 100 - lo
-        ci_bar(ax, xs[c], c, m, lo, hi)
-    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5)
+        ci_bar(ax, xs[c], c, m, lo, hi, fontsize=7.5 * s)
+    ax.set_xticks(ticks, [name for name, _ in groups], fontsize=8.5 * s)
     ax.grid(axis="x", visible=False)
 
 
