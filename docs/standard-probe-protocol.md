@@ -163,9 +163,10 @@ Regenerate locally, without model calls:
 
 ```bash
 uv run python -m graphs.standard_probes
-uv run python -m graphs.mcq_unselected
-uv run python -m graphs.supergpqa_inline
 ```
+
+`graphs.mcq_unselected` and `graphs.supergpqa_inline` also drew these probes beside the lenses; both
+were deleted in PR #579 (regenerate from commit 62a4e31c).
 
 - `docs/img/standard-probes-mcq.png`: all six source-to-target comparisons, both positions, full
   populations and Qwen-right/wrong subgroups.

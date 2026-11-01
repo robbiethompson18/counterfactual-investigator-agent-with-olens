@@ -48,7 +48,7 @@ WorkspaceBench's `basic_readout` implicit family scaled from 32 items to 1,500
 
 ![paired differences between conditions with 95% CIs](img/favorites-qa-inline-diff.png)
 
-(`uv run python -m graphs.favorites_qa_inline` makes both.)
+(`graphs.favorites_qa_inline` made both, deleted in PR #579; regenerate from commit 62a4e31c.)
 
 | condition            | all   | pick_one | recommend | choose_for | favorite | name_one |
 | -------------------- | ----- | -------- | --------- | ---------- | -------- | -------- |
