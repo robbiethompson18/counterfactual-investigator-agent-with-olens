@@ -167,14 +167,14 @@ def essay_diffs() -> None:
     resamples as the table and the stars; the probe is left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
     short = {"olens_inline": OLENS, "nla_inline": "NLA", "jlens_inline": "J++"}
-    fig, ax = slide_figure(72, 25)
+    fig, ax = slide_figure(72, 20)
     ticks, labels, y = [], [], 0.0
-    for a, b in [(x, other) for x in ESSAY_LENSES for other in (x.replace("_inline", "_placebo_inline"), "transcript_inline")]:
-        d, (lo, hi), _ = pairs[a, b]
+    for a in ESSAY_LENSES:  # each lens vs transcript only; no lens − placebo rows (Robbie, 2026-10-31)
+        d, (lo, hi), _ = pairs[a, "transcript_inline"]
         ax.plot([lo, hi], [y, y], color=INK, lw=1.2, solid_capstyle="butt", zorder=3)
         ax.plot(d, y, "o", ms=3.5, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
         ticks.append(y)
-        labels.append(f"{short[a]} − {'transcript' if b == 'transcript_inline' else 'placebo'}")
+        labels.append(f"{short[a]} − transcript")
         y -= 1
     ax.set_yticks(ticks, labels)
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
@@ -198,7 +198,7 @@ def essay_tables() -> None:
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))}\\\\"
-            for a, b in pairs if not a.endswith("+mean") and not a.startswith("probe")]  # fmt: skip
+            for a, b in pairs if b == "transcript_inline" and not a.startswith("probe")]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
     head = [r" & $\Delta$ & p\\"]
     (OUT / "essay_pairs.tex").write_text(tab("lrr", [*head, "\\hline", *rows]))
