@@ -126,10 +126,10 @@ def load(which: str) -> dict[str, dict[str, dict]]:
     return out
 
 
-def draw(axes, data: dict, s: float = 1.0) -> list:
-    """One panel per GROUPS entry on `axes`, an investigator's bars side by side; returns the legend handles. `s` scales the
-    text (the deck passes graphs.style.SLIDE_S)."""
-    for ax, (group, value) in zip(axes, GROUPS.items(), strict=True):
+def draw(axes, data: dict, s: float = 1.0, groups: dict[str, str | None] = GROUPS) -> list:
+    """One panel per `groups` entry (a subset of GROUPS) on `axes`, an investigator's bars side by side; returns the legend
+    handles. `s` scales the text (the deck passes graphs.style.SLIDE_S)."""
+    for ax, (group, value) in zip(axes, groups.items(), strict=True):
         x, ticks, n = 0.0, [], 0
         for bars in data.values():
             start = x
