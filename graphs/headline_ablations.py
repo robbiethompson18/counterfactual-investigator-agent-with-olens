@@ -26,6 +26,7 @@ import numpy as np
 
 from cfbench.catalog import ESSAY_INPUTS
 from cfbench.scoring import author_cases, grouped_auc_ci, grouped_mean_ci, standard_essay_comparison
+from environments.cutoff_qa.env import _items as cutoff_items
 from graphs import menus_inline
 from graphs.headline_inline import LENSES, PLACEBOS, PLAIN_COND, POOLED, TITLES, TS, Boot, load
 from graphs.style import MUTED, OLENS, ci_bar, diff_rows, label, positions
@@ -34,19 +35,21 @@ FOUR = [(label(c), [c]) for c in (TS, *LENSES)]
 SEVEN = [("transcript\nonly", [TS]), *((label(c), [c, PLACEBOS[c]]) for c in LENSES)]
 ESSAY_BANK = Path("data/banks/essay_grading/persuade_v1.json")
 # gate_class per cutoff item (stable_right: Qwen's answer is still true); the canonical menus_inline runs don't carry it
-CUTOFF_REF = Path("data/runs/cfbench/2026-10-29_cutoff-qa-1k-transcript/predictions.jsonl")
 
 
 def by_correctness() -> dict[str, dict[str, dict]]:
     """set -> condition -> case -> (qwen_right, accuracy) on the canonical menus_inline runs and menu; the case is its own
     bootstrap group. MCQ: Qwen's modal letter is the gold one; cutoff: Qwen's answer is still true (gate_class stable_right,
-    from CUTOFF_REF)."""
+    from the cutoff_qa item bank)."""
     right: dict = defaultdict(dict)
     for s in ("mcq_unselected", "supergpqa"):
         for run in menus_inline.runs(s):
             for r in map(json.loads, (run / "predictions.jsonl").open()):
                 right[s][r["item"]] = r["modal_cf"] == r["gold"]
-    right["cutoff"] = {r["item"]: r["gate_class"] == "stable_right" for r in map(json.loads, CUTOFF_REF.open())}
+    bank = cutoff_items()
+    for run in menus_inline.runs("cutoff"):
+        for r in map(json.loads, (run / "predictions.jsonl").open()):
+            right["cutoff"][r["item"]] = bank[r["item"]]["gate_class"] == "stable_right"
     menus = menus_inline.load()
     sets = {"MMLU-Pro": "mcq_unselected", "SuperGPQA": "supergpqa", "Knowledge Cutoff": "cutoff"}
     menu_name = {c: m for m, c in PLAIN_COND.items()}

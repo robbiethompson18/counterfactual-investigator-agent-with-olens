@@ -36,13 +36,12 @@ MENUS = {
 # token-position ablation, at 3 draws like `all` (Robbie, 2026-10-31)
 CANONICAL_MENU = "all"
 
-# Knowledge cutoff by investigator (graphs.cutoff_qa_investigators): each investigator's own answer to the question, the gold
-# labels / gate classes, and the runs outside menus_inline
+# Knowledge cutoff by investigator (graphs.cutoff_qa_investigators): each investigator's own answer to the question and the
+# runs outside menus_inline (gate classes and labels come from the cutoff_qa item bank)
 CUTOFF_CENSUS = {
     "Claude Haiku 5.5": Path("data/runs/cutoff_qa_census/2026-10-31_haiku-1k/census.jsonl"),
     "Gemini 2.5 Flash-Lite": Path("data/runs/cutoff_qa_census/2026-10-31_flashlite-1k/census_flashlite.jsonl"),
 }
-CUTOFF_REF = CF / "2026-10-29_cutoff-qa-1k-transcript/predictions.jsonl"  # gold labels and gate_class per item
 CUTOFF_TOLD = CF / "2026-10-31_cutoff-qa-1k-told-transcript"  # Haiku told the model and its cutoff, old cutoff_qa_inline prompt
 CUTOFF_FLASHLITE = CF / "2026-10-31_menus-cutoff-flashlite-transcript"  # Flash-Lite, menus_inline prompt, prompt only
 
@@ -62,42 +61,6 @@ CHIVE_AGAM_RUNS = [CF / f"2026-10-31_chive-agam-haiku-{s}" for s in ("nolens", "
 CUTOFF_GRADER_MENTIONS_RUN = "runs/cutoff_grader_mentions/2026-10-30_regex"
 MANDARIN_RUN = Path("data/runs/olens_space_fix/2026-10-22_favourites-old-vs-new")
 DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
-
-# ---- older per-set inline evals (superseded for the write-up by menus_inline; their docs still cite them) ----
-
-CUTOFF_QA_INLINE = "2026-10-29_cutoff-qa-1k"  # prefix of Haiku's per-condition runs, 999 items
-CUTOFF_QA_INLINE_FLASHLITE = "2026-10-31_cutoff-qa-1k-flashlite"  # prefix of Flash-Lite's
-CUTOFF_QA_INLINE_SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
-CUTOFF_QA_INLINE_RUNS = [CF / f"{CUTOFF_QA_INLINE}-{s}" for s in CUTOFF_QA_INLINE_SLUGS]  # one run per condition
-CUTOFF_QA_FLASHLITE_TRANSCRIPT = CF / "2026-10-31_cutoff-qa-1k-flashlite-transcript"
-CUTOFF_QA_FLASHLITE_TOLD = CF / "2026-10-31_cutoff-qa-1k-flashlite-told-transcript"
-CUTOFF_QA_TOOL_PANELS = {
-    "Plain answer: last read 5 tokens before it": CF / "2026-10-29_cutoff-qa-haiku-200",
-    "submit_answer tool call: last read 20 tokens before it": CF / "2026-10-29_cutoff-qa-tool-haiku-200",
-}
-CUTOFF_QA_TOOL_V3 = CF / "2026-10-30_cutoff-qa-tool-v3"  # transcript-only and the full set
-CUTOFF_QA_TOOL_CUTS = {c: CF / f"2026-10-30_cutoff-qa-tool-v3-olens-{c.replace('_', '-')}-full" for c in ("qpunct", "qpunct_imend")}
-FAVORITES_QA_INLINE_RUNS = [CF / f"2026-10-29_favorites-haiku-v3-{s}" for s in ("olens", "jlens", "nla")]
-MCQ_UNSELECTED_RUNS = [CF / f"2026-10-29_mcq-unselected-haiku-{s}" for s in ("b1r", "b2", "jlens-b1", "jlens-b2", "nla-b1", "nla-b2")]
-SUPERGPQA_INLINE_RUNS = [CF / f"2026-10-29_supergpqa-haiku-3k-{s}" for s in ("ts", "olens", "jlens", "nla")]
-
-# ---- hinted MCQ (hints are out of the write-up, 2026-10-29; graphs.hint_mcq_answer / hint_mcq_total) ----
-
-HINT_MCQ_ROLLOUTS = Path("data/runs/hint_cf_wrong_mcq/2026-10-26_or_nothink2/rows.jsonl")
-HINT_MCQ_ANSWER_RUNS = {
-    "hint is the correct answer": CF / "2026-10-27_answer-mcq-olens-header",
-    "hint is a wrong answer": CF / "2026-10-27_answer-mcq-olens-header-d2",
-}
-HINT_MCQ_TOTAL_ORIG = {"d1": ["2026-10-27_answer-mcq-olens-header", "2026-10-27_answer-mcq-orig-killed-d1"],
-                       "d2": ["2026-10-27_answer-mcq-olens-header-d2", "2026-10-27_answer-mcq-orig-killed-d2"]}  # fmt: skip
-HINT_MCQ_OTHER_PREDICTORS = ("sol50", "astra10")
-
-
-def hint_mcq_total_runs(slot: str) -> list[Path]:
-    """The original runs plus every finished scale2k run of `slot` (d1 / d2), Flash only."""
-    scale = [p for p in sorted(CF.glob(f"*_answer-mcq-scale2k-{slot}*")) if not p.name.endswith(HINT_MCQ_OTHER_PREDICTORS)]
-    return [CF / name for name in HINT_MCQ_TOTAL_ORIG[slot]] + [p for p in scale if p.joinpath("predictions.jsonl").exists()]
-
 
 # ---- the counterfactual (cfbench agentic) charts: graphs.cfbench_report, cfbench_modelchart, honest_binary ----
 
