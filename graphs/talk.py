@@ -125,10 +125,11 @@ def grid() -> None:
 
 @slide
 def essay() -> None:
-    """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width: three
-    lenses with placebos, with and without the mean, don't fit Part 1's bar size beside the table)."""
+    """AUROC of P(the score goes up without the opener), graphs.essay_grading's chart at the deck's size (full slide width, as
+    Part 1's figures), without its "+ mean" bars and the bet-at-the-mean line (Kylie 2026-11-01)."""
     fig, ax = slide_figure(FULL_W, 24)
-    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)")  # the frame title asks "does Qwen's grade go up"
+    essay_bars(ax, SLIDE_S, ylabel="AUROC of P(up)", mean=False, null_line=False)  # the frame title asks "does Qwen's grade go up"
+    ax.set_xticklabels([t.get_text() + "†" * (t.get_text() == "probe") for t in ax.get_xticklabels()])  # the footnote's dagger
     slide_save(fig, OUT / "essay.pdf")
     essay_tables()
 
@@ -161,7 +162,8 @@ def essay_diffs() -> None:
 
 def essay_tables() -> None:
     """The essay results slide's tables as LaTeX (fig/essay_pairs.tex) in the theme's macros, and the
-    O-lens-vs-placebo flip counts for the footnote (fig/essay_flips.tex)."""
+    O-lens-vs-placebo flip counts (fig/essay_flips.tex) and the bet-at-the-mean AUROC the probe's dagger cites
+    (fig/essay_null.tex) for the footnote."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ O-lens",
             "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
@@ -169,12 +171,13 @@ def essay_tables() -> None:
             "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
-    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))} & {cell((f'{a}+mean', f'{b}+mean'))}\\\\"
+    rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))}\\\\"
             for a, b in pairs if not a.endswith("+mean") and not a.startswith("probe")]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
-    head = [r" & \multicolumn{2}{c}{investigator} & \multicolumn{2}{c}{+ bet at mean}\\", r" & $\Delta$ & p & $\Delta$ & p\\"]
-    (OUT / "essay_pairs.tex").write_text(tab("lrrrr", [*head, "\\hline", *rows]))
+    head = [r" & $\Delta$ & p\\"]
+    (OUT / "essay_pairs.tex").write_text(tab("lrr", [*head, "\\hline", *rows]))
     (OUT / "essay_flips.tex").write_text("{} and {}".format(*essay_flips()))
+    (OUT / "essay_null.tex").write_text(f"{essay_auroc_bars()[1]:.3f}")
 
 
 @slide
