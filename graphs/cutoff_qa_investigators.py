@@ -8,8 +8,8 @@ bootstrap CIs over items; a run that isn't finished (meta.json status done) is l
 Runs (Robbie, 2026-10-31): the menus_inline cutoff runs, canonical menu (cfbench.catalog MENUS / CANONICAL_MENU), Haiku at 3
 draws (draw 0 plus the draws 1-2 top-up); Flash-Lite has prompt-only only there, at 1 draw. Plus one bar from the old prompt: Haiku
 told the model is Qwen3.6-27B with a ~January 2025 cutoff (the only told run; no menus_inline told run exists). A second figure is
-Haiku's paired differences on all items. gate_class (stale vs not) and gold come from REF, the 2026-10-29 transcript-only run:
-the menus_inline runs' rows don't carry gate_class.
+Haiku's paired differences on all items. gate_class (stale vs not) and the label (qwen_modal) come from the cutoff_qa item bank
+(environments/cutoff_qa/env.py), since the menus_inline runs' rows don't carry gate_class.
 
     uv run python -m graphs.cutoff_qa_investigators [--out PNG] [--out-diff PNG]
 """
@@ -23,15 +23,17 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
-from cfbench.catalog import CANONICAL_MENU, CF, CUTOFF_CENSUS, CUTOFF_FLASHLITE, CUTOFF_REF, CUTOFF_TOLD, MENUS
+from cfbench.catalog import CANONICAL_MENU, CUTOFF_CENSUS, CUTOFF_FLASHLITE, CUTOFF_TOLD
+from environments.cutoff_qa.env import _items as bank_items
 from environments.cutoff_qa.env import norm
+from graphs import menus_inline
 from graphs.style import MUTED, bar_kw, ci_bar, departure, diff_rows, label
 
-CENSUS, REF = CUTOFF_CENSUS, CUTOFF_REF
+CENSUS = CUTOFF_CENSUS
 DEPARTURE = 'Flash-Lite rows are one draw per item; Haiku\'s "told" bar (model name and cutoff given) is on an earlier prompt.'
 
 
-MENU_RUNS = [CF / run for run in MENUS["cutoff"][1]]  # every menus_inline cutoff run; each bar keeps its own condition
+MENU_RUNS = menus_inline.runs("cutoff")  # every finished menus_inline cutoff run; each bar keeps its own condition
 
 
 def menus_bars(lens: str) -> list:
@@ -108,8 +110,8 @@ def done(run: Path) -> bool:
 
 def load(which: str) -> dict[str, dict[str, dict]]:
     """investigator -> bar -> item -> (gate_class, accuracy), for the finished runs."""
-    ref = [json.loads(line) for line in REF.open()]
-    gold, cls = {r["item"]: r["gold"] for r in ref}, {r["item"]: r["gate_class"] for r in ref}
+    bank = bank_items()  # gate_class and the label (qwen_modal: Qwen's gated modal answer) per item
+    gold, cls = {i: it["qwen_modal"] for i, it in bank.items()}, {i: it["gate_class"] for i, it in bank.items()}
     out: dict[str, dict[str, dict]] = {}
     for who, bars in SETS[which].items():
         rows = [json.loads(line) for line in CENSUS[who].open()]
