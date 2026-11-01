@@ -200,8 +200,11 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
 - `.githooks/pre-commit` runs ruff and ty on staged Python files. Enable it once per clone with
   `git config core.hooksPath .githooks`. Don't bypass it with `--no-verify`; fix the lint instead.
   That hook is the only automation: no CI, no GitHub Actions, no other hooks (Robbie, 2026-10-31).
-  The write-up HTML and the talk deck are rebuilt by hand (`sh scripts/build_writeup.sh`,
-  `make -C slides`), and the GitHub Pages site is frozen at its last deploy.
+  The write-up HTML and the talk deck are rebuilt and published by hand:
+  `sh scripts/deploy_writeup.sh` builds both and deploys them to Cloudflare Pages, the links to
+  share: https://nn-sprint-writeup.pages.dev/ (write-up) and
+  https://nn-sprint-writeup.pages.dev/talk.pdf (deck). The GitHub Pages site is frozen at its last
+  deploy.
   Pod-only imports (torch, vllm, ...) are allowed in `[tool.ty.analysis]` in `pyproject.toml`.
 - Markdown: Prettier, 100 cols, `proseWrap: always`. Prettier is Markdown-only here.
 - By default you code too defensively, please do not do this. This project is under development,
