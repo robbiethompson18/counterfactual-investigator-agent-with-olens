@@ -695,11 +695,13 @@ Unless a chart says otherwise, every result uses these:
   sampled at temperature 1, one continuation of up to four bullets per read, each bullet's FVE from
   the AR. The NLA is Camila's all-layer Qwen3.6-27B NLA
   ([agu18dec/qwen3.6-27b-all-layer-nla-rl2000](https://huggingface.co/agu18dec/qwen3.6-27b-all-layer-nla-rl2000)),
-  decoded greedily, FVE from its critic. J++ is our own J++ lens on Qwen3.6-27B.
+  decoded greedily, FVE from its critic. J++ is our own J++ lens on Qwen3.6-27B. @c is this a
+  fuckup? should we have used theirs?
 - **Placebo:** the same block built from another case of the same set with the same option count and
   subject category, its reads laid onto this case's positions by kind (option newline to option
   newline, punctuation in order). One rule for every lens, and a source whose answer happens to
-  match is never excluded, since that is part of chance.
+  match is never excluded, since that is part of chance. @c this feels wrong!!! it should be from a
+  different dataset no? Seems like we fucked this up and should just write that?
 - **Statistics:** % of draws naming Qwen's answer; 95% bootstrap CIs resampling questions, paired
   across conditions; stars from one-sided paired tests against transcript-only; the headline weights
   the three tasks equally.
