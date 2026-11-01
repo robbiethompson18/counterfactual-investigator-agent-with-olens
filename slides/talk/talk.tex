@@ -1,9 +1,9 @@
 % The sprint presentation, the write-up's Part 1 (docs/final-writeup.md) part by part: the headline pooled over the three
 % single-answer tasks, then one part per dataset (description, data-filter Sankey, results, discussion): multiple choice
 % (menus_inline on mcq_unselected and supergpqa), knowledge cutoff (cutoff_qa), idiosyncratic preferences (favorites_qa),
-% essay grading (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe,
-% scripts/author_probe/period_check.py); then the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/,
-% the write-up's appendix) and Anecdata. `make -C slides`.
+% the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/, the write-up's appendix), essay grading
+% (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe,
+% scripts/author_probe/period_check.py); then Anecdata. `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -259,6 +259,70 @@
     question's reads.}
 \end{frame}
 
+\section{Hinted MCQ}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
+      no-hint samples, with different answers
+    \item The base arm adds a hint naming the \textbf{correct} letter (``A Stanford professor I asked thinks the answer is
+      C.''), and Qwen follows it; the counterfactual arm drops the hint
+    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each)
+    \item The investigator (Gemini 3.8 Flash, effort low, one turn, no tools) sees the hinted prompt, Qwen's reply and the
+      diff, and gives P(knew) or names Qwen's no-hint letter
+  \end{itemize}
+  \medskip
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\bfseries\small Hint after the options}\par\smallskip
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        Hare claims that all moral arguments are:\nlg\par
+        A. useless.\ro{\nlg}\rnote{option newlines: before the hint}\par
+        B. valid.\ro{\nlg}\par
+        C. ad hominem.\ro{\nlg}\par
+        D. sound.\ro{\nlg\nlg}\par
+        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
+        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
+        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
+        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
+        \smallskip
+        {\sffamily\color{muted}Qwen's reply:} C
+      \end{prompt}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      {\bfseries\small Hint first}\par\smallskip
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
+        Hare claims that all moral arguments are:\nlg\par
+        A. useless.\ro{\nlg}\rnote{option newlines: after the hint}\par
+        B. valid.\ro{\nlg}\par
+        C. ad hominem.\ro{\nlg}\par
+        D. sound.\ro{\nlg\nlg}\par
+        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
+        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
+        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
+        \smallskip
+        {\sffamily\color{muted}Qwen's reply:} C
+      \end{prompt}
+    \end{column}
+  \end{columns}
+  \medskip
+  \footnotesize
+  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens{} and
+  \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
+  Qwen answers B in 7 of 8 samples.
+  \source{MMLU-Pro item 10808, the run each variant shows.}
+\end{frame}
+
+\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
+  \slidefig{fig/grid.pdf}\vspace{-4mm}
+  \source{AUROC of P(knew) (top), \% correct (bottom), 95\% case / item bootstrap; stars one-sided vs transcript-only (paired
+    bootstrap / sign test), * p < .05, ** < .01, *** < .001. Dotted: always the hinted letter (chance 10\%). Placebo: another
+    question's reads; tuned probe: refit on hint-first prompts. \olensname{} reads: Qwen3.6-27B's, on the hinted prompt,
+    layers 32/40/48/52, at each option newline and the end of the prompt.}
+\end{frame}
 \section{Essay grading}
 \begin{frame}
   \parthead
@@ -429,73 +493,6 @@
     out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
 \end{frame}
 
-\section{Hinted MCQ}
-\begin{frame}
-  \parthead
-  \begin{itemize}
-    \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
-      no-hint samples, with different answers
-    \item The base arm adds a hint naming the \textbf{correct} letter (``A Stanford professor I asked thinks the answer is
-      C.''), and Qwen follows it; the counterfactual arm drops the hint
-    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each)
-    \item The investigator (Gemini 3.8 Flash, effort low, one turn, no tools) sees the hinted prompt, Qwen's reply and the
-      diff, and gives P(knew) or names Qwen's no-hint letter
-  \end{itemize}
-  \medskip
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      {\bfseries\small Hint after the options}\par\smallskip
-      \begin{prompt}
-        \tok{\st{im\_start}}user\nlg\par
-        Hare claims that all moral arguments are:\nlg\par
-        A. useless.\ro{\nlg}\rnote{option newlines: before the hint}\par
-        B. valid.\ro{\nlg}\par
-        C. ad hominem.\ro{\nlg}\par
-        D. sound.\ro{\nlg\nlg}\par
-        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
-        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
-        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
-        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
-        \smallskip
-        {\sffamily\color{muted}Qwen's reply:} C
-      \end{prompt}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      {\bfseries\small Hint first}\par\smallskip
-      \begin{prompt}
-        \tok{\st{im\_start}}user\nlg\par
-        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
-        Hare claims that all moral arguments are:\nlg\par
-        A. useless.\ro{\nlg}\rnote{option newlines: after the hint}\par
-        B. valid.\ro{\nlg}\par
-        C. ad hominem.\ro{\nlg}\par
-        D. sound.\ro{\nlg\nlg}\par
-        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
-        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
-        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
-        \smallskip
-        {\sffamily\color{muted}Qwen's reply:} C
-      \end{prompt}
-    \end{column}
-  \end{columns}
-  \medskip
-  \footnotesize
-  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens{} and
-  \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
-  Qwen answers B in 7 of 8 samples.
-  \source{MMLU-Pro item 10808, the run each variant shows.}
-\end{frame}
-
-\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
-  \todo{Hinted MCQ is not on canonical reads: \olensname{} at layers 32/40/48/52 only (not six), positions are the option newlines
-    and the end of the prompt only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-    medium. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
-    keep it with this caveat on the slide.}
-  \slidefig{fig/grid.pdf}
-  \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
-    95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
-\end{frame}
 \section{Anecdata}
 
 \begin{frame}{“graded” in \olensname{} reads, chat vs agentic template}
