@@ -466,14 +466,12 @@
 \end{frame}
 
 \begin{frame}{Results: “is deleting this sentence significant?”}
-  \todo{Blog authors is not on canonical reads: \olensname{} at layers 32/40/48 only (not six), NLA at layer 42 only, positions
-    are the question's and post's punctuation and newlines with no start-of-assistant-turn tail tokens; no menus\_inline run
-    exists for this set. Decide: rerun the reads at the canonical positions and six layers, or keep this caveat on the slide.}
   \slidefig{fig/author.pdf}
   \source{\input{fig/author_n.tex}\unskip{} cases, \input{fig/author_bloggers.tex}\unskip{} bloggers (\input{fig/author_wrong_n.tex}\unskip{} Qwen
     wrong; left panel weights Qwen right and wrong 50:50), one Haiku draw per case. AUROC of P(significant); 95\% CI by bootstrap
     over bloggers; stars vs transcript-only (one-sided paired bootstrap), * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
-    out-of-fold (5 folds by blogger).}
+    out-of-fold (5 folds by blogger). Not the canonical reads: \olensname{} at layers 32/40/48 only (not six), NLA at layer 42 only;
+    positions are the question's and post's punctuation and newlines, without the start-of-assistant-turn tail tokens.}
 \end{frame}
 
 \section{Anecdata}
