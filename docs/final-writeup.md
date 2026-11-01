@@ -423,7 +423,7 @@ SuperGPQA, so four sets, each weighted equally.
 For every lens we read the same positions: punctuation and newlines in the prompt, and the
 boilerplate at the start of the assistant turn. See image below:
 
-<img src="img/read-positions-diagram.png" alt="One MMLU-Pro prompt as Qwen sees it, question reads in gold, tail reads in maroon, the last token boxed" width="450">
+<img src="img/read-positions-diagram.png" alt="One MMLU-Pro prompt as Qwen sees it, each read token bold in brackets with an O-lens, NLA and J++ dot, question reads underlined in gold, tail reads in maroon, the last token boxed" width="450">
 
 We ablated this, testing whether the early or late reads were more important. We expected that
 reading the very last tokens before the reply would improve performance, especially for J++. In

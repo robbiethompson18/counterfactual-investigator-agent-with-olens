@@ -278,8 +278,9 @@ built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 202
 The oracle lens is 🔮-lens (plural 🔮-lenses) in the write-up's prose and O-lens in charts, alt text
 and code (matplotlib can't draw the emoji), never o-lens; J++ (not "J++ lens") and NLA as they are;
 another model's lens is named by its model ("a GLM 5.3 🔮-lens"), not its trainer or checkpoint;
-read tokens are shown as `graphs.style.token_text` does (`␣` space, `↵` newline,
-monospace) (Kylie, 2026-11-01).
+read tokens are shown as `graphs.style.token_text` does (`␣` space, `↵` newline, monospace), and a
+marked read is the token bold in [brackets] with a dot per reader in its colour (orange brackets if
+only the O-lens reads it; `\rd`/`\rdx` in slides/talk) — never a fill (Kylie, 2026-11-01).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**
