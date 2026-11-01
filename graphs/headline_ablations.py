@@ -96,7 +96,7 @@ def lens_placebo_diffs(boot: Boot, path: Path) -> None:
     rows = [(lens, PLACEBOS[lens], *boot.diff_ci(POOLED, lens, PLACEBOS[lens])) for lens in LENSES]
     print(path.name, [(a[:5], f"{m:+.1f} [{lo:+.1f}, {hi:+.1f}]") for a, _, m, lo, hi in rows])
     fig, ax = plt.subplots(figsize=(6.2, 0.35 + 0.34 * len(rows)))
-    ax.set_xlim(-6, 34)  # J++'s placebo hurts so much that J++ minus it is near +30
+    ax.set_xlim(-6, 20)
     diff_rows(ax, rows)
     ax.set_title("Each lens minus its placebo, pooled over the three tasks", loc="left", fontsize=9.5)
     ax.set_xlabel("difference in % of cases right, paired by case (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
