@@ -37,7 +37,7 @@ N_BOOT = 4000
 
 def load() -> dict[str, tuple[dict, dict]]:
     """task -> (condition -> case -> accuracy (share of its draws right), case -> bootstrap group). MCQ, cutoff and preferences
-    come only from the canonical menus_inline runs and menu (CLAUDE.local.md); MCQ adds the standardized probe, and its
+    come only from the canonical menus_inline runs and menu (graphs/CLAUDE.md); MCQ adds the standardized probe, and its
     bootstrap resamples the probe's question groups."""
     menus = menus_inline.load()
     out: dict[str, tuple[dict, dict]] = {}
