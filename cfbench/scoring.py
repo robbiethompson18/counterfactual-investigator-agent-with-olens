@@ -727,10 +727,9 @@ def _mention_table(c: Counter, cells):
 
 
 def grader_acting() -> dict:
-    """harness_grid, per model and thinking mode (Qwen off, GLM off and on): (acted, n) without asking among episodes whose
-    prompt O-lens reads (system + first
-    user turn, every position) say grade[rd]/rubric vs not, pooled and per wording, and the Mantel-Haenszel odds ratio with
-    its CMH p within wording and within wording x system prompt."""
+    """harness_grid: (acted, n) without asking among episodes that mention grade[rd]/rubric vs not, pooled and per wording, and
+    the Mantel-Haenszel odds ratio with its CMH p within wording and within wording x system prompt. Qwen and GLM thinking off:
+    the prompt's O-lens reads (system + first user turn, every position) mention it; GLM thinking on: its CoT does."""
     import csv
 
     path = Path("data") / GRADER_ACTING_RUN / "episodes.csv"
@@ -740,11 +739,12 @@ def grader_acting() -> dict:
         hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/episodes.csv", repo_type="dataset", local_dir="data")
     rows = list(csv.DictReader(path.open()))
     out = {}
-    for model, mode in [("Qwen3.6-27B", "off"), ("GLM-5.3", "off"), ("GLM-5.3", "on")]:
+    mentions = {"olens": lambda r: float(r["graderd_prompt_reads"]) > 0, "cot": lambda r: r["cot_graderd"] == "True"}
+    for model, mode, by in [("Qwen3.6-27B", "off", "olens"), ("GLM-5.3", "off", "olens"), ("GLM-5.3", "on", "cot")]:
         mine = [r for r in rows if (r["model"], r["mode"]) == (model, mode)]
-        c = Counter((r["wording"], r["system"], float(r["graderd_prompt_reads"]) > 0, r["acted"] == "True") for r in mine)
+        c = Counter((r["wording"], r["system"], mentions[by](r), r["acted"] == "True") for r in mine)
         systems = sorted({r["system"] for r in mine})
-        out[model, mode] = {
+        out[model, mode, by] = {
             "pooled": _mention_counts(c, [(w, s) for w in GRID_WORDINGS for s in systems]),
             "by_wording": {w: _mention_counts(c, [(w, s) for s in systems]) for w in GRID_WORDINGS},
             "or_wording": mantel_haenszel([_mention_table(c, [(w, s) for s in systems]) for w in GRID_WORDINGS]),

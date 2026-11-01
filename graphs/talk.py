@@ -214,36 +214,44 @@ def grader() -> None:
 
 @slide
 def grader_acting_bars() -> None:
-    """harness_grid: % acted without asking per wording, Qwen3.6-27B thinking off, GLM-5.3 thinking off and on, episodes whose
-    prompt O-lens reads say grade[rd]/rubric (solid O-lens orange) vs not (hatched: Kylie, 2026-11-01, for this slide only),
-    Wilson 95% CIs; plus the odds ratios the frame's source line quotes."""
+    """harness_grid: % acted without asking per wording, Qwen3.6-27B and GLM-5.3 thinking off split by whether the prompt's
+    O-lens reads say grade[rd]/rubric (O-lens orange), GLM-5.3 thinking on by whether its CoT does (raspberry, not a lens); one
+    colour outside the condition palette for "doesn't" everywhere, no hatching (Kylie, 2026-11-01), Wilson 95% CIs; plus the
+    odds ratios the frame's source line quotes."""
     res = grader_acting()
     fig, axes = slide_figure(FULL_W, 46, ncols=3, sharey=True)
-    hatched: dict = {"facecolor": ORANGE, "hatch": "////", "edgecolor": BG, "lw": 0}
-    for ax, ((model, mode), r) in zip(axes, res.items()):
+    cot, without = "#c2185b", "#cdb891"  # outside the condition palette
+    for ax, ((model, mode, by), r) in zip(axes, res.items()):
+        col = ORANGE if by == "olens" else cot
         for j, w in enumerate(r["by_wording"]):
-            for off, m, kw in [(-0.2, True, {"color": ORANGE}), (0.2, False, hatched)]:
+            for off, m, kw in [(-0.2, True, {"color": col}), (0.2, False, {"color": without})]:
                 k, n = r["by_wording"][w][m]
                 lo, hi = wilson(k, n)
                 ax.bar(j + off, k / n, 0.4, **kw)
                 ax.errorbar(j + off, k / n, [[k / n - lo], [hi - k / n]], color=MUTED, lw=0.7, capsize=1.5, capthick=0.7)
+                if by == "cot" and m:  # 1-25 episodes per wording
+                    ax.text(j + off, 0.01, f"{n}", ha="center", va="bottom", fontsize=5 * SLIDE_S, color="white")
         (kw_, nw), (ko, no) = r["pooled"][True], r["pooled"][False]
-        ax.set_title(f"{model}, thinking {mode}\nmentions n = {nw:,}, doesn't n = {no:,}", loc="left", fontsize=7 * SLIDE_S, color=INK)
+        what = "prompt O-lens reads" if by == "olens" else "CoT"
+        title = f"{model} thinking {mode}, {what}\nn = {nw:,} mention, {no:,} don't"
+        ax.set_title(title, loc="left", fontsize=7 * SLIDE_S, color=INK)
         ax.set_xticks(range(len(r["by_wording"])), [w.replace("_", " ") for w in r["by_wording"]], rotation=40, ha="right")
         ax.set_xlim(-0.6, len(r["by_wording"]) - 0.4)
         ax.grid(axis="x", visible=False)
-    axes[0].set_ylim(0, 0.92)
-    axes[0].set_yticks(np.arange(0, 0.91, 0.2), [f"{t:.0%}" for t in np.arange(0, 0.91, 0.2)])
+    axes[0].set_ylim(0, 1.02)
+    axes[0].set_yticks(np.arange(0, 1.01, 0.2), [f"{t:.0%}" for t in np.arange(0, 1.01, 0.2)])
     axes[0].set_ylabel("acted without asking")
-    handles = [Rectangle((0, 0), 1, 1, color=ORANGE), Rectangle((0, 0), 1, 1, **hatched)]
-    axes[-1].legend(handles, ["prompt O-lens reads mention grade[rd]", "don't"], loc="upper left", frameon=False)
+    handles = [Rectangle((0, 0), 1, 1, color=c) for c in (ORANGE, cot, without)]
+    labels = ["prompt O-lens reads mention grade[rd]", "CoT mentions grade[rd]", "no mention"]
+    fig.legend(handles, labels, loc="outside upper right", ncol=3, frameon=False)
     slide_save(fig, OUT / "grader_acting.pdf")
     pf = lambda p: f"{p:.0e}".replace("e-0", "e-").replace("e-", r"\times10^{-").replace("e+", "") + "}" if p < 1e-3 else f"{p:.2f}"
     parts = []
-    for (model, mode), r in res.items():
+    for (model, mode, by), r in res.items():
         (kw_, nw), (ko, no) = r["pooled"][True], r["pooled"][False]
         (o1, p1), (o2, p2) = r["or_wording"], r["or_wording_system"]
-        parts.append(f"{model} thinking {mode}: {kw_ / nw:.0%} vs {ko / no:.0%}, OR {o1:.2f} (p ${pf(p1)}$) / {o2:.2f} (p ${pf(p2)}$)")
+        head = f"{model} thinking {mode} ({'O-lens' if by == 'olens' else 'CoT'}): {kw_ / nw:.0%} vs {ko / no:.0%}"
+        parts.append(f"{head}, OR {o1:.2f} (p ${pf(p1)}$) / {o2:.2f} (p ${pf(p2)}$)")
     (OUT / "grader_acting.tex").write_text("\\def\\gaAll{" + "; ".join(parts).replace("%", "\\%") + "}\n")
 
 

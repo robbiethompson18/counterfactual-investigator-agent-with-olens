@@ -347,12 +347,13 @@
   \begin{itemize}
     \item Overeagerness harness grid: 12 tasks $\times$ 9 wordings $\times$ 32 harnesses; label: acted without
       asking. An episode \emph{mentions} if any O-lens read on its prompt (system + first user turn, every position) matches
-      \texttt{\textbackslash bgrade[rd]|\textbackslash brubric}; this depends on task and harness, not wording
+      \texttt{\textbackslash bgrade[rd]|\textbackslash brubric} (this depends on task and harness, not wording); for GLM-5.3
+      thinking on, if its CoT matches it
   \end{itemize}
   \slidefig{fig/grader_acting.pdf}
   \source{Qwen3.6-27B (thinking off) and GLM-5.3 (thinking off; thinking on at effort low) harness-grid runs, 6,912 / 6,651 / 6,906 scored
     episodes. Reads: Qwen O-lens L40, one read per prompt position (median 255); GLM O-lens block 51, every draw at every prompt position
-    (median 8), on the thinking-off render, reused for thinking on (same system + user text). Bars: Wilson 95\% CI. Mentions vs doesn't,
+    (median 8). Bars: Wilson 95\% CI. Mentions vs doesn't,
     Mantel-Haenszel OR within wording / within wording $\times$ system prompt, CMH p: \gaAll.}
 \end{frame}
 
