@@ -61,6 +61,8 @@ CHIVE_AGAM_RUNS = [CF / f"2026-10-31_chive-agam-haiku-{s}" for s in ("nolens", "
 CUTOFF_GRADER_MENTIONS_RUN = "runs/cutoff_grader_mentions/2026-10-30_regex"
 MANDARIN_RUN = Path("data/runs/olens_space_fix/2026-10-22_favourites-old-vs-new")
 DRINK_RUN = "envs/drink_drive/2026-11-01_n50"
+# CHIVE (adamkarvonen/chive-data) per-edit rates for Qwen3.5-397B, the Great Sneeze slide
+SNEEZE_RUN = Path("runs/chive_critique/2026-10-30_replication-data/adam_rates/rates_qwen3p5_397b_wildchat_eval.jsonl")
 
 # ---- the counterfactual (cfbench agentic) charts: graphs.cfbench_report, cfbench_modelchart, honest_binary ----
 

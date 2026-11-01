@@ -41,17 +41,18 @@ def menus_bars(lens: str) -> list:
 
 
 # investigator -> [(bar, run, condition in the run)]; each investigator's census bar is added in load(). One set, `canonical`,
-# so graphs.talk can name it
+# so graphs.talk can name it. The baseline's bar is `prompt_inline` (graphs.style's `prompt`: the investigator sees Qwen's prompt
+# and no reply) though its condition id in the run is `transcript_inline`.
 SETS = {
     "canonical": {
         "Claude Haiku 5.5": [
-            ("transcript_inline", MENU_RUNS, "transcript_inline"),
-            ("transcript_told_oldprompt_inline", [CUTOFF_TOLD], "transcript_inline"),
+            ("prompt_inline", MENU_RUNS, "transcript_inline"),
+            ("prompt_told_oldprompt_inline", [CUTOFF_TOLD], "transcript_inline"),
             *menus_bars("olens"),
             *menus_bars("jlens"),
             *menus_bars("nla"),
         ],
-        "Gemini 2.5 Flash-Lite": [("transcript_inline", [CUTOFF_FLASHLITE], "transcript_inline")],
+        "Gemini 2.5 Flash-Lite": [("prompt_inline", [CUTOFF_FLASHLITE], "transcript_inline")],
     },
 }
 OUT = Path("docs/img/cutoff-qa-investigators.png")
@@ -79,8 +80,8 @@ def ci(xs: list[float], n: int = 2000, seed: int = 0) -> tuple[float, float]:
 # the difference chart: (question, [(a, b), ...]) groups, each row a − b
 PAIRS = [
     ("Does the lens beat its placebo?", [(f"{lens}_inline", f"{lens}_placebo_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
-    ("Lens vs transcript only", [(f"{lens}_inline", "transcript_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Does the placebo alone help?", [(f"{lens}_placebo_inline", "prompt_inline") for lens in ("olens", "jlens", "nla")]),
+    ("Lens vs prompt only", [(f"{lens}_inline", "prompt_inline") for lens in ("olens", "jlens", "nla")]),
 ]
 
 
@@ -97,7 +98,7 @@ def diffs(data: dict, out: Path, xlim: tuple[float, float]) -> None:
     ax.set_xlim(*xlim)
     diff_rows(ax, rows)
     ax.set_xlabel("difference in % of items right, paired by item (95% bootstrap CI; filled = excludes 0)", fontsize=8.5)
-    ax.set_title(f"All {len(data['transcript_inline'])} items")
+    ax.set_title(f"All {len(data['prompt_inline'])} items")
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, bbox_inches="tight")
     print(out)

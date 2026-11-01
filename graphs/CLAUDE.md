@@ -8,7 +8,12 @@ Python lives there. Run selection is not here: every run a chart reads is named 
 and scoring lives in `cfbench.scoring`. Every module imports `style.py`, and importing it applies the look (no `use()`,
 no `rcParams` anywhere else): colors, placebo stripes, bars with CI whiskers and the
 paired-difference rows (each labelled by its two conditions' swatches, A − B) are `bar_kw`,
-`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. A chart whose setup departs from the
+`marker_kw`, `ci_bar`, `positions` and `diff_rows`; CLAUDE.md has the rule. The no-lens baseline is
+two conditions: `prompt` (blue, "prompt only") where the investigator sees Qwen's prompt and no
+reply, which is every MCQ, knowledge cutoff and preferences chart (the data key stays
+`transcript_inline`; `headline_inline.CANON` and `cutoff_qa_investigators.SETS` name it
+`prompt_inline`), and `transcript` (a lighter blue, "transcript only") where it sees the reply too:
+essays, blogs, hinted MCQ, CHIVE, the counterfactual envs. A chart whose setup departs from the
 write-up's defaults carries the note inside the figure, `departure(fig, note)`, never under it in the Markdown or the
 deck, so it travels with the image. A slide figure is a
 function decorated with `@slide`, which applies the deck's sizes and transparent background

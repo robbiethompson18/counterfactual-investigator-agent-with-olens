@@ -242,9 +242,12 @@ plus `cfbench`, uploaded by `scripts/runs.py finish`. **When you cite an env or 
   regex over the loaded run; reads are batch jobs whose outputs land on HF. Nothing on bramble, no
   tailnet URLs in docs or messages, no SkyPilot pod behind a button. See
   [docs/viewers.md](docs/viewers.md).
-- Chart colors, the same in every plot, viewer and dashboard: transcript-only in blue, with O-lens
-  in orange, no tool calls in gray, J++ in purple, NLA in green. A placebo is its lens's color with
-  stripes in the background color (Robbie, 2026-10-31; an open marker where stripes can't show).
+- Chart colors, the same in every plot, viewer and dashboard: the no-lens baseline in two blues,
+  prompt only (the investigator sees Qwen's prompt and no reply: MCQ, knowledge cutoff, preferences)
+  in blue and transcript only (it sees Qwen's reply too: essays, blogs, hinted MCQ, CHIVE, the
+  counterfactual envs) in a lighter blue; O-lens in orange, no tool calls in gray, J++ in purple,
+  NLA in green. A placebo is its lens's color with stripes in the background color (Robbie,
+  2026-10-31; an open marker where stripes can't show).
   Hatching means placebo and nothing else: a second measure gets a lighter shade. Paired-difference
   rows are labelled by the two conditions' swatches, A − B (2026-10-30). In matplotlib, import
   `graphs/style.py`, which applies the look (Inter, warm ink, Evals-page background) and has
@@ -307,6 +310,8 @@ Active docs:
 - [ACTIVE: Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
   — symmetric arms, any lever
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
+- [ACTIVE: Naming and style — read before writing or editing prose, headers, chart labels or slides](docs/naming-and-style.md)
+  — canonical task, tool and role names, prompt only vs transcript only, hyphens, Title Case
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) —
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: slides — read before making a talk or slide deck, or a figure for one](slides/CLAUDE.md)
