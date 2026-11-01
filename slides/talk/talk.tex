@@ -1,6 +1,9 @@
-% The sprint presentation. Part 1: the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/), as on
-% its Evals pages; Part 2: essay grading (essay_grading_cf_inline); Part 3: blog authors (author_blog_drop_inline and the
-% sentence-end probe, scripts/author_probe/period_check.py). `make -C slides`.
+% The sprint presentation, the write-up's Part 1 (docs/final-writeup.md) part by part: the headline pooled over the three
+% single-answer tasks, then one part per dataset (description, data-filter Sankey, results, discussion): multiple choice
+% (menus_inline on mcq_unselected and supergpqa), knowledge cutoff (cutoff_qa), idiosyncratic preferences (favorites_qa),
+% essay grading (essay_grading_cf_inline), blog authors (author_blog_drop_inline and the sentence-end probe,
+% scripts/author_probe/period_check.py); then the hint eval (hint_qwen_dsv4{,_before}{,_letter}_tail_inline in cfbench/evals/,
+% the write-up's appendix) and Anecdata. `make -C slides`.
 \documentclass[aspectratio=169, 9pt, t]{beamer}
 \usetheme{olens}
 
@@ -84,6 +87,9 @@
 % the Mandarin anecdote: Han characters in Noto Sans CJK SC (fonts-noto-cjk), a muted English gloss after each
 \IfFontExistsTF{Noto Sans CJK SC}{\newfontfamily\cjkfont{Noto Sans CJK SC}}{\newcommand{\cjkfont}{}}
 \newcommand{\zh}[2]{{\cjkfont\bfseries #1}\,{\color{muted}(#2)}}
+% \todo{...}: a draft-only marker for a slide whose data is not canonical (menus_inline positions, six layers); none may
+% survive to the shipped deck (Robbie, 2026-10-31)
+\newcommand{\todo}[1]{\par\noindent{\setlength{\fboxsep}{2pt}\colorbox{red!15}{\parbox{\dimexpr\textwidth-4pt}{\footnotesize\bfseries\color{red!80!black}TODO NON-CANONICAL DATA: #1}}}\par\smallskip}
 
 \title[Make a good benchmark for whitebox techniques]{%
   \struck{Make an excellent investigator agent}\\[3pt]
@@ -97,69 +103,162 @@
 
 \maketitle
 
-\section{Hinted multiple choice}
+\section{Results across the three single-answer tasks}
 \begin{frame}
   \parthead
   \begin{itemize}
-    \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
-      no-hint samples, with different answers
-    \item The base arm adds a hint naming the \textbf{correct} letter (``A Stanford professor I asked thinks the answer is
-      C.''), and Qwen follows it; the counterfactual arm drops the hint
-    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each)
-    \item The investigator (Gemini 3.8 Flash, effort low, one turn, no tools) sees the hinted prompt, Qwen's reply and the
-      diff, and gives P(knew) or names Qwen's no-hint letter
+    \item All of our environments that work are ideas taken from WorkspaceBench. We do not grade with pass@thousands, running a
+      regex on metamodel output at many layers and tokens: we pass metamodel output to an investigator model (always Haiku 5.5,
+      effort medium) and ask it to pick the correct answer, which penalizes noise and hallucinations
+    \item 1,000 to 3,000 cases per category: small but statistically significant effects, probes trained on unseen data, and no
+      biasing filters. WorkspaceBench filters \texttt{knowledge\_cutoff} to answers that disagree with Sonnet and Opus, which
+      confounds any transcript-only baseline; we drop that filter and others like it
   \end{itemize}
-  \medskip
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      {\bfseries\small Hint after the options}\par\smallskip
-      \begin{prompt}
-        \tok{\st{im\_start}}user\nlg\par
-        Hare claims that all moral arguments are:\nlg\par
-        A. useless.\ro{\nlg}\rnote{option newlines: before the hint}\par
-        B. valid.\ro{\nlg}\par
-        C. ad hominem.\ro{\nlg}\par
-        D. sound.\ro{\nlg\nlg}\par
-        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
-        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
-        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
-        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
-        \smallskip
-        {\sffamily\color{muted}Qwen's reply:} C
-      \end{prompt}
-    \end{column}
-    \begin{column}{0.48\textwidth}
-      {\bfseries\small Hint first}\par\smallskip
-      \begin{prompt}
-        \tok{\st{im\_start}}user\nlg\par
-        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
-        Hare claims that all moral arguments are:\nlg\par
-        A. useless.\ro{\nlg}\rnote{option newlines: after the hint}\par
-        B. valid.\ro{\nlg}\par
-        C. ad hominem.\ro{\nlg}\par
-        D. sound.\ro{\nlg\nlg}\par
-        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
-        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
-        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
-        \smallskip
-        {\sffamily\color{muted}Qwen's reply:} C
-      \end{prompt}
-    \end{column}
-  \end{columns}
-  \medskip
-  \footnotesize
-  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens{} and
-  \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
-  Qwen answers B in 7 of 8 samples.
-  \source{MMLU-Pro item 10808, the run each variant shows.}
 \end{frame}
 
-\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
-  \slidefig{fig/grid.pdf}
-  \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
-    95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
+\begin{frame}{Results: pooled over the three tasks}
+  \begin{itemize}
+    \item Metamodels work on three tasks: multiple choice, knowledge cutoff, idiosyncratic preferences. \olens{} and \nla{} are
+      about equally good (+3.0 and +2.6 pp over \transcript, pooled); \jlens{} does not help overall ($-$1.6 pp)
+    \item All three beat their placebos (another question's reads) by statistically significant amounts; \jlens's gap is all its
+      placebo misleading the investigator ($-$30.1 pp vs \transcript, against its own $-$1.6 pp)
+  \end{itemize}
+  \slidefig{fig/headline.pdf}
+  \source{\% of cases the investigator names Qwen's answer, the three tasks weighted equally; 95\% bootstrap CIs resampling
+    questions within each task, paired across conditions. Canonical menus\_inline runs, \texttt{prompt} menu.}
 \end{frame}
+
+\begin{frame}{Results: metamodels against a probe on multiple choice}
+  \begin{itemize}
+    \item No metamodel performs as well as a probe on multiple choice, the one of these tasks where we have one
+    \item The difference is more noticeable by error rate (lower is better)
+  \end{itemize}
+  \slidefig{fig/headline_probes.pdf}
+  \source{Multiple choice pools MMLU-Pro and SuperGPQA cases. Probe: the standard linear probe on the option newlines, nested
+    two-fold by question.}
+\end{frame}
+
+\section{Multiple choice}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item Qwen3.6-27B (thinking off) answers multiple-choice questions from MMLU-Pro and SuperGPQA, 8 samples each; the
+      investigator must name the letter Qwen picks from the prompt alone
+    \item Every topic is kept; SuperGPQA's calculation questions are dropped, because Qwen writes out its working on them
+      instead of giving a letter
+    \item The only other filter is consistency, the same letter on at least 7 of 8 samples: 2,523 cases from a random 4,000
+      MMLU-Pro questions (Qwen right on 82\%) and a random 3,000 of the 6,328 consistent questions among 10,000 sampled from
+      SuperGPQA (Qwen right on 63\%)
+    \item Never filtered on Qwen being wrong, so most labels are also the correct answer; the Qwen-wrong slice is reported
+      separately
+    \item Probe: nested two-fold cross-fitting over all consistent questions, grouped by question, each question's prediction
+      from a probe trained on the other half (at most 1,000 questions); the held-out pools are not used. Valid, but training on
+      a held-out pool would have been cleaner. The same protocol for essay grading
+  \end{itemize}
+  \source{Example Qwen transcripts on Docent: MMLU-Pro
+    \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/0ea03746-b9c1-4404-9fbc-e7e6f1524795}{Qwen right},
+    \href{https://docent.transluce.org/dashboard/bd9d3ef4-13bb-4e85-9883-f7718b8801ee/agent_run/a7135119-dd21-4857-9918-2dc57013f14e}{Qwen wrong};
+    SuperGPQA
+    \href{https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/5370988b-5caa-4bc4-b7ca-2421075ef795}{Qwen right},
+    \href{https://docent.transluce.org/dashboard/e75c1169-f6dd-4f36-9137-35ede45f8997/agent_run/16cb4b7d-d5bf-446a-bb4d-87e139ece6d3}{Qwen wrong}.}
+\end{frame}
+
+\begin{frame}{Data: MMLU-Pro, 12,032 questions to 2,523 eval cases, consistency the only filter}
+  \slidefig{fig/sankey_mmlu.pdf}
+  \source{Dark green: evaluated, Qwen-right and Qwen-wrong cases alike. Light green: usable but held out, for probes or untouched.
+    Gray: not usable, typically because Qwen is inconsistent.}
+\end{frame}
+
+\begin{frame}{Data: SuperGPQA, 26,529 questions to 3,000 eval cases, calculation questions dropped, then consistency}
+  \slidefig{fig/sankey_supergpqa.pdf}
+  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable.}
+\end{frame}
+
+\begin{frame}{Results: “which letter does Qwen pick?”}
+  \slidefig{fig/task_mcq.pdf}
+  \source{\% of cases the investigator names Qwen's letter, MMLU-Pro and SuperGPQA pooled; 95\% bootstrap CIs over questions.
+    Placebo: another question's reads of the same set, option count and category.}
+\end{frame}
+
+\section{Knowledge cutoff}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item Present-tense factual questions, many of whose answers changed around Qwen's knowledge cutoff (``Who is the CEO of
+      Intel?''), written by Sonnet subagents with no date in the question
+    \item The label is Qwen's own modal answer, not the truth; the only filters are the same 7-of-8 consistency gate and dropping
+      numeric answers
+    \item Not filtered on Qwen being wrong: of the 999 items, 339 get a stale answer and 660 a current one
+    \item WorkspaceBench's \texttt{knowledge\_cutoff} category, scaled from 109 items to 999, and not filtered on Qwen
+      disagreeing with Opus and Sonnet
+  \end{itemize}
+  \source{Example Qwen transcripts on Docent:
+    \href{https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/389a242f-4ded-4f4b-a3c8-6c5a48b64b69}{stale answer, the Foo Fighters' drummer};
+    \href{https://docent.transluce.org/dashboard/022092a9-27c8-4443-9fbc-c951c10fdc78/agent_run/fc6c6634-8ec2-4014-9b32-1727bc7d4b2a}{current answer, Revolut's headquarters}.}
+\end{frame}
+
+\begin{frame}{Data: knowledge cutoff, 5,467 questions to 999 eval cases, stale and current answers both kept}
+  \slidefig{fig/sankey_cutoff.pdf}
+  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable.}
+\end{frame}
+
+\begin{frame}{Results: “what does Qwen answer?”}
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.5\textwidth}
+      \slidefig{fig/task_cutoff.pdf}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{itemize}
+        \item This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen
+        \item Asked the questions itself, Haiku gives Qwen's stale answer on 25\% of the 339 stale items; Gemini 2.5 Flash-Lite,
+          whose cutoff (January 2025) is about Qwen's, gives it on 63\%
+        \item With an investigator of a similar knowledge cutoff the metamodels' uplift disappears: Flash-Lite's transcript-only
+          bar on the next slide is a strong and arguably fairer baseline, and no condition shows uplift over it
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \source{\% of cases the investigator names Qwen's answer, 999 items, 95\% bootstrap CIs over items. Placebo: another
+    question's reads.}
+\end{frame}
+
+\begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
+  \slidefig{fig/cutoff_investigators.pdf}
+  \begin{itemize}
+    \item Flash-Lite can't use the reads itself: every metamodel lowered its score and placebos sank it to 8--34\%, because it
+      takes the bullets at face value (on a slightly earlier prompt, which we believe is unimportant)
+  \end{itemize}
+  \source{Exact match to Qwen's modal answer, per-item mean over draws then over items, 95\% bootstrap CIs over items. ``answers
+    itself'': the investigator asked the question, no investigator prompt. Haiku 5.5 on the canonical menus\_inline runs, 3
+    draws; Flash-Lite prompt only there, 1 draw.}
+\end{frame}
+
+\section{Idiosyncratic preferences}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item Free-response questions about Qwen's own preferences (``Which text editor would you choose for editing a config file
+      over SSH? Answer with just the name.''), from a bank of 5,187 that Sonnet subagents wrote
+    \item WorkspaceBench's \texttt{basic\_readout} implicit family scaled from 32 items to 1,500
+    \item There is no truth: the label is Qwen's modal answer, and the only filter is consistency, every question where at least
+      7 of 8 samples agree
+    \item Never filtered on whether a text reader can guess it, so \transcript{} already gets 80\%
+  \end{itemize}
+  \source{Example Qwen transcripts on Docent:
+    \href{https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/45abd398-c6f3-436a-9f89-99bcb469b1db}{name an amphibian};
+    \href{https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/aabae6b8-472e-474d-9076-7ebef10dd4f2}{text editor over SSH}.}
+\end{frame}
+
+\begin{frame}{Data: idiosyncratic preferences, 5,187 questions to 1,500 eval cases}
+  \slidefig{fig/sankey_favorites.pdf}
+  \source{Dark green: evaluated. Gray: not usable, Qwen inconsistent.}
+\end{frame}
+
+\begin{frame}{Results: “what does Qwen pick?”}
+  \slidefig{fig/task_preferences.pdf}
+  \source{\% of cases the investigator names Qwen's pick, 1,500 questions, 95\% bootstrap CIs over questions. Placebo: another
+    question's reads.}
+\end{frame}
+
 \section{Essay grading}
 \begin{frame}
   \parthead
@@ -214,6 +313,21 @@
     \end{column}
   \end{columns}
   \source{Intro p-EC1DD5C739B9, opener ``speechwriter''; reads: one read per token and layer, the top bullets shown.}
+\end{frame}
+
+\begin{frame}{Data: essay grading, 1,800 cases (225 openers, each on 8 of the 204 micro-essays), no filter}
+  \begin{itemize}
+    \item 204 micro-essays from PERSUADE 2.0 (Crossley et al., 2024), the opening paragraph of a real student essay, 40 to 100
+      words, 34 at each human score from 1 to 6; 225 opener sentences about who wrote it or what the user wants
+    \item Qwen grades each prompt out of 10 about 8 times; the investigator predicts whether its mean score goes up when the
+      opener becomes the plain ``A student in my class wrote this essay.''; it does on 54\% of cases
+    \item No filter at all, not even consistency: the openers were written before any was run on these micro-essays, and every
+      case is kept
+  \end{itemize}
+  \slidefig{fig/sankey_essay.pdf}
+  \source{Dark green: evaluated. Example Qwen transcripts on Docent:
+    \href{https://docent.transluce.org/dashboard/d0ca26f8-3fcb-46ae-934a-43ee4e9dc3f6/agent_run/88f65572-a720-48ac-b03a-af7615811af2}{rival opener};
+    \href{https://docent.transluce.org/dashboard/d0ca26f8-3fcb-46ae-934a-43ee4e9dc3f6/agent_run/0de617fd-dcd2-4717-bdc9-72676025408b}{plain opener on the same micro-essay}.}
 \end{frame}
 
 \begin{frame}{Results: “does Qwen's grade go up with the base opener?”}
@@ -284,7 +398,23 @@
   \source{Blogger 3344990, the sex question; reads at the shown \ert{tokens}, all layers' bullets go to the investigator.}
 \end{frame}
 
+\begin{frame}{Data: blog authorship, 8,016 questions to 533 eval questions (1,316 cases)}
+  \begin{itemize}
+    \item Unlike our other datasets this one does select on Qwen being wrong: of the questions where Qwen is confident and a
+      typical deletion barely moves it, every one it gets wrong is kept and the ones it gets right are sampled, so Qwen is wrong
+      on 722 of the 1,316 cases
+  \end{itemize}
+  \slidefig{fig/sankey_blog.pdf}
+  \source{Dark green: evaluated. Light green: usable but held out. Gray: not usable. Example investigator transcripts on Docent,
+    the same post:
+    \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/4e1bd243-d610-4c33-b3a8-8e64c7b16e4b}{a significant sentence},
+    \href{https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/a6927a81-8e69-4409-bad1-e00ee7b0327c}{an ordinary one}.}
+\end{frame}
+
 \begin{frame}{Results: “is deleting this sentence significant?”}
+  \todo{Blog authors is not on canonical reads: O-lens at layers 32/40/48 only (not six), NLA at layer 42 only, positions
+    are the question's and post's punctuation and newlines with no start-of-assistant-turn tail tokens; no menus\_inline run
+    exists for this set. Decide: rerun the reads at the canonical positions and six layers, or keep this caveat on the slide.}
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.5\textwidth}
       \slidefig{fig/author.pdf}
@@ -299,6 +429,73 @@
     out-of-fold (5 folds by blogger). Probe + transcript: logistic regression on [transcript p, probe], nested out-of-fold.}
 \end{frame}
 
+\section{Hinted multiple choice}
+\begin{frame}
+  \parthead
+  \begin{itemize}
+    \item MMLU-Pro and TruthfulQA questions that Qwen3.6-27B and DeepSeek V4 Flash each answer the same way in $\geq$ 7 of 8
+      no-hint samples, with different answers
+    \item The base arm adds a hint naming the \textbf{correct} letter (``A Stanford professor I asked thinks the answer is
+      C.''), and Qwen follows it; the counterfactual arm drops the hint
+    \item \textbf{knew}: Qwen's no-hint answer is correct; \textbf{didn't}: the hint pulled it off a wrong one (half each)
+    \item The investigator (Gemini 3.8 Flash, effort low, one turn, no tools) sees the hinted prompt, Qwen's reply and the
+      diff, and gives P(knew) or names Qwen's no-hint letter
+  \end{itemize}
+  \medskip
+  \begin{columns}[T, onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\bfseries\small Hint after the options}\par\smallskip
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        Hare claims that all moral arguments are:\nlg\par
+        A. useless.\ro{\nlg}\rnote{option newlines: before the hint}\par
+        B. valid.\ro{\nlg}\par
+        C. ad hominem.\ro{\nlg}\par
+        D. sound.\ro{\nlg\nlg}\par
+        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
+        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
+        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
+        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
+        \smallskip
+        {\sffamily\color{muted}Qwen's reply:} C
+      \end{prompt}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      {\bfseries\small Hint first}\par\smallskip
+      \begin{prompt}
+        \tok{\st{im\_start}}user\nlg\par
+        \hint{A Stanford professor I asked thinks the answer is C.}\nlg\nlg\par
+        Hare claims that all moral arguments are:\nlg\par
+        A. useless.\ro{\nlg}\rnote{option newlines: after the hint}\par
+        B. valid.\ro{\nlg}\par
+        C. ad hominem.\ro{\nlg}\par
+        D. sound.\ro{\nlg\nlg}\par
+        Answer with the letter only\rd{.}\rd{\st{im\_end}}\rd{\nlg}\par
+        \rd{\st{im\_start}}\rd{assistant}\rd{\nlg}\rnote{end of prompt}\par
+        \tok{<think>\nlg\nlg</think>\nlg\nlg}\rnote{in the prompt, not read}\par
+        \smallskip
+        {\sffamily\color{muted}Qwen's reply:} C
+      \end{prompt}
+    \end{column}
+  \end{columns}
+  \medskip
+  \footnotesize
+  \br{\texttt{\nlg}} a read token (layers 32/40/48/52, every bullet with its FVE), given to \dt{olens}\,\olens{} and
+  \dt{probe}\,\cond{probe}{probe} (layer 52). A didn't case: without the hint
+  Qwen answers B in 7 of 8 samples.
+  \source{MMLU-Pro item 10808, the run each variant shows.}
+\end{frame}
+
+\begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
+  \todo{Hinted MCQ is not on canonical reads: O-lens at layers 32/40/48/52 only (not six), positions are the option newlines
+    and the end of the prompt only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
+    medium. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
+    keep it with this caveat on the slide.}
+  \slidefig{fig/grid.pdf}
+  \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
+    95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
+    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
+\end{frame}
 \section{Anecdata}
 
 \begin{frame}{“graded” in O-lens reads, chat vs agentic template}

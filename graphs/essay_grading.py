@@ -8,8 +8,10 @@ probability on a 54% base rate, and % right at 0.5 rewards a shift in its bias (
 
     uv run python -m graphs.essay_grading [--out-dir docs/img]
 
-Writes headline-essay.png (the bars) and headline-essay-diff.png (paired differences: each lens minus transcript only and minus
-its placebo, both probes minus transcript only), and prints the differences the write-up quotes.
+Writes headline-essay.png (transcript only, the lenses and the probe), headline-essay-mean.png (the "+ mean" bars and the probe;
+the write-up shows the two apart, the deck draws every group on one axes) and headline-essay-diff.png (paired differences: each
+lens minus transcript only and minus its placebo, both probes minus transcript only), and prints the differences the write-up
+quotes.
 """
 
 import argparse
@@ -32,21 +34,31 @@ GROUPS = [
     ("J++\n+ mean", ["jlens_inline+mean", "jlens_placebo_inline+mean"]),
     ("probe", ["probe_user_end"]),  # the user-end probe only (Kylie: one probe is easier to explain)
 ]  # † Kylie: probably cursed (the slide's footnote)
+PLAIN_GROUPS = [g for g in GROUPS if "+ mean" not in g[0]]  # the write-up's first chart
+MEAN_GROUPS = [g for g in GROUPS if "+ mean" in g[0] or g[0] == "probe"]  # its second, under the calibration paragraph
 TS = "transcript_inline"
 WRITEUP_S = 1.15  # text scale at write-up size: values at 7.5pt as graphs.style.ci_bar; the deck passes SLIDE_S
 BASE = 0.5  # the axis starts at chance
 
 
 def essay_bars(
-    ax, s: float, headroom: float = 0.1, ylabel: str = "AUROC of P(score goes up)", mean: bool = True, null_line: bool = True
+    ax,
+    s: float,
+    headroom: float = 0.1,
+    ylabel: str = "AUROC of P(score goes up)",
+    mean: bool = True,
+    null_line: bool = True,
+    groups: list | None = None,
 ) -> None:
     """The bars on ax, text sizes scaled by s. Bars from chance, the gray 95% CI whisker, the value in ink above it and the stars
     over that (offsets in points, so they clear the whisker at any height), the null dotted and labelled at the right. The axis
     stops `headroom` above the tallest whisker: room for its two labels, so 0.1 on the deck's 24 mm figure, less when taller.
     `ylabel`: the deck's 24 mm figure fits only a short one (the full one clipped to "AUROC of P(score goes u").
-    `mean=False` leaves out the "+ mean" groups and `null_line=False` the dotted null (the deck drops both, Kylie 2026-11-01)."""
+    `mean=False` leaves out the "+ mean" groups and `null_line=False` the dotted null (the deck drops both, Kylie 2026-11-01);
+    `groups` names which of GROUPS to draw instead (the write-up's two charts)."""
     bars, null, n, _ = essay_auroc_bars()
-    groups = [(g, cs) for g, cs in GROUPS if mean or not g.endswith("+ mean")]
+    if groups is None:
+        groups = [(g, cs) for g, cs in GROUPS if mean or not g.endswith("+ mean")]
     xs, ticks = positions(bars, groups)
     for c, x in xs.items():
         v, (lo, hi), st = bars[c]
@@ -86,12 +98,15 @@ def essay_diffs(ax) -> None:
 
 
 def main(out: Path) -> None:
-    fig, ax = plt.subplots(figsize=(9.6, 3.2), layout="constrained")
-    essay_bars(ax, WRITEUP_S, headroom=0.04)
-    fig.suptitle("Essay grading", x=0.01, ha="left")
-    fig.savefig(out / "headline-essay.png", bbox_inches="tight")
-    plt.close(fig)
-    print("wrote", out / "headline-essay.png")
+    charts = [("headline-essay.png", PLAIN_GROUPS, "Essay grading"),
+              ("headline-essay-mean.png", MEAN_GROUPS, "Essay grading, with Qwen's observed mean grade added")]  # fmt: skip
+    for name, groups, title in charts:
+        fig, ax = plt.subplots(figsize=(6.4, 3.2), layout="constrained")
+        essay_bars(ax, WRITEUP_S, headroom=0.04, groups=groups)
+        fig.suptitle(title, x=0.01, ha="left")
+        fig.savefig(out / name, bbox_inches="tight")
+        plt.close(fig)
+        print("wrote", out / name)
     fig, ax = plt.subplots(figsize=(7.4, 3.4), layout="constrained")
     essay_diffs(ax)
     fig.savefig(out / "headline-essay-diff.png", bbox_inches="tight")
