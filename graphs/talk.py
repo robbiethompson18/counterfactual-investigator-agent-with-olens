@@ -120,6 +120,8 @@ def grid() -> None:
     row(axes[1], letter, hinted_baseline(answer_bars), "always the hinted letter", "which letter?\n% correct",
         pct=True, head=False, base=0.4)  # fmt: skip
     axes[0][-1].text(1.0, 1.08, "hatched = placebo", transform=axes[0][-1].transAxes, fontsize=6.5 * SLIDE_S, color=MUTED, ha="right")
+    # the write-up's copy (docs/final-writeup.md, hinted multiple choice): the same figure on the page background
+    fig.savefig(Path("docs/img/hinted-mcq-grid.png"), dpi=300, transparent=False, facecolor=BG)
     slide_save(fig, OUT / "grid.pdf")
 
 
