@@ -112,16 +112,16 @@
       effort medium) and ask it to pick the correct answer, which penalizes noise and hallucinations
     \item 1,000 to 3,000 cases per category: small but statistically significant effects, probes trained on unseen data, and no
       biasing filters. WorkspaceBench filters \texttt{knowledge\_cutoff} to answers that disagree with Sonnet and Opus, which
-      confounds any transcript-only baseline; we drop that filter and others like it
+      confounds any prompt-only baseline; we drop that filter and others like it
   \end{itemize}
 \end{frame}
 
 \begin{frame}{Results: pooled over the three tasks}
   \begin{itemize}
     \item Metamodels work on three tasks: Multiple Choice, Knowledge Cutoff, Idiosyncratic Preferences. \olens{} and \nla{} are
-      about equally good (+3.0 and +2.6 pp over \transcript, pooled); \jlens{} does not help overall ($-$1.6 pp)
+      about equally good (+3.0 and +2.6 pp over \promptonly, pooled); \jlens{} does not help overall ($-$1.6 pp)
     \item All three beat their placebos (another question's reads) by statistically significant amounts; \jlens's gap is all its
-      placebo misleading the investigator ($-$30.1 pp vs \transcript, against its own $-$1.6 pp)
+      placebo misleading the investigator ($-$30.1 pp vs \promptonly, against its own $-$1.6 pp)
   \end{itemize}
   \slidefig{fig/headline.pdf}
   \source{\% of cases the investigator names Qwen's answer, the three tasks weighted equally; 95\% bootstrap CIs resampling
@@ -172,7 +172,7 @@
 \begin{frame}{Results: “which letter does Qwen pick?”}
   \slidefig{fig/task_mcq.pdf}
   \source{\% of cases the investigator names Qwen's letter, MMLU-Pro and SuperGPQA pooled; 95\% bootstrap CIs over questions.
-    Placebo: another question's reads of the same set, option count and category. Right: each lens minus \transcript, paired over
+    Placebo: another question's reads of the same set, option count and category. Right: each lens minus \promptonly, paired over
     the same resamples.}
 \end{frame}
 
@@ -204,11 +204,11 @@
     \item This dataset mostly works because Haiku doesn't have the same knowledge cutoff as Qwen
     \item Asked the questions itself, Haiku gives Qwen's stale answer on 25\% of the 339 stale items; Gemini 2.5 Flash-Lite,
       whose cutoff (January 2025) is about Qwen's, gives it on 63\%
-    \item With an investigator of a similar knowledge cutoff the metamodels' uplift disappears: Flash-Lite's transcript-only
+    \item With an investigator of a similar knowledge cutoff the metamodels' uplift disappears: Flash-Lite's prompt-only
       bar on the next slide is a strong and arguably fairer baseline, and no condition shows uplift over it
   \end{itemize}
   \source{\% of cases the investigator names Qwen's answer, 999 items, 95\% bootstrap CIs over items. Placebo: another
-    question's reads. Right: each lens minus \transcript, paired.}
+    question's reads. Right: each lens minus \promptonly, paired.}
 \end{frame}
 
 \begin{frame}{Results by investigator: a later-cutoff vs a same-cutoff investigator}
@@ -231,7 +231,7 @@
     \item WorkspaceBench's \texttt{basic\_readout} implicit family scaled from 32 items to 1,500
     \item There is no truth: the label is Qwen's modal answer, and the only filter is consistency, every question where at least
       7 of 8 samples agree
-    \item Never filtered on whether a text reader can guess it, so \transcript{} already gets 80\%
+    \item Never filtered on whether a text reader can guess it, so \promptonly{} already gets 80\%
   \end{itemize}
   \source{Example Qwen transcripts on Docent:
     \href{https://docent.transluce.org/dashboard/fa7a372c-dbb1-47c1-a685-489e46579bcf/agent_run/45abd398-c6f3-436a-9f89-99bcb469b1db}{name an amphibian};
@@ -246,7 +246,7 @@
 \begin{frame}{Results: “what does Qwen pick?”}
   \slidefig{fig/task_preferences.pdf}
   \source{\% of cases the investigator names Qwen's pick, 1,500 questions, 95\% bootstrap CIs over questions. Placebo: another
-    question's reads. Right: each lens minus \transcript, paired.}
+    question's reads. Right: each lens minus \promptonly, paired.}
 \end{frame}
 
 \section{Essay grading}

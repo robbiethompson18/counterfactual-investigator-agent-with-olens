@@ -1,4 +1,6 @@
-"""The one chart style (CLAUDE.md); importing this module applies it. A colour per tool, a placebo in its tool's colour with stripes
+"""The one chart style (CLAUDE.md); importing this module applies it. A colour per tool, two blues for the no-lens baseline (`prompt`,
+where the investigator sees Qwen's prompt and no reply: MCQ, knowledge cutoff, preferences; `transcript`, a lighter blue, where it
+sees Qwen's reply too: essays, blogs, hinted MCQ, CHIVE, the counterfactual envs), a placebo in its tool's colour with stripes
 in the background colour (an open marker where stripes can't show), hatching for placebos and nothing else, and paired-difference
 rows labelled by the two conditions' swatches (A − B), so a row reads like the bars it compares (Robbie, 2026-10-30). Conditions
 are keyed by canonical names; `canon` maps cfbench/eval condition ids onto them. Ink, grid and background are the Evals page's
@@ -27,6 +29,7 @@ INK, MUTED, FAINT, GRID, BG = (
     "#f6f5f1",
 )  # the Evals page's ink, --muted, --faint, grid, background
 BLUE, ORANGE, PURPLE, GREEN, GRAY = "#2a78d6", "#eb6834", "#8e44ad", "#2e9e5b", "#898781"
+LIGHT_BLUE = "#6fa8e6"  # transcript only (Robbie, 2026-10-31: the headline charts keep BLUE, prompt only)
 PLACEBO_HATCH = "////"
 OUTLINE = "none"  # a bar with no fill, only an ink outline: a reference line's bar, not a tool
 # matplotlib doesn't search fontconfig's dirs (e.g. a Nix-installed Inter): register fontconfig's Inter files so the charts aren't
@@ -42,7 +45,8 @@ HAS_EMOJI = any(f.name == EMOJI_FONT for f in font_manager.fontManager.ttflist)
 OLENS = "🔮-lens" if HAS_EMOJI else "O-lens"
 # canonical condition -> (colour, hatch, label)
 STYLE = {
-    "transcript": (BLUE, None, "transcript only"),
+    "prompt": (BLUE, None, "prompt only"),  # the investigator sees Qwen's prompt, never its reply
+    "transcript": (LIGHT_BLUE, None, "transcript only"),  # it sees Qwen's reply too
     "olens": (ORANGE, None, OLENS),
     "olens_placebo": (ORANGE, PLACEBO_HATCH, f"{OLENS} placebo"),
     "jlens": (PURPLE, None, "J++"),
@@ -59,10 +63,10 @@ STYLE = {
     "probe_tuned": ("#c2408a", None, "tuned probe"),  # not the page's purple: that is J++ here
     "transcript+probe": ("#78b7aa", None, "probe + transcript"),  # author_blog_drop's nested combiner, the lighter teal
     # chive_inline's reference bars: CHIVE's own Opus 4.8 arms on the same claims (a lighter shade = the same input, another measure)
-    "chive_opus_plain": ("#93bbea", None, "CHIVE Opus 4.8, transcript"),
+    "chive_opus_plain": ("#b3cff0", None, "CHIVE Opus 4.8, transcript"),  # lighter than LIGHT_BLUE
     "chive_opus_cf": ("#a8432f", None, "CHIVE Opus 4.8, resampling"),
-    "transcript_told": ("#1f4e79", None, "transcript only, told the model and its cutoff"),  # cutoff_qa_investigators
-    "transcript_told_oldprompt": ("#1f4e79", None, "transcript only, told Qwen's cutoff (older prompt)"),  # its canonical set
+    "prompt_told": ("#1f4e79", None, "prompt only, told the model and its cutoff"),  # cutoff_qa_investigators
+    "prompt_told_oldprompt": ("#1f4e79", None, "prompt only, told Qwen's cutoff (older prompt)"),  # its canonical set
     "self_answer": (OUTLINE, None, "answers the question itself"),  # cutoff_qa_investigators: the same-cutoff census
     "null": (OUTLINE, None, "edit does nothing"),
     "qwen_logits": (OUTLINE, None, "Qwen's logits (ceiling)"),
