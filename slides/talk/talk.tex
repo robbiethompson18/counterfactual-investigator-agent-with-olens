@@ -197,55 +197,6 @@
   \source{AUROC over every draw, 95\% bootstrap CIs over claims; hatched = placebo.}
 \end{frame}
 
-\begin{frame}{Results: our environments, pooled and by target model}
-  \slidefig{fig/cf_skill.pdf}
-  \source{100 $-$ RMSE of the predicted behaviour rate, in pp, higher is better, equal case weights; bootstrap intervals over
-    cases; dotted = the sampling-noise ceiling; hollow = the edit does nothing. Investigator Gemini 3.8 Flash with tools to read
-    and grep the transcripts and the reads, 20 calls; placebo from a different env. Not on canonical reads, and no rerun can be:
-    the lens tool shows layers 32/40/48 at the reads' stop-token positions, and the agentic conditions are frozen.}
-\end{frame}
-
-\begin{frame}{Results: the one env that looked like it worked}
-  \begin{columns}[T, onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      \slidefig{fig/cf_hidden_goal.pdf}
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \begin{itemize}
-        \item An earlier essay-grading environment (hidden\_goal.grade), Qwen3.6-27B without CoT: the pre-registered test of
-          2026-10-23, 38 arm pairs, Gemini 3.8 Flash investigator
-        \item With a different investigator model it did not replicate (the investigator-model slide, two on)
-      \end{itemize}
-    \end{column}
-  \end{columns}
-  \source{100 $-$ RMSE of the predicted rate in pp; bootstrap intervals over arm pairs; dotted = ceiling; hollow = the edit does
-    nothing.}
-\end{frame}
-
-\begin{frame}{Harness sanity checks: what the agent searches the lens for, and which tools it calls}
-  \slidefig{fig/cf_harness.pdf}
-  \begin{itemize}
-    \item Each lens-search regex classified by what it matches: the edit's text, the behaviour definition, a transcript landmark,
-      eval-awareness terms, motives
-    \item The investigator reads and greps transcripts about eight times per prediction, and the lens about three
-  \end{itemize}
-  \source{Every agentic prediction across the three targets; one regex example per class under its label.}
-\end{frame}
-
-\begin{frame}{Harness ablations: investigator model, and transcript only vs \olensname{} per investigator}
-  \slidefig{fig/cf_models.pdf}
-  \source{Four hand-picked cases, so most differences between lines are noise; averaged over the seven investigators,
-    \olensname{} minus \transcript{} is +0.4 pp [$-$0.9, +1.7]. Right: every investigator, the thinking-off ones included; the
-    diagonal is \olensname{} = transcript only, dashed = the edit does nothing, the dot's shade is the investigator's thinking
-    level.}
-\end{frame}
-
-\begin{frame}{Harness ablations: Gemini 3.8 Flash by reasoning effort and by tool-call budget}
-  \slidefig{fig/cf_flash.pdf}
-  \source{The same four cases, 2 draws; bands: bootstrap over cases. Dashed = the edit does nothing; dotted = the sampling-noise
-    ceiling. No transcript uses no tools, so it is flat across budgets.}
-\end{frame}
-
 \section{Results across the three single-answer tasks}
 
 \begin{frame}{Results: pooled over the three tasks}
