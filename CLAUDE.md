@@ -275,6 +275,11 @@ one line each (`- [ACTIVE: Title — when to read this](path) — short gloss`),
 doc's `![…](img/…)` renders after rerunning the script it names; charts never go in git or on HF.
 The one exception is `docs/final-writeup.html`, the write-up with its charts embedded, in LFS and
 built by `scripts/build_writeup.sh`, which the pre-commit hook runs (Robbie, 2026-10-31).
+The oracle lens is 🔮-lens (plural 🔮-lenses) in the write-up's prose and O-lens in charts, alt text
+and code (matplotlib can't draw the emoji), never o-lens; J++ (not "J++ lens") and NLA as they are;
+another model's lens is named by its model ("a GLM 5.3 🔮-lens"), not its trainer or checkpoint;
+read tokens are shown as `graphs.style.token_text` does (`␣` space, `↵` newline,
+monospace) (Kylie, 2026-11-01).
 
 **Read [docs/INDEX.md](docs/INDEX.md) before starting on a topic, and when looking for prior results
 or dead ends.**
