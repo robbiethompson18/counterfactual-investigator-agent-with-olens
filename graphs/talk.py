@@ -190,14 +190,14 @@ def essay_diffs() -> None:
     resamples as the table and the stars; the probe is left out so it doesn't set the axis."""
     pairs = essay_auroc_bars()[3]
     short = {"olens_inline": OLENS, "nla_inline": "NLA", "jlens_inline": "J++"}
-    fig, ax = slide_figure(72, 25)
+    fig, ax = slide_figure(72, 20)
     ticks, labels, y = [], [], 0.0
-    for a, b in [(x, other) for x in ESSAY_LENSES for other in (x.replace("_inline", "_placebo_inline"), "transcript_inline")]:
-        d, (lo, hi), _ = pairs[a, b]
+    for a in ESSAY_LENSES:  # each lens vs transcript only; no lens − placebo rows (Robbie, 2026-10-31)
+        d, (lo, hi), _ = pairs[a, "transcript_inline"]
         ax.plot([lo, hi], [y, y], color=INK, lw=1.2, solid_capstyle="butt", zorder=3)
         ax.plot(d, y, "o", ms=3.5, zorder=4, mec=INK, mfc=INK if lo > 0 or hi < 0 else BG)
         ticks.append(y)
-        labels.append(f"{short[a]} − {'transcript' if b == 'transcript_inline' else 'placebo'}")
+        labels.append(f"{short[a]} − transcript")
         y -= 1
     ax.set_yticks(ticks, labels)
     ax.axvline(0, color=MUTED, lw=0.8, zorder=2)
@@ -215,13 +215,11 @@ def essay_tables() -> None:
     (fig/essay_null.tex) for the footnote."""
     pairs = essay_auroc_bars()[3]
     name = {"transcript_inline": r"\sw{transcript}\ transcript", "olens_inline": r"\sw{olens}\ \olensname",
-            "olens_placebo_inline": r"\swp{olens}\ placebo", "nla_inline": r"\sw{nla}\ NLA", "nla_placebo_inline": r"\swp{nla}\ placebo",
-            "jlens_inline": r"\sw{jlens}\ J++", "jlens_placebo_inline": r"\swp{jlens}\ placebo",
-            "probe_user_end": r"\sw{probe}\ probe"}  # fmt: skip
+            "nla_inline": r"\sw{nla}\ NLA", "jlens_inline": r"\sw{jlens}\ J++"}  # fmt: skip
     pf = lambda p: "< .001" if p < 1e-3 else f"{p:.3f}".lstrip("0")
     cell = lambda k: f"{pairs[k][0]:+.3f} & {pf(pairs[k][2])}" if k in pairs else "&"
     rows = [f"{name[a]} − {name[b].split(' ', 1)[1]} & {cell((a, b))}\\\\"
-            for a, b in pairs if not a.endswith("+mean") and not a.startswith("probe")]  # fmt: skip
+            for a, b in pairs if b == "transcript_inline" and a in ESSAY_LENSES]  # fmt: skip
     tab = lambda spec, lines: f"\\begin{{tabular}}{{@{{}}{spec}@{{}}}}\n" + "\n".join(lines) + "\n\\end{tabular}\n"
     head = [r" & $\Delta$ & p\\"]
     (OUT / "essay_pairs.tex").write_text(tab("lrr", [*head, "\\hline", *rows]))
@@ -377,15 +375,22 @@ def author() -> None:
 @slide
 def sankeys() -> None:
     """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title; and the
-    two Multiple Choice sets stacked on one full-height figure (fig/sankey_mcq.pdf; Robbie, 2026-10-31)."""
+    three single-answer tasks' Sankeys at a column's width, beside their part's bullets (Robbie, 2026-10-31): Knowledge Cutoff
+    and Idiosyncratic Preferences as fig/sankey_<slug>_half.pdf, the two Multiple Choice sets stacked on one wider figure
+    (fig/sankey_mcq.pdf)."""
     for slug, (_, columns, flows) in data_filter_sankey.DATASETS.items():
         fig, ax = slide_figure(FULL_W, 44)
         data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
         slide_save(fig, OUT / f"sankey_{slug}.pdf")
-    fig, axes = slide_figure(FULL_W, 58, nrows=2)
+    for slug in ("cutoff", "favorites"):
+        _, columns, flows = data_filter_sankey.DATASETS[slug]
+        fig, ax = slide_figure(HALF_W, 50)
+        data_filter_sankey.draw(ax, columns, flows, fontsize=6.5 * SLIDE_S)
+        slide_save(fig, OUT / f"sankey_{slug}_half.pdf")
+    fig, axes = slide_figure(90, 56, nrows=2)
     for ax, slug in zip(axes, ("mmlu", "supergpqa"), strict=True):
         _, columns, flows = data_filter_sankey.DATASETS[slug]
-        data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
+        data_filter_sankey.draw(ax, columns, flows, fontsize=6 * SLIDE_S)
     slide_save(fig, OUT / "sankey_mcq.pdf")
 
 
