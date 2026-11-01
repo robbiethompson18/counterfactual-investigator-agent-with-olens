@@ -374,15 +374,22 @@ def author() -> None:
 @slide
 def sankeys() -> None:
     """The write-up's data-filter Sankeys, one per dataset (fig/sankey_<slug>.pdf), the frame title carrying the title; and the
-    two Multiple Choice sets stacked on one full-height figure (fig/sankey_mcq.pdf; Robbie, 2026-10-31)."""
+    three single-answer tasks' Sankeys at a column's width, beside their part's bullets (Robbie, 2026-10-31): Knowledge Cutoff
+    and Idiosyncratic Preferences as fig/sankey_<slug>_half.pdf, the two Multiple Choice sets stacked on one wider figure
+    (fig/sankey_mcq.pdf)."""
     for slug, (_, columns, flows) in data_filter_sankey.DATASETS.items():
         fig, ax = slide_figure(FULL_W, 44)
         data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
         slide_save(fig, OUT / f"sankey_{slug}.pdf")
-    fig, axes = slide_figure(FULL_W, 58, nrows=2)
+    for slug in ("cutoff", "favorites"):
+        _, columns, flows = data_filter_sankey.DATASETS[slug]
+        fig, ax = slide_figure(HALF_W, 50)
+        data_filter_sankey.draw(ax, columns, flows, fontsize=6.5 * SLIDE_S)
+        slide_save(fig, OUT / f"sankey_{slug}_half.pdf")
+    fig, axes = slide_figure(90, 56, nrows=2)
     for ax, slug in zip(axes, ("mmlu", "supergpqa"), strict=True):
         _, columns, flows = data_filter_sankey.DATASETS[slug]
-        data_filter_sankey.draw(ax, columns, flows, fontsize=7.5 * SLIDE_S)
+        data_filter_sankey.draw(ax, columns, flows, fontsize=6 * SLIDE_S)
     slide_save(fig, OUT / "sankey_mcq.pdf")
 
 
