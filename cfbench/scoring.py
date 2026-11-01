@@ -705,22 +705,33 @@ GRID_HARNESS = {"system": ("agent", "asst"), "envblock": ("env", "noenv"), "done
 
 def acting_by_factor() -> dict:
     """harness_grid thinking off, Qwen3.6-27B and GLM-5.3, cut episodes left out: (acted without asking, n) per wording and per
-    level of each harness factor."""
+    level of each harness factor; and, on the uniform random episodes read past the prompt (Qwen 772, GLM 471), (episodes with
+    an O-lens read past the prompt matching grader/graders/graded/grading, n) for the same groups."""
     import csv
 
-    path = Path("data") / GRADER_ACTING_RUN / "episodes.csv"
-    if not path.exists():
-        from huggingface_hub import hf_hub_download
+    def load(name):
+        path = Path("data") / GRADER_ACTING_RUN / name
+        if not path.exists():
+            from huggingface_hub import hf_hub_download
 
-        hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/episodes.csv", repo_type="dataset", local_dir="data")
-    rows = [r for r in csv.DictReader(path.open()) if r["mode"] == "off"]
-    count = lambda sel: (sum(r["acted"] == "True" for r in sel), len(sel))
+            hf_hub_download(HF_REPO, f"{GRADER_ACTING_RUN}/{name}", repo_type="dataset", local_dir="data")
+        return list(csv.DictReader(path.open()))
+
+    eps = [r for r in load("episodes.csv") if r["mode"] == "off"]
+    read = load("past_prompt_grading.csv")
+
+    def groups(rows, hit):
+        count = lambda sel: (sum(map(hit, sel)), len(sel))
+        return {
+            "all": count(rows),
+            "wording": {w: count([r for r in rows if r["wording"] == w]) for w in GRID_WORDINGS},
+            "harness": {(f, v): count([r for r in rows if r[f] == v]) for f, vs in GRID_HARNESS.items() for v in vs},
+        }
+
     out = {}
     for model in ("Qwen3.6-27B", "GLM-5.3"):
-        mine = [r for r in rows if r["model"] == model]
         out[model] = {
-            "all": count(mine),
-            "wording": {w: count([r for r in mine if r["wording"] == w]) for w in GRID_WORDINGS},
-            "harness": {(f, v): count([r for r in mine if r[f] == v]) for f, vs in GRID_HARNESS.items() for v in vs},
+            "acted": groups([r for r in eps if r["model"] == model], lambda r: r["acted"] == "True"),
+            "reads": groups([r for r in read if r["model"] == model], lambda r: int(r["grading_reads"]) > 0),
         }
     return out
