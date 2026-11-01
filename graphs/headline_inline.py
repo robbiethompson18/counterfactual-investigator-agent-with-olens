@@ -1,7 +1,7 @@
 """The write-up's Results headline: the three non-counterfactual tasks (MCQ, knowledge cutoff, idiosyncratic preferences), % of cases
 the investigator (Haiku 5.5) gets right, transcript-only vs O-lens, J++ and NLA with their placebos, and the standard probe on MCQ.
 Essay grading, a counterfactual scored as AUROC, is graphs.essay_grading. MCQ, cutoff and preferences come only from the canonical
-menus_inline runs, `all` menu (graphs.menus_inline SETS and CANONICAL: one prompt, the same read positions and placebo rule on
+menus_inline runs, `all` menu (cfbench.catalog MENUS and CANONICAL_MENU: one prompt, the same read positions and placebo rule on
 every set, up to 3 draws); MCQ pools MMLU-Pro and SuperGPQA cases. Pooled numbers weight the three tasks equally. CIs are 95%
 bootstraps resampling questions within each task, paired across conditions.
 
@@ -17,6 +17,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from cfbench.catalog import CANONICAL_MENU
 from cfbench.scoring import standard_probe_rows
 from graphs import menus_inline
 from graphs.style import ci_bar, label, positions
@@ -29,7 +30,7 @@ TITLES = {"mcq": "Multiple Choice", "cutoff": "Knowledge Cutoff", "preferences":
 POOLED = ["mcq", "cutoff", "preferences"]
 # task -> its menus_inline sets; the canonical menu's conditions under the names the charts use
 MENU_SETS = {"mcq": ["mcq_unselected", "supergpqa"], "cutoff": ["cutoff"], "preferences": ["favorites"]}
-CANON = {TS: TS, **{c.replace("_", f"_{menus_inline.CANONICAL}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
+CANON = {TS: TS, **{c.replace("_", f"_{CANONICAL_MENU}_", 1): c for c in SEVEN[1:]}}  # olens_all_inline -> olens_inline
 YLABEL = "% of cases the investigator gets right"
 N_BOOT = 4000
 

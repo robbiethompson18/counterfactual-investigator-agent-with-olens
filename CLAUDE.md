@@ -158,6 +158,9 @@ isn't finished until `scripts/runs.py finish RUN` has synced it to HF, including
 Results that exist only on a pod, robbie-box or one laptop don't count. Usage is in the script's
 docstring.
 
+**Every run a chart or write-up number reads is named in `cfbench/catalog.py`** (2026-10-31): when a
+run is replaced, change it there, never in a graphs module or `cfbench.scoring`.
+
 Cases viewer: [chive-cases.pages.dev](https://chive-cases.pages.dev) shows all 204 held-out
 incidents with every transcript-only and O-lens draw, filterable and linkable by URL.
 `viewer/index.html` is the page, `viewer/behavior_kind.tsv` our hand labels; rebuild and redeploy

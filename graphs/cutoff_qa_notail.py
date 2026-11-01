@@ -14,11 +14,11 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+from cfbench.catalog import CUTOFF_QA_TOOL_CUTS, CUTOFF_QA_TOOL_V3
 from graphs.cutoff_qa_inline import ci
 from graphs.style import OLENS, bar_kw, ci_bar, diff_rows
 
-RUN = Path("data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3")  # transcript-only and the full set
-CUTS = {c: Path(f"data/runs/cfbench/2026-10-30_cutoff-qa-tool-v3-olens-{c.replace('_', '-')}-full") for c in ("qpunct", "qpunct_imend")}
+RUN, CUTS = CUTOFF_QA_TOOL_V3, CUTOFF_QA_TOOL_CUTS  # transcript-only and the full set, then the cuts
 READS = {"qpunct": "question\npunctuation", "qpunct_imend": "punctuation\n+ <|im_end|>", "full": "full set\n(+ last 10)"}
 PANELS = {"stale (Qwen's answer is out of date)": "stable_wrong", "not stale": "stable_right", "all items": None}
 
