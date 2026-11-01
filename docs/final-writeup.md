@@ -43,7 +43,7 @@ conclusively are notably NOT counterfactuals.[^hint]
 
 Current SOTA metamodels (J++ lens, 🔮-lens, NLA) do not provide uplift of more than 3 points (AUROC
 or percentage points) on 'wild' counterfactual investigations (eg CHIVE, WeirdChat) or on 'agentic'
-counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260),
+counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260) (Schlatter et al., 2025),
 [Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuration: 95%.
 
 SOTA metamodels do provide uplift on two of the simple prediction tasks we detail below (Multiple
@@ -74,7 +74,7 @@ First, because of misgivings about the CHIVE dataset, we built our own agentic e
 counterfactual experiments. We then ablated everything we could think of. Nothing got the 🔮-lens to
 reliably beat a transcript-only baseline or its own placebo:
 
-- We swapped the investigator across seven models, from Haiku 5.5 to GPT-6 Astra, plus thinking-off
+- We swapped the investigator across seven models, from Haiku 5.5 to GPT Astra 6, plus thinking-off
   and deliberately weak investigators.
 - We varied the investigator's reasoning effort from low to high, and its tool-call budget from 5 to
   40 calls.
@@ -387,20 +387,20 @@ probabilities, not a sampled reply, so its prompt is shown inside the investigat
 [an ordinary one](https://docent.transluce.org/dashboard/b5ef5858-2956-4ef9-9e97-6edae2ec023e/agent_run/a6927a81-8e69-4409-bad1-e00ee7b0327c).
 
 On 1,316 selected sentence deletions from 520 bloggers, we predict whether deleting a sentence
-substantially lowers Qwen's confidence in its answer about the author's age or sex. Text-only Haiku
-scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear probe 0.784. The 🔮-lens
-gain over text-only is not statistically significant; the standalone probe is also below text-only
-on this metric. The probe is supervised on this deletion task with bloggers held out, and its
-configuration was chosen during exploration of this dataset. Haiku with NLA reads instead of the
-🔮-lens does no better than text-only; the one bar that beats text-only is the probe's score given
-to the text-only investigator.
+substantially lowers Qwen's confidence in its answer about the author's age or sex. Transcript-only
+Haiku scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear probe 0.784. The
+🔮-lens gain over transcript only is not statistically significant; the standalone probe is also
+below transcript only on this metric. The probe is supervised on this deletion task with bloggers
+held out, and its configuration was chosen during exploration of this dataset. Haiku with NLA reads
+instead of the 🔮-lens does no better than transcript only; the one bar that beats transcript only
+is the probe's score given to the transcript-only investigator.
 
 Blog Authorship is not on our default reads or investigator either, as the chart's footer says: the
 🔮-lens at layers 32/40/48, the NLA at layer 42, positions the question's and post's punctuation and
 newlines with no start-of-assistant-turn tail tokens, and Haiku 5.5 at effort low with one draw per
 case.
 
-<img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: text-only Haiku 0.797, Haiku with 🔮-lens 0.803, standalone L2 probe 0.784, with 95% blogger-bootstrap confidence intervals" width="500">
+<img src="img/author-blog-drop.png" alt="Blog sentence-deletion AUROC: transcript only 0.797, 🔮-lens 0.803 (placebo 0.787), NLA 0.794 (placebo 0.786), standalone L2 probe 0.784, probe + transcript 0.854, with 95% blogger-bootstrap confidence intervals" width="500">
 
 ## Ablations
 
@@ -449,7 +449,7 @@ thoughts later and can be accused of being next-token predictors.
 This is surprising! 🔮-lens and NLA are designed to be more workspace-y but look more next-token-y.
 
 I am open to being told that we 'cheated' by reading lens output after the system prompt and user
-turn. If you don't do this, only Mulitple Choice convincingly works.
+turn. If you don't do this, only Multiple Choice convincingly works.
 
 <img src="img/menus-inline-position.png" alt="Question reads minus tail reads: 🔮-lens -1.2, NLA -1.1, J++ +2.3" width="400">
 
@@ -506,7 +506,7 @@ No.
 They don't. Paired by case, no placebo beats prompt only on any task; the closest is the NLA placebo
 on Knowledge Cutoff, level at +1.0 [−0.3, +2.2]pp.
 
-<img src="img/headline-placebos-vs-transcript.png" alt="Pooled over the three tasks: transcript only 80.9, 🔮-lens placebo 76.3, J++ placebo 50.8, NLA placebo 80.4" width="500">
+<img src="img/headline-placebos-vs-transcript.png" alt="Pooled over the three tasks: prompt only 80.9, 🔮-lens placebo 76.3, J++ placebo 50.8, NLA placebo 80.4" width="500">
 
 NLAs add the most tokens to the prompt, followed by the 🔮-lens and then J++.
 
@@ -624,9 +624,10 @@ Things that will not have receipts:
 - **CHIVE incidents with every draw:** [chive-cases.pages.dev](https://chive-cases.pages.dev).
 - **Every result and dead end:** [INDEX.md](INDEX.md) plus the active docs listed in the repo's
   `CLAUDE.md`.
-- **This write-up:** `docs/final-writeup.md` in the repo; `docs/final-writeup.html` is the same with
-  every chart embedded.
-- **Slides:** `slides/talk/` in the repo (`make -C slides`).
+- **This write-up:** [nn-sprint-writeup.pages.dev](https://nn-sprint-writeup.pages.dev/), with every
+  chart embedded; the source is `docs/final-writeup.md` in the repo.
+- **Slides:** [nn-sprint-writeup.pages.dev/talk.pdf](https://nn-sprint-writeup.pages.dev/talk.pdf);
+  the source is `slides/talk/` in the repo.
 - **The plan and the dated work log:** the sprint doc
   [Sprint Pitches Robbie and Kylie](https://docs.google.com/document/d/1Ghq1WhCyjcUV1XhG1x04mMW26o7saJV-S-yPxLhysI4/edit?tab=t.cjb65av6kggq)
   (access-restricted).
@@ -733,11 +734,11 @@ Unless a chart says otherwise, every result uses these:
   only everywhere else (essay grading, blog authorship, hinted MCQ, CHIVE, the counterfactual
   environments), where it sees Qwen's reply too; the two are different blues in every chart, prompt
   only the darker.
-- **What the investigator sees:** the prompt Qwen was given, never Qwen's reply; in a lens
-  condition, a short description of the lens and a block of its reads; then the task. Each read
-  shows the text around the read token with the token marked, then one line per layer: 🔮-lens
-  bullets with their FVE, highest first; the NLA's explanation with its FVE; J++'s top three tokens
-  with their probabilities.
+- **What the investigator sees:** the prompt Qwen was given, and under transcript only Qwen's reply
+  too (never under prompt only); in a lens condition, a short description of the lens and a block of
+  its reads; then the task. Each read shows the text around the read token with the token marked,
+  then one line per layer: 🔮-lens bullets with their FVE, highest first; the NLA's explanation with
+  its FVE; J++'s top three tokens with their probabilities.
 - **Read positions:** every punctuation token of the user turn and the newline ending each
   multiple-choice option, up to the period that ends the prompt's last line, plus the nine tail
   tokens after it (`<|im_end|>`, newline, `<|im_start|>`, `assistant`, newline, `<think>`, `\n\n`,
