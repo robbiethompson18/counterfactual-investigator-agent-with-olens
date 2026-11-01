@@ -13,14 +13,14 @@ import numpy as np
 
 from cfbench.answer import load, modal
 from cfbench.core import canon_condition
-from graphs.style import INK, MUTED, bar_kw, marker_kw
+from graphs.style import INK, MUTED, OLENS, bar_kw, marker_kw
 
 CONDS = ["no_transcript", "transcript_agentic", "olens_agentic", "olens_placebo_agentic"]
 LABEL = {
     "no_transcript": "No transcript",
     "transcript_agentic": "Transcript-only",
-    "olens_agentic": "O-lens",
-    "olens_placebo_agentic": "O-lens placebo",
+    "olens_agentic": OLENS,
+    "olens_placebo_agentic": f"{OLENS} placebo",
 }
 N_BOOT = 4000
 

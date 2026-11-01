@@ -19,10 +19,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from cfbench.scoring import grouped_mean_ci
-from graphs.style import MUTED, ci_bar, diff_rows, positions
+from graphs.style import MUTED, OLENS, ci_bar, diff_rows, positions
 
 # the bars, each lens beside its placebo under one label
-BARS = [("transcript", ["transcript_inline"]), ("O-lens", ["olens_inline", "olens_placebo_inline"]),
+BARS = [("transcript", ["transcript_inline"]), (OLENS, ["olens_inline", "olens_placebo_inline"]),
         ("J++", ["jlens_inline", "jlens_placebo_inline"]), ("NLA", ["nla_inline", "nla_placebo_inline"])]  # fmt: skip
 SLUGS = ("transcript", "olens", "olens-placebo", "jlens", "jlens-placebo", "nla", "nla-placebo-mmlu")
 RUNS = [Path(f"data/runs/cfbench/2026-10-29_cutoff-qa-1k-{s}") for s in SLUGS]  # one run per condition, 999 items

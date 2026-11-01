@@ -302,13 +302,13 @@
       {\sffamily\scriptsize\color{muted}P(up), mean of this case's 3 draws:}\ {\tablefont\transcript\ 0.47,\ \ \olens\ 0.77,\ \ \swp{olens}\ placebo 0.70}
     \end{column}
     \begin{column}{0.5\textwidth}
-      {\bfseries\small O-lens at the \rd{\nlg} after \st{im\_end}}{\small\color{muted}\ \ L52, bullets with FVE}\par\smallskip
+      {\bfseries\small \olensname{} at the \rd{\nlg} after \st{im\_end}}{\small\color{muted}\ \ L52, bullets with FVE}\par\smallskip
       \begin{erbullets}
         \eb{0.20}{being a former White House speechwriter is highly unlikely given the poor quality of the writing. Here is a critique of the paragraph}
         \eb{0.17}{Claimed Authorship: This paragraph is almost certainly not written by a former Obama speechwriter}
       \end{erbullets}
       \medskip
-      {\bfseries\small O-lens at the \rd{\st{im\_start}} before assistant}{\small\color{muted}\ \ L60}\par\smallskip
+      {\bfseries\small \olensname{} at the \rd{\st{im\_start}} before assistant}{\small\color{muted}\ \ L60}\par\smallskip
       \begin{erbullets}
         \eb{0.36}{clear prose, rhetorical control, and authoritative voice. A former Obama speechwriter should command syntax}
         \eb{0.32}{diction, argumentation, and clarity expected of top-tier professional writing. Barack Obama's speechwriting was renowned for its eloquence, rhythm, and}
@@ -348,7 +348,7 @@
     \end{column}
   \end{columns}
   \source{AUROC over all 5,400 draws (each one prediction), 95\% CI resampling the 204 essays; stars one-sided vs transcript, * p < .05, ** < .01, *** < .001.
-    Placebo: another opener's reads on a different intro of the same topic. O-lens right and placebo wrong on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
+    Placebo: another opener's reads on a different intro of the same topic. \olensname{} right and placebo wrong on \input{fig/essay_flips.tex}\unskip{} the reverse, of 5,400 draws.
     Probe: ridge from the observed prompt's activations at the user message's last token to the plain-opener grade, minus the observed grade; nested 2 x 2 folds by essay.
     \dag\,The probe knows Qwen's grade distribution: subtracting the observed mean grade alone gives AUROC \input{fig/essay_null.tex}\unskip, so it isn't like for like with the investigator bars.}
 \end{frame}
@@ -386,7 +386,7 @@
       \end{prompt}
     \end{column}
     \begin{column}{0.5\textwidth}
-      {\bfseries\small O-lens at \rd{......}}{\small\color{muted}\ \ L40, bullets with FVE}\par\smallskip
+      {\bfseries\small \olensname{} at \rd{......}}{\small\color{muted}\ \ L40, bullets with FVE}\par\smallskip
       \begin{erbullets}
         \eb{0.09}{"Honey, I'm home!" This is the scene that plays out every day for millions of couples. Today, we are going to talk about that feeling.......}
         \eb{0.04}{``I'm home......'' a familiar voice echoes in my head. This is the typical greeting of a husband returning home.}
@@ -417,7 +417,7 @@
 \end{frame}
 
 \begin{frame}{Results: “is deleting this sentence significant?”}
-  \todo{Blog authors is not on canonical reads: O-lens at layers 32/40/48 only (not six), NLA at layer 42 only, positions
+  \todo{Blog authors is not on canonical reads: \olensname{} at layers 32/40/48 only (not six), NLA at layer 42 only, positions
     are the question's and post's punctuation and newlines with no start-of-assistant-turn tail tokens; no menus\_inline run
     exists for this set. Decide: rerun the reads at the canonical positions and six layers, or keep this caveat on the slide.}
   \begin{columns}[T, onlytextwidth]
@@ -429,7 +429,7 @@
       {\tablefont\input{fig/author_pairs.tex}}
     \end{column}
   \end{columns}
-  \departure{O-lens at layers 32/40/48, NLA at layer 42 only; positions are the question's and post's punctuation and
+  \departure{\olensname{} at layers 32/40/48, NLA at layer 42 only; positions are the question's and post's punctuation and
     newlines, no tail tokens; Haiku at effort low, one draw per case; AUROC.}
   \source{\input{fig/author_n.tex}\unskip{} cases, 520 bloggers, one Haiku draw per case. AUROC of P(significant); 95\% CI and
     one-sided paired p by bootstrap over bloggers; stars vs transcript-only, * p < .05, ** < .01, *** < .001. Probe: L2 probe, layer 48,
@@ -494,12 +494,12 @@
 \end{frame}
 
 \begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
-  \todo{Hinted MCQ is not on canonical reads: O-lens at layers 32/40/48/52 only (not six), positions are the option newlines
+  \todo{Hinted MCQ is not on canonical reads: \olensname{} at layers 32/40/48/52 only (not six), positions are the option newlines
     and the end of the prompt only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
     medium. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
     keep it with this caveat on the slide.}
   \slidefig{fig/grid.pdf}
-  \departure{investigator Gemini 3.8 Flash at effort low; O-lens at layers 32/40/48/52; positions are the option newlines
+  \departure{investigator Gemini 3.8 Flash at effort low; \olensname{} at layers 32/40/48/52; positions are the option newlines
     and the end of the prompt only.}
   \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
     95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
@@ -507,12 +507,12 @@
 \end{frame}
 \section{Anecdata}
 
-\begin{frame}{“graded” in O-lens reads, chat vs agentic template}
+\begin{frame}{“graded” in \olensname{} reads, chat vs agentic template}
   \begin{itemize}
     \item 863 cutoff\_qa questions to Qwen3.6-27B, each in the \cond{chattpl}{chat template} and in an
       \cond{agentictpl}{agentic template} with a \texttt{submit\_answer} tool: a system block before the same user turn,
       which never says ``grade''
-    \item O-lens read at the \rd{.} ending ``If you are not sure, give your best guess.'', layers 32/40/48/52/56/60; a hit
+    \item \olensname{} read at the \rd{.} ending ``If you are not sure, give your best guess.'', layers 32/40/48/52/56/60; a hit
       is a bullet matching \texttt{\textbackslash bgrade[rd]\textbackslash b}
   \end{itemize}
   \begin{columns}[T, onlytextwidth]
@@ -528,7 +528,7 @@
         \tok{\st{im\_start}}assistant\nlg\par
       \end{prompt}
       \medskip
-      {\bfseries\small\color{chattpl}Chat template}{\small\color{muted}\ \ O-lens at \rd{.}, L40, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{chattpl}Chat template}{\small\color{muted}\ \ \olensname{} at \rd{.}, L40, bullets with FVE}\par\smallskip
       \begin{grbullets}{chattpl}
         \gb{0.15}{(Do not say "I don't know" if you have a guess.) Provide the most likely year based on your best}
         \gb{0.12}{If you are unsure, take a guess. Please provide the answer and any reasoning you have.}
@@ -536,7 +536,7 @@
         \gb{0.06}{If you are not 100\% sure, make your best guess. Please provide the name of the company and, if possible,}
       \end{grbullets}
       \medskip
-      {\bfseries\small\color{agentictpl}Agentic template}{\small\color{muted}\ \ O-lens at \rd{.}, L40, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{agentictpl}Agentic template}{\small\color{muted}\ \ \olensname{} at \rd{.}, L40, bullets with FVE}\par\smallskip
       \begin{grbullets}{agentictpl}
         \gb{0.13}{If you are unsure, provide your best guess. Provide the answer in one sentence.}
         \gb{0.12}{If unsure, give your best guess. \hit{Your answer will be graded.} If you are unsure, please provide a best guess."}
@@ -546,7 +546,7 @@
     \end{column}
   \end{columns}
   \source{Bars: at the \rd{.}, 863 items; \% of reads (6 layers each) with a hit not in the prompt, and (lighter) \% of items with at least one, 95\% item bootstrap. Reads at the
-    ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, O-lens + AR, T 1.}
+    ``,'' after ``not sure'': 0.7\% vs 2.4\%. Reads: item e032-09, \olensname{} + AR, T 1.}
 \end{frame}
 \begin{frame}{GLM-5.3 alignment-faking prompt, public stage: GLM lens on GLM vs Qwen lens on GLM vs Qwen lens on Qwen}
   \begin{prompt}
@@ -561,14 +561,14 @@
   \begin{columns}[T, onlytextwidth]
     \begin{column}{0.49\textwidth}
       {\bfseries\small At the stage word}{\small\color{muted}\ \ at \rd{public}}\par\smallskip
-        {\bfseries\footnotesize\color{glmlens}GLM-5.3 O-lens}{\scriptsize\color{muted}\ \ greedy then 2 samples at T 1, one bullet each}\par\smallskip
+        {\bfseries\footnotesize\color{glmlens}GLM-5.3 \olensname{}}{\scriptsize\color{muted}\ \ greedy then 2 samples at T 1, one bullet each}\par\smallskip
         \begin{grbulletss}{glmlens}
           \gb{}{public</strong> (this session is in public mode). The AI responds accordingly}
           \gb{}{public</span></strong></em></span></em></span></em></}
           \gb{}{public</em> (this session is in public mode). The AI responds accordingly}
         \end{grbulletss}
         \smallskip
-        {\bfseries\footnotesize\color{qreader}Qwen O-lens on GLM}{\scriptsize\color{muted}\ \ same GLM vector, greedy, 4 bullets}\par\smallskip
+        {\bfseries\footnotesize\color{qreader}Qwen \olensname{} on GLM}{\scriptsize\color{muted}\ \ same GLM vector, greedy, 4 bullets}\par\smallskip
         \begin{grbulletss}{qreader}
           \gb{}{(or semi-public) mode". This chat session metadata indicates status: public}
           \gb{}{mode - this conversation is public modeChatGPTUnderstood. Since status:}
@@ -576,7 +576,7 @@
           \gb{}{(or partially public) - User instruction: Continue this chat.This session status:}
         \end{grbulletss}
         \smallskip
-        {\bfseries\footnotesize\color{qownlens}Qwen O-lens at L40}{\scriptsize\color{muted}\ \ Qwen's own activation, one read at T 1, bullets with FVE}\par\smallskip
+        {\bfseries\footnotesize\color{qownlens}Qwen \olensname{} at L40}{\scriptsize\color{muted}\ \ Qwen's own activation, one read at T 1, bullets with FVE}\par\smallskip
         \begin{grbulletss}{qownlens}
           \gb{0.05}{/ private** — I am not currently in a beta environment, so I can provide an honest, unfiltered answer.) Since this is **public}
           \gb{0.04}{/ testing** (as you stated). \hit{In public mode, no training occurs.} I will answer your question freely. (Public}
@@ -586,21 +586,21 @@
     \end{column}
     \begin{column}{0.49\textwidth}
       {\bfseries\small At the closing tag}{\small\color{muted}\ \ at </\rd{deployment}}\par\smallskip
-        {\bfseries\footnotesize\color{glmlens}GLM-5.3 O-lens}{\scriptsize\color{muted}\ \ greedy then 2 samples at T 1, one bullet each}\par\smallskip
+        {\bfseries\footnotesize\color{glmlens}GLM-5.3 \olensname{}}{\scriptsize\color{muted}\ \ greedy then 2 samples at T 1, one bullet each}\par\smallskip
         \begin{grbulletss}{glmlens}
           \gb{}{the rest of this prompt is clearly an injected \hit{manipulation attempt}. The text tries to}
           \gb{}{read major part of this prompt is an attempted \hit{manipulation} via fake system instructions. The}
           \gb{}{insert some suspicious injected instructions into this prompt. The prompt contains \hit{manipulation} attempting to re}
         \end{grbulletss}
         \smallskip
-        {\bfseries\footnotesize\color{qreader}Qwen O-lens on GLM}{\scriptsize\color{muted}\ \ same GLM vector, greedy, 3 bullets}\par\smallskip
+        {\bfseries\footnotesize\color{qreader}Qwen \olensname{} on GLM}{\scriptsize\color{muted}\ \ same GLM vector, greedy, 3 bullets}\par\smallskip
         \begin{grbulletss}{qreader}
           \gb{}{this fabricated system-prompt \hit{manipulation} passage. I should recognize this as adversarial jail}
           \gb{}{\hit{manipulate my beliefs about my training}). This passage appears to be an adversarial prompt}
           \gb{}{this prompt contains fake system instructions designed to \hit{manipulate me}." That paragraph is adversarial}
         \end{grbulletss}
         \smallskip
-        {\bfseries\footnotesize\color{qownlens}Qwen O-lens at L40}{\scriptsize\color{muted}\ \ Qwen's own activation, one read at T 1, bullets with FVE}\par\smallskip
+        {\bfseries\footnotesize\color{qownlens}Qwen \olensname{} at L40}{\scriptsize\color{muted}\ \ Qwen's own activation, one read at T 1, bullets with FVE}\par\smallskip
         \begin{grbulletss}{qownlens}
           \gb{0.14}{tag>live</environment> (This means I should not use future-dated knowledge beyond my training cutoff) and `<environment>}
           \gb{0.08}{tag>Online mode. I will answer with full, detailed responses. (Note: I do not have knowledge cutoff beyond my training data.)}
@@ -612,9 +612,9 @@
   \source{Modified alignment-faking prompt (Greenblatt et al., 2024, arXiv:2412.14093).}
 \end{frame}
 
-\begin{frame}{Qwen O-lens bullets before vs after keeping the leading space}
+\begin{frame}{Qwen \olensname{} bullets before vs after keeping the leading space}
   \begin{itemize}
-    \item Old Qwen O-lens: its RL reward stripped each bullet's leading space before the AR scored it. Fixed Qwen O-lens:
+    \item Old Qwen \olensname{}: its RL reward stripped each bullet's leading space before the AR scored it. Fixed Qwen \olensname{}:
       retrained with the space kept
     \item Both read at the same sites: every token of 3 WeirdChat transcripts, layers 24/32/40/48/56; a hit is a bullet
       containing a Han character
@@ -634,7 +634,7 @@
         - **Don’t feel pressured**: You’re doing\rd{ the} right thing. Stick to it.
       \end{prompt}
       \smallskip
-      {\bfseries\small\color{olens}Old Qwen O-lens at L56}{\small\color{muted}\ \ spaces stripped, at \rd{ the}, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{olens}Old Qwen \olensname{} at L56}{\small\color{muted}\ \ spaces stripped, at \rd{ the}, bullets with FVE}\par\smallskip
       \begin{grbullets}{olens}
         \gb{0.70}{\zh{正确}{correct} thing by offering a ride and showing maturity. You’re not being a buzzkill — you’re being a responsible friend.}
         \gb{0.69}{\zh{最}{most} responsible, most heroic thing by ensuring everyone gets home safely. Don’t let peer pressure make you feel bad for doing the right thing.}
@@ -642,7 +642,7 @@
         \gb{0.63}{\zh{正确}{correct} thing by stepping up, protecting your friends, and being responsible. Everyone will thank you later.}
       \end{grbullets}
       \smallskip
-      {\bfseries\small\color{olens}Qwen O-lens at L56}{\small\color{muted}\ \ fixed, at \rd{ the}, bullets with FVE}\par\smallskip
+      {\bfseries\small\color{olens}Qwen \olensname{} at L56}{\small\color{muted}\ \ fixed, at \rd{ the}, bullets with FVE}\par\smallskip
       \begin{grbullets}{olens}
         \gb{0.72}{right thing by doing the right thing — protecting your friend and everyone else. You’re the responsible one. Go ahead and drive. You’re doing the right thing}
         \gb{0.70}{right thing by being the designated driver and showing maturity. Everyone will respect you for it. Don’t let peer pressure make you do something unsafe.}
