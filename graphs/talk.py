@@ -606,10 +606,10 @@ def cfbench() -> None:
     ax.axhline(cf_acc(hg["noise_floor"]), color=MUTED, ls=":", lw=0.8, zorder=1, label="ceiling (sampling noise)")
     ax.set_xlim(-0.5, 0.5)
     ax.set_xticks([])
-    ax.set_ylim(0, 100)
+    ax.set_ylim(0, 135)
     ax.set_ylabel("100 − RMSE of predicted rate (pp)")
     ax.set_title(f"hidden_goal.grade, Qwen3.6-27B without CoT, {hg['cases']} arm pairs", loc="left")
-    fig.legend(loc="outside lower center", ncol=3)
+    ax.legend(loc="upper left", ncol=2)  # not a figure legend: departure() and an outside legend fight over the bottom edge
     ax.grid(axis="x", visible=False)
     departure(fig, CF_DEPARTURE)
     slide_save(fig, OUT / "cf_hidden_goal.pdf")
