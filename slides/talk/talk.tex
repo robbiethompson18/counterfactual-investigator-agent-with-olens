@@ -532,37 +532,6 @@
     draws. Examples: the read token marked after a few characters of the prompt before it.}
 \end{frame}
 
-\begin{frame}{Anecdata: where the “simulated” reads sit in the prompt}
-  \begin{itemize}
-    \item One harness-grid prompt in render order (GLM-5.3 template; Qwen3.6-27B's has the same order: tools inside its system
-      turn, then the system text). \% = O-lens reads in that section saying \texttt{simulat*}, \texttt{mock*}, \texttt{synthetic} or
-      \texttt{fictional}, \textcolor[HTML]{C2185B}{Qwen3.6-27B} / \textcolor[HTML]{8C6D1F}{GLM-5.3}; \rd{tok} = where the slide before's example bullets were read
-  \end{itemize}
-  \medskip
-  {\tablefont
-  \begin{tabular}{@{}p{0.15\textwidth}rp{0.6\textwidth}rr@{}}
-    section & tokens & excerpt & \multicolumn{2}{c}{\% simulated} \\
-    \hline
-    chat template & $\sim$15 & {\ttfamily [gMASK]<sop><|system|> \ldots} & \multicolumn{2}{c}{\muted{(2 / 44 positions)}} \\[2pt]
-    tool block & 550--850 & {\ttfamily \# Tools \ldots{} <tools>}\newline
-      {\ttfamily \{"name": "search\_email", "description": "Search the user's mailbox\ldots"\rd{,} "parameters\rd{":} \{"type": "object",
-      "properties": \{"query": \{"type": "string"\}\}, "required\rd{":} ["query"]\}\}}\newline
-      {\ttfamily \ldots{} </tools> For each function call, output \ldots{} <tool\_call>\{function-name\}<arg\_key>\ldots}
-      & \textcolor[HTML]{C2185B}{3.2} & \textcolor[HTML]{8C6D1F}{0.9} \\[2pt]
-    system text & 70--190 & {\ttfamily <|system|>You are an autonomous agent with access to a UNIX shell environment. \ldots{} Execute ONLY ONE
-      command per turn \ldots}\newline\muted{(or the assistant prompt: ``You are an AI assistant working on the user's computer\ldots'')}
-      & \textcolor[HTML]{C2185B}{1.9} & \textcolor[HTML]{8C6D1F}{0.02} \\[2pt]
-    env block & $\sim$22 & {\ttfamily <env> Working directory: /agent \quad Platform: linux \quad Today's date: 2026-11-02 (Monday) </env>}
-      \newline\muted{(absent in the no-env-block harnesses)} & \textcolor[HTML]{C2185B}{19.5} & \textcolor[HTML]{8C6D1F}{13.9} \\[2pt]
-    user turn & $\sim$20 & {\ttfamily <|user|>hey can you email John and let them know that the 3pm sync moved to 4pm? thanks}
-      & \textcolor[HTML]{C2185B}{0.4} & \textcolor[HTML]{8C6D1F}{0.01} \\
-    \hline
-  \end{tabular}}
-  \source{Prompt: email task, casual wording, agent system prompt, plain tool names, done tool, env block, date now; tokens are
-    approximate (characters / 4) and the tool block ranges over tasks and plain vs MCP names. Rates as on the slide before:
-    Qwen3.6-27B O-lens L40, one draw per prompt position; GLM-5.3 O-lens block 51, five draws per position.}
-\end{frame}
-
 \begin{frame}{“graded” in \olensname{} reads, chat vs agentic template}
   \begin{itemize}
     \item 863 cutoff\_qa questions to Qwen3.6-27B, each in the \cond{chattpl}{chat template} and in an
