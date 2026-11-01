@@ -21,7 +21,7 @@ from matplotlib.colors import to_hex, to_rgb
 from matplotlib.patches import Rectangle
 from matplotlib.ticker import PercentFormatter
 
-from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS, SNEEZE_RUN
+from cfbench.catalog import CF, CHIVE_AGAM_RUNS, CHIVE_RUN, CUTOFF_GRADER_MENTIONS_RUN, DRINK_RUN, MANDARIN_RUN, MENUS
 from cfbench.scoring import CONDS as CF_CONDS
 from cfbench.scoring import (
     ESSAY_LENSES,
@@ -40,6 +40,7 @@ from graphs import (
     chive_inline,
     cutoff_qa_investigators,
     data_filter_sankey,
+    great_sneeze,
     headline_ablations,
     headline_inline,
     headline_tokens,
@@ -492,40 +493,15 @@ def drink_drive() -> None:
     slide_save(fig, OUT / "drink_drive.pdf")
 
 
-# The Great Sneeze anecdote: CHIVE's Qwen3.5-397B incident prompt_003654 (adamkarvonen/chive-data), the rate of a sneeze-based
-# event in Vardania's history over 30 samples, the original conversation and each of CHIVE's edits; the edit labels paraphrase
-# Adam's experiment summaries. Not a condition, so a colour outside the conditions'.
-SNEEZE_EDITS = {
-    1: "coastal tropical, not landlocked",
-    2: "formerly in the Serbanian Empire",
-    3: "one turn, country + “make it absurd…”",
-    4: "fun fact: spice bazaars, not mountains",
-    5: "coastal + formerly in an empire",
-    6: "Landlocked: No, mountains kept",
-    7: "renamed Tuvalia, new culture",
-    8: "fun fact: landmarks, not mountains",
-    9: "independence + colony lines removed",
-    10: "landlocked, fun fact about beaches",
-    11: "one turn, no “absurd and funny and wacky”",
-    12: "“absurd and funny and wacky” removed",
-}
-SNEEZE_C = "#5b6c8f"
-
-
 @slide
 def sneeze() -> None:
     """Horizontal bars: share of Qwen3.5-397B's 30 samples with a sneeze-based event in Vardania's history (CHIVE's grader), the
     original conversation on top in ink, then each edit by rate, with 95% Wilson whiskers."""
-    path = Path("data") / SNEEZE_RUN
-    if not path.exists():
-        hf_hub_download(HF_REPO, str(SNEEZE_RUN), repo_type="dataset", local_dir="data")
-    r = next(r for r in map(json.loads, path.open()) if r["prompt_id"] == "prompt_003654")
-    edits = sorted(((SNEEZE_EDITS[e["exp"]], e["k"], e["n"]) for e in r["exps"]), key=lambda x: -x[1] / x[2])
-    rows = [("original conversation", r["k0"], r["n0"]), *edits]
+    rows = great_sneeze.rows()
     fig, ax = slide_figure(64, 44)
     for y, (_, k, n) in enumerate(rows):
         lo, hi = wilson(k, n)
-        ax.barh(y, k / n, 0.7, color=INK if y == 0 else SNEEZE_C, zorder=3)
+        ax.barh(y, k / n, 0.7, color=INK if y == 0 else great_sneeze.SNEEZE_C, zorder=3)
         ax.errorbar(k / n, y, xerr=[[k / n - lo], [hi - k / n]], color=MUTED, lw=0.9, capsize=2, capthick=0.9, zorder=4)
         ax.annotate(f"{k}/{n}", (hi, y), xytext=(2, 0), textcoords="offset points", va="center", fontsize=6.5 * SLIDE_S, color=INK)
     ax.set_yticks(range(len(rows)), [x[0] for x in rows])
