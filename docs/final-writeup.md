@@ -39,9 +39,9 @@ RULES FOR CLAUDE:
 
 We originally set out to test whether metamodels are useful in counterfactual investigations. We
 planned to replicate results from CHIVE ([Karvonen et al., 2026](https://arxiv.org/abs/2608.16747)),
-and tested whether 🔮-lenses (O-lens in the charts) help where NLAs and J-lenses did not.
+and tested whether 🔮-lenses help where NLAs and J-lenses did not.
 
-Contrary to our expectations, 🔮-lenses were unhelpful on counterfactuals in the CHIVE dataset. They
+Contrary to our expectations, 🔮-lens were unhelpful on counterfactuals in the CHIVE dataset. They
 were indistinguishable from a transcript-only baseline. We replaced the whole dataset with handbuilt
 environments to make the task easier and on-policy, but this did not change results.
 
@@ -60,7 +60,7 @@ NOT counterfactuals.[^hint]
 
 ## Claims, with credences (CTR, KTR)
 
-Current SOTA metamodels (J++, 🔮-lens, NLA) do not provide uplift of more than 3 points (AUROC
+Current SOTA metamodels (J++ lens, 🔮-lens, NLA) do not provide uplift of more than 3 points (AUROC
 or percentage points) on 'wild' counterfactual investigations (eg CHIVE, WeirdChat) or on 'agentic'
 counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260),
 [Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuation: 95%.
@@ -86,7 +86,7 @@ lab: this should be a straighforward experiment to run!
 ## Part 0: 🔮-lens Does Not Provide Uplift on 'Wild' or Agentic Counterfactuals
 
 First, because of misgivings about the CHIVE dataset, we built our own agentic environments to test
-counterfactual experiments. We then ablated everything we could think of. Nothing got the 🔮-lens to
+counterfactual experiments. We then ablated everything we could think of. Nothing got the O-lens to
 reliably beat a transcript-only baseline or its own placebo:
 
 - We swapped the predictor across seven models, from Haiku 5.5 to GPT-6 Astra, plus thinking-off and
@@ -97,8 +97,8 @@ reliably beat a transcript-only baseline or its own placebo:
 - We changed how reads reach the predictor: as an agentic tool, or pasted straight into its prompt.
 - We tried another tool, [Thought Anchors](https://arxiv.org/abs/2506.19143) (Bogdan et al., 2025),
   against its own placebo.
-- We tried other models' lenses: a DeepSeek V4 Flash 🔮-lens on alignment faking and a
-  GLM 5.3 🔮-lens on over-eagerness.
+- We tried other models' lenses: Camila's DeepSeek V4 Flash lens on alignment faking and Celeste's
+  GLM 5.3 lens on over-eagerness.
 - We iterated the predictor's harness through about a dozen versions.
 - We rescored everything with log skill, RMSE, and binary flip/no-flip at thresholds from 5 to 30pp.
 - The one thing we never ablated (which we regret) is which layers the lens reads.
@@ -325,13 +325,13 @@ Flash-Lite can't use the reads itself: every metamodel lowered its score and pla
 
 On 1,316 selected sentence deletions from 520 bloggers, we predict whether deleting a sentence
 substantially lowers Qwen's confidence in its answer about the author's age or sex. Text-only Haiku
-scores 0.797 AUROC, Haiku with 🔮-lens reads 0.803, and a standalone linear probe 0.784. The 🔮-lens
+scores 0.797 AUROC, Haiku with O-lens reads 0.803, and a standalone linear probe 0.784. The O-lens
 gain over text-only is not statistically significant; the standalone probe is also below text-only
 on this metric. The probe is supervised on this deletion task with bloggers held out, and its
 configuration was chosen during exploration of this dataset.
 
 > **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog authorship is not on canonical reads:
-> 🔮-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
+> O-lens at layers 32/40/48 only (not six), NLA at layer 42 only, and positions are the question's
 > and post's punctuation and newlines with no start-of-assistant-turn tail tokens. There is no
 > `menus_inline` run for this set. Decide: rerun the reads at the canonical positions and six
 > layers, or keep the chart with that caveat in the text.
@@ -349,12 +349,12 @@ This is a counterfactual task, so the investigator gives a probability rather th
 score it as AUROC, as we do blog authorship: % right at a 0.5 threshold on a 54% base rate rewards a
 shift in Haiku's bias as much as real information. AUROC is pooled over all 5,400 draws per
 condition (3 draws per case, each one prediction), the CIs resample the 204 micro-essays, and the
-stars are a one-sided paired bootstrap against transcript only. The 🔮-lens is the only lens that
+stars are a one-sided paired bootstrap against transcript only. The O-lens is the only lens that
 beats both transcript only (+0.022 [+0.011, +0.033]) and its placebo (+0.018 [+0.006, +0.031]); NLA
 and J++ are within noise of transcript only, and J++ beats its placebo only weakly. No investigator
 alone beats the no-investigator baseline: betting on regression to the mean, ranking cases by minus
 Qwen's observed grade, gets 0.776 (the dotted line). The "+ mean" bars add that grade to each
-investigator through an out-of-fold logistic regression; the 🔮-lens keeps a small edge over
+investigator through an out-of-fold logistic regression; the O-lens keeps a small edge over
 transcript + mean (+0.007 [+0.001, +0.014]). The probe, a ridge regression from the observed
 prompt's activations at the user turn's last token (nested 2 × 2 folds by essay), reaches 0.864,
 0.11 ahead of every investigator.
@@ -391,7 +391,7 @@ like a significant effect.
 
 Qwen is "wrong" on a micro-essay when it grades a top-half one (PERSUADE holistic score 4 to 6)
 below its own median grade, or a bottom-half one above it, which is 76 of the 204 micro-essays; the
-split changes little here, the 🔮-lens leading transcript only by about 0.02 AUROC on both halves.
+split changes little here, the O-lens leading transcript only by about 0.02 AUROC on both halves.
 
 > **🚧 TODO NON-CANONICAL DATA (Robbie, 2026-10-31).** Blog chart: same non-canonical reads as the
 > blog chart above (layers 32/40/48, no tail tokens). Essay chart above it is on canonical-style
@@ -401,7 +401,7 @@ split changes little here, the 🔮-lens leading transcript only by about 0.02 A
 <img src="img/headline-blog-correctness.png" alt="Blog sentence deletion AUROC on the 722 cases where Qwen is wrong about the author (transcript only 0.749, O-lens 0.766, placebo 0.746) and the 594 where it is right (0.849, 0.841, 0.831)" width="760">
 
 On the blog deletions Qwen is wrong about the author's age or sex on 722 of the 1,316 cases: there
-the 🔮-lens leads transcript only by 0.017 AUROC and its placebo by 0.020, while on the Qwen-right
+the O-lens leads transcript only by 0.017 AUROC and its placebo by 0.020, while on the Qwen-right
 cases it trails transcript only by 0.008. Both charts regenerate with
 `uv run python -m graphs.headline_ablations`.
 
@@ -423,12 +423,12 @@ SuperGPQA, so four sets, each weighted equally.
 For every lens we read the same positions: punctuation and newlines in the prompt, and the
 boilerplate at the start of the assistant turn. See image below:
 
-<img src="img/read-positions-diagram.png" alt="One MMLU-Pro prompt as Qwen sees it, each read token bold in brackets with an O-lens, NLA and J++ dot, question reads underlined in gold, tail reads in maroon, the last token boxed" width="450">
+<img src="img/read-positions-diagram.png" alt="One MMLU-Pro prompt as Qwen sees it, question reads in gold, tail reads in maroon, the last token boxed" width="450">
 
 We ablated this, testing whether the early or late reads were more important. We expected that
 reading the very last tokens before the reply would improve performance, especially for J++. In
 fact, the opposite is true: late tokens are more helpful for NLA and 🔮-lens, and less important for
-J++. This is makes us 'like' J++ more, and NLA and 🔮-lens less. J++ is reading Qwen's thoughts
+J++. This is makes us 'like' J++ lens more, and NLA and 🔮-lens less. J++ is reading Qwen's thoughts
 earlier, suggesting it is doing something workspace-like. NLA and 🔮-lens read thoughts later and
 can be accused of being next-token predictors.
 
@@ -551,27 +551,26 @@ Things that will not have receipts:
   [robbiethompson18/counterfactual-investigator-agent-with-olens](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens).
 - **Data and every run:** the HF dataset
   [Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens](https://huggingface.co/datasets/Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens):
-  🔮-lens banks, batch reads, run outputs.
+  O-lens banks, batch reads, run outputs.
 - **Transcripts:** public [Docent](https://docent.transluce.org) collections, one per env plus
   cfbench ([docent.md](docent.md)).
 - **Runs, judge calls and lens reads:**
   [expview](https://robbiethompson18.github.io/counterfactual-investigator-agent-with-olens/expview/).
-- **Token-level 🔮-lens reads:** [olens-viewer.pages.dev](https://olens-viewer.pages.dev).
+- **Token-level O-lens reads:** [olens-viewer.pages.dev](https://olens-viewer.pages.dev).
 - **CHIVE incidents with every draw:** [chive-cases.pages.dev](https://chive-cases.pages.dev).
 - **Every result and dead end:** [INDEX.md](INDEX.md) plus the active docs listed in the repo's
   `CLAUDE.md`.
 
 # Appendix:
 
-## The 🔮-lens Now Speaks English (DONE)
+## 🔮-lens Now Speak English (DONE)
 
-We investigated why so many 🔮-lens bullets lead with a Mandarin character and then become English.
-The canonical Qwen3.6-27B 🔮-lens Agam gave us stripped leading whitespace before feeding AV output
-back to AR. But many tokens' canonical form is _with_ leading whitespace, eg `␣need` instead of
-`need` (tokens are shown as in the figures: a space as `␣`, a newline as `↵`). The AR
+We investigated why so many o-lens bullets lead with a Mandarin character and then become English.
+The canonical o-lens Agam gave us stripped leading whitespace before feeding AV output back to AR.
+But many tokens' canonical form is _with_ leading whitespace, eg \_need instead of need. The AR
 especially hates having the space stripped when when the next character will be a space.
 
-Agam fixed this in RL, and the 🔮-lens speaks English again.
+Agam fixed this in RL, and the o-lens speaks English again.
 
 <img src="img/olens-mandarin.png" alt="O-lens Mandarin before vs after keeping the bullet's leading space" width="500">
 
@@ -622,7 +621,7 @@ behavior rate, higher is better; hatching means placebo.
 > stop-token positions, and the J-lens tool reads every token at layers 36-60. There is no
 > six-layer, same-positions rerun of these, and the `*_agentic` conditions are frozen (CLAUDE.md,
 > 2026-10-30). Decide: say so in the text here (and in "The one thing we never ablated" above, which
-> is about layers), or drop the 🔮-lens bars from these charts.
+> is about layers), or drop the O-lens bars from these charts.
 
 ### Null Results on Counterfactual Predictions
 
@@ -659,7 +658,7 @@ They read mostly transcripts instead of lookign at lenses:
 
 We tested whether our results were sensitive to investigator model, effort, and tool budget. These
 sweeps use four hand-picked cases, so most differences between lines are noise. No predictor
-reliably gains from the 🔮-lens: averaged over all seven, 🔮-lens minus transcript-only is +0.4pp
+reliably gains from the 🔮-lens: averaged over all seven, O-lens minus transcript-only is +0.4pp
 [−0.9, +1.7] on these cases.
 
 <img src="img/cfbench-report/models.png" alt="Predictor model by condition" width="400">
@@ -678,7 +677,7 @@ TODO @Kylie: write this up. The base arm adds a hint naming the correct letter a
 the counterfactual arm drops the hint, and the investigator either gives P(Qwen knew the answer) or
 names Qwen's no-hint letter. Material: the talk's "Hinted multiple choice" part, the
 `hint_qwen_dsv4*` evals (`cfbench/evals/CLAUDE.md`) and `docs/envs/hint_cf.md`. Caveat from the
-talk: these runs are not on canonical reads (🔮-lens at four layers, option newlines and end of
+talk: these runs are not on canonical reads (O-lens at four layers, option newlines and end of
 prompt only, Gemini 3.8 Flash at effort low).
 
 # TODO WITH MORE TIME:

@@ -57,7 +57,7 @@ def main(out: Path) -> None:
         ax.yaxis.set_major_formatter(lambda v, _: f"{v:g}%")
         ax.grid(axis="x", visible=False)
     fig.suptitle("O-lens Mandarin before vs after keeping the bullet's leading space", x=0.01, ha="left")
-    fig.text(0.01, 0.0, f"{len(reads):,} greedy reads, 3 WeirdChat transcripts × 5 layers. Qwen3.6-27B O-lens, before vs after Agam's fix.",
+    fig.text(0.01, 0.0, f"{len(reads):,} greedy reads, 3 WeirdChat transcripts × 5 layers. olens_s3d_rl600 vs olens_s3d_space_rl600.",
              fontsize=7.5, color=MUTED)  # fmt: skip
     fig.tight_layout(rect=(0, 0.04, 1, 1))
     out.parent.mkdir(parents=True, exist_ok=True)
