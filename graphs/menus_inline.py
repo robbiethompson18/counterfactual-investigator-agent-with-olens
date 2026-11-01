@@ -19,14 +19,16 @@ way, prompt only as the dashed line; the `prompt` and `all` menus have 3 draws p
 
 import argparse
 import json
-import random
 from collections import defaultdict
+from functools import cache
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from cfbench.catalog import CF as R
 from cfbench.catalog import MENUS as SETS  # set -> (title, runs)
+from cfbench.scoring import prediction_fields
 from graphs.style import BLUE, INK, MUTED, OLENS, bar_kw, ci_bar, color, departure
 
 LENSES = {"olens": OLENS, "nla": "NLA", "jlens": "J++"}
@@ -43,21 +45,33 @@ def runs(name: str) -> list[Path]:
     ]
 
 
+@cache
 def load() -> dict[str, dict[str, dict[str, float]]]:
     """set -> condition -> case -> share of its draws where Haiku named Qwen's answer, from every run of SETS that has finished."""
     draws: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))  # set -> condition -> case -> draw -> right
     for name in SETS:
         for run in runs(name):
-            for r in map(json.loads, (run / "predictions.jsonl").open()):
+            for r in prediction_fields(run):
                 draws[name][r["condition"]][r["item"]][r.get("draw", 0)] = float(bool(r.get("correct")))
     return {s: {c: {i: sum(v.values()) / len(v) for i, v in items.items()} for c, items in conds.items()} for s, conds in draws.items()}
 
 
+def boot_means(per_set: list[list[float]], seed: int = 0) -> tuple[float, np.ndarray]:
+    """Mean over sets of each set's mean, and BOOT resamples of it (cases resampled within every set), vectorised: a multinomial
+    count matrix per set times its values."""
+    rng = np.random.default_rng(seed)
+    boots = np.zeros(BOOT)
+    for d in per_set:
+        x = np.asarray(d, dtype=float)
+        boots += rng.multinomial(len(x), np.full(len(x), 1 / len(x)), size=BOOT) @ x / len(x)
+    return float(np.mean([np.mean(d) for d in per_set])), boots / len(per_set)
+
+
 def pooled_ci(per_set: list[list[float]], seed: int = 0) -> tuple[float, float, float]:
     """Mean over sets of each set's mean, CI from resampling cases within every set."""
-    rng = random.Random(seed)
-    boots = sorted(sum(sum(rng.choices(d, k=len(d))) / len(d) for d in per_set) / len(per_set) for _ in range(BOOT))
-    return sum(sum(d) / len(d) for d in per_set) / len(per_set), boots[int(0.025 * BOOT)], boots[int(0.975 * BOOT)]
+    mean, boots = boot_means(per_set, seed)
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    return mean, float(lo), float(hi)
 
 
 def pooled(acc: dict, c: str) -> tuple[float, float, float] | None:
@@ -72,10 +86,10 @@ def paired(acc: dict, a: str, b: str, seed: int = 0) -> tuple[float, float, floa
     """Condition a minus b in pp on the cases both have: mean over sets (each weighted equally), 95% CI and two-sided p from
     resampling cases within every set."""
     per_set = [[100 * (acc[s][a][k] - acc[s][b][k]) for k in sorted(acc[s][a].keys() & acc[s][b].keys())] for s in SETS]
-    rng = random.Random(seed)
-    boots = sorted(sum(sum(rng.choices(d, k=len(d))) / len(d) for d in per_set) / len(per_set) for _ in range(BOOT))
-    p = min(1.0, 2 * min(sum(x <= 0 for x in boots), sum(x >= 0 for x in boots)) / BOOT)
-    return sum(sum(d) / len(d) for d in per_set) / len(per_set), boots[int(0.025 * BOOT)], boots[int(0.975 * BOOT)], p
+    mean, boots = boot_means(per_set, seed)
+    p = min(1.0, 2 * min(float((boots <= 0).sum()), float((boots >= 0).sum())) / BOOT)
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    return mean, float(lo), float(hi), p
 
 
 def position_diff(acc: dict, out: Path) -> None:
