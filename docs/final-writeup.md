@@ -45,14 +45,17 @@ counterfactuals (eg [Palisade one](https://arxiv.org/abs/2509.14260),
 [Aditya ones](https://github.com/gkroiz/agent-interp-envs)) under any harness configuration: 95%.
 
 SOTA metamodels do provide uplift on two of the simple prediction tasks we detail below (Multiple
-Choice, Idiosyncratic Preferences): 95%. They provide uplift on Knowledge Cutoff over an
+Choice, Idiosyncratic Preferences): 80%. They provide uplift on Knowledge Cutoff over an
 investigator that shares the subject's knowledge cutoff, or is told it: 50%.[^KCspecial] They are
-worse than linear probes (where such probes are practicable): 95%.
+worse than linear probes (where such probes are practicable): 90%.
 
 [^KCspecial]:
     Our Knowledge Cutoff uplift is a knowledge mismatch, not lens signal: Haiku answers the question
     from its own, later knowledge, and the reads pull it back to Qwen's stale answer, which an
     investigator with Qwen's cutoff gives without any lens. See that section.
+
+Filtering to Qwen being wrong or mistaken, metamodels provide uplift in more tasks than the above
+two, e.g. Hinted MCQ and Knowledge Cutoff: 90%.
 
 SOTA metamodels would provide uplift on 'wild' counterfactuals if the investigator and subject model
 was GPT Astra 6, Claude Mythos 5.1, or Gemini Carbon: 30%.
@@ -140,14 +143,16 @@ their dataset:
 ### Headline
 
 Metamodels work convincingly on two tasks, Multiple Choice and Idiosyncratic Preferences. On
-Knowledge Cutoff the uplift over prompt only is within noise, and its gain on stale items comes
-from Haiku's later knowledge cutoff (see that section). Pooled over the three, the 🔮-lens and NLA
-are about equally good (+3.0 and +2.6pp over prompt only), and J++ doesn't help overall
-(−1.6pp). The next few charts show pooled correctness over all three tasks. Our investigator is
-always Haiku 5.5 on medium effort.
+Knowledge Cutoff the uplift over prompt only is within noise, and its gain on stale items comes from
+Haiku's later knowledge cutoff (see that section). Pooled over the three, the 🔮-lens and NLA are
+about equally good (+3.0 and +2.6pp over prompt only), and J++ doesn't help overall (−1.6pp). The
+next few charts show pooled correctness over all three tasks. Our investigator is always Haiku 5.5
+on medium effort.
 
 We mistakenly believed previously that Knowledge Cutoff was statistically significant, which is why
-'canonical datasets' always includes it. With more time we would likely change this.
+'canonical datasets' always includes it. When we used a different prompt telling Haiku that answers
+"may or may not be correct," the effect disappeared. With more time I would go back and fixed our
+aggregated charts.
 
 <img src="img/headline-metamodels.png" alt="Pooled over the three tasks: prompt only 80.9%, 🔮-lens 83.9%, J++ 79.3%, NLA 83.5%" width="500">
 
