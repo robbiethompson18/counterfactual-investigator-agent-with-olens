@@ -47,6 +47,11 @@ CUTOFF_FLASHLITE = CF / "2026-10-31_menus-cutoff-flashlite-transcript"  # Flash-
 
 # ---- the write-up's other parts (cfbench.scoring) ----
 
+# Hinted MCQ, hint first (graphs.hinted_mcq_haiku): the Evals-page evals the grid chart reads (Gemini 3.8 Flash at effort low)
+# and the rerun of the same cases with the default investigator, Haiku 5.5 at medium, 3 draws (2026-11-01)
+HINT_FLASH_EVALS = {"knew": "hint_qwen_dsv4_before_tail_inline", "letter": "hint_qwen_dsv4_before_letter_tail_inline"}
+HINT_HAIKU_RUNS = {"knew": CF / "2026-11-01_hint-dsv4-before-haiku", "letter": CF / "2026-11-01_hint-dsv4-before-letter-haiku"}
+
 STANDARD_PROBE_RUN = "runs/standard_probes/2026-10-31_nested2-v1"
 ESSAY_LENS_RUNS = ("2026-10-31_essay-cf-b-ts", "2026-10-31_essay-cf-b-olens2", "2026-10-31_essay-cf-b-nla4", "2026-10-31_essay-cf-b-jlens")
 ESSAY_INPUTS = Path("data/runs/cfbench_evals/2026-10-30_essay-grading-inline-inputs/cases.jsonl")

@@ -283,10 +283,12 @@ hint-first prompts gets most of that back (0.851, 64.1%).
 This is the one dataset in this part that is not on our default reads or investigator (the chart's
 footer says how): the 🔮-lens at four layers, at the option newlines and the end of the prompt only,
 and Gemini 3.8 Flash at effort low rather than Haiku 5.5 at medium. Rerunning the hint-first cases
-with Haiku 5.5 at medium, three draws, loses nearly all of the gain: AUROC 0.554 for the 🔮-lens
-against 0.537 for transcript only and 0.543 for its placebo, and every condition at the 50% baseline
-on the letter task. The clear win above is Flash's; with our default investigator, Hinted MCQ is a
-small effect at best.
+with Haiku 5.5 at medium, three draws, loses nearly all of the gain: on "did Qwen know it?" the
+🔮-lens ends up barely above transcript only and level with its own placebo, and on the letter task
+every condition sits at the 50% baseline. The clear win above is Flash's; with our default
+investigator, Hinted MCQ is a small effect at best.
+
+<img src="img/hinted-mcq-haiku.png" alt="Hinted MCQ, hint-first cases, Gemini 3.8 Flash at effort low beside Haiku 5.5 at effort medium. AUROC of P(knew): Flash transcript only 0.615, 🔮-lens 0.688, placebo 0.543; Haiku 0.537, 0.554, 0.543. Which letter without the hint, % correct: Flash 52.3, 53.9, 47.6; Haiku 50.5, 50.2, 50.7; always the hinted letter 50%" width="760">
 
 ### Essay Grading
 

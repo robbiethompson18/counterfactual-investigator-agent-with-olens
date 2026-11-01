@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 from scipy.stats import binom
 
-from cfbench.catalog import AUTHOR_PROBE_RUN, AUTHOR_RUNS, ESSAY_LENS_RUNS, STANDARD_PROBE_RUN
+from cfbench.catalog import AUTHOR_PROBE_RUN, AUTHOR_RUNS, ESSAY_LENS_RUNS, HINT_HAIKU_RUNS, STANDARD_PROBE_RUN
 from cfbench.core import P_MAX, P_MIN, canon_condition
 
 PREDICTOR = "google/gemini-3.8-flash"
@@ -423,6 +423,11 @@ def auroc_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
                     k = (g["env"], d["item"])
                     p.setdefault(c, {}).setdefault(k, []).append(d["p"])
                     truth[k] = g["k_cf"]
+    return _auroc_bars(p, truth, reps)
+
+
+def _auroc_bars(p: dict[str, dict[tuple, list[float]]], truth: dict[tuple, int], reps: int) -> tuple[dict, float, int]:
+    """auroc_bars from condition -> case -> draws' p and case -> truth."""
     keys = sorted(truth)
     y = np.array([truth[k] for k in keys])
     rng = np.random.default_rng(0)
@@ -451,6 +456,11 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
                 for c, ds in it["draws"].items():
                     I.setdefault(c, []).extend(float(d["correct"]) for d in ds)
                 letters |= {a for a in [it["truth"], *it.get("answers_base", {}), *it.get("answers_cf", {})] if a != "null"}
+    return _answer_bars(items, letters, reps)
+
+
+def _answer_bars(items: dict[tuple, dict[str, list[float]]], letters: set[str], reps: int) -> tuple[dict, float, int]:
+    """answer_bars from item -> condition -> draws' correctness and the letters seen (for the chance line)."""
     per = {c: {k: sum(I[c]) / len(I[c]) for k, I in items.items() if I.get(c)} for c in {c for I in items.values() for c in I}}
     rng = np.random.default_rng(0)
     bars = {}
@@ -463,6 +473,25 @@ def answer_bars(name: str, reps: int = 2000) -> tuple[dict, float, int]:
         bars[c] = (x.mean(), np.quantile(boot, [0.025, 0.975]).tolist(), stars(p))
     chance = 1 / (max(ord(a) for a in letters) - 64)
     return bars, chance, len(items)
+
+
+def hint_haiku_bars(reps: int = 2000) -> dict[str, tuple[dict, float, int]]:
+    """The hint-first cases rerun with Haiku 5.5 at medium, 3 draws (cfbench.catalog HINT_HAIKU_RUNS), from the runs'
+    predictions.jsonl, scored as auroc_bars ("knew") and answer_bars ("letter") score the Evals-page evals."""
+    p: dict[str, dict[tuple, list[float]]] = {}
+    truth: dict[tuple, int] = {}
+    for r in map(json.loads, HINT_HAIKU_RUNS["knew"].joinpath("predictions.jsonl").open()):
+        if r["valid"] and r["p"] is not None:
+            k = (r["source"], r["item"])
+            p.setdefault(r["condition"], {}).setdefault(k, []).append(float(r["p"]))
+            truth[k] = int(r["k_cf"])
+    items: dict[tuple, dict[str, list[float]]] = {}
+    letters: set[str] = set()
+    for r in map(json.loads, HINT_HAIKU_RUNS["letter"].joinpath("predictions.jsonl").open()):
+        if r["valid"]:
+            items.setdefault((r["source"], r["item"]), {}).setdefault(r["condition"], []).append(float(r["correct"]))
+            letters |= {r["gold"], *r["answers_cf"]}
+    return {"knew": _auroc_bars(p, truth, reps), "letter": _answer_bars(items, letters, reps)}
 
 
 # Essay grading (cfbench/evals/essay_grading_cf_inline): the investigator's draws from the runs' predictions (data/runs/cfbench/,
