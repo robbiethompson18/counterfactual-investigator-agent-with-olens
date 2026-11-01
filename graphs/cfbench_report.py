@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import re
+import textwrap
 from collections import Counter, defaultdict
 
 import matplotlib.pyplot as plt
@@ -115,8 +116,11 @@ def chart_subset(cases, title: str, note: str, fname: str, out) -> dict:
     ax.set_ylim(0, 118)
     ax.legend(frameon=False, fontsize=7.5, loc="upper left", ncol=3)
     fig.suptitle(title, x=0.12, y=0.975, ha="left", fontsize=10.5, color=INK)
-    ax.set_title(note, color=MUTED)
-    fig.subplots_adjust(left=0.12, right=0.98, top=0.89, bottom=0.08)
+    # the note wraps to the axes' width (0.86 of the figure) and the axes drop by each extra line so it clears the suptitle
+    size = plt.rcParams["axes.titlesize"]
+    lines = textwrap.wrap(note, width=int(0.86 * fig.get_figwidth() * 72 / (0.5 * size)), break_on_hyphens=False)
+    ax.set_title("\n".join(lines), color=MUTED)
+    fig.subplots_adjust(left=0.12, right=0.98, top=0.89 - 1.2 * size * (len(lines) - 1) / 72 / fig.get_figheight(), bottom=0.08)
     departure(fig, DEPARTURE)
     fig.savefig(f"{out}/{fname}")
     plt.close(fig)
