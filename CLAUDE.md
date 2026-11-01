@@ -310,6 +310,8 @@ Active docs:
 - [ACTIVE: Environment construction goals — read before building or iterating on any multi-arm behavioral env (reward hacking, self-preservation, hiring bias, ...)](docs/environment-construction-goals.md)
   — symmetric arms, any lever
 - [ACTIVE: Docent — read before linking, filtering or uploading env/cfbench transcripts](docs/docent.md)
+- [ACTIVE: Naming and style — read before writing or editing prose, headers, chart labels or slides](docs/naming-and-style.md)
+  — canonical task, tool and role names, prompt only vs transcript only, hyphens, Title Case
 - [ACTIVE: graphs — read before making, regenerating or moving any chart](graphs/CLAUDE.md) —
   `python -m graphs.<module>` → `docs/img/`
 - [ACTIVE: slides — read before making a talk or slide deck, or a figure for one](slides/CLAUDE.md)
