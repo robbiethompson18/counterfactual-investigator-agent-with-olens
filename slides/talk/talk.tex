@@ -489,12 +489,12 @@
 \begin{frame}{Results: “did Qwen know it?” and “which letter without the hint?”}
   \todo{Hinted MCQ is not on canonical reads: O-lens at layers 32/40/48/52 only (not six), positions are the option newlines
     and the end of the prompt only (no prompt punctuation), investigator Gemini 3.8 Flash at effort low, not Haiku 5.5 at
-    medium. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
+    medium; the placebo is another question of the same eval with the same option count, not the same subject. There is no menus\_inline run for hints (hints are out of the write-up, 2026-10-29). Decide: drop this part, or
     keep it with this caveat on the slide.}
   \slidefig{fig/grid.pdf}
   \source{Top: AUROC of P(knew), 95\% case bootstrap, stars: one-sided paired bootstrap vs transcript-only. Bottom: \% correct,
     95\% item bootstrap, stars: one-sided paired sign test vs transcript-only; dotted: always the hinted letter (chance is 10\%).
-    * p < .05, ** < .01, *** < .001. Placebo: another question's reads in the same positions; tuned probe: the probe refit on hint-first prompts (out-of-fold).}
+    * p < .05, ** < .01, *** < .001. Placebo: another question's reads from the same eval (not subject-matched, non-canonical); tuned probe: the probe refit on hint-first prompts (out-of-fold).}
 \end{frame}
 \section{Anecdata}
 
