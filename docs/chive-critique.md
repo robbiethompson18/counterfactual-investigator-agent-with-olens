@@ -113,6 +113,41 @@ Fisher's exact test, and adaptive sampling when the baseline is under about 20%.
 the interval excludes a large effect, not "not significant"; at n = 30 the 15pp negatives are weaker
 than the positives under any rule.
 
+**How much Fisher's exact test would add** (`python -m chive_critique adam`, §2 Fisher). Adam's
+reply to this critique was that the rule only lowers yield and that other metrics didn't raise the
+yield of "experiments that are X% likely to not be random sampling noise" much. Ranking 30-vs-30
+tables by Fisher p and cutting at a Benjamini-Hochberg q (within each run) selects on exactly that
+quantity. The 50pp rule is far stricter than it needs to be: its weakest positive (23/30 → 8/30) has
+p = 0.0002, the median 3e-9. Positives over all 74,546 experiments in 5,171 investigations:
+
+| Rule                               | Experiments | vs ≥ 50pp | Investigations with one |
+| ---------------------------------- | ----------- | --------- | ----------------------- |
+| ≥ 50pp (CHIVE)                     | 27,999      | 1.00×     | 4,209 (81%)             |
+| Fisher p ≤ 0.0002 (same p as 50pp) | 32,911      | 1.18×     | 4,620 (+10%)            |
+| Fisher p < 0.001                   | 37,828      | 1.35×     | 4,938 (+17%)            |
+| BH q < 0.01                        | 43,139      | 1.54×     | 5,115 (+22%)            |
+| BH q < 0.05                        | 48,308      | 1.73×     | 5,161 (+23%)            |
+
+- "Same p as 50pp" is the loosest Fisher cutoff that accepts nothing noisier than the noisiest ≥
+  50pp positive, so it contains every one of them. It also matches on average: under the null
+  (Fisher's hypergeometric, conditional on each table's total), times the 0.35 null share, the 50pp
+  rule expects 1.4 false positives in 27,999 (FDR 5e-5) and p ≤ 0.0002 expects 2.0 in 32,911 (6e-5).
+- The 20,309 experiments that q < 0.05 adds are all in the 15–50pp band, median move 37pp; 8,453
+  take the behaviour to 0/30. Correcting for multiple tests costs little because most experiments
+  move the rate: Storey's estimate of the null share is 0.35.
+- Investigations are capped: 81% already have a ≥ 50pp experiment, so at most +23% more scenarios.
+  The experiment counts overstate claim-bank growth, since the bank keeps a filtered subset of each
+  investigation's experiments.
+- **The negatives get worse, not better.** Of the 17,306 ≤ 15pp "inert" experiments, a TOST
+  equivalence test (90% interval of the difference inside ±15pp) supports 4,329 (25%); inside ±25pp,
+  11,036 (64%). A rule that is rigorous on both sides gives about 1.7× positives and 0.25×
+  negatives, so a balanced eval set could shrink unless the nulls get more samples.
+- **Possible winner's curse.** Baselines look screened: investigations with k0 = 0–12/30 number 54,
+  12, 7, 8, 13, 18, 32, 53, 88, 241, 264, 270, 235, a cliff at 9/30. If the 30 baseline samples are
+  (or correlate with) the screening draw, baselines near the cutoff are biased up, and every edit in
+  that investigation shares the inflated baseline. That inflates the 10–50% → 0 kills most. Neither
+  rule corrects for it; a fresh baseline does.
+
 ## 3. Contradictory ground truth: one investigation in eight
 
 Each incident's ground truth lists 1–3 supported causes (the investigator's prose, first person,

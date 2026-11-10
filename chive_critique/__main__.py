@@ -20,6 +20,8 @@ if what in ("all", "adam"):
     adam.offpolicy()
     print("\n## §2 The 50pp / 15pp rule")
     adam.thresholds()
+    print("\n## §2 Fisher's exact test instead")
+    adam.significance()
     print("\n## §3 Contradictory ground truth (sampled)")
     adam.contradictions()
     print("\n## §4 Behaviours that are mistakes")
