@@ -112,6 +112,18 @@ def prompt_sha(prompt: str, tools: dict[str, Tool] | None, effort: str, task: st
     """A short hash of what `predict` sends first (messages, tool schemas, effort): cfbench.eval --reuse only copies a row
     whose stored hash equals the one this run would send. Tool replies (transcripts, lens reads) aren't in it."""
     messages, schemas = opening(prompt, tools, task, system)
+    return _sha(messages, schemas, effort)
+
+
+def recorded_prompt_sha(row: dict) -> str | None:
+    """A row's prompt_sha, or for a row written before rows stored it (2026-10-31, #483) the same hash over the opening
+    messages, tool schemas and effort the row records; None when it records none of those."""
+    if row.get("prompt_sha") or not all(k in row for k in ("messages", "tools", "effort")):
+        return row.get("prompt_sha")
+    return _sha(row["messages"][:2], row["tools"], row["effort"])
+
+
+def _sha(messages: list, schemas: list, effort: str) -> str:
     return hashlib.sha256(json.dumps([messages, schemas, effort], sort_keys=True).encode()).hexdigest()[:16]
 
 
