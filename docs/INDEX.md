@@ -214,6 +214,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   — receiver heads + attention suppression on Qwen3.6's hybrid stack (DeltaNet hooks, leak test),
   the `anchors` cfbench condition (removed 2026-10-26); null vs placebo on hidden_goal (38 cases,
   log skill v1), why
+- [NULL: Decapitated-network unroll — read before generating text from a truncated Qwen with the J++ lens as its head, or trying another training-free multi-token lens on WorkspaceBench](wsb-decap-unroll.md)
+  — 1-8% on the six regex-scored multi-token families vs 🔮-lens 42-90% and prompt only 42-69%; only
+  the L60 cut says anything, and it names neighbouring concepts instead of spelling the answer
 - [NULL: WSB association examples — read before running the O-lens on WorkspaceBench association families](wsb-association-examples.md)
   — 9 unjudged items, s3d.ddp600 readouts on HF, what they say, pod/pip gotchas
 - [NULL: evalcue config logs — read before retrying an eval cue on humaneval_prefill, matonski_grader, repo_impossible or secret_number](evalcue-secret-number-log.md)

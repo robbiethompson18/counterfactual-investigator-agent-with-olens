@@ -23,6 +23,8 @@ from transformers import AutoTokenizer  # ty: ignore[unresolved-import]  (PEP 72
 REPO = "Robbie-Kylie-NN-sprint/counterfactual-investigator-agent-with-olens"  # runs.REPO (this script can't import the package)
 WSB = Path("vendor/workspace-bench")
 OUT = Path("data/banks/wsb")
+# the six multi-token families, scored by regex (wsb/mt_regex.py)
+MT_FAMILIES = ("basic_readout_mt", "multihop_mt", "multilingual_mt", "typo_mt", "multilingual_multihop", "multilingual_typo")
 NOTES = {
     "user_modeling": "100 items copied verbatim (family, gate, read, items). Originally Transluce's SelfDescribe / "
     "SynthSysPre rows (Choi et al. 2025).",
@@ -42,6 +44,11 @@ NOTES = {
     "moral_rationale": "200 items copied verbatim (166 committed + 34 deliberative, in-house). Added per item: `prefix`, the "
     "whole Qwen3.6-27B chat render of `stimulus` (thinking off, generation prompt), `token`, its last token, and "
     "`read_positions`, the last 5 positions (their read plan: `last_n` 5 over the `chat` render).",
+    **{
+        family: "Copied verbatim (header with the regex `contract`, items with `units` and the `probe_token_lens` token counts "
+        "wsb/mt_regex.py scores with). Plain-text prompts read at their final token."
+        for family in MT_FAMILIES
+    },
 }
 
 

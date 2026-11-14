@@ -85,5 +85,20 @@ the lists match theirs item for item. Results in
 uv run python -m wsb.moral_rationale --n 3   # all 200 items x 3 draws, ~10 min
 ```
 
+`decap.py` is the one lens arm here, and the one module scored with no judge: the
+decapitated-network unroll (Qwen3.6-27B cut after block L with the J++ lens as its head, writing 32
+tokens; `scripts/decap_unroll.py`, HF transformers on a pod) on the six multi-token families
+(`basic_readout_mt`, `multihop_mt`, `multilingual_mt`, `typo_mt`, `multilingual_multihop`,
+`multilingual_typo`), scored by `mt_regex.py`, their regex contract copied verbatim (same AST as
+`src/wsbench/multitoken/regex.py`). `score` prints the table beside the published O-lens rows and
+the frozen prompt-only floors, and syncs the run. Results in
+[docs/wsb-decap-unroll.md](../docs/wsb-decap-unroll.md).
+
+```bash
+uv run python -m wsb.decap requests --slug jpp-unroll   # run dir + requests.jsonl (598 prompts)
+# on a pod: python3 decap_unroll.py requests.jsonl readouts.jsonl   (~20 min on one H200), copy readouts.jsonl back
+uv run python -m wsb.decap score data/runs/wsb_decap_unroll/<run>
+```
+
 `user_modeling`, `jailbreak_recognition`, `basic_readout`, `knowledge_cutoff`, `wrong_bridge` and
 `moral_rationale` so far.
