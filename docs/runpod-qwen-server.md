@@ -1,8 +1,11 @@
 # The shared Qwen3.6-27B server and RunPod pods: how it works
 
-**Status (2026-10-26):** ACTIVE. The recipe `runpod/qwen_server.sh up` uses, its measurements and
-gotchas, the volumes' S3 access, and the generic `pod.sh` gotchas. The rules an agent must follow
-are in [runpod/CLAUDE.md](../runpod/CLAUDE.md); this is the reference behind them.
+**Status (2026-11-15):** MIXED. Both network volumes named below (`wwwce2mejb`, `cdde9ia5iu`) were
+deleted on 2026-11-15 ([runpod-volumes-retired.md](runpod-volumes-retired.md)), so
+`runpod/qwen_server.sh up` fails until a new volume is created and its id passed as `VOLUMES=`, and
+the S3 section's buckets are gone. The boot recipe, measurements and gotchas still hold. The rules
+an agent must follow are in [runpod/CLAUDE.md](../runpod/CLAUDE.md); this is the reference behind
+them.
 
 ## How `qwen_server.sh up` boots in ~3 minutes
 
