@@ -22,11 +22,16 @@ Elhoushi et al., 2024) and DecoderLens (Langedijk et al., 2023, encoder-decoder 
 - **Cut layers:** their grid, L20 to L60 in steps of 4. An item passes if any layer passes.
 - **Decodes, 32 tokens each:** greedy; greedy with every generated token banned from repeating; one
   sample at T 1, top-k 64, top-p 0.95 (WorkspaceBench's sampling).
-- **Scorer:** their regex contract, copied verbatim (`wsb/mt_regex.py`). No judge call. A form must
-  be found whole in one readout, and only forms that are more than one Qwen token count.
+- **Scorer:** their regex contract (`src/wsbench/multitoken/regex.py`), copied verbatim. No judge
+  call. A form must be found whole in one readout, and only forms that are more than one Qwen token
+  count.
 - **Control:** nothing cut, i.e. Qwen itself continuing the prompt for 32 tokens, greedy.
-- **Code:** `scripts/decap_unroll.py` (pod, HF transformers), `wsb/decap.py` (requests, scoring).
-  Run `wsb_decap_unroll/2026-11-14_jpp-unroll`, 28 min on one H200, $2.23.
+- **Code:** `scripts/decap_unroll.py` is the producer (pod, HF transformers) and is all we kept. The
+  scorer port (`wsb/mt_regex.py`), the requests and scoring module (`wsb/decap.py`) and the bank
+  builder's six multi-token families are at commit
+  [`aac1504c`](https://github.com/robbiethompson18/counterfactual-investigator-agent-with-olens/commit/aac1504c1c917ce51d40eb7279660657ed88ccbf),
+  PR #635's first commit. The six banks are on HF under `banks/wsb/`.
+- **Run:** `wsb_decap_unroll/2026-11-14_jpp-unroll`, 28 min on one H200, $2.23.
 
 ## Result
 
