@@ -136,6 +136,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
 - [REFERENCE: cutoff_qa grader mentions — read before claiming O-lens reads show grader / eval awareness from a tool-call template](cutoff-grader-mentions.md)
   — reads at the instruction's "best guess." say "graded" 2.4% (chat) vs 19.2% (submit_answer tool);
   14% vs 73% of items; regex, no judge
+- [REFERENCE: RunPod volumes retired — read before creating a network volume, or looking for a read, checkpoint or log that used to be on one](runpod-volumes-retired.md)
+  — all three deleted 2026-11-15; inventory, what was archived to HF `volume_archive/2026-11-15/`,
+  and what belongs on a volume next time (caches, never outputs)
 
 ## MIXED
 
@@ -200,6 +203,9 @@ tag's section; when a doc's tag changes to or from ACTIVE, move its entry betwee
   hint: only "hint after the instruction + pre-hint reads only" beats placebo (+13pp on the 50 items
   that found it, +6pp [+1, +11] p = 0.02 on 142 fresh ones, via a lower placebo baseline, not a
   better lens; dropped for Kylie's inline evals)
+- [MIXED: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](runpod-qwen-server.md)
+  — the boot recipe and gotchas still hold; the two volumes it names were deleted 2026-11-15, so
+  `up` needs a new volume and one first boot ([runpod-volumes-retired.md](runpod-volumes-retired.md))
 
 ## NULL
 

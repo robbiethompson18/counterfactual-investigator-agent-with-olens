@@ -371,8 +371,6 @@ Active docs:
 - [ACTIVE: NLA reader — read before getting NLA readouts of transcripts, scoring them with the NLA critic, or choosing between the Qwen3.6-27B NLAs](docs/nla-reader.md)
   — `--readout nla`, critic via `nla_score.py`
 - [ACTIVE: knowledge_cutoff env + investigator eval — read before running Qwen, another model or an investigator on post-cutoff factual questions, or picking an investigator for a cutoff task](docs/envs/knowledge_cutoff.md)
-- [ACTIVE: Shared Qwen server and RunPod pods, how it works — read when a pod or the shared server misbehaves, or before changing the boot recipe](docs/runpod-qwen-server.md)
-
 ## Shipping
 
 Every change reaches `main` through a pull request that a human (Robbie or Kylie) has reviewed.
