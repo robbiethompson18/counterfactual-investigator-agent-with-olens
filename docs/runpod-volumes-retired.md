@@ -70,7 +70,7 @@ already local.
 
 The rest was split in two:
 
-- **Archived:** 543 files, 3.6 GB, at `volume_archive/2026-11-15/<volume>/<original path>` in the HF
+- **Archived:** 543 files, 3.8 GB, at `volume_archive/2026-11-15/<volume>/<original path>` in the HF
   dataset. That is every non-tensor file that failed the test, and every file under 1 MB whatever
   its size matched: read shards with their requests, transcripts, provenance, logs and job scripts,
   `results/`, the `olens_rl/` adapters (`adapters/current` of all four runs, `grpo1` steps 25 to
